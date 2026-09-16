@@ -46,6 +46,9 @@
   import-free `components/` leaf directory), which is why it lives here.
 -->
 <script>
+  import ManagerButton from '../../components/ManagerButton.svelte';
+  import InspectorCard from '../../components/InspectorCard.svelte';
+
   const DEFAULT_LINK_ICON = 'fas fa-arrow-up-right-from-square';
 
   let { icon = '', title = '', items = [], links = [], dataAttr = '', dataValue = '' } = $props();
@@ -59,7 +62,7 @@
   );
 </script>
 
-<section class="manager-inspector-card manager-explainer-card" {...hookAttributes}>
+<InspectorCard class="manager-explainer-card" {...hookAttributes}>
   <h3 class="manager-card-title manager-explainer-card-title">
     {#if icon}
       <i class={icon} aria-hidden="true"></i>
@@ -112,30 +115,33 @@
   {#if docsLinks.length > 0}
     <div class="manager-setup-links">
       {#each docsLinks as link (link.href)}
-        <a
-          class="manager-button is-ghost manager-explainer-card-docs"
+        <ManagerButton
+          role="ghost"
+          tag="a"
+          class="manager-explainer-card-docs"
           href={link.href}
           target="_blank"
-          rel="noreferrer"
         >
           <i class={link.icon || DEFAULT_LINK_ICON} aria-hidden="true"></i>
           <span>{link.label}</span>
-        </a>
+        </ManagerButton>
       {/each}
     </div>
   {/if}
-</section>
+</InspectorCard>
 
 <style>
-  /* Theme-root tokens ONLY. This component is area-agnostic, so it must not reference
-     `--fab-mv2-*` or any other alias declared on `.fabricate-manager` (styles/fabricate.css
-     declares those inside that area block). Outside the manager — `.fabricate-app`,
-     `.fabricate-admin`, `.fabricate-interactables-manager` — such a property is not in
-     scope, the declaration becomes invalid at computed-value time and the colour silently
-     falls back to inheritance. Nothing fails; it just looks wrong, and the trigger is
-     exactly the reuse this primitive exists to enable. Every token below is declared in
-     `:root` or in all seven `.fabricate[data-fabricate-theme="…"]` blocks, which every
-     Fabricate surface carries. */
+  /* Theme-root tokens ONLY. NO scoped `<style>` may reference `--fab-manager-*`, or any other
+     custom property `styles/fabricate.css` declares inside `.fabricate-manager`, from ANY
+     directory — a component is placed in a directory, not in a DOM subtree, so its scoped CSS
+     cannot guarantee where its host renders, and `tests/token-generation-gate.test.js` reds the
+     reference wherever it is written. Outside the manager —
+     `.fabricate-app`, `.fabricate-admin`, `.fabricate-interactables-manager` — such a
+     property is not in scope, the declaration becomes invalid at computed-value time and
+     the colour silently falls back to inheritance. Nothing fails; it just looks wrong, and
+     the trigger is exactly the reuse this primitive exists to enable. Every token below is
+     declared in `:root` or in all seven `.fabricate[data-fabricate-theme="…"]` blocks,
+     which every Fabricate surface carries. */
 
   /* The title's SCALE, WEIGHT, COLOUR and FAMILY come from `.manager-card-title` in the
      global sheet — the manager's one card-title contract. This rule adds only the glyph

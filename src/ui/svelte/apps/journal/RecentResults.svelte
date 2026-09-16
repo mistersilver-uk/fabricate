@@ -4,12 +4,16 @@
   `recentTerminalRuns` (top few terminal runs), NOT the selected run's results.
   It is a quick glance at the most recent outcomes plus a "View full history"
   button that jumps the left History column to its first page. Each row shows the
-  run name, a status pill, and an "×N" badge when the run produced more than one
+  run name, a status chip, and an "×N" badge when the run produced more than one
   result. Card chrome comes from the shared JournalCard.
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
-  import RunStatusPill from './RunStatusPill.svelte';
+  import { statusChipTone } from '../../util/statusChipTone.js';
+  import Chip from '../../components/Chip.svelte';
+  import Medallion from '../../components/Medallion.svelte';
+  import EmptyState from '../manager/EmptyState.svelte';
+  import { runStatusPresentation } from './journalRunStatus.js';
   import JournalCard from './JournalCard.svelte';
 
   const DEFAULT_RUN_IMAGE = 'icons/svg/item-bag.svg';
@@ -26,12 +30,14 @@
 
 <JournalCard kind="recent" title={localize('FABRICATE.App.Journal.RecentResults.Title')}>
   {#if runs.length === 0}
-    <p class="journal-recent-empty">{localize('FABRICATE.App.Journal.RecentResults.Empty')}</p>
+    <EmptyState note hint={localize('FABRICATE.App.Journal.RecentResults.Empty')} />
   {:else}
     <ul class="journal-recent-list">
       {#each runs as run (run.id)}
+        {@const status = String(run.derivedStatus ?? '')}
+        {@const runStatus = runStatusPresentation(status)}
         <li class="journal-recent-item" data-recent-run-id={run.id}>
-          <img class="journal-recent-thumb" src={run.img || DEFAULT_RUN_IMAGE} alt="" />
+          <Medallion art={run.img || DEFAULT_RUN_IMAGE} alt="" size={28} />
           <span class="journal-recent-name" title={run.names?.title ?? ''}
             >{run.names?.title ?? ''}</span
           >
@@ -40,7 +46,13 @@
               >{localize('FABRICATE.App.Journal.Quantity', { n: totalQuantity(run) })}</span
             >
           {/if}
-          <RunStatusPill status={run.derivedStatus} />
+          <Chip
+            class="journal-run-status"
+            density="list"
+            tone={statusChipTone(runStatus.tone)}
+            icon={`fas ${runStatus.icon}`}
+            data-run-status={status}>{localize(runStatus.labelKey)}</Chip
+          >
         </li>
       {/each}
     </ul>
@@ -56,12 +68,6 @@
 </JournalCard>
 
 <style>
-  .journal-recent-empty {
-    margin: 0;
-    font-size: 12px;
-    color: var(--fab-text-muted);
-  }
-
   .journal-recent-list {
     list-style: none;
     margin: 0;
@@ -78,14 +84,14 @@
     min-width: 0;
   }
 
-  .journal-recent-thumb {
-    display: block;
+  /* THE ROW'S STATUS CHIP holds its width (issue 1506). The retired journal status pill declared
+     `flex: 0 0 auto` on itself; the shared chip declares no flex at all, because POSITION is the
+     caller's and geometry is the primitive's — the rule its own `density` note states. This row
+     is the one of the four that genuinely squeezes: it does not wrap, and the name beside the
+     chip is `flex: 1 1 auto` with an ellipsis, so without this the chip would give up width the
+     name is there to absorb. */
+  .journal-recent-item :global(.journal-run-status) {
     flex: 0 0 auto;
-    width: 28px;
-    height: 28px;
-    border-radius: 5px;
-    object-fit: cover;
-    background: var(--fab-surface-raised);
   }
 
   .journal-recent-name {

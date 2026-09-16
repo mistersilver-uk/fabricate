@@ -58,8 +58,7 @@
     // `facts` is the recessed well: [{ id, label, tone, title, attrs, class }]. `tone` is
     // one of 'muted' (the default), 'strong' for the leading stat that carries the emphasis
     // — the prototype's "2 in · 1 out" over its "2 steps" — or one of the semantic
-    // 'warning' / 'danger' / 'success', which resolve to the same tokens `Chip` and
-    // `StatusPill` use.
+    // 'warning' / 'danger' / 'success', which resolve to the same tokens `Chip` uses.
     facts = [],
     factsAttrs = {},
     // Snippets
@@ -221,7 +220,7 @@
     line-height: 1.4;
   }
 
-  /* FACTS: a RECESSED well, split by hairlines. `--fab-bg-1` over `--fab-mv2-border` is the
+  /* FACTS: a RECESSED well, split by hairlines. `--fab-bg-1` over `--fab-border` is the
      inspector stat-tile idiom (`.manager-essence-stat`), and the maintainer's prototype
      measures to the same pair — so the faithful render and the tokenised one agree. */
   .fab-library-card-facts {
@@ -229,7 +228,7 @@
     align-items: center;
     gap: var(--fab-space-2);
     padding: var(--fab-space-chip) var(--fab-space-2);
-    border: 1px solid var(--fab-mv2-border);
+    border: 1px solid var(--fab-border);
     border-radius: 8px;
     background: var(--fab-bg-1);
     color: var(--fab-text-subtle);
@@ -241,13 +240,14 @@
      is the leading stat that carries the emphasis, because a well whose halves read
      identically is a box with no hierarchy.
 
-     The semantic three are the same `--fab-<tone>-text` tokens `Chip` and `StatusPill`
-     already answer to, so a studio marking a fact as a problem gets the colour the rest of
-     the app uses for a problem, rather than a colour invented at the call site. They exist
+     The semantic three are the same `--fab-<tone>-text` tokens `Chip` already answers to —
+     for every status face in both windows since issue 1506 — so a studio marking a fact as a
+     problem gets the colour the rest of the app uses for a problem, rather than a colour
+     invented at the call site. They exist
      so `tone` is a real enum rather than a boolean wearing a string's clothes: a studio can
      colour a stat by NAMING one, without editing this file. */
   .fab-library-card-fact.is-strong {
-    color: var(--fab-mv2-text);
+    color: var(--fab-text);
     font-size: 0.66rem;
     font-weight: 600;
   }
@@ -271,7 +271,7 @@
     flex: 0 0 auto;
     width: 1px;
     height: 0.9em;
-    background: var(--fab-mv2-border);
+    background: var(--fab-border);
   }
 
   /* FOOTER: a divider, leading actions, then trailing actions pushed to the far end.
@@ -289,7 +289,7 @@
     gap: var(--fab-space-2);
     margin-top: var(--fab-space-1);
     padding-top: var(--fab-space-2);
-    border-top: 1px solid var(--fab-mv2-border);
+    border-top: 1px solid var(--fab-border);
   }
 
   .fab-library-card-footer-end {

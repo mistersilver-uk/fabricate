@@ -41,8 +41,9 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import EmptyState from '../EmptyState.svelte';
-  import RadioCardGroup from '../RadioCardGroup.svelte';
-  import ToggleCard from '../ToggleCard.svelte';
+  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import RadioCardGroup from '../../../components/RadioCardGroup.svelte';
+  import ToggleCard from '../../../components/ToggleCard.svelte';
   import CheckFailurePolicy from './CheckFailurePolicy.svelte';
   import ChecksEditorTabs from './ChecksEditorTabs.svelte';
   import ChecksRightMenu from './ChecksRightMenu.svelte';
@@ -59,6 +60,9 @@
   } from './checksReadiness.js';
   import Callout from '../Callout.svelte';
   import CheckModeCallout from './CheckModeCallout.svelte';
+  import { focusValidationTarget } from '../validationFocus.js';
+  import { announceValidationOutcome } from '../validationAnnouncement.js';
+  import InspectorCard from '../../../components/InspectorCard.svelte';
   import { checkIssueCopy, interpolate } from './checksCopy.js';
   import {
     buildCheckModifierContext,
@@ -753,10 +757,71 @@
     })
   );
 
-  /** Deep-link from the Validation route to the control that raised an issue. */
-  function selectIssue(target) {
+  // ── THE VALIDATION ROW ACTION (issue 1517) ──────────────────────────────────────────────
+  //
+  // This studio's own root, so `focusValidationTarget` resolves a `data-validation-target`
+  // inside THIS route rather than anywhere in the manager window.
+  let checksRoot = $state(null);
+
+  // WHAT THE LIVE REGION SAYS: the ACTION'S OUTCOME, not a count. Activating a row action
+  // changes no tally, so a count-subjected region would recite an unchanged number at the
+  // moment a GM most needs to know where they landed.
+  let issueAnnouncement = $state('');
+
+  // The destination SECTION PANEL, and it is the focus fallback for a route-only row
+  // (issue 1517). Eleven of the sixteen registered issues carry no control address, so this is
+  // the majority path here rather than an edge.
+  let sectionPanel = $state(null);
+
+  /** The activity's own name, from the rail's key, so one word is not spelt two ways. */
+  function activityLabel(id) {
+    const key = `FABRICATE.Admin.Manager.Checks.Tabs.${id[0].toUpperCase()}${id.slice(1)}`;
+    return text(key, id);
+  }
+
+  /** The section's own name, from the strip's table for the same reason. */
+  function sectionLabel(id) {
+    const meta = SECTION_META[id];
+    if (!meta) return '';
+    return text(`FABRICATE.Admin.Manager.Checks.Sections.${meta.labelKey}`, meta.labelFallback);
+  }
+
+  /**
+   * Deep-link from the Validation route to the control that raised an issue: open the ACTIVITY
+   * and the SECTION that own the gap, THEN move focus to the offending control.
+   *
+   * THE ORDER IS THE MECHANISM, not a preference. `onOpenActivity` is the router's own
+   * synchronous state write — the same one the rail's click makes — so Svelte has flushed the
+   * route change and the destination panel exists by the time the focus helper's
+   * `queueMicrotask` runs its query. Everything after that — the panel fallback, the sentence,
+   * and the delay that queues it behind the focus utterance — belongs to
+   * `validationAnnouncement.js`, which owns it for all five hosts.
+   *
+   * A ROUTE-ONLY ROW IS NORMAL HERE. Eleven of the sixteen registered issues carry no control
+   * address — see the table in `ChecksValidationTab.svelte` — so the focus helper resolves
+   * `null` and the SECTION PANEL takes the keyboard instead, with the announcement naming the
+   * route it opened. Leaving focus where it was is not the alternative: the row's own button is
+   * unmounted by the route change, so focus would fall to `<body>` and every Foundry keybinding
+   * would go live under a GM who is looking at an open window.
+   *
+   * @param {{activity?: string, section?: string}} target the ROUTE the row carries.
+   * @param {string} [focusTarget] the CONTROL's `data-validation-target` value, if it named one.
+   */
+  function selectIssue(target, focusTarget) {
     if (!target?.activity) return;
-    onOpenActivity(target.activity, target.section || 'roll');
+    const section = target.section || 'roll';
+    onOpenActivity(target.activity, section);
+    announceValidationOutcome({
+      root: checksRoot,
+      routeLabel: [activityLabel(target.activity), sectionLabel(section)]
+        .filter(Boolean)
+        .join(' — '),
+      focus: () => focusValidationTarget(checksRoot, focusTarget),
+      fallbackPanel: sectionPanel,
+      announce: (sentence) => {
+        issueAnnouncement = sentence;
+      },
+    });
   }
 
   const configTitle = text('FABRICATE.Admin.Manager.Checks.Configuration', 'Configuration');
@@ -1251,7 +1316,7 @@
     if (result.data?.breakTools === true || (!success && breakToolsOnFail)) {
       facts.push({
         id: 'tools',
-        icon: 'fas fa-hammer-crash',
+        icon: 'fas fa-hammer',
         title: text('FABRICATE.Admin.Manager.Checks.Simulator.FactTools', 'Required tools break'),
         subtitle: '',
       });
@@ -1327,7 +1392,7 @@
       previewActorId,
       previewRecord?.id ?? '',
       previewPlan.dc,
-    ].join(' ')
+    ].join('\0')
   );
   let adoptedPreviewSignature = $state('');
   $effect(() => {
@@ -1471,15 +1536,18 @@
      which is authored on the task and is cross-referenced here read-only. -->
 {#snippet gatheringOnFailureSection()}
   {@render failurePolicyCard()}
+  <!-- NEUTRAL, not info (issue 1505). The specimen reserves the info tint for a note about
+       LIVE state, and this sentence is true of every gathering system on every screen until
+       issue 683 lands — it reports the product, not this record. -->
   <Callout
-    tone="info"
+    tone="neutral"
     text={text(
       'FABRICATE.Admin.Manager.Checks.FailureResults.GatheringDormant',
       'Routed and progressive gathering are still being built, so nothing on this screen changes what a failed gathering attempt does yet. What you set here is kept and takes effect when they arrive.'
     )}
     dataAttr="data-gathering-failure-dormant"
   />
-  <section class="manager-inspector-card" data-gathering-failure-outcome>
+  <InspectorCard data-gathering-failure-outcome="">
     <h3 class="manager-checks-card-title">
       {text(
         'FABRICATE.Admin.Manager.Checks.FailureResults.FailureOutcomeTitle',
@@ -1509,9 +1577,7 @@
         )}
       </p>
     {/if}
-    <button
-      type="button"
-      class="manager-button"
+    <ManagerButton
       data-gathering-failure-outcome-link
       disabled={!previewedGatheringTask}
       onclick={() => onOpenGatheringTask(previewedGatheringTask?.id || '')}
@@ -1523,8 +1589,8 @@
           'Open this task'
         )}</span
       >
-    </button>
-  </section>
+    </ManagerButton>
+  </InspectorCard>
 {/snippet}
 
 <!-- The one place a section that cannot apply is answered, so the copy names the MODE
@@ -1544,7 +1610,30 @@
   />
 {/snippet}
 
-<div class="manager-environment-edit-view" data-environment-editor data-checks-editor>
+<div
+  class="manager-environment-edit-view"
+  data-environment-editor
+  data-checks-editor
+  bind:this={checksRoot}
+>
+  <!--
+    THE ROW ACTION'S LIVE REGION, and it is HOSTED HERE rather than in the validation surface
+    for a reason that is not stylistic (issue 1517). Activating a row action routes to another
+    ACTIVITY, which unmounts the whole validation panel — live region included — in the same
+    update that was supposed to announce. So the element carrying `aria-live` is ALWAYS in the
+    DOM, outside the `{#if activity === 'validation'}` chain below, with its own `{#if}` INSIDE
+    it.
+
+    A THIRD CHILD OF THIS TWO-ROW GRID IS SAFE, which is worth saying because it would not be
+    if the element were in flow: `.visually-hidden` is `position: absolute`, so it is not a
+    grid item at all and consumes no track of `grid-template-rows: auto minmax(0, 1fr)`.
+
+    It wears the shipped `.visually-hidden` utility, rooted at the MODULE, and is addressed by
+    a `data-` hook rather than a class, so it joins no pinned class family.
+  -->
+  <div class="visually-hidden" role="status" aria-live="polite" data-checks-issue-announcement>
+    {#if issueAnnouncement}{issueAnnouncement}{/if}
+  </div>
   {#if activity !== 'validation'}
     <ChecksEditorTabs
       {sections}
@@ -1556,11 +1645,19 @@
   {/if}
 
   <div class="manager-environment-workspace">
+    <!-- `tabindex="-1"` and `data-keyboard-focus="true"` are the ROUTE-ONLY row's focus
+         destination (issue 1517): eleven of the sixteen registered issues name a route and no
+         control, and the button they were activated from is unmounted by that route change, so
+         without this focus falls to `<body>` and every Foundry keybinding goes live. `-1`, not
+         `0`: the panel is a programmatic destination, not a tab stop. -->
     <div
       class="manager-environment-tab-panel"
       role="tabpanel"
       id={`checks-panel-${activity === 'validation' ? 'validation' : activeSection}`}
       aria-labelledby={activity === 'validation' ? undefined : `checks-section-${activeSection}`}
+      tabindex="-1"
+      data-keyboard-focus="true"
+      bind:this={sectionPanel}
     >
       {#if paneHead && !routeIsOff}
         <header class="manager-checks-pane-head" data-checks-pane-head={activeSection}>
@@ -1587,6 +1684,9 @@
 
       {#if activity !== 'validation' && !routeIsOff && activeSectionIssues.length > 0}
         <div class="manager-checks-section-callouts" data-checks-section-callouts={activeSection}>
+          <!-- The tone is DERIVED and both values stand (issue 1505): a readiness issue is a
+               statement about the live record, so `info` is the tint the specimen reserves for
+               exactly that, and a critical one is the conditional hazard `warning` names. -->
           {#each activeSectionIssues as issue (issue.id)}
             <Callout
               tone={issue.tone}
@@ -1619,21 +1719,20 @@
               'This system can roll a check here, but it is switched off. Every attempt that meets its requirements succeeds outright — no formula, no DC, no failure policy.'
             )}
           >
-            <button
-              type="button"
-              class="manager-button is-primary"
+            <ManagerButton
+              role="primary"
               data-checks-turn-on
               onclick={() => onToggleCheckActive(activity, true)}
             >
               <i class="fas fa-power-off" aria-hidden="true"></i>
               <span>{text('FABRICATE.Admin.Manager.Checks.Off.TurnOn', 'Turn this check on')}</span>
-            </button>
+            </ManagerButton>
           </EmptyState>
         </div>
       {:else if activity === 'crafting' && craftingAlchemy}
         <div class="manager-checks-editor-stack" data-checks-panel="crafting">
           {#if activeSection === 'roll'}
-            <section class="manager-inspector-card">
+            <InspectorCard>
               <h3 class="manager-checks-card-title">
                 {text('FABRICATE.Admin.SystemSettings.Alchemy.CheckModeHeading', 'Alchemy check')}
               </h3>
@@ -1654,7 +1753,7 @@
                 optionDataAttr="data-crafting-alchemy-checkmode-option"
                 onChange={(mode) => onSetAlchemyCheckMode(mode)}
               />
-            </section>
+            </InspectorCard>
           {/if}
 
           {#if activeSection === 'on-failure'}
@@ -1665,7 +1764,7 @@
                  where it already lived — it is alchemy's substitute for the generic
                  consumption pair, not for this. -->
             {@render failurePolicyCard()}
-            <section class="manager-inspector-card" data-alchemy-behaviour>
+            <InspectorCard data-alchemy-behaviour="">
               <h3 class="manager-checks-card-title">
                 {text(
                   'FABRICATE.Admin.SystemSettings.Alchemy.BehaviourHeading',
@@ -1681,7 +1780,7 @@
               <div class="manager-checks-flag-list">
                 <ToggleCard
                   variant="is-info"
-                  icon="fas fa-book-sparkles"
+                  icon="fas fa-book"
                   section="alchemy-learn-on-craft"
                   field="learnOnCraft"
                   title={text(
@@ -1740,7 +1839,7 @@
                   onToggle={(next) => onUpdateAlchemyFlags({ showAttemptHistoryToPlayers: next })}
                 />
               </div>
-            </section>
+            </InspectorCard>
           {/if}
 
           <!-- There is no alchemy `none` branch here. An alchemy system whose check is off
@@ -1835,8 +1934,10 @@
                  suites' lookup and the alchemy absence check all keep resolving.
 
                  The glyphs are the prototype's `fa-fire` and `fa-hammer` — the arguably more
-                 precise `fa-hammer-crash` / `fa-fire-flame-curved` were an exemption, and it
-                 has been overruled: the prototype is the authority for appearance. -->
+                 precise `hammer-crash` / `fire-flame-curved` were an exemption, and it has
+                 been overruled: the prototype is the authority for appearance. Both are
+                 Pro-only names, so they are written here without the `fa-` class prefix that
+                 would make them a reference in code. -->
             <div class="manager-checks-flag-list" data-failure-consumption>
               <ToggleCard
                 icon="fas fa-fire"
@@ -1880,8 +1981,12 @@
             <!-- The sentence the wrapper's description used to carry, restored to where the
                  prototype puts it: the last thing on the screen, and it says where the two
                  policies this screen does NOT govern actually live. -->
+            <!-- NEUTRAL, which is now the shared strip's own default (issue 1505). It is a
+                 pointer to two other screens rather than a note about live state, and the
+                 studio override that used to draw it quietly is deleted with this change: the
+                 quiet treatment IS the primitive. -->
             <Callout
-              tone="info"
+              tone="neutral"
               text={text(
                 'FABRICATE.Admin.Manager.Checks.Crafting.FailureSalvageNote',
                 'Salvage failures follow their own separate policy on the Salvage check. An individual trigger can also break tools on its own — see Triggers.'
@@ -1989,7 +2094,7 @@
       {:else if activity === 'gathering' && gatheringD100}
         <div class="manager-checks-page" data-checks-panel="gathering" data-gathering-d100-readonly>
           {#if activeSection === 'roll'}
-            <section class="manager-inspector-card">
+            <InspectorCard>
               <p class="manager-kicker">{pageKicker}</p>
               <h2 class="manager-checks-card-title">
                 {text('FABRICATE.Admin.Manager.Checks.Gathering.D100Title', 'Fixed d100 roll')}
@@ -2000,8 +2105,8 @@
                   'In d100 mode the gathering check is a fixed d100 roll against each drop’s chance. There is nothing to configure here.'
                 )}
               </p>
-            </section>
-            <section class="manager-inspector-card">
+            </InspectorCard>
+            <InspectorCard>
               <h3 class="manager-checks-card-title">{configTitle}</h3>
               <p class="manager-muted">
                 {text(
@@ -2009,7 +2114,7 @@
                   'Switch the gathering economy to progressive or routed resolution to define an editable check. Per-task tuning adjusts difficulty, not the roll.'
                 )}
               </p>
-            </section>
+            </InspectorCard>
           {:else if activeSection === 'modifiers'}
             <!-- d100 RENDERS Modifiers rather than hiding it (decision 8). The card is the
                  one owned path for reporting that a selection reaches no roll, and it
@@ -2066,15 +2171,15 @@
         </div>
       {:else}
         <div class="manager-checks-page" data-checks-panel={activity}>
-          <section class="manager-inspector-card">
+          <InspectorCard>
             <p class="manager-kicker">{pageKicker}</p>
             <h2 class="manager-checks-card-title">{page.title}</h2>
             <p class="manager-muted">{page.lead}</p>
-          </section>
-          <section class="manager-inspector-card">
+          </InspectorCard>
+          <InspectorCard>
             <h3 class="manager-checks-card-title">{configTitle}</h3>
             <p class="manager-muted">{page.configHint}</p>
-          </section>
+          </InspectorCard>
         </div>
       {/if}
     </div>

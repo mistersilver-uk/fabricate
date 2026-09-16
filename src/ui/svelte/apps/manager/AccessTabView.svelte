@@ -12,24 +12,26 @@
    - recipeCategories: [{ name, count }] for the Category filter.
    - recipeSearchTerm: current search term (owned by the parent).
    - selectedRecipeId: id of the highlighted recipe.
-   - selectedSystemName: kicker label.
    - onSearchChange(term): search input handler.
    - onSelectRecipe(id): row-select handler.
 -->
 <script>
-  import Chip from './Chip.svelte';
+  import Chip from '../../components/Chip.svelte';
+  import Medallion from '../../components/Medallion.svelte';
+  import ManagerButton from '../../components/ManagerButton.svelte';
   import EmptyState from './EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
   import { resolveRecipeImage } from '../../util/craftingImageDefaults.js';
   import { getRecipeCategoryLabel } from '../../../../utils/recipeCategories.js';
+  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
+  import ManagerToolbar from '../../components/ManagerToolbar.svelte';
 
   let {
     recipes = [],
     recipeCategories = [],
     recipeSearchTerm = '',
     selectedRecipeId = '',
-    selectedSystemName = '',
     onSearchChange = () => {},
     onSelectRecipe = () => {},
   } = $props();
@@ -99,36 +101,14 @@
   class="manager-main"
   aria-label={text('FABRICATE.Admin.Manager.Access.Title', 'Recipe access')}
 >
-  <section class="manager-section-header">
-    <div class="manager-heading">
-      <p class="manager-kicker">
-        {selectedSystemName || text('FABRICATE.Admin.Manager.SelectSystem', 'Select a system')}
-      </p>
-      <h2 class="manager-title">{text('FABRICATE.Admin.Manager.Access.Title', 'Recipe access')}</h2>
-      <p class="manager-subtitle">
-        {text(
-          'FABRICATE.Admin.Manager.Access.Hint',
-          'Grant individual recipes to specific characters or players. Only granted recipes are visible to them.'
-        )}
-      </p>
-    </div>
-  </section>
-
-  <section
-    class="manager-toolbar"
-    aria-label={text('FABRICATE.Admin.Manager.Access.Filters', 'Access filters')}
-  >
-    <label class="manager-search">
-      <i class="fas fa-search" aria-hidden="true"></i>
-      <input
-        type="search"
-        value={recipeSearchTerm || ''}
-        oninput={(event) => onSearchChange(event.currentTarget.value)}
-        placeholder={text('FABRICATE.Admin.Manager.Recipe.SearchPlaceholder', 'Search recipes...')}
-        aria-label={text('FABRICATE.Admin.Manager.Recipe.SearchLabel', 'Search recipes')}
-        data-access-search
-      />
-    </label>
+  <ManagerToolbar ariaLabel={text('FABRICATE.Admin.Manager.Access.Filters', 'Access filters')}>
+    <ManagerSearchField
+      value={recipeSearchTerm || ''}
+      onInput={(next) => onSearchChange(next)}
+      placeholder={text('FABRICATE.Admin.Manager.Recipe.SearchPlaceholder', 'Search recipes...')}
+      ariaLabel={text('FABRICATE.Admin.Manager.Recipe.SearchLabel', 'Search recipes')}
+      inputAttrs={{ 'data-access-search': '' }}
+    />
     <label class="manager-filter">
       <span>{text('FABRICATE.Admin.Manager.Recipe.Category', 'Category')}</span>
       <select
@@ -173,17 +153,16 @@
         .replace('{total}', (recipes || []).length)}</Chip
     >
     {#if filtersActive}
-      <button
-        type="button"
-        class="manager-button manager-clear-filters"
+      <ManagerButton
+        class="manager-clear-filters"
         data-clear-filters="access"
         onclick={clearFilters}
       >
         <i class="fas fa-times" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</span>
-      </button>
+      </ManagerButton>
     {/if}
-  </section>
+  </ManagerToolbar>
 
   <section
     class="manager-table-scroll manager-access-scroll"
@@ -210,8 +189,8 @@
           'Clear search and filters to show every recipe in this system.'
         )}
       >
-        <button type="button" class="manager-button" onclick={clearFilters}
-          >{text('FABRICATE.Admin.Manager.ClearSearch', 'Clear search')}</button
+        <ManagerButton onclick={clearFilters}
+          >{text('FABRICATE.Admin.Manager.ClearSearch', 'Clear search')}</ManagerButton
         >
       </EmptyState>
     {:else}
@@ -247,7 +226,11 @@
               data-access-row={recipe.id}
               onclick={() => onSelectRecipe(recipe.id)}
             >
-              <img class="manager-recipe-thumb" src={resolveRecipeImage(recipe)} alt="" />
+              <!-- The shared tile, at the 46px the retired sheet selector for this row's raw
+                   `<img>` sized it to (issue 1506). Its `art` is the ONE shared recipe-image
+                   chokepoint, so a row still shows the recipe's own artwork and never a
+                   containing book's. -->
+              <Medallion art={resolveRecipeImage(recipe)} alt="" icon="fas fa-scroll" size={46} />
               <span class="manager-access-copy">
                 <span class="manager-access-heading">
                   <span class="manager-access-name" title={recipe.name}>{recipe.name}</span>

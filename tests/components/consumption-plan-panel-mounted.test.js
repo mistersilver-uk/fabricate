@@ -22,14 +22,22 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-consumption-plan-',
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/craftingImageDefaults.js',
+    'src/ui/svelte/util/craftingArtResolution.js',
     'src/ui/svelte/util/essenceIcons.js',
     'src/ui/svelte/util/foundryIconVocabulary.js',
   'src/ui/svelte/util/foundryIconCatalogue.js',
   ],
   compiledModules: [
-    'src/ui/svelte/apps/crafting/CraftingThumb.svelte',
+    'src/ui/svelte/components/Medallion.svelte',
     'src/ui/svelte/apps/crafting/detail/EssenceContribution.svelte',
+    // The shared eyebrow (issue 1505). The panel's title is a `<Kicker>` inside the
+    // panel's own flex row, so omitting it HANGS this suite (# cancelled), never fails it.
+    'src/ui/svelte/components/Kicker.svelte',
+    // The shared no-state panel (issue 1514). The panel's nothing-planned line is an
+    // `EmptyState note`, so omitting it fails this suite by name.
+    'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/apps/crafting/detail/ConsumptionPlanPanel.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/crafting/detail/ConsumptionPlanPanel.svelte',
@@ -70,10 +78,9 @@ describe('ConsumptionPlanPanel mounted behavior', () => {
 
   it('states the empty case rather than an empty list', async () => {
     const target = await harness.mount({ plan: buildConsumptionPlan(null) });
-    assert.match(
-      target.querySelector('.consumption-plan-empty').textContent,
-      /ConsumptionPlan\.Empty/
-    );
+    // The line is an `EmptyState note` since issue 1514: the panel is released and the sentence
+    // renders as the variant's `hint`, so the locator is the primitive's own root.
+    assert.match(target.querySelector('.manager-empty.is-note').textContent, /ConsumptionPlan\.Empty/);
     assert.ok(!target.querySelector('[data-consumption-pending]'));
   });
 

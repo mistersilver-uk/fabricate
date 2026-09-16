@@ -8,9 +8,13 @@
   repair. Fully-owned components never appear.
 -->
 <script>
+  import Medallion from '../../components/Medallion.svelte';
+  import { resolveCraftingArt } from '../../util/craftingArtResolution.js';
+  import { normalizeEssenceIcon } from '../../util/essenceIcons.js';
   import { localize } from '../../util/foundryBridge.js';
-  import CraftingEssenceThumb from './CraftingEssenceThumb.svelte';
-  import CraftingThumb from './CraftingThumb.svelte';
+  import StatBox from '../../components/StatBox.svelte';
+  import Kicker from '../../components/Kicker.svelte';
+  import EmptyState from '../manager/EmptyState.svelte';
 
   let {
     aggregate = null,
@@ -202,54 +206,58 @@
   </header>
 
   <div class="crafting-shopping-summary" data-shopping-summary>
-    <div class="crafting-shopping-summary-card" data-summary="recipes">
-      <span class="crafting-shopping-summary-value">
-        <i class="fas fa-scroll" aria-hidden="true"></i>
-        <span class="crafting-shopping-summary-count">{plannedRecipes}</span>
-      </span>
-      <span class="crafting-shopping-summary-label"
-        >{localize('FABRICATE.App.Crafting.Shopping.PlannedRecipes')}</span
-      >
-    </div>
-    <div
-      class="crafting-shopping-summary-card"
-      class:is-alert={missingComponentsCount > 0}
-      data-summary="components"
-    >
-      <span class="crafting-shopping-summary-value">
-        <i class="fas fa-cubes" aria-hidden="true"></i>
-        <span class="crafting-shopping-summary-count">{missingComponentsCount}</span>
-      </span>
-      <span class="crafting-shopping-summary-label"
-        >{localize('FABRICATE.App.Crafting.Shopping.MissingComponents')}</span
-      >
-    </div>
-    <div
-      class="crafting-shopping-summary-card"
-      class:is-alert={unavailableToolsCount > 0}
-      data-summary="tools"
-    >
-      <span class="crafting-shopping-summary-value">
-        <i class="fas fa-screwdriver-wrench" aria-hidden="true"></i>
-        <span class="crafting-shopping-summary-count">{unavailableToolsCount}</span>
-      </span>
-      <span class="crafting-shopping-summary-label"
-        >{localize('FABRICATE.App.Crafting.Shopping.UnavailableTools')}</span
-      >
-    </div>
+    <StatBox
+      value={plannedRecipes}
+      label={localize('FABRICATE.App.Crafting.Shopping.PlannedRecipes')}
+      icon="fas fa-scroll"
+      dataAttr="data-summary"
+      dataValue="recipes"
+    />
+    <StatBox
+      value={missingComponentsCount}
+      label={localize('FABRICATE.App.Crafting.Shopping.MissingComponents')}
+      icon="fas fa-cubes"
+      tone={missingComponentsCount > 0 ? 'danger' : 'default'}
+      dataAttr="data-summary"
+      dataValue="components"
+    />
+    <StatBox
+      value={unavailableToolsCount}
+      label={localize('FABRICATE.App.Crafting.Shopping.UnavailableTools')}
+      icon="fas fa-screwdriver-wrench"
+      tone={unavailableToolsCount > 0 ? 'danger' : 'default'}
+      dataAttr="data-summary"
+      dataValue="tools"
+    />
   </div>
 
   {#if isEmpty}
-    <p class="crafting-shopping-empty" data-crafting-shopping-empty>
-      <i class="fas fa-cart-shopping" aria-hidden="true"></i>
-      {localize('FABRICATE.App.Crafting.Shopping.Empty')}
-    </p>
+    <!--
+      THE PANE'S FILL IS THE CALLER'S, THE PANEL IS THE PRIMITIVE'S (issue 1514). Measured at
+      288.86x574.72, this is not a one-line note: it is a glyph over a centred sentence standing
+      in for the whole planner column, which is the same rendered SHAPE as the inventory
+      inspector's no-selection pane and takes the same answer. `EmptyState` is padding-driven and
+      declares no height, and its documented fill escape is `contextClass`, "whose rules live in
+      the global sheet" (`EmptyState.svelte:53-55`) — which would put `styles/fabricate.css` on
+      this change's path. So `.crafting-shopping-empty` survives as a caller-owned WRAPPER
+      declaring the fill and the centring and nothing else.
+
+      The hook stays ON THE WRAPPER, which is the element it has always sat on, so it keeps
+      rendering `data-crafting-shopping-empty=""` rather than the `="true"` `EmptyState` coerces
+      a bare hook to (`EmptyState.svelte:84`, `dataValue || true`).
+    -->
+    <div class="crafting-shopping-empty" data-crafting-shopping-empty>
+      <EmptyState
+        icon="fas fa-cart-shopping"
+        title={localize('FABRICATE.App.Crafting.Shopping.Empty')}
+      />
+    </div>
   {:else}
     <div class="crafting-shopping-scroll">
       <div class="crafting-shopping-card">
-        <p class="crafting-shopping-card-title">
+        <Kicker as="p">
           {localize('FABRICATE.App.Crafting.Shopping.RecipesTitle')}
-        </p>
+        </Kicker>
         <ul class="crafting-shopping-queue">
           {#each queued as entry (entry.recipeId)}
             <!--
@@ -275,7 +283,7 @@
                 title={entry.name}
                 onclick={() => onIncrement?.(entry.recipeId)}
               >
-                <CraftingThumb src={entry.img} alt="" size={28} />
+                <Medallion {...resolveCraftingArt(entry.img)} alt="" size={28} />
                 <span class="crafting-shopping-entry-name">{entry.name}</span>
                 <span class="crafting-shopping-entry-qty">×{entry.quantity}</span>
               </button>
@@ -295,16 +303,16 @@
 
       {#if acquireComponents.length > 0}
         <div class="crafting-shopping-card" data-shopping-acquire-components>
-          <p class="crafting-shopping-card-title">
+          <Kicker as="p">
             {localize('FABRICATE.App.Crafting.Shopping.AcquireComponents')}
-          </p>
+          </Kicker>
           <ul class="crafting-shopping-acquire">
             {#each acquireComponents as row (row.key)}
               <li class="crafting-shopping-acquire-row">
                 {#if row.isEssence}
-                  <CraftingEssenceThumb icon={row.icon} size={28} />
+                  <Medallion icon={normalizeEssenceIcon(row.icon)} size={28} glyph={12} />
                 {:else}
-                  <CraftingThumb src={row.img} alt="" size={28} />
+                  <Medallion {...resolveCraftingArt(row.img)} alt="" size={28} />
                 {/if}
                 <span class="crafting-shopping-acquire-name" title={row.name}>{row.name}</span>
                 <span
@@ -322,13 +330,13 @@
 
       {#if acquireTools.length > 0}
         <div class="crafting-shopping-card" data-shopping-acquire-tools>
-          <p class="crafting-shopping-card-title">
+          <Kicker as="p">
             {localize('FABRICATE.App.Crafting.Shopping.AcquireTools')}
-          </p>
+          </Kicker>
           <ul class="crafting-shopping-acquire">
             {#each acquireTools as tool (tool.key)}
               <li class="crafting-shopping-acquire-row">
-                <CraftingThumb src={tool.img} alt="" size={28} />
+                <Medallion {...resolveCraftingArt(tool.img)} alt="" size={28} />
                 <span class="crafting-shopping-acquire-name" title={tool.name}>{tool.name}</span>
                 <span
                   class={`crafting-shopping-chip ${tool.needsRepair ? 'tone-warning' : 'tone-danger'}`}
@@ -394,7 +402,8 @@
     color: var(--fab-text);
   }
 
-  /* Three always-visible summary cards. */
+  /* The grid the three always-visible summary cards sit in. Each card is a `<StatBox>`
+     and owns its own box, figure and label; this rule owns only the grid. */
   .crafting-shopping-summary {
     flex: 0 0 auto;
     display: grid;
@@ -402,67 +411,14 @@
     gap: var(--fab-space-2);
   }
 
-  .crafting-shopping-summary-card {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 2px;
-    padding: var(--fab-space-2);
-    border: 1px solid var(--fab-border);
-    border-radius: 8px;
-    background: var(--fab-surface-soft);
-    text-align: center;
-  }
-
-  .crafting-shopping-summary-card.is-alert {
-    border-color: var(--fab-danger-border);
-    background: var(--fab-danger-soft);
-  }
-
-  /* Icon + count share a line; the label sits beneath. */
-  .crafting-shopping-summary-value {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-  }
-
-  .crafting-shopping-summary-card i {
-    font-size: 14px;
-    color: var(--fab-text-muted);
-  }
-
-  .crafting-shopping-summary-card.is-alert i {
-    color: var(--fab-danger-text);
-  }
-
-  .crafting-shopping-summary-count {
-    font-size: 18px;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .crafting-shopping-summary-label {
-    font-size: 10px;
-    line-height: 1.2;
-    color: var(--fab-text-muted);
-  }
-
+  /* THE WRAPPER ONLY: the fill and the centring the planner column needs, and nothing about
+     the glyph, the type or the ink — those belong to the panel nested inside it now. */
   .crafting-shopping-empty {
     flex: 1 1 auto;
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 10px;
-    margin: 0;
     padding: var(--fab-space-4);
-    text-align: center;
-    font-size: 13px;
-    color: var(--fab-text-muted);
-  }
-
-  .crafting-shopping-empty i {
-    font-size: 24px;
   }
 
   /* The card stack scrolls; the header + summary stay pinned above it. */
@@ -484,15 +440,6 @@
     border: 1px solid var(--fab-border);
     border-radius: 8px;
     background: var(--fab-surface-soft);
-  }
-
-  .crafting-shopping-card-title {
-    margin: 0;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--fab-text-muted);
   }
 
   .crafting-shopping-queue,
@@ -581,12 +528,14 @@
   }
 
   /* The ROW draws the ring (the `:has()` rule above). Without this the button ALSO
-     matches `.fabricate-app button:focus-visible` in `styles/fabricate.css` and the row
+     matches `.fabricate button:focus-visible` in `styles/fabricate.css` and the row
      gets two concentric accent rings, the outer one painting over its border. Scoped,
-     this is (0,3,0) and beats that area rule at (0,2,1) — which is held at single-class
-     specificity for exactly this purpose. `.crafting-shopping-remove:focus-visible`
-     below is the same pattern. The area rule's `:focus` half already covers the mouse
-     case, so `:focus-visible` alone is enough. */
+     this is (0,3,0) and beats that module rule at (0,2,1) — which is held at
+     single-class specificity for exactly this purpose, and stayed there when issue 1501
+     collapsed the `.fabricate-app` pair onto the module root, so this argument survives
+     the rename unchanged. `.crafting-shopping-remove:focus-visible` below is the same
+     pattern. The module rule's `:focus` half already covers the mouse case, so
+     `:focus-visible` alone is enough. */
   .crafting-shopping-entry-main:focus-visible {
     outline: none;
   }

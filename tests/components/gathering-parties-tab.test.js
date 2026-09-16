@@ -3,7 +3,16 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  SELECT_COMPILED_MODULES,
+  createMountedComponentHarness,
+} from '../helpers/svelte-component-harness.js';
+import { PICKER_SCROLLER_SELECTOR } from '../../src/ui/svelte/util/overlayBounds.js';
+// Issue 1504: the page-size control is a shared `<Select>`, so choosing a size is two clicks on
+// a portaled panel rather than a `change` on a native `<select>`. The panel lands on the
+// harness's own mount target, which is why every lookup below is rooted there.
+import { chooseSelectOption, selectOptionValues } from '../helpers/select-control.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -15,19 +24,31 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-parties-tab-',
   rawModules: [
+    // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
+    ...SEARCHABLE_POPOVER_RAW_MODULES,
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/iconPickerPopover.js',
+    'src/ui/svelte/util/listboxNavigation.js',
+    'src/ui/svelte/util/overlayHost.js',
     'src/ui/svelte/util/dropUtils.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     'src/ui/svelte/actions/portal.js',
+    'src/ui/svelte/actions/anchoredPopover.js',
+    'src/ui/svelte/util/overlayBounds.js',
     'src/ui/svelte/actions/dragDrop.js',
   ],
   compiledModules: [
-    // The manager's ONE chip (issue 883) and ONE no-state primitive (issue 785).
-    'src/ui/svelte/apps/manager/Chip.svelte',
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/components/Pagination.svelte',
-    'src/ui/svelte/apps/manager/SearchablePopover.svelte',
+    // Issue 1504: the shared `<Select>`'s whole compiled closure — also covers the manager's
+    // ONE chip (issue 883) and ONE no-state primitive (issue 785).
+    ...SELECT_COMPILED_MODULES,
+    'src/ui/svelte/components/IconButton.svelte',
+    // Issue 1515: the pane's search is the shared field and its refusal banner the shared
+    // notice. A component the tree renders and this list omits HANGS the suite (reported as
+    // `# cancelled`) rather than failing it.
+    'src/ui/svelte/components/ManagerSearchField.svelte',
+    'src/ui/svelte/components/Notice.svelte',
     'src/ui/svelte/apps/manager/RealmOverridePicker.svelte',
     'src/ui/svelte/apps/manager/PartyNameField.svelte',
     'src/ui/svelte/apps/manager/PartyMemberRow.svelte',
@@ -71,8 +92,11 @@ function cards(root) {
   return root.querySelectorAll('.manager-travel-parties-row');
 }
 
+// The hook on the INPUT (issue 1515). The field is `ManagerSearchField` now, whose `class`
+// prop lands on the `<label>` it renders, so the input is addressed by the `inputAttrs` hook
+// the pane passes through — the same one the View Lab case types into.
 function typeSearch(root, value) {
-  const input = root.querySelector('.manager-travel-parties-query');
+  const input = root.querySelector('[data-manager-party-search]');
   input.value = value;
   input.dispatchEvent(new window.Event('input', { bubbles: true }));
   flushSync();
@@ -96,11 +120,11 @@ describe('GatheringPartiesTab (mounted)', () => {
 
   it('suppresses the search bar at one party and shows it at two', async () => {
     let root = await mountTab({ parties: makeParties(1) });
-    assert.ok(!root.querySelector('.manager-travel-parties-query'), 'no search bar at one party');
+    assert.ok(!root.querySelector('[data-manager-party-search]'), 'no search bar at one party');
     harness.remount();
 
     root = await mountTab({ parties: makeParties(2) });
-    assert.ok(Boolean(root.querySelector('.manager-travel-parties-query')), 'search bar at two');
+    assert.ok(Boolean(root.querySelector('[data-manager-party-search]')), 'search bar at two');
   });
 
   it('reports MATCHED of TOTAL, not page of total', async () => {
@@ -193,10 +217,7 @@ describe('GatheringPartiesTab (mounted)', () => {
     flushSync();
     assert.match(root.querySelector('[data-pagination-page]').textContent, /Page 3 of 5/);
 
-    const select = root.querySelector('[data-pagination-size]');
-    select.value = '6';
-    select.dispatchEvent(new window.Event('change', { bubbles: true }));
-    flushSync();
+    chooseSelectOption(root, '[data-pagination-size]', 6);
 
     assert.match(root.querySelector('[data-pagination-page]').textContent, /Page 1 of 3/);
     assert.equal(
@@ -231,20 +252,17 @@ describe('GatheringPartiesTab (mounted)', () => {
     // The second party is deleted upstream: the search bar unmounts with it, so the
     // query must go too or nothing left on screen can clear the no-match state.
     await harness.setProps({ parties: makeParties(1) });
-    assert.ok(!root.querySelector('.manager-travel-parties-query'), 'search bar is gone');
+    assert.ok(!root.querySelector('[data-manager-party-search]'), 'search bar is gone');
     assert.ok(!root.querySelector('[data-travel-parties-no-match]'), 'not stranded in no-match');
     assert.equal(cards(root).length, 1);
   });
 
   it('offers exactly 3/6/9 per page and defaults to 3', async () => {
     const root = await mountTab({ parties: makeParties(9) });
-    const select = root.querySelector('[data-pagination-size]');
-    // Counted, not merely present: the select renders unconditionally, so a presence
-    // assertion cannot fail.
-    assert.deepEqual(
-      Array.from(select.querySelectorAll('option')).map((option) => option.value),
-      ['3', '6', '9']
-    );
+    // Counted, not merely present: the control renders unconditionally, so a presence
+    // assertion cannot fail. Read off the OPEN panel's rows, which is where the offered
+    // values live now.
+    assert.deepEqual(selectOptionValues(root, '[data-pagination-size]'), ['3', '6', '9']);
     assert.equal(cards(root).length, 3);
   });
 
@@ -284,10 +302,7 @@ describe('GatheringPartiesTab (mounted)', () => {
 
     // A page CHANGE would unmount the keyed cards and close both incidentally; a page
     // SIZE change keeps them mounted, so it is the only case that proves the close.
-    const select = root.querySelector('[data-pagination-size]');
-    select.value = '6';
-    select.dispatchEvent(new window.Event('change', { bubbles: true }));
-    flushSync();
+    chooseSelectOption(root, '[data-pagination-size]', 6);
 
     assert.ok(!root.querySelector('[data-manager-party-move-drawer]'), 'drawer closed');
     assert.ok(!root.querySelector('.manager-travel-popover'), 'picker closed');
@@ -520,13 +535,22 @@ describe('GatheringPartiesTab (mounted)', () => {
     // cannot be proven by mounting. This pins the ancestor list itself, which is the
     // thing that changed: without the pane class the walk falls through to the manager
     // shell and a card's picker can be laid out past the pane's right edge.
+    //
+    // The list moved to `util/overlayBounds.js` with issue 1500 — a shared component under
+    // `components/` must not name an application's own scroller — so the pin follows it, and
+    // the second half checks the picker still DEFAULTS to that walk. Either half alone would
+    // pass over a picker that had stopped using it.
+    assert.match(PICKER_SCROLLER_SELECTOR, /\.manager-table-scroll/);
+    assert.match(PICKER_SCROLLER_SELECTOR, /\.manager-travel-parties/);
+
     const source = readFileSync(
-      resolve(repoRoot, 'src/ui/svelte/apps/manager/SearchablePopover.svelte'),
+      resolve(repoRoot, 'src/ui/svelte/components/SearchablePopover.svelte'),
       'utf8'
     );
-    const ancestorList = source.split('\n').find((line) => line.includes("'.admin-main"));
-    assert.ok(Boolean(ancestorList), 'getHorizontalBounds still walks a named ancestor list');
-    assert.match(ancestorList, /\.manager-table-scroll/);
-    assert.match(ancestorList, /\.manager-travel-parties/);
+    assert.match(
+      source,
+      /bounds = pickerScrollerBounds/,
+      'SearchablePopover no longer defaults to the shipped scroller walk'
+    );
   });
 });

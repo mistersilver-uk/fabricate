@@ -18,6 +18,7 @@ import {
 // the sentence in src/ is reworded; and each of these literals is referenced by nothing except its
 // own console write, so a copy living in this file would still match a bundle that write had been
 // stripped out of — which is exactly the regression the stale-entry assertion below has to catch.
+import { MIGRATION_NOTICE_DETAIL_CONSOLE_MESSAGE } from '../src/migration/migrationNoticeDetail.js';
 import {
   DEFERRED_CHUNK_LOAD_CONSOLE_MESSAGE,
   STALE_ENTRY_SCRIPT_CONSOLE_MESSAGE
@@ -312,6 +313,34 @@ function escapeForRegExp(text) {
   return text.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+/** Static `from "./x.js"` and side-effect `import "./x.js"` specifiers; a lazy `import()` is excluded. */
+const STATIC_IMPORT_SPECIFIER = /(?:\bfrom\s*|\bimport\s*)["'](\.{1,2}\/[^"']+\.js)["']/g;
+
+/**
+ * The source of the built file holding `literal`, among `dist/main.js` and every chunk it loads
+ * STATICALLY. Rolldown hoists a module the lazy manager chunk also imports into a shared chunk, so
+ * a startup write need not sit in `dist/main.js` itself; a lazily imported chunk does not count.
+ *
+ * @param {string} distDir
+ * @param {string} literal
+ * @returns {string} that file's source, or `''` when no startup file holds the literal.
+ */
+function startupModuleHolding(distDir, literal) {
+  const pending = ['main.js'];
+  const seen = new Set();
+  while (pending.length > 0) {
+    const name = pending.pop();
+    if (seen.has(name)) continue;
+    seen.add(name);
+    const source = readFileSync(join(distDir, name), 'utf8');
+    if (source.includes(literal)) return source;
+    for (const match of source.matchAll(STATIC_IMPORT_SPECIFIER)) {
+      pending.push(join(dirname(name), match[1]));
+    }
+  }
+  return '';
+}
+
 /**
  * Pin BOTH that a module console literal reached the bundle AND the level it is written at.
  *
@@ -325,7 +354,8 @@ function escapeForRegExp(text) {
  *
  * @param {string} bundle The built `dist/main.js`.
  * @param {string} literal The exported console literal, imported from src/ rather than retyped.
- * @param {'error'|'warn'} level The level this line must be written at.
+ * @param {'error'|'warn'|'info'} level The level this line must be written at. The optional-call
+ *   form `console.info?.(...)` is accepted too: it is how a pure-marked level survives as a statement.
  * @param {string} what Names the line, for the failure message.
  * @returns {void}
  */
@@ -344,7 +374,8 @@ function assertBundleConsoleLine(bundle, literal, level, what) {
   // pin the level; accepting both keeps this from failing on a formatting choice while still
   // failing on every level change. (Rolldown currently binds it.)
   const quoted = `["'\`]${escapeForRegExp(literal)}["'\`]`;
-  if (new RegExp(`console\\.${level}\\(\\s*${quoted}`).test(bundle)) return;
+  const call = `console\\.${level}(?:\\?\\.)?\\(`;
+  if (new RegExp(`${call}\\s*${quoted}`).test(bundle)) return;
   const bound = bundle.match(new RegExp(`([A-Za-z_$][\\w$]*)\\s*=\\s*${quoted}`));
   assert.ok(
     bound,
@@ -362,8 +393,11 @@ function assertBundleConsoleLine(bundle, literal, level, what) {
   // actual guarded by `tests/item-directory-manager-launch.test.js` therefore produce reports of
   // much the same size. The message below carries the diagnosis instead. A local choice for a
   // whole-bundle actual, not a rule about `assert.match`.
+  // Escaped: Rolldown allocates `$`-prefixed identifiers in a large bundle, and a raw `$` in this
+  // pattern reads as an end anchor, so the assertion can fail against a correct bundle (issue 1654).
+  const boundName = escapeForRegExp(bound[1]);
   assert.ok(
-    new RegExp(`console\\.${level}\\(\\s*${bound[1]}\\b`).test(bundle),
+    new RegExp(`${call}\\s*${boundName}\\b`).test(bundle),
     `${what}: must be written at console.${level} in the built bundle`
   );
 }
@@ -371,7 +405,7 @@ function assertBundleConsoleLine(bundle, literal, level, what) {
 // Issue 1565. BUNDLE-level assertions, not spy-level ones, and that distinction is the whole
 // point: a unit test's `log` spy passes at any level, so the only thing that can hold the line on
 // the LEVEL of the module's own console writes is the built artefact.
-test('the built bundle carries the version this build shipped, and both console lines at their levels', () => {
+test('the built bundle carries the version this build shipped, and every console line at its level', () => {
   buildWithoutZip();
   const bundle = readFileSync(join(REPO_ROOT, 'dist', 'main.js'), 'utf8');
 
@@ -390,6 +424,14 @@ test('the built bundle carries the version this build shipped, and both console 
     STALE_ENTRY_SCRIPT_CONSOLE_MESSAGE,
     'warn',
     'the stale-entry console line'
+  );
+  // Issue 1737: every migration toast points at this line, and `vite.config.js` marks
+  // `console.info` pure, so only the built artefact can prove the write was not deleted.
+  assertBundleConsoleLine(
+    startupModuleHolding(join(REPO_ROOT, 'dist'), MIGRATION_NOTICE_DETAIL_CONSOLE_MESSAGE),
+    MIGRATION_NOTICE_DETAIL_CONSOLE_MESSAGE,
+    'info',
+    'the migration notice detail console line'
   );
 });
 

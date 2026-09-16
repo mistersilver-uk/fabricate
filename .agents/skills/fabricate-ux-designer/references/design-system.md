@@ -3,16 +3,29 @@
 The **target** visual language for any Fabricate screen — the Player app and the GM
 authoring app.
 Colour is never hard-coded: everything is driven by `--fab-*` custom properties, and one
-attribute chooses which of the six themes is live.
+attribute chooses which of the seven themes is live.
 Build to this reference and the output drops into either app and reskins with every theme.
 
+> **The `design-system` capability is the authority on the primitive set.**
+> `openspec/specs/design-system/spec.md` is the canonical, versioned record of the rules the
+> shared primitive set obeys: the two-caller membership bar, the geometry ladders, the Svelte
+> APIs, the rules that route a near-neighbour case, and the screen recipes.
+> The set itself is enumerated in `openspec/specs/design-system/library.html`, one primitive
+> per `div.spec-head > h4` heading, which also renders each at its geometry.
+> `scripts/lib/designSystemPrimitives.json` is the machine-readable half, one row per shipped
+> primitive.
+> Where this document and that capability disagree, the capability wins.
+> This file remains the working reference for theming architecture, the two token layers, and
+> the shipped inventory as it stands.
+>
 > **Ground truth wins.**
 > `styles/fabricate.css` (the token and theme blocks) and `src/ui/theme.js`
 > (`applyFabricateTheme`) are the source of truth.
 > Where this document disagrees with them, they win — treat the disagreement as a bug in this
 > file.
-> Sections marked **aspirational** describe a target the shipped code has not reached yet;
-> each names the tracked proposal that would make it true.
+> A section describing a TARGET rather than the shipped tree must say so in its own words and
+> name the tracked proposal that would make it true.
+> None does today: the typography section said so for a ramp that has since shipped.
 
 ## 0. When to use this
 
@@ -39,8 +52,30 @@ Unknown ids fall back to the default (`fabricate`).
   <div class="fabricate crafting-system-manager">…</div> <!-- GM -->
 ```
 
-The six theme ids are `fabricate`, `mythwright`, `ironblood-forge`, `hearth-herb`,
-`starglass-arcana`, and `foundry-native`.
+The seven theme ids are `fabricate`, `foundry-native`, `mythwright`, `ironblood-forge`,
+`hearth-herb`, `starglass-arcana` and `sovereign`.
+All seven are dark.
+
+### 1.1a Two CASCADE layers, and the module sheet is the weaker one
+
+`module.json` registers `styles/fabricate.css` with no explicit `layer`, so Foundry imports it at
+`layer(modules)`.
+A Svelte component's scoped block is injected as an unlayered `<style>` at runtime.
+An unlayered declaration beats a layered one whatever the specificity, so for any property a
+component declares in its own scoped block, NO rule in `styles/fabricate.css` can override it at
+any specificity that can be written.
+The failure is silent — the selector is emitted, it matches, and the declaration is unused — and
+no gate reports it, so a route-scoped repair aimed at a primitive's own border, margin or colour
+looks correct in review and does nothing in the product.
+Override such a property by extending the primitive with a prop whose default preserves the
+shipped rendering; leave the sheet everything the primitive does not declare.
+
+`tests/view-lab/cascade.css` reproduces the layer order verbatim, which is why the View Lab
+catches this and a flat browser harness does not.
+Svelte also emits some scope hashes as `:where(.svelte-<hash>)`, which contributes zero
+specificity, and moving a compound in or out of `:global()` changes which form it emits — so
+settle any specificity question by compiling the component with `css: 'external'` and reading the
+emitted selector rather than by reading the source.
 
 ### 1.2 Two token layers
 
@@ -48,18 +83,21 @@ The six theme ids are `fabricate`, `mythwright`, `ironblood-forge`, `hearth-herb
 
 | Layer | Holds |
 |---|---|
-| **Base `:root`** | non-colour tokens (spacing `--fab-space-*`, radii, control heights) **and** the semantic colour-*alias* layer (`--fab-v2-*`, `--fab-status-*`, `--fab-editor-*`) that forwards via `var()` into the live theme |
+| **Base `:root`** | non-colour tokens only — the fonts, spacing `--fab-space-*`, the icon-picker chip/row pair, and the two off-ladder Books & Scrolls radii. There is no control-height token (§1.3) and no colour-alias layer: a forwarding alias re-themes nothing and hides its target from every surface outside its own selector, so a surface reads its foundation token directly (design-system spec, *The token namespace is one generation and names its purpose*) |
 | **`[data-fabricate-theme="…"]` block** | the colour *literals* only — bg, text, accent, semantics, tags, drop-rates, shadows |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
-Colour *literals* live only in the theme blocks.
-The `:root` layer holds no literals, but it does hold the alias tokens that resolve to them —
-so "base `:root` is colour-free" is about literals, not tokens.
+Colour *literals* live only in the theme blocks — including the default one, whose selector list
+names `:root` itself so an untagged root still themes.
+The BASE `:root` block above those holds no colour of either kind.
+The layer of forwarding colour aliases that used to sit there is gone, so "base `:root` is
+colour-free" is now true of tokens as well as of literals.
 Every theme block defines the **identical** token surface: the contract test asserts each theme
 declares the same >100 token names plus its own palette anchors, and that no `var(--fab-*)`
 reference is left dangling.
-The `--fab-v2-*` aliases let legacy code migrate one token at a time.
+The namespace is ONE generation: a foundation token name carries no version or generation
+marker, and `tests/token-generation-gate.test.js` fails any that does.
 Every theme is dark, so app roots set `color-scheme: dark` and native controls and `<select>`
 popups match.
 
@@ -74,20 +112,29 @@ The spacing scale is canonically specified in `openspec/specs/ui-integration/spe
   /* spacing — 4px base */
   --fab-space-2xs:2px; --fab-space-1:4px; --fab-space-chip:6px; --fab-space-2:8px;
   --fab-space-3:12px; --fab-space-4:16px; --fab-space-5:20px; --fab-space-6:24px;
-  /* radius */
-  --fab-v2-radius-control:5px;   /* inputs, selects, chips */
-  --fab-v2-radius-panel:6px;     /* cards, panels, wells   */
-  /* sizing rhythm */
-  --fab-v2-control-height:34px; --fab-v2-icon-button:34px;
-  --fab-v2-thumb-sm:40px; --fab-v2-thumb-md:58px; --fab-v2-row-height:72px;
+  /* radius — the two the Books & Scrolls tab and the item-page inspector share.
+     OFF the canonical ladder below FOR THE ELEMENTS THEY PAINT: 5px is not a rung at
+     all, and 6px is the chip rung carried by a panel, which takes 11. They are carried
+     at their shipped values because correcting them moves pixels. */
+  --fab-books-control-radius:5px;      /* Books & Scrolls + inspector only */
+  --fab-books-panel-radius:6px;        /* Books & Scrolls + inspector only */
 }
 ```
 
-### 1.4 The six themes
+There is no control-height or thumbnail token.
+Heights are literal, which the design-system spec's *Geometry* requirement states outright, and
+the ladder itself is the rule rather than a token:
+
+```text
+control height  26 · 28 · 30 · 34 · 38 · 44   (32 · 36 · 40 are RETIRED)
+thumbnails and portraits carry their own ladder and are not controls
+```
+
+### 1.4 The seven themes
 
 The palettes are **not** duplicated here — `styles/fabricate.css` is the single source of
 truth for every colour literal, and copying them into this file only invites drift.
-Read the `:root[data-fabricate-theme="…"]` blocks there for the live values, and ship all six.
+Read the `:root[data-fabricate-theme="…"]` blocks there for the live values, and ship all seven.
 The default `fabricate` block is reproduced once below as a shape reference; treat the file, not
 this snippet, as authoritative.
 
@@ -136,36 +183,41 @@ ink for the SOLID accent fill, which `--fab-accent-text` does not replace.
 **Rarity / drop-rate ramp** (`--fab-drop-rate-*`, theme-constant):
 `guaranteed` `common` `uncommon` `rare` `very-rare` `legendary`.
 
-**Essence tags** (`--fab-tag-*`, per-theme tinted dots):
-`sage` `mist` `lavender` `rose` `peach` `butter` `aqua` `mauve`.
+**Entity tints** (`--fab-tag-*`, per-theme tinted dots):
+Thirteen are declared in every theme.
+Eight are offered in the picker — `sage` `mist` `lavender` `rose` `peach` `butter` `aqua`
+`mauve` — and five are declared but not offered: `ember` `verdant` `azure` `bone` `slate`.
+The tint colours a glyph, a badge ink or a bar fill, never a chip background, which would
+double-code kind against state.
+The `design-system` capability owns that rule and records which of the eight break the hue
+promise across themes; do not restate the measurements here.
 
-## 3. Typography — aspirational
+## 3. Typography
 
-> **Aspirational.**
-> The shipped app inherits Foundry's `--font-primary` (Signika in practice) for everything and
-> has no serif or mono token: `--fab-font-mono` is referenced once but never defined, so it
-> falls back to generic `monospace`.
-> The type ramp below is the target.
-> Adopting it is a tracked proposal — add `@font-face` for Spectral and JetBrains Mono, define
-> `--fab-font-serif` / `--fab-font-sans` / `--fab-font-mono` tokens, and apply serif to
-> entity/name surfaces and mono to dice/IDs.
-> Until then, style names and prose with the inherited `--font-primary`.
+> **Shipped.**
+> `styles/fabricate.css` declares `--fab-font-serif` (Spectral) and `--fab-font-mono`
+> (JetBrains Mono) in its `:root` block, with real `@font-face` rules for both, so use the
+> tokens rather than a font stack.
+> There is no `--fab-font-sans` and there is not meant to be: sans is Foundry core's Signika
+> through `--font-primary`, which every surface already inherits.
+> A serif heading must name the element it renders on — bare headings take core's colour and
+> margins — and the `design-system` capability states that rule and the shipped ramp's sizes.
+> The table below is the ROLE map, not a second copy of those sizes.
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
 
-| Role | Font (target) | Weight / size / lh |
-|---|---|---|
-| Page title | Spectral (serif) | 600 · 40px / 1.05 |
-| Section heading | Spectral | 600 · 30px / 1.1 |
-| Panel / entity title | Spectral | 600 · 20–22px / 1.15 |
-| Card / item name | Spectral | 600 · 13–14px |
-| Big value | Spectral | 700 · 28–30px · semantic colour |
-| Body copy | Signika (sans) | 400 · 13–14px / 1.5 |
-| Control / button label | Signika | 600–700 · 12–14px |
-| Section kicker | Signika | 700 · 10–11px · UPPER · tracking .12–.16em |
-| Dice / IDs | JetBrains Mono | 400–500 · 10–12px |
+| Role | Face |
+|---|---|
+| Page title, section heading, panel or entity title, card and row names, stat values | `--fab-font-serif` |
+| Body copy, control and button labels, section kickers | `--font-primary`, Foundry's Signika |
+| Dice formulas, run ids, token names, counts | `--fab-font-mono` |
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+The SIZES and weights each rung takes are the type ladder rendered in section 03 of
+`openspec/specs/design-system/library.html`, at the values the app ships.
+They are not restated here, because this file had them wrong: it drew the page title at 40px
+against the shipped 22px, and a second copy of a ladder is a second answer to one question.
 
 The intent: **serif names, sans explains.**
 If it names a thing (item, recipe, page) it takes the serif; UI, prose, and labels take the
@@ -175,16 +227,23 @@ sans; mono is only for dice formulas and run IDs.
 
 - **Spacing** (`--fab-space-*`, 4px base): the canonical scale is in
   `openspec/specs/ui-integration/spec.md`; prefer flex/grid with `gap`.
-- **Radius:** `--fab-v2-radius-control` **5px** (inputs, chips) · `--fab-v2-radius-panel` **6px**
-  (cards, panels) · **999px** pills.
-  Player-app cards commonly ride 8–12px; keep to 5 / 8 / 10 / 12 / 999.
+- **Radius:** the canonical ladder is in `openspec/specs/design-system/spec.md` — **6** for chips
+  at or below 24px, **7** for controls of 26–32px, **9** for controls of 34–38px and for rows and
+  wells, **11** for a 44px control and for cards and panels, **999** for pills and tracks.
+  Two shipped tokens, `--fab-books-control-radius` (5px) and `--fab-books-panel-radius` (6px),
+  are off that ladder **for the elements they paint** — 5px is not a rung at all, and 6px is the
+  chip rung carried by a panel, which takes 11.
+  They are read by the Books & Scrolls tab and the item-page inspector and by nothing else, and
+  they are named for the surface that carries them, not for a control class, precisely so they
+  read as that surface's debt rather than as a second ladder.
 - **Sizing rhythm:** control and icon-button **34** · thumb-sm **40** · thumb-md **58** ·
-  row **72**.
+  row **72**, written as literals.
 - **Elevation** (`--fab-shadow-*`): `-sm` 0 8 18 · `-md` 0 10 24 · `-lg` 0 14 38 (windows).
   Shadow tint is theme-scoped, keyed off each theme's darkest channel rather than fixed black.
-- **Focus ring:** the Foundry orange ring is overridden per app-area in `styles/fabricate.css`,
-  not in scoped Svelte `<style>` — see the "Foundry vs Fabricate CSS overrides" section of
-  `CONTRIBUTING.md` and the focus-ring rule in the UX-designer `SKILL.md`.
+- **Focus ring:** the Foundry orange ring is overridden once for the whole module in
+  `styles/fabricate.css`, at the module root `.fabricate` every Fabricate application emits, not
+  in scoped Svelte `<style>` (issue 1501) — see the "Foundry vs Fabricate CSS overrides" section
+  of `CONTRIBUTING.md` and the focus-ring rule in the UX-designer `SKILL.md`.
 
 ## 5. Shipped primitive inventory
 
@@ -213,8 +272,8 @@ A component that paints its own visuals BEHIND a native control — the chance s
 Exclude the type from every such rule, and enumerate them all before declaring it fixed: this exact bug shipped three times because two rules were patched and a third, reachable through a different ancestor, was missed.
 
 **A primitive must reference theme-ROOT tokens only.**
-`--fab-mv2-*` and similar aliases are declared inside `.fabricate-manager`, so an area-agnostic component that references one is fine in the manager and silently wrong everywhere else: outside that area the property is not in scope, the declaration becomes invalid at computed-value time, and the colour falls back to inheritance.
-Nothing fails and no test catches it — the trigger is exactly the reuse the primitive exists to enable.
+`--fab-manager-*` is the prefix for an area-scoped custom property, declared inside `.fabricate-manager`, so an area-agnostic component that references one is fine in the manager and silently wrong everywhere else: outside that area the property is not in scope, the declaration becomes invalid at computed-value time, and the value falls back to inheritance.
+Nothing fails at run time — the trigger is exactly the reuse the primitive exists to enable — and the two gates that DO catch it are source scans, not renders: `tests/token-generation-gate.test.js` forbids the prefix in any Svelte scoped `<style>`, and `manager-layout.test.js` checks the five shared primitives by name.
 Use tokens declared in `:root` or in all seven `.fabricate[data-fabricate-theme="…"]` blocks, and say so in the component's `<style>` so the next editor does not reintroduce it.
 
 **Svelte trims whitespace at the end of a block.**
@@ -229,11 +288,11 @@ Use the expression `{' '}`, which survives the trim.
 | `Callout` | `src/ui/svelte/apps/manager/Callout.svelte` | EVERY manager standing statement — a permanent `info` hint or a conditional `warning` hazard. One shape; tone changes colour only, never geometry or type |
 | `ExplainerCard` | `src/ui/svelte/apps/manager/ExplainerCard.svelte` | EVERY side-panel "how this surface works" card — glyph-led card title, glyph-led guidance rows with optional bold lead-ins, an optional trailing row of ghost docs links. It wears `.manager-inspector-card` and `.manager-card-title`, so never restate the card shell or heading scale per surface |
 | `IconFactRow` | `src/ui/svelte/apps/manager/IconFactRow.svelte` | EVERY side-panel derived-fact row — leading accent glyph, bold statement, muted qualifying line. The stacking container owns the list gap; the row owns the well |
-| `Medallion` | `src/ui/svelte/components/Medallion.svelte` | Manager entity imagery with the canonical fallback icon, surface, radius, and sizing |
-| `StatusPill` | `src/ui/svelte/components/StatusPill.svelte` | Semantic icon-plus-label state chips; never hand-roll a local status ramp |
+| `Medallion` | `src/ui/svelte/components/Medallion.svelte` | THE art tile, manager and player alike — a record's linked image with a glyph fallback, the canonical surface, radius and sizing, and a `tint` that recolours the glyph only. Player item/recipe imagery and its missing-art fallback resolve through `src/ui/svelte/util/craftingArtResolution.js` and pass the result to this tile; never hand-roll a second thumbnail |
+| `Avatar` | `src/ui/svelte/components/Avatar.svelte` | THE actor portrait — a person, a party, a vehicle or a place — with an INITIALS fallback where the art tile has a glyph one. `shape` is caller-supplied (round for people, rounded-square for the rest) because actor type is system-defined and eligibility comes from a world setting, not a type map; never hand-roll a second portrait tile |
+| `Chip` | `src/ui/svelte/components/Chip.svelte` | EVERY chip and state badge — the pill, its thirteen tones, its six densities and its three emphases. Semantic icon-plus-label state badges are `tone` plus `density`; never hand-roll a local status ramp and never mint a second pill |
 | `DropZone` | `src/ui/svelte/components/DropZone.svelte` | Shared drag/drop activation, disabled state, label, and active-class behavior |
 | `ChanceSlider` | `src/ui/svelte/components/ChanceSlider.svelte` | Synchronized number/range input, normalized value, semantic thumb, value fill, or full-track semantic scale |
-| `CraftingThumb` | `src/ui/svelte/apps/crafting/CraftingThumb.svelte` | Player-facing item/recipe imagery and missing-art fallback |
 | `CraftButton` | `src/ui/svelte/apps/crafting/CraftButton.svelte` | Player craft-action treatment and disabled/action state |
 | `RollResultBox` | `src/ui/svelte/apps/crafting/detail/RollResultBox.svelte` | Post-roll result hierarchy, total, message, and awarded-item presentation |
 | Manager row/card selection | `.manager-recipe-row` and sibling manager selectors in `styles/fabricate.css` | One consistent selected-row signal, spacing, action placement, and host-CSS override |
@@ -550,9 +609,11 @@ Critical/Warning count pills + a green-check / red-x checklist.
 5. **One loud thing per panel.**
    The primary number and its action win; everything else supports.
 6. **Snap to the scale.**
-   Space in 4px steps; radius 5 / 8 / 10 / 12 / 999; controls on the 34 / 40 / 42 rhythm.
+   Space in 4px steps; radius and control height come from the two ladders in
+   `openspec/specs/design-system/spec.md`, which §4 cites and reproduces — 32 / 36 / 40 are
+   RETIRED control heights, and 40 is a thumbnail size.
 7. **No colour literals in UI.**
-   Only `var(--fab-*)`; verify the screen reskins under all six themes before calling it done.
+   Only `var(--fab-*)`; verify the screen reskins under all seven themes before calling it done.
 8. **When it renders correctly in isolation but wrong in Foundry, read the runtime.**
    A Playwright repro that loads only `styles/fabricate.css` — or even Foundry's and the
    system's stylesheets too — omits the ancestor a view-scoped rule needs, so it renders

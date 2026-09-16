@@ -19,7 +19,13 @@
     // The View Lab / screenshot publisher writes a `.pr-body.md` staging file here.
     "ui-screenshot-artifact",
     // Generated from commit history by the release tooling.
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    // Frozen byte copies of AGENTS.md, CLAUDE.md and CONTRIBUTING.md as they stood before the
+    // harness-document split (issue #1661), read only by tests/doc-split-sentences.test.js. They
+    // lint clean today because they are copies of files that do — but they are a historical
+    // record, so the moment a rule change reddens one the only "fix" available is to edit the
+    // record, which is the one thing that must not happen to it.
+    "tests/fixtures/doc-split"
   ],
   // One-sentence-per-line rule (markdownlint-sentences-per-line, parser: "none").
   "customRules": ["markdownlint-sentences-per-line"],

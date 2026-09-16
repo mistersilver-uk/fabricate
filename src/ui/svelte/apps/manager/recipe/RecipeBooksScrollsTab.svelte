@@ -22,8 +22,10 @@
 -->
 <script>
   import EmptyState from '../EmptyState.svelte';
+  import ManagerButton from '../../../components/ManagerButton.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { DEFAULT_RECIPE_IMAGE } from '../../../util/recipeImageIcons.js';
+  import IconButton from '../../../components/IconButton.svelte';
 
   let {
     recipe = null,
@@ -159,13 +161,12 @@
                 >{definitionName(def)}</button
               >
             {/if}
-            <button
-              type="button"
-              class="manager-icon-button is-danger"
-              aria-label={text('FABRICATE.Admin.Manager.Recipe.UnlinkItem', 'Unlink recipe item')}
+            <IconButton
+              class="is-danger"
+              ariaLabel={text('FABRICATE.Admin.Manager.Recipe.UnlinkItem', 'Unlink recipe item')}
               title={text('FABRICATE.Admin.Manager.Recipe.UnlinkItem', 'Unlink recipe item')}
               onclick={() => unlinkDefinition(def)}
-              ><i class="fas fa-link-slash" aria-hidden="true"></i></button
+              ><i class="fas fa-link-slash" aria-hidden="true"></i></IconButton
             >
           </li>
         {/each}
@@ -191,9 +192,8 @@
       />
     {/if}
 
-    <button
-      type="button"
-      class="manager-button manager-recipe-tab-action"
+    <ManagerButton
+      class="manager-recipe-tab-action"
       data-recipe-open-books
       onclick={() => onOpenBooksScrolls()}
     >
@@ -205,7 +205,7 @@
         )}</span
       >
       <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
-    </button>
+    </ManagerButton>
   </div>
 </section>
 
@@ -277,16 +277,12 @@
   }
 
   .manager-recipe-book-name.is-link {
-    color: var(--fab-mv2-accent);
+    color: var(--fab-accent);
     cursor: pointer;
   }
 
   .manager-recipe-book-name.is-link:hover {
     text-decoration: underline;
-  }
-
-  .manager-recipe-tab-action {
-    align-self: flex-start;
   }
 
   /* Grid parity with `.manager-recipe-access-list` (issue 740/796): a thumb + a name + an

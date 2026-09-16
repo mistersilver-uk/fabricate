@@ -7,9 +7,11 @@
   the products that option produces. Renders nothing for a single-set recipe.
 -->
 <script>
+  import Medallion from '../../../components/Medallion.svelte';
+  import { resolveCraftingArt } from '../../../util/craftingArtResolution.js';
   import { localize } from '../../../util/foundryBridge.js';
-  import CraftingThumb from '../CraftingThumb.svelte';
   import { ingredientOptionStatus } from '../../../util/ingredientOptionStatus.js';
+  import Kicker from '../../../components/Kicker.svelte';
 
   let { sets = [], selectedSetId = null, onChoose = null } = $props();
 
@@ -38,9 +40,9 @@
 
 {#if multiple}
   <section class="crafting-set-selector" data-recipe-section="ingredient-sets">
-    <p class="crafting-detail-section-title">
+    <Kicker as="p">
       {localize('FABRICATE.App.Crafting.Detail.IngredientSetsTitle')}
-    </p>
+    </Kicker>
     <div class="crafting-option-cards" role="group">
       {#each options as set (set.id)}
         {@const status = statusOf(set)}
@@ -72,13 +74,13 @@
           </span>
           {#if products.length > 0}
             <div class="crafting-option-products">
-              <span class="crafting-option-products-caption">
+              <Kicker as="span">
                 {localize('FABRICATE.App.Crafting.Detail.OptionProduces')}
-              </span>
+              </Kicker>
               <ul class="crafting-option-product-grid">
                 {#each products as product, index (product.name + index)}
                   <li class="crafting-option-product" title={product.name}>
-                    <CraftingThumb src={product.img} alt="" size={40} />
+                    <Medallion {...resolveCraftingArt(product.img)} alt="" size={40} />
                     <span class="crafting-option-product-pip">×{product.qty}</span>
                   </li>
                 {/each}
@@ -213,13 +215,6 @@
     gap: 4px;
   }
 
-  .crafting-option-products-caption {
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--fab-text-muted);
-  }
-
   .crafting-option-product-grid {
     margin: 0;
     padding: 0;
@@ -257,14 +252,5 @@
     line-height: 1;
     font-variant-numeric: tabular-nums;
     box-shadow: var(--fab-shadow-sm);
-  }
-
-  .crafting-detail-section-title {
-    margin: 0;
-    font-size: 12px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--fab-text-muted);
   }
 </style>

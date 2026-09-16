@@ -240,4 +240,263 @@ describe('BulkSelectionToolbar hook and row-class parameters (issue 1010)', () =
       assert.ok(!root.querySelector(`[${hook}]`), `${hook} belongs to a non-empty selection`);
     }
   });
+
+  // ── THE TWO PARAMETERS ISSUE 1373 ADDED, AND WHERE THEIR CSS HAS TO LIVE ───────────────────
+  it('renders the standing hint only when one is given', async () => {
+    const bare = await toolbar.mount({ count: 3 });
+    assert.ok(
+      !bare.querySelector('.fab-bulk-selection-hint'),
+      'the default renders a hint element, so the three studios are no longer byte-identical'
+    );
+
+    const hinted = await toolbar.mount({ count: 3, hint: 'Bulk actions are in the inspector' });
+    const hint = hinted.querySelector('.fab-bulk-selection-hint');
+    assert.ok(Boolean(hint), 'the hint prop rendered nothing');
+    assert.equal(hint.textContent.trim(), 'Bulk actions are in the inspector');
+  });
+
+  it('draws the two actions as bare type only when asked, glyph and underline together', async () => {
+    // `proto:595` is a bare clickable span in `--info` with NO border; `proto:596` is the same
+    // shape in `--subtle` with NO glyph. The `fa-xmark` this component draws is not invented —
+    // `proto:626` is the INSPECTOR PANEL's Clear and it carries one — it is the panel's treatment
+    // borrowed for the band, where the reference states the plainer one.
+    //
+    // BOTH HALVES ON ONE PROP, and both directions asserted: a variant that dropped the glyph and
+    // kept the underline would satisfy either clause on its own.
+    const shipped = await toolbar.mount({ count: 3, showSelectAllResults: true });
+    assert.ok(
+      Boolean(shipped.querySelector('.fab-bulk-selection-clear i')),
+      'the default lost the xmark, so the three studios are no longer byte-identical'
+    );
+    assert.ok(
+      !shipped.querySelector('.fab-bulk-selection-link').classList.contains('is-bare'),
+      'the default marks the link bare, so the studios lose their underline too'
+    );
+
+    const bare = await toolbar.mount({ count: 3, showSelectAllResults: true, bareActions: true });
+    assert.ok(
+      !bare.querySelector('.fab-bulk-selection-clear i'),
+      '`Clear` still draws the panel’s xmark, which `proto:596` does not'
+    );
+    assert.ok(
+      bare.querySelector('.fab-bulk-selection-link').classList.contains('is-bare'),
+      'the link never takes the class its underline override is keyed on'
+    );
+    // AND THE LABEL SURVIVES THE GLYPH. Removing the `<i>` from a button whose accessible name is
+    // its text is safe; removing the text would not be, and the two edits look alike in a diff.
+    assert.match(bare.querySelector('.fab-bulk-selection-clear').textContent, /Clear/);
+
+    // THE OVERRIDE IS A RULE, not just a class. A `class:` directive with no selector behind it
+    // renders identically to one with a broken selector.
+    const source = readFileSync(
+      resolve(repoRoot, 'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte'),
+      'utf8'
+    );
+    assert.match(
+      source,
+      /\.fab-bulk-selection-link\.is-bare\s*\{[^}]*border-bottom:\s*0/,
+      'nothing removes the underline `proto:595` does not draw'
+    );
+  });
+
+  it('draws the count glyph the caller names, and defaults to the studios’ own', async () => {
+    // ── THE COUNT IS A THIRD OBJECT, NOT A THIRD ACTION ──────────────────────────────────────
+    // `proto:593` draws the band's count as `700 11px var(--sans)` in `--accent` behind a
+    // `fa-solid fa-check-double` at `font-size:10px; margin-right:6px`. Measured in Chromium
+    // against the production layering, everything but the glyph already matches: 10.88px / 700 /
+    // `#E8C6A7`, and a 6px optical gap from `--fab-space-chip`. The one real divergence is WHICH
+    // GLYPH, and that is markup — no stylesheet can swap an element the template renders, which
+    // is why this is a prop and not a rule.
+    //
+    // A PROP OF ITS OWN rather than a third clause on `bareActions`: see the note beside
+    // `countIcon`'s declaration. Both directions are asserted, because a component that ignored
+    // the prop and one that hard-coded the design's glyph for everybody each satisfy one clause.
+    const shipped = await toolbar.mount({ count: 2 });
+    const shippedGlyph = shipped.querySelector('.fab-bulk-selection-count > i');
+    assert.ok(Boolean(shippedGlyph), 'the count lost its leading glyph outright');
+    assert.deepEqual(
+      authoredClasses(shippedGlyph),
+      ['fa-layer-group', 'fas'],
+      'the default moved off the stack glyph, so the Component, Recipe and Essence Studios — and ' +
+        'the two font-size fixtures that hand-copy this markup — no longer render what ships'
+    );
+
+    const band = await toolbar.mount({ count: 2, countIcon: 'fa-solid fa-check-double' });
+    const bandGlyph = band.querySelector('.fab-bulk-selection-count > i');
+    assert.ok(Boolean(bandGlyph), 'the named glyph rendered no element at all');
+    assert.deepEqual(
+      authoredClasses(bandGlyph),
+      ['fa-check-double', 'fa-solid'],
+      'the caller names a glyph and the count draws the shipped one anyway'
+    );
+    // STILL DECORATIVE. The count's accessible name is the `N selected` text beside it; a glyph
+    // that lost `aria-hidden` would be announced as an unnamed image in the middle of it.
+    assert.equal(bandGlyph.getAttribute('aria-hidden'), 'true', 'the glyph is decoration');
+    // AND THE LABEL SURVIVES THE SWAP, which is the edit next to it in any future diff.
+    assert.match(band.querySelector('.fab-bulk-selection-count').textContent, /2 selected/);
+
+    // AND THE CATALOGUE ACTUALLY ASKS FOR IT. A prop nobody passes renders the shipped glyph on
+    // every screen while both mounted directions above stay green.
+    const frame = readFileSync(
+      resolve(repoRoot, 'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte'),
+      'utf8'
+    );
+    assert.match(
+      frame,
+      /countIcon="fa-solid fa-check-double"/,
+      'the scoped catalogue band never opts in, so `proto:593`’s glyph ships nowhere'
+    );
+  });
+
+  // ── `selectAllScope`: THE BAND WITHOUT ITS MASTER BOX (issue 1371, gap-list row 37) ────────
+  it('keeps the master box and the results wording under the shipped scope', async () => {
+    // THE DEFAULT HALF, asserted first and in both directions. A prop that suppressed the box
+    // for everybody would still satisfy every `'shown'` assertion below.
+    const root = await toolbar.mount({
+      pageSelectionState: 'some',
+      count: 3,
+      showSelectAllResults: true,
+      selectAllResultsCount: 9
+    });
+    assert.ok(
+      Boolean(root.querySelector('[data-component-select-all-page]')),
+      'the shipped band lost its tri-state box, so the three studios cannot start a selection from it'
+    );
+    assert.equal(
+      root.querySelector('[data-component-select-all-results]').textContent.trim(),
+      'Select all 9 results',
+      'the shipped band names the FILTERED set, which is the population its link acts on'
+    );
+  });
+
+  it('drops the master box and names the SHOWN rows under selectAllScope="shown"', async () => {
+    // `proto:592-596` draws a count, a standing sentence, one `Select all {n} shown` and Clear —
+    // no master box anywhere, and its one action selects the rows on screen. Both halves are one
+    // ruling, so both are asserted together: a variant that dropped the box and kept `results`
+    // would offer the filtered set with no way to take the page.
+    const root = await toolbar.mount({
+      pageSelectionState: 'some',
+      count: 3,
+      showSelectAllResults: true,
+      selectAllResultsCount: 9,
+      selectAllScope: 'shown'
+    });
+    assert.ok(
+      !root.querySelector('[data-component-select-all-page]'),
+      'the master box is still drawn beside a link that already covers the rows it acts on'
+    );
+    assert.ok(
+      !root.querySelector('.fab-bulk-selection-all'),
+      'and its label host goes with it — an empty click target is worse than no control'
+    );
+    assert.equal(
+      root.querySelector('[data-component-select-all-results]').textContent.trim(),
+      'Select all 9 shown',
+      'the one remaining action still names `results`, which is not the population it now takes'
+    );
+    // The count, the hint and Clear are untouched by the scope: it is a ruling about the
+    // select-all pair and nothing else.
+    assert.match(
+      root.querySelector('[data-component-selection-count]').textContent,
+      /3 selected/,
+      'the count is the fact the band acts on and is not part of this ruling'
+    );
+    assert.ok(Boolean(root.querySelector('[data-component-clear-selection]')), 'Clear survives');
+  });
+
+  it('renders NOTHING under "shown" while the selection is empty, rather than an empty row', async () => {
+    // Everything except the box lives behind `count > 0`, so suppressing the box leaves a
+    // bordered, padded row with no children — `.is-selection` in the global sheet gives that row
+    // its metrics and its hairline, so it is visible. `proto:591` gates the whole band on the
+    // selection for exactly this reason.
+    const empty = await toolbar.mount({ count: 0, selectAllScope: 'shown' });
+    assert.ok(
+      !empty.querySelector('[data-component-selection-toolbar]'),
+      'an empty band still renders its bordered row with nothing inside it'
+    );
+
+    // AND THE DEFAULT STILL RENDERS AT ZERO, which is the assertion that keeps the one above
+    // from being a licence to delete the band: the shipped studios show the box at zero selection
+    // because the box is how a selection starts.
+    const shipped = await toolbar.mount({ count: 0 });
+    assert.ok(
+      Boolean(shipped.querySelector('[data-component-selection-toolbar]')),
+      'the shipped band stopped rendering at zero selection, which deletes the control that starts one'
+    );
+  });
+
+  it('renders the shipped band for an unrecognised scope rather than deleting its box', async () => {
+    // The closed-set contract `Chip`'s tone and `ManagerButton`'s role both state: a typo shows
+    // up as the default, never as a silently missing control.
+    for (const selectAllScope of ['results', 'Shown', 'page', '', undefined]) {
+      const root = await toolbar.mount({ count: 2, selectAllScope });
+      assert.ok(
+        Boolean(root.querySelector('[data-component-select-all-page]')),
+        `\`${String(selectAllScope)}\` is not a scope this band offers, so it renders the shipped one`
+      );
+      toolbar.remount();
+    }
+  });
+
+  it('groups the two text actions at the trailing edge only when asked, and pays for the pair', () => {
+    // ── WHY THIS IS A SOURCE ASSERTION AND NOT A MOUNTED ONE ─────────────────────────────────
+    // happy-dom computes no cascade, so the mounted tree can state that `is-trailing` is on the
+    // element and never that the margin moved. The real geometry is measured in a browser by
+    // `scoped-list-inspector-geometry.test.js`. What is pinned HERE is the thing that measurement
+    // cannot see: WHICH FILE the two declarations are written in.
+    //
+    // `styles/fabricate.css` ships at `layer(modules)` — `module.json` gives it no explicit layer
+    // and Foundry imports an unlayered module sheet there, which `tests/view-lab/cascade.css`
+    // reproduces. This component's scoped block is injected unlayered at runtime, and an
+    // unlayered declaration beats a layered one whatever the specificity. So the obvious
+    // authoring of this rule — a higher-specificity selector in the global sheet — is emitted,
+    // matches, and has its declaration silently discarded. It was written that way first and the
+    // View Lab is what caught it.
+    const source = readFileSync(
+      resolve(repoRoot, 'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte'),
+      'utf8'
+    );
+    assert.match(
+      source,
+      /\.fab-bulk-selection-link\.is-trailing\s*\{[^}]*margin-left:\s*auto/,
+      'the trailing-group margin is not in this component’s scoped block'
+    );
+    // AND THE SECOND HALF, which is the one an eye skips: two flex items each carrying
+    // `margin-left: auto` SPLIT the free space rather than both moving right, so `Clear` has to
+    // give its own back or the pair sits half a band apart.
+    assert.match(
+      source,
+      /\.fab-bulk-selection-link\.is-trailing\s*\+\s*\.fab-bulk-selection-clear\s*\{[^}]*margin-left:\s*0/,
+      '`Clear` keeps its own auto margin beside a trailing link, so the free space splits'
+    );
+
+    // COMMENTS STRIPPED FIRST, and that is not tidiness: the sheet's own note about this rule
+    // NAMES both selectors, so a comment-blind scan reports the explanation as the violation and
+    // the guard can never go green. It also has to still bite, so `fails on a real rule` below is
+    // the negative half.
+    const sheet = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8').replace(
+      /\/\*[\s\S]*?\*\//g,
+      ''
+    );
+    const declarations = sheet
+      .split('}')
+      .filter((block) => /\.fab-bulk-selection-(link|clear)[^{]*\{/.test(block));
+    assert.deepEqual(
+      declarations,
+      [],
+      'a rule in `styles/fabricate.css` targets this primitive’s own elements. That sheet is ' +
+        'layered and this block is not, so the rule is discarded silently — author it here.'
+    );
+
+    // THE SCAN IS PROVED TO BITE, on the sheet's own text plus one synthetic rule. A
+    // comment-stripping filter that stripped too much would report zero on every input, which is
+    // indistinguishable from a clean sheet.
+    const seeded = `${sheet}\n.fabricate-manager .x .fab-bulk-selection-clear { margin-left: 0; }`;
+    assert.equal(
+      seeded.split('}').filter((block) => /\.fab-bulk-selection-(link|clear)[^{]*\{/.test(block))
+        .length,
+      1,
+      'the scan cannot see a rule in the global sheet at all, so its green above means nothing'
+    );
+  });
 });

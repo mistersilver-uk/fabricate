@@ -28,6 +28,7 @@ import {
   bulkTarget,
   cardSubject,
   craftingSystemLookup,
+  recordedSalvageResults,
 } from './helpers/bulkSalvageFixtures.js';
 
 /** A localizer that renders each key as a readable, greppable token. */
@@ -340,7 +341,7 @@ describe('the per-system chatOutput gate reaches the card, not just the model', 
     const service = new BulkSalvageService({
       salvage: async (actorUuid, systemId, componentId) => ({
         success: true,
-        results: [{ name: `${componentId} ingot`, img: 'icons/ingot.webp' }],
+        results: recordedSalvageResults([{ name: `${componentId} ingot`, img: 'icons/ingot.webp' }]),
       }),
       getCraftingSystem: craftingSystemLookup([
         bulkSystem({
@@ -369,9 +370,15 @@ describe('the per-system chatOutput gate reaches the card, not just the model', 
   it('a subject appears iff ITS OWN system has chatOutput enabled', async () => {
     // Acceptance 9. Each system's GM decides independently whether Fabricate narrates,
     // and a run can span systems — so this is a per-subject filter, not a run-level one.
-    const { posted } = await runTwoSystems({ chatOutputA: true, chatOutputB: false });
+    const { posted, result } = await runTwoSystems({ chatOutputA: true, chatOutputB: false });
     assert.equal(posted.length, 1);
     assert.match(posted[0].content, /Iron Ore/);
+    // Mutation control: both rows must genuinely SUCCEED and the qualifying row's
+    // acknowledged award must reach the table. Without these the subject row still
+    // renders its component name when every row errored, so the filter reads as proved
+    // by a card built from two failures.
+    assert.equal(result.counts.succeeded, 2, 'every salvage row must genuinely succeed');
+    assert.match(posted[0].content, /comp-ore ingot/, 'and its recovered contribution');
     assert.doesNotMatch(posted[0].content, /Boar Hide/);
     assert.doesNotMatch(posted[0].content, /comp-hide ingot/, 'nor its recovered contribution');
   });
@@ -381,5 +388,69 @@ describe('the per-system chatOutput gate reaches the card, not just the model', 
     assert.equal(posted.length, 0, 'nothing — not an empty card');
     assert.equal(result.posted, false);
     assert.equal(result.counts.succeeded, 2, 'and the run itself still happened');
+  });
+});
+
+describe('buildBulkSalvageChatContent: every row’s complications on the ONE card (issue 1286)', () => {
+  /** Three rows, two of which fired something. */
+  const MODEL = {
+    status: 'succeeded',
+    actorNames: ['Akra'],
+    counts: { total: 3, succeeded: 3, failed: 0 },
+    subjects: [
+      cardSubject({ name: 'Iron Ore' }),
+      cardSubject({ name: 'Boar Hide' }),
+      cardSubject({ name: 'Cave Bone' }),
+    ],
+    complications: [
+      {
+        name: 'Shrapnel Burst',
+        description: 'Splinters spray across the bench.',
+        severity: 'major',
+        componentName: 'Iron Ingot',
+      },
+      {
+        name: 'Rancid Stench',
+        description: 'The hide sours as it parts.',
+        severity: 'minor',
+        componentName: 'Cured Leather',
+      },
+    ],
+  };
+
+  it('renders one complications section carrying every row, not one section per row', () => {
+    const html = card(MODEL);
+    assert.equal(
+      occurrences(html, 'fabricate-craft-chat__section--complications'),
+      1,
+      'ONE section: a bulk run is not one resolution, but it is one card'
+    );
+    assert.ok(html.includes('Shrapnel Burst'), 'the first row’s complication');
+    assert.ok(html.includes('Rancid Stench'), 'the third row’s complication');
+    assert.ok(
+      html.includes('Iron Ingot') && html.includes('Cured Leather'),
+      'each names its own stage occurrence, or two rows’ beats are indistinguishable'
+    );
+  });
+
+  it('reads the shared complications heading key, not a bulk-only one', () => {
+    const asked = [];
+    buildBulkSalvageChatContent(MODEL, (key) => {
+      asked.push(key);
+      return loc(key);
+    });
+    assert.ok(
+      asked.includes(SALVAGE_CHAT_KEYS.complications),
+      'the salvage map forwards the crafting map’s key rather than spelling a fourth'
+    );
+    assert.ok(
+      asked.every((key) => !key.includes('BulkSalvageComplications')),
+      'and no bulk-only complications key was invented'
+    );
+  });
+
+  it('a run that fired nothing renders no section at all', () => {
+    const html = card({ ...MODEL, complications: [] });
+    assert.ok(!html.includes('--complications'), 'no empty heading, no empty grid');
   });
 });

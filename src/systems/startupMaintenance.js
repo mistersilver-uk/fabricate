@@ -15,14 +15,28 @@
  * whole-map replacement, so gating it on the recipe basis alone would wipe every `salvage:`
  * key whenever the component basis is incomplete.
  *
+ * `componentIdentityRemap` is a kind about CURRENCY rather than COMPLETENESS, and it is
+ * declared only by the two passes that prune against COMPONENT ids (issue 1363). The `1.30.0`
+ * world-scope migration MOVES component ids, and the pass that repairs every actor-side
+ * reference to them runs later in the same `ready` tick and on the active GM alone. In that
+ * window the corpus is complete — so `components: true` is honest — while an in-flight salvage
+ * run and a `salvage:<componentId>` ordering key both still name the OLD id. Gating on
+ * completeness alone deletes them. Crafting runs are NOT declared on it: they key on recipe
+ * and system ids, and neither is ever re-keyed.
+ *
  * @type {Readonly<Record<string, readonly string[]>>}
  */
 export const STARTUP_PASS_ENTITY_KINDS = Object.freeze({
   'crafting runs': Object.freeze(['recipes', 'systems']),
   'phantom crafting runs': Object.freeze(['recipes']),
-  'salvage runs': Object.freeze(['systems', 'components']),
+  'salvage runs': Object.freeze(['systems', 'components', 'componentIdentityRemap']),
   'learned recipes': Object.freeze(['recipes']),
-  'stale preferences': Object.freeze(['recipes', 'systems', 'components']),
+  'stale preferences': Object.freeze([
+    'recipes',
+    'systems',
+    'components',
+    'componentIdentityRemap',
+  ]),
 });
 
 /**

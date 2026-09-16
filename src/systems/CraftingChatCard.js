@@ -35,9 +35,74 @@
  * pattern this module exists to avoid. `renderTierStep` now renders what
  * `tierStepText` returns, and the `null` return preserves its "no note at all" branch
  * exactly (see that function's contract).
+ *
+ * ## The complications block lives here and serves all FOUR builders (issue 1286)
+ *
+ * A fired component complication has to reach the crafting card, the salvage card, the
+ * gathering card and the aggregated bulk-salvage card. Four copies of one `<li>` shape
+ * is the duplication this module already exists to prevent, so {@link renderComplications}
+ * is a single renderer parameterised by the BEM block token its caller's card uses —
+ * `craft` for the three that emit `fabricate-craft-chat`, `gather` for the gathering
+ * card. The gathering card imports it rather than growing a second copy, which is the
+ * first thing that module has ever taken from this one.
+ *
+ * Two properties of that renderer are load-bearing rather than incidental:
+ *
+ *  - **It is the escaping boundary.** A complication contributes a GM-authored `name`
+ *    and a free-prose `description`, and Fabricate imports third-party crafting systems,
+ *    so a hostile definition carrying markup is the threat model — not a typo. EVERY
+ *    authored string routes through {@link esc}, and every attribute the block writes is
+ *    DOUBLE-quoted, because `esc` deliberately does not escape `'`.
+ *  - **It returns `''` for an empty list**, exactly as {@link renderSection} does, so a
+ *    component with no complications produces a card byte-identical to the pre-change
+ *    build in all four builders. That identity is asserted, not assumed.
  */
 
 const ITEM_FALLBACK_IMG = 'icons/svg/item-bag.svg';
+
+/**
+ * The ONE heading key every complications block reads, whichever card draws it.
+ *
+ * Shared across the four builders on the `FABRICATE.Chat.Roll` precedent — the crafting,
+ * salvage and bulk cards already read one key for a label that means the same thing in
+ * all of them — rather than authored four times with four family prefixes. A complication
+ * is the same object on every card, so four keys would be four chances for a locale to
+ * disagree with itself about what to call it.
+ *
+ * It is a FLAT leaf in the `Chat` namespace, matching every other card key; see
+ * `BulkSalvageChatCard.js`'s key-map docblock for why a container object beneath that
+ * namespace must never be authored, and why neither the namespace nor a container path is
+ * spelled out as a dotted literal in prose anywhere under `src`.
+ */
+const COMPLICATIONS_HEADING_KEY = 'FABRICATE.Chat.Complications';
+
+/**
+ * The key that names WHICH stage occurrence a complication row belongs to (issue 1286).
+ *
+ * Deliberately the salvage panel's own vocabulary — `FABRICATE.App.Complications.ResultEyebrow`
+ * reads `Result {position} · {name} · DC {difficulty}` — reduced to the part a chat row needs.
+ * The number MUST mean on this card exactly what it means on that panel: the 1-based place of
+ * the entry in the list the player is looking at, counting every stage, gaps included. A number
+ * that meant anything else would be worse than no number at all, because the player would look
+ * for it in a list where it names a different row.
+ *
+ * A FLAT leaf in the `Chat` namespace, on the same rule as the heading key above.
+ */
+const COMPLICATION_POSITION_KEY = 'FABRICATE.Chat.ComplicationResult';
+
+/**
+ * The card BEM blocks a complications block can be rendered into, by token.
+ *
+ * A token rather than a free-text prefix, and resolved through `Object.hasOwn` for the
+ * reason `BulkSalvageChatCard.js`'s `STATUS_MODIFIERS` lookup already records: a bare
+ * index reaches the prototype, and this value is interpolated into a `class` attribute.
+ * Making the vocabulary closed means no caller-supplied string can ever reach a class
+ * name, which is a stronger guarantee than escaping one would be.
+ */
+const COMPLICATION_BLOCKS = Object.freeze({
+  craft: 'fabricate-craft-chat',
+  gather: 'fabricate-gather-chat',
+});
 
 /**
  * The crafting label-key map for {@link buildResultCard}: the subject is the
@@ -58,6 +123,7 @@ export const CRAFTING_CHAT_KEYS = Object.freeze({
   failureReason: 'FABRICATE.Chat.FailureReason',
   consumedOnFailure: 'FABRICATE.Chat.ConsumedOnFailure',
   producedOnFailure: 'FABRICATE.Chat.ProducedOnFailure',
+  complications: COMPLICATIONS_HEADING_KEY,
 });
 
 /** Escape text destined for HTML so user-authored names cannot inject markup. */
@@ -160,6 +226,182 @@ export function renderSection({ heading, entries, modifier }) {
 }
 
 /**
+ * Render ONE fired complication as a list item in the shared grid (issue 1286).
+ *
+ * Three authored strings reach it and all three are hostile-by-assumption: `name` and
+ * `description` are GM prose, and `severity` is a vocabulary token that the persisted
+ * shape deliberately PRESERVES when malformed, so it is not safe to treat as one of the
+ * three known words. Every one of them goes through {@link esc}.
+ *
+ * `severity` is carried as a double-quoted `data-` attribute rather than interpolated
+ * into a class name: it is the block's only attribute that carries authored text, so it
+ * is where the double-quoting rule is actually load-bearing (`esc` does not escape `'`,
+ * by design and by the shipped contract every other card already relies on). It renders
+ * no visible text, so it needs no localization and adds no key.
+ *
+ * `componentName` is the STAGE OCCURRENCE's component, resolved by the engine. It is on
+ * the row because a player reading "you missed the iron ingot" against a card that also
+ * GRANTED an iron ingot cannot otherwise reconcile the two.
+ *
+ * `positionText` is the already-localized "Result N" sentence, or `''`. It sits between the
+ * component and the prose because it QUALIFIES the component — it says which of that
+ * component's occupancies of the list this row is about — so the identity half of the row
+ * reads as one phrase and the authored prose still ends it.
+ *
+ * @param {{name?: string, description?: string, severity?: string, componentName?: string}} entry
+ * @param {string} block The resolved BEM block, from {@link COMPLICATION_BLOCKS}.
+ * @param {string} [positionText] The localized stage-position sentence, or '' for none.
+ * @returns {string}
+ */
+function renderComplication(entry, block, positionText = '') {
+  const parts = [`<span class="${block}__complication-name">${esc(entry?.name)}</span>`];
+  if (entry?.componentName) {
+    parts.push(`<span class="${block}__complication-source">${esc(entry.componentName)}</span>`);
+  }
+  if (positionText) {
+    parts.push(`<span class="${block}__complication-position">${esc(positionText)}</span>`);
+  }
+  if (entry?.description) {
+    parts.push(`<span class="${block}__complication-description">${esc(entry.description)}</span>`);
+  }
+  return [
+    `<li class="${block}__item ${block}__item--complication" data-fabricate-complication-severity="${esc(entry?.severity)}">`,
+    `<span class="${block}__label">${parts.join(' — ')}</span>`,
+    '</li>',
+  ].join('');
+}
+
+/**
+ * The RENDERED identity of one complication row: every string the row actually emits.
+ *
+ * Two entries sharing this produce byte-identical markup, whatever differs underneath —
+ * which is the only definition of "indistinguishable" that answers the reader's question.
+ * Keyed on what is drawn rather than on `(componentId, complicationId)` deliberately: two
+ * DIFFERENT complications that a GM happened to name and word identically on one component
+ * are just as unreadable as one complication fired twice, and want the same treatment.
+ *
+ * `severity` is in the key even though it draws no visible text, because it is emitted as a
+ * `data-` attribute and drives the row's styling — two rows differing in it already differ.
+ *
+ * @param {object} entry
+ * @returns {string}
+ */
+function complicationSignature(entry) {
+  return JSON.stringify([
+    String(entry?.name ?? ''),
+    String(entry?.description ?? ''),
+    String(entry?.severity ?? ''),
+    String(entry?.componentName ?? ''),
+  ]);
+}
+
+/**
+ * The signatures that occur more than once in ONE rendered list.
+ *
+ * @param {Array<object>} entries
+ * @returns {Set<string>}
+ */
+function repeatedComplicationSignatures(entries) {
+  const seen = new Set();
+  const repeated = new Set();
+  for (const entry of entries) {
+    const signature = complicationSignature(entry);
+    if (seen.has(signature)) repeated.add(signature);
+    else seen.add(signature);
+  }
+  return repeated;
+}
+
+/**
+ * The localized "Result N" sentence for one row, or '' when this row cannot state a
+ * position.
+ *
+ * A non-integer or non-positive `position` degrades to no sentence rather than to
+ * "Result null": the field is absent on a firing minted before it existed, and a card is a
+ * permanent world document, so the safe failure is silence.
+ *
+ * @param {object} entry
+ * @param {(key: string) => string} localize Key-only lookup.
+ * @returns {string}
+ */
+function complicationPositionText(entry, localize) {
+  const position = entry?.position;
+  if (!Number.isInteger(position) || position < 1) return '';
+  return String(localize(COMPLICATION_POSITION_KEY)).replace('{position}', String(position));
+}
+
+/**
+ * Render the fired-complications section, or '' when nothing fired (issue 1286).
+ *
+ * The ONE renderer all four card builders use. It emits only classes the shipped
+ * `fabricate-craft-chat` / `fabricate-gather-chat` rules already define, plus a
+ * `--complication` element modifier and a `--complications` section modifier for which
+ * there is deliberately no rule yet — the same "unstyled modifier lands on the base
+ * treatment" move `BulkSalvageChatCard.js`'s `--mixed` makes, so this needs no new CSS
+ * and cannot regress a card that has none.
+ *
+ * ## The caller has already redacted
+ *
+ * This renders whatever it is given, so the audience filter is NOT here: every caller
+ * feeds it the output of `publicComplications`, which is the only projection that may
+ * reach a player. Putting a filter here as well would put the disclosure guarantee in two
+ * places and make it ambiguous which one is authoritative.
+ *
+ * ## The stage position appears ONLY where it disambiguates (issue 1286)
+ *
+ * A complication fires once per RESULT ENTRY, so a component staged twice that went wrong
+ * twice legitimately contributes two rows carrying the same authored strings. Those rows
+ * must not be merged — `openspec/specs/resolution-modes/spec.md` forbids de-duplicating
+ * them, because each is an independently rolled consequence — so they are told apart
+ * instead, by naming the entry's place in the list the player is looking at.
+ *
+ * The rule is: a row states its position when, and only when, ANOTHER row in the SAME
+ * rendered list would draw identically. That is the whole test, and it is deliberately
+ * narrower than "every row states its position": a complication that fired once is already
+ * unambiguous, and a number appended to it is noise a reader has to check against the panel
+ * before learning nothing. The decision therefore belongs HERE and nowhere upstream — this
+ * is the one place that sees the FINAL row set, which for the aggregate bulk card is
+ * assembled from many separate resolutions that no single engine call can see.
+ *
+ * Rows from different components never collide, because the component name is part of the
+ * identity; a bulk card listing two components each at their own position 1 stays silent.
+ *
+ * @param {object} options
+ * @param {Array<object>} [options.entries] Already-redacted complication rows.
+ * @param {string} [options.heading] The already-localized section heading.
+ * @param {'craft'|'gather'} [options.card] Which card's BEM block to emit.
+ * @param {(key: string) => string} [options.localize] Key-only lookup for the position
+ *   sentence. Defaults to identity, matching every other builder in this module.
+ * @returns {string} HTML, or '' when there is nothing to render.
+ */
+export function renderComplications({
+  entries,
+  heading,
+  card = 'craft',
+  localize = (key) => key,
+} = {}) {
+  if (!Array.isArray(entries) || entries.length === 0) return '';
+  const block = Object.hasOwn(COMPLICATION_BLOCKS, card)
+    ? COMPLICATION_BLOCKS[card]
+    : COMPLICATION_BLOCKS.craft;
+  const repeated = repeatedComplicationSignatures(entries);
+  return [
+    `<section class="${block}__section ${block}__section--complications">`,
+    `<div class="${block}__heading">${esc(heading)}</div>`,
+    `<ul class="${block}__grid">`,
+    ...entries.map((entry) =>
+      renderComplication(
+        entry,
+        block,
+        repeated.has(complicationSignature(entry)) ? complicationPositionText(entry, localize) : ''
+      )
+    ),
+    '</ul>',
+    '</section>',
+  ].join('');
+}
+
+/**
  * Build the HTML content for a result chat card (crafting or salvage), keyed by a
  * label-key map so the SAME markup and `fabricate-craft-chat` styles back both.
  *
@@ -180,6 +422,10 @@ export function renderSection({ heading, entries, modifier }) {
  * @param {{mode:'target'|'up'|'down',steps:number}} [model.tierStep] - Realized routed
  *   tier-step evidence (`data.tierStepApplied`), present only on an actual tier change.
  * @param {string}  [model.failureReason]
+ * @param {Array<{name:string,description:string,severity:string,componentName:string}>}
+ *   [model.complications] - Component complications this resolution FIRED, already
+ *   redacted to the player-visible set by the caller (issue 1286). Absent or empty
+ *   renders nothing at all, so a system authoring none is byte-identical.
  * @param {object}  keys - The label-key map (e.g. {@link CRAFTING_CHAT_KEYS}).
  * @param {(key:string)=>string} [localize] - Localization lookup; defaults to identity.
  * @returns {string} HTML string suitable for ChatMessage content.
@@ -242,6 +488,15 @@ export function buildResultCard(model = {}, keys, localize = (key) => key) {
     ].filter(Boolean);
   }
 
+  // LAST, after what the resolution produced and what it cost: a complication is a
+  // consequence OF the award, so it reads as one only once the award has been stated.
+  const complications = renderComplications({
+    entries: model.complications,
+    heading: loc(keys.complications),
+    card: 'craft',
+    localize: loc,
+  });
+
   return [
     `<div class="fabricate-craft-chat fabricate-craft-chat--${stateModifier}">`,
     '<header class="fabricate-craft-chat__header">',
@@ -252,6 +507,7 @@ export function buildResultCard(model = {}, keys, localize = (key) => key) {
     tierStep,
     notice,
     ...sections,
+    complications,
     '</div>',
   ]
     .filter(Boolean)
@@ -280,6 +536,7 @@ export function buildCraftingChatContent(model = {}, localize = (key) => key) {
       rollValue: model.rollValue,
       tierStep: model.tierStep,
       failureReason: model.failureReason,
+      complications: model.complications,
     },
     CRAFTING_CHAT_KEYS,
     localize

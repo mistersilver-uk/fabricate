@@ -1,0 +1,21 @@
+function _vocabularyBasis(vocabulary) {
+  return vocabulary.length > 0 ? vocabulary : null;
+}
+
+  _scopeBasis(system) {
+    return {
+      componentIds: _scopeEntityBasis(
+        _resolveStoreSeam(this._componentScopeStore),
+        system?.components ?? system?.managedItems ?? system?.items
+      ),
+      essenceIds: _scopeEntityBasis(
+        _resolveStoreSeam(this._essenceScopeStore),
+        system?.essenceDefinitions ?? system?.essences
+      ),
+      toolIds: _scopeEntityBasis(_resolveStoreSeam(this._toolScopeStore), system?.tools),
+      componentCategories: _vocabularyBasis(
+        normalizeCustomComponentCategories(system?.componentCategories)
+      ),
+      recipeCategories: _vocabularyBasis(normalizeCustomRecipeCategories(system?.categories)),
+    };
+  }

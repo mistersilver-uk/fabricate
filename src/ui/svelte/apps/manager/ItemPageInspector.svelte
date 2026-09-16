@@ -19,7 +19,11 @@
    - onToggleQuickLimit(id, limited): flip Limited use / Limited learning.
 -->
 <script>
-  import Chip from './Chip.svelte';
+  import Chip from '../../components/Chip.svelte';
+  import ManagerButton from '../../components/ManagerButton.svelte';
+  import StatusToggle from '../../components/StatusToggle.svelte';
+  import InspectorCard from '../../components/InspectorCard.svelte';
+  import StatBox from '../../components/StatBox.svelte';
   import { localize } from '../../util/foundryBridge.js';
 
   let {
@@ -132,7 +136,7 @@
 <div class="manager-books-scrolls-inspector" data-item-page-inspector>
   {#if !item}
     <div class="manager-inspector-empty" data-item-page-empty>
-      <i class="fas fa-book-sparkles" aria-hidden="true"></i>
+      <i class="fas fa-book" aria-hidden="true"></i>
       <p class="manager-muted">
         {text(
           'FABRICATE.Admin.Manager.BooksScrolls.SelectHint',
@@ -155,12 +159,12 @@
           <Chip tone={recipeCount === 0 ? 'danger' : 'neutral'} data-item-page-type
             >{typePillLabel()}</Chip
           >
-          <button
-            type="button"
-            class={`manager-status-toggle ${enabled ? 'is-on' : 'is-off'}`}
-            aria-pressed={enabled}
-            data-item-page-toggle
-            aria-label={enabled
+          <StatusToggle
+            on={enabled}
+            label={enabled
+              ? text('FABRICATE.Admin.Manager.StatusOn', 'On')
+              : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}
+            ariaLabel={enabled
               ? text('FABRICATE.Admin.Manager.BooksScrolls.DisableNamed', 'Disable {name}').replace(
                   '{name}',
                   item.resolvedName
@@ -169,17 +173,9 @@
                   '{name}',
                   item.resolvedName
                 )}
+            data-item-page-toggle=""
             onclick={() => onToggleEnabled(item.id, !enabled)}
-          >
-            <span class="manager-status-toggle-track" aria-hidden="true"
-              ><span class="manager-status-toggle-knob"></span></span
-            >
-            <span class="manager-status-toggle-label"
-              >{enabled
-                ? text('FABRICATE.Admin.Manager.StatusOn', 'On')
-                : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}</span
-            >
-          </button>
+          />
         </span>
       </div>
     </div>
@@ -193,31 +189,29 @@
     </p>
 
     <div class="manager-books-scrolls-stat-grid" data-item-page-stats>
-      <div class="manager-books-scrolls-stat" data-item-page-stat="recipes">
-        <div class="manager-books-scrolls-stat-value" data-item-page-recipe-count>
-          {recipeCount}
-        </div>
-        <div class="manager-books-scrolls-stat-label">
-          {text('FABRICATE.Admin.Manager.BooksScrolls.Recipes', 'Recipes')}
-        </div>
-      </div>
-      <div
-        class="manager-books-scrolls-stat"
-        data-item-page-stat={isItemMode ? 'uses' : 'learning'}
-      >
-        <div class="manager-books-scrolls-stat-value is-accent" data-item-page-mid-value>
-          {midValue}
-        </div>
-        <div class="manager-books-scrolls-stat-label" data-item-page-mid-label>{midLabel}</div>
-      </div>
-      <div class="manager-books-scrolls-stat" data-item-page-stat="learned-by">
-        <div class="manager-books-scrolls-stat-value" data-item-page-learned-by>
-          {item.learnedByCount || 0}
-        </div>
-        <div class="manager-books-scrolls-stat-label">
-          {text('FABRICATE.Admin.Manager.BooksScrolls.LearnedBy', 'Learned by')}
-        </div>
-      </div>
+      <StatBox
+        value={recipeCount}
+        label={text('FABRICATE.Admin.Manager.BooksScrolls.Recipes', 'Recipes')}
+        dataAttr="data-item-page-stat"
+        dataValue="recipes"
+        valueDataAttr="data-item-page-recipe-count"
+      />
+      <StatBox
+        value={midValue}
+        label={midLabel}
+        tone="info"
+        dataAttr="data-item-page-stat"
+        dataValue={isItemMode ? 'uses' : 'learning'}
+        valueDataAttr="data-item-page-mid-value"
+        labelDataAttr="data-item-page-mid-label"
+      />
+      <StatBox
+        value={item.learnedByCount || 0}
+        label={text('FABRICATE.Admin.Manager.BooksScrolls.LearnedBy', 'Learned by')}
+        dataAttr="data-item-page-stat"
+        dataValue="learned-by"
+        valueDataAttr="data-item-page-learned-by"
+      />
     </div>
 
     <div class="manager-books-scrolls-recipes-inside" data-item-page-recipes-inside>
@@ -253,10 +247,7 @@
       {/if}
     </div>
 
-    <section
-      class="manager-inspector-card manager-books-scrolls-quick-limits"
-      data-item-page-quick-limits
-    >
+    <InspectorCard class="manager-books-scrolls-quick-limits" data-item-page-quick-limits="">
       <div class="manager-inspector-title-row">
         <span class="manager-inspector-icon" aria-hidden="true"><i class="fas fa-sliders"></i></span
         >
@@ -281,38 +272,30 @@
           <span>{quickSub}</span>
         </span>
         <span class="manager-rule-field">
-          <button
-            type="button"
-            class={`manager-status-toggle ${quickLimited ? 'is-on' : 'is-off'}`}
-            aria-pressed={quickLimited}
-            data-item-page-quick-limit-toggle
-            aria-label={isItemMode
+          <StatusToggle
+            on={quickLimited}
+            label={quickLimited
+              ? text('FABRICATE.Admin.Manager.StatusOn', 'On')
+              : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}
+            ariaLabel={isItemMode
               ? text('FABRICATE.Admin.Manager.BooksScrolls.LimitedUse', 'Limited use')
               : text('FABRICATE.Admin.Manager.BooksScrolls.LimitedLearning', 'Limited learning')}
+            data-item-page-quick-limit-toggle=""
             onclick={() => onToggleQuickLimit(item.id, !quickLimited)}
-          >
-            <span class="manager-status-toggle-track" aria-hidden="true"
-              ><span class="manager-status-toggle-knob"></span></span
-            >
-            <span class="manager-status-toggle-label"
-              >{quickLimited
-                ? text('FABRICATE.Admin.Manager.StatusOn', 'On')
-                : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}</span
-            >
-          </button>
+          />
         </span>
       </div>
-    </section>
+    </InspectorCard>
 
-    <button
-      type="button"
-      class="manager-button is-primary manager-books-scrolls-edit-action"
+    <ManagerButton
+      role="primary"
+      class="manager-books-scrolls-edit-action"
       data-item-page-edit
       onclick={() => onOpenRecipeItem(item.id)}
     >
       <i class="fas fa-pen" aria-hidden="true"></i>
       <span>{text('FABRICATE.Admin.Manager.BooksScrolls.EditRecipeItem', 'Edit recipe item')}</span>
-    </button>
+    </ManagerButton>
   {/if}
 </div>
 
@@ -360,31 +343,6 @@
     gap: var(--fab-space-2);
   }
 
-  .manager-books-scrolls-stat {
-    padding: var(--fab-space-2) var(--fab-space-3);
-    border: 1px solid var(--fab-mv2-border);
-    border-radius: var(--fab-v2-radius-panel);
-    background: var(--fab-bg-1);
-    text-align: center;
-  }
-
-  .manager-books-scrolls-stat-value {
-    font-size: 1.15rem;
-    font-weight: 700;
-    color: var(--fab-text);
-  }
-
-  .manager-books-scrolls-stat-value.is-accent {
-    color: var(--fab-info-text);
-  }
-
-  .manager-books-scrolls-stat-label {
-    margin-top: var(--fab-space-2xs);
-    font-size: 0.7rem;
-    font-weight: 500;
-    color: var(--fab-text-subtle);
-  }
-
   .manager-books-scrolls-recipes-inside {
     display: flex;
     flex-direction: column;
@@ -402,8 +360,8 @@
     align-items: center;
     gap: var(--fab-space-2);
     padding: var(--fab-space-2);
-    border: 1px solid var(--fab-mv2-border);
-    border-radius: var(--fab-v2-radius-panel);
+    border: 1px solid var(--fab-border);
+    border-radius: var(--fab-books-panel-radius);
     background: var(--fab-bg-1);
     min-width: 0;
   }
@@ -415,7 +373,7 @@
     width: 24px;
     height: 24px;
     flex: none;
-    border-radius: var(--fab-v2-radius-control);
+    border-radius: var(--fab-books-control-radius);
     background: var(--fab-bg-3);
     color: var(--fab-accent);
     font-size: 0.65rem;
@@ -436,18 +394,44 @@
     padding-left: var(--fab-space-2);
   }
 
-  .manager-books-scrolls-quick-limits {
+  /* `:global()` AND CHAINED (issue 1427), for the reason the `.manager-books-scrolls-edit-action`
+     rule below states for `<ManagerButton>`. The quick-limits card is an `<InspectorCard>` now,
+     so `manager-books-scrolls-quick-limits` rides the `class` prop onto an element THIS
+     component does not write, and Svelte stamps its `svelte-<hash>` only onto the ones it does.
+     This half of the sweep was the LOUD one — the component spreads no attributes onto a regular
+     element, so the compiler pruned the descendant rule and `lint:svelte:warnings` named it. The
+     bare rule beside it did NOT warn and was equally dead, so both are repaired.
+     `.manager-inspector-card` is chained rather than left off so the selector stays at (0,2,0),
+     exactly where the scoped form put it. */
+  :global(.manager-inspector-card.manager-books-scrolls-quick-limits) {
     margin: 0;
   }
 
-  .manager-books-scrolls-quick-limits .manager-rule-row {
+  /* Same repair, and WHOLLY `:global()` rather than a `:global()` ancestor with a scoped
+     descendant — which is the form that looks right and quietly changes the cascade. Svelte
+     writes the hash as `:where(.svelte-<hash>)`, worth nothing, only while the selector has
+     another scoped compound to carry it; leave `.manager-rule-row` as the ONLY scoped compound
+     and the compiler emits a bare `.svelte-<hash>` instead, taking the rule from (0,3,0) to
+     (0,4,0). Measured, not assumed. Inside the `:global()` it stays at (0,3,0), and the ancestor
+     compound is written by nothing but this component, so the match set is unchanged. */
+  :global(.manager-inspector-card.manager-books-scrolls-quick-limits .manager-rule-row) {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: var(--fab-space-2);
   }
 
-  .manager-books-scrolls-edit-action {
+  /* `:global()` AND CHAINED (issue 1118), for the two reasons `BulkEditPanelShell` gives at
+     length. `:global()` because this is a `<ManagerButton>` now, and Svelte stamps its
+     `svelte-<hash>` class onto the elements this component WRITES rather than onto a child
+     component's internals — a scoped selector would have matched nothing while the compiler,
+     `lint:svelte:warnings` and every hand-stamped fixture all reported clean, and this
+     button would have quietly stopped filling the rail and stopped sitting on its bottom
+     edge. Chained because `justify-content` is stated by the base control at (0,2,0) and a
+     bare `:global(.manager-books-scrolls-edit-action)` would be (0,1,0); naming the ancestor
+     and both primitive classes puts all three declarations at (0,4,0), which is decided by
+     specificity rather than by which sheet the browser loaded last. */
+  :global(.fabricate-manager .manager-button.fab-manager-button.manager-books-scrolls-edit-action) {
     width: 100%;
     justify-content: center;
     margin-top: auto;

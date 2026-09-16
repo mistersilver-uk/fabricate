@@ -19,14 +19,28 @@
   IDENTITY FIRST, then the stepper: the card was once a single five-column run rendering
   −, qty, +, icon, name, which put the control before the thing it counted.
 
-  The class names are the SHIPPED ones. `.manager-component-essence-card`, `-identity`,
-  `-icon` and `-name` moved out of the global sheet into this scoped block unchanged, so
-  the editor renders what it rendered before the extraction. What stayed global is the
-  PARENT grid (`.manager-component-essence-grid`), because the editor's 4-up and the bulk
-  panel's 2-up are host layout, not card identity.
+  THE TILE IS THE SHARED `Medallion` (issue 1371 r18-colour, maintainer ruling M29). The card
+  used to draw its own 22px span and take a `color` prop for the glyph's ink — a prop the editor
+  passed and nothing ever fed, because the editor's option builder is a whitelist rebuild that
+  never named the colour, so every tile painted the accent. The reference draws the tile as a
+  22px slate chip with the glyph in the essence's colour (`proto:5717`: `width: 22px; height:
+  22px; border-radius: 6px; background: var(--bg3); color: e.color`), which is exactly the
+  `variant="glyph-chip"` face the bulk panels' essence rows already draw at the same size, so
+  the card now renders that medallion rather than a second tile of its own. The colour arrives
+  as the BARE `--fab-tag-*` key the Essence Catalogue stores (`colorToken`), the same shape
+  `Medallion`'s `tint` and `Chip`'s `tint` validate; the retired `color` prop took an authored
+  CSS colour, which no projection ever produced.
+
+  The class names are the SHIPPED ones. `.manager-component-essence-card`, `-identity` and
+  `-name` moved out of the global sheet into this scoped block unchanged, so the editor
+  renders what it rendered before the extraction. What stayed global is the PARENT grid
+  (`.manager-component-essence-grid`), because the editor's 4-up and the bulk panel's 2-up are
+  host layout, not card identity.
 
   Props:
    - id / name / icon: the essence's identity. `icon` falls back to a mortar-and-pestle.
+   - colorToken: the essence's own colour as a bare `--fab-tag-*` key, or '' for the untinted
+     tile (the accent glyph the tile has always painted).
    - quantity: the current amount. Zero renders the receding `is-inactive` treatment — an
      essence the GM has not used is still the control they would use to add one.
    - disabled: disables the stepper (a saving editor, an inert panel section).
@@ -39,12 +53,14 @@
   an extraction would move the surface and its seams in one commit.
 -->
 <script>
+  import Medallion from '../../../components/Medallion.svelte';
   import Stepper from '../../../components/Stepper.svelte';
 
   let {
     id = '',
     name = '',
     icon = '',
+    colorToken = '',
     quantity = 0,
     disabled = false,
     ariaLabel = '',
@@ -65,9 +81,15 @@
   data-component-essence-active={active}
 >
   <div class="manager-component-essence-identity">
-    <span class="manager-component-essence-icon" aria-hidden="true">
-      <i class={icon || 'fas fa-mortar-pestle'}></i>
-    </span>
+    <!-- `size` and `glyph` are the reference's 22px tile and its 10px glyph; the variant owns the
+         absent edge and the slate fill that does not follow the tint. See the header note. -->
+    <Medallion
+      icon={icon || 'fas fa-mortar-pestle'}
+      size={22}
+      glyph={10}
+      tint={colorToken || ''}
+      variant="glyph-chip"
+    />
     <strong class="manager-component-essence-name" title={name}>{name}</strong>
   </div>
 
@@ -85,10 +107,11 @@
 </article>
 
 <style>
-  /* Manager-scoped by PLACEMENT: this component lives under `apps/manager/`, so
-     `--fab-mv2-*` (declared on `.fabricate-manager` in styles/fabricate.css) is always in
-     scope for it. That is the opposite of `SelectionCheckbox`, which is area-agnostic and
-     may use theme-root tokens only — do not carry that rule over to here.
+  /* THEME-ROOT tokens only. The reason once recorded here — that living under
+     `apps/manager/` puts an area-scoped `--fab-manager-*` property in scope — has LAPSED:
+     a scoped `<style>` may not reach one from ANY directory (design-system spec, *The token
+     namespace is one generation and names its purpose*). `SelectionCheckbox` records the
+     same rule for the same reason; it is no longer the opposite case.
 
      TWO rows — identity (tile + label) above, the stepper below — not a single run. The
      card is TINTED by whether the component contributes this essence at all, so a GM
@@ -102,15 +125,17 @@
     align-content: start;
     min-width: 0;
     padding: var(--fab-space-2) var(--fab-space-2);
-    border: 1px solid color-mix(in srgb, var(--fab-mv2-accent) 32%, transparent);
-    border-radius: 10px;
-    background: color-mix(in srgb, var(--fab-mv2-accent) 8%, var(--fab-mv2-surface-2));
+    /* `proto:5716`: a contributing tile is `--fab-bg-1` behind a `border-strong` hairline, not an
+       accent wash. Radius 10 snaps to the 9 rung (`design-system/spec.md:220`). */
+    border: 1px solid var(--fab-border-strong);
+    border-radius: 9px;
+    background: var(--fab-bg-1);
   }
 
   /* No essence contributed: this card is a control the GM has not used. It recedes rather
      than disappearing — the stepper is still how they would add one. */
   .manager-component-essence-card.is-inactive {
-    border-color: var(--fab-mv2-border);
+    border-color: var(--fab-border);
     background: var(--fab-surface-soft);
     opacity: 0.6;
   }
@@ -122,24 +147,14 @@
     min-width: 0;
   }
 
-  .manager-component-essence-icon {
-    display: inline-flex;
-    flex: 0 0 auto;
-    align-items: center;
-    justify-content: center;
-    width: 22px;
-    height: 22px;
-    border-radius: 6px;
-    background: var(--fab-overlay-light-06);
-    color: var(--fab-mv2-accent);
-    font-size: 0.7rem;
-  }
-
+  /* `proto:5717`: 11.5px/600 in the SECONDARY ink, ellipsised. The tile's subject is the
+     numeral below it, so the name recedes a rung rather than competing with it. */
   .manager-component-essence-name {
     min-width: 0;
     overflow: hidden;
-    color: var(--fab-mv2-text);
-    font-size: 0.76rem;
+    color: var(--fab-text-secondary);
+    font-weight: 600;
+    font-size: 0.72rem;
     text-overflow: ellipsis;
     white-space: nowrap;
   }

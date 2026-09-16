@@ -13,6 +13,7 @@
 -->
 <script>
   import { DEFAULT_GATHERING_EVENT_IMG } from '../../../../gatheringImageDefaults.js';
+  import Kicker from '../../components/Kicker.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import {
     riskClass,
@@ -133,9 +134,7 @@
 
     {#if hasDetails}
       <div class="gathering-event-detail-card" data-gathering-event-details>
-        <p class="gathering-event-detail-card-heading">
-          {localize('FABRICATE.App.Gathering.Detail.EventConditionsHeading')}
-        </p>
+        <Kicker as="p">{localize('FABRICATE.App.Gathering.Detail.EventConditionsHeading')}</Kicker>
 
         {#if weatherChips.length > 0}
           <div class="gathering-event-detail-group" data-gathering-event-match="weather">
@@ -355,15 +354,6 @@
     border: 1px solid var(--fab-border);
     border-radius: 8px;
     background: var(--fab-surface);
-  }
-
-  .gathering-event-detail-card-heading {
-    margin: 0;
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--fab-text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
   }
 
   .gathering-event-detail-group {

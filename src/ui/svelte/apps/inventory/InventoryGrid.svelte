@@ -84,6 +84,17 @@
       />
     </div>
   {:else}
+    <!-- HAND-ROLLED, AND DEFERRED RATHER THAN CONVERTED (issue 1514). Every other one-line
+         empty in this tab is `EmptyState note` now. This one is not, and the reason is a
+         property of that variant rather than of this site: `note` declares
+         `place-items: start` and `text-align: left` on ITSELF, so a caller cannot restore a
+         centred line through a wrapper — an inherited alignment loses to the variant's own
+         declaration. Measured in the View Lab at the default window: this sentence is a
+         full-width centred line 48.25px tall standing in for the whole 630px card grid, and
+         under `note` it became a 146.55px line 26px tall in the top-left corner of that
+         column. `filtered` centres but keeps the dashed panel, which is the box the frame-move
+         rule forbids. So it goes to the geometry-and-gaps register with the measurement, and
+         a centred one-line form is what would close it. -->
     <p class="inventory-grid-empty" data-inventory-grid-empty>
       {filtering
         ? localize('FABRICATE.App.Inventory.NoMatches')
@@ -135,10 +146,22 @@
   }
 
   /*
-    Pagination.svelte renders .manager-pagination* markup that is
-    .fabricate-manager-scoped in the GM app and therefore UNSTYLED in the player
-    app. Theme it here with base --fab-* tokens as a single compact inline row,
-    matching the Crafting browser's pagination treatment.
+    Pagination.svelte renders .manager-pagination* markup. Theme it here with base
+    --fab-* tokens as a single compact inline row, matching the Crafting browser's
+    pagination treatment. (Written before issue 1502, when that markup really was
+    .fabricate-manager-scoped and so unstyled here; see the note below.)
+  */
+  /*
+    ISSUE 1502 — THE PAGER'S SHEET RULES NOW REACH THIS BLOCK, and the `1502 base` declarations
+    below are what stops that moving the frame. `Pagination` and `IconButton` are rooted at the
+    classes they emit, so `styles/fabricate.css` paints this player-app pager where it previously
+    only painted the manager's — the markup is no longer "unstyled" here, which is why that word
+    is gone from the sentence above. Every property this block already declares still WINS (a
+    Svelte `:global` block is injected unlayered; the sheet is imported at `layer(modules)`), so
+    only the remainder is newly painted — and each `1502 base` declaration restates what the
+    remainder rendered BEFORE the widening, which for this control is Foundry core's own `button`
+    / `select` chrome. The per-property audit for all six player callers is in
+    `components/Pagination.svelte`'s docblock.
   */
   .inventory-grid-pagination :global(.manager-pagination) {
     display: flex;
@@ -149,6 +172,9 @@
     border-top: 1px solid var(--fab-border);
     font-size: 12px;
     color: var(--fab-text-muted);
+    /* 1502 base: the sheet's `background: var(--fab-overlay-light-03)` is newly painted here
+       and this bar has always been transparent. */
+    background: transparent;
   }
 
   .inventory-grid-pagination :global(.manager-pagination-summary) {
@@ -169,6 +195,11 @@
   .inventory-grid-pagination :global(.manager-pagination-page) {
     color: var(--fab-text);
     white-space: nowrap;
+    /* 1502 base: the sheet newly paints `min-width: 96px` and `font-weight: 700` on this
+       label. It has always been a content-width flex item at the inherited weight; the
+       sheet's `text-align: center` is adopted and is inert on a content-width box. */
+    min-width: auto;
+    font-weight: 400;
   }
 
   .inventory-grid-pagination :global(.manager-pagination-size) {
@@ -180,15 +211,26 @@
     white-space: nowrap;
   }
 
-  .inventory-grid-pagination :global(.manager-pagination-size select) {
-    height: 26px;
-    border: 1px solid var(--fab-border);
-    border-radius: 6px;
+  /* 1504: the per-page control is a `<Select size="inline">`, so its height, corner, border
+     and colour come from the sheet's `.fabricate-select*` family rather than from this block.
+     Its height (30) and corner (7) are the `inline` rung's, where this block declared 26 and 6;
+     only the border and the ink are unchanged. Only the FILL is this pager's own, and the
+     sheet's family note records how this block still beats the family for it. */
+  .inventory-grid-pagination :global(.manager-pagination-size .fabricate-select-trigger) {
     background: var(--fab-surface);
-    color: var(--fab-text);
+    /* And this row REFUSES the pager's 64px width floor, as it refused the same floor on the
+       native select it replaces: the footer is one nowrap line in a narrow column, and a floor
+       is the thing that would wrap it. */
+    min-width: 0;
   }
 
   .inventory-grid-pagination :global(.manager-icon-button) {
+    /* 1502 base: Foundry core's `button` rule gives every button `min-height: 2em` and
+       `font-size: var(--font-size-14)`, and the sheet newly overrides both with
+       `min-height: 0` and `font: inherit`. Restated, so the arrow keeps its 28px box (the
+       core minimum, not the 26px below) and the chevron keeps its 14px glyph. */
+    min-height: var(--button-size, 2em);
+    font-size: var(--font-size-14, 0.875rem);
     flex: 0 0 auto;
     width: 26px;
     height: 26px;
@@ -196,7 +238,7 @@
     align-items: center;
     justify-content: center;
     border: 1px solid var(--fab-border);
-    border-radius: 6px;
+    border-radius: 7px; /* 1504: the specimen's icon rung, so the pager reads as one pair */
     background: var(--fab-surface);
     color: var(--fab-text);
     cursor: pointer;

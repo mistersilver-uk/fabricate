@@ -1,4 +1,3 @@
-<!-- Svelte 5 runes mode -->
 <script>
   let {
     value = 0,
@@ -8,7 +7,7 @@
     numberLabel = 'Percentage',
     rangeLabel = 'Percentage',
     unit = '%',
-    resolveColor = () => 'var(--fab-mv2-accent)',
+    resolveColor = () => 'var(--fab-accent)',
     trackGradient = '',
     controlClass = '',
     stopPropagation = false,
@@ -89,7 +88,15 @@
   }
 </script>
 
-<span class="manager-chance-slider manager-drop-rate-value" data-chance-slider>
+<!-- THE FAMILY ROOT, WRITTEN INLINE: this component composes no class array, so its namespace
+     root is the FIRST token of this element's own attribute, as `Pagination.svelte` writes its.
+     Every rule the family owns is rooted at that class — this element as a COMPOUND, everything
+     else as a descendant chain beneath it — so a hand-built fixture copying this tree has to copy
+     the root as well, or it measures an unstyled default while reporting on this primitive by
+     name. The root also carries the family's font FLOOR for the two `<input>`s below, declared
+     beside the other families' floors near the top of the sheet rather than in this family's own
+     block. -->
+<span class="fabricate-slider manager-chance-slider manager-drop-rate-value" data-chance-slider>
   <span class="manager-chance-slider-number manager-drop-rate-percent">
     <input
       {...numberInputProps}

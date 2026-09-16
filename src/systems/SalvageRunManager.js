@@ -1,4 +1,9 @@
 import { RunContainerManagerBase } from './runContainerStore.js';
+import {
+  assertNativeEffectsUninvoked,
+  historyEvidenceFields,
+  nativeHistoryRecord,
+} from './runHistoryEvidence.js';
 import { selectWritableActors } from './writableActors.js';
 
 const HISTORY_LIMIT = 50;
@@ -34,11 +39,21 @@ export class SalvageRunManager extends RunContainerManagerBase {
     );
   }
 
+  _normalizeContainer(raw) {
+    const container = super._normalizeContainer(raw);
+    return {
+      active: Object.fromEntries(
+        Object.entries(container.active).map(([id, run]) => [id, nativeHistoryRecord(run)])
+      ),
+      history: container.history.map(nativeHistoryRecord),
+    };
+  }
+
   async createRun(actor, runData = {}) {
     const container = this._getContainer(actor);
     const now = this._nowWorldTime();
     const runId = foundry.utils.randomID();
-    const run = {
+    const run = nativeHistoryRecord({
       // Defaults first; `...runData` lets the caller override; then the
       // authoritative fields below are re-asserted so they cannot be clobbered.
       craftingSystemId: null,
@@ -53,11 +68,12 @@ export class SalvageRunManager extends RunContainerManagerBase {
       createdResults: [],
       failureReason: undefined,
       ...runData,
+      ...historyEvidenceFields(runData),
       id: runId,
       actorUuid: runData.actorUuid || actor.uuid,
       userId: runData.userId ?? game.user?.id ?? null,
       updatedAt: now,
-    };
+    });
 
     if (run.status === 'waitingTime' || run.status === 'inProgress') {
       container.active[runId] = run;
@@ -77,7 +93,7 @@ export class SalvageRunManager extends RunContainerManagerBase {
     const container = this._getContainer(actor);
     if (!container.active?.[run.id]) return null;
     run.updatedAt = this._nowWorldTime();
-    container.active[run.id] = run;
+    container.active[run.id] = nativeHistoryRecord(run);
     await this._persist(actor, container);
     return run;
   }
@@ -108,23 +124,61 @@ export class SalvageRunManager extends RunContainerManagerBase {
 
   async markRunInProgress(actor, run) {
     if (!run) return null;
+    if (run.status === 'inProgress') return run;
     run.status = 'inProgress';
     run.updatedAt = this._nowWorldTime();
     return this.updateRun(actor, run);
   }
 
+  /**
+   * Archive an active run to history with a terminal status and whatever the caller has
+   * to record about how it ended.
+   *
+   * ## The payload is NOT an allowlist, and one field now depends on that
+   *
+   * `...payload` is spread wholesale between the run and the authoritative status fields,
+   * so any key a caller passes lands on the persisted record and survives the
+   * flag round-trip — `_normalizeContainer` normalizes the CONTAINER, never the individual
+   * run records. That is a deliberate property of this class (the salvage `resultOrder`
+   * capture already relies on it) and it is what lets `salvage()` write
+   * `firedComplications` here rather than amending an archived entry afterwards, which
+   * this class offers no way to do (issue 1286).
+   *
+   * `firedComplications` is `[{resultId, componentId, complicationId, buckets}]` and is
+   * REDACTED BY THE CALLER, at the write, through `publicComplications`. That is not a
+   * caller courtesy this class could take over: the container is an actor flag replicated
+   * to every client with permission on the actor — for a player character, the owning
+   * player — so a `gmOnly` complication reaching this method has already leaked, whatever
+   * this method then does with it. Redacting on the way OUT would be too late and would
+   * also be the wrong shape, because history records are read straight off the flag by
+   * surfaces that never call back through here.
+   *
+   * The list may legitimately hold SEVERAL records differing only in `resultId`: a
+   * complication fires per result entry, so a component staged twice that went wrong twice
+   * wrote two firings. Nothing on the write path may de-duplicate them.
+   *
+   * A run that fired nothing player-visible carries no such key at all, matching the
+   * omitted-when-default doctrine the rest of the persisted shapes follow.
+   *
+   * @param {Actor} actor
+   * @param {object} run The active run being completed.
+   * @param {'succeeded'|'failed'|'cancelled'} [status]
+   * @param {object} [payload] Terminal evidence, spread verbatim onto the record.
+   * @returns {Promise<object>} the archived record.
+   */
   async completeRun(actor, run, status = 'succeeded', payload = {}) {
     const container = this._getContainer(actor);
     if (!container.active?.[run.id]) return run;
 
     const now = this._nowWorldTime();
-    const completed = {
+    const completed = nativeHistoryRecord({
       ...run,
       ...payload,
+      ...historyEvidenceFields(payload),
       status,
       updatedAt: now,
       finishedAt: payload.finishedAt ?? now,
-    };
+    });
 
     delete container.active[run.id];
     container.history.unshift(completed);
@@ -138,6 +192,7 @@ export class SalvageRunManager extends RunContainerManagerBase {
   async cancelRun(actor, runId, reason = 'Salvage cancelled') {
     const run = this.getActiveRun(actor, runId);
     if (!run) return null;
+    assertNativeEffectsUninvoked(run);
     return this.completeRun(actor, run, 'cancelled', {
       failureReason: run.failureReason || reason,
     });
@@ -173,24 +228,20 @@ export class SalvageRunManager extends RunContainerManagerBase {
     // connects and its startup pass catches up any matured run.
     if (this._isPrimaryGM() !== true) return;
     for (const actor of game.actors || []) {
-      const container = this._getContainer(actor);
-      let dirty = false;
-
-      for (const run of Object.values(container.active || {})) {
+      for (const run of this.getActiveRuns(actor)) {
         if (run.status !== 'waitingTime') continue;
         if (!run.timeGate) continue;
         if (Number(worldTime) < Number(run.timeGate.availableAt || 0)) continue;
-
+        assertNativeEffectsUninvoked(run);
+        const container = this._getContainer(actor);
+        if (!container.active[run.id]) continue;
         run.status = 'inProgress';
         run.updatedAt = Number(worldTime);
-        dirty = true;
+        container.active[run.id] = run;
+        await this._persist(actor, container);
         if (typeof onReadyRun === 'function') {
           await onReadyRun(actor, run);
         }
-      }
-
-      if (dirty) {
-        await this._persist(actor, container);
       }
     }
   }

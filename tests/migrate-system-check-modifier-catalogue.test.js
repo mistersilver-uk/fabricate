@@ -210,19 +210,20 @@ test('the export upcast lifts an imported bundle’s catalogue and rewrites its 
     recipes: [],
   };
   const migrated = migrateExportPayload(bundle);
-  // The upcast chain does not stop at `1.22.0`: `1.23.0`'s mirror runs immediately after it
-  // and merges the just-lifted catalogue into `system.modifiers`, so the ASSERTION IS ON THE
-  // END OF THE CHAIN. That composition is the point — a bundle and a world have to reach one
-  // state by one route — and asserting the intermediate key would pin a state no imported
-  // bundle is ever in.
-  assert.deepEqual(migrated.system.modifiers, CATALOGUE);
+  // The upcast chain does not stop at `1.22.0`: `1.23.0`'s mirror merges the just-lifted
+  // catalogue into `system.modifiers`, and `1.28.0`'s then lifts THAT into the envelope's
+  // `characterLibraries` slice, so the ASSERTION IS ON THE END OF THE CHAIN. That composition is
+  // the point — a bundle and a world have to reach one state by one route — and asserting an
+  // intermediate key would pin a state no imported bundle is ever in.
+  assert.deepEqual(migrated.characterLibraries.modifiers, CATALOGUE);
+  assert.equal(migrated.system.modifiers, undefined, 'and the per-system copy is shed');
   assert.equal(Object.hasOwn(migrated.system, 'checkModifiers'), false);
   assert.equal(Object.hasOwn(migrated.system.craftingCheck, 'checkModifiers'), false);
   assert.equal(migrated.system.craftingCheck.defaultModifierPolicy, 'bySubject');
   // Branch-independent: a LEGACY-schema bundle gets the same treatment, because the
   // catalogue's LOCATION is orthogonal to the envelope version.
   const legacyBundle = migrateExportPayload({ fabricateVersion: '1.0.0', system: legacySystem() });
-  assert.deepEqual(legacyBundle.system.modifiers, CATALOGUE);
+  assert.deepEqual(legacyBundle.characterLibraries.modifiers, CATALOGUE);
   assert.equal(legacyBundle.system.craftingCheck.defaultModifierPolicy, 'bySubject');
   // …and the input is never aliased.
   assert.ok(Array.isArray(bundle.system.craftingCheck.checkModifiers), 'the input is untouched');

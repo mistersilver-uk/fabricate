@@ -1,117 +1,190 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  THE manager's labelled push-button (issue 1096).
+  THE manager's labelled push-button.
 
-  ── WHY IT EXISTS ─────────────────────────────────────────────────────────────────
-  Before this component the manager's button was a CSS CONVENTION and nothing else:
-  write `class="manager-button"`, then remember to add `is-primary`, `is-ghost` or
-  `is-danger`. Nothing enforced the second half, and the Modifiers card is the proof
-  that it drifts — `Add modifier` carried `is-primary` while `Delete modifier` and
-  `Done` carried a BARE `manager-button`, so the destructive verb in that card was
-  painted as a neutral one while the identical verb in the Tool Studio was painted
-  as danger. A forgotten modifier class is invisible to lint, to `format:check` and
-  to every source-contract test; it is only visible to someone looking at the screen.
-
-  Making the role a REQUIRED-SHAPED PROP rather than a remembered class is the fix:
-  `role` has a small closed set, an unrecognised value renders neutral rather than
-  emitting an unstyled `is-*`, and a call site cannot express "danger" by accident or
-  omit it silently — it either passes `role="danger"` or it is visibly neutral in the
-  source.
-
-  ── THE TOOL STUDIO IS THE AUTHORITY ──────────────────────────────────────────────
-  The maintainer's ruling: `ToolEditView.svelte`'s header buttons define the correct
-  rendering, and where another screen differs, THAT SCREEN CHANGES. Those buttons get
-  their refined treatment from an ANCESTOR-CONTEXT rule —
-  `.fabricate-manager .manager-tool-edit-actions .manager-button` (34px, `0 space-3`,
-  `0.72rem`), plus the `.manager-header-actions .manager-button.is-primary` and
-  `.manager-tool-edit-actions .manager-button.is-ghost` companions — which is
-  precisely why the Modifiers card could not match them: it is not inside either
-  ancestor, so it landed on the base control at the app's INHERITED body size. "The
-  fonts differ from the tool studio's" is that missing `font-size`, exactly.
-
-  Worth knowing when reading the sheet: `.manager-header-actions .manager-button`
-  declares a 38px control, and the Tool Studio never renders it — its own
-  `.manager-tool-edit-actions` block is later and more specific and pins 34px. The
-  authority is what that cluster RENDERS, so 34px is what this primitive reproduces.
-
-  So the primitive emits a SECOND class, `fab-manager-button`, and the global sheet
-  re-declares the tool studio's values against it with no ancestor requirement. The
-  tool studio's own buttons then carry both selectors with identical values, so
-  converting them is a no-op on screen, while the Modifiers card is lifted onto the
-  authority. Every value is COPIED from the header-actions block, never re-chosen: no
-  new size, spacing or radius scale is introduced here.
-
-  It deliberately has no scoped `<style>`. A scoped block would be a second source of
-  truth for the same control and would begin to disagree with the global sheet — the
-  exact failure this component exists to end. `InspectorActionButton` made the
-  opposite choice for the opposite reason: it is a DIFFERENT treatment from
-  `.manager-button`, so it owns its own tones.
-
-  Consequence: this button is only styled inside `.fabricate-manager`. It is a manager
-  primitive, not an app-agnostic one. `manager-layout.test.js` pins the equivalence in
-  a real browser — it renders a tool studio button and a Modifiers card button of the
-  same role and compares the COMPUTED `font-size`, `font-weight`, `padding`, `height`
-  and `border-radius`, so a scoped rule landing on one screen and not the other reds
-  the gate instead of shipping as drift.
-
-  ── RELATIONSHIP TO `ArmedDangerButton` ───────────────────────────────────────────
-  INDEPENDENT, not composed. `ArmedDangerButton` also renders
-  `manager-button is-danger`, so composition looks tempting, but it is a different
-  component with a different subject: it owns a two-state ARM/CONFIRM machine
-  (`token`, `armed`, Escape/blur disarm, a label AND icon swap per state) and its
-  danger role is a fixed invariant of that machine rather than a caller's choice.
-  Routing it through this primitive would buy one shared line — the class string —
-  while forcing this component to grow `class:is-armed`, a second label slot and a
-  keydown/blur contract that no other call site wants. The honest statement is that
-  `ArmedDangerButton` is a CONSUMER of the same CSS contract, not a consumer of this
-  component, and the two are listed together in `ui-integration/spec.md` so a future
-  sweep sees them as a pair.
+  Before this component the manager's button was a CSS convention: write
+  `class="manager-button"`, then remember to add `is-primary`, `is-ghost` or `is-danger`. A
+  forgotten modifier class is invisible to lint, to `format:check` and to every source-contract
+  test; it is visible only to someone looking at the screen. Making the role a REQUIRED-SHAPED
+  PROP is the fix — a call site either passes `role="danger"` or is visibly neutral in the source.
 
   Props:
-   - role: `'neutral'` (default — the bare `.manager-button`, which is a real and
-     correct treatment for a secondary verb), `'primary'`, `'ghost'` or `'danger'`.
-     Neutral is the default because it is what a bare `class="manager-button"`
-     already renders, so converting an existing site is mechanical.
-   - type: the native button type, defaulting to `'button'` — a manager button inside
-     a `<form>`-adjacent card must never submit by accident.
-   - disabled / onclick: forwarded.
-   - children: the label snippet. Content is a snippet rather than a `label` string
-     because the shipped call sites interleave an `<i>` glyph with localized text and
-     some wrap the text in its own `<span>`.
+  | prop | values | default | contract |
+  | --- | --- | --- | --- |
+  | `role` | `'neutral'` \| `'primary'` \| `'ghost'` \| `'danger'` \| `'dashed'` \| `'warning'` | `'neutral'` | A CLOSED set; see the invariants for how a caller picks. An unrecognised value renders neutral. |
+  | `tag` | `'button'` \| `'a'` | `'button'` | An unrecognised value, and `tag="a"` with an empty `href`, render a `<button>`. |
+  | `href` / `target` / `rel` | anchor attributes | `''` / `undefined` / `undefined` | Emitted only when an anchor is actually rendered. An explicit `rel` always wins; unset with `target="_blank"` it defaults to `noreferrer`. |
+  | `type` | native button type | `'button'` | A manager button inside a `<form>`-adjacent card must never submit by accident. Emitted only on a `<button>`. |
+  | `fullWidth` | boolean | `false` | Emits `is-full-width`. Deliberately NOT a role: width is a statement about the CONTAINER, not about the verb. |
+  | `size` | `''` \| `'38'` | `''` | The control-height RUNG, as a string naming the rung. `''` is the shipped 34px button. An unrecognised value resolves to `''`, never to an unstyled `is-size-*`. |
+  | `disabled` | boolean | `false` | Not valid on an anchor, so it is ignored and warned about when one is rendered. |
+  | `class` | class string | `''` | An EXTRA class, appended to the primitive's own, never a replacement. |
+  | `element` | bindable | `null` | The rendered DOM node. `bind:this` on a component yields the INSTANCE, so a caller that must MEASURE or FOCUS the button has no other way to reach it. |
+  | `children` | snippet | `undefined` | The label. A snippet rather than a string because call sites interleave an `<i>` glyph with localized text. |
 
-  Every other attribute — `data-*` hooks, `aria-*`, `title`, `data-tooltip` — is
-  forwarded through the rest spread, so a call site keeps its own selectors.
+  Callbacks:
+  - `onclick` — forwarded to the rendered element.
+
+  Rest spread:
+  - `{...rest}` lands on the element, so a call site keeps its own `data-*` hooks, `aria-*`,
+    `title` and `data-tooltip`.
+  - `class` is the one exception: it is a named prop and merged by hand, because the spread lands
+    after `class={classes}` and a `class` arriving through it would REPLACE the primitive's whole
+    class string rather than add to it.
+  - `data-keyboard-focus="true"` is written on the SAME SIDE of the spreads as `class={classes}`
+    — before `{...attributes}`, `{onclick}` and `{...rest}` — and that placement is PRESCRIBED: a
+    spread landing later wins, so a caller's `data-*` bag could unset it by accident. Foundry's
+    `KeyboardManager#hasFocus` reads `dataset.keyboardFocus` on the focused element only, with no
+    inheritance, so while this button holds focus Foundry's own Space/arrow/Tab bindings stop
+    firing — the intended behaviour change, not a side effect.
+
+  Invariants:
+  - `manager-layout.test.js` READS `ROLE_CLASSES` and the `classes` array literal out of this
+    file to build its browser probes, so keep the mapping a named object declared OUTSIDE the
+    array and keep the array's own string literals to the three unconditional classes. This is a
+    FALSE-PASS rule: an inline conditional there puts its tokens into every probe, and the gate
+    goes green while measuring markup this component never emits.
+  - THE ROLE SET IS CLOSED and a caller routes by MEANING, never by matching a role name to a
+    token name. `danger` is the DESTRUCTIVE verb — it removes or unlinks a record — while
+    `warning` is the OVERRIDE verb — it proceeds against a rule the system has already flagged,
+    and destroys nothing. A control that does both is `danger`. `dashed` is the ADD action at the
+    foot of a list it appends to. `neutral` is the EMPTY MODIFIER, which is why it has no entry
+    in the mapping. A per-site visual tweak is a pass-through on `class`, never a seventh role.
+  - THE ROLE-TO-CLASS RELATION IS A NAMED MAPPING, never an `is-${role}` template, and `warning`
+    is the proof: the sheet's amber treatment is `.manager-button.is-warning-action` and
+    `.manager-button.is-warning` is declared NOWHERE, so a site that guessed the obvious spelling
+    shipped with no treatment at all while the amber treatment shipped with no call site. The
+    class each role emits is an implementation detail of the sheet that the vocabulary must not
+    be forced to mirror. `SIZE_CLASSES` is a named mapping for that reason and a fourth:
+    `scripts/lib/stylesheetLiveClasses.js` never widens an `is-` class through a positional
+    wildcard, so a class this component only ever BUILT would look like a rule with no customer.
+  - `size` IS A STRING NAMING A RUNG, not a boolean and not a number: a boolean could only ever
+    express the second of the six published control-height rungs, and a number invites
+    `size={38}` and `size={37}` alike with only the sheet to say which exists.
+    `ManagerSearchField`'s `size` is the same shape and emits the same token.
+  - `tag="a"` WITH AN EMPTY `href` RENDERS A `<button>`. An anchor with no `href` is not
+    focusable, has no implicit link role and does not activate on Enter; several anchor call
+    sites take their `href` from caller data, so the empty case is reachable in the product.
+  - No scoped `<style>`. A scoped block would be a second source of truth for the same control
+    and would begin to disagree with the global sheet — the exact failure this component exists
+    to end — which is why the anchor's `text-decoration: none` and the `is-full-width` rule live
+    in `styles/fabricate.css` even though this component emits their classes.
+  - MOVING A CLASS ONTO THIS COMPONENT CAN KILL A SCOPED RULE. This is the canonical account the
+    other primitives point at. Svelte stamps a rule's `svelte-<hash>` onto the elements the
+    component ITSELF writes, and a `class` prop handed to a child is forwarded verbatim, so a
+    caller's scoped rule matches nothing the instant that class moves onto a component tag. It
+    fails two ways and neither names the cause: EMITTED with the hash appended and silently
+    matching nothing, or PRUNED behind a bare `css_unused_selector` warning. Measured on Svelte
+    5.56.3, which you get is a property of the WHOLE caller rather than of the class you moved —
+    it is emitted-and-silent whenever that file also holds a regular element carrying a spread or
+    an expression-valued `class`, which is common, so assume the silent mode and grep the
+    caller's own style block rather than trusting `lint:svelte:warnings`. The repair is
+    `:global(…)`, RE-CHAINED with the ancestor and both primitive classes so its specificity is
+    unchanged — a bare `:global(.the-other-class)` smuggles a cascade change in as a repair — or
+    hoisted into `styles/fabricate.css` when more than one component needs the rule. A DESCENDANT
+    selector must be wrapped WHOLE: `:global(ancestor) .child` leaves `.child` as the only scoped
+    compound, so the hash is emitted bare and the rule silently gains a level of specificity.
+    `tests/components/manager-button-scoped-class-reach.test.js` is the mechanical guard; this
+    shipped twice before that guard existed.
+  - `ArmedDangerButton` IS INDEPENDENT, not composed. It renders the same CSS contract, but its
+    danger role is a fixed invariant of its arm/confirm machine rather than a caller's choice, so
+    routing it through this primitive would buy one shared class string in exchange for a
+    keydown/blur contract no other call site wants.
 -->
 <script>
   let {
     role = 'neutral',
+    tag = 'button',
+    href = '',
+    target = undefined,
+    rel = undefined,
     type = 'button',
+    fullWidth = false,
+    size = '',
     disabled = false,
     onclick = () => {},
+    // `null` until mount; unbound callers never observe it.
+    element = $bindable(null),
     children = undefined,
-    // An EXTRA class, appended to the primitive's own — never a replacement for it. It has
-    // to be a named prop rather than a rest key: the rest spread lands after `class={…}` in
-    // the markup, so a `class` passed through it would REPLACE `manager-button
-    // fab-manager-button is-<role>` outright and silently unstyle the button while every
-    // `data-*` selector in the tests kept resolving.
     class: extraClass = '',
     ...rest
   } = $props();
 
-  // An unrecognised role renders the neutral treatment rather than emitting an unstyled
-  // `is-*` class, so a typo shows up as the default button instead of silently doing
-  // nothing. `neutral` is in no way absent from the set — it is the empty modifier.
-  // `dashed` is the FULL-WIDTH ADD action that sits at the foot of a list it appends to —
-  // the Checks Studio's "Add outcome tier", the prototype's own treatment for every
-  // add-a-row verb. It is a role rather than a per-screen class because the shape is a
-  // statement about the verb (append to the list above me), not about one card: a dashed
-  // outline reads as an empty slot waiting to be filled, which a solid button does not.
-  const ROLES = new Set(['primary', 'ghost', 'danger', 'dashed']);
+  // A NAMED MAPPING, declared outside the `classes` array: see the header's first two
+  // invariants, which are what keep `manager-layout.test.js`'s probes honest.
+  const ROLE_CLASSES = {
+    primary: 'is-primary',
+    ghost: 'is-ghost',
+    danger: 'is-danger',
+    dashed: 'is-dashed',
+    warning: 'is-warning-action',
+  };
+
+  // Hoisted out of the `classes` array for the same reason `ROLE_CLASSES` is.
+  const FULL_WIDTH_CLASS = 'is-full-width';
+
+  // The rungs this button can be asked for, and the class each one emits. Keys are strings
+  // because a rung is a NAME and not an arithmetic quantity.
+  const SIZE_CLASSES = { 38: 'is-size-38' };
+
+  const TAGS = new Set(['button', 'a']);
+
+  const resolvedTag = $derived(
+    TAGS.has(tag) && !(tag === 'a' && !String(href ?? '').trim()) ? tag : 'button'
+  );
+
+  // `Object.hasOwn`, not a plain index: an index reads INHERITED members too, so the
+  // unrecognised-value contract would hold only for values that are not names on
+  // `Object.prototype`.
+  const roleClass = $derived(Object.hasOwn(ROLE_CLASSES, role) ? ROLE_CLASSES[role] : '');
+
+  // `Object.hasOwn` again, for the identical reason.
+  const sizeClass = $derived(
+    Object.hasOwn(SIZE_CLASSES, String(size ?? '')) ? SIZE_CLASSES[String(size)] : ''
+  );
+
+  // Family root first, then the primitive's own modifiers, then the rung, then the caller's
+  // extra — the order `ManagerSearchField` documents for the same token.
   const classes = $derived(
-    ['manager-button', 'fab-manager-button', ROLES.has(role) ? `is-${role}` : '', extraClass]
+    [
+      'fabricate-button',
+      'manager-button',
+      'fab-manager-button',
+      roleClass,
+      fullWidth ? FULL_WIDTH_CLASS : '',
+      sizeClass,
+      extraClass,
+    ]
       .filter(Boolean)
       .join(' ')
   );
+
+  // A primitive that owns the anchor shape owns its safety default too. An explicit `rel`
+  // still wins — `noopener noreferrer` is a legitimate thing for a caller to want.
+  const resolvedRel = $derived(rel ?? (target === '_blank' ? 'noreferrer' : undefined));
+
+  // Built conditionally rather than let through the rest spread, because the two element
+  // shapes have DISJOINT attribute sets: `type` and `disabled` are invalid on an anchor,
+  // and `href`, `target` and `rel` are invalid on a button.
+  const attributes = $derived(
+    resolvedTag === 'a' ? { href, target, rel: resolvedRel } : { type, disabled }
+  );
+
+  $effect(() => {
+    if (resolvedTag === 'a' && disabled) {
+      console.warn(
+        'Fabricate | ManagerButton: `disabled` is not a valid attribute on an anchor and was ignored. ' +
+          'Render a <button> (drop `tag="a"`, or leave `href` empty) if the control needs a disabled state.'
+      );
+    }
+  });
 </script>
 
-<button {type} class={classes} {disabled} {onclick} {...rest}>{@render children?.()}</button>
+<svelte:element
+  this={resolvedTag}
+  bind:this={element}
+  class={classes}
+  data-keyboard-focus="true"
+  {...attributes}
+  {onclick}
+  {...rest}>{@render children?.()}</svelte:element
+>

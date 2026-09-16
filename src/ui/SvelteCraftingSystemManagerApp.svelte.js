@@ -4,7 +4,6 @@ import { createAdminStore } from './svelte/stores/adminStore.js';
 import { getSetting, setSetting } from '../config/settings.js';
 import { confirmDialog, renderDialog, choiceDialog } from './foundryCompat.js';
 import { registerCraftingSystemManagerApp } from './appFactory.js';
-import { SvelteComponentEditorApp } from './SvelteComponentEditorApp.svelte.js';
 import { get } from 'svelte/store';
 import { resolveDropUuid, resolveDropData, folderIdFromDropData } from './svelte/util/dropUtils.js';
 import {
@@ -14,6 +13,7 @@ import {
   enrichToHtml,
   resolveItemSourceSnapshot,
 } from './svelte/util/foundryBridge.js';
+import { descriptionTextCandidate, plainTextDescription } from '../utils/plainTextDescription.js';
 import { normalizeSceneOption } from './svelte/util/sceneImages.js';
 import { readSceneRegions, filterActorUuidsInsideRegion } from './svelte/util/sceneRegions.js';
 import { getTokenSceneUuid } from '../gatheringBootstrapAdapters.js';
@@ -167,6 +167,26 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
       getGatheringEnvironmentStore: () => game?.fabricate?.getGatheringEnvironmentStore?.() ?? null,
       getGatheringPartyStore: () => game?.fabricate?.getGatheringPartyStore?.() ?? null,
       getCurrencyConfigStore: () => game?.fabricate?.getCurrencyConfigStore?.() ?? null,
+      getCharacterLibrariesStore: () =>
+        game?.fabricate?.getCharacterLibrariesStore?.() ?? null,
+      // The three world-scope entity stores (issues 1362 and 1364, epic 1357). `src/main.js`
+      // already constructs, loads, publishes and replicates all three, so nothing there changes;
+      // this is the only place the manager can reach them, and it uses the same
+      // `game.fabricate.getXStore?.() ?? null` idiom every other world store here uses.
+      // They are also what the Export button passes to `buildExportPayload`: that button and
+      // `game.fabricate.exportSystem` are two paths to one payload, and every parameter after
+      // `version` is DEFAULTED, so a slice missing from one path exports empty from that path
+      // alone and nothing reports it.
+      getComponentScopeStore: () => game?.fabricate?.getComponentScopeStore?.() ?? null,
+      getEssenceScopeStore: () => game?.fabricate?.getEssenceScopeStore?.() ?? null,
+      getToolScopeStore: () => game?.fabricate?.getToolScopeStore?.() ?? null,
+      // The world VOCABULARY store (issue 1392, epic 1357, PR 7a). THE FIFTH WIRING EDIT, and
+      // the one with no test of its own until this change: without it the vocabulary leg is
+      // `null` forever, `projectWorldVocabulary` publishes `{available: false, total: 0}` — a
+      // legitimate published shape — and every adminStore unit test stays green, because each
+      // injects its own services bag. `tests/components/manager-contract.test.js` slices this
+      // method and asserts the line.
+      getVocabularyScopeStore: () => game?.fabricate?.getVocabularyScopeStore?.() ?? null,
       getGatheringRealmStore: () => game?.fabricate?.getGatheringRealmStore?.() ?? null,
       getGatheringLocationService: () => game?.fabricate?.getGatheringLocationService?.() ?? null,
       getCurrentSceneRegions: () =>
@@ -304,6 +324,21 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
           }))
           .filter((actor) => actor.uuid && actor.name)
           .sort((a, b) => a.name.localeCompare(b.name)),
+      // ONE ACTOR'S PREPARED ROLL DATA, for the Tool rules editor's `Preview as` region
+      // (issue 1373). The editor evaluates a Tool's character prerequisites against a chosen
+      // actor, and `characterPrerequisites.js` states the spelling every call site must use:
+      // `actor?.getRollData?.() ?? actor?.system ?? {}`, because `ActorPF2e#getRollData()`
+      // answers `{actor: this}` and nothing else, so a bare `actor.system` read would resolve
+      // every path to `undefined` and silently fail every prerequisite.
+      //
+      // It answers `null` rather than `{}` for an unresolvable uuid, so the preview can tell
+      // "no actor" from "an actor with no data" — the first states nothing, the second would
+      // fail every gate.
+      getActorRollData: async (actorUuid) => {
+        const actor = await fromUuid(String(actorUuid || ''));
+        if (!actor) return null;
+        return actor.getRollData?.() ?? actor.system ?? {};
+      },
       // Player-character actors, name-sorted, for the Access tab's grantable
       // Characters roster under the `restricted` visibility mode. Membership is the
       // shared, GM-CONFIGURABLE player-character predicate (issue 1024), imported
@@ -336,8 +371,23 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
       // `game.*` itself. Unsorted and unfiltered on purpose: the shared selector owns the
       // scope, so a second filter here could only make the two disagree.
       getWorldActors: () => Array.from(game.actors?.contents || game.actors || []),
-      // Game-world Items ({ uuid, name, img, type }), name-sorted, for resolving
+      // Game-world Items ({ uuid, name, img, type, description }), name-sorted, for resolving
       // linked Item previews after drag-and-drop.
+      //
+      // ── `description` IS PART OF THE PROJECTION (issue 1373) ──────────────────────────────
+      // The world Tools Catalogue reads it as the SECOND rung of a Tool's description: a world
+      // record's own `description` is a snapshot taken when the link was made, so a record the
+      // migration lifted from a legacy component-linked Tool has none, and every such row read
+      // `No description` while wearing a `Linked` chip. The scope that owns identity was the only
+      // one that could not see the description identity carries.
+      //
+      // IT IS NOT ENRICHED, and that is deliberate rather than a shortcut. `enrichToHtml` is
+      // async and per-document; running it over every Item in the world to fill a list preview
+      // would put an enrichment pass behind opening a catalogue. `descriptionTextCandidate`
+      // picks the same field this app's own snapshot resolver picks and `plainTextDescription`
+      // flattens it, so an unenriched `@UUID[...]` reference renders as its raw text rather than
+      // as a link — which is a preview, and the entry editor's own card is where the resolved
+      // description is shown.
       getWorldItemOptions: () =>
         Array.from(game.items?.contents || [])
           .map((item) => ({
@@ -345,6 +395,11 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
             name: item.name,
             img: item.img || '',
             type: item.type || '',
+            description: plainTextDescription(
+              descriptionTextCandidate(item?.system?.description?.value) ||
+                descriptionTextCandidate(item?.system?.description) ||
+                ''
+            ),
           }))
           .filter((item) => item.uuid && item.name)
           .sort((a, b) => a.name.localeCompare(b.name)),
@@ -526,7 +581,15 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
           }
 
           const mode = result.conflictMode === 'copy' ? 'copy' : 'keep';
-          const packData = prepareForImport(data, mode);
+          // The DESTINATION world's entity roster (issue 1364). Copy mode REQUIRES it: without it
+          // every incoming component mints a fresh id and the world acquires a second record for
+          // every item it already holds.
+          const worldEntityIndex = {
+            components: game.fabricate.getComponentScopeStore?.()?.listEntities?.() ?? [],
+            essences: game.fabricate.getEssenceScopeStore?.()?.listEntities?.() ?? [],
+            tools: game.fabricate.getToolScopeStore?.()?.listEntities?.() ?? [],
+          };
+          const packData = prepareForImport(data, mode, { worldEntityIndex });
 
           const systemManager = game.fabricate.getCraftingSystemManager();
           const recipeManager = game.fabricate.getRecipeManager();
@@ -535,6 +598,13 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
             getSetting: (key) => getSetting(key),
             setSetting: (key, value) => setSetting(key, value),
             isGM: () => game.user?.isGM === true,
+            // The three world-scope entity stores (issue 1364), injected exactly as the
+            // environment store is. The importer fails CLOSED on an absent seam, so leaving these
+            // to a lazy lookup would make a broken accessor present as a successful import that
+            // merged nothing.
+            componentScopeStore: game.fabricate.getComponentScopeStore?.() ?? null,
+            essenceScopeStore: game.fabricate.getEssenceScopeStore?.() ?? null,
+            toolScopeStore: game.fabricate.getToolScopeStore?.() ?? null,
           });
           summary = await importer.importFromPackData(packData, {
             overwriteExisting: result.conflictMode === 'overwrite',
@@ -884,11 +954,6 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
           } catch (err) {
             ui.notifications.warn(err?.message || localize('FABRICATE.Admin.Items.SourceNotFound'));
           }
-        },
-        onEditComponent: async (itemId) => {
-          const systemId = get(this._adminStore.selectedSystemId) || '';
-          if (!systemId || !itemId) return;
-          SvelteComponentEditorApp.show(itemId, systemId, this);
         },
         confirmDiscardEssenceDraft: () =>
           confirmDialog({
@@ -1258,6 +1323,14 @@ export class SvelteCraftingSystemManagerApp extends SvelteApplicationMixin(
         // Only a CAPPED book consumes learn budget, so only a capped book can
         // release any on erase.
         sourceCapped: sourceCaps?.learn?.limitLearning === true,
+        // The GM-grant pair (issue 1289), carried RAW and uncoerced. This literal is a
+        // hand-built allowlist, so a field it does not name never reaches
+        // `learnedRecipeSource` at all — both must be here or neither rung can render.
+        // They are deliberately not defaulted: the ladder tests `granted === true` and
+        // `typeof grantedBy === 'string'` strictly, and a `String(...)`/`|| ''` here
+        // would coerce a hostile value into a plausible-looking one before it got there.
+        granted: entry?.granted,
+        grantedBy: entry?.grantedBy,
       });
     }
     return { learnedRecipes, otherSystemCount, orphanCount };

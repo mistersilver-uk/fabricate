@@ -13,14 +13,17 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-chance-bar-',
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/gatheringFormat.js'
   ],
   // `FillBar` joined the tree when issue 1096 rebuilt ChanceBar on the shared primitive
   // `ui-integration/spec.md` §Shared product UI primitives names. Omitting it does not fail
   // this suite — `createMountedComponentHarness` throws in `before()` naming the module,
   // which is the loud half of the trap; a hand-rolled harness would have HUNG instead.
+  // `Kicker` joined the tree when issue 1514 converted the caption to the shared label.
   compiledModules: [
     'src/ui/svelte/components/FillBar.svelte',
+    'src/ui/svelte/components/Kicker.svelte',
     'src/ui/svelte/apps/gathering/ChanceBar.svelte'
   ],
   componentPath: 'src/ui/svelte/apps/gathering/ChanceBar.svelte'
@@ -45,7 +48,10 @@ describe('ChanceBar (mounted)', () => {
     assert.equal(meter.getAttribute('aria-valuemin'), '0');
     assert.equal(meter.getAttribute('aria-valuemax'), '100');
     assert.equal(meter.getAttribute('data-gathering-event-value'), null);
-    assert.equal(root.querySelector('.chance-bar-caption') !== null, true);
+    // The caption moved onto the shared `Kicker` leaf (issue 1514), on the same terms the fill
+    // moved onto `FillBar` below: retargeted at the class the primitive emits rather than
+    // deleted, because what this line proves is that the caption RENDERS.
+    assert.ok(Boolean(root.querySelector('.fab-kicker')), 'the caption renders as a kicker');
     // The fill moved into the shared `FillBar` leaf (issue 1096). Retargeted rather than
     // deleted: the value-width binding is the thing this line has always been proving, and
     // an assertion left pointing at the retired `.chance-bar-fill` would have passed
@@ -60,7 +66,7 @@ describe('ChanceBar (mounted)', () => {
 
   it('hides the caption when showCaption is false', async () => {
     const root = await harness.mount({ value: 0.5, scale: 'success', showCaption: false });
-    assert.equal(root.querySelector('.chance-bar-caption'), null);
+    assert.ok(!root.querySelector('.fab-kicker'), 'no kicker is rendered');
     assert.ok(root.querySelector('.chance-bar'));
   });
 

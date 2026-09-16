@@ -13,18 +13,40 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  SELECT_COMPILED_MODULES,
+  STATUS_TONE_RAW_MODULES,
+  createMountedComponentHarness,
+} from '../helpers/svelte-component-harness.js';
 import { createRecipeBrowserState } from '../../src/utils/recipeBrowserModel.js';
 import { buildInterleavedCategoryOrder } from '../helpers/interleavedCategoryLibrary.js';
 import { itResolvesTheRecipesOwnImage } from '../helpers/recipeOwnImageCases.js';
 import { describeBrowserBulkSelection } from '../helpers/browserBulkSelectionCases.js';
+// Issue 1504: a converted control is a shared `<Select>`, so choosing a value is two clicks
+// on a portaled panel rather than a `change` on a native `<select>`. The panel lands on the
+// harness's own mount target, which is why every lookup is rooted there.
+import { chooseSelectOption } from '../helpers/select-control.js';
+// Issue 1506: the row and inspector states are chips, so the tone is the chip's own class.
+import { chipToneOf } from '../helpers/chipTone.js';
+// Issue 1515: the blocked-enable strip is a `<Notice>`, and the View Lab case that photographs
+// it names the primitive's own class and dismiss hook. Reading the case's selector here is what
+// makes that declaration a tested claim rather than one the capture discovers.
+import { getCaseById } from '../../scripts/lib/viewLabCases.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
 const RECIPE_RAW_MODULES = [
+  // Issue 1506: the one tone map the converted status pills read at a dynamic site.
+  ...STATUS_TONE_RAW_MODULES,
+  // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
+  ...SEARCHABLE_POPOVER_RAW_MODULES,
   'src/ui/svelte/util/foundryBridge.js',
+  'src/ui/svelte/util/listReorderAnnouncement.js',
   'src/ui/svelte/util/craftingImageDefaults.js',
   'src/utils/recipeCategories.js',
+  // #1663: the ONE implementation behind both category shims; imports nothing.
+  'src/utils/categoryNormalization.js',
   'src/utils/recipeBrowserModel.js',
   // recipeBrowserModel imports the shared category totals (issue 676); omitting it here
   // HANGS this suite (`# cancelled`) rather than failing it.
@@ -41,18 +63,19 @@ const RECIPE_RAW_MODULES = [
 ];
 
 const RECIPE_PRIMITIVES = [
-  // The manager's ONE chip (issue 883). Both harnesses below render it now that the
-  // browser's filter and check pills are `Chip`s, so it is hoisted here rather than
-  // repeated: the file-level guard in `mounted-harness-primitive-allowlist.test.js`
-  // reads the WHOLE file, so naming it in only one of two harnesses reads as covered.
-  'src/ui/svelte/apps/manager/Chip.svelte',
-  // The shared no-state primitive (issue 785). A `.svelte` the tree renders but
-  // the harness omits HANGS the suite (# cancelled) rather than failing it.
-  'src/ui/svelte/apps/manager/EmptyState.svelte',
   'src/ui/svelte/components/Pagination.svelte',
+  // Select's own compiled closure (issue 1504) is spread beside this list wherever it is used
+  // (`...RECIPE_PRIMITIVES, ...SELECT_COMPILED_MODULES`), not folded in here — it covers the
+  // manager's ONE chip (issue 883) and shared no-state primitive (issue 785) too. Both
+  // harnesses below render them now that the browser's filter and check pills are `Chip`s, so
+  // hoisting is required: the file-level guard in `mounted-harness-primitive-allowlist.test.js`
+  // reads the WHOLE file, so naming a primitive in only one of two harnesses reads as covered.
   'src/ui/svelte/components/Medallion.svelte',
-  'src/ui/svelte/components/StatusPill.svelte',
-  'src/ui/svelte/components/CollapsibleGroupHeader.svelte'
+  'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
+  'src/ui/svelte/components/IconButton.svelte',
+  'src/ui/svelte/components/ManagerSearchField.svelte',
+  'src/ui/svelte/components/ManagerToolbar.svelte',
+  'src/ui/svelte/components/StatusToggle.svelte'
 ];
 
 const browser = createMountedComponentHarness({
@@ -61,12 +84,17 @@ const browser = createMountedComponentHarness({
   rawModules: RECIPE_RAW_MODULES,
   compiledModules: [
     ...RECIPE_PRIMITIVES,
+    ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/apps/manager/SegmentedControl.svelte',
     // The manager's ONE selection control and its ONE multi-select toolbar row (issue
     // 1010). The inspector harness below does not render either, so they are named here
     // rather than hoisted into RECIPE_PRIMITIVES.
     'src/ui/svelte/components/SelectionCheckbox.svelte',
     'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
+    // The blocked-enable strip is the shared `<Notice>` as of issue 1515. The inspector
+    // harness below renders none, so it is named here rather than hoisted; omitting it HANGS
+    // this suite (`# cancelled`) rather than failing it.
+    'src/ui/svelte/components/Notice.svelte',
     'src/ui/svelte/apps/manager/RecipesBrowserView.svelte'
   ],
   componentPath: 'src/ui/svelte/apps/manager/RecipesBrowserView.svelte'
@@ -78,6 +106,7 @@ const inspector = createMountedComponentHarness({
   rawModules: RECIPE_RAW_MODULES,
   compiledModules: [
     ...RECIPE_PRIMITIVES,
+    ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte'
   ],
   componentPath: 'src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte'
@@ -203,10 +232,7 @@ describe('RecipesBrowserView defaults (the smoke harness depends on these)', () 
     assert.equal(renderedRows(), 12, 'the default page holds all twelve');
     assert.equal(countText(), '12 recipes', 'a wholly-shown group says it once, not "12 of 12"');
 
-    const size = root.querySelector('[data-pagination-size]');
-    size.value = '10';
-    size.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
-    flushSync();
+    chooseSelectOption(root, '[data-pagination-size]', '10');
 
     assert.equal(renderedRows(), 10, 'page 1 of a 10-row page');
     assert.equal(countText(), '10 of 12 recipes', 'ten rows below it, twelve in the category');
@@ -235,10 +261,7 @@ describe('RecipesBrowserView defaults (the smoke harness depends on these)', () 
     });
     const countText = () => root.querySelector('.fab-group-count').textContent.trim();
 
-    const size = root.querySelector('[data-pagination-size]');
-    size.value = '10';
-    size.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
-    flushSync();
+    chooseSelectOption(root, '[data-pagination-size]', '10');
     root.querySelector('[data-pagination-next]').click();
     flushSync();
 
@@ -290,10 +313,7 @@ describe('RecipesBrowserView category-major grouped pagination (issue 801)', () 
     });
 
     // Shrink the page to 10 so general (12) must span two pages.
-    const size = root.querySelector('[data-pagination-size]');
-    size.value = '10';
-    size.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
-    flushSync();
+    chooseSelectOption(root, '[data-pagination-size]', '10');
 
     // Page 1: the whole alchemy bucket, then the first slice of general — not an
     // interleaved alphabetical slice of all three categories.
@@ -542,10 +562,8 @@ describe('RecipesBrowserView row readout (issue 643 §9)', () => {
 describe('RecipesBrowserView authoring-state pills (issue 1010)', () => {
   const pills = (root, id) =>
     [
-      ...root.querySelectorAll(
-        `[data-recipe-id="${id}"] .manager-recipe-name-row [data-status-pill]`
-      )
-    ].map((pill) => [pill.dataset.statusPill, pill.textContent.trim()]);
+      ...root.querySelectorAll(`[data-recipe-id="${id}"] .manager-recipe-name-row .manager-chip`)
+    ].map((pill) => [chipToneOf(pill), pill.textContent.trim()]);
 
   it('paints an off, blocked recipe RED and says enabling would be refused', async () => {
     // `incomplete: false` is the load-bearing half: this is the structurally-broken row the
@@ -593,10 +611,7 @@ describe('RecipesBrowserView result count', () => {
     assert.equal(count.textContent.trim(), '1–12 of 12');
     assert.equal(count.classList.contains('manager-chip'), false, 'the count is not a chip to press');
 
-    const size = root.querySelector('[data-pagination-size]');
-    size.value = '10';
-    size.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
-    flushSync();
+    chooseSelectOption(root, '[data-pagination-size]', '10');
     assert.equal(root.querySelector('[data-recipe-count]').textContent.trim(), '1–10 of 12');
 
     root.querySelector('[data-pagination-next]').click();
@@ -909,9 +924,49 @@ describe('RecipesBrowserView lifted browser state', () => {
     assert.equal(flash.getAttribute('role'), 'alert');
     assert.match(flash.textContent, /This recipe has no result groups\./);
 
-    root.querySelector('[data-recipe-flash-dismiss]').click();
+    // THE CAPTURE CASE'S OWN SELECTOR, resolved against the rendered strip. One bad
+    // `expectSelector` fails the WHOLE View Lab capture and publishes no frames at all, and
+    // nothing checks it until that run — so the frame's proof is proved here. It is READ from the
+    // case rather than restated: a copy would keep passing after the case started naming
+    // something else. Only the area root is stripped, which is the one part of it a mounted
+    // component has no shell to supply.
+    const captureSelector = getCaseById(
+      'manager-recipes-blocked-enable-flash'
+    ).expectSelector.replace('.fabricate-manager ', '');
+    assert.ok(
+      Boolean(root.querySelector(captureSelector)),
+      `the blocked-enable frame's selector matched nothing: ${captureSelector}`
+    );
+
+    // `<Notice dismissable>` stamps no per-caller hook on the control it draws, so the dismiss
+    // is addressed by the primitive's own `data-notice-dismiss` (issue 1515). What the caller
+    // still owns is the `dataAttr` hook on the root, which is what `[data-recipe-flash]` reads.
+    root.querySelector('[data-notice-dismiss]').click();
     flushSync();
-    assert.equal(root.querySelector('[data-recipe-flash]'), null, 'the flash is dismissible');
+    assert.ok(!root.querySelector('[data-recipe-flash]'), 'the flash is dismissible');
+
+    // THE REFUSAL ARRIVES AS TWO PARTS WHEN THE STORE CAN BUILD THEM (issue 1515). An activation
+    // error carries a recipe name and coded issues, so `adminStore` hands the sink a
+    // `{ title, detail }` pair beside the one-line string and the notice draws the name in its
+    // title and the reasons in its detail. Read from the primitive's OWN two elements rather than
+    // from the strip's `textContent`, which cannot tell a split notice from an unsplit one.
+    calls[0].options.onBlocked('Cannot enable recipe "Iron Sword": It has no result groups.', {
+      title: 'Cannot enable recipe "Iron Sword"',
+      detail: 'It has no result groups.'
+    });
+    flushSync();
+
+    const split = root.querySelector('[data-recipe-flash]');
+    assert.equal(
+      split.querySelector('.fab-notice-title').textContent.trim(),
+      'Cannot enable recipe "Iron Sword"',
+      'the title names what happened, without the reasons trailing it'
+    );
+    assert.equal(
+      split.querySelector('.fab-notice-detail').textContent.trim(),
+      'It has no result groups.',
+      'and the reasons are the detail line the specimen draws beneath it'
+    );
   });
 
   it('never reaches for a Foundry notification itself', async () => {
@@ -1069,7 +1124,7 @@ describe('RecipeBrowserInspector (mounted)', () => {
     });
 
     assert.equal(on.querySelectorAll('.manager-chip-row > *').length, 2, 'category + status, one line');
-    const status = on.querySelector('[data-status-pill="success"]');
+    const status = on.querySelector('.manager-chip.is-positive');
     assert.equal(status.textContent.trim(), 'On', 'the same state has the same name as the row switch');
     assert.ok(status.querySelector('i.fa-circle'), 'the status pill leads with a dot');
     assert.equal(on.textContent.includes('Unlocked'), false, 'unlocked is not a state to chip');
@@ -1081,8 +1136,11 @@ describe('RecipeBrowserInspector (mounted)', () => {
       recipeCount: 1,
       showRecipeCategories: true
     });
-    assert.equal(off.querySelector('[data-status-pill="subtle"]').textContent.trim(), 'Off');
-    assert.ok(off.querySelector('[data-status-pill="accent"]'), 'Locked IS a state and keeps its pill');
+    assert.equal(off.querySelector('.manager-chip.is-subtle').textContent.trim(), 'Off');
+    assert.ok(
+      off.querySelector('.manager-chip.is-accent'),
+      'Locked IS a state and keeps its pill'
+    );
   });
 
   // The panel is the one surface with the room for the recipe's flavour text; it used to
@@ -1259,11 +1317,8 @@ describe('RecipeBrowserInspector (mounted)', () => {
       recipeCount: 1
     });
 
-    assert.ok(root.querySelector('[data-status-pill="accent"]'), 'the locked state shows');
-    assert.equal(
-      root.querySelector('[data-status-pill="danger"]').textContent.trim(),
-      "Can't enable"
-    );
+    assert.ok(root.querySelector('.manager-chip.is-accent'), 'the locked state shows');
+    assert.equal(root.querySelector('.manager-chip.is-danger').textContent.trim(), "Can't enable");
   });
 
   it('routes an empty, component-less system to Components rather than to a dead form', async () => {

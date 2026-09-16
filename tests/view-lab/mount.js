@@ -19,6 +19,7 @@ import {
   findLabInjectedContentWidthLosses,
   measureWithoutLabStyles,
 } from './labInjectedLayoutGuard.js';
+import { LAB_INTERACTABLE_REFS } from './world/labInteractables.js';
 import { buildLabWorld } from './world/labWorld.js';
 
 const READY_ATTRIBUTE = 'data-view-lab-ready';
@@ -92,7 +93,7 @@ function installDeterminismStyles() {
 
       \`scrollbar-gutter: stable\` reserves gutter space on any element that is a SCROLL CONTAINER,
       and \`overflow: hidden\` makes one. The \`*\` therefore carved ~10px out of the content box of
-      every clipping element under the window — \`.crafting-thumb\` measured a 44px box with a 34px
+      every clipping element under the window — the crafting recipe row's 44px art tile measured a 34px
       content box, so every item image in every published frame was drawn narrow, left-aligned and
       needlessly cropped by its own \`object-fit: cover\`.
 
@@ -131,15 +132,57 @@ function readParams() {
     // three manager surfaces exist only for a system in the right visibility mode - clicking to
     // them is impossible when the rail entry is not rendered at all.
     system: params.get('system') ?? null,
-    // World Parties is the one Manager route that remains operable with no selected system.
-    // Clearing through the real admin store after construction reaches that state without
-    // weakening production's persisted-selection normalization.
+    gatheringTaskMode: params.get('gatheringTaskMode') ?? null,
+    journalCaseState: params.get('journalCaseState') ?? null,
+    // TWO things, and the name says only the second: a world seeded with NO crafting systems,
+    // and the persisted selection cleared through the real admin store after construction. Both
+    // halves are needed, because a Manager refresh resolves an empty selection back to the first
+    // available system — so only an empty LIBRARY makes 'nothing selected' stable. `buildLabWorld`
+    // is where the first half happens (`content.systems = []`), and clearing through the store
+    // rather than by seeding reaches the second without weakening production's
+    // persisted-selection normalization.
+    //
+    // So this IS the lab's suppress-the-seeded-systems input, as well as its clear-the-selection
+    // one: `manager-world-parties-no-selection` photographs the second half and
+    // `manager-systems-empty` the first. Before adding a param that means the same thing, note
+    // what it would cost — a new param here sits outside every marked region below, so a change
+    // to this file would select surface coverage rather than the frames it moved.
     clearSystem: params.get('clearSystem') === '1',
     // Seed an EMPTY party list, for the World > Parties empty state. It takes no
     // post-construction store call the way `clearSystem` does: the pane's empty state is a
     // function of the persisted `gatheringParties` setting, so the fixture seeds `[]` and
     // the real store reads it exactly as it reads a populated one.
     noParties: params.get('noParties') === '1',
+    // Build a world with NO Tools at all, for the world Tools Catalogue's empty state. It takes
+    // more than an empty `toolScope` setting: the lab runs every migration on every build and the
+    // world-scope pass LIFTS each crafting system's own tools into world records, so the systems'
+    // libraries have to go with the corpus. `stripTools` in `labWorld.js` owns that and says why.
+    noTools: params.get('noTools') === '1',
+    // Seed NO world component records of the lab's own, so the world's tag vocabulary is empty
+    // and — with `clearSystem` beside it — its component catalogue is too (issue 1540). It is a
+    // SECOND flag rather than a widening of `clearSystem` because the corpus has two independent
+    // sources: the migration lifts one world record per crafting system component, which
+    // `clearSystem` already removes, and the fixture authors one world-only record that no
+    // deletion of systems can reach. `stripAuthoredWorldComponents` in `labWorld.js` owns that
+    // and says why folding the two together would state something false.
+    noAuthoredWorldComponents: params.get('noAuthoredWorldComponents') === '1',
+    // Grow the world's non-GM roster to eight, for the two Access frames whose subject is the
+    // Players roster's own pager and its no-match line (issue 1515). It is a SHIM call rather
+    // than a `buildLabWorld` argument, because the roster is `game.users` and nothing in the
+    // world fixture owns it; `installFoundryShim.js` holds the table and says why it is seven
+    // added rather than any other number.
+    //
+    // A SEPARATE FLAG rather than a widening of anything above, for the reason `clearSystem`
+    // records about itself: every other frame in the corpus is photographed against the
+    // two-seat table a resting lab world has, and a roster that grew for all of them would
+    // repaint the Knowledge roster and the recipe editor's context rail without saying so.
+    //
+    // Its COST is stated rather than discovered. Like every param here it sits outside the
+    // marked regions below, so a hunk touching it selects surface coverage rather than the two
+    // frames it moved — and the shim it calls is an unattributed lab input, which resolves the
+    // same way, so narrowing this one line would buy nothing while the other half of the change
+    // is in the same commit.
+    manyPlayers: params.get('manyPlayers') === '1',
     // Evidence-only localization stress. It changes no shipped string and exists solely so the
     // named long-label frame cannot collapse to the ordinary stacked Map frame.
     longTravelLabels: params.get('longTravelLabels') === '1',
@@ -165,6 +208,23 @@ function readParams() {
     // display text rendered verbatim, so the stress belongs on the provider rather than on the
     // localizer Core's own five tab labels read.
     longPlayerLabels: params.get('longPlayerLabels') === '1',
+    // view-lab-region:end
+    // view-lab-region:canvas-mount-params
+    // The two params only the three CANVAS windows read (issue 1520).
+    //
+    // `interactable` names WHICH seeded behaviour the config panel opens against, by the key
+    // `LAB_INTERACTABLE_REFS` declares rather than by a three-part ref: the panel is opened
+    // AGAINST a behaviour, so its ref is instance state and there is no `mountManagerApp`
+    // analogue for it. `noInteractables` builds a world whose scene carries none, which is the
+    // Manage panel's empty state and the one state no seeded behaviour count can produce.
+    //
+    // Their own attributed REGION, and the readership is structural rather than assumed: neither
+    // param is read anywhere but `mountCanvasApp` and the world build it drives, and no player or
+    // manager frame mounts a canvas window at all. `scripts/lib/viewLabCases.js` keys
+    // `ATTRIBUTED_LAB_INPUTS` on that fact, so a hunk confined to this block selects the canvas
+    // frames rather than the whole corpus.
+    interactable: params.get('interactable') ?? null,
+    noInteractables: params.get('noInteractables') === '1',
     // view-lab-region:end
     // The Graph rail placeholder is advertised only behind the experimental toggle, so a case that
     // reproduces the smoke's experimental-off frame has to turn it back off.
@@ -335,6 +395,7 @@ async function mountPlayerApp(content, params) {
     render: () => {},
   });
   const services = app._buildServices();
+  installJournalCaseServiceSeam(services, params.journalCaseState);
 
   const props = {
     activeTab,
@@ -365,6 +426,50 @@ async function mountPlayerApp(content, params) {
   const instance = mount(FabricateAppRoot, { target: content, props });
   return { instance, services, props };
 }
+
+function installJournalCaseServiceSeam(services, state) {
+  if (!state || !services) return;
+  const list = services.listJournalForActor?.bind(services);
+  const execute = services.executeJournalRunCommand?.bind(services);
+  const fixtureExecute = globalThis.game?.fabricate?.executeJournalCaseFixtureCommand;
+  const fixtureEvents = globalThis.game?.fabricate?.journalCaseFixtureEvents;
+  if (typeof fixtureExecute === 'function') {
+    services.executeJournalRunCommand = async (command) =>
+      (await fixtureExecute(command)) ?? execute?.(command) ?? null;
+    if (Array.isArray(fixtureEvents)) {
+      services.notify = (message) => {
+        fixtureEvents.push({ type: 'notification', message, state });
+      };
+    }
+  }
+  if (state === 'loading') {
+    services.listJournalForActor = () => new Promise(() => {});
+    return;
+  }
+  if (state === 'error-retry') {
+    let recovered = false;
+    services.recoverJournalCaseFixture = () => {
+      recovered = true;
+    };
+    services.listJournalForActor = (...args) => {
+      if (!recovered) return Promise.reject(new Error('View Lab Journal load failure'));
+      return list?.(...args) ?? null;
+    };
+    return;
+  }
+  if (state === 'no-actor-empty') {
+    services.getSelectedActorId = () => '';
+    services.listJournalForActor = async () => ({
+      selectedActorId: null,
+      selectedActorUuid: null,
+      actor: null,
+      worldTime: Number(services.getWorldTime?.() ?? 0),
+      activeRuns: [],
+      history: [],
+      counts: { active: 0, history: 0 },
+    });
+  }
+}
 // view-lab-region:end
 
 /**
@@ -377,35 +482,48 @@ async function mountPlayerApp(content, params) {
  * @returns {object} An API-v1 World navigation provider.
  */
 function labDowntimeProvider() {
+  // NAMED ONCE, then used twice: as the provider's tab set, and as the source the
+  // cross-navigation control below reads its destination's real label out of (issue 1332). A
+  // second literal for that label would be a mirror inside one function, and the frame it
+  // captions is published as evidence.
+  const tabs = [
+    {
+      id: 'ledger',
+      label: 'Test Companion — Ledger',
+      accessibleName: 'Open the downtime ledger',
+      // The widest sub-item case (AC-16/AC-18) needs a four-digit `.manager-nav-count` beside
+      // a long multi-word label, on the same tab, or the widest case is one the layout
+      // assertions do not look at.
+      badge: { count: 1284, accessibleName: '1,284 downtime claims waiting for review' },
+      tooltip: 'Every character’s downtime, in one ledger',
+      icon: 'fas fa-scroll',
+      title: 'Downtime ledger',
+      subtitle: 'Downtime Studio · Every character’s work, in one place.',
+      breadcrumb: 'Ledger',
+    },
+    {
+      id: 'crew',
+      label: 'Test Companion — Crew',
+      accessibleName: 'Open the downtime crew roster',
+      tooltip: 'Who is working on what',
+      icon: 'fas fa-users-gear',
+    },
+    {
+      id: 'writs',
+      label: 'Test Companion — Writs',
+      accessibleName: 'Open downtime writs',
+      tooltip: 'Standing orders and commissions',
+      icon: 'fas fa-file-signature',
+    },
+  ];
+  // The tab this screen's cross-navigation control points at: the next of the stand-in's own
+  // three, wrapping. Derived rather than mapped, so adding a tab above needs nothing here.
+  const nextTab = (tabId) => tabs[(tabs.findIndex((tab) => tab.id === tabId) + 1) % tabs.length];
+
   return {
     apiVersion: 1,
     id: 'downtime',
-    tabs: [
-      {
-        id: 'ledger',
-        label: 'Ledger',
-        accessibleName: 'Open the downtime ledger',
-        tooltip: 'Every character’s downtime, in one ledger',
-        icon: 'fas fa-scroll',
-        title: 'Downtime ledger',
-        subtitle: 'Downtime Studio · Every character’s work, in one place.',
-        breadcrumb: 'Ledger',
-      },
-      {
-        id: 'crew',
-        label: 'Crew',
-        accessibleName: 'Open the downtime crew roster',
-        tooltip: 'Who is working on what',
-        icon: 'fas fa-users-gear',
-      },
-      {
-        id: 'writs',
-        label: 'Writs',
-        accessibleName: 'Open downtime writs',
-        tooltip: 'Standing orders and commissions',
-        icon: 'fas fa-file-signature',
-      },
-    ],
+    tabs,
     // A companion that OWNS ITS LAYOUT, because that is the state issue 1213's contract is
     // about and the frame has to be able to show it. The old stand-in mounted a short padded
     // div, which renders identically in a 689px target and a 528px one — so the frame could
@@ -446,7 +564,7 @@ function labDowntimeProvider() {
       openEditor.addEventListener('click', () => {
         context?.setRouteChrome?.({
           title: 'Marn the Quartermaster',
-          subtitle: 'Crew member · two projects in flight',
+          subtitle: 'Test companion record · not a Fabricate surface',
           breadcrumb: 'Marn',
           actionsLabel: 'Crew member actions',
           // An asset the LAB serves. A Foundry core path resolves in a real world and 404s
@@ -488,16 +606,58 @@ function labDowntimeProvider() {
         context?.onRouteReselect?.(closeEditor);
       });
 
+      // Item 2 (issue 1332): A COMPANION SENDING THE GM TO ANOTHER OF ITS OWN TABS, which is
+      // the control the seam was widened for — a setting shown where the GM feels its effect,
+      // with a way to reach the screen where it is changed. Until Core published
+      // `navigateToTab` a companion could NAME another of its screens and not reach it, so this
+      // button was either absent or dead, and no frame could tell those two apart from a
+      // working one. Pressing it moves the panel AND the rail's current sub-item with no rail
+      // click, which is a claim about behaviour a photograph can carry.
+      const destination = nextTab(tabId);
+      const crossLink = element(
+        'button',
+        'flex:0 0 auto;align-self:flex-start;padding:6px 10px;border-radius:6px;' +
+          'border:1px solid var(--fab-border);background:var(--fab-bg-3);color:var(--fab-text)',
+        `Go to ${destination.label}`
+      );
+      crossLink.type = 'button';
+      // The literal hook, for the reason the drill-down states above it: the case registry's
+      // selector guard greps this file for the hook a selector names, and a `dataset` write
+      // would leave that literal nowhere in it.
+      crossLink.setAttribute('data-lab-companion-tab-link', '');
+      crossLink.addEventListener('click', () => context?.navigateToTab?.(destination.id));
+
       const panel = element(
         'div',
         'height:100%;min-height:0;display:flex;flex-direction:column;gap:12px;' +
           'padding:16px;border:2px dashed var(--fab-accent);border-radius:12px;' +
           'background:var(--fab-bg-2)'
       );
+      // THE BANNER, AND IT IS FOR THE PHOTOGRAPH RATHER THAN FOR THE TEST (issue 1324). Every
+      // frame that registers this provider is published to a PR body on a PUBLIC repository, and
+      // a reader has nothing but the picture. A stand-in whose tabs look like a product's reads
+      // as a feature -- and to a reader who KNOWS those tabs are in neither the free module nor
+      // Premium it reads as a feature that leaked, which is the question this banner exists to
+      // answer before it is asked.
+      //
+      // In the PANEL rather than only in the rail, because the panel is the largest thing in the
+      // frame and the one a reader looks at. The rail's labels say it too; this says it where
+      // the eye already is.
+      const banner = element(
+        'div',
+        'flex:0 0 auto;padding:8px 12px;border:1px solid var(--fab-warning);border-radius:8px;' +
+          'background:var(--fab-warning-soft, var(--fab-bg-3));color:var(--fab-warning);' +
+          'font-size:11px;font-weight:700;letter-spacing:0.04em',
+        'TEST-ONLY COMPANION — registered by tests/view-lab/mount.js so Core can photograph its ' +
+          'own companion seam. Not a Fabricate feature; in neither the free module nor Premium.'
+      );
+      banner.setAttribute('data-lab-companion-banner', '');
+      panel.append(banner);
       panel.append(
-        element('h2', 'flex:0 0 auto;margin:0;font-size:14px', `Downtime Studio — ${tabId}`)
+        element('h2', 'flex:0 0 auto;margin:0;font-size:14px', `Test companion — ${tabId}`)
       );
       panel.append(openEditor);
+      panel.append(crossLink);
       const scroller = element(
         'div',
         'flex:1 1 auto;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:8px'
@@ -526,6 +686,88 @@ function labDowntimeProvider() {
   };
 }
 
+// view-lab-region:mount-canvas-app
+/**
+ * The three GM canvas windows, each keyed by its own {@link APP_CHROME} id.
+ *
+ * A TABLE plus one mount function rather than three near-identical mount functions. All three
+ * applications expose the SAME seam `mountManagerApp` uses — `_prepareSvelteProps()` returning
+ * `{ services }` off a lazily-built `_services` — so three copies would differ only in two import
+ * specifiers each, which is a duplicated block wearing three names (and one the new-code
+ * duplication gate would fail).
+ *
+ * `load` is a pair of literal dynamic imports rather than an interpolated path because Vite
+ * resolves the lab's module graph statically: a computed specifier yields a runtime 404 in the
+ * browser, not a build error here.
+ *
+ * `ref` is the one thing this table has that `mountManagerApp` has no analogue for. The config
+ * panel is opened AGAINST a behaviour — production constructs it with `{ ref }` and stores
+ * `this._ref` — so the lab must supply that instance field or `_resolveBehavior` answers null and
+ * the window renders its own "no behaviour" body as if it were the screen.
+ */
+const CANVAS_APP_MOUNTS = Object.freeze({
+  'fabricate-interactable-browser': Object.freeze({
+    exportName: 'InteractableBrowserApp',
+    load: () =>
+      Promise.all([
+        import('../../src/ui/InteractableBrowserApp.svelte.js'),
+        import('../../src/ui/svelte/apps/InteractableBrowserRoot.svelte'),
+      ]),
+  }),
+  'fabricate-interactable-config': Object.freeze({
+    exportName: 'InteractableConfigApp',
+    load: () =>
+      Promise.all([
+        import('../../src/ui/InteractableConfigApp.svelte.js'),
+        import('../../src/ui/svelte/apps/InteractableConfigRoot.svelte'),
+      ]),
+    ref: (params) => {
+      const key = params.interactable ?? 'configured';
+      const ref = LAB_INTERACTABLE_REFS[key];
+      // Loudly, and by name. A missing ref renders a panel with no behaviour in it, which looks
+      // like a screen rather than like a fault and would publish as evidence of one.
+      if (!ref) {
+        throw new Error(
+          `view lab: unknown interactable "${key}"; ` +
+            `labInteractables.js declares ${Object.keys(LAB_INTERACTABLE_REFS).join(', ')}`
+        );
+      }
+      return ref;
+    },
+  }),
+  'fabricate-interactables-manager': Object.freeze({
+    exportName: 'InteractablesManagerApp',
+    load: () =>
+      Promise.all([
+        import('../../src/ui/InteractablesManagerApp.svelte.js'),
+        import('../../src/ui/svelte/apps/interactables/InteractablesManagerRoot.svelte'),
+      ]),
+  }),
+});
+
+/**
+ * Mount one of the three canvas windows into the built frame.
+ *
+ * @param {HTMLElement} content The frame's `.window-content`.
+ * @param {object} params The parsed query params.
+ * @returns {Promise<{instance: object, services: object, props: object}>} The mounted window.
+ */
+async function mountCanvasApp(content, params) {
+  const spec = CANVAS_APP_MOUNTS[params.appId];
+  const [appModule, rootModule] = await spec.load();
+
+  const app = borrowInstance(appModule[spec.exportName], {
+    _services: null,
+    ...(spec.ref ? { _ref: spec.ref(params) } : {}),
+    // The lab never re-renders through ApplicationV2; an action in a captured frame is a no-op.
+    render: () => {},
+  });
+  const props = app._prepareSvelteProps();
+  const instance = mount(rootModule.default, { target: content, props });
+  return { instance, services: props.services, props };
+}
+// view-lab-region:end
+
 async function mountManagerApp(content, params) {
   const [{ SvelteCraftingSystemManagerApp }, { default: CraftingSystemManagerRoot }] =
     await Promise.all([
@@ -549,6 +791,26 @@ async function mountManagerApp(content, params) {
   if (params.clearSystem) await props.store.selectSystem('');
   const instance = mount(CraftingSystemManagerRoot, { target: content, props });
   return { instance, services, props, store: props.store, tab: params.tab };
+}
+
+/**
+ * The mount path for the window a case names.
+ *
+ * A three-way choice rather than the player/manager ternary it replaced (issue 1520): the lab now
+ * draws five windows, and a binary would have sent every canvas case down the Manager's mount.
+ * That failure is silent in the worst way — `borrowInstance` would build a Manager stand-in and
+ * `mount` would render the Manager root into a 420px frame — so the fall-through THROWS rather
+ * than defaulting.
+ *
+ * @param {HTMLElement} content The frame's `.window-content`.
+ * @param {object} params The parsed query params.
+ * @returns {Promise<object>} The mounted window.
+ */
+async function mountAppFor(content, params) {
+  if (params.appId === 'fabricate-app') return mountPlayerApp(content, params);
+  if (params.appId === 'fabricate-crafting-system-manager') return mountManagerApp(content, params);
+  if (CANVAS_APP_MOUNTS[params.appId]) return mountCanvasApp(content, params);
+  throw new Error(`view lab: no mount path for app "${params.appId}"`);
 }
 
 /**
@@ -798,7 +1060,12 @@ async function boot() {
         experimentalFeatures: params.experimental,
         clearSystem: params.clearSystem,
         noParties: params.noParties,
+        noTools: params.noTools,
+        noAuthoredWorldComponents: params.noAuthoredWorldComponents,
         longTravelLabels: params.longTravelLabels,
+        noInteractables: params.noInteractables,
+        gatheringTaskMode: params.gatheringTaskMode,
+        journalCaseState: params.journalCaseState,
       });
   if (params.longDowntimeLabels) applyLongDowntimeLocalization(world);
   const localize = world ? world.localize : (key) => key;
@@ -823,12 +1090,13 @@ async function boot() {
     // A case may override with `viewer=` when the GM/player difference is what it photographs.
     const defaultViewer = params.appId === 'fabricate-app' ? 'player' : 'gm';
     world.shim.setViewer(params.viewer ?? defaultViewer);
+    // BEFORE the services are built, for the same reason the viewer flip is: the manager's
+    // world-user projection reads `game.users.players` when it is constructed and nothing
+    // re-reads it afterwards.
+    if (params.manyPlayers) world.shim.seedPlayerRoster();
     // Before any step can click something that confirms.
     world.shim.setDialogAnswer(params.dialog);
-    mounted =
-      params.appId === 'fabricate-app'
-        ? await mountPlayerApp(built.content, params)
-        : await mountManagerApp(built.content, params);
+    mounted = await mountAppFor(built.content, params);
     await settle([built.frame], mounted?.services ?? null);
     // After settle, because the check needs the populated tree — an empty window has nothing
     // clipped to measure.
@@ -846,6 +1114,7 @@ async function boot() {
     services: mounted?.services ?? null,
     store: mounted?.store ?? null,
     frame: built.frame,
+    journalCaseEvents: world?.fabricate?.journalCaseFixtureEvents ?? [],
     // The dialogs standing in the page, so a case can assert one opened and the driver can settle
     // it. `frame.screenshot()` clips the PAGE to the frame's box rather than rendering the frame in
     // isolation, so a dialog centred in the viewport lands on top of the window in the capture —
@@ -853,6 +1122,9 @@ async function boot() {
     dialogs: () => (world ? world.shim.openDialogs() : []),
     settle: () => settle(labSettleRoots(built.frame, world), mounted?.services ?? null),
   };
+  if (params.journalCaseState) {
+    document.body.setAttribute('data-journal-case-state', params.journalCaseState);
+  }
   document.body.setAttribute(READY_ATTRIBUTE, params.caseId ?? params.appId);
 }
 

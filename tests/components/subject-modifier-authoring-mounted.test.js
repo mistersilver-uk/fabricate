@@ -26,7 +26,11 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  SELECT_COMPILED_MODULES,
+  createMountedComponentHarness,
+} from '../helpers/svelte-component-harness.js';
 import {
   COMPONENT_EDIT_VIEW_COMPILED_MODULES,
   COMPONENT_EDIT_VIEW_RAW_MODULES,
@@ -39,11 +43,13 @@ const CATALOGUE = [
   { id: 'alch', label: 'Alchemy', icon: 'fas fa-flask' },
 ];
 
+const MARKED_IDS = CATALOGUE.map((entry) => entry.id);
+
 const salvageHarness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-salvage-modifier-pick-',
   rawModules: COMPONENT_EDIT_VIEW_RAW_MODULES,
-  compiledModules: COMPONENT_EDIT_VIEW_COMPILED_MODULES,
+  compiledModules: [...COMPONENT_EDIT_VIEW_COMPILED_MODULES],
   componentPath: 'src/ui/svelte/apps/manager/ComponentEditView.svelte',
 });
 
@@ -71,7 +77,10 @@ function salvageProps(overrides = {}) {
     checkModifierOptions: CATALOGUE,
     salvageModifierPolicy: 'bySubject',
     salvageModifierMaxPicks: null,
-    salvageModifierDefaultIds: [],
+    // The activity MARKS the whole catalogue, because the mark now bounds what the picker
+    // offers (issue 1608). Leaving it empty would offer nothing and put every case below
+    // on the suppressed path; the inherit cases override it with their own mark.
+    salvageModifierDefaultIds: MARKED_IDS,
     ...rest,
   };
 }
@@ -187,6 +196,57 @@ describe('salvage check-modifier pick — the ComponentEditView host', () => {
     salvageHarness.remount();
   });
 
+  // THE SAME HOST→PICKER HOP, now carrying a SECOND job (issue 1608). `inheritedIds` was
+  // only ever read for the inherit note above, so a host that wired it correctly for that
+  // reading proved nothing about the new one — and the bound is the half a GM cannot see
+  // going wrong, because a picker offering too much looks exactly like a picker offering
+  // the right amount until you know what the check marked.
+  //
+  // Asserted through the REAL host rather than against the picker directly, because the
+  // narrowing is only as good as the id list the host hands down: `ComponentEditView`
+  // reading the CRAFTING check's mark for its salvage picker would be invisible on both
+  // screens (the two agree in the lab world) and is exactly what this suite exists for.
+  it('bounds the salvage pick by the SALVAGE mark, keeping an un-marked pick on the record (issue 1608)', async () => {
+    const { target } = await mountSalvage({
+      salvageModifierDefaultIds: ['med'],
+      // `alch` was picked while it was marked; the salvage check has since un-marked it.
+      component: { salvage: { enabled: true, checkModifierIds: ['med', 'alch'] } },
+    });
+    assert.ok(
+      target.querySelector(`${PICKER} [data-modifier-pill="med"]`),
+      'the marked pick reaches the row'
+    );
+    assert.ok(
+      !target.querySelector(`${PICKER} [data-modifier-pill="alch"]`),
+      'the un-marked one draws no chip — the mark reached the picker as a BOUND, not just ' +
+        'as the inherit note’s name list'
+    );
+    assert.equal(
+      target
+        .querySelector(`${PICKER} [data-subject-modifier-suppressed]`)
+        ?.getAttribute('data-subject-modifier-suppressed'),
+      '1',
+      'and the note counts it, so the chip that vanished is accounted for on screen'
+    );
+    salvageHarness.remount();
+
+    // THE NEGATIVE CONTROL: marking both must restore the second chip and silence the
+    // note, or the assertions above would pass against a picker that rendered no chips.
+    const { target: wide } = await mountSalvage({
+      salvageModifierDefaultIds: MARKED_IDS,
+      component: { salvage: { enabled: true, checkModifierIds: ['med', 'alch'] } },
+    });
+    assert.ok(
+      wide.querySelector(`${PICKER} [data-modifier-pill="alch"]`),
+      'marking alch puts its chip back'
+    );
+    assert.ok(
+      !wide.querySelector(`${PICKER} [data-subject-modifier-suppressed]`),
+      'and nothing is suppressed, so no note renders'
+    );
+    salvageHarness.remount();
+  });
+
   it('threads the salvage cap, so the picker bounds what the salvage roll bounds', async () => {
     const { target } = await mountSalvage({
       salvageModifierMaxPicks: 1,
@@ -244,7 +304,9 @@ describe('salvage check-modifier pick — the ComponentEditView host', () => {
     });
     target.querySelector(`${PICKER} [data-modifier-pill-menu-button]`).click();
     await Promise.resolve();
-    const option = target.querySelector(`${PICKER} [data-modifier-pill-option="alch"]`);
+    // The option is in the PORTALED panel, which is no longer a descendant of the picker
+    // (issue 1466); the mount hosts exactly one picker, so this stays unambiguous.
+    const option = target.querySelector('[data-modifier-pill-option="alch"]');
     assert.ok(Boolean(option), 'the add menu offers the catalogue entry');
     option.click();
     await flushEffects();
@@ -262,28 +324,55 @@ const gatheringHarness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-gathering-modifier-pick-',
   rawModules: [
+    // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
+    ...SEARCHABLE_POPOVER_RAW_MODULES,
+    'src/systems/characterLibraries.js',
     'src/systems/checkModifierResolver.js',
     'src/systems/salvageCheckUsability.js',
     'src/utils/checkModifierPicks.js',
     'src/systems/toolCheckBonus.js',
     'src/utils/craftingCheckExpression.js',
     'src/utils/rollExpressionAverage.js',
+    'src/utils/rollFormulaRollability.js',
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/components/stepperLabels.js',
     'src/ui/svelte/util/dropRateTier.js',
     'src/ui/svelte/actions/dragDrop.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
+    // The availability menus and `ModifierPillSelect`'s add menu are `SearchablePopover`
+    // now (issue 1458), which portals its panel and lays it out against the trigger.
+    'src/ui/svelte/actions/portal.js',
+    'src/ui/svelte/actions/anchoredPopover.js',
+    'src/ui/svelte/util/overlayBounds.js',
+    'src/ui/svelte/util/iconPickerPopover.js',
+    'src/ui/svelte/util/listboxNavigation.js',
+    'src/ui/svelte/util/overlayHost.js',
     'src/gatheringImageDefaults.js',
+    'src/utils/complicationSummary.js',
+    'src/systems/characterPrerequisites.js',
   ],
   compiledModules: [
     'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/components/ChanceSlider.svelte',
+    'src/ui/svelte/components/ManagerSearchField.svelte',
     'src/ui/svelte/components/Pagination.svelte',
-    'src/ui/svelte/apps/manager/Chip.svelte',
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
+    // Issue 1504: the shared `<Select>`'s whole compiled closure — also covers the manager's
+    // ONE labelled push-button (issue 1118), which the stamina Add modifier and both Add drop
+    // rule controls render, and the three availability add menus' shared primitive (issue 1458).
+    ...SELECT_COMPILED_MODULES,
+    'src/ui/svelte/components/RadioCardGroup.svelte',
+    'src/ui/svelte/components/RowDisclosure.svelte',
+    'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
+    'src/ui/svelte/apps/manager/recipe/RecipeResultsSection.svelte',
+    'src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte',
+    'src/ui/svelte/apps/manager/recipe/RecipeResultItemRow.svelte',
+    'src/ui/svelte/apps/manager/recipe/RecipeRoutingAssignment.svelte',
     'src/ui/svelte/apps/manager/SubjectModifierPicker.svelte',
     'src/ui/svelte/components/SelectionCheckbox.svelte',
+    'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/ModifierPillSelect.svelte',
+    'src/ui/svelte/components/StatusToggle.svelte',
     GATHERING_PATH,
   ],
   componentPath: GATHERING_PATH,
@@ -297,7 +386,10 @@ async function mountGathering(overrides = {}) {
     checkModifierOptions: CATALOGUE,
     gatheringModifierPolicy: 'bySubject',
     gatheringModifierMaxPicks: null,
-    gatheringModifierDefaultIds: [],
+    // The activity MARKS the whole catalogue, because the mark now bounds what the picker
+    // offers (issue 1608). Leaving it empty would offer nothing and put every case below
+    // on the suppressed path; the inherit cases override it with their own mark.
+    gatheringModifierDefaultIds: MARKED_IDS,
     onUpdateTask: (patch) => updates.push(patch),
     ...overrides,
   });
@@ -381,15 +473,28 @@ describe('CraftingSystemManagerRoot threads each host its OWN activity’s selec
     'utf8'
   );
 
-  it('hands both hosts the SYSTEM library', () => {
+  // STILL THE WHOLE LIBRARY, deliberately, and this test says so rather than leaving the
+  // next reader to "fix" it. Issue 1608 narrows what a subject may PICK to the ids its
+  // activity marks — but the narrowing is `SubjectModifierPicker`'s, computed from the
+  // `inheritedIds` the row below wires, not the root's. Pre-filtering here instead would
+  // hand the component a list it could not tell apart from the catalogue, and the
+  // suppressed-picks note — which exists precisely to count the difference — would have
+  // nothing to count and would silently never render.
+  it('hands both hosts the WORLD library, unnarrowed', () => {
     const wirings = [...source.matchAll(/checkModifierOptions=\{([^}]+)\}/g)].map((m) => m[1]);
     assert.equal(wirings.length, 2, 'one wiring per host — salvage and gathering');
     for (const wiring of wirings) {
       assert.match(
         wiring,
-        /selectedSystem\?\.modifiers/,
-        'the library is SYSTEM-level since issue 1095 and is named `modifiers` since issue ' +
-          '1117; an empty literal here renders a picker with nothing in it'
+        /selectedSystemModifiers/,
+        'the library is ONE list since issue 1117 and WORLD scope since issue 1308, read off the ' +
+          'view state rather than the selection; an empty literal here renders a picker with ' +
+          'nothing in it'
+      );
+      assert.ok(
+        !/defaultModifierIds|ModifierDefaultIds/.test(wiring),
+        'and it is NOT intersected with the mark here — the picker owns that, and a ' +
+          'pre-narrowed list would leave the suppressed-picks note with nothing to count'
       );
     }
   });

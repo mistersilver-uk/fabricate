@@ -8,8 +8,9 @@
  * Analysis while `tests/**` duplication counts against the new-code gate, so per-suite copies of
  * this fixture would fail the quality gate on otherwise correct code.
  *
- * This file is deliberately NOT collected by `npm test`: its glob lists the top-level
- * `tests/*.test.js` plus a fixed set of subdirectories, and `tests/helpers/` is not among them.
+ * This file is deliberately NOT collected by `npm test`: its glob is `tests/**\/*.test.js`, which
+ * this filename does not match. That the whole directory holds no suite is asserted by
+ * `tests/lint-coverage.test.js`, since the glob stopped excluding it by construction in #1660.
  *
  * The EVALUATION bundle is not faked anywhere. It is a cycle-avoidance seam, not a test double: the
  * suites pass the real `isExemptByLabel`, `validateChangedFilesForCheck`, `hasUiChanges` and

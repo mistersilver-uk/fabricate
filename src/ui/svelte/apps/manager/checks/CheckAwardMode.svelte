@@ -15,7 +15,7 @@
   modes read as the same icon-tile radio cards as every other manager choice.
 -->
 <script>
-  import RadioCardGroup from '../RadioCardGroup.svelte';
+  import RadioCardGroup from '../../../components/RadioCardGroup.svelte';
 
   let { value = 'equal', name = 'progressive-award-mode', onChange = () => {} } = $props();
 

@@ -11,7 +11,14 @@ import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { tick } from '../../node_modules/svelte/src/index-client.js';
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  MARKS_AND_NOTICES_COMPILED_MODULES,
+  PLAYER_APP_COMPILED_MODULES,
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  SELECT_COMPILED_MODULES,
+  STATUS_TONE_RAW_MODULES,
+  createMountedComponentHarness,
+} from '../helpers/svelte-component-harness.js';
 import { createPlayerExtensionsRegistry } from '../../src/ui/playerExtensions.js';
 import { deriveExtensionSurfaces, resolveActiveTab } from '../../src/ui/playerNavModel.js';
 import {
@@ -31,15 +38,32 @@ const harness = createMountedComponentHarness({
   // message, never by guessing: `validateMountedComponentDependencies` walks the whole static
   // import closure and names the importer chain, the specifier and the target list.
   rawModules: [
+    // Issue 1506: the one tone map the converted status pills read at a dynamic site.
+    ...STATUS_TONE_RAW_MODULES,
+    // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
+    ...SEARCHABLE_POPOVER_RAW_MODULES,
     'src/config/flags.js',
     'src/config/hooks.js',
     'src/config/stackQuantityPathPresets.js',
     'src/gatheringImageDefaults.js',
     'src/systems/CraftingListingBuilder.js',
+    'src/systems/characterLibraries.js',
     'src/systems/checkModifierResolver.js',
     'src/systems/craftingBrowseStatus.js',
     'src/systems/foundryCalendar.js',
     'src/systems/inventorySnapshot.js',
+    // Issue 1370 (epic 1357, PR 8a): the listing builder and the inventory snapshot enter
+    // through the SHARED READ SEAM rather than reading `system.components` directly, and
+    // these seven are that seam's whole closure. Same mechanical rule as everything else in
+    // this list: drop one and this suite HANGS (`# cancelled`) rather than fails.
+    'src/systems/scopedEntityReads.js',
+    'src/systems/componentScope.js',
+    'src/systems/essenceScope.js',
+    'src/systems/toolScope.js',
+    'src/systems/scopedDefinitions.js',
+    'src/systems/scopedDefinitionStore.js',
+    'src/utils/scalars.js',
+    'src/migration/worldScopeEntityGrouping.js',
     'src/systems/invalidationDomains.js',
     'src/systems/itemStackQuantity.js',
     'src/systems/passInventorySnapshot.js',
@@ -51,11 +75,28 @@ const harness = createMountedComponentHarness({
     'src/ui/playerExtensions.js',
     'src/ui/playerNavModel.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
+    // `ActorSelectTopBar`'s picker is a `<SearchablePopover>` now (issue 1475), and the
+    // primitive PORTALS its panel and measures it against the resolved application root.
+    // These three arrive through that one conversion; omitting any of them fails this
+    // suite's `before()` by name rather than hanging it, which is what the shared harness
+    // buys over the allowlist it replaced.
+    'src/ui/svelte/actions/portal.js',
+    'src/ui/svelte/actions/anchoredPopover.js',
+    'src/ui/svelte/util/overlayBounds.js',
+    'src/ui/svelte/util/iconPickerPopover.js',
+    'src/ui/svelte/util/listboxNavigation.js',
+    'src/ui/svelte/util/overlayHost.js',
     'src/ui/svelte/apps/gathering/gatheringBlockedReasons.js',
     'src/ui/svelte/apps/gathering/scopedSelection.js',
     'src/ui/svelte/apps/gathering/selectionDefault.js',
     'src/ui/svelte/apps/journal/journalRunStatus.js',
+    'src/ui/svelte/apps/journal/historyPresentation.js',
+    'src/ui/svelte/apps/journal/runStateNotice.js',
+    'src/ui/svelte/apps/journal/runDetailPresentation.js',
+    'src/ui/svelte/apps/journal/stageHeading.js',
+    'src/ui/svelte/apps/journal/runRecovery.js',
     'src/ui/svelte/util/craftingImageDefaults.js',
+    'src/ui/svelte/util/craftingArtResolution.js',
     'src/ui/svelte/util/craftingRecipeStatus.js',
     'src/ui/svelte/util/essenceIcons.js',
     'src/ui/svelte/util/essenceTint.js',
@@ -63,6 +104,9 @@ const harness = createMountedComponentHarness({
   'src/ui/svelte/util/foundryIconCatalogue.js',
     'src/ui/svelte/util/formatDuration.js',
     'src/ui/svelte/util/foundryBridge.js',
+    // Issue 1648: the shared authority-refusal wording the Journal panels and stores read.
+    'src/ui/svelte/util/journalRunReasons.js',
+    'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/gatheringConditionIcons.js',
     'src/ui/svelte/util/gatheringFormat.js',
     'src/ui/svelte/util/ingredientOptionStatus.js',
@@ -72,17 +116,31 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/sceneImages.js',
     'src/ui/svelte/util/worldTimeLabel.js',
     'src/utils/checkModifierPicks.js',
+    // The player complication projection (issue 1286). Reached TWICE from this tree:
+    // CraftingListingBuilder attaches the crafting forecast, and `inventoryStore` marks
+    // the salvage fired tense. Its closure is complicationPlan -> componentComplications.
+    'src/utils/complicationPlan.js',
     'src/utils/componentCategories.js',
+    // #1663: the ONE implementation behind both category shims; imports nothing.
+    'src/utils/categoryNormalization.js',
+    'src/utils/componentComplications.js',
     'src/utils/craftingCheckExpression.js',
     'src/utils/definitionIndex.js',
     'src/utils/objectPath.js',
+    'src/utils/progressiveStageComplications.js',
     'src/utils/progressiveStageThresholds.js',
     'src/utils/recipeCategories.js',
     'src/utils/rollExpressionAverage.js',
+    'src/utils/rollFormulaRollability.js',
     'src/utils/sourceReferenceUnion.js',
     'src/utils/sourceUuid.js',
   ],
   compiledModules: [
+    // The player window's own shared roster (issue 1514), spread rather than listed: this tree
+    // renders the not-yet-ready chrome, the record tile, the portrait and the kind filter's
+    // segmented track, and a manifest that named each would insert lines into a block Sonar
+    // already reads as duplicated across these suites. See `PLAYER_APP_COMPILED_MODULES`.
+    ...PLAYER_APP_COMPILED_MODULES,
     'src/ui/svelte/apps/PlayerExtensionHost.svelte',
     'src/ui/svelte/apps/alchemy/AlchemyDisciplineChooser.svelte',
     'src/ui/svelte/apps/alchemy/AlchemyView.svelte',
@@ -92,11 +150,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/alchemy/Workbench.svelte',
     'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte',
     'src/ui/svelte/apps/crafting/CraftButton.svelte',
-    'src/ui/svelte/apps/crafting/CraftingEssenceThumb.svelte',
-    'src/ui/svelte/apps/crafting/CraftingStatusBadge.svelte',
-    'src/ui/svelte/apps/crafting/CraftingThumb.svelte',
     'src/ui/svelte/apps/crafting/CraftingView.svelte',
-    'src/ui/svelte/apps/crafting/QuantityTag.svelte',
     'src/ui/svelte/apps/crafting/RecipeBrowser.svelte',
     'src/ui/svelte/apps/crafting/RecipeDetail.svelte',
     'src/ui/svelte/apps/crafting/RecipeDetailHeader.svelte',
@@ -114,6 +168,16 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/crafting/detail/OutcomeTierTable.svelte',
     'src/ui/svelte/apps/crafting/detail/ProgressiveBody.svelte',
     'src/ui/svelte/apps/crafting/detail/ProgressiveStageList.svelte',
+    // The shared complication summary row and the two leaves it renders (issue 1286).
+    // `ProgressiveStageList` draws the per-stage complication band through it, and it is
+    // already listed above — so omitting any of these three HANGS this suite (# cancelled)
+    // rather than failing it.
+    'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
+    // Issue 1504: the shared `<Select>`'s whole compiled closure — covers `Chip` (also shared
+    // with the complication band above), the searchable picker `ActorSelectTopBar` converted
+    // onto (issue 1475) and the empty panel it renders over a filtered-to-nothing list.
+    ...SELECT_COMPILED_MODULES,
+    'src/ui/svelte/components/RowDisclosure.svelte',
     'src/ui/svelte/apps/crafting/detail/RecipeBodyShell.svelte',
     'src/ui/svelte/apps/crafting/detail/RequirementRail.svelte',
     'src/ui/svelte/apps/crafting/detail/RequirementTile.svelte',
@@ -142,6 +206,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/inventory/InventoryGrid.svelte',
     'src/ui/svelte/apps/inventory/InventoryItemCard.svelte',
     'src/ui/svelte/apps/inventory/InventoryView.svelte',
+    'src/ui/svelte/apps/inventory/bulk/InventoryBulkComplicationGroup.svelte',
     'src/ui/svelte/apps/inventory/bulk/InventoryBulkPanel.svelte',
     'src/ui/svelte/apps/inventory/bulk/InventoryBulkReport.svelte',
     'src/ui/svelte/apps/inventory/bulk/InventoryBulkRow.svelte',
@@ -171,15 +236,31 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/journal/RecentResults.svelte',
     'src/ui/svelte/apps/journal/RunCard.svelte',
     'src/ui/svelte/apps/journal/RunDetail.svelte',
-    'src/ui/svelte/apps/journal/RunStatusPill.svelte',
+    'src/ui/svelte/apps/journal/HistoricalRunDetail.svelte', 'src/ui/svelte/apps/journal/ThisRun.svelte',
     'src/ui/svelte/apps/journal/StepDetails.svelte',
+    'src/ui/svelte/components/RadioCardGroup.svelte',
     'src/ui/svelte/apps/journal/StepTimeline.svelte',
     'src/ui/svelte/apps/journal/TimeRemainingBox.svelte',
     'src/ui/svelte/apps/journal/WhatToExpect.svelte',
-    'src/ui/svelte/components/ActorSelectTopBar.svelte',
+    'src/ui/svelte/apps/ActorSelectTopBar.svelte',
+    'src/ui/svelte/components/ManagerSearchField.svelte',
+    'src/ui/svelte/components/RunActionBar.svelte',
+    'src/ui/svelte/components/SlotTile.svelte',
+    'src/ui/svelte/components/ChoiceOptionList.svelte',
+    'src/ui/svelte/components/SlotRow.svelte',
+    'src/ui/svelte/components/EssencePool.svelte',
+    'src/ui/svelte/components/RunProgress.svelte',
+    'src/ui/svelte/components/InspectorCard.svelte',
+    'src/ui/svelte/components/StageNav.svelte',
+    'src/ui/svelte/components/StageCard.svelte',
+    'src/ui/svelte/components/ListRow.svelte',
+    'src/ui/svelte/components/YieldScale.svelte',
+    'src/ui/svelte/components/OutcomeLadder.svelte',
+    'src/ui/svelte/components/WorldClockChip.svelte',
     'src/ui/svelte/components/FillBar.svelte',
     'src/ui/svelte/components/Pagination.svelte',
-    'src/ui/svelte/components/StatusPill.svelte',
+    'src/ui/svelte/components/IconButton.svelte',
+    ...MARKS_AND_NOTICES_COMPILED_MODULES,
     'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/apps/FabricateAppRoot.svelte',
   ],
@@ -259,7 +340,14 @@ function fakeServices({ selectedActorId = '' } = {}) {
       selectScopedActor: () => {},
       selectActor: () => {},
     },
-    journal: { navCount: 0, loadedOnce: true, load: () => {} },
+    journal: {
+      navCount: 0,
+      loadedOnce: true,
+      load: () => {},
+      worldTime: 28800,
+      listing: { selectedActorId: selectedActorId || null },
+    },
+    getWorldTimeComponents: () => ({ day: 13, hour: 8, minute: 0, secondsPerDay: 86400 }),
   };
 }
 
@@ -367,6 +455,25 @@ after(() => harness.teardown());
 afterEach(() => harness.remount());
 
 describe('FabricateAppRoot (mounted, against a real player registry)', () => {
+  it('shows the read-only shared world clock only while the Journal tab is active', async () => {
+    const registry = createPlayerExtensionsRegistry({ emitHook: () => {} });
+    const host = makeHost(registry, 'journal');
+    host.selectActor('actor-1');
+    const root = await harness.mount(host.props());
+    const clock = root.querySelector('[data-world-clock]');
+    assert.ok(clock, 'the Journal top bar contains the world clock');
+    assert.equal(root.querySelector('.fabricate-app-actor-bar').style.background, 'transparent', 'the actor child releases its second translucent fill');
+    assert.ok(clock.classList.contains('is-clock'));
+    assert.match(clock.textContent, /"day":14,"time":"08:00"/, 'it uses the existing calendar formatter');
+    assert.equal(clock.querySelector('button, input'), null, 'the clock is read-only');
+
+    railButton(root, 'crafting').click();
+    await tick();
+    await harness.setProps(host.props());
+    assert.equal(root.querySelector('[data-world-clock]'), null, 'other tabs do not duplicate it');
+    assert.equal(root.querySelector('.fabricate-app-actor-bar').style.background, '', 'other tabs keep the ordinary actor surface');
+  });
+
   it('appends provider tabs after the Core tabs and addresses them by route key', async () => {
     const registry = createPlayerExtensionsRegistry({ emitHook: () => {} });
     registry.publicApi.registerPlayerNavProvider(makeProvider().provider);
@@ -511,6 +618,25 @@ describe('FabricateAppRoot (mounted, against a real player registry)', () => {
     assert.ok(Boolean(fault), 'Core renders its own error state in the panel');
     assert.equal(fault.dataset.playerExtensionFault, 'downtime');
     assert.match(fault.textContent, /downtime/, 'and it names the provider that failed');
+    // The strip is the shared `Notice` since issue 1514, and `blocking` is what keeps the role
+    // this state has always carried. Matched on the attribute's exact value rather than by
+    // substring: a non-blocking notice emits `status`, and `alert` is not a substring of it, but
+    // a later role would be — and `role="alert"` is the whole reason `Callout` was refused here.
+    assert.equal(fault.getAttribute('role'), 'alert', 'the strip is still announced as an alert');
+    assert.equal(
+      fault.getAttribute('aria-live'),
+      null,
+      'and `blocking` is what keeps it: a non-blocking notice would demote this to `status` ' +
+        'with `aria-live="polite"`, which is not what a companion whose mount threw is'
+    );
+    assert.equal(
+      fault.getAttribute('data-notice-tone'),
+      'danger',
+      'and the tone is danger, which is a published frame move: the deleted rule drew a NEUTRAL ' +
+        'band, `--fab-border-strong` over `--fab-surface-raised`, with only the glyph in the ' +
+        'danger ink. Measured in the View Lab as 560.00x85.09 becoming 560.00x77.09, unmoved in ' +
+        'width because the `max-width` and the margin stayed on this caller`s own wrapper'
+    );
     assert.ok(
       !root.querySelector('[data-companion-control]'),
       'the partial content the companion appended before throwing is gone'
@@ -805,7 +931,7 @@ describe('FabricateAppRoot invalidation-domain routing (mounted)', () => {
   }
 
   /** Mount the shell with counting services and a live Hooks fake. */
-  async function mountWithSpies() {
+  async function mountWithSpies(serviceOverrides = {}) {
     installHooks();
     const registry = createPlayerExtensionsRegistry({ emitHook: () => {} });
     const { calls, services } = spyServices();
@@ -813,7 +939,7 @@ describe('FabricateAppRoot invalidation-domain routing (mounted)', () => {
       activeTab: DEFAULT_TAB,
       showAlchemy: false,
       onSelectTab: () => {},
-      services,
+      services: { ...services, ...serviceOverrides },
       extensionSurfaces: deriveExtensionSurfaces(registry, { experimentalFeaturesEnabled: true }),
       playerExtensions: registry,
     });
@@ -851,6 +977,83 @@ describe('FabricateAppRoot invalidation-domain routing (mounted)', () => {
         'narrowing was possible however good a delta was emitted'
     );
     assert.equal(hooks.count('fabricate.craftingSystemsChanged'), 0);
+  });
+
+  it('quietly refreshes Journal dismissals across tabs and actor switches, then unsubscribes', async () => {
+    const dismissalHook = 'fabricate.journalDismissalsChanged';
+    const loads = [];
+    let selectedActorId = 'actor-1';
+    const services = fakeServices({ selectedActorId });
+    services.getSelectedActorId = () => selectedActorId;
+    services.journal.load = (quiet) => loads.push({ actorId: selectedActorId, quiet });
+    await mountWithSpies(services);
+    assert.deepEqual(loads, [], 'subscribing does not itself reload an already-loaded Journal');
+
+    const localDismissal = (actorId) => ({
+      actorUuid: `Actor.${actorId}`,
+      runType: 'crafting',
+      runId: 'finished-run',
+    });
+    const expectQuietRefresh = async (payload) => {
+      loads.length = 0;
+      hooks.callAll(dismissalHook, payload);
+      await tick();
+      assert.deepEqual(loads, [{ actorId: selectedActorId, quiet: true }]);
+      assert.equal(hooks.count(dismissalHook), 1, 'exactly one shell-owned dismissal listener');
+    };
+
+    await expectQuietRefresh(localDismissal(selectedActorId));
+    await expectQuietRefresh(undefined); // Both createSetting and updateSetting publish no args.
+    loads.length = 0;
+    hooks.callAll(dismissalHook, localDismissal('actor-2'));
+    assert.deepEqual(loads, [], 'an unrelated local actor dismissal does not reload this Journal');
+
+    await harness.setProps({ activeTab: 'journal' });
+    await expectQuietRefresh(undefined);
+    selectedActorId = 'actor-2';
+    await harness.setProps({
+      services: {
+        ...services,
+        actorBar: { ...services.actorBar, selectedActorId },
+      },
+    });
+    loads.length = 0;
+    hooks.callAll(dismissalHook, localDismissal('actor-1'));
+    assert.deepEqual(loads, [], 'the listener does not retain the outgoing actor selection');
+    await expectQuietRefresh(localDismissal(selectedActorId));
+
+    await harness.setProps({ activeTab: 'crafting' });
+    await expectQuietRefresh(undefined);
+    await harness.remount();
+    assert.equal(hooks.count(dismissalHook), 0, 'unmount removes the dismissal hook by its id');
+    loads.length = 0;
+    hooks.callAll(dismissalHook);
+    await tick();
+    assert.deepEqual(loads, [], 'a closed shell cannot keep refreshing the Journal');
+  });
+
+  it('quietly rebuilds the Journal when the run authority reports its refusal lifted', async () => {
+    // M25: the listing captures the authority's availability as it builds, so a `claim-held`
+    // captured while a command ran keeps refusing runs against a claim that has since gone.
+    // The authority announces the lift; this is the shell binding that acts on it.
+    const restoredHook = 'fabricate.journalRunAuthorityRestored';
+    const loads = [];
+    const services = fakeServices();
+    services.journal.load = (quiet) => loads.push({ quiet });
+    await mountWithSpies(services);
+    assert.deepEqual(loads, [], 'subscribing does not itself reload an already-loaded Journal');
+    assert.equal(hooks.count(restoredHook), 1, 'exactly one shell-owned listener');
+
+    hooks.callAll(restoredHook);
+    await tick();
+    assert.deepEqual(loads, [{ quiet: true }], 'a quiet rebuild, with no loading flicker');
+
+    await harness.remount();
+    assert.equal(hooks.count(restoredHook), 0, 'unmount removes the listener by its id');
+    loads.length = 0;
+    hooks.callAll(restoredHook);
+    await tick();
+    assert.deepEqual(loads, [], 'a closed shell cannot keep refreshing the Journal');
   });
 
   // TABLE-DRIVEN, from the shipped constant. A domain added to the taxonomy without a

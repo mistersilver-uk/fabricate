@@ -21,6 +21,7 @@
   } from '../../util/foundryBridge.js';
   import { INVALIDATION_STORES, STORE_DOMAINS } from '../../../../systems/invalidationDomains.js';
   import { describeBlockedReasons } from './gatheringBlockedReasons.js';
+  import { journalRefusalMessage } from '../../util/journalRunReasons.js';
   import GatheringEnvironmentList from './GatheringEnvironmentList.svelte';
   import GatheringDetail from './GatheringDetail.svelte';
   import GatheringTaskDetail from './GatheringTaskDetail.svelte';
@@ -33,6 +34,7 @@
     visibleEventsFor,
   } from './selectionDefault.js';
   import { resolveScopedGatheringSelection } from './scopedSelection.js';
+  import PlayerViewState from '../PlayerViewState.svelte';
 
   let {
     services = null,
@@ -83,6 +85,36 @@
   const isEmpty = $derived(
     !listing || listing.visible === false || !hasActor || environments.length === 0
   );
+
+  // The three branches this view can reach, in priority order, handed to the shared composition
+  // as data. Gathering folds no-actor into `empty`, so it has no no-actor branch of its own.
+  // The hook name and each value are the ones the smoke locators and the mounted suites read.
+  const viewStates = $derived([
+    {
+      when: loading,
+      kind: 'loading',
+      hook: 'data-gathering-state',
+      value: 'loading',
+      icon: 'fas fa-spinner fa-spin',
+      message: localize('FABRICATE.App.Gathering.Loading'),
+    },
+    {
+      when: error,
+      kind: 'error',
+      hook: 'data-gathering-state',
+      value: 'error',
+      icon: 'fas fa-triangle-exclamation',
+      message: localize('FABRICATE.App.Gathering.Error'),
+    },
+    {
+      when: isEmpty,
+      kind: 'empty',
+      hook: 'data-gathering-state',
+      value: 'empty',
+      icon: 'fas fa-leaf',
+      message: localize('FABRICATE.App.Gathering.Environments.Empty'),
+    },
+  ]);
   // The environment whose detail the center column renders; null until the
   // player picks a selectable card (or when the prior selection drops out).
   const selectedEnvironment = $derived(
@@ -238,6 +270,11 @@
       }
       if (result && result.accepted === false) {
         notifyWarn(describeBlockedReasons(result.blockedReasons, localize));
+      } else if (result && result.success === false) {
+        // A versioned start goes through the run authority, whose refusal shape is
+        // `{success:false, reason}` with NO `accepted` and no `message` — so it
+        // missed the branch above entirely and the attempt was a silent no-op.
+        notifyWarn(journalRefusalMessage(result, localize, describeBlockedReasons(null, localize)));
       }
       await load();
     } finally {
@@ -376,22 +413,7 @@
   });
 </script>
 
-{#if loading}
-  <div class="gathering-view-state" data-gathering-state="loading">
-    <i class="fas fa-spinner fa-spin" aria-hidden="true"></i>
-    <p>{localize('FABRICATE.App.Gathering.Loading')}</p>
-  </div>
-{:else if error}
-  <div class="gathering-view-state" data-gathering-state="error">
-    <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
-    <p>{localize('FABRICATE.App.Gathering.Error')}</p>
-  </div>
-{:else if isEmpty}
-  <div class="gathering-view-state" data-gathering-state="empty">
-    <i class="fas fa-leaf" aria-hidden="true"></i>
-    <p>{localize('FABRICATE.App.Gathering.Environments.Empty')}</p>
-  </div>
-{:else}
+<PlayerViewState branches={viewStates}>
   <div class="gathering-view-container">
     <div class="gathering-view-grid" data-gathering-state="populated">
       <div class="gathering-view-column gathering-view-column-left">
@@ -435,7 +457,7 @@
       </section>
     </div>
   </div>
-{/if}
+</PlayerViewState>
 
 <style>
   /* The grid's wrapper is the size container so the columns reflow against the
@@ -501,25 +523,5 @@
     border: 1px solid var(--fab-border);
     border-radius: 8px;
     background: var(--fab-surface-soft);
-  }
-
-  .gathering-view-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    height: 100%;
-    color: var(--fab-text-muted);
-    background: var(--fab-surface);
-  }
-
-  .gathering-view-state i {
-    font-size: 32px;
-  }
-
-  .gathering-view-state p {
-    margin: 0;
-    font-size: 14px;
   }
 </style>

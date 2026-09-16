@@ -38,13 +38,15 @@
   deferral is recorded rather than assumed.
 
   ── IT IS NOT `.manager-button` ───────────────────────────────────────────────────
-  Deliberately. `.fabricate-manager .manager-button.is-primary` is three classes; a scoped
+  Deliberately. `.fabricate-button.manager-button.is-primary` is three classes; a scoped
   Svelte rule compiles to two (`.fab-inspector-action.is-primary.svelte-<hash>` still selects
   on two of ITS OWN classes plus the hash, but the global rule would win the tone), so
   reusing that class and those modifier names would put the primitive's own tones behind the
   global sheet's. The `fab-` namespace is the repo's convention for an area-agnostic shared
-  primitive (`fab-medallion`, `fab-status-pill`, `fab-selection-check`) and it collides with
-  nothing in the global sheet.
+  primitive (`fab-medallion`, `fab-avatar`, `fab-selection-check`) and it collides with
+  nothing in the global sheet. The third example here was `fab-status-pill` until issue 1506
+  retired that component into the chip; it is repointed at a class that still exists, because
+  a namespace convention illustrated by a class nothing emits illustrates nothing.
 
   Because it is not `.manager-button`, it must carry the Foundry `<button>` reset itself —
   Foundry pins a fixed `height` and its own `font-family` on every button. Those declarations
@@ -52,8 +54,9 @@
   button-tagged variant. Foundry's rules are inside `@layer`, so this unlayered block beats
   them at any specificity.
 
-  Every token it reads is declared in `:root` or in all seven theme blocks — never a
-  `--fab-mv2-*` manager alias — so the component stays usable outside `.fabricate-manager`.
+  Every token it reads is declared in `:root` or in all seven theme blocks — never an
+  area-scoped `--fab-manager-*` property — so the component stays usable outside
+  `.fabricate-manager`.
 
   Props:
    - tone: `'neutral'` (default), `'primary'` (accent fill — the ONE loud verb per rail),
@@ -125,9 +128,44 @@
     min-height: 34px;
     padding: 0 var(--fab-space-3);
     border: 1px solid var(--fab-border);
-    border-radius: 6px;
+
+    /* THE CORNER FOLLOWS THE HEIGHT (issue 1371, maintainer ruling M12a applied to this
+       primitive). This was 6px, which `openspec/specs/design-system/spec.md`'s radius ladder
+       gives to a CHIP at or below 24px; a control of 34 to 38px takes 9. A 34px button on a
+       chip's corner is the identical off-ladder pairing M12a closed one rule up on
+       `.manager-button.fab-manager-button`, and the rules list measured it as the last line on
+       `sys-inspector-foot-action`.
+
+       IT IS A COMPLIANCE FIX AND NOT AN OPT-IN, for M12a's reason: a published ladder is not a
+       per-caller preference, and an opt-in would leave every OTHER inspector foot action on the
+       wrong rung while making the wrongness look deliberate. It moves every inspector foot
+       action by three pixels of corner curvature and nothing else — no box, no stacking context
+       and no hit target moves.
+
+       `.is-primary` below overrides the height to 36px, which is a RETIRED rung and is already
+       booked as debt in `tests/components/control-height-known-literals.js`. It is left exactly
+       as it stands: 36 is inside the 34-38 band this corner serves, so it takes the same 9 and
+       no second value is introduced here. */
+    border-radius: 9px;
     color: var(--fab-text);
-    background: var(--fab-bg-2);
+
+    /* NO FILL — THE NEUTRAL VERB SITS ON THE PANE, IT DOES NOT STAND OFF IT (issue 1372,
+       maintainer parity round 6).
+
+       This was `--fab-bg-2`, and the rail it lives in was moved onto `--fab-bg-0` in the same
+       epic (`EntityListInspectorFrame.svelte`) — so `Duplicate essence` was painting two rungs
+       ABOVE its own surface and reading as raised. The prototype's equivalent secondary is a
+       step BELOW its surface, on a value that sits under `--fab-bg-0` and has no token; minting
+       one would have to be authored into all seven themes and would move every theme's ramp
+       contour, so the exact value is not available.
+
+       Unfilled and bounded by `--fab-border` is: it is the treatment the prototype's own
+       `← Back` wears next to `Save essence` (`essEntry.png`, where the button's fill measures
+       identical to the header behind it), and it is what every other card on these three screens
+       already does. The affordance is not lost with it — the hover below still washes to
+       `--fab-surface-raised`, the border is the same one the cards carry, and the accent primary
+       directly beneath it is what the eye lands on first, which is the ordering the rail wants. */
+    background: transparent;
     font-family: inherit;
 
     /* 0.72rem (~11.5px), the Tool Studio's header label size. The essence rail rendered
@@ -173,11 +211,14 @@
   }
 
   /* DANGER keeps the panel surface and speaks in danger text and a danger-tinted edge, so a
-     destructive verb reads as destructive without ever out-shouting the primary. */
+     destructive verb reads as destructive without ever out-shouting the primary. It restates
+     the neutral's absent fill rather than inheriting it, because that is the declaration a
+     later tone edit is most likely to reintroduce here on its own: "keeps the panel surface"
+     is the sentence, and a rung is not the panel surface. */
   .fab-inspector-action.is-danger {
     border-color: var(--fab-danger-border);
     color: var(--fab-danger-text);
-    background: var(--fab-bg-2);
+    background: transparent;
   }
 
   .fab-inspector-action.is-danger:not(:disabled):hover {

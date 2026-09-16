@@ -52,6 +52,7 @@
       aria-selected={activeTab === tab.id}
       aria-controls={`gathering-detail-panel-${tab.id}`}
       tabindex={activeTab === tab.id ? 0 : -1}
+      data-keyboard-focus="true"
       data-gathering-detail-tab={tab.id}
       onclick={() => onSelect(tab.id)}
       onkeydown={(event) => onKeydown(event, index)}

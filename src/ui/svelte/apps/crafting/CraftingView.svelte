@@ -13,10 +13,12 @@
 -->
 <script>
   import { localize, subscribeSceneChange, subscribeWorldTime } from '../../util/foundryBridge.js';
+  import { journalRunReasonMessage } from '../../util/journalRunReasons.js';
   import RecipeBrowser from './RecipeBrowser.svelte';
   import RecipeDetail from './RecipeDetail.svelte';
   import ShoppingList from './ShoppingList.svelte';
   import RunSummaryPanel from './RunSummaryPanel.svelte';
+  import PlayerViewState from '../PlayerViewState.svelte';
 
   let { services = null } = $props();
 
@@ -40,6 +42,44 @@
   const isNoActor = $derived(Boolean(store?.loadedOnce) && !hasActor);
   const isEmpty = $derived(Boolean(store?.loadedOnce) && hasActor && summaries.length === 0);
 
+  // The four branches this view can reach, in priority order, handed to the shared composition
+  // as data. The hook name and each value are the ones the smoke locators and the mounted
+  // suites already read, so neither is derived from `kind`.
+  const viewStates = $derived([
+    {
+      when: isLoading,
+      kind: 'loading',
+      hook: 'data-crafting-state',
+      value: 'loading',
+      icon: 'fas fa-spinner fa-spin',
+      message: localize('FABRICATE.App.Crafting.Loading'),
+    },
+    {
+      when: isError,
+      kind: 'error',
+      hook: 'data-crafting-state',
+      value: 'error',
+      icon: 'fas fa-triangle-exclamation',
+      message: localize('FABRICATE.App.Crafting.Error'),
+    },
+    {
+      when: isNoActor,
+      kind: 'empty',
+      hook: 'data-crafting-state',
+      value: 'no-actor',
+      icon: 'fas fa-user-slash',
+      message: localize('FABRICATE.App.Crafting.NoActor'),
+    },
+    {
+      when: isEmpty,
+      kind: 'empty',
+      hook: 'data-crafting-state',
+      value: 'empty',
+      icon: 'fas fa-hammer',
+      message: localize('FABRICATE.App.Crafting.Empty'),
+    },
+  ]);
+
   // The hydrated rich model, and the row it was hydrated from. The browser list highlights
   // the ROW, so a hydration that answers nothing leaves the selection visible rather than
   // silently clearing it.
@@ -50,6 +90,25 @@
   );
   const craftability = $derived(store?.selectedCraftability ?? null);
   const craftInFlight = $derived(Boolean(store?.craftInFlight));
+
+  // Why the header can refuse a recipe the listing calls available: the authority gates every
+  // versioned start, and its availability is a CACHE the boot/journal hooks refresh, so it is
+  // re-read whenever the listing reloads rather than subscribed to.
+  //
+  // It FAILS CLOSED on a code it cannot word. This used to answer '' and leave the green
+  // Ready-to-craft chip standing — for an AVAILABILITY answer that is backwards, and it is
+  // exactly what hid `authority-unavailable` while that code was unmapped. `available === false`
+  // means the craft WILL be refused whatever the code says, so an unwordable one falls back to
+  // the generic sentence rather than to silence.
+  const authorityRefusal = $derived.by(() => {
+    void listing;
+    const availability = services?.getJournalRunAuthorityAvailability?.();
+    if (availability?.available !== false) return '';
+    return (
+      journalRunReasonMessage(availability.reason, localize) ||
+      localize('FABRICATE.App.Journal.Actions.AuthorityUnavailable')
+    );
+  });
 
   // Progressive stage list (issue 651). The ORDER is applied in the store, not here —
   // this view only threads getters down and routes callbacks back.
@@ -190,27 +249,7 @@
   );
 </script>
 
-{#if isLoading}
-  <div class="crafting-view-state" data-crafting-state="loading">
-    <i class="fas fa-spinner fa-spin" aria-hidden="true"></i>
-    <p>{localize('FABRICATE.App.Crafting.Loading')}</p>
-  </div>
-{:else if isError}
-  <div class="crafting-view-state" data-crafting-state="error">
-    <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
-    <p>{localize('FABRICATE.App.Crafting.Error')}</p>
-  </div>
-{:else if isNoActor}
-  <div class="crafting-view-state" data-crafting-state="no-actor">
-    <i class="fas fa-user-slash" aria-hidden="true"></i>
-    <p>{localize('FABRICATE.App.Crafting.NoActor')}</p>
-  </div>
-{:else if isEmpty}
-  <div class="crafting-view-state" data-crafting-state="empty">
-    <i class="fas fa-hammer" aria-hidden="true"></i>
-    <p>{localize('FABRICATE.App.Crafting.Empty')}</p>
-  </div>
-{:else}
+<PlayerViewState branches={viewStates}>
   <div class="crafting-view-container">
     <div class="crafting-view-grid" data-crafting-state="populated">
       <div class="crafting-view-column crafting-view-column-left">
@@ -260,6 +299,7 @@
           {rail}
           {activeStepId}
           {displayedStepId}
+          {authorityRefusal}
         />
       </section>
 
@@ -286,7 +326,7 @@
       </section>
     </div>
   </div>
-{/if}
+</PlayerViewState>
 
 <style>
   /* The grid wrapper is the size container so columns reflow against the Fabricate
@@ -343,25 +383,5 @@
     border-radius: 8px;
     background: var(--fab-surface-soft);
     overflow: hidden;
-  }
-
-  .crafting-view-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    height: 100%;
-    color: var(--fab-text-muted);
-    background: var(--fab-surface);
-  }
-
-  .crafting-view-state i {
-    font-size: 32px;
-  }
-
-  .crafting-view-state p {
-    margin: 0;
-    font-size: 14px;
   }
 </style>

@@ -77,6 +77,23 @@ export function isGameMaster() {
   return globalThis.game?.user?.isGM === true;
 }
 
+/**
+ * Localize `key`, substituting `data` when supplied.
+ *
+ * DELIBERATELY calls `i18n.format(key, data)` rather than `i18n.localize(key, data)` for the
+ * `data` branch. On Foundry V13.351 `format(stringId, data={})` and `localize(stringId)` are
+ * two separately declared methods and `localize` takes no `data` argument at all, so this
+ * split is required there. On V14.365 `format` is no longer declared as its own method — the
+ * class declares only `localize(stringId, data)`, which now accepts `data` itself — and
+ * `format` survives solely as a non-enumerable prototype alias of `localize`, installed with
+ * no deprecation warning. `i18n.format(key, data)` is therefore correct on BOTH supported
+ * builds today; "modernising" this call to `i18n.localize(key, data)` would silently break on
+ * V13.351, where `localize` ignores a second argument.
+ *
+ * @param {string} key
+ * @param {object} [data]
+ * @returns {string} the key itself when no `game.i18n` is reachable (outside a running world).
+ */
 export function localize(key, data) {
   const i18n = globalThis.game?.i18n;
   if (!i18n) return key;
@@ -554,6 +571,38 @@ export function subscribeTravelMarkerMove(handler) {
 }
 
 /**
+ * The run-container flag base paths, a derived local mirror of `runFlagInvalidation.js`'s
+ * `RUN_CONTAINER_FLAG_PATHS` and deliberately not an import: this module is enumerated by hand
+ * in over a hundred mounted-test manifests, and one that misses a transitive import does not
+ * fail — the suite hangs and reports `# cancelled`, never `# fail`.
+ * `src/systems/worldScopeRekeyPending.js` makes the same trade for the same reason.
+ * `tests/util/foundry-bridge-subscriptions.test.js` asserts {@link RUN_FLAG_DIFF_PATHS} equals
+ * the shared module's own derivation, so the mirror cannot drift silently (issue 1654).
+ */
+const RUN_FLAG_BASE_PATHS = Object.freeze([
+  'flags.fabricate.fabricate.craftingRuns',
+  'flags.fabricate.fabricate.salvageRuns',
+  'flags.fabricate.gatheringRuns',
+]);
+
+/** Mirrored from `FLAG_UPDATE_OPERATOR_PREFIXES`; see {@link RUN_FLAG_BASE_PATHS}. */
+const RUN_FLAG_OPERATOR_PREFIXES = Object.freeze(['-=', '==']);
+
+/**
+ * Every change-diff path that means a run container was touched: each base path, plus one per
+ * update-operator prefix on its last segment, the only segment an operator may sit on. Exported
+ * for the drift guard named on {@link RUN_FLAG_BASE_PATHS}, not as a runtime surface.
+ */
+export const RUN_FLAG_DIFF_PATHS = Object.freeze(
+  RUN_FLAG_BASE_PATHS.flatMap((path) => {
+    const lastDot = path.lastIndexOf('.');
+    const parent = path.slice(0, lastDot + 1);
+    const key = path.slice(lastDot + 1);
+    return [path, ...RUN_FLAG_OPERATOR_PREFIXES.map((operator) => `${parent}${operator}${key}`)];
+  })
+);
+
+/**
  * Subscribe to run-flag writes on the relevant actor so callers can quietly re-fetch
  * run-derived views (the Journal listing, the nav active-run count badge) when a run
  * is created, advanced, or archived by ANY client — including the primary-GM
@@ -575,11 +624,12 @@ export function subscribeActorRunFlagChange(handler, { isRelevantActor } = {}) {
   if (!hooks?.on || typeof handler !== 'function') return () => {};
   const relevant = typeof isRelevantActor === 'function' ? isRelevantActor : () => true;
   const hasProperty = globalThis.foundry?.utils?.hasProperty;
+  // With no `foundry.utils.hasProperty` this refreshes nothing rather than probing the diff
+  // itself, which is what the shared matcher's own fallback would do.
+  // `tests/util/foundry-bridge-subscriptions.test.js` pins that choice.
   const touchesRunFlag = (changes) =>
     typeof hasProperty === 'function' &&
-    (hasProperty(changes, 'flags.fabricate.fabricate.craftingRuns') ||
-      hasProperty(changes, 'flags.fabricate.fabricate.salvageRuns') ||
-      hasProperty(changes, 'flags.fabricate.gatheringRuns'));
+    RUN_FLAG_DIFF_PATHS.some((path) => hasProperty(changes, path));
   const onUpdate = (actor, changes) => {
     const actorId = actor?.id ?? null;
     if (actorId && relevant(actorId) && touchesRunFlag(changes)) handler();
@@ -588,6 +638,47 @@ export function subscribeActorRunFlagChange(handler, { isRelevantActor } = {}) {
   return () => {
     hooks.off?.('updateActor', id);
   };
+}
+
+/**
+ * Subscribe to the current viewer's Journal dismissal refresh signal.
+ * Local dismissals name an actor UUID; replicated create/updateSetting signals
+ * carry no payload, so those must refresh without an actor or user-id filter.
+ * The Journal listing reads the current user's dismissal setting itself.
+ *
+ * @param {Function} handler Read-only refresh callback, invoked without arguments.
+ * @param {object} [options]
+ * @param {(actorUuid: string) => boolean} [options.isRelevantActor] Local actor
+ *   predicate read at fire time; omitted means all actors.
+ * @returns {Function} Cleanup callback; safe when Foundry Hooks is absent.
+ */
+export function subscribeJournalDismissalsChange(handler, { isRelevantActor } = {}) {
+  const hooks = globalThis.Hooks;
+  if (!hooks?.on || typeof handler !== 'function') return () => {};
+  const hook = 'fabricate.journalDismissalsChanged';
+  const id = hooks.on(hook, (payload) => {
+    if (payload?.actorUuid && isRelevantActor && !isRelevantActor(payload.actorUuid)) return;
+    handler();
+  });
+  return () => hooks.off?.(hook, id);
+}
+
+/**
+ * Subscribe to the Journal run authority's refusal LIFTING.
+ *
+ * Availability is read when the Journal listing is built, so a refusal captured by one build
+ * outlives the claim it names until something rebuilds. The authority announces the lift; a
+ * surface that captured the refusal re-derives on it. There is no poll and no per-read probe.
+ *
+ * @param {Function} handler Read-only refresh callback, invoked without arguments.
+ * @returns {Function} Cleanup callback; safe when Foundry Hooks is absent.
+ */
+export function subscribeJournalAuthorityRestored(handler) {
+  const hooks = globalThis.Hooks;
+  if (!hooks?.on || typeof handler !== 'function') return () => {};
+  const hook = 'fabricate.journalRunAuthorityRestored';
+  const id = hooks.on(hook, () => handler());
+  return () => hooks.off?.(hook, id);
 }
 
 export function notifyInfo(msg) {

@@ -20,13 +20,65 @@
  *   4. initialize as GM (initialization migrates and writes),
  *   5. flip the viewer for player frames.
  */
-import { buildLabActors, buildDocumentIndex } from './labActors.js';
-import { buildLabBlindRunSecret, buildLabRunStates, installLabRunStates } from './labRunStates.js';
-import { buildLabContent, ICON_BASE, LAB_SYSTEM_IDS } from './labContent.js';
 import { installFoundryShim, settingsKey } from '../foundry/installFoundryShim.js';
 import { createLocalizer, toI18nStub } from '../labI18n.js';
+import { JOURNAL_RUN_SOCKET_KIND } from '../../../src/systems/journalRunCommands.js';
+import { JOURNAL_RUN_CLAIM_PAGE_ID } from '../../../src/systems/journalRunAuthority.js';
+
+import { buildLabActors, buildDocumentIndex } from './labActors.js';
+import {
+  buildLabContent,
+  ICON_BASE,
+  LAB_SYSTEM_IDS,
+  seedJournalNoCheckFixture,
+} from './labContent.js';
+import { seedLabInteractables } from './labInteractables.js';
+import { stockJournalPrototype } from './labJournalPrototype.js';
+import { installUpdateSemantics, makeGetFlag } from './labFlags.js';
+import {
+  buildLabBlindRunSecret,
+  buildLabRunStates,
+  createLabJournalCaseController,
+  installLabRunStates,
+  LAB_RETAINED_CLAIM,
+} from './labRunStates.js';
 
 const FABRICATE_NAMESPACE = 'fabricate';
+
+// These variants change persisted authoring before the real services initialize. The default
+// world remains unchanged, including every existing d100 editor and gathering screenshot.
+function seedGatheringTaskMode(content, mode) {
+  if (!['straight', 'routed', 'routed-unmatched'].includes(mode)) return;
+  const system = content.systems.find((entry) => entry.id === LAB_SYSTEM_IDS.HERBALISM);
+  const slice = content.gatheringConfig.systems[LAB_SYSTEM_IDS.HERBALISM];
+  const task = structuredClone(slice.tasks.find((entry) => entry.id === 'hb-task-slowbloom'));
+  task.resolutionMode = mode === 'straight' ? 'straight' : 'routed';
+  task.resultGroups = [
+    {
+      id: 'lab-gathering-yield',
+      name: mode === 'routed-unmatched' ? 'Old abundance name' : 'Abundant',
+      results: [{ id: 'lab-gathering-emberbloom', componentId: 'hb-emberbloom', quantity: 2 }],
+    },
+  ];
+  if (mode !== 'straight') {
+    system.gatheringCraftingCheck = {
+      ...system.gatheringCraftingCheck,
+      routed: {
+        rollFormula: '1d20',
+        dc: 15,
+        type: 'relative',
+        thresholdMode: 'meet',
+        relativeOutcomes: [
+          { id: 'lab-abundant', name: 'Abundant', success: true, dc: 0 },
+          { id: 'lab-failed', name: 'Failed', success: false, dc: -15 },
+        ],
+      },
+    };
+  }
+  const replaceTask = (entry) => (entry.id === task.id ? task : entry);
+  slice.tasks = slice.tasks.map(replaceTask);
+  content.gatheringConfig.tasks = content.gatheringConfig.tasks.map(replaceTask);
+}
 
 /** 14 days into the world's calendar, so relative timestamps render as something. */
 export const LAB_WORLD_TIME = 1_209_600;
@@ -62,6 +114,36 @@ function seedSettings(content, actors, managedSystemId, experimentalFeatures, no
   // World > Travel page photographs an empty realm list and every realm-gated environment
   // resolves against nothing.
   put('travelConfig', content.travelConfig);
+  // The WORLD TOOL corpus (issue 1373, epic 1357). World scope, like the currency ladder: a
+  // crafting system carries its own in-system tools, and the world record that is SHARED across
+  // systems lives in its own setting. Without it the world Tools Catalogue photographs its
+  // no-state hero and the world Tool entry is unreachable, because the only way in is a
+  // catalogue row.
+  put('toolScope', content.toolScope);
+  // The WORLD COMPONENT scope and the WORLD VOCABULARY (issue 1392, epic 1357, PR 7a). Both
+  // beside `toolScope` for its reason and read from `labContent`, where the fixture states what
+  // each record exists to make photographable.
+  //
+  // `componentScope` is a PARTIAL seed, and the partiality is deliberate rather than an omission:
+  // `1.30.0`'s world-scope pass lifts the rest out of the systems on every lab build, and its
+  // per-pair guard skips an entity whose default is already present, so every record seeded here
+  // survives the pass rather than being overwritten by it. Issue 1371 added the `membership` half
+  // this comment once said the key did not carry, for the inheriting-category pair `labContent`
+  // states its reasons on; issue 1392's own world-only record is one of the `entities` beside it.
+  //
+  // ONE `put` FOR THE KEY, and it is this one. Issue 1371 seeded the same literal again below the
+  // `essenceScope` put, which was idempotent and therefore invisible; the capture-registry guard
+  // that reason names resolves a clicked component row against `content.componentScope`, so it
+  // reads the same literal wherever the put sits.
+  //
+  // POSITION AMONG THE PUTS IS COSMETIC. The shim's settings map answers a SEEDED key with its
+  // seed whether or not `registerSettings()` has declared it, so nothing here depends on the
+  // registration landing first. What DOES depend on it is production, where
+  // `ClientSettings#assertSetting` throws on an unregistered key — and that ordering is pinned
+  // by the source-order assertions in `tests/scoped-definition-read-and-basis.test.js`, not by
+  // this file.
+  put('componentScope', content.componentScope);
+  put('worldVocabulary', content.worldVocabulary);
   // FIVE parties, and every one of them earns its place in the World > Parties card list:
   // the pane is paged at four, searchable once more than one exists, and draws its enable
   // gate, its unlinked travel-actor tile and its disabled treatment only when a party is in
@@ -137,6 +219,42 @@ function seedSettings(content, actors, managedSystemId, experimentalFeatures, no
           },
         ]
   );
+  // ── ONE INHERITING SECTION, seeded so the state can be PHOTOGRAPHED (issue 1372) ───────────
+  //
+  // The lab runs every migration, and `buildMembershipRecord` writes every section OVERRIDING for
+  // every `(entity, system)` pair it creates. So with no seed here every essence in every lab
+  // system is fully overridden, and NO View Lab case can render an inheriting inherit row or a
+  // `· world default` on-craft card — the two states the whole world-scope model exists to
+  // express. Both were unit-covered and neither was in the registry, which is the shape that lets
+  // a regression ship green.
+  //
+  // The seed is the MEMBERSHIP RECORD ALONE. The migration's lift half is gated PER PAIR
+  // (`if (payload.membership[key]) continue;`), so this record survives it, while its defaults
+  // half is gated per ENTITY and therefore still ELECTS `aether`'s world defaults from the donor
+  // system exactly as it would have. Seeding a world default here as well would take that election
+  // out of the frame and put a hand-written value in its place.
+  //
+  // `aether` in `lab-smithing` is the pair, because it is the one the three essence-editor cases
+  // open, and `effectSource` is the section, because `manager-essence-edit-on-craft` documents the
+  // MACRO card's missing state and scrolling to it is how that frame stays distinct from the
+  // first-state frame. Leaving `macro` overridden keeps both of those true, so exactly one row on
+  // one screen changes and it is a row a case already photographs.
+  //
+  // `enabled: false` matches what the migration would have written for this record (`aether` is a
+  // disabled essence), so the catalogue's three-state per-system cell reads `disabled` here as it
+  // did before rather than flipping to `enabled`.
+  put('essenceScope', {
+    entities: [],
+    defaults: {},
+    membership: {
+      [`aether|${LAB_SYSTEM_IDS.SMITHING}`]: {
+        entityId: 'aether',
+        systemId: LAB_SYSTEM_IDS.SMITHING,
+        inherit: { effectSource: true, macro: false },
+        enabled: false,
+      },
+    },
+  });
   // Selection preferences, so the player app opens on a populated actor and system rather than on
   // an empty-state prompt that says nothing about the UI.
   put('lastCraftingActor', characterActors[0].id);
@@ -159,6 +277,89 @@ function seedSettings(content, actors, managedSystemId, experimentalFeatures, no
 }
 
 /**
+ * Empty the world of Tools ENTIRELY, so the world Tools Catalogue renders its no-state
+ * (issue 1373, maintainer feedback round 2).
+ *
+ * ── WHY CLEARING `toolScope` IS NOT ENOUGH, AND FINDING THAT OUT IS THE POINT ────────────────
+ * The lab seeds no `migrationVersion`, so every registered migration runs on every build — and
+ * `1.30.0`'s world-scope pass LIFTS each crafting system's own `tools[]` into world records. A
+ * world with an empty `toolScope` and three systems carrying eleven tools between them therefore
+ * boots with an ELEVEN-ROW catalogue, which is precisely why "there is no empty world tool
+ * catalogue" survived two automated parity passes: the state is unreachable from the corpus the
+ * fixture authors, and only reachable by removing the tools the migration reads.
+ *
+ * So all three sources go: the world corpus, every system's library, and the flat roster beside
+ * them. `toolIds` references are nulled with them, because a recipe requiring a Tool that no
+ * longer exists is a different world state from one that requires none, and this flag is for the
+ * catalogue's empty state rather than for a broken-reference frame.
+ *
+ * The world break mode is KEPT. It is a world setting rather than a Tool, the catalogue's scope
+ * band states it whether or not any Tool exists, and an empty catalogue whose one authored
+ * control had also been blanked would photograph two absences as one.
+ *
+ * @param {object} content the built lab content, mutated in place.
+ * @returns {void}
+ */
+function stripTools(content) {
+  content.tools = [];
+  for (const system of content.systems ?? []) {
+    if (system && typeof system === 'object') system.tools = [];
+  }
+  content.toolScope = {
+    entities: [],
+    defaults: {},
+    membership: {},
+    toolBreakage: content.toolScope?.toolBreakage ?? { authority: 'toolSpecific' },
+  };
+  const clearToolIds = (node) => {
+    if (Array.isArray(node)) {
+      for (const item of node) clearToolIds(item);
+      return;
+    }
+    if (!node || typeof node !== 'object') return;
+    for (const [key, value] of Object.entries(node)) {
+      if (key === 'toolIds' && Array.isArray(value)) {
+        node[key] = [];
+        continue;
+      }
+      clearToolIds(value);
+    }
+  };
+  clearToolIds(content.recipes ?? []);
+}
+
+/**
+ * Remove the world's OWN authored component records, leaving the migration's lifted ones
+ * (issue 1540).
+ *
+ * ── WHY THIS IS A SEPARATE INPUT FROM `clearSystem`, AND NOT PART OF IT ──────────────────────
+ * The world component corpus has TWO sources and they are independent. `1.30.0`'s world-scope
+ * pass LIFTS one world record out of each crafting system's own `components[]`, so `clearSystem`
+ * — a world with no crafting systems — already empties that half. What it cannot touch is the
+ * half the fixture AUTHORS: `lab-world-component-curio` is a world-only record no system has
+ * adopted, seeded by issue 1392 so the world Tags & Categories screen can photograph a category
+ * with `0 references` that is still confirm-gated and a tag whose only reference is a world
+ * default. Nothing lifted it, so removing the systems leaves it exactly where it was.
+ *
+ * Folding this into `clearSystem` would therefore state something false — a world-only record
+ * surviving the deletion of every crafting system IS the honest state, and three other cases
+ * photograph `clearSystem` worlds that have no quarrel with it. This flag is the other half, and
+ * a case that needs a world which has authored nothing at all asks for both.
+ *
+ * BOTH HALVES OF THE SEED GO, entities and defaults together. The defaults carry the tag `moss`,
+ * which is the entire world tag vocabulary the Tool repair route's `+ Tag` picker lists, so a
+ * frame of an EMPTY picker needs the defaults gone; and an entity with no default would leave a
+ * catalogue row behind, which is what a frame of an EMPTY catalogue cannot have. `membership` is
+ * not seeded for this scope at all, so there is none to clear.
+ *
+ * @param {object} content the built lab content, mutated in place.
+ * @returns {void}
+ */
+function stripAuthoredWorldComponents(content) {
+  content.componentScope = { entities: [], defaults: {} };
+}
+
+/**
  * Build the lab world and boot the real Fabricate facade against it.
  *
  * @param {object} [options] Options.
@@ -166,6 +367,19 @@ function seedSettings(content, actors, managedSystemId, experimentalFeatures, no
  * @param {boolean} [options.noParties] Seed an EMPTY party list. Unlike `clearSystem` this
  *   needs no post-construction store call: the pane's empty state is a function of the
  *   persisted setting, so seeding `[]` is both the shortest path and the truthful one.
+ * @param {boolean} [options.noTools] Build a world with NO Tools anywhere. See
+ *   {@link stripTools} for why an empty `toolScope` alone would not produce one.
+ * @param {boolean} [options.noAuthoredWorldComponents] Seed NO world component records of the
+ *   lab's own. This does NOT empty the world component catalogue by itself — the migration still
+ *   lifts one record per crafting system component — so a case wanting an empty catalogue pairs
+ *   it with `clearSystem`. See {@link stripAuthoredWorldComponents}.
+ * @param {boolean} [options.noInteractables] Attach NO `fabricate.interactable` behaviours to the
+ *   scene's region, for the Manage Interactables panel's empty state. A FLAG rather than a second
+ *   fixture shape, because it is the one state no behaviour COUNT can produce: the panel scans
+ *   whatever the active scene carries, so "nothing on this scene" is a property of the world
+ *   rather than of which behaviour a case opens. See `labInteractables.js` for why the two config
+ *   states are seeded behaviours instead.
+ * @param {string|null} [options.journalCaseState] Focused persisted Journal state for View Lab.
  * @returns {Promise<object>} The world, with `fabricate`, `shim`, and `content` attached.
  */
 export async function buildLabWorld({
@@ -175,8 +389,21 @@ export async function buildLabWorld({
   clearSystem = false,
   longTravelLabels = false,
   noParties = false,
+  noTools = false,
+  noAuthoredWorldComponents = false,
+  noInteractables = false,
+  gatheringTaskMode = null,
+  journalCaseState = null,
 } = {}) {
-  const content = buildLabContent();
+  const content = buildLabContent({ journalCaseState });
+  if (
+    ['ready-single', 'waiting-auto-eligible', 'automatic-completion'].includes(journalCaseState)
+  ) {
+    seedJournalNoCheckFixture(content);
+  }
+  seedGatheringTaskMode(content, gatheringTaskMode);
+  if (noTools) stripTools(content);
+  if (noAuthoredWorldComponents) stripAuthoredWorldComponents(content);
   // A real Manager refresh resolves an empty selection to the first available crafting system.
   // The dedicated World Parties no-selection case therefore needs the truthful world state that
   // makes an empty selection stable: no crafting systems, while global Parties and actors remain.
@@ -218,14 +445,39 @@ export async function buildLabWorld({
     localize,
   };
 
+  // BEFORE the shim, because `installFoundryShim` wraps `world.scenes` in the collection
+  // `game.scenes` exposes and captures `current` / `active` off it. The seeder also replaces the
+  // scene's plain `regions` array with a collection, which is what the two canvas windows'
+  // `_resolveBehavior` walks (`scene.regions.get(id).behaviors.get(id)`).
+  //
+  // A world DELIBERATELY STRIPPED of its sources seeds no interactables, and that is a caller
+  // decision rather than a softening of the seeder. `seedLabInteractables` throws when it cannot
+  // name a gathering task and a Tool, and that throw is correct: it exists to stop a plausible
+  // row publishing while resolving no source at all. But it is only meaningful where a source
+  // COULD have been resolved. `clearSystem` empties `content.systems` and `noTools` strips every
+  // Tool, so under either flag there is nothing for an interactable to name and asking is the
+  // error. Without this, `manager-systems-empty` — which is `clearSystem` — aborts the whole
+  // capture, and one failed case publishes NO frames at all.
+  const worldHasInteractableSources = !clearSystem && !noTools;
+  if (!noInteractables && worldHasInteractableSources) seedLabInteractables(world);
+
   const shim = installFoundryShim(world);
   world.shim = shim;
+  // The authority-unavailable case starts without a ledger, which is what blocks its actions.
+  if (journalCaseState !== 'authority-unavailable') {
+    const ledger = createLabRunAuthorityLedger(journalCaseState === 'claim-retained');
+    const journal = globalThis.game.journal;
+    const get = journal.get;
+    journal.contents.push(ledger);
+    journal.get = (id) => (id === ledger.id ? ledger : get(id));
+  }
 
   // Dynamic, and only now: `src/main.js` registers hooks at module scope.
   const runtime = await import('../../../src/main.js');
   const fabricate = runtime.default;
   await fabricate.initialize();
   globalThis.game.fabricate = fabricate;
+  installLabJournalTransport(globalThis.game, fabricate.journalRunCommands);
 
   // The rest of `Hooks.once('ready')`, called directly.
   //
@@ -292,19 +544,32 @@ export async function buildLabWorld({
     world.settings.get(settingsKey(FABRICATE_NAMESPACE, 'lastCraftingActor')) ??
     world.settings.get(settingsKey(FABRICATE_NAMESPACE, 'lastGatheringActor'));
   const journalActor = globalThis.game.actors.get(rememberedId) ?? actors[0];
+  await stockJournalPrototype(journalActor, content, journalCaseState);
   // If the viewer can see none of them, fall back to the full set: a journal of redacted rows still
   // shows how each STATUS renders, where an empty journal shows nothing at all.
   const runRecipes = journalRecipes.length > 0 ? journalRecipes : allRecipes;
   if (runRecipes.length > 0) {
-    installLabRunStates(
-      journalActor,
-      buildLabRunStates({
+    const runContainers = buildLabRunStates({
+      actor: journalActor,
+      userId: 'user-lab-player',
+      recipes: runRecipes,
+      environments: content.environments,
+      tasks: content.gatheringConfig.tasks,
+      journalCaseState,
+    });
+    installLabRunStates(journalActor, runContainers);
+    if (journalCaseState) {
+      const controller = createLabJournalCaseController({
         actor: journalActor,
-        userId: 'user-lab-player',
+        containers: runContainers,
+        state: journalCaseState,
         recipes: runRecipes,
-        environments: content.environments,
-      })
-    );
+        nowWorldTime: () => Number(fabricate.getWorldTime?.() ?? LAB_WORLD_TIME),
+        onPersist: () => invalidateJournalFixtureCaches(fabricate),
+      });
+      fabricate.executeJournalCaseFixtureCommand = controller.execute;
+      fabricate.journalCaseFixtureEvents = controller.events;
+    }
     // The in-flight blind run's secret half (issue 901). It is NOT a flag: the drawn task, its
     // start-time snapshot and its node reservation live in the `gatheringBlindRuns` WORLD setting,
     // which only a GM may write — that is the integrity boundary the fix draws, and the reason a
@@ -327,14 +592,162 @@ export async function buildLabWorld({
     // The run managers memoise each actor's container the first time they read it, and
     // `initialize()` reads it — so a container written afterwards is invisible until the cache is
     // dropped. The symptom is a journal with runs on the actor and none on screen.
-    for (const manager of [
-      fabricate.craftingRunManager,
-      fabricate.salvageRunManager,
-      fabricate.gatheringRunManager,
-    ]) {
-      manager?.invalidateCache?.();
-    }
+    invalidateJournalFixtureCaches(fabricate);
   }
 
   return world;
+}
+
+function invalidateJournalFixtureCaches(fabricate) {
+  for (const manager of [
+    fabricate.craftingRunManager,
+    fabricate.salvageRunManager,
+    fabricate.gatheringRunManager,
+  ]) {
+    manager?.invalidateCache?.();
+  }
+}
+
+// The in-memory document edge lets the REAL authority and craft pipeline run in local and CI
+// captures. It is deliberately not evidence of server arbitration or cross-client persistence.
+/**
+ * @param {boolean} [retainedClaim] Seed a RETAINED execution claim — the state a refused
+ *   command leaves behind when the authority cannot prove the refusal happened before any
+ *   write. Only `reconcileJournalRunAuthority` clears it, which is the affordance issue 1648
+ *   put in the app, so the lab has to be able to reach the state to photograph it.
+ */
+function createLabRunAuthorityLedger(retainedClaim = false) {
+  const ledger = installUpdateSemantics({
+    id: 'lab-run-authority',
+    flags: { fabricate: { journalRunAuthorityLedger: true } },
+    pages: new Map(),
+  });
+  ledger.getFlag = makeGetFlag(ledger);
+  if (retainedClaim) seedRetainedClaim(ledger);
+  ledger.createEmbeddedDocuments = async (type, sources, options) => {
+    if (type !== 'JournalEntryPage' || options?.keepId !== true) {
+      throw new Error('view lab: unexpected authority claim creation');
+    }
+    const created = [];
+    for (const source of sources) {
+      if (ledger.pages.has(source._id)) continue;
+      const page = { ...structuredClone(source), id: source._id };
+      page.getFlag = makeGetFlag(page);
+      ledger.pages.set(page.id, page);
+      created.push(page);
+    }
+    return created;
+  };
+  ledger.deleteEmbeddedDocuments = async (type, ids) => {
+    if (type !== 'JournalEntryPage')
+      throw new Error('view lab: unexpected authority claim deletion');
+    return ids.flatMap((id) => {
+      const page = ledger.pages.get(id);
+      return ledger.pages.delete(id) ? [page] : [];
+    });
+  };
+  return ledger;
+}
+
+/**
+ * The maintainer's own stuck world, in fixture form: a `pause` the lifecycle refused before it
+ * wrote anything, recorded `recoveryRequired` with its refusal message, whose claim the
+ * authority KEPT. `acquiredAt: 0` puts it far outside the live window, so it reads as retained
+ * rather than as a command still running.
+ */
+function seedRetainedClaim(ledger) {
+  const { claimId, requestId, requestKind, requestStatus, failureReason, failureMessage, claimedAt } =
+    LAB_RETAINED_CLAIM;
+  ledger.flags.fabricate.journalRunAuthorityState = {
+    version: 1,
+    requests: {
+      [requestId]: {
+        kind: requestKind,
+        operationId: requestId,
+        status: requestStatus,
+        senderId: 'user-lab-player',
+        sessionId: 'lab-session',
+        startedAt: claimedAt,
+        settledAt: claimedAt,
+        claimId,
+        response: { success: false, reason: failureReason, message: failureMessage },
+      },
+    },
+    prepareTokens: {},
+    reconciliations: [],
+  };
+  const page = {
+    id: JOURNAL_RUN_CLAIM_PAGE_ID,
+    _id: JOURNAL_RUN_CLAIM_PAGE_ID,
+    flags: {
+      fabricate: {
+        journalRunClaimId: claimId,
+        journalRunRequestId: requestId,
+        journalRunClaimedAt: claimedAt,
+      },
+    },
+  };
+  page.getFlag = makeGetFlag(page);
+  ledger.pages.set(page.id, page);
+}
+
+// There is one browser realm in the lab. Serialize server delivery under the elected GM,
+// restoring the initiating viewer BEFORE accepting the reply so the real local prompt and
+// Roll.toMessage handoff retain player authorship. Never manufacture a prompt or a roll result.
+function installLabJournalTransport(game, service) {
+  let delivery = Promise.resolve();
+  let reply = null;
+  const listeners = new Map();
+  game.socket = {
+    // Retain the real ready-hook registrations and Socket.IO-style disposal.
+    // Outbound emits do not echo to these local listeners. The virtual remote
+    // GM and the Journal reply below already have one explicit service route;
+    // invoking main's registered router too would duplicate command handling.
+    on(channel, listener) {
+      const entries = listeners.get(channel) ?? [];
+      entries.push(listener);
+      listeners.set(channel, entries);
+      return this;
+    },
+    off(channel, listener) {
+      if (channel === undefined) listeners.clear();
+      else if (listener === undefined) listeners.delete(channel);
+      else {
+        const entries = listeners.get(channel) ?? [];
+        const index = entries.indexOf(listener);
+        if (index !== -1) entries.splice(index, 1);
+        if (entries.length === 0) listeners.delete(channel);
+      }
+      return this;
+    },
+    listeners(channel) {
+      return [...(listeners.get(channel) ?? [])];
+    },
+    emit(channel, payload, options) {
+      if (channel !== 'module.fabricate') return;
+      if (payload?.kind === JOURNAL_RUN_SOCKET_KIND.REPLY) {
+        reply = { payload, senderId: game.user.id, recipients: options?.recipients };
+        return;
+      }
+      if (payload?.kind !== JOURNAL_RUN_SOCKET_KIND.REQUEST) return;
+      const sender = game.user;
+      delivery = delivery
+        .then(async () => {
+          const viewer = game.user;
+          reply = null;
+          game.user = game.users.activeGM;
+          try {
+            await service.handleSocketMessage(payload, sender.id);
+          } finally {
+            game.user = viewer;
+          }
+          if (reply && (!Array.isArray(reply.recipients) || reply.recipients.includes(viewer.id))) {
+            service.acceptReply(reply.payload, reply.senderId);
+          }
+        })
+        .catch((error) => {
+          console.error('view lab: Journal command delivery failed', error);
+        });
+    },
+  };
 }

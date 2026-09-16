@@ -35,6 +35,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-simple-check-characterization-',
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/components/stepperLabels.js',
     'src/utils/craftingCheckExpression.js',
     // Added by the conversion, and ONLY the dependency manifest: no assertion below moved.
@@ -55,15 +56,16 @@ const harness = createMountedComponentHarness({
     // The deterministic roll-expression reducer. The formula card reads the `avg` of the
     // authored formula from it (issue 1096). Manifest only.
     'src/utils/rollExpressionAverage.js',
+    'src/utils/rollFormulaRollability.js',
     // A trigger's own summary and the common-trigger presets (issue 1096), both pure and
     // both imported by `CheckTriggers.svelte`. Manifest only.
     'src/ui/svelte/apps/manager/checks/checkTriggerSummary.js',
     'src/ui/svelte/apps/manager/checks/checkTriggerPresets.js',
   ],
   compiledModules: [
-    'src/ui/svelte/apps/manager/ItemDropZone.svelte',
+    'src/ui/svelte/components/ItemDropZone.svelte',
     'src/ui/svelte/apps/manager/SegmentedControl.svelte',
-    'src/ui/svelte/apps/manager/RadioCardGroup.svelte',
+    'src/ui/svelte/components/RadioCardGroup.svelte',
     // The shared numeric stepper the DC, tier-DC and trigger fields are built on
     // (issue 1050). Omitting it HANGS this suite (# cancelled) rather than failing it.
     'src/ui/svelte/components/Stepper.svelte',
@@ -73,10 +75,18 @@ const harness = createMountedComponentHarness({
     // deleted — this suite's whole value is that it did not move while the tree around it
     // did. `tests/components/mounted-harness-primitive-allowlist.test.js` is what turned
     // the omission into a failure here rather than a hung suite.
+    // `Chip.svelte` travels with it since issue 1371: `IconFactRow` renders the manager's ONE
+    // chip for its trailing badge, so it is now in the row's STATIC closure. Omitting it does
+    // not fail a suite, it HANGS it and reports `# cancelled`.
     'src/ui/svelte/apps/manager/IconFactRow.svelte',
+    'src/ui/svelte/components/Chip.svelte',
+    'src/ui/svelte/components/Field.svelte',
     // The shared button primitive: the recipe-tier list and the trigger list are both
     // extended by its `dashed` role now (issue 1096). Manifest only.
     'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/IconButton.svelte',
+    'src/ui/svelte/components/StatusToggle.svelte',
+    'src/ui/svelte/components/InspectorCard.svelte',
     'src/ui/svelte/apps/manager/checks/CheckDcMacroCard.svelte',
     'src/ui/svelte/apps/manager/checks/CheckDifficultyCard.svelte',
     // An issue 1097 addition, and ONLY the dependency manifest: the simple check's Outcomes
@@ -87,7 +97,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/checks/CheckRecipeTiers.svelte',
     // The shared status card: a trigger's break-tools effect is its own bordered card now
     // (issue 1096). Manifest only.
-    'src/ui/svelte/apps/manager/ToggleCard.svelte',
+    'src/ui/svelte/components/ToggleCard.svelte',
     'src/ui/svelte/apps/manager/checks/CheckTriggers.svelte',
     'src/ui/svelte/apps/manager/checks/SimpleCraftingCheckEditor.svelte',
   ],

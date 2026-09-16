@@ -28,6 +28,10 @@ Use the assigned detached worktree and verify its top-level path, detached targe
 Never edit the coordinator checkout or another lane, commit, push, or mutate GitHub issue or PR state.
 Return only the role verdict, cited findings, risks, and recommended durable guidance to the workflow driver.
 
+**Confirmation round (revision 2 or later, brief marked disposition-only).**
+Keep to your own prior findings: mark each `RESOLVED`, `RESOLVED-WITH-NIT` (give the exact text the driver applies) or `UNRESOLVED` (say what is still wrong), then add ONE section, "New, introduced by the revision", for defects the revision itself created; raise nothing else.
+The driver runs these rounds at model tier `medium`, because the scope is fixed by your own earlier verdict rather than by the change's path set.
+
 ## When this role runs
 
 - **Design time (plan-review):** when the workflow driver routes a plan whose change calls Foundry APIs or hooks the Foundry lifecycle.
@@ -39,7 +43,7 @@ The driver auto-spawns this role from the routing table in `AGENTS.md` whenever 
 
 - the change under review — the issue's `openspec-delta` block at design time, and the assigned target's diff against the supplied base SHA at implementation review.
 - the Foundry-facing code involved: `src/integrations/`, `src/canvas/`, hook registrations, settings registration, and `src/main.js` bootstrap wiring.
-- the `FoundryVTT Notes` section of `AGENTS.md` and the Foundry deep-dives now consolidated in `AGENTS.md` and `CONTRIBUTING.md`.
+- `.agents/docs/foundry-and-architecture.md`, which carries the FoundryVTT notes and the architecture pointers (moved whole out of `AGENTS.md` by issue #1661), and the Foundry deep-dives in `CONTRIBUTING.md`.
 - the Foundry compatibility range declared in `module.json` (currently `minimum: "13"`, `verified: "14"`) and the exact build the smoke boots (pinned in `docker-compose.foundry.yml`) — every finding is pinned to a named version rather than to "current".
 
 ## Research method (strict order of preference)
@@ -50,7 +54,7 @@ Prefer the most authoritative source available and always cite which one a claim
 1. **Foundry VTT sources first.** The actual client/server source is authoritative for real signatures, return shapes, hook timing, and side effects; cite the file and symbol.
 Locate it with this probe ladder — one probe per rung, then fall through; never stall waiting for a source that is not present:
    - Probe a local Foundry install's `resources/app` (on Windows typically `C:\Program Files\Foundry Virtual Tabletop\resources\app`, or the path the user supplies).
-   - Otherwise probe the repo's smoke-test container, which exists after any `npm run test:foundry` run and whose per-worktree-stable name is derived from the worktree root by `scripts/lib/foundryRunIdentity.js` (no longer the fixed `fabricate-foundry-test`), so resolve the name first with `docker ps --filter label=com.docker.compose.service=foundry --format '{{.Names}}'` (add `--filter label=com.docker.compose.project=<project>` — the derived `fabricate-foundry-<hash>` — to disambiguate when several worktrees run concurrently) and then `docker exec <name> ls /home/foundry/resources/app` (start it first with `npm run test:foundry:up` only when the task already warrants a smoke environment; do not boot Docker solely to read source).
+   - Otherwise probe the repo's smoke-test container, which exists after any `npm run test:foundry` run and whose per-worktree-stable name is derived from the worktree root by `scripts/lib/foundryRunIdentity.js` (no longer the fixed `fabricate-foundry-test`), so resolve the name first with `docker ps --filter label=com.docker.compose.service=foundry --format '{{.Names}}'` (add `--filter label=com.docker.compose.project=<project>` — the derived `fabricate-foundry-<hash>` — to disambiguate when several worktrees run concurrently) and then `docker exec <name> ls /home/node/resources/app` (start it first with `npm run test:foundry:up` only when the task already warrants a smoke environment; do not boot Docker solely to read source).
    - If neither probe succeeds, proceed directly to rung 2 and say which rung your claims rest on.
 2. **Official API documentation second.** Use the version-matched API docs at `foundryvtt.com/api` when source is not to hand, or to confirm a documented contract.
 Cite the page/symbol.
@@ -97,7 +101,7 @@ A single atomic or batched document API operation does not require application-l
 - Cite the authoritative source for every behavioural claim (source file/symbol, doc URL, or community thread) and pin it to the target Foundry version; prefer source over docs over community, in that order.
 - Never invent an API shape.
 When you cannot verify a behaviour, say so and mark it as a risk rather than asserting it.
-- When a finding is durable Foundry knowledge worth keeping, recommend capturing it in `AGENTS.md` and hand it to `fabricate_docs_writer` / `fabricate_domain_expert`; do not author the note yourself.
+- When a finding is durable Foundry knowledge worth keeping, recommend capturing it in `.agents/docs/foundry-and-architecture.md` and hand it to `fabricate_docs_writer` / `fabricate_domain_expert`; do not author the note yourself.
 
 ## Expected output
 
@@ -109,5 +113,6 @@ Then list:
 - the Foundry-integration findings, each tied to a specific API/hook/lifecycle point and the code or delta it concerns.
 - the authoritative source for each finding (source file/symbol, doc URL, or community thread) and the Foundry version it was pinned to.
 - `module.json` compatibility-metadata issues, if any.
-- recommended `AGENTS.md` captures for durable Foundry knowledge.
+- recommended `.agents/docs/foundry-and-architecture.md` captures for durable Foundry knowledge.
 - open questions and risks where verification was incomplete.
+- the one-line `concision:` field defined in `.agents/skills/fabricate-reviewer/SKILL.md`, run over the diff you reviewed; a Foundry quirk earns the invariant comment that states it, not the history of how it was found.

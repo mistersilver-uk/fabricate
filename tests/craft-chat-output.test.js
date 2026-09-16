@@ -18,6 +18,26 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
+import { attachAwardReceipts } from '../src/systems/runHistoryEvidence.js';
+
+/**
+ * The published card renders ACKNOWLEDGED awards only: production hands
+ * `_postCraftChatMessage` the array `_createResultItems` returned, carrying its
+ * immutable per-invocation receipts, so a bare array of item-likes would stand in for
+ * a caller that cannot exist.
+ */
+function awardedResults(entries) {
+  return attachAwardReceipts(
+    entries,
+    entries.map((entry) => ({
+      actorUuid: 'Actor.a1',
+      itemUuid: entry.uuid ?? `Item.${entry.name}`,
+      name: entry.name,
+      img: entry.img,
+      quantity: entry.system?.quantity ?? 1,
+    }))
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Minimal globals
@@ -122,9 +142,14 @@ function buildIngredientItem(name = 'Iron Ingot', quantity = 2) {
     name,
     parent: null,
     system: { quantity },
-    async delete() {},
+    // Foundry resolves the DOCUMENT from both writes, and the acknowledged-receipt
+    // contract reads that return before recording an actual consumption.
+    async delete() {
+      return this;
+    },
     async update(p) {
       if (p['system.quantity'] != null) this.system.quantity = p['system.quantity'];
+      return this;
     },
   };
 }
@@ -200,9 +225,9 @@ test('_postCraftChatMessage: success message includes actor name, recipe name, c
     { item: { name: 'Iron Ingot', uuid: 'Item.iron', img: 'icons/ingot.png' }, quantity: 3 },
   ];
   const tools = [{ item: { name: 'Forge Hammer', uuid: 'Item.hammer', img: 'icons/hammer.png' } }];
-  const createdResults = [
+  const createdResults = awardedResults([
     { name: 'Iron Sword', uuid: 'Item.sword', img: 'icons/sword.png', system: { quantity: 1 } },
-  ];
+  ]);
 
   await engine._postCraftChatMessage({
     success: true,
@@ -225,6 +250,32 @@ test('_postCraftChatMessage: success message includes actor name, recipe name, c
   assert.ok(content.includes('Iron Sword'), 'Created result name in content');
   assert.ok(content.includes('src="icons/ingot.png"'), 'consumed ingredient image src');
   assert.ok(content.includes('src="icons/sword.png"'), 'created result image src');
+});
+
+// Mutation control on the publication boundary: strip the receipts the writer
+// attached and the card refuses to publish rather than presenting planned awards as
+// actual ones. An empty award list is not an award, so it stays publishable.
+test('_postCraftChatMessage: refuses to publish awards that carry no acknowledged receipts', async () => {
+  setupGame(true);
+  resetChat();
+
+  const post = (createdResults) =>
+    new CraftingEngine({})._postCraftChatMessage({
+      success: true,
+      craftingActor: buildActor('Gandalf'),
+      recipe: buildRecipe(),
+      consumedIngredients: [],
+      tools: [],
+      createdResults,
+    });
+
+  await assert.rejects(post([{ name: 'Iron Sword', system: { quantity: 1 } }]), {
+    code: 'HISTORY_EFFECT_UNCERTAIN',
+  });
+  assert.equal(chatCreated.length, 0, 'nothing was published for an unacknowledged award');
+
+  await post([]);
+  assert.equal(chatCreated.length, 1, 'a genuinely empty award list still publishes');
 });
 
 test('_postCraftChatMessage: tools render authored component names (not the matched item) and never duplicate', async () => {
@@ -394,7 +445,7 @@ test('_postCraftChatMessage: uses FABRICATE.Chat.* localization keys', async () 
     recipe: buildRecipe(),
     consumedIngredients: [{ item: { name: 'Iron Ingot' }, quantity: 1 }],
     tools: [],
-    createdResults: [{ name: 'Iron Sword', system: { quantity: 1 } }],
+    createdResults: awardedResults([{ name: 'Iron Sword', system: { quantity: 1 } }]),
   });
 
   assert.ok(i18nKeys.length > 0, 'Localization keys should be used');

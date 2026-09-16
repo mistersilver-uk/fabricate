@@ -69,6 +69,8 @@ Flag or refactor these patterns when they create real risk:
 - classes or modules with mixed responsibilities
 - job-title names like `ThingManager`, `ParserService`, or `ContextHolder`
 - getter-heavy APIs that expose internal state instead of owning behavior
+- a unit past the size gate in `tests/file-size-ledger.txt`: a function over 100 lines, a `.js` module over 800 lines, a `.svelte` component over 500
+- a helper redeclared locally when a shared implementation exists (`tests/scalar-helper-duplicates.test.js`)
 
 ## JavaScript Adaptation
 
@@ -91,3 +93,6 @@ When you use this skill, explain the structural decision in terms of:
 - explicit dependencies
 - cohesion and split points
 - test seam and validation impact
+
+State the rejected alternative here and in the issue, never as a comment in the shipped code, and keep each docblock to the purpose and contract in at most six lines.
+See "Observed failure mode: bloat" in `AGENTS.md`.

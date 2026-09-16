@@ -1,9 +1,12 @@
-<!-- Svelte 5 runes mode -->
 <script>
+  import { anchoredPopover, hostRelativePopoverLayout } from '../actions/anchoredPopover.js';
   import { dismissOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
   import { computeIconPickerPopoverLayout } from '../util/iconPickerPopover.js';
+  import { MANAGER_MAIN_SELECTOR } from '../util/overlayBounds.js';
   import ManagerColorPopover from './ManagerColorPopover.svelte';
   import { normalizeManagerColorToken } from '../util/managerColorTokens.js';
+
+  const popoverLayout = hostRelativePopoverLayout(computeIconPickerPopoverLayout);
 
   let {
     colorToken = 'sage',
@@ -11,32 +14,24 @@
     buttonTitle = 'Choose colour',
     presetGridLabel = 'Colour presets',
     customHexLabel = 'Custom hex',
-    // Forwarded to the popover: false offers the preset palette only. See
-    // ManagerColorPopover for why the per-essence colour (issue 917) has no free hex.
     allowCustom = true,
-    // TRUE when the caller's model holds no authored colour at all. `colorToken`
-    // normalizes an absent value to `sage`, so without this the trigger paints a Sage
-    // swatch and the popover marks Sage selected while the caller's own copy says "No
-    // colour" — the control would assert an authored choice nobody made. Unset paints a
-    // neutral swatch and selects no preset; picking any preset ends the unset state
-    // through the caller's own `onChange`.
+    // TRUE when the caller's model holds no authored colour at all: `colorToken` normalizes an
+    // absent value onto a preset, so without this the control would assert an authored choice
+    // nobody made. Unset paints a neutral swatch and selects no preset.
     unset = false,
+    bounds = MANAGER_MAIN_SELECTOR,
     onChange = () => {},
   } = $props();
 
-  // Neutral, from the theme's own border token: visibly a swatch, unmistakably not one
-  // of the eight saturated palette colours.
   const UNSET_SWATCH = '--manager-color-swatch: var(--fab-border-strong)';
 
   let open = $state(false);
   let pickerRoot = $state(null);
   let triggerButton = $state(null);
   let popoverRoot = $state(null);
-  let popoverStyle = $state('');
 
-  // The palette lived here as a third inline copy of the same eight keys (issue 1036).
-  // The trigger's swatch and the popover's selection marking have to agree about which
-  // token is which, so they read ONE constant.
+  // ONE constant: the trigger's swatch and the popover's selection marking have to agree about
+  // which token is which.
   function normalizedToken(value) {
     return normalizeManagerColorToken(value);
   }
@@ -59,102 +54,35 @@
     open = !open;
   }
 
-  function getPopoverHost() {
-    if (!pickerRoot || typeof document === 'undefined') return null;
-
-    return pickerRoot.closest('.fabricate-manager');
-  }
-
-  function getPopoverHorizontalBounds(hostRect) {
-    if (!pickerRoot) return {};
-
-    const mainPanel = pickerRoot.closest('.manager-main');
-    const mainPanelRect = mainPanel?.getBoundingClientRect?.();
-    if (!mainPanelRect) return {};
-
-    return {
-      minLeft: mainPanelRect.left - hostRect.left + 16,
-      maxRight: mainPanelRect.right - hostRect.left - 16,
-    };
-  }
-
-  function updatePopoverPosition() {
-    if (!open || !triggerButton || typeof window === 'undefined') return;
-
-    const popoverHost = getPopoverHost();
-    const hostRect = popoverHost?.getBoundingClientRect?.() ?? {
-      left: 0,
-      top: 0,
-      width: window.innerWidth,
-      height: window.innerHeight,
-    };
-    const triggerRect = triggerButton.getBoundingClientRect();
-    const horizontalBounds = getPopoverHorizontalBounds(hostRect);
-
-    const layout = computeIconPickerPopoverLayout(
-      {
-        left: triggerRect.left - hostRect.left,
-        right: triggerRect.right - hostRect.left,
-        top: triggerRect.top - hostRect.top,
-        bottom: triggerRect.bottom - hostRect.top,
-        width: triggerRect.width,
-        height: triggerRect.height,
-      },
-      { width: hostRect.width || window.innerWidth, height: hostRect.height || window.innerHeight },
-      {
-        horizontalAlign: 'left',
-        minLeft: horizontalBounds.minLeft,
-        maxRight: horizontalBounds.maxRight,
-        minWidth: 220,
-        maxWidth: 220,
-      }
-    );
-
-    if (!layout) {
-      popoverStyle = '';
-      return;
-    }
-
-    const verticalPosition =
-      layout.placement === 'top'
-        ? `top: auto; bottom: ${layout.bottom}px;`
-        : `top: ${layout.top}px; bottom: auto;`;
-
-    popoverStyle = [
-      `left: ${layout.left}px;`,
-      'right: auto;',
-      `width: ${layout.width}px;`,
-      `max-height: ${layout.maxHeight}px;`,
-      verticalPosition,
-    ].join(' ');
-  }
-
   function registerPopoverNode(node) {
     popoverRoot = node;
   }
 
+  // `anchoredPopover` is applied HERE rather than with `use:` on the panel, because the panel is
+  // `ManagerColorPopover` — a separate shared component this one does not own the markup of. An
+  // action is a plain function, so the picker drives it against the node the popover registers:
+  // same contract, same teardown, no new prop on a component three other surfaces render.
   $effect(() => {
-    if (!open || typeof window === 'undefined' || typeof document === 'undefined') {
-      popoverStyle = '';
-      return;
-    }
+    if (!popoverRoot) return;
 
-    updatePopoverPosition();
+    const handle = anchoredPopover(popoverRoot, {
+      component: 'ManagerColorPicker',
+      trigger: () => triggerButton,
+      layout: popoverLayout,
+      layoutOptions: () => ({ horizontalAlign: 'left', minWidth: 220, maxWidth: 220 }),
+      bounds,
+    });
 
-    const handleViewportChange = () => updatePopoverPosition();
-    window.addEventListener('resize', handleViewportChange);
-    document.addEventListener('scroll', handleViewportChange, true);
-
-    return () => {
-      window.removeEventListener('resize', handleViewportChange);
-      document.removeEventListener('scroll', handleViewportChange, true);
-    };
+    return () => handle.destroy();
   });
 </script>
 
+<!-- `fabricate-color-picker` is this primitive's NAMESPACE root. ONE class, not two: this
+     component renders no panel of its own — its panel is `ManagerColorPopover`, which carries its
+     own root class. -->
 <span
   bind:this={pickerRoot}
-  class="manager-color-picker"
+  class="fabricate-color-picker manager-color-picker"
   use:dismissOnOutsideClick={{
     enabled: open,
     onDismiss: closePicker,
@@ -183,8 +111,6 @@
       {allowCustom}
       {unset}
       {onChange}
-      {popoverStyle}
-      portalTarget={() => getPopoverHost()}
       {registerPopoverNode}
       manageDismiss={false}
     />

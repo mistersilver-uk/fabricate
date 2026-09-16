@@ -438,18 +438,24 @@ test('the runner applies 1.21.0 to craftingSystems and bumps the migration versi
 
   const result = await runnerOver(store).run();
 
-  // SIX migrations run from 1.20.0, not one: `1.22.0` follows this one in the ladder and
+  // TEN migrations run from 1.20.0, not one: `1.22.0` follows this one in the ladder and
   // lifts the catalogue to the system level (issue 1095), `1.23.0` merges it with the
   // gathering character-modifier library (issue 1117), `1.24.0` marks the routed
   // DC-source downgrade boundary (issue 1096) as a deliberate no-op, `1.25.0` seeds
-  // the failure-result policy to `never` on every existing check (issue 1098), and
-  // `1.26.0` lifts the currency configuration to world scope (issue 1278), and `1.27.0` lifts
-  // travel — realms and their map links — to world scope too (issue 1282). The count is
-  // asserted rather than loosened so an EIGHTH migration landing here is noticed rather than
-  // absorbed — which is exactly how the fourth through seventh were.
-  assert.equal(result.ran, 7);
+  // the failure-result policy to `never` on every existing check (issue 1098), `1.26.0` lifts
+  // the currency configuration to world scope (issue 1278), `1.27.0` lifts travel — realms and
+  // their map links — to world scope too (issue 1282), `1.28.0` lifts both character libraries
+  // (issue 1308), `1.29.0` folds manual force lists into their picked lists (issue 1315), and
+  // `1.30.0` lifts components, essences and tools to world scope (issue 1363), and `1.31.0`
+  // backfills each system's own tool prerequisites and check bonus as its own override
+  // (issue 1373).
+  // `1.32.0` elects each component's world essence map (issue 1371) and `1.33.0` records the
+  // mark that keeps every existing subject modifier pick rolling (issue 1608).
+  // The count is asserted rather than loosened so a FOURTEENTH migration landing here is
+  // noticed rather than absorbed — which is exactly how the fourth through thirteenth were.
+  assert.equal(result.ran, 14);
   assert.equal(store.get('craftingSystems')[0].craftingCheck.simple.rollFormula, '1d20');
-  assert.equal(store.get('migrationVersion'), '1.27.0');
+  assert.equal(store.get('migrationVersion'), '1.34.0');
 });
 
 // THE CHANNEL. The counts reach `main.js` ONLY through a transient field the runner
@@ -651,21 +657,23 @@ test('the notice SUMS each count across systems, and never across causes', () =>
   assert.deepEqual(totals, { inert: 3, subtractive: 5, repeated: 3, untouched: 0 });
 
   // The counts are deliberately DISTINCT and no two of them sum to a third, so folding any
-  // cause into any other changes a number the assertions below read out of the message.
-  const { message } = buildRetiredCraftingModNotice(REPORTED);
-  assert.match(message, /3 check\(s\) had modifiers that never reached the roll/);
-  assert.match(message, /5 formula\(s\) subtracted the modifier/);
-  assert.match(message, /3 formula\(s\) counted it more than once/);
+  // cause into any other changes a number the assertions below read out of the detail.
+  const { detail } = buildRetiredCraftingModNotice(REPORTED);
+  assert.match(detail, /3 check\(s\) had modifiers that never reached the roll/);
+  assert.match(detail, /5 formula\(s\) subtracted the modifier/);
+  assert.match(detail, /3 formula\(s\) counted it more than once/);
 });
 
 test('the notice LEADS with the sentence that names every affected system', () => {
-  const { message, systems } = buildRetiredCraftingModNotice(REPORTED);
+  const { message, detail, systems } = buildRetiredCraftingModNotice(REPORTED);
   assert.equal(systems, 'Alchemy, Smithing');
   assert.ok(
-    message.startsWith('Fabricate now adds check modifiers to every crafting-check roll'),
+    message.startsWith('Fabricate now adds check modifiers to crafting-check rolls automatically'),
     'the lead is the first thing the GM reads, not an optional clause'
   );
-  assert.match(message, /removed from these systems: Alchemy, Smithing\./);
+  assert.match(message, /removed the old placeholder from: Alchemy, Smithing\./);
+  assert.ok(detail.startsWith('Fabricate now adds check modifiers to every crafting-check roll'));
+  assert.match(detail, /removed from these systems: Alchemy, Smithing\./);
   // A blank/absent name contributes nothing rather than an empty list slot.
   assert.equal(
     buildRetiredCraftingModNotice([{ system: '', inert: 1 }, { system: 'Only', inert: 1 }]).systems,
@@ -673,23 +681,38 @@ test('the notice LEADS with the sentence that names every affected system', () =
   );
 });
 
-test('the notice DROPS every zero clause, so a single-cause world reads one sentence', () => {
-  const { message } = buildRetiredCraftingModNotice([{ system: 'Alchemy', inert: 4 }]);
-  assert.match(message, /4 check\(s\) had modifiers/);
-  for (const absent of [/subtracted the modifier/, /counted it more than once/, /left exactly as authored/]) {
-    assert.equal(absent.test(message), false, `a zero cause says nothing: ${absent}`);
+// Issue 1737: the toast is the lead plus the one clause that leaves a world broken; every other
+// clause, and the remedy, is console detail the toast points at.
+test('the TOAST carries only the lead and the untouched warning, and points at the console', () => {
+  const { message } = buildRetiredCraftingModNotice([
+    { system: 'All', inert: 1, subtractive: 2, repeated: 3, untouched: 4 },
+  ]);
+  assert.match(message, /4 formula\(s\) could not be updated and will not roll until you rewrite them\./);
+  for (const absent of [/had modifiers/, /subtracted/, /counted it/, /clear the Default modifiers set/]) {
+    assert.equal(absent.test(message), false, `detail stays out of the toast: ${absent}`);
   }
-  assert.equal(message.includes('0 '), false, 'and no clause reports a zero');
+  assert.match(message, /Details are in the console \(F12\)\.$/);
+  const clean = buildRetiredCraftingModNotice([{ system: 'All', inert: 1 }]).message;
+  assert.equal(/will not roll/.test(clean), false, 'no untouched warning without an untouched formula');
+});
+
+test('the notice DROPS every zero clause, so a single-cause world reads one sentence', () => {
+  const { detail } = buildRetiredCraftingModNotice([{ system: 'Alchemy', inert: 4 }]);
+  assert.match(detail, /4 check\(s\) had modifiers/);
+  for (const absent of [/subtracted the modifier/, /counted it more than once/, /left exactly as authored/]) {
+    assert.equal(absent.test(detail), false, `a zero cause says nothing: ${absent}`);
+  }
+  assert.equal(detail.includes('0 '), false, 'and no clause reports a zero');
 });
 
 test('the notice keeps the clauses in cause order and joins them into one string', () => {
-  const { message } = buildRetiredCraftingModNotice([
+  const { detail } = buildRetiredCraftingModNotice([
     { system: 'All', inert: 1, subtractive: 2, repeated: 3, untouched: 4 },
   ]);
   const order = ['these systems: All', '1 check(s)', '2 formula(s) subtracted', '3 formula(s) counted', '4 formula(s) were left'];
   let cursor = -1;
   for (const fragment of order) {
-    const at = message.indexOf(fragment);
+    const at = detail.indexOf(fragment);
     assert.ok(at > cursor, `${fragment} appears, after the fragment before it`);
     cursor = at;
   }
@@ -715,23 +738,27 @@ test('the notice localizes every clause, and falls back to interpolated English'
     asked.map(([key]) => key),
     [
       'FABRICATE.Migration.RetireCheckModifierPlaceholder.Lead',
+      'FABRICATE.Migration.RetireCheckModifierPlaceholder.LeadDetail',
       'FABRICATE.Migration.RetireCheckModifierPlaceholder.Inert',
       'FABRICATE.Migration.RetireCheckModifierPlaceholder.Subtractive',
       'FABRICATE.Migration.RetireCheckModifierPlaceholder.Repeated',
+      'FABRICATE.Migration.ConsoleDetails',
     ],
     'every non-zero clause is localized under its own key, and no zero clause asks for one'
   );
   assert.deepEqual(asked[0][1], { systems: 'Alchemy, Smithing' });
-  assert.deepEqual(asked[1][1], { count: 3 });
+  assert.deepEqual(asked[2][1], { count: 3 });
   assert.ok(localized.message.startsWith('[FABRICATE.Migration.RetireCheckModifierPlaceholder.Lead:'));
+  assert.ok(localized.detail.startsWith('[FABRICATE.Migration.RetireCheckModifierPlaceholder.LeadDetail:'));
 
   // The fallback branch: `game.i18n` absent (or the key unresolved) still interpolates the
   // count and the system list rather than rendering a literal `{count}`.
   const fallback = buildRetiredCraftingModNotice(REPORTED, () => '');
-  assert.equal(fallback.message.includes('{count}'), false, 'the fallback interpolates its count');
-  assert.equal(fallback.message.includes('{systems}'), false, 'and its system list');
-  assert.match(fallback.message, /3 check\(s\)/);
-  assert.match(fallback.message, /systems: Alchemy, Smithing\./);
+  const both = `${fallback.message}\n${fallback.detail}`;
+  assert.equal(both.includes('{count}'), false, 'the fallback interpolates its count');
+  assert.equal(both.includes('{systems}'), false, 'and its system list');
+  assert.match(fallback.detail, /3 check\(s\)/);
+  assert.match(fallback.message, /from: Alchemy, Smithing\./);
 });
 
 test('the notice is safe on junk input', () => {
@@ -740,7 +767,7 @@ test('the notice is safe on junk input', () => {
   assert.equal(empty.severity, 'info');
   const coerced = buildRetiredCraftingModNotice([null, 'nope', { system: 'A', inert: 'two' }]);
   assert.equal(coerced.totals.inert, 0, 'a non-numeric count contributes 0, never NaN');
-  assert.equal(coerced.message.includes('NaN'), false);
+  assert.equal(`${coerced.message}${coerced.detail}`.includes('NaN'), false);
 });
 
 test('every notice clause is localized under a key that exists in en.json', () => {
@@ -759,14 +786,20 @@ test('every notice clause is localized under a key that exists in en.json', () =
     asked.push(key);
     return '';
   });
-  assert.equal(asked.length, 5, 'the lead plus all four clauses');
+  assert.equal(
+    asked.length,
+    8,
+    'the toast lead and untouched warning, the detail lead and all four clauses, and the pointer'
+  );
   for (const key of asked) {
     const leaf = key.split('.').reduce((node, segment) => (node == null ? undefined : node[segment]), lang);
     assert.equal(typeof leaf, 'string', `${key} resolves to a string leaf`);
   }
 
-  assert.ok(copyFor('Lead').includes('{systems}'), 'the lead names the affected systems');
-  for (const key of ['Inert', 'Subtractive', 'Repeated', 'Untouched']) {
+  for (const key of ['Lead', 'LeadDetail']) {
+    assert.ok(copyFor(key).includes('{systems}'), `${key} names the affected systems`);
+  }
+  for (const key of ['Inert', 'Subtractive', 'Repeated', 'Untouched', 'UntouchedDetail']) {
     assert.ok(copyFor(key).includes('{count}'), `${key} interpolates its own count`);
   }
 
@@ -780,14 +813,16 @@ test('every notice clause is localized under a key that exists in en.json', () =
   // The untouched clause states the CONSEQUENCE, not just the fact, because that is the
   // one clause whose world is broken until the GM acts.
   assert.ok(/will not roll until you rewrite them/i.test(copyFor('Untouched')));
+  assert.ok(/will not roll until you rewrite them/i.test(copyFor('UntouchedDetail')));
 
   // The English fallbacks the composer ships must SAY THE SAME THING as en.json, or a
   // world with no `game.i18n` reads different copy from every other world.
-  const english = buildRetiredCraftingModNotice(
+  const notice = buildRetiredCraftingModNotice(
     [{ system: 'A', inert: 1, subtractive: 1, repeated: 1, untouched: 1 }],
     () => ''
-  ).message;
-  for (const key of ['Lead', 'Inert', 'Subtractive', 'Repeated', 'Untouched']) {
+  );
+  const english = `${notice.message}\n${notice.detail}`;
+  for (const key of ['Lead', 'LeadDetail', 'Inert', 'Subtractive', 'Repeated', 'Untouched', 'UntouchedDetail']) {
     const expected = copyFor(key).replace('{count}', '1').replace('{systems}', 'A');
     assert.ok(english.includes(expected), `${key}'s fallback matches en.json verbatim`);
   }

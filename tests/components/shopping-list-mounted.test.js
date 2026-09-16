@@ -57,10 +57,21 @@ function aggregate(overrides = {}) {
 
 const ENTRY = { recipeId: 'recipe-1', quantity: 2, name: 'Healing Potion', img: null };
 
+// The three summary cards are `<StatBox>`es since issue 1505, so both class selectors here
+// name the PRIMITIVE's elements rather than the hand-rolled ones whose rules went with the
+// conversion. `.fab-stat-box-value` also carries the card's leading glyph, which contributes no
+// text, so the trim below still yields the bare figure.
 function summaryCount(target, kind) {
   return target
-    .querySelector(`[data-summary="${kind}"] .crafting-shopping-summary-count`)
+    .querySelector(`[data-summary="${kind}"] .fab-stat-box-value`)
     .textContent.trim();
+}
+
+// The alerting state was `is-alert` on the caller's own card. It is now the primitive's `danger`
+// tone, which it publishes as an attribute — `StatBox` emits no caller-supplied class, and
+// `tests/stat-box-source-contract.test.js` pins the attribute as an emission for that reason.
+function summaryTone(target, kind) {
+  return target.querySelector(`[data-summary="${kind}"]`).getAttribute('data-stat-tone');
 }
 
 describe('ShoppingList mounted behavior', () => {
@@ -71,7 +82,7 @@ describe('ShoppingList mounted behavior', () => {
   it('always renders the three summary cards; empty state with no queued recipes', async () => {
     const target = await harness.mount({ aggregate: null, entries: [] });
     assert.equal(
-      target.querySelectorAll('.crafting-shopping-summary-card').length,
+      target.querySelectorAll('.fab-stat-box').length,
       3,
       'three summary cards always shown'
     );
@@ -131,7 +142,9 @@ describe('ShoppingList mounted behavior', () => {
     const card = target.querySelector('[data-shopping-acquire-components]');
     assert.ok(card, 'components card rendered for the essence');
     assert.match(card.textContent, /Fire/);
-    const thumb = card.querySelector('.crafting-essence-thumb');
+    // Issue 1506: the acquire card's essence row draws the ONE shared art tile in its glyph
+    // face, so it is read by that tile's own hook rather than by a retired class.
+    const thumb = card.querySelector('[data-medallion="glyph"]');
     assert.ok(thumb, 'essence icon tile rendered');
     assert.match(thumb.getAttribute('style'), /28px/, 'shopping glyph keeps 28px geometry');
     assert.ok(thumb.querySelector('i').classList.contains('fa-fire'));
@@ -507,8 +520,9 @@ describe('ShoppingList currency rows (issue 1493)', () => {
       '0',
       'but nothing the player can buy clears a GM setup problem, so it is not their debt'
     );
-    assert.ok(
-      !target.querySelector('[data-summary="components"]').classList.contains('is-alert'),
+    assert.equal(
+      summaryTone(target, 'components'),
+      'default',
       'and it must not redden the card that means "go and acquire these"'
     );
   });
@@ -566,7 +580,7 @@ describe('ShoppingList currency rows (issue 1493)', () => {
       entries: [ENTRY]
     });
     assert.equal(summaryCount(target, 'components'), '1');
-    assert.ok(target.querySelector('[data-summary="components"]').classList.contains('is-alert'));
+    assert.equal(summaryTone(target, 'components'), 'danger');
   });
 
   // -------------------------------------------------------------------------
@@ -640,5 +654,77 @@ describe('ShoppingList currency rows (issue 1493)', () => {
       entries: [ENTRY]
     });
     assert.equal(target.querySelectorAll('.crafting-shopping-acquire-row').length, 3);
+  });
+
+  /**
+   * THE PLANNER'S EMPTY IS A PANEL, NOT A ONE-LINE NOTE (issue 1514), and the classification is
+   * a MEASUREMENT rather than a reading of the markup.
+   *
+   * The plan listed this among the tab's one-liners because the markup is a single `<p>`. What it
+   * RENDERS is a 24px glyph over a centred sentence filling the whole planner column — measured
+   * 288.86x574.72 in the View Lab — which is the same shape as the inventory inspector's
+   * no-selection pane and takes the same answer: `EmptyState`'s panel nested inside a
+   * caller-owned fill wrapper. `note` would have released the fill AND the centring, which is
+   * the refusal recorded on `RecipeBrowser` in this same phase.
+   */
+  it('draws the empty planner as the shared panel inside a caller-owned fill wrapper', async () => {
+    const target = await harness.mount({ aggregate: aggregate({ ingredients: [], essences: [], tools: [] }), entries: [] });
+
+    const wrapper = target.querySelector('[data-crafting-shopping-empty]');
+    assert.ok(Boolean(wrapper), 'the hook stays on the wrapper, the box it has always sat on');
+    assert.equal(
+      wrapper.getAttribute('data-crafting-shopping-empty'),
+      '',
+      'so it keeps rendering bare rather than the `="true"` `EmptyState` coerces a bare hook to'
+    );
+    const panel = wrapper.querySelector('.manager-empty');
+    assert.ok(Boolean(panel), 'and the panel inside it is the shared primitive');
+    assert.ok(
+      !panel.classList.contains('is-note'),
+      'the FULL panel, not the released one: `note` declares `place-items: start` and ' +
+        '`text-align: left` on itself, so a caller cannot restore this pane`s centring'
+    );
+    assert.ok(
+      Boolean(panel.querySelector('i.fa-cart-shopping')),
+      'and the cart glyph is the panel`s own tile now rather than a bare 24px mark beside the line'
+    );
+    // THE PANEL FORM TAKES `title` AND THE `note` FORM DOES NOT, and the pair of rules is the
+    // whole classification. `title` renders an <h3>, so the four one-line `note` sites in this
+    // tab pass `hint` to keep headings out of the player app's outline; a full panel standing in
+    // for an entire column is a section in its own right and warrants exactly one, which is the
+    // same answer `InventoryDetail`'s no-selection pane took one phase earlier.
+    assert.ok(
+      Boolean(panel.querySelector('h3')),
+      'the panel heads with one <h3>, the same single heading the inventory inspector`s pane adds'
+    );
+  });
+
+  it('draws all three card titles as the shared eyebrow', async () => {
+    // A fixture with TOOLS, because the third card only renders when one is unavailable — the
+    // default aggregate has none, and a two-of-three reading would have passed a `>= 2` check
+    // while leaving the tools title unconverted.
+    const target = await harness.mount({
+      aggregate: aggregate({
+        tools: [{ toolId: 't1', name: 'Alembic', img: 'icons/tool.webp', available: false }],
+      }),
+      entries: [ENTRY],
+    });
+
+    const kickers = [...target.querySelectorAll('.crafting-shopping-card .fab-kicker')];
+    assert.equal(
+      kickers.length,
+      3,
+      'the queue, the components and the tools card each head with one — three copies of one ' +
+        'rule is the drift this component exists to end'
+    );
+    assert.ok(
+      kickers.every((kicker) => kicker.tagName.toLowerCase() === 'p'),
+      'each keeps its `<p>` host, which is in the primitive`s own host set, so no heading is ' +
+        'inserted into the player app`s outline'
+    );
+    assert.ok(
+      !target.querySelector('.crafting-shopping-card-title'),
+      'and the deleted rule takes its class with it rather than leaving one that paints nothing'
+    );
   });
 });

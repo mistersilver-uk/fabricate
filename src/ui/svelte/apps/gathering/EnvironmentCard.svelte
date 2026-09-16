@@ -264,9 +264,11 @@
 
   /*
     Selection is an accent-coloured border outline, NOT a box-shadow: the host
-    rule `.fabricate-app button:focus:not(:focus-visible)` clears box-shadow on
-    mouse-click focus, which would hide a shadow-based indicator until focus
-    leaves the card. A border-color outline is immune to that reset.
+    rule `.fabricate button:focus` clears box-shadow on mouse-click focus, which
+    would hide a shadow-based indicator until focus leaves the card. A
+    border-color outline is immune to that reset. (That reset was rooted at
+    `.fabricate-app` until issue 1501 collapsed it onto the module root; the rank
+    and the declarations are unchanged, so this argument is too.)
   */
   .gathering-env-card.is-selected {
     border-color: var(--fab-accent);

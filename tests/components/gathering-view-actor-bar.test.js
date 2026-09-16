@@ -8,6 +8,14 @@ import { compile, compileModule } from 'svelte/compiler';
 import { flushSync, mount, tick, unmount } from '../../node_modules/svelte/src/index-client.js';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
 import { rewriteClientImports } from '../helpers/rewriteClientImports.js';
+// The raw `.js` closure of `SearchablePopover`, which the shared `<Select>` composes
+// (issue 1504). Spread from the harness's own roster rather than copied, so a module added
+// there cannot go missing here.
+import {
+  PLAYER_APP_COMPILED_MODULES,
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  SELECT_COMPILED_MODULES,
+} from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -122,6 +130,9 @@ describe('GatheringView ↔ actor bar wiring', () => {
     copyModule('src/ui/svelte/util/gatheringFormat.js');
     copyModule('src/ui/svelte/util/gatheringConditionIcons.js');
     copyModule('src/ui/svelte/apps/gathering/gatheringBlockedReasons.js');
+    // Issue 1648: the authority-refusal wording GatheringView falls back to when a
+    // versioned start is refused. Omitting it HANGS this suite (# cancelled).
+    copyModule('src/ui/svelte/util/journalRunReasons.js');
     copyModule('src/ui/svelte/apps/gathering/selectionDefault.js');
     copyModule('src/ui/svelte/apps/gathering/scopedSelection.js');
     copyModule('src/ui/svelte/util/sceneImages.js');
@@ -135,6 +146,17 @@ describe('GatheringView ↔ actor bar wiring', () => {
     writeCompiledModule('src/ui/svelte/stores/actorBarStore.svelte.js');
 
     writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
+    // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
+    for (const rawModule of SEARCHABLE_POPOVER_RAW_MODULES) {
+      const rawDestination = join(tempRoot, rawModule);
+      mkdirSync(dirname(rawDestination), { recursive: true });
+      writeFileSync(rawDestination, readFileSync(resolve(repoRoot, rawModule), 'utf8'));
+    }
+    // Issue 1504: the shared `<Select>`'s whole compiled closure, spread rather than copied.
+    for (const selectModule of SELECT_COMPILED_MODULES) {
+      writeCompiledSvelte(selectModule);
+    }
+    writeCompiledSvelte('src/ui/svelte/components/IconButton.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/EnvironmentCard.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte');
     // `FillBar` joined this tree when issue 1096 rebuilt `ChanceBar` on the shared
@@ -154,6 +176,7 @@ describe('GatheringView ↔ actor bar wiring', () => {
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringDropModifiers.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskDrops.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskDetail.svelte');
+    for (const primitive of PLAYER_APP_COMPILED_MODULES) writeCompiledSvelte(primitive);
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringView.svelte');
 
     GatheringView = (await import(pathToFileURL(join(
@@ -516,6 +539,69 @@ describe('GatheringView ↔ actor bar wiring', () => {
       assert.match(warns[0], /CannotAttempt|NoRegion/, 'the notification names the blocked reason');
     } finally {
       delete globalThis.ui;
+    }
+  });
+
+  // Issue 1648: a versioned start goes through the run authority, which refuses with
+  // `{success:false, reason}` — no `accepted`, no `message`. That missed the
+  // `accepted === false` branch above entirely, so the attempt was a SILENT no-op.
+  it('warns with the worded reason when the run authority refuses a versioned start', async () => {
+    const warns = [];
+    globalThis.ui = { notifications: { warn: (msg) => warns.push(msg) } };
+    try {
+      const services = {
+        listGatheringForActor: () => Promise.resolve(listing([attemptableEnv()], 'a1')),
+        startGatheringAttempt: () => Promise.resolve({ success: false, reason: 'ledger-missing' })
+      };
+      const store = makeStore({ actors: [{ id: 'a1', uuid: 'Actor.a1', name: 'Bromm' }], seededId: 'a1' });
+      store.loadSelectableActors();
+      flushSync();
+      services.actorBar = store;
+      await mountView(services);
+
+      target.querySelector('[data-gathering-task-detail] [data-gathering-attempt]').click();
+      await settle();
+
+      assert.equal(warns.length, 1, 'a refused start is never a silent no-op');
+      assert.equal(warns[0], 'FABRICATE.App.Journal.Actions.LedgerMissing');
+      assert.notEqual(warns[0], undefined);
+    } finally {
+      delete globalThis.ui;
+    }
+  });
+
+  it('never warns with a non-string, whatever refusal shape the authority returns', async () => {
+    const shapes = [
+      { success: false },
+      { success: false, message: 42 },
+      { success: false, reason: 'command-timeout' },
+      { success: false, reason: 'a-reason-nobody-mapped' }
+    ];
+    for (const shape of shapes) {
+      const warns = [];
+      globalThis.ui = { notifications: { warn: (msg) => warns.push(msg) } };
+      try {
+        const services = {
+          listGatheringForActor: () => Promise.resolve(listing([attemptableEnv()], 'a1')),
+          startGatheringAttempt: () => Promise.resolve(shape)
+        };
+        const store = makeStore({ actors: [{ id: 'a1', uuid: 'Actor.a1', name: 'Bromm' }], seededId: 'a1' });
+        store.loadSelectableActors();
+        flushSync();
+        services.actorBar = store;
+        await mountView(services);
+
+        target.querySelector('[data-gathering-task-detail] [data-gathering-attempt]').click();
+        await settle();
+
+        const label = JSON.stringify(shape);
+        assert.equal(warns.length, 1, `one warning for ${label}`);
+        assert.equal(typeof warns[0], 'string', `a string for ${label}`);
+        assert.notEqual(warns[0], 'undefined', `never the text "undefined" for ${label}`);
+        assert.notEqual(warns[0].trim(), '', `never blank for ${label}`);
+      } finally {
+        delete globalThis.ui;
+      }
     }
   });
 });

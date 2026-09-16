@@ -17,6 +17,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { CurrencyConfigStore } from '../src/systems/CurrencyConfigStore.js';
+import { CURRENCY_MACRO_KEYS } from '../src/systems/currencyProfile.js';
 
 function makeStore(seed = null) {
   const settings = { currencyConfig: seed };
@@ -41,7 +42,10 @@ describe('CurrencyConfigStore', () => {
     assert.deepEqual(config.units, []);
     assert.equal(config.spendStrategy, 'actorProperty');
     assert.equal(config.providerId, '');
-    assert.deepEqual(Object.keys(config.macros).sort(), ['canAfford', 'decrement', 'increment']);
+    // Derived from the declared vocabulary rather than restated, because the point of the
+    // assertion is that the normalizer emits EVERY declared slot — a literal list agrees with
+    // a normalizer that dropped a key only until someone updates both together.
+    assert.deepEqual(Object.keys(config.macros).sort(), [...CURRENCY_MACRO_KEYS].sort());
     // Reading must not persist: a world that never configured currency should not acquire a
     // setting document merely because something asked.
     assert.deepEqual(writes, []);

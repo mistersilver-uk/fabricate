@@ -47,6 +47,10 @@ For read-only quality review, return findings and issue-ready recommended text; 
 11. Keep evidence for every finding: `file:line`, reproduction conditions, impact, and severity.
 12. For explicitly assigned mutable work, commit only owned workflow or documentation paths locally and return the commit handoff to the workflow driver.
 
+**Confirmation round (revision 2 or later, brief marked disposition-only).**
+Keep to your own prior findings: mark each `RESOLVED`, `RESOLVED-WITH-NIT` (give the exact text the driver applies) or `UNRESOLVED` (say what is still wrong), then add ONE section, "New, introduced by the revision", for defects the revision itself created; raise nothing else.
+The driver runs these rounds at model tier `medium`, because the scope is fixed by your own earlier verdict rather than by the change's path set.
+
 ## Rules
 
 - Do not modify implementation files under `src/`, `tests/`, or `styles/`.
@@ -62,7 +66,18 @@ When reviewing added tests, verify the directory is in the glob and that `npm te
 - Mutation-test the COMPOSITION, not only the pure helper.
 A suite can pin `f()`'s logic while the handler, `main()`, or `if (!dryRun)` branch that must CALL `f()` is never exercised — so mutate the call site (delete the call, invert its condition, swap its branches) and confirm a test flips to FAIL.
 A mutation that survives with the pure-helper tests still green is a test-gap finding: the logic is proven, the capability is not (e.g. a waiver predicate is unit-tested but the console/`pageerror` handler that must route through it is not, so making the handler ignore the predicate ships green).
+- A control is covered when something ACTS on it, not when something SEES it.
+Presence evidence — a View Lab `expectSelector`, an `expectContained` target, a screenshot — does not constitute coverage of a control.
+Coverage means one of: a View Lab case whose `steps[]` clicks it and whose `expectSelector` names a state only its effect can produce, or a mount test that clicks it and asserts the resulting DOM.
+This is mandatory for any control rendered inside an `EmptyState`, because in that state it is the screen's only affordance: if it is inert the screen is a dead end, and a photograph of a dead end is indistinguishable from a photograph of a working one.
+Worked example: `[data-tool-empty-browse-world]` shipped named by two registry terminals and clicked by nothing anywhere, so it was proven to EXIST and never proven to ACT, and the maintainer found it inert by hand on a live world (issue 1373).
+- A guard over a filter that changes which rows EXIST — not merely which of them are shown — must exercise that filter at the cohort's ZERO POINT.
+Zero members is the only place the widened branch and the empty branch can disagree, so a widening test mounted with members present cannot fail on a widening defect.
+Worked example: the one mount test that did exercise the Tool rules list's `All world tools` widening mounted two adopted Tools, so it never entered the branch that computed, counted and paged every widened row and then discarded them (issue 1373).
 - For UI screenshots, check first visible state, clipping, spacing, alignment, image fidelity, scroll containment, button visibility, and responsive window sizes.
+- For a changed screen, demand the reachable-state matrix from `.agents/skills/fabricate-ux-designer/references/prototype-parity-measurement.md` and audit it: every state a GM can reach has a View Lab case that reaches it and a mounted test that acts on its controls, under the act-not-see and zero-point rules above.
+A fixture that authors a state the product's own editor forbids is a defect, not evidence; a mounted test asserts the DOM the GM meets rather than the spy behind it, and where a write refuses silently it asserts the forwarded argument list.
+- For a screen with a prototype, treat a parity claim that arrives without both harness outputs (`compare.mjs` and `inventory.mjs` from `scripts/visual-parity/`, run against the integrated branch) as unproven, and treat a green run whose lab was opened without the case's own seeding query, attached to a stale server, or measured on one side of a breakpoint as a false green.
 - Flag a validation gap when an image UI screenshot only exercises fallback art but the feature depends on linked scene, item, or external imagery.
 - For UI-changing PRs, treat unrelated image markdown, artifact names, and file lists as missing normal evidence.
 Expected evidence is an embedded screenshot image in the PR description with `pr-<number>` in its alt text, uploaded to S3 under `pr-screenshots/<number>/` — published by the View Lab `capture` job for a view the case registry covers, or by `npm run screenshots:ui:publish` from a smoke run for one it does not.
@@ -76,6 +91,8 @@ PR-scoped screenshots are collected under `tmp/pr-screenshots/<number>/` (local 
 Benign fixture-world `404 (Not Found)` asset misses populate `consoleErrors` and flip `passed` to false with zero failed steps; a known-benign console or `pageerror` line can be admitted per run via `--allowed-console-error-patterns` (appended to the in-source defaults, never replacing them), but a failing `steps[]` entry is never waivable and throws first.
 Distinguish that benign case (screenshots still valid, no regression) from a real failing step before flagging a defect or rejecting screenshot evidence.
 - If confidence is low, file a clarification or investigation issue instead of overstating the defect.
+- Run the bloat checklist in `.agents/skills/fabricate-reviewer/SKILL.md` over the diff and report defects at `low` unless a shape also hides a behaviour risk.
+A test-file header that argues its design instead of stating its contract, or a new `Source.includes(` pin where an AST read would do, is a maintainability finding in its own right.
 - If `gh` is unavailable, provide ready-to-file issue drafts.
 
 ## Severity guide
@@ -117,3 +134,4 @@ Otherwise provide:
 - local commit handoff for any owned workflow or documentation changes
 - high-severity findings first
 - reviewed areas that were not flagged
+- the one-line `concision:` field defined in `.agents/skills/fabricate-reviewer/SKILL.md`

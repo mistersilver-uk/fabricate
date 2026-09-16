@@ -8,6 +8,8 @@ import assert from 'node:assert/strict';
 
 import {
   COMPONENT_DEFAULT_PAGE_SIZE,
+  COMPONENT_ESSENCE_FILTER_ANY,
+  COMPONENT_ESSENCE_FILTER_NONE,
   COMPONENT_SORT_KEYS,
   componentCategoryOf,
   componentCategoryOptions,
@@ -288,5 +290,76 @@ describe('component browser model (issue 676)', () => {
     assert.deepEqual(sortComponents(null, {}), []);
     assert.deepEqual(groupComponentsByCategory(null), []);
     assert.deepEqual(paginateComponents(null, {}).components, []);
+  });
+});
+
+// ── issue 1371 r12-list ──────────────────────────────────────────────────────────────────────
+//
+// The system rules list's toolbar draws the reference's THREE essence predicates and its FOUR sort
+// keys. `proto:5533` offers `All essences | Carries any essence | No essences` before the per-essence
+// entries, and `proto:5477-5479` is the predicate for each; `proto:5536` lists the sort keys
+// `Name | Category | Essences | Tags`, and `proto:5485` orders the `Tags` key by tag count and then
+// by name. `Salvage` survives as a recorded subject-only extra.
+describe('the system rules list draws the reference’s essence predicates and Tags sort (issue 1371 r12-list)', () => {
+  it('offers the two predicate sentinels as values no authored essence can collide with', () => {
+    // `all` predates them and is the lifted view-state's persisted default; the two new ones take
+    // the dunder form so a GM who names an essence `Any` or `None` can still filter by it.
+    assert.equal(COMPONENT_ESSENCE_FILTER_ANY, '__any');
+    assert.equal(COMPONENT_ESSENCE_FILTER_NONE, '__none');
+  });
+
+  it('`Carries any essence` keeps every row with at least one essence, whichever it is', () => {
+    assert.deepEqual(names(filterComponents(ROWS, { essence: COMPONENT_ESSENCE_FILTER_ANY })), [
+      'Iron Ore',
+      'Sage',
+    ]);
+  });
+
+  it('`No essences` keeps only the rows that carry none', () => {
+    assert.deepEqual(names(filterComponents(ROWS, { essence: COMPONENT_ESSENCE_FILTER_NONE })), [
+      'Glass Vial',
+      'Copper Ore',
+    ]);
+  });
+
+  it('and both compose with the category filter, so neither is a bypass', () => {
+    assert.deepEqual(
+      names(filterComponents(ROWS, { category: 'Metal', essence: COMPONENT_ESSENCE_FILTER_ANY })),
+      ['Iron Ore']
+    );
+    assert.deepEqual(
+      names(filterComponents(ROWS, { category: 'Metal', essence: COMPONENT_ESSENCE_FILTER_NONE })),
+      ['Copper Ore']
+    );
+  });
+
+  it('lists the sort keys in the reference’s order, with the subject-only Salvage LAST', () => {
+    assert.deepEqual([...COMPONENT_SORT_KEYS], ['name', 'category', 'essences', 'tags', 'salvage']);
+  });
+
+  it('sorts by tag COUNT and then by name, in both directions', () => {
+    const tagged = [
+      { id: 't1', name: 'Dust', tags: [] },
+      { id: 't2', name: 'Ash', tags: ['fuel', 'bulk'] },
+      { id: 't3', name: 'Brimstone', tags: [] },
+      { id: 't4', name: 'Cinder', tags: ['fuel'] },
+      { id: 't5', name: 'Ember' },
+    ];
+    // A row with no `tags` array at all counts as zero rather than throwing, because the
+    // projection blanks the field when the system hides tags.
+    assert.deepEqual(names(sortComponents(tagged, { key: 'tags' })), [
+      'Brimstone',
+      'Dust',
+      'Ember',
+      'Cinder',
+      'Ash',
+    ]);
+    assert.deepEqual(names(sortComponents(tagged, { key: 'tags', direction: 'desc' })), [
+      'Ash',
+      'Cinder',
+      'Brimstone',
+      'Dust',
+      'Ember',
+    ]);
   });
 });

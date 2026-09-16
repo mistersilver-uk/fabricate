@@ -41,8 +41,20 @@ export const MINIMUM_REASON_LENGTH = 40;
  */
 export const EDGE_TOLERANCE_PX = 0.5;
 
-/** The edges a group may be asserted on. Vertical rhythm is a different question. */
-export const ALIGNABLE_EDGES = Object.freeze(['left', 'right']);
+/**
+ * The edges a group may be asserted on.
+ *
+ * `top` joined `left` and `right` at issue 1371: two cards drawn SIDE BY SIDE in one grid row
+ * share a top edge, and that is the same claim about layout intent the horizontal edges make,
+ * not the vertical-rhythm question this list still excludes. It is the edge an ancestor's inset
+ * moves when the inset is a `margin-top` or a row gap, and the reference's component rules
+ * editor draws exactly that shape — a Category card beside a Tags card, tops level.
+ *
+ * `bottom` is deliberately still absent: two cards in a row legitimately end at different
+ * heights because their CONTENT differs, so a shared bottom edge is a fact about the world's
+ * data rather than about the design.
+ */
+export const ALIGNABLE_EDGES = Object.freeze(['left', 'right', 'top']);
 
 /**
  * The CLOSED locator vocabulary.
@@ -151,6 +163,13 @@ export const DEFAULT_PROPERTY_GROUPS = {
   // weight and transform come from the icon font's own sheet, which neither side owns and a
   // markup harness usually does not load, so recording them compares the harness to itself.
   glyph: ['color', 'fontSize'],
+  // A PAINTED MARKER THAT MOVES NO GEOMETRY. `box-shadow` was in no group at all, so an
+  // `inset 2px 0 0 0 var(--fab-accent)` rule on a roster row was invisible to `compare` — and
+  // because the row is a landmark either way, `inventory` was silent on it too. That is how an
+  // invented membership marker on the world catalogue's system roster survived four approvals
+  // (issue 1371). A shadow is the ONE way to paint a rule, a glow or a lift without changing a
+  // single measured box, which is exactly what makes it worth measuring.
+  shadow: ['boxShadow'],
   // The SCROLLER's own paint. Host chrome (Foundry's, in this repo) can leak a scrollbar
   // colour through a pane nothing ever selected a token for, and it draws as two full-height
   // rules at the pane's edges that no named region is looking at.
@@ -343,7 +362,8 @@ export function exemptionProblems(fixture) {
  * container `column-gap: normal` IS zero — the initial value computes to `normal` and lays out
  * as 0 — so a fixture recording `normal` and a sheet declaring `0` describe one gutter.
  * Nothing else is normalised. A tolerance band on colours or lengths is the beginning of a
- * gate that cannot fail.
+ * gate that cannot fail; the ONE exception is declared per property and reported rather than
+ * suppressed — see `classifyDifference` below.
  *
  * @param {string} property CSS property name.
  * @param {string} actual Subject's computed value.
@@ -356,4 +376,102 @@ export function sameComputedValue(property, actual, expected) {
     return zero(actual) === zero(expected);
   }
   return actual === expected;
+}
+
+/**
+ * THE CEILING ON A DECLARED TOLERANCE, and it is deliberately below the smallest thing a
+ * design decides.
+ *
+ * The published spacing scale steps in 4px and the type ladder in half-points, so any real
+ * decision is at least 0.5px apart. A tolerance at or above that could absorb one, which is the
+ * gate-that-cannot-fail this whole file is written against. Half a pixel is refused rather than
+ * accepted so the boundary itself is not a judgement call.
+ */
+export const MAX_TOLERANCE_PX = 0.5;
+
+const LENGTH = /^-?\d+(?:\.\d+)?px$/;
+
+/**
+ * Classify one property's difference: the same, ROUNDING, or drift.
+ *
+ * ── Why a tolerance exists here at all, after this file spent a round refusing one ─────────
+ *
+ * The two documents express the same type ramp in different UNITS. The prototype writes
+ * absolute pixels (`font:600 11.5px`) and this product writes `rem` against a 16px root, so
+ * `0.72rem` computes to `11.52px` and `0.53rem` to `8.496px`. Twenty-eight lines of one review
+ * were `11.52 !== 11.5`, `9.504 !== 9.5`, `13.504 !== 13.5`, `8.496 !== 8.5` — sub-hundredth
+ * differences that no GM can see, that no edit can close without abandoning `rem`, and that a
+ * reader has to re-derive as noise every round.
+ *
+ * Three things keep this from becoming the tolerance band the README refuses:
+ *
+ *  1. It is DECLARED PER PROPERTY IN THE SPEC, with a stated reason, and validated like an
+ *     exemption. There is no default and no harness-wide band: a spec that declares none gets
+ *     the exact-equality gate it had.
+ *  2. It is CAPPED at `MAX_TOLERANCE_PX`, an order below the smallest step any published scale
+ *     takes, so it cannot absorb a decision.
+ *  3. It is REPORTED, not suppressed. A rounding line prints its own delta in its own block, so
+ *     "28 lines are unit conversion" stays a visible claim someone can check rather than a
+ *     silence. An exemption that hides is the defect the exemption rules exist against.
+ *
+ * Both values must be plain `px` lengths. A keyword, a colour or a multi-part value is never
+ * rounding, whatever the property, because there is no delta to be under a tolerance.
+ *
+ * @param {string} property CSS property name.
+ * @param {string} actual Subject's computed value.
+ * @param {string} expected Prototype's recorded value.
+ * @param {Record<string, {px: number, reason: string}>} tolerances Spec's declared tolerances.
+ * @returns {{verdict: 'same'|'rounding'|'drift', delta?: number, px?: number}} The verdict.
+ */
+export function classifyDifference(property, actual, expected, tolerances = {}) {
+  if (sameComputedValue(property, actual, expected)) return { verdict: 'same' };
+  const tolerance = tolerances[property];
+  if (!tolerance) return { verdict: 'drift' };
+  if (!LENGTH.test(String(actual)) || !LENGTH.test(String(expected))) return { verdict: 'drift' };
+  const delta = Math.abs(Number.parseFloat(actual) - Number.parseFloat(expected));
+  if (delta > tolerance.px) return { verdict: 'drift' };
+  return { verdict: 'rounding', delta, px: tolerance.px };
+}
+
+/**
+ * Every declared tolerance names a property something measures, is under the cap, and says why.
+ *
+ * The same three rules an exemption answers to, for the same reason: a tolerance nobody can
+ * read the reason for is indistinguishable from a gate somebody quietly widened.
+ *
+ * @param {object} spec Loaded spec module.
+ * @returns {string[]} Problems, empty when every tolerance is well formed.
+ */
+export function toleranceProblems(spec) {
+  const problems = [];
+  const groups = { ...DEFAULT_PROPERTY_GROUPS, ...spec?.propertyGroups };
+  const measurable = new Set(Object.values(groups).flat());
+  for (const [property, tolerance] of Object.entries(spec?.tolerances ?? {})) {
+    if (!measurable.has(property)) {
+      problems.push(
+        `tolerance ${property}: no property group measures it, so the tolerance applies to ` +
+          `nothing and would outlive whatever it was written for`
+      );
+    }
+    const px = tolerance?.px;
+    if (typeof px !== 'number' || !Number.isFinite(px) || px <= 0) {
+      problems.push(`tolerance ${property}: needs a positive \`px\` number`);
+    } else if (px >= MAX_TOLERANCE_PX) {
+      problems.push(
+        `tolerance ${property}: ${px}px is at or over the ${MAX_TOLERANCE_PX}px cap — a band ` +
+          `that wide can absorb a decision from a published scale, which is a gate that ` +
+          `cannot fail rather than a unit conversion`
+      );
+    }
+    if (
+      typeof tolerance?.reason !== 'string' ||
+      tolerance.reason.trim().length < MINIMUM_REASON_LENGTH
+    ) {
+      problems.push(
+        `tolerance ${property}: needs a stated reason of at least ${MINIMUM_REASON_LENGTH} ` +
+          `characters, not a placeholder`
+      );
+    }
+  }
+  return problems;
 }

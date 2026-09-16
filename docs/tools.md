@@ -1,7 +1,7 @@
 ---
 layout: default
 title: Tools
-nav_order: 5
+nav_order: 9
 ---
 
 # Tools
@@ -21,6 +21,8 @@ The library shows each Tool's image, display name, enabled state, breakage summa
 Select a row to inspect it.
 Choose **Edit Tool** to open its editor.
 
+{% include screenshot.html case="manager-tool-parity-01-library-1280x720" %}
+
 **Ready** means the Tool passes every validation check.
 **Needs attention** means the Tool has one or more issues.
 The inspector shows the issue count before you open the editor.
@@ -35,7 +37,8 @@ The Tool Studio has no browse button or blank Tool shortcut.
 
 Fabricate records the linked Item's name, image, and description when you create or relink the Tool.
 Later changes to the source Item do not refresh that stored display automatically.
-Open **Overview** and drop another Item onto the linked source card when you want a new source and a fresh display snapshot.
+Open the Tool's entry in the world **Tools Catalogue** and drop another Item onto its linked source card when you want a new source and a fresh display snapshot.
+A crafting system's Tool rules editor cannot change which Item a Tool is.
 
 A **Display label** overrides the stored source name in Fabricate without changing the Item.
 The source name and description are read-only in the Tool Studio.
@@ -43,22 +46,35 @@ Unlinking the Item preserves the draft, but the Tool cannot be saved until it ha
 
 ## Edit a Tool
 
-The editor has four tabs:
+The editor has three tabs:
 
-- **Overview** controls the linked Item, display label, and enabled state.
-- **Breakage** controls wear, check-driven immunity, on-break behavior, replacement, and repair materials.
+- **Breakage** controls whether this system is enabled for the Tool, its display label here, wear, check-driven immunity, on-break behavior, replacement, and repair materials.
 - **Requirements** controls shared character prerequisites and the Tool check bonus.
 - **Validation** lists every issue that blocks saving.
+Selecting an issue's **View** button jumps to the tab it concerns and highlights the part of it the issue is about.
+
+A Tool's identity — the linked Item, its art and its description — is not editable here.
+It belongs to the world Tool, which the header's **World Tool** button opens.
+
+Each behavior section states whether this system **inherits** the world Tool's answer or **overrides** it, and the switch at the card's right edge moves between the two.
+While a section inherits, the card shows the world value and the controls are not offered; turning the switch off opens them on that value.
 
 The behavior preview summarizes the draft while you work.
-Its **How Tools work in Fabricate** card remains available on every tab.
 The **Unsaved** state appears after a change.
 Leaving the editor with unsaved changes offers **Save**, **Discard**, and **Keep editing**.
 
-Choose **Save Tool** when the Tool is ready.
+Choose **Save rules** when the Tool's rules are ready.
 An invalid or failed save keeps the editor open and moves attention to **Validation**.
 Validation and operation failures use safe descriptions instead of technical error details.
-Changing **Tool enabled** takes effect immediately and does not stage the other editor changes.
+Changing **Enabled in <system>** takes effect immediately and does not stage the other editor changes.
+
+Because the library is a draft-and-save surface, your edits are held until you save, leaving with unsaved edits prompts before discarding, and a notice appears if someone else changed the Tool list while you were editing it.
+
+A Tool is invalid if it has neither a source item nor a component, names the same component as its replacement, has a breakage chance outside the allowed range, or has an empty dice formula.
+The Save button stays disabled until every Tool is valid; hover it to see the first failing reason.
+Tools belong to the crafting system that owns them and cannot be shared across systems.
+A gathering task, recipe, or salvage configuration only references them.
+See [Tools]({% link gathering/tasks.md %}#tools) for how a gathering task does that.
 
 ## Presence and prerequisites
 
@@ -69,10 +85,12 @@ Presence matching accepts familiar copies so players can use Items copied from t
 Usage and breakage require a durable identity match because those actions can change or delete an Item.
 A loosely recognized copy can satisfy presence while being spared from usage and breakage.
 
+{% include screenshot.html case="manager-tool-parity-04-requirements-1280x720" caption="Character prerequisites gate who may wield a Tool." %}
+
 {: .note }
 
 > Use **Repair Item Data** or issue a fresh copy from the source Item when a Tool is present but does not track use or break.
-> See [Tools Not Breaking or Tracking Usage]({% link troubleshooting.md %}#tools-not-breaking-or-tracking-usage).
+> See [Tools Not Breaking or Tracking Usage]({% link help/troubleshooting.md %}#tools-not-breaking-or-tracking-usage).
 
 The **Requirements** tab can apply shared character prerequisites defined for the crafting system.
 Every selected prerequisite is required.
@@ -85,6 +103,9 @@ Choose what happens when those prerequisites fail:
 - **Bonus is withheld** keeps the Tool usable but suppresses its numeric bonus.
 
 ## Tool check bonuses
+
+A Tool's bonus is a roll expression.
+See [Expressions]({% link expressions.md %}) for the syntax, and for the one respect in which this field differs from every other expression field in Fabricate.
 
 Enable **Tool check bonus** in the **Requirements** tab and enter a bonus expression.
 The expression is evaluated against the actor who supplies the Tool.
@@ -118,11 +139,13 @@ Authority decides whether Tool-specific settings or the active check controls br
 The Tool's **Breakable** or **Immune** choice decides whether it participates in check-driven breakage.
 The **On-break action** decides what happens after a break.
 
-See [Tool breakage triggers]({% link crafting-checks.md %}#tool-breakage-triggers) for check-driven setup.
+See [Tool breakage triggers]({% link checks/crafting.md %}#tool-breakage-triggers) for check-driven setup.
 
 ## Tool-specific breakage mechanics
 
 Under **Tool-specific**, choose one breakage mechanic:
+
+{% include screenshot.html case="manager-tool-parity-03-breakage-1280x720" %}
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
 
@@ -214,11 +237,11 @@ Gathering Tools stored by early versions are also reconciled into the system lib
 
 ## See Also
 
-- [Recipes]({% link recipes/index.md %}).
+- [Recipes]({% link crafting/recipes/index.md %}).
   Configure recipe Tool requirements and bonus modes.
-- [Degrading Tools]({% link how-to/degrading-tools.md %}).
+- [Degrading Tools]({% link help/how-to/degrading-tools.md %}).
   Build a Tool that wears out through repeated crafting.
-- [Breakable Gathering Tools]({% link how-to/breakable-gathering-tools.md %}).
+- [Breakable Gathering Tools]({% link help/how-to/breakable-gathering-tools.md %}).
   Apply the shared Tool setup to gathering.
 - [Canvas Interactables]({% link canvas-interactables.md %}).
   Provide virtual Tool presence from a Scene Region station.

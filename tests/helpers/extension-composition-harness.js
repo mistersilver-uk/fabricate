@@ -1,19 +1,7 @@
 /**
- * The two boots the companion-extension composition suites run under.
- *
- * Both the Manager seam's composition suite and the player seam's need the same two things:
- * a real Vite server that can evaluate the production entry module, and an ApplicationV2
- * close-ordering fixture that records what happened in what order. Hand-inlining the pair a
- * second time is the exact near-identical block SonarCloud's new-code duplication gate counts
- * against `tests/**` just as it does against `src/`, so they live here once (issue 1198).
- *
- * THE TWO BOOTS ARE DELIBERATELY NOT UNIFIED. `withFabricateLifecycleReplay` runs middleware
- * mode with HMR disabled, a `/lang/en.json` fetch shim and a `CONFIG` stub, because it
- * evaluates `src/main.js` inside `buildLabWorld`'s Foundry host, which fetches during boot.
- * `captureCloseOrdering` runs middleware mode alone against hand-stubbed globals and no lab
- * world, because it evaluates one application module and must control every global that
- * module's class hierarchy reads. Collapsing them onto one option set would silently change
- * what the second runs under.
+ * Both composition boots use one isolated middleware-server factory with distinct Foundry hosts.
+ * Lifecycle replay supplies `/lang/en.json` and `CONFIG` for the real entry module's boot.
+ * Close-ordering capture evaluates one application against hand-stubbed globals.
  */
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
@@ -21,7 +9,20 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
 
+import { viteDepCacheDir } from './vite-dep-cache-dir.js';
+
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+
+async function startCompositionServer() {
+  const vite = await createServer({
+    root: repoRoot,
+    cacheDir: viteDepCacheDir(),
+    // Test processes own their cache; sequential boots retain warm prebundles.
+    server: { middlewareMode: true, hmr: false, ws: false, watch: null },
+    appType: 'custom',
+  });
+  return { vite, close: () => vite.close() };
+}
 
 /**
  * Boot the real entry module inside `buildLabWorld`'s Foundry host and hand the caller the
@@ -40,11 +41,7 @@ export async function withFabricateLifecycleReplay(run) {
   const originalFetch = globalThis.fetch;
   const originalConfig = globalThis.CONFIG;
   let world = null;
-  const vite = await createServer({
-    root: repoRoot,
-    server: { middlewareMode: true, hmr: false },
-    appType: 'custom',
-  });
+  const { vite, close } = await startCompositionServer();
 
   globalThis.fetch = async (url) => {
     if (String(url) !== '/lang/en.json') return new Response('', { status: 404 });
@@ -68,7 +65,7 @@ export async function withFabricateLifecycleReplay(run) {
     world?.shim.restore();
     globalThis.fetch = originalFetch;
     globalThis.CONFIG = originalConfig;
-    await vite.close();
+    await close();
   }
 }
 
@@ -109,16 +106,11 @@ export async function captureCloseOrdering({
     }
   }
 
-  globalThis.foundry = { applications: { api: { ApplicationV2 } } };
-  globalThis.Hooks = { on: () => 1, off: () => {}, once: () => 1 };
-  globalThis.game = { i18n: { localize: (key) => key, format: (key) => key } };
-
-  const vite = await createServer({
-    root: repoRoot,
-    server: { middlewareMode: true },
-    appType: 'custom',
-  });
+  const { vite, close } = await startCompositionServer();
   try {
+    globalThis.foundry = { applications: { api: { ApplicationV2 } } };
+    globalThis.Hooks = { on: () => 1, off: () => {}, once: () => 1 };
+    globalThis.game = { i18n: { localize: (key) => key, format: (key) => key } };
     const module = await vite.ssrLoadModule(modulePath);
     const ApplicationClass = module[exportName];
     assert.equal(
@@ -137,10 +129,10 @@ export async function captureCloseOrdering({
 
     await app.close(closeOptions);
   } finally {
-    await vite.close();
     globalThis.foundry = originalFoundry;
     globalThis.Hooks = originalHooks;
     globalThis.game = originalGame;
+    await close();
   }
   return lifecycle;
 }

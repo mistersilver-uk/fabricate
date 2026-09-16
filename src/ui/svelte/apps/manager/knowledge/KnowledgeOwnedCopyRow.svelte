@@ -27,9 +27,10 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
+  import ManagerButton from '../../../components/ManagerButton.svelte';
   import Medallion from '../../../components/Medallion.svelte';
-  import ArmedDangerButton from '../ArmedDangerButton.svelte';
-  import Chip from '../Chip.svelte';
+  import ArmedDangerButton from '../../../components/ArmedDangerButton.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import { USES_CHIP_SPENT, USES_CHIP_UNLIMITED } from './knowledgeStudio.js';
 
   let {
@@ -160,7 +161,7 @@
     title={matchTierTitle(copy)}
   >
     <span class="manager-knowledge-copy-identity">
-      <Medallion src={copy.img} icon="fas fa-book" size={44} alt="" />
+      <Medallion art={copy.img} icon="fas fa-book" size={44} alt="" />
       <span class="manager-knowledge-copy-copy">
         <!-- Line 1 is the prototype's rhythm: name, type, quantity. Keeping the type
              pill here rather than in the chip row is what lets line 2 carry the whole
@@ -211,9 +212,7 @@
       role="group"
       aria-label={text('FABRICATE.Admin.Manager.Knowledge.RowActions', 'Copy actions')}
     >
-      <button
-        type="button"
-        class="manager-button"
+      <ManagerButton
         data-knowledge-expend={copy.itemId}
         disabled={!copy.canExpend}
         title={expendTitle(copy)}
@@ -224,7 +223,7 @@
              glyph, and repeating it on the action beside it reads as the same thing. -->
         <i class="fas fa-fire" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Knowledge.Expend', 'Expend use')}</span>
-      </button>
+      </ManagerButton>
       <ArmedDangerButton
         token={deleteToken}
         armed={armedToken === deleteToken}

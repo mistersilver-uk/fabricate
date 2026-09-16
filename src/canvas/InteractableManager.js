@@ -30,6 +30,7 @@
  */
 
 import { getSetting, SETTING_KEYS } from '../config/settings.js';
+import { resolvedComponentsFor, resolvedToolsFor } from '../systems/scopedEntityReads.js';
 import { getFabricateAppClass, getInteractionPromptAppClass } from '../ui/appFactory.js';
 
 import { promptDropEnvironment } from './environmentDialog.js';
@@ -1078,7 +1079,7 @@ class InteractableManager {
       const systemManager = globalThis.game?.fabricate?.getCraftingSystemManager?.();
       const system = systemManager?.getSystem?.(classification.systemId);
       const componentId = entry?.componentId;
-      const component = (system?.components ?? []).find(
+      const component = resolvedComponentsFor(system).find(
         (c) => String(c?.id ?? '') === String(componentId)
       );
       const img = component?.img;
@@ -1107,7 +1108,7 @@ class InteractableManager {
     return {
       getTool: ({ systemId, toolId }) => {
         const system = systemManager?.getSystem?.(systemId);
-        return (system?.tools ?? []).find((tool) => tool?.id === toolId) ?? null;
+        return resolvedToolsFor(system).find((tool) => tool?.id === toolId) ?? null;
       },
       getTask: ({ systemId, taskId }) => {
         const tasks = this._readLibraryTasks(systemId);

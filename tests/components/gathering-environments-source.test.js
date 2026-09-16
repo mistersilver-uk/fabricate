@@ -18,8 +18,8 @@ const responsiveViewSources = [
   ['gathering', viewSource, '220px'],
   ['crafting', read('../../src/ui/svelte/apps/crafting/CraftingView.svelte'), '220px'],
   ['alchemy', read('../../src/ui/svelte/apps/alchemy/AlchemyView.svelte'), '240px'],
-  ['journal', read('../../src/ui/svelte/apps/journal/JournalView.svelte'), '220px'],
 ];
+const journalSource = read('../../src/ui/svelte/apps/journal/JournalView.svelte');
 const listSource = read('../../src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte');
 const cardSource = read('../../src/ui/svelte/apps/gathering/EnvironmentCard.svelte');
 const cssSource = read('../../styles/fabricate.css');
@@ -118,6 +118,25 @@ describe('GatheringView 3-column layout and states', () => {
     }
   });
 
+  it('stacks Journal browse sections before detail at the shared breakpoint', () => {
+    assert.match(journalSource, /container:\s*fabricate-journal\s*\/\s*inline-size;/);
+    const marker = '@container fabricate-journal (max-width: 960px)';
+    assert.ok(journalSource.includes(marker));
+    const narrow = journalSource.slice(journalSource.indexOf(marker));
+    assert.match(narrow, /\.journal-view-grid\s*\{[^}]*grid-template-columns:\s*1fr;[^}]*height:\s*auto;/);
+    for (const wrapper of ['journal-browse', 'journal-browse-lists']) {
+      assert.match(narrow, new RegExp(`\\.${wrapper}\\s*\\{\\s*display: contents;`));
+    }
+    assert.match(narrow, /journal-list-section\)[^{]*\{[^}]*box-sizing:\s*border-box;[^}]*height:\s*360px;[^}]*min-height:\s*360px;/);
+    assert.match(narrow, /\.journal-detail-pane\s*\{[^}]*min-height:\s*220px;[^}]*overflow:\s*visible;/);
+    const positions = ['<ActiveRunsList', '<HistoryList', '<RunDetail'].map((tag) => {
+      const index = journalSource.indexOf(tag);
+      assert.ok(index >= 0, `${tag} remains rendered`);
+      return index;
+    });
+    assert.ok(positions[0] < positions[1] && positions[1] < positions[2]);
+  });
+
   it('enforces a minimum window size on the Fabricate app so the columns cannot be clipped', () => {
     // ApplicationV2 V13 has no `position.minWidth`/`minHeight` (the position
     // object is non-extensible, assigning to it throws), so the floor is enforced
@@ -139,9 +158,20 @@ describe('GatheringView 3-column layout and states', () => {
         && appSource.includes('Math.max(result.height, SvelteFabricateApp.MIN_WINDOW_HEIGHT)'),
       'the clamp should floor both width and height at the configured minimum'
     );
-    // The drag-resize floor lives on the app root in the global stylesheet.
-    assert.ok(cssSource.includes('min-width: 1024px;'), 'the app root CSS should floor the window width');
-    assert.ok(cssSource.includes('min-height: 640px;'), 'the app root CSS should floor the window height');
+    // The drag-resize floor lives on `.fabricate.fabricate-app-window` in the global stylesheet —
+    // the PLAYER-ONLY class, not the shared `.fabricate-app` area class the three canvas
+    // interactables windows adopted in issue 1520.
+    //
+    // THESE TWO CLAUSES ARE SELECTOR-BLIND AND ARE NOT THE AUTHORITATIVE FLOOR GUARD. They are
+    // bare substring reads over the whole sheet, so they pass wherever the declarations sit —
+    // including on the shared class, which is the one place they must not be, because a floor
+    // there inflates three 420-560px windows to the player window's size. The authority is the
+    // PAIR in `tests/view-lab-app-options-parity.test.js`: the declarations are on the
+    // `-window` rule AND the shared rule declares neither. What survives here is the weaker but
+    // still useful claim these clauses were written for — that the sheet floors the player
+    // window at the same two numbers the app's own constants above name.
+    assert.ok(cssSource.includes('min-width: 1024px;'), 'the sheet should floor the player window width');
+    assert.ok(cssSource.includes('min-height: 640px;'), 'the sheet should floor the player window height');
   });
 
   it('localizes the loading, error, and empty states', () => {
@@ -290,8 +320,9 @@ describe('EnvironmentCard markup contracts', () => {
       cardSource.includes('border-color: var(--fab-accent)'),
       'selected card gets an accent-coloured border outline'
     );
-    // The host rule `.fabricate-app button:focus:not(:focus-visible)` clears
-    // box-shadow on mouse-click focus, so selection must not rely on one.
+    // The host rule `.fabricate button:focus` clears box-shadow on mouse-click
+    // focus, so selection must not rely on one. (Rooted at `.fabricate-app`
+    // until issue 1501 collapsed it onto the module root.)
     assert.equal(
       cardSource.includes('box-shadow: inset 3px 0 0 var(--fab-accent)'),
       false,
@@ -367,10 +398,15 @@ describe('EnvironmentCard markup contracts', () => {
     assert.ok(cardSource.includes('gathering-env-card-event-label'), 'event chip renders a level-name label');
   });
 
-  it('uses base tokens only (no manager-only --fab-mv2-* tokens)', () => {
-    assert.equal(cardSource.includes('--fab-mv2-'), false, 'no manager-only tokens in the player card');
-    assert.equal(listSource.includes('--fab-mv2-'), false, 'no manager-only tokens in the list');
-    assert.equal(viewSource.includes('--fab-mv2-'), false, 'no manager-only tokens in the view');
+  it('uses base tokens only (no area-scoped --fab-manager-* properties)', () => {
+    // `--fab-manager-*` is the prefix for an area-scoped custom property, declared inside
+    // `.fabricate-manager`. These three files render in the PLAYER app, where such a
+    // property is out of scope: the declaration is invalid at computed-value time and the
+    // value silently falls back to inheritance (issue 1399 retargeted this from the
+    // retired manager alias generation, which no longer exists to name).
+    assert.equal(cardSource.includes('--fab-manager-'), false, 'no area-scoped properties in the player card');
+    assert.equal(listSource.includes('--fab-manager-'), false, 'no area-scoped properties in the list');
+    assert.equal(viewSource.includes('--fab-manager-'), false, 'no area-scoped properties in the view');
   });
 
   it('pins each card slot so the bottom card is not squashed by flex-shrink', () => {

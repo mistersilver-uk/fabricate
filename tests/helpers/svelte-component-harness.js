@@ -202,9 +202,172 @@ export function createSvelteCompiler(repoRoot, getTempRoot) {
 // the dependency list verbatim.
 export const SEARCHABLE_POPOVER_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/foundryBridge.js',
+  // The listbox cursor's arithmetic (issue 1503). `SearchablePopover` imports it statically, so
+  // it is in the component's closure whether or not a test presses an arrow key — and a raw
+  // module missing from a manifest is INVISIBLE to
+  // `mounted-harness-primitive-allowlist.test.js`, which quantifies over compiled COMPONENTS.
+  // The only symptom is the suite throwing in `before()` (or hanging, in a hand-rolled one).
+  'src/ui/svelte/util/listboxNavigation.js',
+  'src/ui/svelte/util/listReorderAnnouncement.js',
   'src/ui/svelte/util/iconPickerPopover.js',
+  'src/ui/svelte/util/overlayHost.js',
   'src/ui/svelte/actions/dismissOnOutsideClick.js',
-  'src/ui/svelte/actions/portal.js'
+  'src/ui/svelte/actions/portal.js',
+  'src/ui/svelte/actions/anchoredPopover.js',
+  'src/ui/svelte/util/overlayBounds.js'
+]);
+
+// The compiled `.svelte` modules `SearchablePopover` ITSELF needs when it is the component under
+// test — the three primitives it renders, plus itself. Hoisted for the same reason its raw list
+// above is, and with one addition of its own: a suite that mounts the popover directly declares
+// this list VERBATIM, so two such suites are two copies of a hand-maintained mirror, which rots
+// silently in one of them and counts as duplicated new code in both. `ManagerButton` is the
+// entry that made it worth hoisting — issue 1371 gave the popover a `triggerButton` form, and
+// a `.svelte` this tree renders but a suite omits does not fail that suite, it CANCELS it.
+//
+// Suites that mount a larger tree keep their own list: they need these plus a screen's worth of
+// components, and spreading a constant into a longer literal buys nothing.
+export const SEARCHABLE_POPOVER_COMPILED_MODULES = Object.freeze([
+  'src/ui/svelte/components/Chip.svelte',
+  'src/ui/svelte/apps/manager/EmptyState.svelte',
+  'src/ui/svelte/components/ManagerButton.svelte',
+  'src/ui/svelte/components/SearchablePopover.svelte'
+]);
+
+// THE APP'S ONE SELECT, plus `Field` (its labelled-form wrapper) and the popover closure above —
+// the whole compiled graph a `<Select>` composes (issue 1504). A converted control (a pager's
+// page-size field, a rules-sort dropdown, anything else migrated onto `<Select>`) reaches every
+// module here whether or not a test opens it, so a suite that mounts a tree with one of those
+// controls spreads this roster into its own `compiledModules` instead of copying the six paths
+// by hand. A hand-copied list is exactly what rotted silently before this constant existed: the
+// merged main's `ManagerButton` entry landed once and had to be re-added, by hand, to nine
+// already-shipped suites that each carried their own copy of this same block. As with the
+// popover roster above, a `.svelte` a suite's tree renders but its manifest omits does not fail
+// that suite — it CANCELS it, and `node --test` reports the blocked tests as `# cancelled`,
+// never `# fail`.
+//
+// Deliberately flat rather than `...SEARCHABLE_POPOVER_COMPILED_MODULES`: a suite that imports
+// only this constant and spreads it once cannot see through a SECOND level of spread — the
+// static guard in `mounted-harness-primitive-allowlist.test.js` reads an imported array's own
+// source text for quoted literals, and a nested `...NAME` inside that text is not a literal, so
+// a two-deep spread would silently under-report the popover's four modules as uncompiled. Four
+// repeated lines once, here, is cheaper than that miss in every consuming suite.
+export const SELECT_COMPILED_MODULES = Object.freeze([
+  'src/ui/svelte/components/Select.svelte',
+  'src/ui/svelte/components/Field.svelte',
+  'src/ui/svelte/components/Chip.svelte',
+  'src/ui/svelte/apps/manager/EmptyState.svelte',
+  'src/ui/svelte/components/ManagerButton.svelte',
+  'src/ui/svelte/components/SearchablePopover.svelte'
+]);
+
+// THE ONE TONE MAP the retired status pill's call sites read (issue 1506). Every screen that
+// bound a pill tone dynamically — the salvage yield rows, the bulk report's outcome table, the
+// recipe browser's row pills, the world Essence rollup, the Tool player preview and the world
+// Component catalogue's source badge — now routes that read through `statusChipTone.js`, so the
+// module is in the closure of any tree holding one of those components whether or not a test
+// exercises the tone.
+//
+// Hoisted rather than written per suite because it reaches more than two of them, which is the
+// threshold this file's other rosters record: a hand-copied manifest entry rots silently in one
+// copy and counts as duplicated new code in all of them. Flat, and one entry, so the static
+// guard in `mounted-harness-primitive-allowlist.test.js` can read the literal it quotes.
+//
+// A raw module missing from a manifest is INVISIBLE to that guard, which quantifies over
+// compiled COMPONENTS — the only symptom is the harness throwing its named "add it to
+// rawModules" error in `before()`, which cancels the suite's subtests rather than failing one.
+//
+// THE QUANTITY READINGS RIDE WITH IT (issue 1506). `QuantityTag` retired into the same chip, and
+// the readings it never owned — a count, a held-against-needed pair, a stack's `×N` — became a
+// second pure leaf beside the map. Every suite that mounts a converted crafting tree needs both,
+// and the same three-plus suites need both, so they are ONE closure rather than two rosters that
+// have to be remembered separately.
+export const STATUS_TONE_RAW_MODULES = Object.freeze([
+  'src/ui/svelte/util/statusChipTone.js',
+  'src/ui/svelte/util/craftingQuantityReading.js'
+]);
+
+// THE MARKS AND NOTICES the design-system pass of issue 1505 closed, as ONE closure. Every
+// suite whose tree reaches any of them names all four, because they compose each other and a
+// module a tree renders but a manifest omits does not fail that suite — it CANCELS it, and
+// `node --test` reports the blocked tests as `# cancelled`, never `# fail`.
+//
+// `Kicker` is the sharpest of the four: it is a LEAF TWO RUNGS DOWN on two separate routes —
+// nine crafting detail components render it directly, and `StatBox` COMPOSES it — so a tree
+// holding a Shopping list or a Books & Scrolls aside pulls a kicker in without naming one
+// anywhere. `Notice` is the shared standing statement the inventory bulk report's banner and
+// the alchemy workbench compose, and `Callout` is the manager strip the salvage banner became,
+// which made a MANAGER primitive reachable from the player app for the first time.
+//
+// Kept as one roster rather than as four hand-copied entries per suite for the reason
+// `SELECT_COMPILED_MODULES` above records: five suites carried byte-identical copies of these
+// paths and their comments, which is both the block SonarCloud's new-code duplication gate
+// counts and the shape that rots — the merged main's `ManagerButton` entry had to be re-added,
+// by hand, to nine already-shipped suites that each carried their own copy.
+export const MARKS_AND_NOTICES_COMPILED_MODULES = Object.freeze([
+  'src/ui/svelte/components/Kicker.svelte',
+  'src/ui/svelte/components/StatBox.svelte',
+  'src/ui/svelte/components/Notice.svelte',
+  'src/ui/svelte/apps/manager/Callout.svelte',
+]);
+
+// THE SHARED PRIMITIVES THE PLAYER WINDOW'S TREES RENDER, as ONE closure (issue 1514).
+//
+// It began as the GATHERING tree's roster, because three suites mount that tree —
+// `gathering-detail-mounted`, `gathering-environments-mounted` and `gathering-view-actor-bar` —
+// and all three are HAND-ROLLED rather than built on `createMountedComponentHarness`, so a
+// module the tree renders and the manifest omits is not the named "add it to compiledModules"
+// error the shared harness raises. It is `ERR_MODULE_NOT_FOUND` in `before()`, and
+// `node --test` reports the whole file as `# cancelled`, never `# fail`.
+//
+// ONE ROSTER RATHER THAN N COPIES, and the reason is measured rather than stylistic. Issue
+// 1514's first phase added the same six-line comment and its two `writeCompiledSvelte` calls to
+// each of those three suites and to `fabricate-app-root-mounted`, and SonarCloud reported
+// `new_duplicated_lines_density` at 6.8% against a 3% threshold naming exactly those four files
+// — two of them at 100% of their new lines. Sonar counts a NEW line as duplicated when it falls
+// inside a duplicated block, and these harness manifests are near-identical across suites
+// already, so every line inserted into one lands inside such a block. The fix is therefore to
+// insert FEWER lines rather than to reword them: the prose lives here once and each call site
+// is a single loop or a single spread.
+//
+// WIDENED FROM THE GATHERING TREE TO THE WINDOW at issue 1514's third phase, rather than
+// copied. That phase adopts the same primitives in the ALCHEMY and JOURNAL trees, whose five
+// suites are `createMountedComponentHarness`-based and so fail loudly — but the manifests are
+// the same near-identical block, and five more hand-listed entries across five of them is the
+// same duplicated-lines measurement in a different file set. A SECOND frozen array beside this
+// one would not have helped: SonarCloud's copy-paste detector normalises literals, so two
+// adjacent five-line arrays of component paths match each other by SHAPE whatever the strings
+// say. So there is one list, `FillBar` joins it for the Journal run card's progress track, and
+// a suite compiling a member its own tree never renders writes one inert file into a temp
+// directory — which is cheaper than the roster it would otherwise fork.
+//
+// FLAT, and one quoted literal per entry, because the static guard in
+// `mounted-harness-primitive-allowlist.test.js` resolves an imported roster by matching
+// `export const NAME = Object.freeze([ … ])` up to the FIRST `]`. A spread of another roster
+// inside this body would resolve to nothing and the guard would read these suites as compiling
+// none of it — green, and blind. That is why `Kicker`, `Notice` and `Callout` are restated here
+// rather than spread from the roster above.
+//
+// WIDENED AGAIN AT THE FOURTH PHASE, on the same rule and for the same reason. That phase gives
+// the INVENTORY tree its first `Avatar` (a source actor's portrait) and its first
+// `SegmentedControl` (the kind filter), and the three suites that mount it — `inventory-view`,
+// `inventory-view-salvage-reload` and `fabricate-app-root-mounted` — spread this roster instead
+// of naming the two paths each. Two entries in three manifests is six new lines inside blocks
+// Sonar already reads as duplicated; one spread per suite is three, and each of those three
+// REPLACES two entries the roster already carries. Neither of the newcomers is rendered by the
+// gathering, alchemy or Journal trees, and that is the same trade the paragraph above makes:
+// a suite compiling a member its own tree never renders writes one inert file into a temp
+// directory, which is cheaper than the roster it would otherwise fork.
+export const PLAYER_APP_COMPILED_MODULES = Object.freeze([
+  'src/ui/svelte/apps/manager/Callout.svelte',
+  'src/ui/svelte/apps/manager/EmptyState.svelte',
+  'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+  'src/ui/svelte/apps/PlayerViewState.svelte',
+  'src/ui/svelte/components/Avatar.svelte',
+  'src/ui/svelte/components/FillBar.svelte',
+  'src/ui/svelte/components/Kicker.svelte',
+  'src/ui/svelte/components/Medallion.svelte',
+  'src/ui/svelte/components/Notice.svelte',
 ]);
 
 // The raw `.js` modules the player Crafting tab tree needs in a mounted test.
@@ -212,8 +375,18 @@ export const SEARCHABLE_POPOVER_RAW_MODULES = Object.freeze([
 // test references one source of truth — a component referencing a `.svelte`/`.js`
 // missing from the allowlist does not fail, it HANGS (reported as `# cancelled`).
 export const CRAFTING_APP_RAW_MODULES = Object.freeze([
-  'src/ui/svelte/util/foundryBridge.js',
+  // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`,
+  // spread from the roster above rather than copied so the two cannot drift. It already
+  // carries `foundryBridge.js`, so this list does not restate it.
+  ...SEARCHABLE_POPOVER_RAW_MODULES,
   'src/ui/svelte/util/craftingImageDefaults.js',
+  // The art decision the retired `CraftingThumb` owned (issue 1506), now a pure leaf every
+  // converted tile reads. It joins this roster IN PLACE rather than as a roster of its own:
+  // the eleven suites that spread this constant are exactly the suites whose trees reach it,
+  // and a raw module a tree imports but a manifest omits HANGS the suite (# cancelled) rather
+  // than failing one test in it. It imports `craftingImageDefaults.js` alone, which is the
+  // entry directly above, so the two together close it.
+  'src/ui/svelte/util/craftingArtResolution.js',
   'src/ui/svelte/util/essenceIcons.js',
   // The essence colour fold (issue 1036). `EssencePoolPanel` spends it on the pool meters
   // so a bar reads as the same essence as the pip that filled it; the panel is already in
@@ -223,6 +396,15 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/foundryIconVocabulary.js',
   'src/ui/svelte/util/foundryIconCatalogue.js',
   'src/ui/svelte/util/craftingRecipeStatus.js',
+  // THE ONE TONE MAP (issue 1506), spread from its own roster rather than copied. The recipe
+  // browser's row and the detail header draw their status through `<Chip>` now, and the browse
+  // status vocabulary above emits `success` and `neutral`, neither of which is a chip tone under
+  // that spelling — so the map is in this tree's closure wherever that vocabulary is read.
+  ...STATUS_TONE_RAW_MODULES,
+  // Issue 1648: the authority-refusal wording `craftingStore` falls back to when a
+  // craft is refused with a `reason` and no `message`. Import-free, so one entry
+  // closes it; omitting it CANCELS every suite whose tree reaches the store.
+  'src/ui/svelte/util/journalRunReasons.js',
   'src/ui/svelte/util/ingredientOptionStatus.js',
   // The requirement rail's pure slot/consumption-plan projection (issue 917). IoTable
   // is already in the compiled graph and imports it, so omitting this HANGS every
@@ -234,6 +416,7 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   // omitting this raw dep HANGS every mounted crafting test (# cancelled). It imports
   // only foundryBridge.js (already listed above), so this single entry suffices.
   'src/ui/svelte/util/recipeDuration.js',
+  'src/systems/characterLibraries.js',
   'src/systems/CraftingListingBuilder.js',
   // Same rule, issue 1091: the browse-status vocabulary and its precedence rule moved out
   // of the builder into an import-free leaf so #1091's summary projection can share them
@@ -255,6 +438,7 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   // average this import-free leaf computes, which is also what tells it that a modifier
   // rolls at all.
   'src/utils/rollExpressionAverage.js',
+  'src/utils/rollFormulaRollability.js',
   // Issue 1095 gave it a third: `resolveActiveSalvageCheckFormula` delegates to the ONE
   // salvage `(mode, checkUsable)` derivation rather than re-deriving the pair. That module
   // imports only `craftingCheckExpression.js`, already listed, so this entry closes the
@@ -267,8 +451,9 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   'src/systems/stepRecipeView.js',
   // Same rule, issue 1075: the builder's SUMMARY phase projects each browsable recipe
   // through #1091's canonical summary, which reads held quantities from #1077's per-pass
-  // inventory snapshot. These SEVEN entries are that projection's whole transitive closure —
-  // summaryProjection -> componentCategories + inventorySnapshot, and inventorySnapshot ->
+  // inventory snapshot. These EIGHT entries are that projection's whole transitive closure —
+  // summaryProjection -> componentCategories + inventorySnapshot, componentCategories ->
+  // categoryNormalization (issue 1663, an import-free leaf), and inventorySnapshot ->
   // config/flags + itemStackQuantity -> stackQuantityPathPresets + objectPath. (Its other
   // FOUR imports — craftingImageDefaults, recipeCategories, craftingBrowseStatus and
   // stepRecipeView — are already listed above.)
@@ -282,6 +467,8 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   // happens to reach.
   'src/systems/summaryProjection.js',
   'src/utils/componentCategories.js',
+  // #1663: the ONE implementation behind both category shims; imports nothing.
+  'src/utils/categoryNormalization.js',
   'src/systems/inventorySnapshot.js',
   'src/config/flags.js',
   'src/systems/itemStackQuantity.js',
@@ -303,8 +490,10 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   'src/utils/sourceReferenceUnion.js',
   // CraftingListingBuilder imports these category helpers (issue 514); the builder
   // is already in the mounted graph, so this transitive dep must be copied too or
-  // the mounted crafting tests hang (# cancelled). recipeCategories.js has no
-  // imports of its own, so this single entry suffices.
+  // the mounted crafting tests hang (# cancelled). Since #1663 recipeCategories.js is an
+  // aliasing shim over `categoryNormalization.js` rather than an import-free leaf, so it no
+  // longer suffices on its own — the one implementation behind it is listed above, and THAT
+  // module imports nothing, so the two entries close the graph.
   'src/utils/recipeCategories.js',
   // Same rule, issue 651: the builder now derives each progressive stage's cumulative
   // "reached at >=N" threshold through this helper. Both of these are deliberately
@@ -312,6 +501,31 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   'src/utils/progressiveStageThresholds.js',
   // The player's stored stage order is reconciled against the authored list here.
   'src/utils/progressiveResultOrder.js',
+  // Same rule, issue 1286: both progressive read-models attach each stage's player
+  // complication forecast through this leaf, and `inventoryStore` marks the fired tense
+  // with its sibling export. It is a leaf but for `complicationPlan.js`, which is itself a
+  // leaf but for the frozen complication vocabularies — so these three entries close it.
+  'src/utils/progressiveStageComplications.js',
+  'src/utils/complicationPlan.js',
+  'src/utils/componentComplications.js',
+  // Same rule, issue 1370: `CraftingListingBuilder` and `inventorySnapshot` no longer read
+  // `system.components` directly. They enter through the SHARED READ SEAM, which is the one
+  // door onto the world-scope read union. These SEVEN entries are that seam's whole closure —
+  // scopedEntityReads -> componentScope + essenceScope + toolScope (+ definitionIndex, already
+  // listed above), each of those -> scopedDefinitionStore + scopedDefinitions, and
+  // scopedDefinitionStore -> worldScopeEntityGrouping, which imports nothing.
+  //
+  // The migration module is here for its LIFTED IDENTITY FIELD LIST alone: the union deletes
+  // every identity field the in-system record does not carry, and that list has exactly one
+  // definition in the tree.
+  'src/systems/scopedEntityReads.js',
+  'src/systems/componentScope.js',
+  'src/systems/essenceScope.js',
+  'src/systems/toolScope.js',
+  'src/systems/scopedDefinitionStore.js',
+  'src/utils/scalars.js',
+  'src/systems/scopedDefinitions.js',
+  'src/migration/worldScopeEntityGrouping.js',
   'src/ui/svelte/actions/dismissOnOutsideClick.js'
 ]);
 
@@ -321,14 +535,37 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
 // can be mounted from one shared list.
 export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Pagination.svelte',
+  // Select's own compiled closure (issue 1504), spread rather than copied: `Pagination`'s
+  // page-size control is a `<Select>` now, so this PLAYER-app list reaches `Select`, `Field`,
+  // `SearchablePopover`, the `ManagerButton` `SearchablePopover` renders its trigger through
+  // (issue 1371), and the `Chip`/`EmptyState` pair the popover's list renders — the same route
+  // `IconButton` below arrives by. Omitting one HANGS every mounted crafting suite (# cancelled)
+  // rather than failing it.
+  ...SELECT_COMPILED_MODULES,
+  // The manager's icon-only push-button (issue 1422). It reaches this PLAYER-app list by two
+  // independent routes, which is why it sits beside `Pagination` rather than under any one
+  // screen: `Pagination` renders its two arrows, and `ProgressiveStageList` renders
+  // `ComplicationSummaryRow`, whose delete is one. Omitting it does not fail a crafting
+  // suite — it HANGS it (# cancelled).
+  'src/ui/svelte/components/IconButton.svelte',
   // The shared numeric stepper the essence pool's per-carrier rows are built on
   // (issue 917). IoTable renders EssencePoolPanel, which renders this, so omitting it
   // HANGS every mounted crafting suite rather than failing it.
   'src/ui/svelte/components/Stepper.svelte',
-  'src/ui/svelte/apps/crafting/CraftingThumb.svelte',
-  'src/ui/svelte/apps/crafting/CraftingEssenceThumb.svelte',
-  'src/ui/svelte/apps/crafting/QuantityTag.svelte',
-  'src/ui/svelte/apps/crafting/CraftingStatusBadge.svelte',
+  // The two marks this tree reaches (issue 1505): the eyebrow nine `detail/` components render,
+  // and the figure box the Shopping list's summary cards are, which composes that eyebrow.
+  // Written flat rather than as `...MARKS_AND_NOTICES_COMPILED_MODULES` for the reason
+  // `SELECT_COMPILED_MODULES` records above — a suite spreading THIS constant into its own
+  // literal cannot see through a second level of spread — and argued once at that roster.
+  'src/ui/svelte/components/Kicker.svelte',
+  'src/ui/svelte/components/StatBox.svelte',
+  // The ONE art tile (issue 1506). It replaced `CraftingThumb` and `CraftingEssenceThumb`, which
+  // were entries here, and it joins IN PLACE for the reason they were here: the eleven suites
+  // that spread this constant render it, and ten of them never named a thumb path at all, so a
+  // roster of its own would have left ten suites HANGING (# cancelled) with nothing naming the
+  // omission. It is also a `SHARED_PRIMITIVES` member now, so an omission is the NAMED failure
+  // of `mounted-harness-primitive-allowlist.test.js` rather than a silent hang.
+  'src/ui/svelte/components/Medallion.svelte',
   'src/ui/svelte/apps/crafting/RecipeListRow.svelte',
   'src/ui/svelte/apps/crafting/RecipeBrowser.svelte',
   'src/ui/svelte/apps/crafting/CraftButton.svelte',
@@ -362,10 +599,84 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   // renders this, so omitting it HANGS every mounted crafting test (# cancelled), not
   // just the stage-list one.
   'src/ui/svelte/apps/crafting/detail/ProgressiveStageList.svelte',
+  // The per-stage complication band (issue 1286). `ProgressiveStageList` — already listed
+  // directly above — renders the shared `ComplicationSummaryRow`, which renders `Chip` (already
+  // in this list via the `SELECT_COMPILED_MODULES` spread above) and imports `RowDisclosure`, an
+  // import-free leaf. Omitting either HANGS every mounted crafting suite (# cancelled) rather
+  // than failing one.
+  'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
+  'src/ui/svelte/components/RowDisclosure.svelte',
   'src/ui/svelte/apps/crafting/RecipeDetail.svelte',
   'src/ui/svelte/apps/crafting/ShoppingList.svelte',
   'src/ui/svelte/apps/crafting/RunSummaryPanel.svelte',
   'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte',
+  // The ONE not-yet-ready chrome the five player views draw (issue 1514). `CraftingView` below
+  // renders the composition, so this roster is where the crafting suites acquire it. Its error
+  // branch composes `Notice`, which this list already carries flat a few lines down; `Callout`
+  // is kept beside it because the crafting tree still reaches that strip through the recipe
+  // detail's own panels. Omitting either does not fail a crafting suite: it CANCELS it.
+  'src/ui/svelte/apps/manager/Callout.svelte',
+  'src/ui/svelte/apps/PlayerViewState.svelte',
+  // The four the Crafting tab reaches as of issue 1514's crafting phase, each written FLAT for
+  // the reason `SELECT_COMPILED_MODULES` records above — the static guard in
+  // `mounted-harness-primitive-allowlist.test.js` reads this array's own source text for quoted
+  // literals, and a nested `...NAME` is not one. `Avatar` is the component-sources bar's two
+  // actor portraits; `Notice` is the detail header's blocking well; `FillBar` is the essence
+  // pool's per-essence meter; `EmptyState` is four pane empties, the shopping planner's panel
+  // and `RecipeDetail`'s no-selection pane.
+  //
+  // WHAT AN OMISSION COSTS HERE, MEASURED RATHER THAN ASSUMED, because the obvious sentence is
+  // wrong twice over. Dropping `Avatar` from this array leaves
+  // `mounted-harness-primitive-allowlist.test.js` GREEN — so `SHARED_PRIMITIVES` membership is
+  // NOT what makes the omission loud.
+  //
+  // THE REASON IT STAYS GREEN IS NOT AN EXEMPTION, and the sentence here used to say it was.
+  // That guard's naming clause exempts nothing: it inspects every suite mentioning
+  // `writeCompiledSvelte` or `compiledModules`, which every `createMountedComponentHarness`
+  // caller does. What it cannot READ is this roster's call shape. Its region matcher requires
+  // an inline array written out in place after `compiledModules:`, an opening bracket it can
+  // scan to a closing one, and the crafting suites pass the bare identifier
+  // `compiledModules: CRAFTING_APP_COMPILED_MODULES`, so it resolves no path for them, holds
+  // over an empty set and reports clean whatever they render. That is the same silent-vacuity
+  // shape the guard's own `BARE_LOOP_COMPILE` note records for compile LOOPS, and its vacuity
+  // ratchet cannot catch this instance because that ratchet skips
+  // `createMountedComponentHarness` suites by name — an exemption that sits on the RATCHET
+  // alone, never on the naming guard above it.
+  //
+  // NO BRACKET CHARACTER MAY APPEAR ANYWHERE IN THIS ARRAY'S COMMENTS, and that is a property
+  // of where the comment SITS rather than of the prose it carries. `importedArraysOf` in that
+  // same guard captures a roster body with a negated character class that stops at the FIRST
+  // closing bracket it meets, and a comment inside this array is inside that body — so an
+  // earlier draft of this very paragraph, which quoted the matcher's required shape literally,
+  // truncated the capture and silently dropped the last five entries below. Measured across
+  // refs: 35 of 35 own literals resolved on `origin/main`, 41 of 41 at `fda0e84f6`, and 36 of
+  // 41 once that draft landed — the losses being `EmptyState`, `Avatar`, `FillBar`, `Notice`
+  // and `CraftingView`, four of them the shared primitives that guard exists to police. It is
+  // a comment read AS code by a parser, which is the inverse of the scan-whose-haystack-holds
+  // -prose defect this file records elsewhere. Latent while no suite spreads this roster into a
+  // readable array and ARMED the moment one does, which is the repair the paragraph above
+  // recommends. `mounted-harness-primitive-allowlist.test.js` now holds a test that reds when
+  // any exported roster in this file stops resolving whole through that reader.
+  //
+  // RECORDED RATHER THAN FIXED: teaching the region matcher the bare-identifier form is not one
+  // change. Measured on a scratch copy of the guard, it reds 10 suites reporting 9 missing
+  // primitives each, and NONE of those 9 are pre-existing coverage gaps — they are artifacts of
+  // two FURTHER limits in the same parser, the capture truncation above and the absence of
+  // recursive spread expansion. Repairing both moves it to 23 suites, whose remainder is still
+  // un-expanded two-level nesting. So the parser repair is three changes, not one. The sentence
+  // this replaces said it "reds 18 suites on pre-existing gaps", which asserted an unverified
+  // cause as a measurement — the same failure the SEVEN/EIGHT correction in this commit spends
+  // twenty lines undoing. What makes an omission loud is
+  // this harness's own up-front `validateMountedComponentDependencies`, which names the
+  // importer, the missing module and this list. And the shape of that failure is not `# fail`:
+  // measured, `crafting-view-mounted` reports `not ok 1 - CraftingView mounted behavior` with
+  // the named message, `# fail 0` and `# cancelled 14`, because a throw from a `describe` body
+  // escapes the failure count. That is why the acceptance bar for this change is an unanchored
+  // grep for `not ok` and a `# cancelled 0`, not the summary line.
+  'src/ui/svelte/apps/manager/EmptyState.svelte',
+  'src/ui/svelte/components/Avatar.svelte',
+  'src/ui/svelte/components/FillBar.svelte',
+  'src/ui/svelte/components/Notice.svelte',
   'src/ui/svelte/apps/crafting/CraftingView.svelte'
 ]);
 
@@ -383,9 +694,11 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
  * @param {string[]} [args.rawModules]  repo-relative `.js` modules copied verbatim
  * @param {string[]} [args.compiledModules] repo-relative `.svelte` modules to compile
  * @param {string} args.componentPath   repo-relative `.svelte` of the component under test
+ * @param {string} [args.rootClass]     application root class the mount target carries, for a
+ *   component whose production host is not the manager (see `mount()` below)
  * @returns {{ setup: () => Promise<void>, teardown: () => void, mount: (props?: object) => Promise<HTMLElement>, setProps: (props: object) => Promise<HTMLElement>, remount: () => void, readonly target: HTMLElement|null }}
  */
-export function createMountedComponentHarness({ repoRoot, tmpPrefix, rawModules = [], compiledModules = [], runeModules = [], componentPath }) {
+export function createMountedComponentHarness({ repoRoot, tmpPrefix, rawModules = [], compiledModules = [], runeModules = [], componentPath, rootClass = 'fabricate-manager' }) {
   let tempRoot = null;
   let mounted = null;
   let target = null;
@@ -430,6 +743,27 @@ export function createMountedComponentHarness({ repoRoot, tmpPrefix, rawModules 
       // synchronously from hundreds of places.
       await new Promise((resolve) => setImmediate(resolve));
       target = document.createElement('div');
+      // THE MOUNT TARGET IS AN APPLICATION ROOT (issue 1466).
+      //
+      // A component that portals an overlay resolves its host by walking up to the nearest
+      // Fabricate application root (`src/ui/svelte/util/overlayHost.js`), because a panel has to
+      // escape its own scrolling, clipping container to be seen. Mounted into a bare `<div>` a
+      // picker is somewhere no production mount of it has ever been — outside every application —
+      // and its panel lands on `<body>`, out of reach of every `target.querySelector` in the suite.
+      //
+      // The class is not a convenience: it is the root the component under test is mounted inside
+      // in production, and before this the fixtures were quietly asserting against a portal that
+      // had FAILED, which is the very defect issue 1466 removed.
+      //
+      // `fabricate-manager` is the DEFAULT rather than the only answer, and issue 1475 is why.
+      // When this was written every component that portalled was reachable only from the
+      // crafting-system manager, measured by walking the import graph from all seven application
+      // roots. `ActorSelectTopBar` converting its picker onto `SearchablePopover` ends that: it is
+      // reachable only from the PLAYER window, whose root is `fabricate-app`, and both roots are
+      // in `OVERLAY_HOST_ROOT_CLASSES`. A suite that mounted it under `fabricate-manager` would
+      // resolve a host no production mount of it can reach, which is the same class of untruth
+      // this comment was added to remove. Pass `rootClass` to state the real one.
+      target.className = rootClass;
       document.body.appendChild(target);
       mounted = createClassComponent({ component: Component, target, props });
       flushSync();

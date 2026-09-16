@@ -34,6 +34,81 @@ export const SETTING_KEYS = Object.freeze({
   // cannot meaningfully disagree about where a party is standing. Each crafting system keeps
   // only `gatheringRealmSettings.enabled`, which decides whether it PARTICIPATES.
   TRAVEL_CONFIG: 'travelConfig',
+  // Issue 1308: the world-scoped character libraries — the character-prerequisite library and
+  // the modifier library, as `{ characterPrerequisites: [], modifiers: [] }`. They are world
+  // scope because both resolve against the acting CHARACTER rather than against any one
+  // crafting system, so three crafting systems used to mean three copies of the same
+  // "Medicine proficiency at least 1" and three copies of the same `@abilities.med.mod`.
+  // Unlike currency and travel, NO per-system participation flag remains: an unreferenced
+  // entry already costs nothing, so there is no meaningful "off" state to model.
+  //
+  // ONE key for TWO independent libraries, and that is a persistence decision rather than a
+  // modelling one. They share no key, no reference, no invariant and no reader; the key is
+  // shared only so a fourth near-identical persistence shell is not written beside
+  // `CurrencyConfigStore` and `GatheringRealmStore`. Splitting it later would be a pure
+  // persistence change. The cost, accepted knowingly: a write to either library rewrites both,
+  // so two GMs editing DIFFERENT libraries can clobber each other where two keys would not.
+  CHARACTER_LIBRARIES: 'characterLibraries',
+  // Issue 1359 (epic 1357): the three WORLD-SCOPE entity definition settings — the World
+  // Component, World Essence and World Tool rosters, their world defaults, and the
+  // per-`(entity, system)` membership records. Each carries `{ entities, defaults, membership }`;
+  // `toolScope` carries the WORLD tool-breakage authority beside them, and nothing else does.
+  //
+  // THREE KEYS RATHER THAN ONE, and the reason is SEEDEDNESS INDEPENDENCE rather than write
+  // amplification — the counter-case to `CHARACTER_LIBRARIES` above, which shares one key for two
+  // libraries. `isSeeded()` is what makes a destructive prune decidable, and on a shared key it
+  // cannot be honest per entity type: a store writes the whole object, so one entity type's first
+  // write persists the others as EMPTY and converts UNKNOWN bases into real, empty, PRUNABLE ones
+  // in a single keystroke. Across three entity types whose references reach recipe ingredients,
+  // results, salvage, gathering drop rows, tool links and essence source components, that is not
+  // survivable. The accepted cost, stated as `CHARACTER_LIBRARIES` states its own: three keys are
+  // three non-atomic writes, so a partially-migrated corpus becomes observable — which is fine,
+  // because each entity type's union read and Valid Id Basis are independently valid in every
+  // interleaving.
+  //
+  // ADDITIVE UNTIL THE MIGRATION. Nothing writes these yet, so every world reads the registered
+  // default and `## CraftingSystem`'s `components` / `essenceDefinitions` / `tools` stay live and
+  // authoritative.
+  COMPONENT_SCOPE: 'componentScope',
+  ESSENCE_SCOPE: 'essenceScope',
+  TOOL_SCOPE: 'toolScope',
+  // Issue 1392 (epic 1357, PR 7a): the WORLD VOCABULARY — component categories, component tags
+  // and recipe categories, authored once for the world instead of once per crafting system.
+  //
+  // A FOURTH WORLD KEY, NOT A FOURTH SCOPED-ENTITY LAYER. `## Scoped Entity Definitions`
+  // requirement 12 states the World Vocabulary is a separate concern, so it is deliberately
+  // absent from that requirement's three-key table and is modelled by `## World Vocabulary` in
+  // `data-models`. It holds VALUES the scoped entities draw from — it has no entity roster, no
+  // world defaults and no membership records.
+  //
+  // ONE KEY FOR THREE VOCABULARIES, which is the OPPOSITE of the three-key decision above, and
+  // the reason is that the hazard those three keys exist to avoid does not arise here. That
+  // hazard is a shared key making `isSeeded()` dishonest per entity type and arming a
+  // DESTRUCTIVE prune. This key arms none: `CraftingSystemManager._vocabularyBasis` deliberately
+  // does not consult it (`## World Vocabulary` requirement 6), and `WorldVocabularyStore` keeps
+  // seededness honest anyway by OMITTING a kind that has never been written from the payload it
+  // persists, so key absence per kind survives a round trip.
+  //
+  // `type: Object` and NOT a `DataModel`, and that is load-bearing rather than conventional.
+  // Foundry 14.365 applies no schema to a plain-constructor type — `ClientSettings##cleanJSON`
+  // hands the value straight to `JSON.stringify` into the `Setting` document's `JSONField` — so
+  // an absent sub-key stays absent on disk. A `DataModel`-typed setting would run `fromSource`
+  // and fill every declared key back in, which is exactly what the store must not have.
+  WORLD_VOCABULARY: 'worldVocabulary',
+  // Issue 1363 (epic 1357, PR 3): the `1.30.0` migration's DURABLE DECISION RECORD — the
+  // per-system `{ components: {oldId: newId}, tools: {...} }` re-key map, written as the FIRST
+  // writeback leg so a torn pass is recoverable whichever later legs landed. It is TRANSIENT:
+  // the one-shot `ready` pass that restamps owned-Item identity flags consumes it and clears
+  // it. It carries no essence leg — `REKEYABLE_ENTITY_TYPES` is `['components', 'tools']` — and the
+  // `1.34.0` merge re-keys essence ids under `WORLD_ESSENCE_MERGE_MAP` below instead (issue 1654).
+  WORLD_SCOPE_REKEY_MAP: 'worldScopeRekeyMap',
+  // Issue 1654: the `1.34.0` equivalent-essence merge's durable decision record, written as the
+  // second writeback leg (after `worldScopeRekeyMap`, before `recipes`) so a torn pass is
+  // recoverable. Shape `{systems: {[systemId]: {essences: {loserId: survivorId}}}, retired: {...}}`,
+  // one lifetime per leg: the one-shot `ready` remap clears the transient `systems`, while
+  // `retired` is never cleared, because `mintEssenceId` would otherwise reissue a retired id. The
+  // legs nest so a crafting system whose id is literally `retired` cannot collide with that key.
+  WORLD_ESSENCE_MERGE_MAP: 'worldEssenceMergeMap',
   GATHERING_ENVIRONMENTS: 'gatheringEnvironments',
   GATHERING_CONFIG: 'gatheringConfig',
   GATHERING_PARTIES: 'gatheringParties',
@@ -51,6 +126,7 @@ export const SETTING_KEYS = Object.freeze({
   MANAGER_RAIL_COLLAPSED: 'managerRailCollapsed',
   GATHERING_HIDE_UNAVAILABLE: 'gatheringHideUnavailableEnvironments',
   PROGRESSIVE_RESULT_ORDER: 'progressiveResultOrder',
+  JOURNAL_RUN_DISMISSALS: 'journalRunDismissals',
   MIGRATION_VERSION: 'migrationVersion',
   FAVOURITE_RECIPES: 'favouriteRecipes',
   LAST_ALCHEMY_SYSTEM: 'lastAlchemySystem',
@@ -75,6 +151,18 @@ export const SETTING_KEYS = Object.freeze({
   // resolve to a component by name ONLY. Bumped past `OWNED_ITEM_COMPONENT_STAMP_TARGET`
   // once the pass has run so it never repeats.
   OWNED_ITEM_COMPONENT_STAMP_VERSION: 'ownedItemComponentStampVersion',
+  // Issue 1363 (epic 1357, PR 3): version stamp for the one-shot active-GM pass that remaps the
+  // durable identity flags the `1.30.0` re-key invalidates. A NUMBER, deliberately, and not a
+  // semver string: the gate is a numeric `>=` and `MigrationRunner.compareSemver` is not on this
+  // path. It gates whether the pass RUNS; whether the pass may DESTROY the re-key map is gated
+  // separately on `migrationVersion`, because a `ready`-body one-shot runs even when the
+  // migration pass DEFERRED.
+  WORLD_SCOPE_IDENTITY_FLAG_VERSION: 'worldScopeIdentityFlagVersion',
+  // Issue 1654: version stamp for the one-shot active-GM pass that remaps the durable identity
+  // flags the `1.34.0` essence merge invalidates. Separate from its `1.30.0` sibling above, because
+  // a world can have consumed one decision record while still owing the other. It gates whether the
+  // pass runs; whether the pass may destroy the map's transient leg is gated on `migrationVersion`.
+  WORLD_ESSENCE_MERGE_FLAG_VERSION: 'worldEssenceMergeFlagVersion',
   // Issue 1024: the ADDITIONAL actor types a GM designates as player characters.
   // `'character'` is unioned in by `resolvePlayerCharacterTypes` and is never stored
   // here, so an existing dnd5e/pf2e world is unaffected by the default `[]`. Edited
@@ -97,19 +185,40 @@ export const RECIPE_ITEM_FLAG_STAMP_TARGET = 2;
 
 // The target version for the one-shot component flag auto-stamp (issue 556). When the
 // stored `COMPONENT_FLAG_STAMP_VERSION` is below this, the primary GM runs the backfill
-// once on `ready` and writes this value back.
-export const COMPONENT_FLAG_STAMP_TARGET = 1;
+// once on `ready` and writes this value back. Bumped 1 -> 2 by issue 1363: the `1.30.0`
+// world-scope migration RE-KEYS component ids, so every source Item stamped at v1 carries a
+// `roles[systemId].componentId` naming a retired id. The source-side writer overwrites when
+// the stored value differs, so re-running the stamp is what repairs the SOURCE half; the
+// OWNED half is the separate `remapWorldScopeIdentityFlags` pass, because the shipped
+// owned-item restamp returns early for any item that already carries a durable identity flag
+// — precisely the population the re-key invalidates.
+export const COMPONENT_FLAG_STAMP_TARGET = 2;
 
 // The target version for the one-shot tool flag auto-stamp (issue 561). When the stored
 // `TOOL_FLAG_STAMP_VERSION` is below this, the primary GM runs the backfill once on `ready`
 // (AFTER the 1.15.0 settings-data migration populates tool source refs) and writes it back.
-export const TOOL_FLAG_STAMP_TARGET = 1;
+// Bumped 1 -> 2 by issue 1363, for the reason `COMPONENT_FLAG_STAMP_TARGET` states: `1.30.0`
+// re-keys tool ids too.
+export const TOOL_FLAG_STAMP_TARGET = 2;
 
 // The target version for the one-shot owned-item component re-stamp (issue 600, #540 Phase
 // 2). When the stored `OWNED_ITEM_COMPONENT_STAMP_VERSION` is below this, the active GM runs
 // the name-fallback back-fill once on `ready` (AFTER the source-side component auto-stamp)
 // and writes this value back.
 export const OWNED_ITEM_COMPONENT_STAMP_TARGET = 1;
+
+// The target version for the one-shot world-scope identity-flag remap (issue 1363, epic 1357).
+// When the stored `WORLD_SCOPE_IDENTITY_FLAG_VERSION` is below this AND the world scope corpus is
+// seeded, the active GM runs the remap once on `ready` and writes this value back — UNLESS it
+// withheld the re-key map clear, in which case it withholds this advance too, so the pass genuinely
+// re-runs on a later boot rather than orphaning the map forever.
+export const WORLD_SCOPE_IDENTITY_FLAG_TARGET = 1;
+
+// The target version for the one-shot essence-merge identity-flag remap (issue 1654). When the
+// stored `WORLD_ESSENCE_MERGE_FLAG_VERSION` is below this, the active GM runs the remap once on
+// `ready` and writes this value back — unless it withheld the merge-map clear, in which case it
+// withholds this advance too, so the pass re-runs on a later boot rather than orphaning the map.
+export const WORLD_ESSENCE_MERGE_FLAG_TARGET = 1;
 
 const BASE_DEFINITIONS = Object.freeze({
   [SETTING_KEYS.RECIPES]: {
@@ -135,6 +244,67 @@ const BASE_DEFINITIONS = Object.freeze({
   },
   [SETTING_KEYS.TRAVEL_CONFIG]: {
     name: 'Travel Configuration',
+    scope: 'world',
+    config: false,
+    type: Object,
+    default: {},
+  },
+  [SETTING_KEYS.CHARACTER_LIBRARIES]: {
+    name: 'Character Libraries',
+    scope: 'world',
+    config: false,
+    type: Object,
+    default: {},
+  },
+  // Issue 1359. `scope: 'world'` here is what admits each key to the DERIVED
+  // `WORLD_SCOPED_SETTING_KEYS` below — that set is filtered out of these definitions precisely so
+  // it cannot drift, so nothing restates these three there.
+  [SETTING_KEYS.COMPONENT_SCOPE]: {
+    name: 'World Component Scope',
+    scope: 'world',
+    config: false,
+    type: Object,
+    default: {},
+  },
+  [SETTING_KEYS.ESSENCE_SCOPE]: {
+    name: 'World Essence Scope',
+    scope: 'world',
+    config: false,
+    type: Object,
+    default: {},
+  },
+  [SETTING_KEYS.TOOL_SCOPE]: {
+    name: 'World Tool Scope',
+    scope: 'world',
+    config: false,
+    type: Object,
+    default: {},
+  },
+  // Issue 1392 (epic 1357, PR 7a). `scope: 'world'` admits it to the DERIVED
+  // `WORLD_SCOPED_SETTING_KEYS` below exactly as the three above, so nothing restates it there.
+  [SETTING_KEYS.WORLD_VOCABULARY]: {
+    name: 'World Vocabulary',
+    scope: 'world',
+    config: false,
+    type: Object,
+    default: {},
+  },
+  // Issue 1363. TRANSIENT: written as the FIRST leg of the `1.30.0` migration's writeback and
+  // cleared by the one-shot `ready` pass that consumes it. `scope: 'world'` because it is the
+  // decision record of a world-scope migration and every client must see the same one.
+  [SETTING_KEYS.WORLD_SCOPE_REKEY_MAP]: {
+    name: 'World Scope Re-key Map',
+    scope: 'world',
+    config: false,
+    type: Object,
+    default: {},
+  },
+  // Issue 1654. Part-transient: the one-shot `ready` pass clears the per-system re-key legs and
+  // leaves the `retired` tombstone in place forever. `scope: 'world'` because the Manager's
+  // essence-id minter reads it on every client. Registered here because `game.settings.get` throws
+  // on an unregistered key.
+  [SETTING_KEYS.WORLD_ESSENCE_MERGE_MAP]: {
+    name: 'World Essence Merge Map',
     scope: 'world',
     config: false,
     type: Object,
@@ -270,6 +440,15 @@ const BASE_DEFINITIONS = Object.freeze({
     type: Object,
     default: {},
   },
+  [SETTING_KEYS.JOURNAL_RUN_DISMISSALS]: {
+    name: 'Journal Run Dismissals',
+    // Terminal-run hiding follows this user across their clients in this world. The actor
+    // history remains untouched; this setting contains only bounded composite identity keys.
+    scope: 'user',
+    config: false,
+    type: Object,
+    default: {},
+  },
   [SETTING_KEYS.MIGRATION_VERSION]: {
     name: 'Migration Version',
     scope: 'world',
@@ -314,6 +493,20 @@ const BASE_DEFINITIONS = Object.freeze({
   },
   [SETTING_KEYS.OWNED_ITEM_COMPONENT_STAMP_VERSION]: {
     name: 'Owned Item Component Stamp Version',
+    scope: 'world',
+    config: false,
+    type: Number,
+    default: 0,
+  },
+  [SETTING_KEYS.WORLD_SCOPE_IDENTITY_FLAG_VERSION]: {
+    name: 'World Scope Identity Flag Version',
+    scope: 'world',
+    config: false,
+    type: Number,
+    default: 0,
+  },
+  [SETTING_KEYS.WORLD_ESSENCE_MERGE_FLAG_VERSION]: {
+    name: 'World Essence Merge Flag Version',
     scope: 'world',
     config: false,
     type: Number,

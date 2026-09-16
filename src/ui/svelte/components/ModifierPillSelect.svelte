@@ -1,65 +1,74 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  A dropdown-plus-cancellable-pills multi-select (issue 770). Selected entries render
-  as removable chips; a menu button opens a listbox of the still-unselected options.
-  Mirrors the gathering availability widget's markup so it inherits the shared
-  `manager-availability-*` styling for free (see GatheringEventEditView). Extracted as a
-  reusable leaf so the check-modifier "default set" (Checks tab) and a recipe's
-  "eligible modifiers" override (Recipe Overview tab) share one control instead of two
-  near-identical checkbox lists.
+  A dropdown-plus-cancellable-pills multi-select: selected entries render as removable chips, and a
+  menu button opens a `SearchablePopover` listbox of the still-unselected options. CONTROLLED — it
+  renders `options`/`selectedIds` and emits one `onToggle(id, nextSelected)`; the parent owns the
+  resulting set write.
 
-  Controlled: it renders `options`/`selectedIds` and emits a single toggle via
-  `onToggle(id, nextSelected)`; the parent owns the resulting set write.
+  Props:
+  | prop | values | default | contract |
+  | --- | --- | --- | --- |
+  | `options` / `selectedIds` | arrays | `[]` | The vocabulary and the current selection. |
+  | `onToggle(id, nextSelected)` | function | no-op | One toggle per gesture. |
+  | `disabled` | boolean | `false` | The whole control off. |
+  | `addDisabled` | boolean | `false` | Disables the ADD path ALONE, leaving every pill removable. Distinct from `disabled`: a selection that has hit its cap must stay editable in the one direction that can un-hit it, so a caller reaching for `disabled` here would strand the GM at the cap with no way down. The caller states WHY through `describedBy`; this leaf authors no copy. |
+  | `menuLabel` / `emptyMenuLabel` / `placeholder` | pre-localized strings | `''` | The closed menu button's label, the note shown when every option is selected, and the empty pill-row text. |
+  | `labelledBy` | element id | `''` | The caller's own label element. The control is a GROUP of controls rather than a labelled field, so it takes `role="group"` + `aria-labelledby` rather than a `<label for>`: the menu button and every pill remove button are separate focus stops that would otherwise be announced with no shared context. The label stays at the CALL SITE because its position differs per surface. |
+  | `describedBy` | element id | `''` | A caller-owned element describing a CONSTRAINT on the group — the pick cap. It goes on the GROUP rather than on the menu button, because a `disabled` button is skipped by several screen readers' tab order, so a description hung off it is exactly what a capped user would never hear. |
+  | `dataAttr` | attribute name | `''` | A test hook on the outer element. |
+
+  Invariants:
+  - THE AT-CAP STATE IS `aria-disabled`, NOT THE `disabled` ATTRIBUTE, and the second reason is a
+    real defect rather than a preference. (1) A `disabled` button is removed from the tab order by
+    several screen readers, so a capped user tabs straight past the only control that explains the
+    cap. (2) The post-removal focus fallback targets this button when the removed pill has no
+    surviving neighbour — at a cap of 1, every removal — and `focus()` on a disabled button
+    silently no-ops and drops the keyboard user to `<body>`. The trade is that `aria-disabled`
+    does not suppress the click, so `SearchablePopover`'s `triggerAriaDisabled` does.
+  - THE LIVE REGION IS THIS SUMMARY ALONE, NEVER THE PILL ROW. Neither gesture moves focus into the
+    row, but a region wrapped AROUND the pills announces each added pill's whole subtree, its
+    remove button's label included, and NOTHING AT ALL on a removal, because `aria-relevant`
+    defaults to `additions text` and removing a keyed `{#each}` child is excluded outright. A text
+    node that default already covers is the fix, and it says NAMES as well as a count, because "3
+    selected" does not tell a non-sighted GM WHICH three.
+  - `data-keyboard-focus="true"` IS WRITTEN ON THE PILL REMOVE BUTTON, on the same side of the
+    attribute list as its `class` and BEFORE any spread: a spread landing later would win, so a
+    caller's `data-*` bag could unset it by accident. That button is outside a `<form>`, so while
+    it holds focus Foundry's Space/arrow/Tab bindings stop firing — the intended behaviour change.
+    The MENU button is `SearchablePopover`'s trigger and declares the attribute there.
+  - FOCUS DIES WITH THE REMOVED PILL and would drop to `<body>`, so it is moved BEFORE emitting:
+    next pill, then the previous one, then the menu button, which always exists. That button is
+    found by HOOK rather than `bind:this`, because it is `SearchablePopover`'s element and
+    `bind:this` on a component tag binds the INSTANCE.
+  - THE FAMILY IS ROOTED AT `fabricate-pill-select`, which rides on the `<Field>` this component
+    renders, so that one element carries `fabricate-field` and `fabricate-pill-select` together —
+    exactly as `RadioCardGroup`'s fieldset carries `fabricate-field` and `fabricate-option-cards`.
 -->
 <script>
-  import { dismissOnOutsideClick } from '../actions/dismissOnOutsideClick.js';
+  import Field from './Field.svelte';
+  import SearchablePopover from './SearchablePopover.svelte';
   import { formatList, localize } from '../util/foundryBridge.js';
 
   let {
     options = [],
     selectedIds = [],
     disabled = false,
-    // Disables the ADD path alone, leaving every pill removable (issue 1055). Distinct
-    // from `disabled`, which turns the whole control off: a selection that has hit its
-    // cap must stay editable in the one direction that can un-hit it, so a caller that
-    // reached for `disabled` here would strand the GM at the cap with no way down. The
-    // caller states WHY through `describedBy`; this leaf authors no copy.
     addDisabled = false,
-    // Label on the closed menu button (e.g. "Add modifier").
     menuLabel = '',
-    // Shown inside the open menu when every option is already selected.
     allSelectedLabel = '',
-    // Placeholder pill-row text when nothing is selected.
     noneSelectedLabel = '',
-    // A test hook mapped onto the outer element (`data-modifier-pill-select`).
     testId = '',
-    // The id of the caller's own label element (issue 1055). The control is a group of
-    // controls, not a labelled field, so it takes `role="group"` + `aria-labelledby`
-    // rather than a `<label for>`: the menu button and every pill remove button are
-    // separate focus stops that would otherwise be announced with no shared context.
-    // The label stays at the CALL SITE because its position differs — the Overview cell
-    // puts a micro-label above a tri-state select, the Checks card an `<h4>` above the
-    // whole default-set block — and only its id is needed here.
     labelledBy = '',
-    // The id of a caller-owned element describing a CONSTRAINT on the group — the pick
-    // cap, in the recipe editor. It goes on the group rather than on the menu button
-    // because a `disabled` button is skipped by several screen readers' tab order, so a
-    // description hung off it is exactly the thing a capped user would never hear.
     describedBy = '',
     onToggle = () => {},
   } = $props();
 
   let open = $state(false);
-  let menuButton = $state(null);
 
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
   }
 
-  // `text`'s interpolating sibling, with the same fallback contract: the fallback carries
-  // the same `{name}` placeholders so an unlocalized build reads identically rather than
-  // printing a raw brace.
   function format(key, fallback, data) {
     const translated = localize(key, data);
     if (translated && translated !== key) return translated;
@@ -78,20 +87,6 @@
     );
   }
 
-  // The live region's whole content, restated on every change to either axis.
-  //
-  // `aria-live` used to sit on the pill row itself, which announced almost nothing:
-  // `aria-relevant` defaults to `additions text`, so REMOVING a keyed `{#each}` child is
-  // excluded outright and only emptying the row announced at all — incidentally, via the
-  // `{:else}` placeholder's text node. Adding announced the whole new pill subtree,
-  // including the remove button's own label, so a pick read as "Medicine, Remove
-  // Medicine". `aria-relevant="removals"` is not the fix (support for it is unreliable
-  // and it would still re-read pill chrome); a text node the default `additions text`
-  // already covers is, and it can say something worth hearing.
-  //
-  // Names as well as a count, through the active language's list conventions —
-  // "Medicine, Alchemy and Herbalism" is a language rule, not a separator — because "3
-  // selected" does not tell a non-sighted GM WHICH three the pill row now shows.
   const selectionSummary = $derived.by(() => {
     if (selectedOptions.length === 0) {
       return (
@@ -114,39 +109,37 @@
     );
   });
 
-  // `aria-disabled`, NOT the `disabled` attribute, for the at-cap state. Two reasons, and
-  // the second is a real defect rather than a preference:
-  //
-  //  1. A `disabled` button is removed from the tab order by several screen readers, so a
-  //     capped user would tab straight past the only control that explains the cap.
-  //  2. `focusAfterRemoval` falls back to this button when the removed pill has no
-  //     surviving neighbour. At a cap of 1 that is EVERY removal — and a `disabled`
-  //     button cannot take focus, so `focus()` would silently no-op and drop the keyboard
-  //     user to `<body>`, which is precisely the regression that fallback exists to
-  //     prevent. Staying focusable keeps the landing spot real.
-  //
-  // The trade is that `aria-disabled` does not suppress the click, so the handler must.
-  function openMenu() {
-    if (addDisabled) return;
-    open = !open;
-  }
+  // The trigger's visible text AND the popover's accessible name. `menuLabel` alone is usable for
+  // neither: it is optional, and an empty `aria-label` is dropped by Svelte, leaving a
+  // `role="listbox"` with no accessible name at all.
+  const menuButtonLabel = $derived(
+    menuLabel || text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPillAdd', 'Add modifier')
+  );
+
+  // The still-unselected options, shaped for `SearchablePopover`. `data` carries the row hook
+  // VERBATIM rather than folding it into the primitive's own `dataId`, because four mounted
+  // suites address a row by that exact attribute.
+  const menuOptions = $derived(
+    availableOptions.map((option) => ({
+      id: option.id,
+      label: optionLabel(option),
+      icon: option.icon || 'fa-solid fa-dice-d20',
+      data: { 'data-modifier-pill-option': option.id },
+    }))
+  );
 
   function add(id) {
     onToggle(id, true);
     open = false;
   }
 
-  // Focus dies with the removed pill and drops to `<body>`, stranding a keyboard user at
-  // the top of the document with no way back to the control they were operating. Move it
-  // BEFORE emitting: every candidate below is a node that exists right now and survives
-  // the update (the `{#each}` is keyed), so there is no re-render to wait on and no
-  // ordering question. Next pill first, then the previous one — removing the LAST pill of
-  // several has no "next", and jumping to the menu button while pills remain reads as
-  // being thrown out of the row — and the menu button, which always exists, last.
   function focusAfterRemoval(button) {
     const pill = button?.closest?.('[data-modifier-pill]');
     const neighbour = pill?.nextElementSibling || pill?.previousElementSibling || null;
-    const target = neighbour?.querySelector?.('[data-modifier-pill-remove]') || menuButton;
+    const group = pill?.closest?.('.manager-availability-multi');
+    const target =
+      neighbour?.querySelector?.('[data-modifier-pill-remove]') ||
+      group?.querySelector?.('[data-modifier-pill-menu-button]');
     target?.focus?.();
   }
 
@@ -156,60 +149,36 @@
   }
 </script>
 
-<div
-  class="manager-field manager-availability-multi"
+<Field
+  as="div"
+  class="fabricate-pill-select manager-availability-multi"
   role="group"
   aria-labelledby={labelledBy || undefined}
   aria-describedby={describedBy || undefined}
   data-modifier-pill-select={testId || undefined}
 >
-  <div
-    class="manager-availability-picker"
-    use:dismissOnOutsideClick={{ enabled: open, onDismiss: () => (open = false) }}
-  >
-    <button
-      type="button"
-      class="manager-availability-menu-button"
-      aria-haspopup="listbox"
-      aria-expanded={open}
-      {disabled}
-      aria-disabled={addDisabled || undefined}
-      bind:this={menuButton}
-      data-modifier-pill-menu-button
-      onclick={openMenu}
-    >
-      <span
-        >{menuLabel ||
-          text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPillAdd', 'Add modifier')}</span
-      >
-      <i class="fas fa-chevron-down" aria-hidden="true"></i>
-    </button>
-    {#if open}
-      <div class="manager-availability-menu" role="listbox" aria-label={menuLabel}>
-        {#each availableOptions as option (option.id)}
-          <button
-            type="button"
-            class="manager-availability-option"
-            role="option"
-            aria-selected="false"
-            data-modifier-pill-option={option.id}
-            onclick={() => add(option.id)}
-          >
-            <i class={option.icon || 'fa-solid fa-dice-d20'} aria-hidden="true"></i>
-            <span>{optionLabel(option)}</span>
-          </button>
-        {:else}
-          <p class="manager-availability-empty">
-            {allSelectedLabel ||
-              text(
-                'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPillAllSelected',
-                'All modifiers selected.'
-              )}
-          </p>
-        {/each}
-      </div>
-    {/if}
-  </div>
+  <!-- The menu-button hook rides `triggerData` with an EMPTY-STRING value, not as a bare
+       attribute: a bare `data-x` on a component tag arrives in the rest spread as boolean `true`
+       and renders `data-x="true"`, which every presence selector resolves either way — so the DOM
+       would change and nothing would report it. -->
+  <SearchablePopover
+    bind:open
+    options={menuOptions}
+    showSearch={false}
+    triggerHasPopup="listbox"
+    triggerClass="manager-availability-menu-button"
+    triggerLabel={menuButtonLabel}
+    dialogAriaLabel={menuButtonLabel}
+    triggerAriaDisabled={addDisabled}
+    triggerData={{ 'data-modifier-pill-menu-button': '' }}
+    {disabled}
+    emptyHint={allSelectedLabel ||
+      text(
+        'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPillAllSelected',
+        'All modifiers selected.'
+      )}
+    onChoose={add}
+  />
   <div class="manager-availability-pill-row" data-modifier-pill-row>
     {#each selectedOptions as option (option.id)}
       <span class="manager-availability-pill is-modifier" data-modifier-pill={option.id}>
@@ -218,6 +187,7 @@
         <button
           type="button"
           class="manager-availability-remove"
+          data-keyboard-focus="true"
           {disabled}
           aria-label={`${text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierPillRemove', 'Remove')} ${optionLabel(option)}`}
           data-modifier-pill-remove={option.id}
@@ -236,35 +206,36 @@
       </span>
     {/each}
   </div>
-  <!-- The pill row is the control's only feedback that a menu pick or a pill removal
-       landed, and neither gesture moves focus into the row, so without this a
-       screen-reader user is told nothing at all. The region is this summary ALONE, not
-       the row: a live region wrapped around the pills announces each added pill's whole
-       subtree (its remove button's label included) and nothing at all on a removal.
-       `polite` announces after the current utterance rather than interrupting it.
-       Visually hidden here rather than through the global `.sr-only` utility, which is
-       scoped to the two app theme roots — this is a shared primitive and must not depend
-       on which root it is dropped into. -->
+  <!-- Visually hidden HERE rather than through the global utility: that utility is rooted at the
+       module root, and this is a shared primitive a host may portal out from under any root. -->
   <span class="manager-modifier-pill-status" aria-live="polite" data-modifier-pill-status
     >{selectionSummary}</span
   >
-</div>
+</Field>
 
 <style>
-  /* The at-cap menu button. It keeps its box and its focus ring — it is still a real tab
-     stop, deliberately (see `openMenu`) — and only loses the affordance colour and the
-     pointer, so it reads as "unavailable right now" rather than "gone". The global sheet
-     gives `.manager-availability-menu-button` no disabled treatment at all, so this is
-     the state's only visual, and it is scoped here rather than added to the global class
-     because the cap is this call site's concept, not the widget's chrome. */
-  .manager-availability-menu-button[aria-disabled='true'] {
+  /* The at-cap menu button keeps its box and its focus ring — it is still a real tab stop,
+     deliberately — and loses only the affordance colour and the pointer, so it reads as
+     "unavailable right now" rather than "gone". The global sheet gives that class no disabled
+     treatment at all, so this is the state's only visual, and it is scoped here because the cap
+     is this call site's concept rather than the widget's chrome. */
+  /* `:global(...)` around the WHOLE selector, and the ancestor is load-bearing rather than
+     decorative. The button is `SearchablePopover`'s element now, so the scoped spelling compiled
+     to a hash this component no longer stamps on anything and the compiler PRUNED both rules with
+     an `Unused CSS selector` warning. Specificity is preserved EXACTLY, which is why the ancestor
+     stays: the scoped form was (0,3,0) and a bare `:global(.the-class[attr])` is (0,2,0), which
+     would smuggle a cascade change in as a repair and lose to the sheet's own `:hover` rule. The
+     ancestor is the class this component hands its own `<Field>`, so the anchor is local. */
+  :global(.manager-availability-multi .manager-availability-menu-button[aria-disabled='true']) {
     color: var(--fab-text-disabled);
     cursor: default;
     opacity: 0.55;
   }
 
-  .manager-availability-menu-button[aria-disabled='true']:hover {
-    border-color: var(--fab-mv2-border);
+  :global(
+    .manager-availability-multi .manager-availability-menu-button[aria-disabled='true']:hover
+  ) {
+    border-color: var(--fab-border);
     box-shadow: none;
   }
 

@@ -17,12 +17,16 @@
   GM-scoped.
 -->
 <script>
-  import Chip from '../Chip.svelte';
+  import Field from '../../../components/Field.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import EmptyState from '../EmptyState.svelte';
-  import { localize } from '../../../util/foundryBridge.js';
+  import { formatList, localize } from '../../../util/foundryBridge.js';
   import { dragDrop } from '../../../actions/dragDrop.js';
   import { resolveDropData } from '../../../util/dropUtils.js';
   import IconPicker from '../../../components/IconPicker.svelte';
+  import ManagerButton from '../../../components/ManagerButton.svelte';
+  import IconButton from '../../../components/IconButton.svelte';
+  import Select from '../../../components/Select.svelte';
 
   let {
     currencyUnits = [],
@@ -33,7 +37,7 @@
     currencyPresetsSupported = false,
     currencySpendStrategy = 'actorProperty',
     currencyProviderId = '',
-    currencyMacros = { canAfford: '', increment: '', decrement: '' },
+    currencyMacros = { canAfford: '', increment: '', decrement: '', balance: '' },
     currencyProviderOptions = [],
     onAddCurrencyUnit = async () => null,
     onUpdateCurrencyUnit = async () => {},
@@ -116,7 +120,8 @@
       labelKey: 'FABRICATE.Admin.Manager.CurrencyUnits.MacroIncrement',
       labelFallback: 'Increment macro',
       hintKey: 'FABRICATE.Admin.Manager.CurrencyUnits.MacroIncrementHint',
-      hintFallback: 'Reserved for a future refund flow — configured now but not yet invoked.',
+      hintFallback:
+        'Runs whenever coin goes back to an actor: a cancelled craft, a companion credit, or a pooled take that could not be completed.',
     },
     {
       key: 'decrement',
@@ -124,6 +129,19 @@
       labelFallback: 'Decrement macro',
       hintKey: 'FABRICATE.Admin.Manager.CurrencyUnits.MacroDecrementHint',
       hintFallback: 'Runs after a successful craft to spend the currency cost.',
+    },
+    // The fourth key (issue 1342), and the only one that ASKS rather than acts. It is what lets a
+    // macro world answer a companion's pooled holdings question at all; without it Fabricate can
+    // spend a macro world's coins but cannot see them, and every holdings read answers "cannot
+    // see" rather than a number. Optional, on the increment precedent — a world that never
+    // authors it loses the read and keeps every craft-time behaviour.
+    {
+      key: 'balance',
+      labelKey: 'FABRICATE.Admin.Manager.CurrencyUnits.MacroBalance',
+      labelFallback: 'Balance macro',
+      hintKey: 'FABRICATE.Admin.Manager.CurrencyUnits.MacroBalanceHint',
+      hintFallback:
+        'Optional. Returns how much the actor holds, as a number of the smallest coin on the ladder; anything else reads as "unknown".',
     },
   ];
 
@@ -177,9 +195,10 @@
     return currencyMacroDocs[key] || null;
   }
 
-  // Each empty macro drop zone needs a field-specific accessible name; otherwise the three zones
-  // (canAfford/increment/decrement) expose an identical "Drag a macro here to link it." label and
-  // are indistinguishable to assistive tech. Compose the visible field label with the drop hint.
+  // Each empty macro drop zone needs a field-specific accessible name; otherwise the zones
+  // (canAfford/increment/decrement/balance) expose an identical "Drag a macro here to link it."
+  // label and are indistinguishable to assistive tech. Compose the visible field label with the
+  // drop hint.
   function currencyMacroDropZoneLabel(field) {
     const fieldLabel = text(field.labelKey, field.labelFallback);
     const composed = localize('FABRICATE.Admin.Manager.CurrencyUnits.MacroDropZoneLabel', {
@@ -231,6 +250,48 @@
     });
   }
 
+  // THE THREE OPTION LISTS THE CONVERTED SELECTS SPEAK (issue 1510). Each is the `<option>` set
+  // it replaced, mapped to the shared `<Select>`'s `{value, label}` shape and nothing else: same
+  // order, same values, same rendered text. The strategy list localises at derivation time
+  // rather than in the template, which is where the `<option>` did it.
+  const currencySpendStrategyOptions = $derived(
+    CURRENCY_SPEND_STRATEGY_OPTIONS.map((option) => ({
+      value: option.value,
+      label: text(option.labelKey, option.fallback),
+    }))
+  );
+
+  const currencyProviderSelectOptions = $derived(
+    currencyProviderOptions.map((option) => ({ value: option.id, label: option.label }))
+  );
+
+  /**
+   * A unit's assignable sub-units, as the shared `<Select>`'s option shape.
+   *
+   * A FUNCTION rather than a `$derived`, because the list is per EXPANDED UNIT: the caller
+   * already computes `subUnitOptions` inside the `{#each}` over units, and lifting it out would
+   * mean re-deriving the same per-unit set a second way.
+   *
+   * @param {Array<{id: string, label: string, abbreviation?: string}>} options
+   * @returns {Array<{value: string, label: string}>}
+   */
+  function subUnitSelectOptions(options) {
+    return options.map((option) => ({
+      value: option.id,
+      label: `${option.label}${option.abbreviation ? ` (${option.abbreviation})` : ''}`,
+    }));
+  }
+
+  // The spend-strategy caption's id, per instance: the trigger is named by pointing at the
+  // caption rather than by containment, and two tabs on one screen must not share the pointer.
+  const instanceId = $props.id();
+  const strategyCaptionId = `${instanceId}-strategy-caption`;
+
+  // The hint's id, for the same reason as the caption's: the hint is DRAWN by this caller (its
+  // copy changes with the chosen strategy) rather than by the primitive's own labelled form, so
+  // the trigger reaches it through `ariaDescribedBy` and nothing else would announce it.
+  const strategyHintId = `${instanceId}-strategy-hint`;
+
   // The strategy select renders one shared hint that reflects the selected strategy, so the GM
   // sees the actor-data-path / actor-inventory / macro guidance inline as they switch.
   function currencySpendStrategyHint() {
@@ -252,6 +313,22 @@
   function currencyUnitLabel(unitId) {
     const unit = currencyUnits.find((entry) => entry.id === unitId);
     return unit?.label || unit?.abbreviation || unitId;
+  }
+
+  // ONE live region per host row, and it is the CALLER'S to own: `Chip.svelte`'s `removable`
+  // note records that a bare chip cannot have one, because neither adding nor removing a member
+  // moves focus into the row, and a region wrapped around the row would read each added chip's
+  // whole subtree on an add and say nothing at all on a removal. Restated on every change to
+  // the ladder, through the active language's list conventions.
+  function subUnitSummary(unit) {
+    const contained = Array.isArray(unit?.contains) ? unit.contains : [];
+    if (contained.length === 0) {
+      return text(
+        'FABRICATE.Admin.Manager.CurrencyUnits.NoSubUnits',
+        'This unit is a base denomination.'
+      );
+    }
+    return formatList(contained.map((entry) => currencyUnitLabel(entry.unitId)));
   }
 
   function currencyUnitIcon(unitId) {
@@ -372,13 +449,12 @@
       </div>
       {#if !currencyUnitsReadOnly}
         <div class="manager-character-modifier-card-header-actions">
-          <button type="button" class="manager-button is-primary" onclick={handleAddCurrencyUnit}>
+          <ManagerButton role="primary" data-add-currency-unit onclick={handleAddCurrencyUnit}>
             <i class="fa-solid fa-plus" aria-hidden="true"></i>
             {text('FABRICATE.Admin.Manager.CurrencyUnits.Add', 'Add currency unit')}
-          </button>
-          <button
-            type="button"
-            class="manager-button"
+          </ManagerButton>
+          <ManagerButton
+            data-seed-currency-presets
             disabled={!currencyPresetsSupported}
             data-tooltip={!currencyPresetsSupported
               ? text(
@@ -390,50 +466,79 @@
           >
             <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
             {text('FABRICATE.Admin.Manager.CurrencyUnits.SeedPresets', 'Seed presets')}
-          </button>
+          </ManagerButton>
         </div>
       {/if}
     </header>
 
     <div id="manager-section-body-currency" class="manager-section-body">
       <div class="manager-currency-strategy" data-world-currency-strategy>
-        <label class="manager-field">
-          <span
+        <!-- A `Field as="div"` RATHER THAN THE `as="label"` THIS WAS (issue 1510), because the
+             select is the shared `<Select>` now and a `<label>` forwards a caption click into the
+             trigger it names — which, with the panel open, dismisses it on `mousedown` and
+             re-opens it on the forwarded click. The wrapper is NOT deleted in favour of the
+             primitive's own `label=` form, because it holds a third child this control does not
+             own: the `[data-world-currency-strategy-hint]` line, whose copy changes with the
+             chosen strategy and which the smoke and the case registry both address. -->
+        <Field as="div">
+          <span id={strategyCaptionId}
             >{text('FABRICATE.Admin.Manager.CurrencyUnits.SpendStrategy', 'Spend strategy')}</span
           >
-          <select
+          <Select
             value={currencySpendStrategy}
-            data-world-currency-strategy-select
-            onchange={(event) => onSetCurrencySpendStrategy(event.currentTarget.value)}
+            options={currencySpendStrategyOptions}
+            showTick={false}
+            ariaLabelledBy={strategyCaptionId}
+            ariaDescribedBy={strategyHintId}
+            triggerData={{ 'data-world-currency-strategy-select': '' }}
+            onChange={(next) => onSetCurrencySpendStrategy(next)}
+          />
+          <!-- THE PRIMITIVE'S OWN NOTE, MARKUP AND ALL (issue 1510). The provider below renders
+               its hint through `hint=`, which draws a `<span class="fabricate-select-note">`;
+               this one is drawn here because its copy changes with the chosen strategy, so it
+               is written as the same element with the same class and the two hints in one card
+               read alike.
+
+               A `<span>` RATHER THAN THE `<small>` THIS WAS, and the element is the whole
+               mechanism. `.fabricate-field.manager-field small` (`styles/fabricate.css:13118`)
+               is ELEMENT-TYPED at (0,2,1) and `.fabricate-select-note` is (0,1,0), so on a
+               `<small>` the class is out-ranked and adding it changes nothing at all — measured
+               in Chromium on `tests/fixtures/manager-select/?subject=currency`, which is where
+               the sibling clause in `manager-select-conversion-rendered.test.js` compares the
+               two computed treatments. Changing the element is what lets the class win, and it
+               leaves the shared sheet alone.
+
+               The ACCEPTED COST is contrast: this line moves from `--fab-text-muted` at
+               12.16px/500 (5.38:1 on `--fab-bg-1`) to `--fab-text-subtle` at 10.5px/400
+               (3.71:1). The library's `k-hint` is the authority for that treatment and the token
+               question belongs to issue 1523's geometry and token sweep, not here —
+               consistency inside the card is what this change owes. -->
+          <span class="fabricate-select-note" id={strategyHintId} data-world-currency-strategy-hint
+            >{currencySpendStrategyHint()}</span
           >
-            {#each CURRENCY_SPEND_STRATEGY_OPTIONS as option (option.value)}
-              <option value={option.value}>{text(option.labelKey, option.fallback)}</option>
-            {/each}
-          </select>
-          <small data-world-currency-strategy-hint>{currencySpendStrategyHint()}</small>
-        </label>
+        </Field>
 
         {#if currencyShowProviderBranch}
-          <label class="manager-field">
-            <span>{text('FABRICATE.Admin.Manager.CurrencyUnits.Provider', 'Provider')}</span>
-            <select
-              value={currencyProviderId}
-              data-world-currency-provider-select
-              onchange={(event) => onSetCurrencyProvider(event.currentTarget.value)}
-            >
-              {#each currencyProviderOptions as option (option.id)}
-                <option value={option.id}>{option.label}</option>
-              {/each}
-            </select>
-            <small
-              >{text(
-                'FABRICATE.Admin.Manager.CurrencyUnits.ProviderHint',
-                'A preconfigured adapter that reads and spends coins from the actor inventory.'
-              )}</small
-            >
-          </label>
+          <!-- THE WRAPPER IS GONE, not demoted (issue 1510). It existed only to caption the
+               select and to carry a hint beneath it, and the shared `<Select>`'s own labelled
+               form renders exactly that column — a visible caption span, the trigger, then the
+               hint — so the caller keeps neither a class nor a hook here and the two strings
+               ride `label=` and `hint=` instead. This is the first caller of `hint` in the
+               corpus. -->
+          <Select
+            value={currencyProviderId}
+            options={currencyProviderSelectOptions}
+            showTick={false}
+            label={text('FABRICATE.Admin.Manager.CurrencyUnits.Provider', 'Provider')}
+            hint={text(
+              'FABRICATE.Admin.Manager.CurrencyUnits.ProviderHint',
+              'A preconfigured adapter that reads and spends coins from the actor inventory.'
+            )}
+            triggerData={{ 'data-world-currency-provider-select': '' }}
+            onChange={(next) => onSetCurrencyProvider(next)}
+          />
         {:else if currencySpendStrategy === 'actorInventory'}
-          <div class="manager-field">
+          <Field as="div">
             <span>{text('FABRICATE.Admin.Manager.CurrencyUnits.Provider', 'Provider')}</span>
             <div
               class="manager-currency-subunit-warning manager-environment-comp-callout"
@@ -448,7 +553,7 @@
                 )}</span
               >
             </div>
-          </div>
+          </Field>
         {:else if currencyMacroMode}
           <div
             class="manager-currency-macro-zones manager-currency-macro-row"
@@ -456,7 +561,7 @@
           >
             {#each CURRENCY_MACRO_FIELDS as field (field.key)}
               {@const macroDoc = currencyMacroDisplay(field.key)}
-              <div class="manager-field manager-currency-macro-field">
+              <Field as="div" class="manager-currency-macro-field">
                 <span>{text(field.labelKey, field.labelFallback)}</span>
                 {#if macroDoc}
                   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
@@ -510,10 +615,9 @@
                         >{macroDoc.name || macroDoc.uuid}</span
                       >
                     {/if}
-                    <button
-                      type="button"
-                      class="manager-icon-button is-danger"
-                      aria-label={text(
+                    <IconButton
+                      class="is-danger"
+                      ariaLabel={text(
                         'FABRICATE.Admin.Manager.CurrencyUnits.MacroUnlink',
                         'Unlink macro'
                       )}
@@ -524,7 +628,7 @@
                       onclick={(event) => {
                         event.stopPropagation();
                         onClearCurrencyMacro(field.key);
-                      }}><i class="fas fa-link-slash" aria-hidden="true"></i></button
+                      }}><i class="fas fa-link-slash" aria-hidden="true"></i></IconButton
                     >
                   </div>
                 {:else}
@@ -548,7 +652,7 @@
                   </div>
                 {/if}
                 <small>{text(field.hintKey, field.hintFallback)}</small>
-              </div>
+              </Field>
             {/each}
           </div>
         {/if}
@@ -712,7 +816,7 @@
               {#if expanded}
                 <div class="manager-character-modifier-editor">
                   <div class="manager-edit-grid manager-currency-edit-grid">
-                    <label class="manager-field">
+                    <Field as="label">
                       <span>{text('FABRICATE.Admin.Manager.CurrencyUnits.Label', 'Label')}</span>
                       <input
                         type="text"
@@ -722,8 +826,8 @@
                             label: event.currentTarget.value,
                           })}
                       />
-                    </label>
-                    <label class="manager-field">
+                    </Field>
+                    <Field as="label">
                       <span
                         >{text(
                           'FABRICATE.Admin.Manager.CurrencyUnits.Abbreviation',
@@ -738,8 +842,8 @@
                             abbreviation: event.currentTarget.value,
                           })}
                       />
-                    </label>
-                    <div class="manager-field">
+                    </Field>
+                    <Field as="div">
                       <span>{text('FABRICATE.Admin.Manager.CurrencyUnits.Icon', 'Icon')}</span>
                       <IconPicker
                         value={unit.icon || 'fa-solid fa-coins'}
@@ -749,7 +853,7 @@
                         )}
                         onChange={(iconClass) => onUpdateCurrencyUnit(unit.id, { icon: iconClass })}
                       />
-                    </div>
+                    </Field>
                   </div>
 
                   {#if currencyMacroMode}
@@ -764,7 +868,7 @@
                     >
                   {:else}
                     <div class="manager-edit-grid manager-currency-detail-grid">
-                      <label class="manager-field">
+                      <Field as="label">
                         <span
                           >{text(
                             'FABRICATE.Admin.Manager.CurrencyUnits.ActorPath',
@@ -780,44 +884,36 @@
                               actorPath: event.currentTarget.value,
                             })}
                         />
-                      </label>
+                      </Field>
                       {#if subUnitOptions.length > 0}
                         <div class="manager-currency-subunit-builder">
-                          <label class="manager-field">
-                            <span
-                              >{text(
-                                'FABRICATE.Admin.Manager.CurrencyUnits.AddSubUnit',
-                                'Add sub-unit'
-                              )}</span
-                            >
-                            <select
-                              value={currencySelectedSubUnit(unit.id)}
-                              onchange={(event) =>
-                                updateCurrencySubUnitSelection(unit.id, event.currentTarget.value)}
-                            >
-                              {#each subUnitOptions as option (option.id)}
-                                <option value={option.id}
-                                  >{option.label}{option.abbreviation
-                                    ? ` (${option.abbreviation})`
-                                    : ''}</option
-                                >
-                              {/each}
-                            </select>
-                          </label>
-                          <button
-                            type="button"
-                            class="manager-icon-button"
-                            aria-label={text(
+                          <!-- THE WRAPPER IS GONE, not demoted (issue 1510): it captioned the
+                               select and held nothing else, so the caption rides `label=` on the
+                               shared `<Select>`'s own labelled form. The option labels are
+                               carried verbatim, abbreviation parenthetical and all. -->
+                          <Select
+                            value={currencySelectedSubUnit(unit.id)}
+                            options={subUnitSelectOptions(subUnitOptions)}
+                            showTick={false}
+                            label={text(
+                              'FABRICATE.Admin.Manager.CurrencyUnits.AddSubUnit',
+                              'Add sub-unit'
+                            )}
+                            onChange={(next) => updateCurrencySubUnitSelection(unit.id, next)}
+                          />
+                          <IconButton
+                            ariaLabel={text(
                               'FABRICATE.Admin.Manager.CurrencyUnits.AddSubUnit',
                               'Add sub-unit'
                             )}
                             onclick={() => handleAddCurrencySubUnit(unit.id)}
+                            data-chip-remove-fallback=""
                           >
                             <i class="fa-solid fa-plus" aria-hidden="true"></i>
-                          </button>
+                          </IconButton>
                         </div>
                       {:else}
-                        <div class="manager-field">
+                        <Field as="div">
                           <span
                             >{text(
                               'FABRICATE.Admin.Manager.CurrencyUnits.AddSubUnit',
@@ -842,7 +938,7 @@
                               >
                             {/if}
                           </div>
-                        </div>
+                        </Field>
                       {/if}
                     </div>
 
@@ -850,26 +946,48 @@
                       <p class="manager-card-title manager-currency-subunit-heading">
                         {text('FABRICATE.Admin.Manager.CurrencyUnits.SubUnits', 'Sub-units')}
                       </p>
-                      {#if (unit.contains || []).length > 0}
-                        <div
-                          class="manager-availability-pill-row"
-                          aria-label={text(
-                            'FABRICATE.Admin.Manager.CurrencyUnits.SubUnits',
-                            'Sub-units'
-                          )}
-                        >
+                      <!-- THE AMOUNT IS NOT A CHIP, and the chip around it is (issue 1515).
+                           A number a GM can change is a stepper and never a badge, so the
+                           `<input type="number">` keeps its own control and only its class
+                           moves out of the retiring availability family; what carries it is a
+                           removable membership token, which is the primitive.
+
+                           THE ROW IS ALSO THE LAST RUNG OF THE CHIP'S FOCUS LADDER, which is why
+                           it is rendered in BOTH states rather than only when it holds chips.
+                           `Chip` takes its focus destination before it removes the chip - the
+                           next remove control, else the previous one, else the nearest
+                           `[data-chip-remove-fallback]` - and the Add sub-unit control above
+                           carries that hook only while an ELIGIBLE unit remains to add. Remove
+                           the last sub-unit in a two-unit world and the add row is a warning
+                           note instead, so the ladder ran out and focus fell to `<body>`. A row
+                           that appeared only alongside chips could not be that rung either: it
+                           would be resolved, focused, and then replaced in the same removal. -->
+                      <div
+                        class="manager-chip-row"
+                        tabindex="-1"
+                        data-keyboard-focus="true"
+                        data-chip-remove-fallback=""
+                        aria-label={text(
+                          'FABRICATE.Admin.Manager.CurrencyUnits.SubUnits',
+                          'Sub-units'
+                        )}
+                      >
+                        {#if (unit.contains || []).length > 0}
                           {#each unit.contains as contained (contained.unitId)}
-                            <span
-                              class="manager-availability-pill is-currency"
+                            <Chip
+                              tone="info"
+                              icon={currencyUnitIcon(contained.unitId)}
+                              removable
+                              removeLabel={`${text('FABRICATE.Admin.Manager.CurrencyUnits.RemoveSubUnit', 'Remove sub-unit')} (${currencyUnitLabel(contained.unitId)})`}
+                              onRemove={() => onDeleteCurrencySubUnit(unit.id, contained.unitId)}
                               data-world-currency-subunit={contained.unitId}
                             >
-                              <i class={currencyUnitIcon(contained.unitId)} aria-hidden="true"></i>
                               <span>{currencyUnitLabel(contained.unitId)}</span>
                               <input
                                 type="number"
                                 min="1"
                                 step="1"
-                                class="manager-availability-pill-amount"
+                                class="manager-currency-subunit-amount"
                                 value={contained.amount}
                                 aria-label={`${currencyUnitLabel(contained.unitId)} ${text('FABRICATE.Admin.Manager.CurrencyUnits.SubUnitAmount', 'Sub-unit amount').toLowerCase()}`}
                                 oninput={(event) =>
@@ -879,43 +997,41 @@
                                     event.currentTarget.value
                                   )}
                               />
-                              <button
-                                type="button"
-                                class="manager-availability-remove"
-                                aria-label={`${text('FABRICATE.Admin.Manager.CurrencyUnits.RemoveSubUnit', 'Remove sub-unit')} (${currencyUnitLabel(contained.unitId)})`}
-                                onclick={() => onDeleteCurrencySubUnit(unit.id, contained.unitId)}
-                              >
-                                <i class="fas fa-xmark" aria-hidden="true"></i>
-                              </button>
-                            </span>
+                            </Chip>
                           {/each}
-                        </div>
-                      {:else}
-                        <p class="manager-muted">
-                          {text(
-                            'FABRICATE.Admin.Manager.CurrencyUnits.NoSubUnits',
-                            'This unit is a base denomination.'
-                          )}
-                        </p>
-                      {/if}
+                        {:else}
+                          <p class="manager-muted">
+                            {text(
+                              'FABRICATE.Admin.Manager.CurrencyUnits.NoSubUnits',
+                              'This unit is a base denomination.'
+                            )}
+                          </p>
+                        {/if}
+                      </div>
+                      <p
+                        class="visually-hidden"
+                        aria-live="polite"
+                        data-world-currency-subunit-status
+                      >
+                        {subUnitSummary(unit)}
+                      </p>
                     </div>
                   {/if}
 
                   <div class="manager-character-modifier-actions">
-                    <button
-                      type="button"
-                      class="manager-button"
+                    <ManagerButton
+                      data-currency-unit-done
                       onclick={() => (currencyExpandedUnitId = '')}
-                      >{text('FABRICATE.Admin.Manager.Done', 'Done')}</button
+                      >{text('FABRICATE.Admin.Manager.Done', 'Done')}</ManagerButton
                     >
-                    <button
-                      type="button"
-                      class="manager-button is-danger"
+                    <ManagerButton
+                      role="danger"
+                      data-currency-unit-delete
                       onclick={() => handleDeleteCurrencyUnit(unit.id)}
                       >{text(
                         'FABRICATE.Admin.Manager.CurrencyUnits.Delete',
                         'Delete currency unit'
-                      )}</button
+                      )}</ManagerButton
                     >
                   </div>
                 </div>
@@ -929,10 +1045,8 @@
                     >{(unit.contains || []).length}
                     {text('FABRICATE.Admin.Manager.CurrencyUnits.SubUnitCount', 'sub-units')}</Chip
                   >
-                  <button
-                    type="button"
-                    class="manager-icon-button"
-                    aria-label={text('FABRICATE.Admin.Manager.ListErgonomics.MoveUp', 'Move up')}
+                  <IconButton
+                    ariaLabel={text('FABRICATE.Admin.Manager.ListErgonomics.MoveUp', 'Move up')}
                     data-tooltip={text('FABRICATE.Admin.Manager.ListErgonomics.MoveUp', 'Move up')}
                     data-move-currency-up={unit.id}
                     disabled={index === 0}
@@ -946,14 +1060,9 @@
                       )}
                   >
                     <i class="fa-solid fa-chevron-up" aria-hidden="true"></i>
-                  </button>
-                  <button
-                    type="button"
-                    class="manager-icon-button"
-                    aria-label={text(
-                      'FABRICATE.Admin.Manager.ListErgonomics.MoveDown',
-                      'Move down'
-                    )}
+                  </IconButton>
+                  <IconButton
+                    ariaLabel={text('FABRICATE.Admin.Manager.ListErgonomics.MoveDown', 'Move down')}
                     data-tooltip={text(
                       'FABRICATE.Admin.Manager.ListErgonomics.MoveDown',
                       'Move down'
@@ -970,29 +1079,27 @@
                       )}
                   >
                     <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
-                  </button>
-                  <button
-                    type="button"
-                    class="manager-icon-button"
-                    aria-label={text(
+                  </IconButton>
+                  <IconButton
+                    ariaLabel={text(
                       'FABRICATE.Admin.Manager.CurrencyUnits.Edit',
                       'Edit currency unit'
                     )}
                     onclick={() => (currencyExpandedUnitId = unit.id)}
+                    data-world-currency-unit-expand={unit.id}
                   >
                     <i class="fa-solid fa-pen" aria-hidden="true"></i>
-                  </button>
-                  <button
-                    type="button"
-                    class="manager-icon-button is-danger"
-                    aria-label={text(
+                  </IconButton>
+                  <IconButton
+                    class="is-danger"
+                    ariaLabel={text(
                       'FABRICATE.Admin.Manager.CurrencyUnits.Delete',
                       'Delete currency unit'
                     )}
                     onclick={() => handleDeleteCurrencyUnit(unit.id)}
                   >
                     <i class="fa-solid fa-trash" aria-hidden="true"></i>
-                  </button>
+                  </IconButton>
                 </div>
               {/if}
             </li>
@@ -1016,5 +1123,33 @@
   .currency-validation-list {
     margin: 0;
     padding-inline-start: var(--fab-space-4);
+  }
+
+  /* THE WIDTH THE ELEMENT-TYPED SHEET RULE NO LONGER SUPPLIES (issue 1510), for EVERY converted
+     control in this component. `.fabricate-field.manager-field select { width: 100% }`
+     (`styles/fabricate.css:10839`) painted them until they became `<button>`s, and
+     `.fabricate-select-trigger` declares no width at all — a trigger's box belongs to the row it
+     sits in. Without this rule the spend strategy measured 68.73px on "Macro" and 118.78px on
+     "Actor data path" in a 654px column, the provider 214.64px, and the add-sub-unit control
+     90.27px on "Silver (sp)" and 142.38px on "Electrum piece (ep)" in a 266px column, so the
+     card's controls sat at whatever width the chosen value happened to need. Measured in Chromium
+     against the fixture's declared Arial face; with the rule the add-sub-unit trigger holds 266px
+     across both option labels.
+
+     ONE RULE FOR THREE CONTROLS. The strategy field is the caller's own demoted `Field as="div"`
+     column; the provider and the add-sub-unit control are the primitive's own labelled form,
+     whose `<Field>` emits `.fabricate-select-field`. All three are `.manager-field` columns, so
+     the descendant selector reaches them without naming either shape. Two anchors are needed
+     because they sit in two blocks this component writes: `.manager-currency-strategy` holds the
+     first two, and `.manager-currency-subunit-builder` — a `minmax(0, 1fr) auto` grid
+     (`styles/fabricate.css:5209-5213`) whose first track is full width — holds the third, which
+     the strategy anchor cannot reach. Both `:global()`s are anchored at classes THIS component
+     writes, so the rules keep a scoping hash rather than reaching every trigger in the document.
+
+     The shape is the shipped one: the three interactables roots state exactly this rule for the
+     labelled form's trigger, and the player pagers state their own fills the same way. */
+  .manager-currency-strategy :global(.manager-field .fabricate-select-trigger),
+  .manager-currency-subunit-builder :global(.manager-field .fabricate-select-trigger) {
+    width: 100%;
   }
 </style>

@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Player select conversion — caption clicks and width floors</title>
+    <!--
+      Served by `tests/components/player-select-conversion-rendered.test.js` from a Vite dev
+      server, so `mount.js` can import the REAL `.svelte` components through the real Svelte
+      plugin (issue 1511). That is why this page exists rather than a `page.setContent` fixture,
+      and the reason is the same one `tests/fixtures/overlay-host/index.html` records: both
+      questions here are about what a component's SCRIPT does at runtime.
+
+        - THE CAPTION CLICK. A `<label>` forwards a click on its caption into the control it
+          wraps. The control is a `<button>` toggling a portaled panel, and that panel's
+          outside-click dismissal listens on `mousedown` IN THE CAPTURE PHASE and only while the
+          panel is open. Nothing in that sentence is markup — it is three listeners and their
+          order — so hand-written HTML could not reproduce it and a synthetic `.click()` would
+          skip the mousedown entirely.
+        - THE WIDTH FLOORS. Each converted call site declares its floor in its own scoped
+          `<style>`, which the Svelte plugin compiles and injects exactly as the shipped bundle
+          does. happy-dom computes no cascade, so a mounted suite cannot see a `min-width` at all.
+    -->
+    <link rel="stylesheet" href="/@player-select-styles/fabricate.css" />
+    <style>
+      /*
+        Foundry core's universal border-box reset (`foundry2.css` `@layer reset`). The trigger
+        declares a padding and a border and takes `box-sizing: border-box` from its own family
+        rule, but the wrappers around it do not — and a content-box wrapper measures every figure
+        here wider than the product does.
+      */
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
+      /*
+        THE OTHER HALF OF THAT SAME `@layer reset` BLOCK, and it is load bearing here rather than
+        tidy (issue 1511). A `<button>` does not inherit type from its ancestors: the user agent
+        gives it its own font, so without this the trigger and every option row render in
+        Chromium's default button face and the `font-family: Arial, sans-serif` declared below
+        never reaches the text this fixture measures. On this repository's runners that default
+        happens to BE Arial, which is why the suite's face assertion passed while reading the user
+        agent's answer rather than the fixture's — a silent agreement, not a measurement. Core
+        declares the two together (`input, button, textarea, select { font: inherit }`), so the
+        fixture mirrors both.
+      */
+      input,
+      button,
+      textarea,
+      select {
+        font: inherit;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        background: #0b0a13;
+      }
+
+      /*
+        ARIAL, DELIBERATELY AND EXPLICITLY. Every width below is a text measurement, and the
+        product's own face is Foundry's licensed Signika, which this repository cannot ship. The
+        repository's other Chromium gates all render against `Arial, sans-serif` for that reason,
+        and Chromium resolves it to a metric-compatible face on every platform CI runs on — so
+        the numbers are the same on a maintainer's machine and on the runner. The suite asserts
+        this actually took effect rather than trusting the declaration, because a fixture that
+        silently fell back to the platform's default sans would report widths nobody could
+        reproduce. The floors themselves are set past BOTH faces; see each call site's own note.
+      */
+      body {
+        font-family: Arial, sans-serif;
+      }
+
+      /*
+        The player window's ApplicationV2 frame, positioned as core positions it. `.fabricate-app`
+        is the overlay host the converted panels portal into, and it is only usable as one because
+        it is a positioned element — a static frame would move the panel's containing block up to
+        the initial one and measure a different arrangement than production has.
+      */
+      .fabricate-app {
+        position: absolute;
+        left: 40px;
+        top: 40px;
+        width: 900px;
+        height: 620px;
+        overflow: hidden;
+        background: #17161f;
+        border: 1px solid #3b3a48;
+      }
+
+      .fixture-mount {
+        padding: 24px;
+      }
+
+      /*
+        The narrow end of every converted control's range: the crafting and journal columns are
+        `minmax(280px, 1fr)` and the inventory's left column is `minmax(320px, 1.6fr)`, so 280 is
+        the tightest box any of them has to hold a row in. Fixture chrome, deliberately not in
+        `styles/fabricate.css`.
+      */
+      .fixture-column {
+        width: 280px;
+      }
+    </style>
+  </head>
+  <body class="vtt game theme-dark">
+    <script type="module" src="/tests/fixtures/player-select/mount.js"></script>
+  </body>
+</html>

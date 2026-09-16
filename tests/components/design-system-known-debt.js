@@ -1,0 +1,1046 @@
+/**
+ * The measured, frozen debt behind the design-system rules that had no gate (issue 1497).
+ *
+ * `openspec/specs/design-system/spec.md` states a dozen rules the product is held to and, until
+ * this change, three of them were enforced by anything at all: the control-height ladder, the
+ * spacing scale and the token generation. The rest were prose. This file is the table the ten
+ * gates added by that issue freeze — `:focus` outside a core reset, viewport `@media`, off-scale
+ * and heavy-mono font weights, off-token shadows, native `<select>`, the radius ladder, the
+ * area-scoped token reads, the required accessible names, the widened keyboard-focus walk and the
+ * closed-vocabulary register.
+ *
+ * It is DEBT, not permission. Every row is something the spec already prohibits, and
+ * `assertRatchet` fails just as loudly when a row is paid down without being banked as when a new
+ * one arrives — see `tests/helpers/ratchetBaseline.js` for why a shrink has to be a failure too.
+ *
+ * ── WHERE THE NUMBERS COME FROM ─────────────────────────────────────────────────────────
+ * Every array below records, in its own docblock, the commit it was measured on and the gate that
+ * reproduces it. They were RE-MEASURED by the shipped gates on this branch rather than copied from
+ * the issue, and the figures differ from the issue's in two independent ways.
+ *
+ * THE COMMIT EACH DOCBLOCK NAMES IS `6a2c3b46b`, and it is the base this work was measured on: the
+ * head of the issue-1499 branch as it stood when the lane opened. That branch was then merged into
+ * its parent and the lane restacked, so the figures were re-verified on the INTEGRATED base
+ * `007b6a528` — the issue-1531 head after the maintainer's merge, of which this branch is a
+ * descendant — and every one of them is unchanged. That is not a coincidence to be re-checked on
+ * the next restack: the two commits are byte-identical under `src/` and `styles/`, which are the
+ * only roots any gate here reads, so no figure below COULD have moved between them. The whole
+ * table is reproduced by
+ *
+ *     node --conditions=browser --test tests/components/design-system-debt-ratchets.test.js
+ *
+ * which fails with the observed count beside the pinned one for every row that has drifted, and
+ * the two gates that live elsewhere by running `tests/token-generation-gate.test.js`,
+ * `tests/design-system-required-names.test.js` and `tests/design-system-keyboard-focus.test.js`
+ * the same way.
+ *
+ * The first is the base. The lane branches on issue 1499, which stacks on 1498, and between them
+ * those two deleted 367 dead rule blocks and 29 unread tokens from `styles/fabricate.css`. That
+ * took debt with it — two font weights, three shadows — and the docblocks below say which. It was
+ * paid by DELETION rather than by anything moving onto a ladder, which is banked here all the same:
+ * an unbanked shrink leaves the slot open for the next author to fill for free.
+ *
+ * The second is the CORPUS EXTRACTOR, and it moves the numbers UPWARD. The issue's audit read
+ * Svelte scoped blocks with a regular expression matching a `<style` tag and everything up to the
+ * next closing tag. That matches the FIRST such tag ANYWHERE in the file, including the twenty-five
+ * components whose own docblock names one in prose. In those files the capture starts in the header
+ * comment, swallows the whole template, and the brace structure it hands a CSS parser is nonsense:
+ * `EmptyState.svelte` contributed ZERO of its seven corner radii that way. These gates use
+ * `collectStyleCorpus`, whose opener must be the WHOLE LINE for exactly this reason, so they see
+ * 776 radius declarations where the audit saw 754 and 101 shadows where it saw 100. The larger
+ * figure is the correct one.
+ *
+ * ── WHY THE ROWS ARE JSON AND NOT ARRAYS IN THIS MODULE ─────────────────────────────────
+ * The reason `spacing-known-literals.js` records, applied to a bigger table. SonarCloud's
+ * copy-paste detector NORMALISES string literals, so a run of quoted-string lines matches another
+ * such run by SHAPE whatever the strings say, and its minimum block is roughly 100 tokens — about
+ * fifty such lines. These gates carry several hundred rows between them, and
+ * `scripts/lib/screenshotCaptureMap.js` already ships a 157-line run of exactly that shape for
+ * them to collide with. `.json` is not indexed by the JavaScript analyser at all, so the table
+ * lives there: one row per line, diffed the same way, with none of the risk of a duplication
+ * failure that says nothing about the change.
+ *
+ * This module is the PARSER for that table, not a second copy of it. Everything here is generic
+ * over the rows — one `key | count` shape, one freeze, one sum — so adding a gate adds a JSON key
+ * and a two-line export rather than another table.
+ */
+import { readFileSync } from 'node:fs';
+
+/**
+ * The whole table, keyed by gate.
+ *
+ * Read once at module load. The file is data with no imports and no cycles, so there is nothing
+ * to defer: a parse failure here is a broken checkout, not a test outcome.
+ */
+const TABLE = JSON.parse(
+  readFileSync(new URL('./design-system-known-debt.json', import.meta.url), 'utf8')
+);
+
+/**
+ * One gate's rows, as `assertRatchet` wants them.
+ *
+ * The row shape is `'<key fields, ` | `-separated> | <count>'` — the LAST field is the count and
+ * everything before it is the key. Uniform across gates whose keys carry a different number of
+ * fields, which is why the split is from the right rather than a fixed arity: gate 5 keys on
+ * `file`, the `:focus` gate on `file | selector`, and the radius gate on
+ * `file | property | value`. A fixed arity would need one parser per gate, and a parser per gate
+ * is how a row silently lands in the wrong column.
+ *
+ * @param {string} gate The top-level key in `design-system-known-debt.json`.
+ * @returns {ReadonlyArray<{key: string, count: number}>} Frozen, in file order.
+ */
+export function knownDebt(gate) {
+  const rows = TABLE[gate];
+  if (!Array.isArray(rows)) {
+    throw new Error(
+      `design-system-known-debt.json has no array under "${gate}". A gate reading a missing key ` +
+        'would otherwise ratchet against an empty baseline, which reports every live offence as ' +
+        'new debt — or, if the gate is an absence check, passes over nothing at all.'
+    );
+  }
+  return Object.freeze(
+    rows.map((row) => {
+      const fields = String(row).split(' | ');
+      const count = Number(fields.pop());
+      const key = fields.join(' | ');
+      if (!Number.isInteger(count) || count < 1 || key.length === 0) {
+        throw new Error(
+          `design-system-known-debt.json row ${JSON.stringify(row)} under "${gate}" is malformed. ` +
+            'Every row ends with a positive integer count and carries at least one key field ' +
+            'before it.'
+        );
+      }
+      return Object.freeze({ key, count });
+    })
+  );
+}
+
+/**
+ * A selector matching `:focus` that is not `:focus-visible` or `:focus-within`, keyed
+ * `file | selector`.
+ *
+ * MEASURED at `6a2c3b46b` by `no bare :focus selector survives outside a Foundry-core reset` in
+ * `tests/components/design-system-debt-ratchets.test.js`. The corpus holds 53 such selectors;
+ * 29 of them are the six Foundry-core reset blocks the gate allow-lists by shape, leaving these.
+ * Issue 1501 collapses the `.fabricate-app`/`.fabricate-manager` pair, and issue 1520 deletes the
+ * three interactables copies; both will move the allow-list rather than this table.
+ *
+ * RE-MEASURED at 24 → 23 by issue 1508's third phase, which paid one row down by ROOTING it:
+ * `.fabricate-manager .manager-status-toggle:focus` became
+ * `.fabricate-toggle.manager-status-toggle:focus`, the strip half of the pair `StatusToggle`
+ * already declared, and a recognised member of `PRIMITIVE_FOCUS_STRIPS` rather than debt. The
+ * three OTHER strips that phase adds — the toggle's checkbox-host input, and `ChanceSlider`'s —
+ * are new and exempt, so they add no row; a strip is required chrome and booking one here would
+ * file a requirement as a defect.
+ *
+ * RE-MEASURED at 23 → 22 by issue 1509's third phase, which paid a second row down the same way
+ * and adds none. `.fabricate-manager .manager-resolution-option input[type='radio']:focus` was a
+ * booked bare `:focus` for a reason that had nothing to do with what it declares — it already
+ * carried exactly `outline: none; box-shadow: none` — but it SHARED a selector list with the Tool
+ * Requirements bonus row's radio, and `primitiveFocusStrip` accepts exactly one compound. Rooting
+ * the family at `fabricate-option-cards` forced that list to be SPLIT, and the split is what made
+ * the strip recognisable. The bonus row's two rows STAY: they are the caller's own control, rooted
+ * at the manager, and no primitive declares them.
+ *
+ * Its SIBLING does not leave and is re-keyed instead:
+ * `.fabricate-option-cards .manager-resolution-option input[type='radio']:checked:focus` declares
+ * an inset `box-shadow` that restores the checked dot, which is a strip that PAINTS — exactly the
+ * population this table is about — so it stays booked under its new key.
+ */
+export const KNOWN_BARE_FOCUS_SELECTORS = knownDebt('bareFocusSelectors');
+
+/** @see KNOWN_BARE_FOCUS_SELECTORS */
+export const KNOWN_BARE_FOCUS_TOTAL = 22;
+
+/**
+ * An `@media` query that is not a user preference, keyed `file | query`.
+ *
+ * MEASURED at `6a2c3b46b`: five occurrences across four keys. The corpus holds eight `@media`
+ * at-rules, three of them `prefers-reduced-motion`. The five are the three 720px manager
+ * breakpoints — written in TWO different spellings, `(width <= 720px)` twice and
+ * `(max-width: 720px)` once, which is itself why the gate reads the query rather than matching a
+ * pixel figure — and the component editor's two.
+ */
+export const KNOWN_VIEWPORT_MEDIA_QUERIES = knownDebt('viewportMediaQueries');
+
+/** @see KNOWN_VIEWPORT_MEDIA_QUERIES */
+export const KNOWN_VIEWPORT_MEDIA_TOTAL = 5;
+
+/**
+ * A `font-weight` outside {400, 500, 600, 700}, keyed `file | selector | value`.
+ *
+ * MEASURED at `6a2c3b46b`: 7 declarations of 613. The issue predicted 9 — 800 ×4, 650 ×3 and
+ * `inherit` ×2 — and issue 1498 deleted two of the 800s with the dead rule blocks that carried
+ * them, so 800 stands at 2 here. The debt fell rather than being paid: nothing was moved onto the
+ * ramp, the rules simply went.
+ */
+export const KNOWN_OFF_SCALE_FONT_WEIGHTS = knownDebt('offScaleFontWeights');
+
+/** @see KNOWN_OFF_SCALE_FONT_WEIGHTS */
+export const KNOWN_OFF_SCALE_FONT_WEIGHT_TOTAL = 7;
+
+/**
+ * A rule setting the mono face and a weight above 500, keyed `file | selector | value`.
+ *
+ * MEASURED at `6a2c3b46b`: 33 declarations across the 62 rules that name `var(--fab-font-mono)`,
+ * 8 in the sheet and 25 in scoped blocks, with 700 in 24 of them. The shipped mono face has two
+ * weights only — 400 and 500, per the four `@font-face` blocks at the top of
+ * `styles/fabricate.css` — so every one of these renders synthetically emboldened rather than in
+ * the weight it asks for.
+ */
+export const KNOWN_HEAVY_MONO_WEIGHTS = knownDebt('heavyMonoWeights');
+
+/** @see KNOWN_HEAVY_MONO_WEIGHTS */
+export const KNOWN_HEAVY_MONO_WEIGHT_TOTAL = 33;
+
+/**
+ * A `box-shadow` that is neither an elevation token, `none`, nor an inset ring, keyed
+ * `file | selector | value`.
+ *
+ * MEASURED at `6a2c3b46b`: 26 declarations of 101, 22 in the sheet and 4 in scoped blocks. The
+ * issue measured 28 before issue 1498 deleted three with their rules, and this gate finds one more
+ * than the issue's audit could see — the header explains which extractor difference accounts for
+ * it. The two commonest shapes are the inset hairline `inset 0 1px 0 var(--fab-*)` (9) and the
+ * left accent bar `inset 3px 0 0 var(--fab-*)` (5); whether either becomes a token is the sweep
+ * child's decision, and until it is made they are debt rather than vocabulary.
+ */
+export const KNOWN_OFF_TOKEN_SHADOWS = knownDebt('offTokenShadows');
+
+/**
+ * 26 → 25 with issue 1503. The picker panels' hand-written `0 16px 36px var(--fab-overlay-dark-34)`
+ * left with the block that carried it: both pickers render through `SearchablePopover` now and
+ * take the shared panel's `var(--fab-shadow-lg)`, so the caller's own panel rule is deleted
+ * rather than out-specified. Paid down by adoption, not by a sweep.
+ *
+ * 25 → 27 with issue 1509's third phase, and NOTHING was added: two rows were SPLIT. The checked
+ * radio's inset ring and its focused restore were each written as one rule over a two-member list
+ * pairing the resolution option's radio with the Tool Requirements bonus row's, and this table
+ * keys a row by its whole selector list — so re-rooting the family, which a list cannot do by
+ * halves, turns each of those rows into two. Same declarations, same ranks, same source order, one
+ * more row apiece.
+ *
+ * 27 -> 26 with issue 1515's sixth phase, and the row VANISHES rather than shrinking: the recipes
+ * blocked-enable flash was a bespoke TOAST wearing `0 12px 40px var(--fab-overlay-dark-48)`, and
+ * it is a `<Notice blocking>` in the page's own flow now. A notice is a bar rather than a floating
+ * object, so it needs no elevation at all — the debt is PAID by the conversion, not moved.
+ *
+ * @see KNOWN_OFF_TOKEN_SHADOWS
+ */
+export const KNOWN_OFF_TOKEN_SHADOW_TOTAL = 26;
+
+/**
+ * A native `<select>` rendered by a Svelte template, keyed `file`.
+ *
+ * MEASURED at `6a2c3b46b`: 99 elements in 38 files, counted as `RegularElement` nodes by
+ * `svelte/compiler`. A raw text grep over the same corpus says 140 in 48 files, because it counts
+ * docblock prose and CSS — the parse is the pin, and the discrepancy is the reason why.
+ *
+ * No file carries the `<!-- native select: … -->` marker today. `BulkEditSelect.svelte` carries a
+ * DOCBLOCK reason, which is not the marker and does not exempt it; it is baselined like the rest.
+ * `InventorySystemSelector.svelte` carried one too until issue 1511, and what happened to it is
+ * the point of the distinction: the docblock went with the element it justified rather than
+ * outliving it as an exemption.
+ *
+ * ONE ROW WAS ADDED AFTER THAT MEASUREMENT, at issue 1392: the World Vocabulary screen's sort
+ * key, `scoped/WorldVocabularyPage.svelte`. It is the FIRST growth this table has taken since it
+ * was measured, which is worth saying out loud — a debt table that grows once without anyone
+ * noticing grows twice.
+ *
+ * It is banked rather than exempted, and the marker is not used: that exemption is for a surface
+ * which genuinely cannot host a Svelte component, and this one can. Nor is it banked for want of a
+ * picker. `apps/manager/SearchablePopover.svelte` is the shipped shared picker and COULD take this
+ * control today — `showSearch={false}` with `triggerHasPopup="listbox"` is the bare-list shape, and
+ * four call sites already render it that way.
+ *
+ * It was banked on the maintainer's decision, for CONVERGENCE. The control is the same one as the
+ * sort key select in `scoped/EntityListInspectorFrame.svelte` — one of that file's two, the other
+ * being a lane filter — which this page's own header records it duplicates deliberately.
+ * Converting one of a duplicated pair leaves the manager asking for a sort key two different ways
+ * a screen apart. Issue 1504 built `<Select>` and converted that frame; issue 1510 sweeps the
+ * manager's remaining call sites onto it, and `WorldVocabularyPage.svelte | 1` leaves there.
+ *
+ * 100 → 96 with issue 1504, and the rows fell in fours: `components/Pagination.svelte | 1`,
+ * `apps/manager/BulkEditSelect.svelte | 1` and `apps/manager/scoped/EntityListInspectorFrame.svelte
+ * | 2` are DELETED because all four elements now render `components/Select.svelte`, the app's own
+ * option list. The file count falls 39 → 36 with them. Paid down by conversion, not by a marker
+ * and not by a sweep: no `<!-- native select: … -->` comment was added, and every remaining row is
+ * still owed.
+ *
+ * Note which row did NOT move. `scoped/WorldVocabularyPage.svelte | 1` STAYS — that page's sort
+ * key is a separate element on a separate screen, and it is issue 1510's to convert. The pair the
+ * paragraph above calls duplicated is now asked two different ways, deliberately and briefly,
+ * which is the cost the convergence argument accepted rather than a defect this table hides.
+ *
+ * 96 -> 88 with issue 1520's fourth phase, and the row leaves entirely:
+ * `apps/InteractableConfigRoot.svelte | 8` is DELETED because all eight elements now render
+ * `components/Select.svelte`. The file count falls 36 -> 35 with it. Paid down by conversion,
+ * exactly as issue 1504's eight were - and it is the first payment made from OUTSIDE the manager
+ * and the player app, which is what the interactables windows joining the design system means.
+ *
+ * 88 -> 84 with issue 1520's FIFTH phase, and the last two interactables rows leave with it:
+ * `InteractableBrowserRoot.svelte | 1` and `interactables/InteractablesManagerRoot.svelte | 3` are
+ * DELETED because all four elements now render `components/Select.svelte`. The file count falls
+ * 35 -> 33 with them, and NO interactables row is left in this table - the three canvas windows
+ * carry no native select between them.
+ *
+ * 84 -> 78 with issue 1511, and the player app leaves the table entirely: `apps/crafting/
+ * RecipeBrowser.svelte | 2`, `apps/inventory/InventoryFilters.svelte | 1`,
+ * `apps/inventory/detail/InventoryBookDetail.svelte | 1`,
+ * `apps/inventory/detail/InventorySystemSelector.svelte | 1` and
+ * `apps/journal/JournalListShell.svelte | 1` are DELETED because all six elements now render
+ * `components/Select.svelte`. The file count falls 33 -> 28 with them.
+ *
+ * WHAT THAT PAYMENT ALSO BOUGHT, which no figure in this table records: the three
+ * `.fabricate-app select` rules in `styles/fabricate.css` themed a control the player app no
+ * longer renders, so they were DELETED rather than narrowed. A debt row is paid down when the
+ * element goes; a THEME for that element is only dischargeable when the LAST carrier under its
+ * root goes, and this is the first row-set in this table whose payment emptied a root. Every
+ * remaining row is the manager's (issue 1510's sweep and the root's own convergence, issue 1357)
+ * except `WorldVocabularyPage.svelte | 1`, which is the manager's too.
+ *
+ * 78 -> 71 with issue 1510's FIRST phase, and four settings-and-tabs rows leave with it:
+ * `apps/manager/system/CharacterPrerequisitesCard.svelte | 1`,
+ * `apps/manager/world/WorldCurrencyTab.svelte | 3`,
+ * `apps/manager/ImportFolderMappingModal.svelte | 1` and
+ * `apps/manager/GatheringEconomyView.svelte | 2` are DELETED because all seven elements now
+ * render `components/Select.svelte`. The file count falls 28 -> 24 with them. Paid down by
+ * conversion, not by a marker: no `<!-- native select: ... -->` comment was added.
+ *
+ * WHAT THAT PAYMENT ALSO BOUGHT, and it is not a row in any table: the primitive's own labelled
+ * form was REPAIRED in the same change. `Select label=` hosted on `<Field as="label">`, and a
+ * `<label>` forwards a caption click into the control it names — which, with the panel open,
+ * the capture-phase dismisser closes on `mousedown` and the forwarded click re-opens, so the
+ * list could never be closed from its own caption at any of its twelve shipped call sites. The
+ * host is `Field as="div"` now. Three of this phase's seven conversions adopted that form, which
+ * is why the repair belongs to the phase rather than to a caller sweep, and no caller changed.
+ *
+ * NO SHEET RULE WAS DELETED IN THIS PHASE, and the reason is measured rather than deferred:
+ * every one of the seven is painted by `.fabricate-field.manager-field select`, which keeps
+ * three root carriers, so there was nothing stranded to strip. What each converted caller states
+ * instead is the `width: 100%` that element-typed rule can no longer supply to a `<button>`.
+ */
+export const KNOWN_NATIVE_SELECT_ELEMENTS = knownDebt('nativeSelectElements');
+
+/** @see KNOWN_NATIVE_SELECT_ELEMENTS */
+export const KNOWN_NATIVE_SELECT_TOTAL = 71;
+
+/**
+ * A native `<select>` written into a JavaScript template string, keyed `file`.
+ *
+ * MEASURED at `6a2c3b46b`: four, all of them DialogV2 bodies, which cannot render a Svelte
+ * component and therefore cannot use the app's own option list. Issue 1504 states that exemption
+ * permanently; until it does, they are recorded here rather than silently outside the gate.
+ *
+ * The scan strips JavaScript comments first, and that is load-bearing: nine docblocks under
+ * `src/**` name `<select>` in prose to explain what a model binds to, and a text scan that
+ * counted them would be answered with a file-level exemption for exactly the modules the gate
+ * exists to police.
+ */
+export const KNOWN_NATIVE_SELECTS_IN_JS = knownDebt('nativeSelectsInDialogBodies');
+
+/** @see KNOWN_NATIVE_SELECTS_IN_JS */
+export const KNOWN_NATIVE_SELECTS_IN_JS_TOTAL = 4;
+
+/**
+ * A corner radius off the published ladder, keyed `file | property | value`.
+ *
+ * MEASURED at `6a2c3b46b`: 318 corner values across 140 keys, out of 776 radius declarations. 8px
+ * alone is 187 of them — 59% — which is what a ladder looks like when nothing enforces it. The
+ * count is per CORNER VALUE rather than per declaration, so `border-radius: 8px 8px 0 0` is two
+ * findings and one compliant pair; a per-declaration count would let a shorthand hide three
+ * offences behind one row.
+ *
+ * A `var()` token is RESOLVED through the corpus's own definitions and pinned as
+ * `raw => resolved`, so moving a banned literal into a private token does not pay the debt down.
+ * One token is live debt on this base: `--fab-books-control-radius` is 5px and is read three
+ * times. One other resolves to a compliant value and is correctly absent —
+ * `--fab-books-panel-radius` is 6px, which is on the ladder. The issue predicted the panel token
+ * would be debt; it measured compliant, so it has no row. A second worked example stood here
+ * until issue 1506 — `--crafting-essence-thumb-radius`, set from markup so the scan reached only
+ * its 6px fallback — and the art-tile unification deleted the component that declared it, so
+ * the token and the note about it go together.
+ */
+export const KNOWN_OFF_LADDER_RADII = knownDebt('offLadderRadii');
+
+/**
+ * RE-MEASURED at 318 → 314 in 140 → 139 rows by issue 1371, all four paid down rather than moved:
+ * `styles/fabricate.css` lost one 8px (73 → 72), one 10px (14 → 13) and one 12px (6 → 5) as the
+ * component screens' rebuild deleted the rules that held them, and
+ * `EssenceQuantityCard.svelte`'s single 10px went with its own rebuild, which is why that row is
+ * deleted rather than lowered. Banking a shrink is not bookkeeping: an unbanked one leaves the
+ * slot open for the next author to fill for free.
+ *
+ * 314 → 313 with issue 1503, and the row that moved is `styles/fabricate.css | border-radius |
+ * 8px`, 72 → 71: the deleted picker-panel block above carried an 8px corner, and the shared panel
+ * it now takes is 10px. It is a SECOND 8px occurrence, independent of the one issue 1371 deleted,
+ * so the two payments compound rather than describe the same corner.
+ *
+ * THE 10px ROW IS UNTOUCHED and stays owed. 10px is not on the ladder either — the shared panel's
+ * own corner is one of the occurrences that row counts — so that change moved one
+ * occurrence off an off-ladder value and onto a different off-ladder value's existing row. That
+ * is a net −1 rather than a snap, and the snap is still owed against the `10px` row.
+ *
+ * 313 → 312 with issue 1504, and this one IS a snap. `apps/manager/BulkEditSelect.svelte |
+ * border-radius | 8px | 1` is deleted: the component's whole scoped block went with its native
+ * `<select>`, and the control it became takes the shared select's `form` rung, whose corner is the
+ * ladder's 9. So the row leaves because a control moved onto a rung, which is the one way this
+ * number is meant to fall. The key count falls 139 → 138 with it.
+ *
+ * 312 → 311 with issue 1505, and it is the same kind of snap. `apps/crafting/ShoppingList.svelte
+ * | border-radius | 8px` falls 2 → 1: the three summary cards became `<StatBox>`es, whose corner
+ * is the specimen's — and the ladder's — 9. The file's other 8px is an unrelated rule and stays,
+ * so the KEY count is unchanged at 138. The manager's converted stat tiles move NO row in either
+ * direction: they read `var(--fab-books-panel-radius)`, which resolves to a compliant 6px and
+ * therefore never had one.
+ *
+ * 311 → 310 with the same issue's alchemy conversion, and it is a third snap of the same kind.
+ * `apps/alchemy/Workbench.svelte | border-radius | 10px` falls 5 → 4: the last-brew banner's
+ * corner went with its scoped block, and the `<Notice>` it became takes the specimen's r11. The
+ * wrapper the caller keeps carries only its `margin-bottom`, so nothing brings the radius back.
+ *
+ * 310 → 308 with the same issue's `Callout` convergence, and both movers are the snap this
+ * number exists to reward. `apps/manager/Callout.svelte | border-radius | 8px | 1` is DELETED —
+ * the primitive's own corner takes the specimen's r11 — and `styles/fabricate.css |
+ * border-radius | 10px` falls 13 → 12, because the deleted `[data-failure-salvage-note]`
+ * override carried one of those thirteen. The key count falls 138 → 137 with the first.
+ *
+ * 308 -> 307 with issue 1520's fourth phase, and it is a SNAP rather than a deletion:
+ * `apps/InteractableConfigRoot.svelte | border-radius | 3px | 1` is the reference-id pill in the
+ * panel's facts row, and 3px is off the ladder at every band. It takes the 6px rung the ladder
+ * publishes for a chip at or below 24px, so the corner moves by three pixels and the row leaves.
+ * The key count falls with it. The panel's other two corners were the type chip's 999px and the
+ * unconfigured section's 6px, both compliant and neither on this table; the chip's went to
+ * `Chip` and the section's went with the box the `<Notice>` replaced.
+ *
+ * 307 -> 301 with issue 1520's FIFTH phase, and all six are snaps of the same kind, in the two
+ * remaining canvas windows. `apps/InteractableBrowserRoot.svelte | border-radius | 3px | 1` is the
+ * row thumbnail and `| 4px | 3` are the entry row and the tab strip's two top corners; all four
+ * take the 6px rung the ladder publishes at or below the 24px band, so both rows LEAVE and the key
+ * count falls by two. `styles/fabricate.css | border-radius | 4px` falls 24 -> 22 as the Manage
+ * Interactables panel's own 4px fieldset and row corners go with the `fab-im-*` family that moved
+ * into that root's scoped block, snapped to the same 6px rung on the way.
+ *
+ * NO INTERACTABLES ROW IS LEFT IN THIS TABLE. That is worth stating because it is the last of the
+ * four ceilings this change published, and the only one that came in UNDER its own plan: the plan
+ * priced 303, having counted the two Svelte rows and not the two sheet occurrences that left with
+ * them.
+ *
+ *
+ * 301 → 293 with issue 1514's alchemy-and-journal conversion, and every one of the eight is a
+ * snap of the same kind: a raw `<img>` thumbnail whose scoped rule carried the corner became a
+ * `<Medallion>`, whose fixed 9px IS the ladder's rung. Four rows fall by one —
+ * `alchemy/ComponentInventoryColumn.svelte | 8px` 2 → 1, `alchemy/KnownRecipesColumn.svelte |
+ * 8px` 3 → 2, `alchemy/Workbench.svelte | 10px` 4 → 3 and `journal/RunDetail.svelte | 8px`
+ * 2 → 1, because each file draws another off-ladder corner that is not a tile — and four rows at
+ * count 1 are DELETED outright, so the key count falls 134 → 130:
+ * `journal/RecentResults.svelte | 5px`, `journal/RunDetail.svelte | 5px`,
+ * `journal/StepDetails.svelte | 5px` and `journal/TimeRemainingBox.svelte | 8px`.
+ *
+ * The last of those four is the one that is NOT a tile: `TimeRemainingBox`'s whole scoped block
+ * went with the well it drew, and the `<Callout>` it became takes the specimen's r11. The two
+ * tiles at 6px — `journal/HistoryRow` and `journal/RunCard` — move nothing in either direction,
+ * because 6 is already on the ladder and neither ever had a row.
+ *
+ * 300 → 299 with the same issue's INVENTORY phase, and it is one occurrence of the same snap:
+ * `inventory/detail/InventoryComponentDetail.svelte | border-radius | 8px` falls 2 → 1 as the
+ * source-actor portrait's `.inventory-detail-portrait` rule goes and `<Avatar shape="square">`
+ * takes its place at the ladder's own 9px. The row SURVIVES rather than vanishing, because the
+ * same file draws `.inventory-detail-row` at 8px too and that is a row, not a tile. The key count
+ * does not move.
+ *
+ * Nothing else in that phase touches a corner. The three banner and empty conversions each
+ * DELETE a rule drawing 8px or 9px — `.inventory-detail-broken-banner` r8, `.salvage-misconfigured`
+ * r9 — but 9 is on the ladder and the r8 banner's rule is counted under `.inventory-detail-row`'s
+ * own row above rather than under a row of its own, which is why the total falls by one and not
+ * by three. Re-derived from the JSON at this head rather than reasoned about.
+ *
+ * 299 → 296 with the same issue's CRAFTING-AND-ROOTS phase, three occurrences across three rows
+ * and each of them a rule DELETED or SNAPPED by a conversion rather than a value edited:
+ *
+ *  - `crafting/ComponentSourcesBar.svelte | 8px` 4 → 3. The source-portrait button drew its own
+ *    r8 tile; `<Avatar shape="square">` draws the tile now at the ladder's own 9px, and the
+ *    button keeps a radius only so no sliver of it shows outside the tile's corner. The row
+ *    SURVIVES because the same file draws the remove overlay, the add button and the picker
+ *    popover at 8px, and none of those three is a tile.
+ *  - `crafting/RecipeDetailHeader.svelte | 8px` 2 → 1. The blocking well's r8 goes with its rule
+ *    as the well becomes a non-blocking `<Notice>` at the specimen's r11. The row survives
+ *    because the header's own dashed frame is r8 too, and that is a frame, not a banner.
+ *  - `apps/FabricateAppRoot.svelte | 10px` 2 → 1. The companion-fault strip's r10 goes the same
+ *    way, into `<Notice blocking>`'s r11. The root's other 10px corner is untouched.
+ *
+ * The phase's other deletions move nothing: `.crafting-source-option-portrait` drew 6px, the
+ * essence pool's track and fill drew 999px and the stamina track drew 999px — all three are
+ * published rungs and none ever had a row. Re-derived from the JSON at this head.
+ *
+ * 289 → 288 with issue 1513, one occurrence on one row: `crafting/ComponentSourcesBar.svelte |
+ * 8px` 3 → 2. The picker popover this file positioned for itself — `position: absolute`,
+ * `z-index: 4000` and an 8px corner — is `SearchablePopover`'s panel now, and the corner goes
+ * with the rule rather than being snapped: the shared panel draws its own, so restating a radius
+ * here would be a second copy of a value this file no longer owns. The row SURVIVES on its other
+ * two, the remove overlay and the add trigger, and neither is a panel. Nothing else in the phase
+ * touches a corner — the option row's own 6px was a published rung and never had a row.
+ *
+ * 288 -> 285 with issue 1515's sixth phase (on top of issue 1513's 289 -> 288), three occurrences across two rows and every one of
+ * them a rule DELETED by a conversion rather than a value edited:
+ *
+ *  - `apps/manager/GatheringPartiesTab.svelte | 8px` 3 -> 1, which is TWO rules. The parties
+ *    search row drew its own r8 box and the pane's refusal banner drew another; the row is layout
+ *    only now, with `ManagerSearchField` drawing the pill at the ladder's own 6px, and the banner
+ *    is `<Notice>` at the specimen's r11. The row SURVIVES rather than vanishing because the same
+ *    file draws its create button at r8, and that is a button rather than a field or a banner.
+ *  - `styles/fabricate.css | 10px` 12 -> 11. The recipes blocked-enable toast's r10 goes with the
+ *    rule that drew it, into `<Notice>`'s own r11.
+ *
+ * 285 -> 284 with issue 1515's seventh phase: `styles/fabricate.css | 5px` 14 -> 13. The
+ * currency sub-unit pill's own r5 rule goes with the pill, which is the shared chip now and
+ * draws the ladder's own corner from the primitive's scoped block.
+ *
+ * 284 -> 283 with issue 1515's review round 1: `apps/manager/ToolsBrowserView.svelte | 8px` 3 -> 2.
+ * The Tools cohort switch was a hand-rolled radiogroup with its own r8 track, and the track goes
+ * with the rule as the control becomes `<SegmentedControl density="compact" tone="accent">` — the
+ * shared primitive draws the corner from its own scoped block, so restating one here would be a
+ * second copy of a value this file no longer owns. The row SURVIVES on the file's other two 8px
+ * corners, neither of which is a segmented track. The same deletion also took a 6px segment
+ * corner, which is a published rung and never had a row.
+ *
+ * Re-derived from the JSON at this head rather than reasoned about, by the two-run procedure: the
+ * row was banked first and the assertion reported the total the tree actually holds.
+ *
+ * 283 → 281 with issue 1511, two occurrences over two rows, both paid by the same conversion:
+ * `crafting/RecipeBrowser.svelte | 8px` 3 → 2 as the two browse filters' own select rule goes and
+ * the trigger takes the `inline` rung's 7px, the row SURVIVING on the filter toggles' 8px; and
+ * `inventory/InventoryFilters.svelte | 8px` 1 → 0, DELETED, that file's only off-ladder corner
+ * having been the sort select's. The two other converted files moved a corner without moving a
+ * row: `InventoryBookDetail`'s page-size select and the journal sort both drew 6px, a published
+ * rung, and both are 7px now.
+ *
+ * @see KNOWN_OFF_LADDER_RADII
+ */
+export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 277;
+
+/**
+ * A Svelte SCOPED STYLE reading an area-scoped `--fab-*` property, keyed `file | property`.
+ *
+ * MEASURED at `6a2c3b46b` by `tests/token-generation-gate.test.js`, and RE-MEASURED after issue
+ * 1508's re-root. 17 of the 141 distinct `--fab-*` names have every one of their declaration
+ * sites inside a `.fabricate-manager` compound — the predicate `areaScopedProperties` applies is
+ * that EVERY compound of EVERY rule declaring the name matches `.fabricate-manager` with a
+ * right-hand boundary — and 12 of those 17 carry no `--fab-manager-`
+ * prefix, which is why that gate computes its population instead of matching the prefix, and why
+ * these rows appeared at all. The pair was 24 and 19 before the re-root; see
+ * {@link KNOWN_AREA_SCOPED_STRING_USES} for the seven names that left.
+ *
+ * All six read ONE property, `--fab-recipe-control-font`, for their control type. Every one of
+ * the three components does render inside the manager today and not one of them can prove it: a
+ * component is placed in a DIRECTORY, not in a DOM subtree, so where the host is not under
+ * `.fabricate-manager` the property is undefined and the declaration falls back to inheritance
+ * without failing.
+ */
+export const KNOWN_AREA_SCOPED_STYLE_READS = knownDebt('areaScopedStyleReads');
+
+/** @see KNOWN_AREA_SCOPED_STYLE_READS */
+export const KNOWN_AREA_SCOPED_STYLE_READ_TOTAL = 6;
+
+/**
+ * An area-scoped `--fab-*` property spelled into a template or module string, keyed
+ * `file | property`.
+ *
+ * MEASURED at `6a2c3b46b`, over the part of each file the CSS scans do NOT read, and RE-MEASURED
+ * after issue 1508's re-root. TWO sites remain, and they are one mistake: `WorldToolEntryPage` and
+ * `ToolBreakageTab` READ `--fab-tool-breakage-chance-track-gradient` through a component prop.
+ * That shape is the `var(` one, which is also the pair the issue behind this baseline predicted.
+ *
+ * THREE `ChanceSlider` ROWS RETIRED WITH ISSUE 1508'S RE-ROOT, and they are not a repair of the
+ * debt — they are the re-root's intended effect. The component DECLARES
+ * `--fab-chance-slider-track-gradient`, `--fab-drop-rate-color` and `--fab-drop-rate-value` into
+ * an inline `style` attribute exactly as before; what changed is where the sheet declares them.
+ * Issue 1508 re-rooted the slider family's rules from `.fabricate-manager .manager-drop-rate-*`
+ * onto `.fabricate-slider …`, so those three names no longer have every declaration site inside
+ * the area, no longer measure as area-scoped, and are rightly no longer flagged. A family-rooted
+ * property travels with the component: it is declared wherever the component's own root class is
+ * emitted, which is the guarantee the area-scoped shape could not give, and it is why the debt
+ * ended rather than moved.
+ *
+ * SEVEN names left the area-scoped set in that re-root, 24 → 17. Three had rows here and so read
+ * as VANISHED: `--fab-chance-slider-track-gradient`, `--fab-drop-rate-color`,
+ * `--fab-drop-rate-value`. Four left silently, having none: `--fab-toggle-track`,
+ * `--fab-toggle-track-border`, `--fab-toggle-knob` (re-rooted onto `.fabricate-toggle`) and
+ * `--fab-chance-slider-thumb-radius` (onto `.fabricate-slider`). The exact-set pin that would
+ * make a silent departure loud is a follow-up; this note is the published record until it lands.
+ */
+export const KNOWN_AREA_SCOPED_STRING_USES = knownDebt('areaScopedStringUses');
+
+/** @see KNOWN_AREA_SCOPED_STRING_USES */
+export const KNOWN_AREA_SCOPED_STRING_USE_TOTAL = 2;
+
+/**
+ * A name-bearing prop defaulting to untranslated English, keyed `file | prop | default`.
+ *
+ * MEASURED at `6a2c3b46b` by `tests/design-system-required-names.test.js`, over the 26 flat
+ * `src/ui/svelte/components/*.svelte` files and the 31 manifest rows under `apps/manager/`. Each
+ * of these ships a hard-coded English string as the accessible name of a control, which no world
+ * can translate: `game.i18n` never sees a default written into a `$props()` destructuring.
+ *
+ * A LOCALIZATION KEY default is not untranslated text and is correctly absent: `DropZone` defaults
+ * its label to `'FABRICATE.DropZone.DefaultLabel'`, which resolves through the lang files like any
+ * other key.
+ *
+ * The issue predicted eight rows and the gate measured TEN, on the same defects. The difference is
+ * granularity rather than scope: the key is (file, prop, text), so `ManagerColorPicker`'s two
+ * defaults and `ManagerColorPopover`'s three are five rows here where the issue's prose collapsed
+ * them into one sentence naming three strings. The finer key is what stops a swap inside one file
+ * — 'Custom hex' becoming 'Hex value' — from leaving the count unmoved.
+ *
+ * ONE ROW HAS BEEN PAID DOWN, 10 → 9 (issue 1517).
+ * `EditorValidationSurface.svelte | viewLabel | View | 1` is gone because that surface now takes
+ * the `DropZone` route: its `viewLabel` defaults to `'FABRICATE.Admin.Manager.Validation.View'`
+ * and the template resolves it through `localize()`, so the View button on all nine validation
+ * screens carries a name a world can translate. The row is DELETED here rather than left banked,
+ * because `assertRatchet` reports an un-banked pay-down as `VANISHED` and fails on it as loudly
+ * as on a regression — a baseline is an exact set in both directions.
+ *
+ * The remaining nine are unmoved and are the same defects the measurement found.
+ */
+export const KNOWN_UNTRANSLATED_NAME_DEFAULTS = knownDebt('untranslatedNameDefaults');
+
+/** @see KNOWN_UNTRANSLATED_NAME_DEFAULTS */
+export const KNOWN_UNTRANSLATED_NAME_DEFAULT_TOTAL = 9;
+
+/**
+ * An `aria-label` bound to a prop that defaults to the empty string, keyed `file | expression`.
+ *
+ * MEASURED at `6a2c3b46b`: two, of the 45 `aria-label` bindings in the corpus. Ten of the 45 are
+ * already written `aria-label={x || undefined}`, and only these two bind a prop that defaults to
+ * `''` — which renders `aria-label=""` and SUPPRESSES the element's accessible name rather than
+ * leaving it to the content. Every other unguarded binding defaults to `undefined` or to a
+ * non-empty string, neither of which can render an empty attribute, so none of them is a violation
+ * of this obligation and none is a row.
+ *
+ * `RowDisclosure` is the one the issue predicted. `ManagerModal` is the one it did not, and it is
+ * the worse of the two: the binding is on a `role="dialog" aria-modal="true"` root, so a modal
+ * opened without a title announces as an UNNAMED DIALOG — the case a screen-reader user has no way
+ * to recover from, because the surrounding page is inert. The issue's audit missed it because it
+ * matched `aria-label` only against props whose NAME looked like a label, and this prop is called
+ * `title`.
+ *
+ * `IconButton` and `SelectionCheckbox` already ship the guarded shape and are the pattern.
+ */
+export const KNOWN_EMPTY_NAME_BINDINGS = knownDebt('unguardedEmptyNameBindings');
+
+/** @see KNOWN_EMPTY_NAME_BINDINGS */
+export const KNOWN_EMPTY_NAME_BINDING_TOTAL = 2;
+
+/**
+ * A non-form element with `tabindex="0"` and an interactive role, keyed `file`.
+ *
+ * MEASURED at `6a2c3b46b`: 21 elements in 17 files, NONE of them declaring `data-keyboard-focus`.
+ * Every one can hold focus, and Foundry's `KeyboardManager#hasFocus` returns false for all of
+ * them — so Space pauses the game and the arrows pan the canvas behind the open application.
+ *
+ * The ten roving `tabindex={active ? 0 : -1}` sites in this corpus are outside this population by
+ * construction: each either carries no static `role` or is a `<button>`, which the clause below
+ * already counts.
+ *
+ * 21 -> 19 with issue 1520's FIFTH phase, and it is the FIRST payment this population has taken.
+ * `apps/InteractableBrowserRoot.svelte | 2` is DELETED because both members now declare
+ * `data-keyboard-focus="true"`, which is the remedy this gate's own message prescribes.
+ *
+ * WHICH TWO ELEMENTS THEY WERE IS WORTH RECORDING, because the row was twice attributed to the
+ * wrong ones while this change was planned. They are the browser's two `tabpanel` SCROLL
+ * CONTAINERS, not the tab strip above them: the tab buttons carry a roving `tabindex` EXPRESSION,
+ * which routes them to the disjoint `roving` population, AND they already declared themselves - so
+ * they were excluded twice over and no conversion of the tab strip could ever have cleared this
+ * row. The panels are what a GM tabs into, each is its own scroll box, and until this phase
+ * Foundry kept its own bindings live over both.
+ *
+ * 19 -> 18 with issue 1515's browse-list phase, and the population itself drops 21 -> 20.
+ * `apps/manager/SystemsBrowserView.svelte | 1` is DELETED rather than paid: the element was the
+ * system row `<div>`, which carried `role="row"` and `tabindex="0"` so a whole table row sat in
+ * the tab order. The row is a `listitem` now and the thing a keyboard reaches is the identity
+ * `<button>` inside it, so there is no role-bearing focus target left to declare. Only ONE of the
+ * four converted browse views appears here because only this one's row had a `tabindex` at all.
+ *
+ * 18 -> 17 at issue 1517's review round, and this row was paid down by a change that was not
+ * about it. `apps/manager/ToolEditView.svelte | 1` is DELETED: the Tool editor's tab panel is the
+ * destination a ROUTE-ONLY validation row falls back to — a row that names a tab and no control
+ * leaves focus on a button the route change unmounts, and `<body>` is where every Foundry
+ * keybinding is live — so it had to become focusable programmatically and declare itself. It was
+ * the one panel in the manager carrying `tabindex="0"`, an empty scroll container in the Tab order
+ * between the strip and the first field, and it is now `-1` with `data-keyboard-focus="true"`,
+ * which is exactly the remedy this gate's own message prescribes. The row is DELETED rather than
+ * left banked, because `assertRatchet` reports an un-banked pay-down as VANISHED and fails on it
+ * as loudly as on a regression: a baseline is an exact set in both directions.
+ *
+ * The four sibling panels that gained the same pair in that change — the recipe, recipe-item,
+ * essence and Checks panels — never entered this population at all: it reads a STATIC
+ * `tabindex="0"` beside an interactive role, and all four went straight to `-1`.
+ */
+export const KNOWN_ROLE_FOCUS_TARGETS = knownDebt('roleFocusTargets');
+
+/** @see KNOWN_ROLE_FOCUS_TARGETS */
+export const KNOWN_ROLE_FOCUS_TARGET_TOTAL = 17;
+
+/**
+ * A `<button>` outside any `<form>` that does not declare `data-keyboard-focus`, keyed `file`.
+ *
+ * MEASURED at `6a2c3b46b`: 280 elements in 97 file rows. RE-MEASURED on this tree at 277 in 94,
+ * after the two payments recorded below. The corpus holds 303 formless buttons across 108 files
+ * and 26 of them declare, so those 26 are compliant and correctly absent. `ActionMenu.svelte` is
+ * the case worth naming: it emits the attribute on the trigger it opens with, and a baseline keyed
+ * on the POPULATION rather than on the debt would have listed it as owing something it does not.
+ *
+ * `hasFocus` returns `!!focused.form` for a BUTTON, so a button with no ancestor form is exactly
+ * as unrecognised as a bare `div`. This is the largest single row set in this file and it is
+ * meant to collapse: once the shared primitives emit the attribute (issues 1502 and 1508) most of
+ * it goes at once.
+ *
+ * RE-MEASURED at 280 → 278 in 97 → 95 file rows by issue 1371, which paid two rows down by
+ * rebuilding the files that held them: `ComponentsBrowserView.svelte` and
+ * `ComponentIdentityStrip.svelte` each carried one undeclared formless button and now carry none.
+ * The banking is the point rather than the bookkeeping — an unbanked shrink leaves the slot open
+ * for the next author to fill for free. That lane's three NEW inline-link buttons are absent from
+ * this table because they declare `data-keyboard-focus="true"`, which is what the gate asks for;
+ * they were never banked as debt.
+ *
+ * RE-MEASURED again at 278 → 277 in 95 → 94 file rows by issue 1502, which made `IconButton`
+ * emit the attribute and so retired the single row it owned. Its SIZE is the point — one row, not
+ * the hundreds the runtime change actually reaches. This scanner counts SOURCE elements: a
+ * `RegularElement` `<button>` outside a form, never a component call site. So `IconButton`'s own
+ * `<button>` left, while `ManagerButton`'s `<svelte:element>` root and the six hand-written
+ * `manager-icon-button` carriers in `CraftingSystemManagerRoot.svelte` are invisible to it and
+ * stay. Every rendered instance of both primitives outside a form now answers `hasFocus` true;
+ * this number does not say so, and must not be read as if it did.
+ */
+export const KNOWN_FORMLESS_BUTTONS = knownDebt('formlessButtons');
+
+/**
+ * 277 → 274 with issue 1503, across three rows: `SearchablePopover.svelte` 3 → 2,
+ * `IconPicker.svelte` 2 → 1 and `EssenceSourceSelector.svelte` 3 → 2.
+ *
+ * ONE `<button>` accounts for all three. The pickers' option rows moved into the primitive, and
+ * the primitive's own option row now writes a literal `data-keyboard-focus="true"` — because it
+ * gained `tabindex="-1"` to carry an `aria-activedescendant` listbox, and a formless button in
+ * the tab order that does not declare itself is exactly what this ledger is for. The two
+ * pickers' remaining rows are their triggers (and the source picker's clear button), which are
+ * caller-owned markup and stay.
+ *
+ * The primitive's own TRIGGER is deliberately still counted: its attribute arrives through
+ * `{...triggerAttributes}`, which this source-level scanner cannot see, so nothing is being
+ * quietly banked that the scanner did not measure.
+ *
+ * 274 → 272 with issue 1508's third phase, across two rows that leave entirely:
+ * `StatusToggle.svelte` 1 → 0 and `ModifierPillSelect.svelte` 1 → 0. Each declares
+ * `data-keyboard-focus="true"` on the one formless `<button>` it writes — the toggle's `button`
+ * host, and the pill row's remove button.
+ *
+ * ITS SIZE IS THE POINT, exactly as issue 1502's one-row entry above records. This scanner counts
+ * SOURCE elements, never component call sites, so `StatusToggle`'s single `<button>` leaves while
+ * the 42 render sites across 28 importing files that now answer `hasFocus` true are invisible to
+ * it. `ModifierPillSelect`'s MENU button is `SearchablePopover`'s trigger and was never on this
+ * row. The two hand-rolled `manager-status-toggle` buttons in `CraftingSystemManagerRoot.svelte`
+ * are `<span>`s and a `<button>` inside the root's own rows, and their file's row is unmoved.
+ *
+ * 272 -> 253 with issue 1520's fourth phase, and it is the largest single payment this table has
+ * taken: `apps/InteractableConfigRoot.svelte | 19` leaves whole. Nineteen is also the file's RAW
+ * button count, so nothing is left behind - sixteen became `<ManagerButton>`, three became
+ * `<StatusToggle>`, and both primitives write `data-keyboard-focus="true"` themselves.
+ *
+ * It is the same INVISIBILITY this table records above, read the other way. The scanner counts
+ * SOURCE elements, so a file that renders nineteen shared buttons scores zero while a file that
+ * writes one raw `<button>` scores one. That is why this row could only ever be paid by
+ * conversion, and why the payment is nineteen at once rather than nineteen attributes.
+ *
+ * 253 -> 243 with the same change's FIFTH phase, and both remaining interactables rows leave
+ * whole: `apps/InteractableBrowserRoot.svelte | 4` and
+ * `apps/interactables/InteractablesManagerRoot.svelte | 6`. The browser's four are its per-row
+ * placement pair, now `<IconButton>`; the manager's six are its promote toggle, its confirm and
+ * cancel, and its three per-row actions, now `<ManagerButton>` and `<IconButton>`.
+ *
+ * THE BROWSER'S RAW COUNT IS SIX AND ITS ROW WAS FOUR, which is the one asymmetry worth naming
+ * here: the two tab-strip buttons carry `data-keyboard-focus="true"` already and were never debt.
+ * They are also the two this phase deliberately does NOT convert - a tablist is a keyboard
+ * contract rather than a radio group - so the row leaves without the file's raw count reaching
+ * zero, and that is correct rather than an omission.
+ *
+ * NO INTERACTABLES ROW IS LEFT IN THIS TABLE.
+ *
+ * 243 → 242 with issue 1514's inventory phase, and the row VANISHES rather than shrinking:
+ * `apps/inventory/InventoryFilters.svelte` declared exactly one, the kind filter's five
+ * `<button aria-pressed>` pills sharing a rule, and the strip is a `SegmentedControl` now. Its
+ * segments are `<label>`s over real radios, which Foundry recognises without a `<form>` at all —
+ * so the debt is PAID rather than moved, and the slot is closed rather than left open for the
+ * next author to fill.
+ *
+ * 242 → 241 with issue 1513, one occurrence on one row: `crafting/ComponentSourcesBar.svelte`
+ * 4 → 3. The picker's option row was a raw `<button>` this file wrote; it is
+ * `SearchablePopover`'s row now, and the primitive writes a literal `data-keyboard-focus="true"`
+ * on it — the same payment issue 1503 recorded three times over when the icon and source
+ * pickers' rows moved into that same element. The row SURVIVES on the three raw buttons the
+ * file still writes: the source portrait, its remove overlay and the picker TRIGGER, which is
+ * this caller's own button through the `trigger` snippet and takes its attribute through a
+ * spread this source-level scanner cannot see. Nothing is being banked that the scanner did not
+ * measure — that trigger is deliberately still counted, exactly as the primitive's own is.
+ *
+ * 241 -> 240 with issue 1515's fifth phase, and the row SHRINKS rather than leaving:
+ * `apps/manager/ToolsBrowserView.svelte` 5 -> 4. The Tools list's per-row enable switch is a
+ * `<StatusToggle>` now, and the primitive writes `data-keyboard-focus="true"` on its `button`
+ * host, so the debt is paid by conversion rather than by an attribute. The file's other four
+ * raw buttons — the sort-direction switch, the row's select target, and the row's `Edit rules`
+ * and `Add to system` routes — are unconverted and stay.
+ *
+ * 240 -> 239 with issue 1515's sixth phase, and the row VANISHES rather than shrinking:
+ * `apps/manager/BooksScrollsView.svelte` declared exactly one, the library row's identity
+ * `<button>`, and it carries `data-keyboard-focus="true"` now. That is the whole of that file's
+ * raw-button population, so the slot is closed rather than left open for the next author to fill.
+ *
+ * 239 -> 231 with issue 1515's seventh phase, across four files, three SHRINKING and one
+ * VANISHING. The availability pill family's hand-written remove crosses were eight raw
+ * `<button>` elements written four ways, and every one of them is the shared chip's own declared
+ * control now: `GatheringTaskEditView` 10 -> 7, `GatheringEventEditView` 5 -> 3,
+ * `environment/EnvironmentOverviewTab` 4 -> 2, and `world/WorldCurrencyTab` vanishes, its single
+ * raw button having been the currency sub-unit's remove cross. The debt is PAID by conversion
+ * rather than by an attribute, which is why three of the four slots close by that much and the
+ * fourth closes outright. The danger-tag row's cross is the one that does NOT convert - its six
+ * colour levels are a ramp no chip tone states - so it declares the attribute in place and is
+ * absent from these rows for that reason rather than for the other one.
+ *
+ * @see KNOWN_FORMLESS_BUTTONS
+ */
+// #1648: ActionsPanel delegates its four former raw controls to RunActionBar (230 - 4).
+export const KNOWN_FORMLESS_BUTTON_TOTAL = 226;
+
+/**
+ * A shared component outside `components/` with no manifest row, keyed `path`.
+ *
+ * RE-MEASURED by `tests/design-system-primitives.test.js` after issue 1506's art-tile
+ * unification: 45 files under `src/ui/svelte/` but outside `components/` are imported by two or
+ * more independent callers — the bar `openspec/specs/design-system/spec.md` sets for membership
+ * of the primitive set — and carry no row in either manifest table. 71 clear the bar in that
+ * domain and 26 are registered.
+ *
+ * This register is the EXCLUSION MECHANISM rather than a list of offenders. A path leaves it only
+ * by gaining a manifest row, in either table, and enters it only by being added here, so a name
+ * arriving or departing unrecorded is a failure. That is what settles the domain question issue
+ * 1481 raises: nested manager directories ARE in domain, and the answer is now a table rather
+ * than a reading.
+ *
+ * ONE ROW SWAPPED BY ISSUE 1371, and the total is unchanged at 49 because the two movements are
+ * opposite. `ScopedPlaceholderPage.svelte` LEFT, measured 2 importers → 0: that lane gave the
+ * world Component catalogue and entry real bodies, and they were its only two callers, so it
+ * dropped below the bar rather than gaining a manifest row. `ScopedEntityPreview.svelte` ARRIVED,
+ * measured 1 importer → 3: `ComponentEditView.svelte` and `WorldComponentEntryPreviewRail.svelte`
+ * joined `ToolBehaviorPreview.svelte`, which put it over the bar.
+ *
+ * IT IS REGISTERED RATHER THAN ADJUDICATED, which is what this table is for and is also the
+ * smaller claim. Deciding whether a preview belongs in the shared vocabulary needs a `library`
+ * specimen and an `evidence` derivation, or a `notAPrimitive` row with the measurement behind it;
+ * recording it here says only that it crossed the bar and that the decision is outstanding.
+ */
+/**
+ * An ART TILE render site whose `size` is off the published art ladder, keyed `path | size`.
+ *
+ * ── WHY THIS EXISTS, AND WHY IT IS A RECORD RATHER THAN A CORRECTION ────────────────────
+ * The published ladder for the icon chip is 22 / 26 / 30 / 38, default 26. Measured when issue
+ * 1506 unified the tree's art tiles into one primitive, the shipped population renders at
+ * nineteen distinct numeric sizes plus one `dynamic` size key, and only four of the nineteen are
+ * rungs. Restricting `size` would therefore
+ * move almost every art tile in the app, which is a geometry correction with its own frames and
+ * its own screen-by-screen judgement; the size-ladder sweep owns that, and this table is what
+ * lets that sweep LOWER a pin rather than re-derive a census from nothing.
+ *
+ * ── WHY IT IS MEASURED AFTER THE UNIFICATION AND NOT BEFORE ─────────────────────────────
+ * Before that change the same population was spread across four implementations — the manager's
+ * tile, two crafting tiles and three raw image elements — and every key would have named a file
+ * that no longer renders one. A pre-unification baseline is wholly VANISHED afterwards, which
+ * `assertRatchet` reports as loudly as a new row and for no useful reason.
+ *
+ * ── THE TWO `dynamic` KEYS ARE EXPLICIT, AND THAT IS THE POINT ──────────────────────────
+ * Two sites forward a `size` this scan cannot read: the player inventory detail header passes
+ * its own `{size}` prop through, and the scoped list inspector's row tile takes one from a
+ * caller-supplied descriptor. Each is recorded as an explicit `dynamic` key rather than dropped,
+ * because a silently dropped site is invisible to the `scanned` floor as well as to the table —
+ * a scan that had stopped reading expression attributes would look like a tidier tree.
+ *
+ * The ladder-COMPLIANT sites are deliberately absent: this is a debt table, and eight render
+ * sites currently sit on a rung. One of them is a REGRESSION rather than a survivor and is
+ * recorded here as such — the recipe-item contents row drew at 30px on radius 7 with no edge,
+ * the only art tile in the tree already compliant on both, and converting it to the shared
+ * primitive kept its size while moving its corner to a flat 9px and adding a hairline. Radius is
+ * not recordable on a `path | size` table, so it is stated in that change's pull request.
+ *
+ * ── TWO PRIMITIVES, ONE POPULATION, AND WHY THE SAME CHANGE MOVED NO KEY ────────────────
+ * The same issue then shipped `components/Avatar.svelte`, an ACTOR's portrait, and converted the
+ * GM Knowledge surface's roster row and detail header onto it. The population is unchanged at 65
+ * because a call site is a call site whichever tile it renders, and the two keys those sites hold
+ * — `KnowledgeRoster.svelte | 34` and `KnowledgeView.svelte | 50`, still the tree's only carriers
+ * of either value — did not move either, because THIS TABLE IS KEYED BY CALL SITE AND NOT BY
+ * PRIMITIVE. What that conversion had to move instead is the extractor's own list of tile names,
+ * and that is load-bearing rather than clerical: with the portrait missing from it those two
+ * sites leave the scan silently and `assertRatchet` reports them VANISHED, which is a scan that
+ * stopped seeing a tile wearing the costume of debt that had been paid. The two names default to
+ * different rungs — 40 for the icon chip and 32 for the portrait — so the list carries the
+ * default beside each name rather than one constant beside the scan.
+ */
+export const KNOWN_OFF_LADDER_ART_SIZES = knownDebt('offLadderArtSizes');
+
+/**
+ * @see KNOWN_OFF_LADDER_ART_SIZES
+ *
+ * MEASURED after issue 1506's art-tile unification and re-measured after the portrait shipped:
+ * 57 off-ladder render sites across 40 `path | size` keys, out of 65 art-tile render sites in the
+ * tree — 63 icon chips and 2 portraits, with 8 of the 65 on a rung. Unchanged by the portrait
+ * conversion, for the reason the docblock above gives.
+ *
+ * 59 ACROSS 42 KEYS since issue 1514 moved the player gathering tab's two stateless raw thumbs
+ * onto the tile, and both new rows are the price the guidance above names by hand — a decision
+ * about one tile, stated with the rung it rejected:
+ *
+ *  - `GatheringTaskDrops.svelte | 36`. The drop row's tile renders at 36 and 38 is the nearest
+ *    rung. It was REJECTED because 38 is the only rung above it and the row is a 52px summary
+ *    whose height the tile already sets; snapping up would grow every drop row in the panel,
+ *    which is a layout move, and the conversion this row records preserves geometry by rule.
+ *  - `GatheringTaskRequirements.svelte | 40`. The tool card's tile renders at 40 — the icon
+ *    chip's own DEFAULT, and still off the published art ladder, which is the conflation
+ *    `ART_TILE_COMPONENTS` records above. 38 was rejected for the same reason and one more:
+ *    dropping 2px here would put the one tile in the tree at a rung its own primitive does not
+ *    default to, on a card whose 63.75px height it shares with a three-line copy stack.
+ *
+ * Both are pre-existing geometry becoming VISIBLE rather than new geometry: each tile was
+ * already that size as a raw `<img>`, and only the conversion puts it where this census can see
+ * it. Issue 1519's sweep owns lowering them.
+ *
+ * 71 ACROSS 53 KEYS since the same issue's third phase moved the ALCHEMY and JOURNAL tabs' twelve
+ * raw thumbs onto the tile. Eleven new keys, twelve occurrences, and they fall into three groups
+ * rather than twelve separate decisions — the price the guidance above names, paid by group
+ * because the rejected rung is the same argument each time:
+ *
+ *  - THE FIVE ALCHEMY TILES — `AlchemyDisciplineChooser | 44`, `ComponentInventoryColumn | 34`,
+ *    `KnownRecipesColumn | 36`, `Workbench | 40` and `Workbench | 46`. Every one of the five sets
+ *    the height of the row or card it leads: the chooser card's head measured 44px, the inventory
+ *    row 60px around a 34px tile, the bench chip 107.55px around a 40px one. 38 is the only rung
+ *    at or below any of them and it is BELOW all five, so snapping would shrink five different
+ *    containers at once — a layout move in a commit whose rule is that a conversion preserves the
+ *    rendered size.
+ *  - THE FOUR JOURNAL RECORD TILES — `HistoryRow | 40`, `RecentResults | 28`, `RunCard | 64` and
+ *    `RunDetail | 64`. Each sets its row's or header's measured height (58px, 28px, 86px and 64px
+ *    respectively), and the two at 64 are the run's identity image at the size the gathering tab's
+ *    own detail tiles already draw. 38 was rejected for the 64s as a 26px cut to the largest image
+ *    in the tab, and 30 for the 28 as a 2px cut that buys nothing and moves a row.
+ *  - THE THREE 24px LEAF TILES — `RunDetail | 24` and `StepDetails | 24` (2x). These are the
+ *    smallest tiles in the tree and 22 is the nearest rung, 2px below. It was rejected because all
+ *    three sit in `font-size: 13px` list rows whose 24px height the tile sets, and because the
+ *    three are the same list drawn in two files: snapping one and not the others is exactly the
+ *    "decision about one tile in isolation" this pin exists to make visible.
+ *
+ * All twelve are pre-existing geometry becoming visible, on the same reading as the two above.
+ * Issue 1519's sweep owns lowering them.
+ *
+ * 72 ACROSS THE SAME 53 KEYS since the fourth phase moved the INVENTORY inspector's source-actor
+ * portrait onto `<Avatar shape="square" size={40}>`. NO new key: the file already carried
+ * `InventoryComponentDetail.svelte | 40` at six occurrences — the six record tiles converted
+ * before it — and this is the seventh element in that same row.
+ *
+ * THE RUNG REJECTED IS 38, and this one is the case the requirement's own second clause is for.
+ * 40 is not merely near a rung: `Avatar.svelte:97-102` records that the PORTRAIT ladder published
+ * at `spec.md:427` carries 32 as its single mark and 26 stacked, and neither is 38 — 38 belongs
+ * to the ART ladder, which is `Medallion`'s. This census filters BOTH primitives against
+ * `ART_SIZE_LADDER` alone, so a portrait is measured against a ladder the canon does not publish
+ * for it, and a row is banked here whatever size the tile takes. The size itself was rejected on
+ * the ordinary ground as well: the portrait shares a 56px-min row with six `<Medallion size={40}>`
+ * record tiles in the same body, and cutting one of the seven to 38 would make the sources list
+ * the only list in the inspector whose leading tile is smaller than its neighbours'.
+ *
+ * Pre-existing geometry becoming visible, on the same reading as the twelve above. Reconciling
+ * `ART_SIZE_LADDER` with the two ladders the requirement publishes is issue 1519's, by name.
+ *
+ * 74 ACROSS 55 KEYS since the fifth phase moved the Crafting tab's two SOURCE-ACTOR portraits
+ * onto `<Avatar shape="square">`. Two new keys, both in
+ * `crafting/ComponentSourcesBar.svelte` — `| 40 | 1` for the row of portrait buttons in the top
+ * bar, and `| 32 | 1` for the picker option beneath it.
+ *
+ * THE RUNG REJECTED AT 40 IS 38, and the reason is the one the inventory portrait recorded a
+ * phase earlier read from the other side. Here 38 is not merely near: the portrait button was
+ * ALREADY rendering its image at exactly 38, because the button is a 40px border-box drawing a
+ * 1px edge of its own. Snapping the tile to 38 would have kept the image where it was and
+ * shrunk the BUTTON to 38 with it — the row's hit target, its focus ring and its remove overlay
+ * all move — or left a 2px ring of button showing around the tile. The 40 preserves the
+ * rendered button, which is what a conversion is for.
+ *
+ * THE RUNG REJECTED AT 32 IS 30, a 2px cut. 32 is the PORTRAIT ladder's single mark
+ * (`spec.md:427`, restated at `Avatar.svelte:97-102`) and this is the tile the ladder was
+ * published for — so the row exists ONLY because this census filters both primitives against
+ * `ART_SIZE_LADDER`, which knows the art ladder alone. It is the second shipped instance of the
+ * conflation the entry above names, and the third counting `IoTable.svelte | 32 | 1`, which was
+ * already banked before this change. The option row is `min-height: 44px` and the tile does not
+ * set it, so 30 would have cost 2px of mark and moved nothing else — which is a geometry
+ * decision about one tile in isolation, and issue 1519's to take.
+ *
+ * Both are pre-existing geometry becoming visible, on the same reading as the thirteen above.
+ */
+// Issue 1648 removes six former Journal render sites and adds SlotTile's single 56px site.
+// The generic 38px maximum is rejected for that site because the published SlotTile specimen
+// specifies a 56px material-choice tile with an overlaid quantity pip. Its dedicated geometry
+// takes precedence over the generic Medallion ladder; ordinary Journal art now uses 30px/38px.
+export const KNOWN_OFF_LADDER_ART_SIZE_TOTAL = 69;
+
+export const KNOWN_UNREGISTERED_SHARED_COMPONENTS = knownDebt('unregisteredSharedComponents');
+
+/** @see KNOWN_UNREGISTERED_SHARED_COMPONENTS */
+// 49 -> 48 (issue 1371 r16-list): `EssenceQuantityCard` dropped to ONE importer when maintainer
+// ruling M23 rebuilt the system Component Rules bulk panel's essence axis as the reference's inset
+// rows — the card renders in the component editor's grid alone now, so it no longer clears the bar.
+// 48 -> 49 (issue 1371 r16-cat): `BulkStagingInset` gained its SECOND importer when maintainer rulings
+// M24/M25 converged the world Component catalogue's bulk panel onto the inset the system panel had
+// extracted — the same object over different data, which is the maximum reuse the maintainer asked
+// for. It crosses the bar beside `BulkSelectionToolbar` and `BulkEditPanelShell`'s family; whether it
+// is a manifest row with a `library.html` specimen is the outstanding decision this register records.
+// 49 -> 48 (issue 1371 r17-b): that decision was taken — `BulkStagingInset` LEFT by gaining its manifest
+// row (`shipped`, `targeted`) and its `library.html` specimen beside `<BulkEditPanel>`'s.
+// 48 -> 49 (issue 1371 r18-list): `scoped/WorldComponentEntryPreviewRail` gained its SECOND importer
+// when maintainer ruling M27 made the system Component Rules editor render the world entry's `How
+// players see it` rail at the system scope in place of a rail of its own — the same object over
+// different data, which is what the ruling asked for. Measured 1 importer → 2:
+// `ComponentEditView.svelte` joined `WorldComponentEntryPage.svelte`. Whether a component-specific
+// preview rail is a manifest row with a `library.html` specimen, or a `notAPrimitive` row beside the
+// deferred `EssenceBehaviorPreview`, is the outstanding decision this register records.
+// 49 -> 50 (issue 1371 r18-entry): `components/EssenceQuantityCard` is BACK over the bar. Maintainer
+// ruling M31 gave the world record an `essences` section and the world Component entry an `Essence
+// contribution` card on the shape the rules editor's card takes — the same quantity card over the
+// world essence catalogue instead of a system's roster. Measured 1 importer → 2:
+// `scoped/WorldComponentEntryPage.svelte` joined `ComponentEditView.svelte`. It left this register at
+// r16-list by dropping BELOW the bar, never by adjudication, so the decision it records is the same
+// one as then: a manifest row with a `library.html` specimen, or a `notAPrimitive` row with this
+// measurement behind it.
+// 50 -> 49 (issue 1506): the journal's `RunStatusPill` LEFT by being DELETED. Its four
+// callers render the shared `<Chip>` directly now, so the file this row named is gone and the
+// register's own rule — a name departing unrecorded is a failure — is satisfied by removing it in
+// the same commit. Re-measured rather than subtracted: 75 components outside `components/` clear
+// the two-caller bar, 26 of them are registered, and 49 are not, which is what the docblock above
+// already states.
+// 49 -> 48 (issue 1506): the crafting `CraftingStatusBadge` LEFT the same way, its two
+// callers rendering the shared chip. Re-measured: 74 clear the bar, 26 are registered, 48 are not.
+// 48 -> 47 (issue 1506): the crafting `QuantityTag` LEFT, the last of the three retired
+// look-alikes. Re-measured: 73 clear the two-caller bar, 26 are registered, 47 are not.
+// 47 -> 45 (issue 1506): the crafting `CraftingThumb` and `CraftingEssenceThumb` LEFT together,
+// by being DELETED. Their thirty-five render sites across twenty-one files draw the registered
+// `components/Medallion.svelte` now, so the art tile is one component with a manifest row rather
+// than three without one — which is this register working rather than a name slipping out of it.
+// Re-measured on the tree, not subtracted: 71 clear the two-caller bar, 26 are registered, 45
+// are not, and the docblock above is re-measured with it.
+// 45 -> 46 (issue 1514): `apps/PlayerViewState.svelte` ARRIVED, at five callers, and it is banked
+// rather than adjudicated in either direction because neither table can hold it. It is not a
+// primitive — `spec.md` says "a candidate that decomposes entirely into existing members is a
+// COMPOSITION and MUST NOT enter the set", and this decomposes into `EmptyState` and `Callout`
+// plus one line of chrome. It cannot take a `notAPrimitive` row either: the row-shape assertion
+// beside that table caps a recorded non-member at ONE caller, and all twelve shipped rows have
+// zero or one, so a five-caller row reds on its first run. So this register is its answer, which
+// is the register working rather than a gap in it: the five player views drew the same centred
+// loading/error/empty fill up to a class-name prefix, that chrome is one component now, and the
+// decision that it is a composition rather than a member is recorded HERE instead of nowhere.
+// The answer is PATH-CONDITIONAL and the condition is the row itself: it holds only while the
+// file sits outside `src/ui/svelte/components/` and inside `src/ui/svelte/`, which is what
+// `unregisteredSharedComponents()` filters on. The same file under `components/` would be inside
+// the primitive directory and would demand a manifest row instead.
+// Issue 1648: ThisRun is an app-specific composition of InspectorCard, Kicker and
+// JournalFactRow, shared by the active and historical detail compositions.
+export const KNOWN_UNREGISTERED_SHARED_COMPONENT_TOTAL = 47;

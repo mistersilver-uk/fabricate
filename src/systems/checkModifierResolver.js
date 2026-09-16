@@ -101,7 +101,9 @@
 
 import { stripRetiredModifierPlaceholder } from '../utils/craftingCheckExpression.js';
 import { reduceRollExpression } from '../utils/rollExpressionAverage.js';
+import { formulaRolls } from '../utils/rollFormulaRollability.js';
 
+import { resolveModifierLibrary } from './characterLibraries.js';
 import { resolveSalvageCheck } from './salvageCheckUsability.js';
 import {
   appendCheckModifierRollTerms,
@@ -303,15 +305,24 @@ function readSubjectModifierIds(activity, subject) {
  * `undefined` when it has never been asked; the key is always present on the bag
  * so the shape is fixed, and {@link resolveMaxModifierPicks} owns what absence means.
  *
- * @param {object|null|undefined} system The crafting system (owner of `modifiers`).
+ * @param {object|null|undefined} system The crafting system. Since issue 1308 it no longer owns
+ *   the modifier library — the world does — but it is still read for any surviving legacy copy
+ *   on a client that has not migrated yet.
  * @param {'crafting'|'salvage'|'gathering'} activity Which activity's selection to read.
  * @param {object|null|undefined} subject The record being resolved: a recipe, a component
  *   or a gathering task.
+ * @param {object|Function|null} [characterLibrariesStore] Explicit world-libraries seam. Omitted
+ *   in production, where the module registry resolves it; supplied by tests.
  * @returns {{ activity: string, catalogue: Array|undefined, systemPolicy: unknown,
  *   defaultModifierIds: Array|undefined, subjectModifierIds: Array|null,
  *   maxModifierPicks: number|undefined }}
  */
-export function buildCheckModifierContext(system, activity, subject) {
+export function buildCheckModifierContext(
+  system,
+  activity,
+  subject,
+  characterLibrariesStore = null
+) {
   const check = system?.[ACTIVITY_CHECK_KEYS.get(activity) ?? ''] ?? {};
   return {
     activity,
@@ -320,7 +331,7 @@ export function buildCheckModifierContext(system, activity, subject) {
     // 1.23.0 migration and the export upcast are the only two paths a legacy payload
     // arrives through, and no read-alias is kept here for the same reason 1.22.0 kept
     // none — a silent alias makes the relocation unobservable.
-    catalogue: system?.modifiers,
+    catalogue: resolveModifierLibrary(system, characterLibrariesStore),
     systemPolicy: check.defaultModifierPolicy,
     defaultModifierIds: check.defaultModifierIds,
     subjectModifierIds: readSubjectModifierIds(activity, subject),
@@ -545,6 +556,24 @@ export function resolveModifierPolicy(context = {}) {
  * under every other rule the activity's `defaultModifierIds` is the source and a stored
  * subject subset is ignored outright.
  *
+ * Under `bySubject` the activity's `defaultModifierIds` BOUNDS that source (issue 1608).
+ * It is not a mere default to fall back on there: it is the set the Checks studio MARKS
+ * as selectable — its per-row pill reads "Selectable" / "Not selectable" over exactly this
+ * list, and its intro promises "Mark which of the system's modifiers the recipe may choose
+ * from". A pick the check does not mark therefore does not roll, so the screen and the dice
+ * agree; before this the validation was against the catalogue alone, and a modifier picked
+ * on a recipe and later un-marked on the check went on rolling.
+ *
+ * THE BOUND IS APPLIED ON READ AND PRUNES NOTHING. The subject's stored ids survive
+ * un-marking untouched — no authoring surface narrows them — so re-marking the entry
+ * restores its contribution with no re-authoring, exactly as the cap's read-time truncation
+ * does. An EMPTY mark consequently means no eligible modifier at all, which is the same
+ * reading an empty default set already has under every other rule. A non-array mark is the
+ * unknown-basis sentinel `CraftingSystemManager._normalizeCheckModifierSelection` uses for
+ * `validIds`: bound nothing, rather than let a caller that cannot vouch for the mark
+ * silently empty the roll. An ABSENT key is such a non-array — the mark is read raw, with
+ * no `= []` default — so only a mark the check actually authored can suppress a pick.
+ *
  * Under `bySubject` the resolved list is TRUNCATED to {@link resolveMaxModifierPicks},
  * keeping the first N in authored order. The bound is enforced here and not only at the
  * picker, per "A UI control's constraint is never an invariant" — a GM who lowers the cap
@@ -563,25 +592,62 @@ export function resolveModifierPolicy(context = {}) {
  * @returns {string[]}
  */
 export function resolveEligibleModifierIds(context = {}) {
-  const { catalogue = [], defaultModifierIds = [], subjectModifierIds = null } = context ?? {};
-  const known = new Set(
-    (Array.isArray(catalogue) ? catalogue : [])
-      .map((entry) => (entry && typeof entry === 'object' ? entry.id : null))
-      .filter((id) => typeof id === 'string' && id !== '')
-  );
+  const { catalogue = [], subjectModifierIds = null } = context ?? {};
+  // The check's MARK, read RAW — no `= []` destructuring default. That default would make
+  // an ABSENT mark indistinguishable from an authored empty one, and as a BOUND an empty
+  // basis suppresses every pick: the exact failure
+  // `CraftingSystemManager._normalizeCheckModifierSelection` names in its own guard ("an
+  // empty basis prunes every id on every run"). `null` is therefore "no mark authored".
+  const mark = Array.isArray(context?.defaultModifierIds) ? context.defaultModifierIds : null;
   const subjectPicks =
     resolveModifierPolicy(context) === 'bySubject' && Array.isArray(subjectModifierIds);
-  const source = subjectPicks
-    ? subjectModifierIds
-    : Array.isArray(defaultModifierIds)
-      ? defaultModifierIds
-      : [];
-  const limit = subjectPicks ? resolveMaxModifierPicks(context) : Infinity;
+  return takeEligibleModifierIds(subjectPicks ? subjectModifierIds : (mark ?? []), {
+    known: knownModifierIds(catalogue),
+    // The mark BOUNDS only under `bySubject`; under every other rule it IS the source
+    // above, so intersecting it with itself would say nothing.
+    marked: subjectPicks && mark ? new Set(mark) : null,
+    limit: subjectPicks ? resolveMaxModifierPicks(context) : Infinity,
+  });
+}
+
+/**
+ * The catalogue's usable ids. An entry that is not an object, or whose `id` is not a
+ * non-empty string, names nothing and is dropped rather than admitted as `undefined`.
+ *
+ * @param {Array|unknown} catalogue The world modifier library.
+ * @returns {Set<string>}
+ */
+function knownModifierIds(catalogue) {
+  const ids = new Set();
+  for (const entry of Array.isArray(catalogue) ? catalogue : []) {
+    const id = entry && typeof entry === 'object' ? entry.id : null;
+    if (typeof id === 'string' && id !== '') ids.add(id);
+  }
+  return ids;
+}
+
+/**
+ * The ordered survivors of `source`: source order is preserved, and an id is dropped when
+ * it is not a string, is a duplicate, names nothing in `known`, or — when `marked` is a
+ * Set rather than `null` — is not in it.
+ *
+ * EVERY DROP HAPPENS BEFORE `limit` IS COUNTED, which is the reason this is one loop and
+ * not a chain of filters followed by a slice: the cap counts SURVIVORS, so an unknown or
+ * un-marked id ahead of the cap must not consume a slot a real, marked pick was entitled
+ * to.
+ *
+ * @param {Iterable<unknown>} source The ids to draw from, in authored order.
+ * @param {{ known: Set<string>, marked: Set<string>|null, limit: number }} bounds
+ * @returns {string[]}
+ */
+function takeEligibleModifierIds(source, { known, marked, limit }) {
   const seen = new Set();
   const ids = [];
   for (const id of source) {
     if (ids.length >= limit) break;
-    if (typeof id !== 'string' || !known.has(id) || seen.has(id)) continue;
+    if (typeof id !== 'string' || seen.has(id)) continue;
+    if (!known.has(id)) continue;
+    if (marked && !marked.has(id)) continue;
     seen.add(id);
     ids.push(id);
   }
@@ -827,50 +893,21 @@ function resolveCatalogueEntry(id, entry, resolveExpression, Roll) {
 /**
  * Whether a rolling fragment can actually be ROLLED, proven by rolling it.
  *
- * `Roll.validate` IS NOT THIS TEST, and believing it was is how the first version of this
- * guard came to have a hole the size of a capitalized function name. `validate` is
- * `evaluateSync({ strict: false })`, and `Roll#_evaluateASTSync` SKIPS every
- * non-deterministic node — so on a fragment that rolls, which is every fragment reaching
- * here, the dice-bearing subtree is never evaluated and no evaluate-time error class is
- * exercised at all. It is a PARSE oracle wearing an evaluation's clothes. Measured against
- * the shipped 14.365 stack over 355 emitted formulas, 25 validated `true` and then threw:
+ * DELEGATED to `src/utils/rollFormulaRollability.js`, which carries the whole argument: that
+ * `Roll.validate` is a PARSE oracle wearing an evaluation's clothes, that `maximize: true` is
+ * what makes the proof total, that the finite test on the total closes the `max(, 2)` empty-head
+ * trap, and that a missing dice engine must FAIL OPEN. The world Tool entry's breakage formula
+ * field needs the identical predicate, and two copies of an argument this long is how one of
+ * them ends up subtly weaker than the other.
  *
- * | authored            | what `evaluate()` says                                            |
- * |---------------------|-------------------------------------------------------------------|
- * | `MAX(1d4, 2)`       | `The function "MAX" is not registered in CONFIG.Dice.functions`    |
- * | `1000d6`            | `You may not evaluate a DiceTerm with more than 999 results`       |
- * | `1d4 + .5`          | `Unresolved StringTerm .5` (`Constant` needs a leading digit)      |
- *
- * Each of those throws inside `evaluateCheckRoll`, which the runners catch as a FAILED
- * check — ingredients spent, tools broken, every attempt, with only a `console.error`.
- *
- * `maximize: true` is what makes the proof total: it renders every term deterministic, so
- * `_evaluateASTSync` skips NOTHING and every node is really evaluated. The finite test on
- * the total is required rather than decorative — `Roll#total` is `Number(this._total) || 0`,
- * which passes `-Infinity` through as a number, and `max(, 2)` is exactly that shape. So
- * this predicate closes the empty-head trap BY CONSTRUCTION rather than by argument.
- *
- * Measured at 0.03-0.5 ms per fragment on the real stack, exploding and reroll pools
- * included, and it runs once per eligible rolling entry per resolution.
- *
- * FAIL OPEN when there is no dice engine (headless, tests), matching
- * `stripRetiredModifierPlaceholder`: nothing evaluates the formula there either, and
- * answering "unrollable" would silently delete a modifier from every headless resolution.
+ * Kept as a named local so this module's call site still reads as a question about a FRAGMENT.
  *
  * @param {string} formula The assembled, clamped fragment.
  * @param {typeof globalThis.Roll} [Roll]
  * @returns {boolean}
  */
 function fragmentRolls(formula, Roll) {
-  if (typeof Roll !== 'function') return true;
-  try {
-    const roll = new Roll(formula);
-    if (typeof roll?.evaluateSync !== 'function') return true;
-    roll.evaluateSync({ maximize: true });
-    return Number.isFinite(roll.total);
-  } catch {
-    return false;
-  }
+  return formulaRolls(formula, Roll);
 }
 
 /**

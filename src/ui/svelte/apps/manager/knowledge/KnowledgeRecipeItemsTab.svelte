@@ -39,10 +39,13 @@
 </script>
 
 <div class="manager-knowledge-tab-body">
-  <!-- The permanent hint stays INFO on purpose. This tab also raises the conditional
-       party-pool hazard below, and a yellow permanent hint beside a yellow conditional one
-       spends the colour that is supposed to make the hazard stand out. -->
+  <!-- The permanent hint is NEUTRAL (issue 1505): the specimen reserves the info tint for a
+       note about LIVE state and this one is true of the tab itself. It stays quiet for a second
+       reason too — this tab also raises the conditional party-pool hazard below, and a loud
+       permanent hint beside a conditional one spends the colour that is supposed to make the
+       hazard stand out. -->
   <Callout
+    tone="neutral"
     text={text(
       'FABRICATE.Admin.Manager.Knowledge.RecipeItemsBanner',
       'Expending a use spends one charge as if the character read the item. Deleting removes the copy from their pack entirely.'

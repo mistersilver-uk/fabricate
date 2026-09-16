@@ -1,0 +1,121 @@
+// Fabricate documentation theme — token setup.
+//
+// just-the-docs imports this before any colour scheme. The full order is
+//   support -> custom/setup -> color_schemes/light -> color_schemes/<scheme>
+//   -> modules -> callouts -> custom/custom
+// so everything defined here is visible to the scheme file, to the generated callout rules,
+// and to custom/custom.scss.
+//
+// Every token belongs in THIS file rather than in the colour scheme. Jekyll builds all three
+// theme sheets — just-the-docs-default, -light and -dark — whatever site.color_scheme says,
+// and the -light and -dark builds import custom/setup and custom/custom but NOT
+// color_schemes/fabricate. A token defined only in the scheme file but referenced from
+// custom.scss therefore fails the whole build, with an error naming a sheet nobody edited.
+//
+// Values mirror the module's own default `fabricate` theme block, styles/fabricate.css:194-350.
+// Assign plainly: support/_variables.scss has already bound the theme's own names with
+// !default, so a !default here would be a silent no-op.
+
+// -----------------------------------------------------------------------------------------
+// Fabricate tokens
+// -----------------------------------------------------------------------------------------
+
+// Surfaces, deepest first.
+$fab-bg-0: #111a23; // sunken: code wells, sidebar
+$fab-bg-1: #15212b; // app base: the page itself
+$fab-bg-2: #1b2833; // raised: tables, search, buttons
+$fab-bg-3: #2c3b49; // highest: table headers, chips
+
+// Edges. The warm cast comes from tinting the text colour over the base rather than from grey.
+$fab-border: rgba(217, 184, 156, 0.18);
+$fab-border-strong: rgba(217, 184, 156, 0.32);
+
+// Text.
+$fab-text: #f1d1b5;
+$fab-text-secondary: #d9b89c;
+$fab-text-muted: rgba(217, 184, 156, 0.74);
+
+// Opaque flattenings over $fab-bg-1, for the theme variables that pass a colour through
+// rgba(). Sass rgba($c, $a) REPLACES alpha rather than multiplying it, so handing a
+// translucent token to one of those call sites silently rescales it — see the notes in
+// color_schemes/fabricate.scss.
+$fab-border-opaque: #383c3f;
+$fab-text-muted-opaque: #a69179;
+
+// Accent. Warm tan; the module's single brand colour.
+$fab-accent: #e8c6a7;
+$fab-accent-hover: #f1d1b5;
+$fab-accent-soft: rgba(232, 198, 167, 0.16);
+$fab-accent-border: rgba(232, 198, 167, 0.48);
+$fab-on-accent: #111a23;
+
+// Semantic tones. Each is a glyph colour (full strength), a soft fill and an edge — the same
+// three-part shape the module's Callout.svelte uses.
+$fab-info: #b9d3dd;
+$fab-info-soft: rgba(185, 211, 221, 0.14);
+$fab-info-border: rgba(185, 211, 221, 0.44);
+
+$fab-success: #9ab89c;
+$fab-success-soft: rgba(154, 184, 156, 0.16);
+$fab-success-border: rgba(154, 184, 156, 0.56);
+
+$fab-warning: #e7dbb1;
+$fab-warning-soft: rgba(231, 219, 177, 0.14);
+$fab-warning-border: rgba(231, 219, 177, 0.46);
+
+$fab-purple: #cec1e6;
+$fab-purple-soft: rgba(206, 193, 230, 0.14);
+$fab-purple-border: rgba(206, 193, 230, 0.44);
+
+// Washes used for hover states, a cream tint over the base rather than white.
+$fab-surface-soft: rgba(241, 209, 181, 0.05);
+$fab-surface-raised: rgba(241, 209, 181, 0.08);
+
+// Shadows are cast in the deepest surface colour, never in black.
+$fab-shadow-sm: 0 8px 18px rgba(17, 26, 35, 0.2);
+$fab-shadow-md: 0 10px 24px rgba(17, 26, 35, 0.28);
+
+// Type. Spectral and JetBrains Mono are self-hosted; see the @font-face block in custom.scss.
+$fab-font-serif: "Spectral", georgia, "Times New Roman", serif;
+
+// Radii. The module uses 6px for panels, 5px for controls and 8px for callouts, which one
+// theme variable cannot express — $border-radius covers panels and the callout overrides its
+// own radius in custom.scss.
+$fab-radius-callout: 8px;
+
+// -----------------------------------------------------------------------------------------
+// Callout ramps
+// -----------------------------------------------------------------------------------------
+//
+// _includes/css/callouts.scss.liquid builds each callout from two levels of a named ramp:
+// -000 draws the 1px outer hairline and -300 draws the title text and the left bar. Naming
+// the scheme `fabricate` rather than `dark` is what keeps those two levels apart; see the
+// header of color_schemes/fabricate.scss.
+//
+// Referenced from _config.yml as `color: fab-note` and friends.
+
+$fab-note-000: $fab-info-border;
+$fab-note-300: $fab-info;
+
+$fab-tip-000: $fab-success-border;
+$fab-tip-300: $fab-success;
+
+$fab-warning-000: $fab-warning-border;
+$fab-warning-300: $fab-warning;
+
+$fab-gm-000: $fab-purple-border;
+$fab-gm-300: $fab-purple;
+
+// -----------------------------------------------------------------------------------------
+// Theme variable overrides that are not colour-scheme specific
+// -----------------------------------------------------------------------------------------
+
+// Panel radius. Also reaches .btn, .search-input-wrap, .table-wrapper and inline code.
+$border-radius: 6px;
+
+$mono-font-family: "JetBrains Mono", ui-monospace, sfmono-regular, menlo, consolas, monospace;
+
+// Not a grey any more. The theme hard-codes this ramp entry for list bullets, ordered-list
+// numerals, breadcrumb separators and the search magnifier, none of which read from a scheme
+// variable, so this one assignment is what keeps them in the palette.
+$grey-dk-000: $fab-text-muted-opaque;

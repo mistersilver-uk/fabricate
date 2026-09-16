@@ -7,8 +7,9 @@
   is no recorded result.
 -->
 <script>
+  import Medallion from '../../../components/Medallion.svelte';
+  import { resolveCraftingArt } from '../../../util/craftingArtResolution.js';
   import { localize } from '../../../util/foundryBridge.js';
-  import CraftingThumb from '../CraftingThumb.svelte';
 
   let { result = null } = $props();
 
@@ -54,7 +55,7 @@
       <ul class="crafting-roll-awards">
         {#each items as item, index (item.name + index)}
           <li class="crafting-roll-award">
-            <CraftingThumb src={item.img} alt="" size={24} />
+            <Medallion {...resolveCraftingArt(item.img)} alt="" size={24} />
             <span class="crafting-roll-award-name">{item.name}</span>
             <span class="crafting-roll-award-qty">×{item.qty ?? 1}</span>
           </li>

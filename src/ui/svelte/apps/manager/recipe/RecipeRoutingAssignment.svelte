@@ -19,9 +19,9 @@
     onAdd(id) / onRemove(id)
 -->
 <script>
-  import Chip from '../Chip.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import { localize } from '../../../util/foundryBridge.js';
-  import SearchablePopover from '../SearchablePopover.svelte';
+  import SearchablePopover from '../../../components/SearchablePopover.svelte';
 
   let {
     options = [],
@@ -81,7 +81,7 @@
       <SearchablePopover
         options={pickerOptions}
         pickerClass="manager-recipe-component-picker manager-recipe-routing-picker"
-        triggerClass="manager-button is-subtle manager-recipe-routing-add-trigger"
+        triggerClass="fabricate-button manager-button is-subtle manager-recipe-routing-add-trigger"
         triggerIcon="fas fa-plus"
         triggerLabel={addLabel}
         triggerAriaLabel={addLabel}

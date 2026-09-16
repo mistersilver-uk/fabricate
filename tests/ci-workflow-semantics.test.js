@@ -87,6 +87,7 @@ test('CI semantically isolates edited metadata runs and fully gates ready_for_re
     'check-screenshots',
     'lint',
     'lint-commits',
+    'lint-debt',
     'unit-tests',
     'validate-bindings',
   ]);
@@ -96,6 +97,42 @@ test('CI semantically isolates edited metadata runs and fully gates ready_for_re
   assert.notEqual(edited, ready);
   assert.match(edited, /metadata/);
   assert.match(ready, /code/);
+});
+
+test('a red unit-tests job re-prints its failing tests at the END of the job log', () => {
+  const workflow = readFileSync('.github/workflows/ci.yml', 'utf8');
+
+  // `node --test`'s TAP reporter emits ~119,000 lines, so every `not ok` on a red run sits past
+  // the bounded tail the log APIs serve. The end-of-job re-print is the only thing that makes a
+  // red run readable, and a green run never exercises it (issue 1654).
+  assert.match(
+    workflow,
+    /npm test 2>&1 \| tee "\$RUNNER_TEMP\/unit-tests\.tap"/,
+    'the unit-tests run must tee its output, or the failure re-print below has nothing to read'
+  );
+  assert.match(
+    workflow,
+    /set -o pipefail/,
+    'without pipefail the step takes tee\u2019s exit status and a failing suite reports GREEN'
+  );
+  assert.match(
+    workflow,
+    /- name: Report failing tests\n\s+if: failure\(\)/,
+    'the failing-test re-print must exist and run only on failure'
+  );
+  assert.match(
+    workflow,
+    /grep -E '\^\[\[:space:\]\]\*not ok '/,
+    'the re-print must match INDENTED not-ok lines too, since a subtest failure is indented'
+  );
+
+  // RUNNER_TEMP, not the workspace: several suites scan the repository tree, so a stray file
+  // appearing there while the suite runs is a test input.
+  assert.equal(
+    /tee "?\$?\{?\{? ?runner\.temp|tee "\$RUNNER_TEMP/i.test(workflow),
+    true,
+    'the TAP must be written outside the checkout'
+  );
 });
 
 // ────────────────────────────────────────────────────────────────────────────────────────────────

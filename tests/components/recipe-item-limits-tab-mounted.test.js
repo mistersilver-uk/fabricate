@@ -11,6 +11,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-recipe-item-limits-',
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/util/listReorderAnnouncement.js',
     // The Limits tab's "Character prerequisites to learn" picker imports the pure
     // prerequisite engine (issue 544).
     'src/systems/characterPrerequisites.js',
@@ -18,11 +19,12 @@ const harness = createMountedComponentHarness({
   compiledModules: [
     // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the harness
     // omits HANGS the suite (# cancelled) rather than failing it.
-    'src/ui/svelte/apps/manager/Chip.svelte',
+    'src/ui/svelte/components/Chip.svelte',
     // The shared no-state primitive (issue 785). A `.svelte` the tree renders but
     // the harness omits HANGS the suite (# cancelled) rather than failing it.
     'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+    'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemLimitsTab.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/recipe-item/RecipeItemLimitsTab.svelte',

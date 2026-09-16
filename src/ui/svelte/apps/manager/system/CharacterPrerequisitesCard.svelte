@@ -1,21 +1,33 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  Character prerequisites (issue 544) — a System Settings accordion of reusable,
-  system-scoped pass/fail conditions (property path + comparison + value) the GM
-  attaches to gate actions (learning a recipe today). One item open at a time.
-  The collapsed header shows the name and a live `@path op value` preview; the
-  expanded body edits name, then path + operator + value on one line. Valueless
-  operators (is true / is false / exists) hide the value field.
+  Character prerequisites (issue 544) — the editor for the world's library of reusable
+  pass/fail conditions (property path + comparison + value) the GM attaches to gate
+  actions: learning a recipe, wielding a tool. One item open at a time. The collapsed
+  header shows the name and a live `@path op value` preview; the expanded body edits
+  name, then path + operator + value on one line. Valueless operators (is true / is
+  false / exists) hide the value field.
+
+  It is the whole body of World > Rules & Resources > Character prerequisites, whose page
+  shell (`world/WorldPrerequisitesTab.svelte`) adds only the reorder live region. It was a
+  collapsible card on the System Settings tab until issue 1311; the collapse toggle went
+  with the move, because on that tab collapsing yielded space to the sibling cards below it
+  and as a whole route there is nothing to make room for. The "every system" scope chip went
+  the same way: the World rail states the scope itself now.
 -->
 <script>
+  import Field from '../../../components/Field.svelte';
+  import { tick } from 'svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import IconPicker from '../../../components/IconPicker.svelte';
+  import ManagerButton from '../../../components/ManagerButton.svelte';
   import {
     PREREQUISITE_OPERATORS,
     DEFAULT_PREREQUISITE_ICON,
     isValuelessOperator,
     prerequisitePreview,
   } from '../../../../../systems/characterPrerequisites.js';
+  import IconButton from '../../../components/IconButton.svelte';
+  import Select from '../../../components/Select.svelte';
 
   let {
     library = [],
@@ -23,40 +35,71 @@
     onAdd = async () => null,
     onUpdate = async () => {},
     onDelete = async () => {},
-    // Manual reorder (issue 768). Called with (fromIndex, toIndex, name); the
-    // parent owns the store op + the shared aria-live announcement. Array order IS
-    // the persisted order, so no new field is threaded.
+    // Manual reorder (issue 768). Called with (fromIndex, toIndex, name); the caller
+    // owns the store op and the polite announcement of the new position, which belongs
+    // to the route rather than to this card. Array order IS the persisted order, so no
+    // new field is threaded.
     onReorder = async () => {},
     onSeedPresets = async () => {},
-    // Whole-section collapse (issue 768) — owned by the parent SystemEditView so
-    // all three list sections share one session Set and one reset-on-switch. This
-    // is distinct from the per-item accordion (`openId`) below.
-    collapsed = false,
-    onToggleCollapsed = () => {},
-    // Cross-list copy (issue 768). When set (parent gates on `features.gathering`),
-    // each row shows a "Copy to Modifiers" button that hands the entry back to the
-    // parent, which owns the destination store add + the aria-live announcement.
+    // Cross-library copy (issue 768). When set, each row shows a "Copy to Modifiers"
+    // button that hands the RAW entry back to the caller, which owns the mapping, the
+    // destination store add and — since the destination became a sibling route in issue
+    // 1311 — the navigation to it.
     onCopyToModifier = null,
-    // The parent requests opening a freshly-copied entry in edit mode; the nonce
+    // The caller requests opening a freshly-copied entry in edit mode; the nonce
     // forces the effect to re-fire even when the id-run is unchanged.
     requestOpenId = '',
     requestOpenNonce = 0,
   } = $props();
 
   let openId = $state('');
+  let cardRoot = $state(null);
 
-  // Open the parent-requested entry (a just-copied prerequisite) in edit mode.
+  // Open (and SHOW) the requested entry — the prerequisite a GM just copied out of the
+  // modifier library. Opening alone is not enough: a copy is appended to the end of the
+  // library, so on any list worth this feature the new row lands below the fold and the GM
+  // sees an unchanged screen. Scoped to this card's own root so a query never crosses into
+  // another mounted manager instance.
   let appliedOpenNonce = $state(0);
   $effect(() => {
-    if (requestOpenNonce !== appliedOpenNonce) {
-      appliedOpenNonce = requestOpenNonce;
-      if (requestOpenId) openId = requestOpenId;
-    }
+    if (requestOpenNonce === appliedOpenNonce) return;
+    appliedOpenNonce = requestOpenNonce;
+    if (!requestOpenId) return;
+    openId = requestOpenId;
+    void revealEntry(requestOpenId);
   });
+
+  async function revealEntry(entryId) {
+    await tick();
+    const row = cardRoot?.querySelector?.(`[data-world-character-prerequisite="${entryId}"]`);
+    if (!row) return;
+    row.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+    row.querySelector?.('input, select, textarea')?.focus?.();
+  }
 
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
+  }
+
+  // THE OPERATOR VOCABULARY, mapped once for the shared `<Select>` rather than per row. The
+  // labels are carried verbatim from the `<option>` text this replaced, including the `symbol ·
+  // label` join a valueless operator does not take, so nothing a GM reads changes.
+  const operatorOptions = PREREQUISITE_OPERATORS.map((operator) => ({
+    value: operator.id,
+    label: operator.valueless ? operator.label : `${operator.symbol} · ${operator.label}`,
+  }));
+
+  // The caption id, per ROW rather than per component: the library renders one of these per
+  // prerequisite, and two triggers pointing at one caption would name both controls the same.
+  const instanceId = $props.id();
+
+  /**
+   * @param {string} entryId The prerequisite's own id.
+   * @returns {string} The document-unique id of that row's operator caption.
+   */
+  function operatorCaptionId(entryId) {
+    return `${instanceId}-operator-${entryId}`;
   }
 
   function toggleOpen(id) {
@@ -76,34 +119,19 @@
 
 <section
   class="manager-edit-card manager-prerequisite-card"
-  class:is-section-collapsed={collapsed}
-  data-system-character-prerequisites
+  data-world-character-prerequisites
+  bind:this={cardRoot}
   aria-label={text(
     'FABRICATE.Admin.Manager.CharacterPrerequisites.Title',
     'Character prerequisites'
   )}
 >
   <header class="manager-character-modifier-card-header">
-    <button
-      type="button"
-      class="manager-section-collapse-toggle"
-      aria-expanded={!collapsed}
-      aria-controls="manager-section-body-prerequisites"
-      aria-label={text(
-        'FABRICATE.Admin.Manager.ListErgonomics.ToggleSection',
-        'Collapse or expand this section'
-      )}
-      data-section-collapse="prerequisites"
-      onclick={() => onToggleCollapsed()}
-    >
-      <i class={`fa-solid ${collapsed ? 'fa-chevron-right' : 'fa-chevron-down'}`} aria-hidden="true"
-      ></i>
-    </button>
     <div class="manager-character-modifier-card-header-copy">
-      <h3 class="manager-card-title">
+      <h2 class="manager-card-title">
         <i class="fa-solid fa-user-shield" aria-hidden="true"></i>
         {text('FABRICATE.Admin.Manager.CharacterPrerequisites.Title', 'Character prerequisites')}
-      </h3>
+      </h2>
       <p class="manager-muted">
         {text(
           'FABRICATE.Admin.Manager.CharacterPrerequisites.Hint',
@@ -112,18 +140,12 @@
       </p>
     </div>
     <div class="manager-character-modifier-card-header-actions">
-      <button
-        type="button"
-        class="manager-button is-primary"
-        data-add-prerequisite
-        onclick={handleAdd}
-      >
+      <ManagerButton role="primary" data-add-prerequisite onclick={handleAdd}>
         <i class="fa-solid fa-plus" aria-hidden="true"></i>
         {text('FABRICATE.Admin.Manager.CharacterPrerequisites.Add', 'Add prerequisite')}
-      </button>
-      <button
-        type="button"
-        class="manager-button"
+      </ManagerButton>
+      <ManagerButton
+        data-seed-prerequisite-presets
         disabled={!presetsSupported}
         data-tooltip={!presetsSupported
           ? text(
@@ -135,212 +157,219 @@
       >
         <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
         {text('FABRICATE.Admin.Manager.CharacterPrerequisites.SeedPresets', 'Seed presets')}
-      </button>
+      </ManagerButton>
     </div>
   </header>
 
-  {#if !collapsed}
-    <div id="manager-section-body-prerequisites" class="manager-section-body">
-      {#if library.length === 0}
-        <p class="manager-muted manager-prerequisite-empty">
-          {text(
-            'FABRICATE.Admin.Manager.CharacterPrerequisites.Empty',
-            'No character prerequisites yet.'
-          )}
-        </p>
-      {:else}
-        <ul class="manager-prerequisite-list">
-          {#each library as entry, index (entry.id)}
-            {@const open = openId === entry.id}
-            <li
-              class="manager-prerequisite-item"
-              class:is-open={open}
-              data-system-character-prerequisite={entry.id}
-            >
-              <div class="manager-prerequisite-header">
-                <button
-                  type="button"
-                  class="manager-prerequisite-summary"
-                  aria-expanded={open}
-                  aria-controls={`prerequisite-body-${entry.id}`}
-                  data-toggle-prerequisite
-                  onclick={() => toggleOpen(entry.id)}
-                >
-                  <i
-                    class={`fa-solid ${open ? 'fa-chevron-down' : 'fa-chevron-right'} manager-prerequisite-chevron`}
-                    aria-hidden="true"
-                  ></i>
-                  <span class="manager-prerequisite-icon">
-                    <i class={entry.icon || DEFAULT_PREREQUISITE_ICON} aria-hidden="true"></i>
-                  </span>
-                  <span class="manager-prerequisite-name">{entry.name}</span>
-                  <span class="manager-prerequisite-preview" data-prerequisite-preview>
-                    <i class="fa-solid fa-arrow-right-long" aria-hidden="true"></i>
-                    {prerequisitePreview(entry)}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  class="manager-icon-button"
-                  aria-label={text('FABRICATE.Admin.Manager.ListErgonomics.MoveUp', 'Move up')}
-                  data-tooltip={text('FABRICATE.Admin.Manager.ListErgonomics.MoveUp', 'Move up')}
-                  data-move-prerequisite-up={entry.id}
-                  disabled={index === 0}
-                  onclick={() => onReorder(index, index - 1, entry.name)}
-                >
-                  <i class="fa-solid fa-chevron-up" aria-hidden="true"></i>
-                </button>
-                <button
-                  type="button"
-                  class="manager-icon-button"
-                  aria-label={text('FABRICATE.Admin.Manager.ListErgonomics.MoveDown', 'Move down')}
+  <div id="manager-section-body-prerequisites" class="manager-section-body">
+    {#if library.length === 0}
+      <p class="manager-muted manager-prerequisite-empty">
+        {text(
+          'FABRICATE.Admin.Manager.CharacterPrerequisites.Empty',
+          'No character prerequisites yet.'
+        )}
+      </p>
+    {:else}
+      <ul class="manager-prerequisite-list">
+        {#each library as entry, index (entry.id)}
+          {@const open = openId === entry.id}
+          <li
+            class="manager-prerequisite-item"
+            class:is-open={open}
+            data-world-character-prerequisite={entry.id}
+          >
+            <div class="manager-prerequisite-header">
+              <button
+                type="button"
+                class="manager-prerequisite-summary"
+                aria-expanded={open}
+                aria-controls={`prerequisite-body-${entry.id}`}
+                data-toggle-prerequisite
+                onclick={() => toggleOpen(entry.id)}
+              >
+                <i
+                  class={`fa-solid ${open ? 'fa-chevron-down' : 'fa-chevron-right'} manager-prerequisite-chevron`}
+                  aria-hidden="true"
+                ></i>
+                <span class="manager-prerequisite-icon">
+                  <i class={entry.icon || DEFAULT_PREREQUISITE_ICON} aria-hidden="true"></i>
+                </span>
+                <span class="manager-prerequisite-name">{entry.name}</span>
+                <span class="manager-prerequisite-preview" data-prerequisite-preview>
+                  <i class="fa-solid fa-arrow-right-long" aria-hidden="true"></i>
+                  {prerequisitePreview(entry)}
+                </span>
+              </button>
+              <IconButton
+                ariaLabel={text('FABRICATE.Admin.Manager.ListErgonomics.MoveUp', 'Move up')}
+                data-tooltip={text('FABRICATE.Admin.Manager.ListErgonomics.MoveUp', 'Move up')}
+                data-move-prerequisite-up={entry.id}
+                disabled={index === 0}
+                onclick={() => onReorder(index, index - 1, entry.name)}
+              >
+                <i class="fa-solid fa-chevron-up" aria-hidden="true"></i>
+              </IconButton>
+              <IconButton
+                ariaLabel={text('FABRICATE.Admin.Manager.ListErgonomics.MoveDown', 'Move down')}
+                data-tooltip={text('FABRICATE.Admin.Manager.ListErgonomics.MoveDown', 'Move down')}
+                data-move-prerequisite-down={entry.id}
+                disabled={index === library.length - 1}
+                onclick={() => onReorder(index, index + 1, entry.name)}
+              >
+                <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+              </IconButton>
+              {#if onCopyToModifier}
+                <IconButton
+                  ariaLabel={text(
+                    'FABRICATE.Admin.Manager.ListErgonomics.CopyToModifiers',
+                    'Copy to modifiers'
+                  )}
                   data-tooltip={text(
-                    'FABRICATE.Admin.Manager.ListErgonomics.MoveDown',
-                    'Move down'
+                    'FABRICATE.Admin.Manager.ListErgonomics.CopyToModifiers',
+                    'Copy to modifiers'
                   )}
-                  data-move-prerequisite-down={entry.id}
-                  disabled={index === library.length - 1}
-                  onclick={() => onReorder(index, index + 1, entry.name)}
+                  data-copy-to-modifier={entry.id}
+                  onclick={() => onCopyToModifier(entry)}
                 >
-                  <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
-                </button>
-                {#if onCopyToModifier}
-                  <button
-                    type="button"
-                    class="manager-icon-button"
-                    aria-label={text(
-                      'FABRICATE.Admin.Manager.ListErgonomics.CopyToModifiers',
-                      'Copy to modifiers'
-                    )}
-                    data-tooltip={text(
-                      'FABRICATE.Admin.Manager.ListErgonomics.CopyToModifiers',
-                      'Copy to modifiers'
-                    )}
-                    data-copy-to-modifier={entry.id}
-                    onclick={() => onCopyToModifier(entry)}
-                  >
-                    <i class="fa-solid fa-user-gear" aria-hidden="true"></i>
-                  </button>
-                {/if}
-                <button
-                  type="button"
-                  class="manager-icon-button is-danger"
-                  aria-label={text(
-                    'FABRICATE.Admin.Manager.CharacterPrerequisites.Delete',
-                    'Remove prerequisite'
-                  )}
-                  data-delete-prerequisite
-                  onclick={() => handleDelete(entry.id)}
-                >
-                  <i class="fa-solid fa-trash" aria-hidden="true"></i>
-                </button>
-              </div>
+                  <i class="fa-solid fa-user-gear" aria-hidden="true"></i>
+                </IconButton>
+              {/if}
+              <IconButton
+                class="is-danger"
+                ariaLabel={text(
+                  'FABRICATE.Admin.Manager.CharacterPrerequisites.Delete',
+                  'Remove prerequisite'
+                )}
+                data-delete-prerequisite=""
+                onclick={() => handleDelete(entry.id)}
+              >
+                <i class="fa-solid fa-trash" aria-hidden="true"></i>
+              </IconButton>
+            </div>
 
-              {#if open}
-                <div class="manager-prerequisite-body" id={`prerequisite-body-${entry.id}`}>
-                  <div class="manager-prerequisite-name-row">
-                    <div
-                      class="manager-field manager-prerequisite-icon-field"
-                      data-prerequisite-icon-field
+            {#if open}
+              <div class="manager-prerequisite-body" id={`prerequisite-body-${entry.id}`}>
+                <div class="manager-prerequisite-name-row">
+                  <Field
+                    as="div"
+                    class="manager-prerequisite-icon-field"
+                    data-prerequisite-icon-field=""
+                  >
+                    <span
+                      >{text('FABRICATE.Admin.Manager.CharacterPrerequisites.Icon', 'Icon')}</span
                     >
-                      <span
-                        >{text('FABRICATE.Admin.Manager.CharacterPrerequisites.Icon', 'Icon')}</span
-                      >
-                      <IconPicker
-                        value={entry.icon || DEFAULT_PREREQUISITE_ICON}
-                        buttonTitle={text(
-                          'FABRICATE.Admin.Manager.CharacterPrerequisites.ChangeIcon',
-                          'Change icon'
-                        )}
-                        triggerClass="manager-prerequisite-icon-trigger"
-                        onChange={(iconClass) => onUpdate(entry.id, { icon: iconClass })}
-                      />
-                    </div>
-                    <label class="manager-field manager-prerequisite-name-field">
-                      <span
-                        >{text('FABRICATE.Admin.Manager.CharacterPrerequisites.Name', 'Name')}</span
-                      >
+                    <IconPicker
+                      value={entry.icon || DEFAULT_PREREQUISITE_ICON}
+                      buttonTitle={text(
+                        'FABRICATE.Admin.Manager.CharacterPrerequisites.ChangeIcon',
+                        'Change icon'
+                      )}
+                      triggerClass="manager-prerequisite-icon-trigger"
+                      onChange={(iconClass) => onUpdate(entry.id, { icon: iconClass })}
+                    />
+                  </Field>
+                  <Field as="label" class="manager-prerequisite-name-field">
+                    <span
+                      >{text('FABRICATE.Admin.Manager.CharacterPrerequisites.Name', 'Name')}</span
+                    >
+                    <input
+                      type="text"
+                      value={entry.name}
+                      data-prerequisite-name
+                      oninput={(event) => onUpdate(entry.id, { name: event.currentTarget.value })}
+                    />
+                  </Field>
+                </div>
+
+                <span class="manager-prerequisite-condition-label">
+                  {text('FABRICATE.Admin.Manager.CharacterPrerequisites.Condition', 'Condition')}
+                </span>
+                <div class="manager-prerequisite-condition">
+                  <Field as="label" class="manager-prerequisite-path">
+                    <span class="visually-hidden">
+                      {text('FABRICATE.Admin.Manager.CharacterPrerequisites.Path', 'Property path')}
+                    </span>
+                    <div class="manager-prerequisite-path-input">
+                      <span class="manager-prerequisite-at" aria-hidden="true">@</span>
                       <input
                         type="text"
-                        value={entry.name}
-                        data-prerequisite-name
-                        oninput={(event) => onUpdate(entry.id, { name: event.currentTarget.value })}
+                        value={entry.path}
+                        placeholder="abilities.int.mod"
+                        data-prerequisite-path
+                        oninput={(event) => onUpdate(entry.id, { path: event.currentTarget.value })}
                       />
-                    </label>
-                  </div>
-
-                  <span class="manager-prerequisite-condition-label">
-                    {text('FABRICATE.Admin.Manager.CharacterPrerequisites.Condition', 'Condition')}
-                  </span>
-                  <div class="manager-prerequisite-condition">
-                    <label class="manager-field manager-prerequisite-path">
+                    </div>
+                  </Field>
+                  <!-- A `Field as="div"` RATHER THAN THE `as="label"` THIS WAS (issue 1510). The
+                       select is the shared `<Select>` now, so the control is a `<button>` opening
+                       a portaled panel — and a `<label>` forwards a caption click into it, which
+                       from the open state dismisses the panel on `mousedown` and re-opens it on
+                       the forwarded click. The caption keeps its class and its `visually-hidden`
+                       treatment and names the trigger through `aria-labelledby` instead of by
+                       containment. It stays hidden rather than adopting the primitive's own
+                       `label=` form, which renders a VISIBLE caption: this row already carries a
+                       "Condition" heading above it, and putting "Operator" on screen beside the
+                       path and value fields would be new copy this change is not making. -->
+                  <Field as="div" class="manager-prerequisite-operator">
+                    <span class="visually-hidden" id={operatorCaptionId(entry.id)}>
+                      {text('FABRICATE.Admin.Manager.CharacterPrerequisites.Operator', 'Operator')}
+                    </span>
+                    <Select
+                      value={entry.op}
+                      options={operatorOptions}
+                      ariaLabelledBy={operatorCaptionId(entry.id)}
+                      triggerData={{ 'data-prerequisite-operator': '' }}
+                      minWidth={160}
+                      onChange={(next) => onUpdate(entry.id, { op: next })}
+                    />
+                  </Field>
+                  {#if !isValuelessOperator(entry.op)}
+                    <Field as="label" class="manager-prerequisite-value">
                       <span class="visually-hidden">
-                        {text(
-                          'FABRICATE.Admin.Manager.CharacterPrerequisites.Path',
-                          'Property path'
-                        )}
+                        {text('FABRICATE.Admin.Manager.CharacterPrerequisites.Value', 'Value')}
                       </span>
-                      <div class="manager-prerequisite-path-input">
-                        <span class="manager-prerequisite-at" aria-hidden="true">@</span>
-                        <input
-                          type="text"
-                          value={entry.path}
-                          placeholder="skills.cra.rank"
-                          data-prerequisite-path
-                          oninput={(event) =>
-                            onUpdate(entry.id, { path: event.currentTarget.value })}
-                        />
-                      </div>
-                    </label>
-                    <label class="manager-field manager-prerequisite-operator">
-                      <span class="visually-hidden">
-                        {text(
-                          'FABRICATE.Admin.Manager.CharacterPrerequisites.Operator',
-                          'Operator'
-                        )}
-                      </span>
-                      <select
-                        value={entry.op}
-                        data-prerequisite-operator
-                        onchange={(event) => onUpdate(entry.id, { op: event.currentTarget.value })}
-                      >
-                        {#each PREREQUISITE_OPERATORS as operator (operator.id)}
-                          <option value={operator.id}
-                            >{operator.valueless
-                              ? operator.label
-                              : `${operator.symbol} · ${operator.label}`}</option
-                          >
-                        {/each}
-                      </select>
-                    </label>
-                    {#if !isValuelessOperator(entry.op)}
-                      <label class="manager-field manager-prerequisite-value">
-                        <span class="visually-hidden">
-                          {text('FABRICATE.Admin.Manager.CharacterPrerequisites.Value', 'Value')}
-                        </span>
-                        <input
-                          type="text"
-                          value={entry.value ?? ''}
-                          placeholder="2"
-                          data-prerequisite-value
-                          oninput={(event) =>
-                            onUpdate(entry.id, { value: event.currentTarget.value })}
-                        />
-                      </label>
-                    {/if}
-                  </div>
-                  <p class="manager-muted manager-prerequisite-note">
-                    {text(
-                      'FABRICATE.Admin.Manager.CharacterPrerequisites.Note',
-                      "Resolves against the character's roll data. Boolean comparisons (is true / is false / exists) hide the value field. Unknown paths fall back to 0 / false."
-                    )}
-                  </p>
+                      <input
+                        type="text"
+                        value={entry.value ?? ''}
+                        placeholder="2"
+                        data-prerequisite-value
+                        oninput={(event) =>
+                          onUpdate(entry.id, { value: event.currentTarget.value })}
+                      />
+                    </Field>
+                  {/if}
                 </div>
-              {/if}
-            </li>
-          {/each}
-        </ul>
-      {/if}
-    </div>
-  {/if}
+                <p class="manager-muted manager-prerequisite-note">
+                  {text(
+                    'FABRICATE.Admin.Manager.CharacterPrerequisites.Note',
+                    "Resolves against the character's roll data. Boolean comparisons (is true / is false / exists) hide the value field. Unknown paths fall back to 0 / false."
+                  )}
+                </p>
+              </div>
+            {/if}
+          </li>
+        {/each}
+      </ul>
+    {/if}
+  </div>
 </section>
+
+<style>
+  /* THE WIDTH THE ELEMENT-TYPED SHEET RULE NO LONGER SUPPLIES (issue 1510).
+     `.fabricate-field.manager-field select { width: 100% }` painted this control until it became
+     a `<button>`, and `.fabricate-select-trigger` declares no width at all by design — a
+     trigger's box belongs to the row it sits in. Without this rule the button hugs its value, so
+     the operator control measured 72.91px on "is false", 92.28px on "≥ · at least" and 109.66px
+     on "≠ · not equals" inside a 218px column, and picking a different comparison visibly
+     re-flowed the path and value fields beside it. Measured in Chromium against the fixture's
+     declared Arial face; the same three values render at one width with it.
+
+     The `:global()` is anchored at `.manager-prerequisite-condition`, which THIS component
+     writes, so the rule keeps a scoping hash rather than reaching every trigger in the document.
+     The class it qualifies sits on a `<Field>`, which Svelte stamps no hash on — the trap
+     `Field.svelte` documents at length. */
+  .manager-prerequisite-condition
+    :global(.manager-prerequisite-operator .fabricate-select-trigger) {
+    width: 100%;
+  }
+</style>

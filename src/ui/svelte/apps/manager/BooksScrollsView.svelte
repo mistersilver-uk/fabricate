@@ -37,12 +37,17 @@
   recipe-item Overview tab use) and hands it upstream to create + link the definition.
 -->
 <script>
-  import Chip from './Chip.svelte';
+  import Chip from '../../components/Chip.svelte';
   import EmptyState from './EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import { dragDrop } from '../../actions/dragDrop.js';
   import { resolveDropData } from '../../util/dropUtils.js';
+  import ManagerButton from '../../components/ManagerButton.svelte';
+  import StatusToggle from '../../components/StatusToggle.svelte';
   import Pagination from '../../components/Pagination.svelte';
+  import IconButton from '../../components/IconButton.svelte';
+  import ManagerToolbar from '../../components/ManagerToolbar.svelte';
+  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
 
   let {
     recipeItems = [],
@@ -55,6 +60,7 @@
     onToggleEnabled = () => {},
   } = $props();
 
+  let searchTerm = $state('');
   let statusFilter = $state('all');
   let typeFilter = $state('all');
   let capFilter = $state('all');
@@ -184,8 +190,15 @@
     Array.from(new Set((recipeItems || []).map((item) => item?.derivedType || 'Book'))).sort()
   );
 
+  const normalizedSearch = $derived(searchTerm.trim().toLowerCase());
+
   const filteredItems = $derived(
     (recipeItems || []).filter((item) => {
+      const matchesSearch =
+        !normalizedSearch ||
+        String(item?.resolvedName || '')
+          .toLowerCase()
+          .includes(normalizedSearch);
       const matchesStatus =
         statusFilter === 'all' ||
         (statusFilter === 'enabled' && item.enabled !== false) ||
@@ -195,12 +208,12 @@
         capFilter === 'all' ||
         (capFilter === 'limited' && capLimited(item)) ||
         (capFilter === 'unlimited' && !capLimited(item));
-      return matchesStatus && matchesType && matchesCap;
+      return matchesSearch && matchesStatus && matchesType && matchesCap;
     })
   );
 
   const filtersActive = $derived(
-    statusFilter !== 'all' || typeFilter !== 'all' || capFilter !== 'all'
+    normalizedSearch !== '' || statusFilter !== 'all' || typeFilter !== 'all' || capFilter !== 'all'
   );
 
   const paginatedItems = $derived(
@@ -218,9 +231,11 @@
   }
 
   function clearFilters() {
+    searchTerm = '';
     statusFilter = 'all';
     typeFilter = 'all';
     capFilter = 'all';
+    pageIndex = 0;
   }
 </script>
 
@@ -273,10 +288,19 @@
     </span>
   </section>
 
-  <section
-    class="manager-toolbar"
-    aria-label={text('FABRICATE.Admin.Manager.BooksScrolls.Filters', 'Recipe item filters')}
+  <ManagerToolbar
+    ariaLabel={text('FABRICATE.Admin.Manager.BooksScrolls.Filters', 'Recipe item filters')}
   >
+    <ManagerSearchField
+      value={searchTerm}
+      onInput={(next) => {
+        searchTerm = next;
+        pageIndex = 0;
+      }}
+      placeholder={text('FABRICATE.Admin.Manager.BooksScrolls.Search', 'Search recipe items')}
+      ariaLabel={text('FABRICATE.Admin.Manager.BooksScrolls.Search', 'Search recipe items')}
+      inputAttrs={{ 'data-books-scrolls-search': '' }}
+    />
     <label class="manager-filter">
       <span>{text('FABRICATE.Admin.Manager.StatusFilter', 'Status')}</span>
       <select
@@ -351,17 +375,16 @@
         .replace('{total}', (recipeItems || []).length)}</Chip
     >
     {#if filtersActive}
-      <button
-        type="button"
-        class="manager-button manager-clear-filters"
+      <ManagerButton
+        class="manager-clear-filters"
         data-clear-filters="books-scrolls"
         onclick={clearFilters}
       >
         <i class="fas fa-times" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</span>
-      </button>
+      </ManagerButton>
     {/if}
-  </section>
+  </ManagerToolbar>
 
   <section
     class="manager-table-scroll manager-books-scrolls-scroll"
@@ -369,7 +392,7 @@
   >
     {#if (recipeItems || []).length === 0}
       <EmptyState
-        icon="fas fa-book-sparkles"
+        icon="fas fa-book"
         title={text('FABRICATE.Admin.Manager.BooksScrolls.EmptyTitle', 'No recipe items yet')}
         hint={text(
           'FABRICATE.Admin.Manager.BooksScrolls.EmptyHint',
@@ -390,8 +413,8 @@
         )}
         dataAttr="data-books-scrolls-empty-filtered"
       >
-        <button type="button" class="manager-button" onclick={clearFilters}
-          >{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</button
+        <ManagerButton onclick={clearFilters}
+          >{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</ManagerButton
         >
       </EmptyState>
     {:else}
@@ -421,6 +444,7 @@
             <button
               type="button"
               class="manager-books-scrolls-identity"
+              data-keyboard-focus="true"
               data-books-scrolls-select={item.id}
               aria-pressed={isSelected(item)}
               aria-label={text(
@@ -482,12 +506,12 @@
             </Chip>
 
             <div class="manager-books-scrolls-actions">
-              <button
-                type="button"
-                class={`manager-status-toggle ${item.enabled === false ? 'is-off' : 'is-on'}`}
-                aria-pressed={item.enabled !== false}
-                data-books-scrolls-toggle={item.id}
-                aria-label={item.enabled === false
+              <StatusToggle
+                on={item.enabled !== false}
+                label={item.enabled === false
+                  ? text('FABRICATE.Admin.Manager.StatusOff', 'Off')
+                  : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
+                ariaLabel={item.enabled === false
                   ? text(
                       'FABRICATE.Admin.Manager.BooksScrolls.EnableNamed',
                       'Enable {name}'
@@ -496,25 +520,16 @@
                       'FABRICATE.Admin.Manager.BooksScrolls.DisableNamed',
                       'Disable {name}'
                     ).replace('{name}', item.resolvedName)}
+                data-books-scrolls-toggle={item.id}
                 onclick={(event) => {
                   event.stopPropagation();
                   onToggleEnabled(item.id, item.enabled === false);
                 }}
-              >
-                <span class="manager-status-toggle-track" aria-hidden="true"
-                  ><span class="manager-status-toggle-knob"></span></span
-                >
-                <span class="manager-status-toggle-label"
-                  >{item.enabled === false
-                    ? text('FABRICATE.Admin.Manager.StatusOff', 'Off')
-                    : text('FABRICATE.Admin.Manager.StatusOn', 'On')}</span
-                >
-              </button>
-              <button
-                type="button"
-                class="manager-icon-button manager-books-scrolls-edit"
+              />
+              <IconButton
+                class="manager-books-scrolls-edit"
                 data-books-scrolls-edit={item.id}
-                aria-label={text(
+                ariaLabel={text(
                   'FABRICATE.Admin.Manager.BooksScrolls.EditNamed',
                   'Edit {name}'
                 ).replace('{name}', item.resolvedName)}
@@ -522,7 +537,7 @@
                 onclick={() => onOpenRecipeItem(item.id)}
               >
                 <i class="fas fa-pen" aria-hidden="true"></i>
-              </button>
+              </IconButton>
             </div>
           </div>
         {/each}
@@ -564,9 +579,9 @@
        success-soft fill + 8px radius mirror `.manager-component-drop-zone`. */
     margin: var(--fab-space-3);
     padding: var(--fab-space-3) var(--fab-space-3);
-    border: 1px dashed var(--fab-mv2-border-strong);
+    border: 1px dashed var(--fab-border-strong);
     border-radius: 8px;
-    color: var(--fab-mv2-text);
+    color: var(--fab-text);
     background: var(--fab-success-soft);
   }
 
@@ -586,9 +601,9 @@
     justify-content: center;
     width: 34px;
     height: 34px;
-    border: 1px solid var(--fab-mv2-border);
+    border: 1px solid var(--fab-border);
     border-radius: 6px;
-    color: var(--fab-mv2-accent);
+    color: var(--fab-accent);
     background: var(--fab-overlay-dark-16);
   }
 
@@ -662,8 +677,8 @@
 
   .manager-books-scrolls-listitem {
     padding: var(--fab-space-3);
-    border: 1px solid var(--fab-mv2-border);
-    border-radius: var(--fab-v2-radius-panel);
+    border: 1px solid var(--fab-border);
+    border-radius: var(--fab-books-panel-radius);
     background: var(--fab-bg-2);
   }
 
@@ -698,13 +713,13 @@
   .manager-books-scrolls-identity:focus-visible {
     outline: 2px solid var(--fab-accent-border);
     outline-offset: 3px;
-    border-radius: var(--fab-v2-radius-control);
+    border-radius: var(--fab-books-control-radius);
   }
 
   .manager-books-scrolls-thumb {
-    width: var(--fab-v2-thumb-sm);
-    height: var(--fab-v2-thumb-sm);
-    border-radius: var(--fab-v2-radius-control);
+    width: 40px;
+    height: 40px;
+    border-radius: var(--fab-books-control-radius);
     object-fit: cover;
     flex: none;
   }

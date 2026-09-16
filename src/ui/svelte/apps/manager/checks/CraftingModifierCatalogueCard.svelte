@@ -88,12 +88,15 @@
   library patch at all — the store's check-modifier saver no longer accepts one.
 -->
 <script>
+  import Field from '../../../components/Field.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import Stepper from '../../../components/Stepper.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';
-  import Chip from '../Chip.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
-  import RadioCardGroup from '../RadioCardGroup.svelte';
+  import RadioCardGroup from '../../../components/RadioCardGroup.svelte';
+  import InspectorCard from '../../../components/InspectorCard.svelte';
+  import ModifierLibraryRow from '../ModifierLibraryRow.svelte';
   import {
     normalizeModifierPolicy,
     policyDefersSelection,
@@ -459,8 +462,8 @@
 </script>
 
 <!-- CARD ONE: the library, read-only, with the selection control on each row. -->
-<section
-  class="manager-inspector-card manager-checks-card"
+<InspectorCard
+  class="manager-checks-card"
   data-crafting-modifier-catalogue={activity}
   data-check-modifier-activity={activity}
 >
@@ -563,7 +566,7 @@
       <p class="manager-muted" data-crafting-modifier-empty="linked">
         {text(
           'FABRICATE.Admin.Manager.Checks.Crafting.ModifierCatalogueEmptyLinked',
-          'This system has no modifiers yet. They are defined once, in System settings › Modifiers.'
+          'This world has no modifiers yet. They are defined once, in System settings › Modifiers.'
         )}
       </p>
     {/if}
@@ -575,18 +578,21 @@
            second editor for the same rows is how two screens come to disagree about which
            one wrote last. The eligibility pill at the end is NOT part of that — which
            entries an activity applies is exactly what this screen owns. -->
-      <div class="manager-modifier-readonly-row" data-crafting-modifier-row={modifier.id}>
-        <span class="manager-modifier-readonly-glyph" aria-hidden="true">
-          <i class={modifier.icon || DEFAULT_MODIFIER_ICON} data-crafting-modifier-readonly-icon
-          ></i>
-        </span>
-        <span class="manager-modifier-readonly-label" data-crafting-modifier-readonly="label"
-          >{modifier.label || modifier.id}</span
-        >
-        <code
-          class="manager-modifier-readonly-expression"
-          data-crafting-modifier-readonly="expression">{modifier.expression || '—'}</code
-        >
+      <!-- THE ROW IS `ModifierLibraryRow` SINCE ISSUE 1373's ROUND 4, and the markup that was
+           written out here is unchanged — it MOVED. The Tool Studio's check-bonus picker draws
+           the same world modifier library and now calls the same row, which is what stops the
+           two screens presenting one concept from two copies. Everything below the three cells
+           is still this card's: which entries an activity applies is exactly what it owns. -->
+      <ModifierLibraryRow
+        as="div"
+        icon={modifier.icon || DEFAULT_MODIFIER_ICON}
+        label={modifier.label || modifier.id}
+        expression={modifier.expression}
+        rowAttributes={{ 'data-crafting-modifier-row': modifier.id }}
+        iconAttributes={{ 'data-crafting-modifier-readonly-icon': true }}
+        labelAttributes={{ 'data-crafting-modifier-readonly': 'label' }}
+        expressionAttributes={{ 'data-crafting-modifier-readonly': 'expression' }}
+      >
         {#if boundsChipLabel(modifier)}
           <Chip density="row" class="manager-modifier-bounds-chip">{boundsChipLabel(modifier)}</Chip
           >
@@ -621,7 +627,7 @@
           <span class="manager-modifier-eligibility-dot" aria-hidden="true"></span>
           {eligibilityLabelOf(modifier.id)}
         </button>
-      </div>
+      </ModifierLibraryRow>
 
       {#if boundsFault(modifier)}
         <p
@@ -654,17 +660,17 @@
       <span>
         {text(
           'FABRICATE.Admin.Manager.Checks.Crafting.ModifierLibraryNote',
-          'These are defined once for the whole crafting system, in system settings — this check only decides which of them apply and how.'
+          'These are defined once for the whole world, in system settings — this check only decides which of them apply and how.'
         )}
       </span>
     </p>
   </div>
-</section>
+</InspectorCard>
 
 <!-- CARD TWO: how the marked entries reduce to the one number the roll gets. Its own studio
      card, as the design draws it — it was an uppercase micro-label inside the card above,
      which is the treatment this studio retired everywhere else. -->
-<section class="manager-inspector-card manager-checks-card" data-crafting-modifier-policy-card>
+<InspectorCard class="manager-checks-card" data-crafting-modifier-policy-card="">
   <div class="manager-checks-card-head">
     <div class="manager-checks-card-head-body">
       <h3 class="manager-checks-card-title">
@@ -728,8 +734,9 @@
              second "Maximum picks" under the first would be the same words twice.
              The Stepper's `ariaLabel` repeats that heading verbatim, so the accessible name
              still starts with the visible one (WCAG 2.5.3). -->
-        <div
-          class="manager-field manager-modifier-max-picks-field"
+        <Field
+          as="div"
+          class="manager-modifier-max-picks-field"
           data-crafting-modifier-max-picks={maxPicksValue === null
             ? 'unlimited'
             : String(maxPicksValue)}
@@ -750,11 +757,11 @@
             }}
             onChange={selectMaxPicks}
           />
-        </div>
+        </Field>
       </div>
     {/if}
   </div>
-</section>
+</InspectorCard>
 
 <style>
   /* The card is its OWN container-query context (issue 1095, D4). The shipped
@@ -763,8 +770,27 @@
      whole `fabricate-manager` shell, i.e. it fired only when the entire manager was
      narrow, never when the centre pane alone was. Declaring the container here makes it
      measure this card, so the 2x2 rule grid reflows to 1x4 against the real ~700-760px
-     pane rather than overflowing it. */
-  .manager-inspector-card {
+     pane rather than overflowing it.
+
+     `:global()` AND ANCHORED ON THE TWO CARDS' OWN HOOKS (issue 1427). Both cards are
+     `<InspectorCard>`s now, so `manager-inspector-card` is written by that primitive and this
+     rule stopped matching — silently, because `<i class={modifier.icon || …}>` at line 581
+     makes every class selector in this block possibly-matching, so it was emitted with the
+     hash attached and `lint:svelte:warnings` reported nothing. Measured against Svelte
+     5.56.3: a REGULAR element carrying either a spread or a `class` whose value is any
+     expression does that; the same attribute on a COMPONENT tag does not, so the
+     `{...stepperLabels(…)}` spread on the `<Stepper>` above is not what silences this.
+
+     Anchored on `[data-crafting-modifier-catalogue]` and `[data-crafting-modifier-policy-card]`
+     rather than on the `.manager-checks-card` modifier the two cards share, because that
+     modifier has eleven other sites across seven components and `container-type` is not a
+     paint: it creates a containment context, so widening this to every checks card would
+     silently re-point every unnamed `@container` query inside all of them — which is the exact
+     defect the block above exists to fix, inverted. An attribute selector weighs the same as a
+     class, so each half stays at (0,2,0), and the two together match exactly the two elements
+     the scoped form matched. */
+  :global(.manager-inspector-card[data-crafting-modifier-catalogue]),
+  :global(.manager-inspector-card[data-crafting-modifier-policy-card]) {
     container-type: inline-size;
   }
 
@@ -785,9 +811,18 @@
 
      What stays here is layout CONTEXT rather than the chip's own geometry: `flex: 0 0 auto`
      keeps both chips from shrinking below their content when the row is narrow, which is a
-     property of this row's flex layout, not of a chip. */
-  .manager-modifier-readonly-row :global(.manager-modifier-bounds-chip),
-  .manager-modifier-readonly-row :global(.manager-modifier-roll-chip) {
+     property of this row's flex layout, not of a chip.
+
+     RE-ANCHORED ON THE CARD (issue 1373, round 4), for the reason the two rules above already
+     record about `.manager-inspector-card`. The row moved into `ModifierLibraryRow`, so
+     `.manager-modifier-readonly-row` is written by THAT component and carries its hash; the
+     scoped ancestor half stopped matching the moment it moved. Wrapped WHOLE rather than
+     leaving the chip half scoped, and anchored on this card's own hook so the reach is
+     unchanged: `.manager-inspector-card[data-crafting-modifier-catalogue]` is a class plus an
+     attribute, so each half stays at the (0,3,0) the scoped
+     `.manager-modifier-readonly-row.svelte-hash .manager-modifier-bounds-chip` form had. */
+  :global(.manager-inspector-card[data-crafting-modifier-catalogue] .manager-modifier-bounds-chip),
+  :global(.manager-inspector-card[data-crafting-modifier-catalogue] .manager-modifier-roll-chip) {
     flex: 0 0 auto;
   }
 
@@ -796,8 +831,18 @@
      on the Outcomes screen's otherwise identical group, which is the mockup disagreeing with
      itself rather than a second scale to adopt. So this states the measured value where it is
      measured and leaves the primitive alone. Same unlayered-`:global()` route as the chips
-     above, for the same cascade reason. */
-  .manager-inspector-card :global(.manager-resolution-mode-options) {
+     above, for the same cascade reason.
+
+     WHOLLY `:global()` and per-card since issue 1427, for the reason the container rule states:
+     the ancestor half was `.manager-inspector-card`, which this component no longer writes, so
+     it had to move inside the `:global()` and take the two cards' own hooks as its anchor. Each
+     half stays at (0,3,0), so nothing about which declaration wins has moved. */
+  :global(
+    .manager-inspector-card[data-crafting-modifier-catalogue] .manager-resolution-mode-options
+  ),
+  :global(
+    .manager-inspector-card[data-crafting-modifier-policy-card] .manager-resolution-mode-options
+  ) {
     gap: 10px;
   }
 
@@ -849,7 +894,12 @@
      LAYOUT context rather than dropping `fill` (an unfilled `.fab-stepper` is still a
      flex item and `align-items: stretch` widens it to the same box anyway). 160px is the
      width the other four such call sites use. */
-  .manager-modifier-max-picks-field {
+  /* `:global(...)`, chained with `.manager-field`: this class now sits on a `<Field>`, and a
+     scoped rule cannot reach a class the component hands to a child (see `Field.svelte`). The
+     `.manager-field` compound is not decoration — it restores the (0,2,0) the scoped
+     `.manager-modifier-max-picks-field.svelte-hash` form had, which the bare `:global(.manager-modifier-max-picks-field)` would drop to
+     (0,1,0). */
+  :global(.manager-field.manager-modifier-max-picks-field) {
     flex: 0 0 auto;
     width: 160px;
     max-width: 160px;

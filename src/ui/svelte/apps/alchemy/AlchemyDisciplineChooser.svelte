@@ -7,6 +7,7 @@
   an alchemy (crafting) system.
 -->
 <script>
+  import Medallion from '../../components/Medallion.svelte';
   import { localize } from '../../util/foundryBridge.js';
 
   let { systems = [], onChoose = null } = $props();
@@ -26,7 +27,12 @@
       <span class="alchemy-chooser-mark" aria-hidden="true">
         <i class="fas fa-flask-vial"></i>
       </span>
-      <h2 class="alchemy-chooser-heading" tabindex="-1" bind:this={heading}>
+      <h2
+        class="alchemy-chooser-heading"
+        tabindex="-1"
+        data-keyboard-focus="true"
+        bind:this={heading}
+      >
         {localize('FABRICATE.App.Alchemy.ChooseDiscipline')}
       </h2>
       <p class="alchemy-chooser-hint">{localize('FABRICATE.App.Alchemy.ChooseDisciplineHint')}</p>
@@ -41,13 +47,7 @@
           onclick={() => onChoose?.(system.id)}
         >
           <span class="alchemy-chooser-card-top">
-            <span class="alchemy-chooser-card-icon">
-              {#if system.img}
-                <img src={system.img} alt="" />
-              {:else}
-                <i class="fas fa-flask" aria-hidden="true"></i>
-              {/if}
-            </span>
+            <Medallion art={system.img} alt="" size={44} glyph={18} icon="fas fa-flask" />
             <span class="alchemy-chooser-card-heading">
               <span class="alchemy-chooser-card-name">{system.name}</span>
               <span class="alchemy-chooser-card-count">
@@ -180,26 +180,6 @@
     display: flex;
     align-items: center;
     gap: 12px;
-  }
-
-  .alchemy-chooser-card-icon {
-    flex: 0 0 auto;
-    width: 44px;
-    height: 44px;
-    border-radius: 11px;
-    background: var(--fab-surface-raised);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--fab-accent);
-    font-size: 18px;
-    overflow: hidden;
-  }
-
-  .alchemy-chooser-card-icon img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
   }
 
   .alchemy-chooser-card-heading {

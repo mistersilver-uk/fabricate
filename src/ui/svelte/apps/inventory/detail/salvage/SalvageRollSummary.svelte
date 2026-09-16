@@ -20,8 +20,9 @@
   two stacked green boxes make neither one mean anything.
 -->
 <script>
+  import Medallion from '../../../../components/Medallion.svelte';
+  import { resolveCraftingArt } from '../../../../util/craftingArtResolution.js';
   import { localize } from '../../../../util/foundryBridge.js';
-  import CraftingThumb from '../../../crafting/CraftingThumb.svelte';
 
   let { result = null } = $props();
 
@@ -68,9 +69,9 @@
       <ul class="salvage-summary-awarded" data-inventory-salvage-awarded>
         {#each awarded as entry, index (entry.name + ':' + index)}
           <li class="salvage-summary-award">
-            <!-- CraftingThumb, not a raw <img>: missing art gets the house fallback
-                 rather than a broken-image glyph. -->
-            <CraftingThumb src={entry.img ?? ''} alt="" size={14} />
+            <!-- The shared tile through `resolveCraftingArt`, not a raw <img>: missing art
+                 gets the house fallback rather than a broken-image glyph. -->
+            <Medallion {...resolveCraftingArt(entry.img ?? '')} alt="" size={14} />
             <span>{entry.name}</span>
           </li>
         {/each}

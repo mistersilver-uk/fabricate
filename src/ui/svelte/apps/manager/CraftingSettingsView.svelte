@@ -22,7 +22,7 @@
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
-  import ResolutionModeCard from './ResolutionModeCard.svelte';
+  import RadioCardGroup from '../../components/RadioCardGroup.svelte';
   import CraftingEffectPanel from './CraftingEffectPanel.svelte';
   import { resolutionModeOptions, salvageResolutionModeOptions } from './resolutionModeOptions.js';
 
@@ -40,9 +40,16 @@
 
   // The recipe-visibility radio-card options. `global | restricted | item |
   // knowledge` mirror the visibility matrix; icons/copy follow the prototype.
-  // The shared ResolutionModeCard renders label + description per option; the
-  // `icon` field rides along for parity with the design (and any future icon-aware
-  // card variant) and is harmlessly ignored by the current primitive.
+  // The shared RadioCardGroup renders label + description per option; the `icon`
+  // field rides along for parity with the design and is drawn as the leading glyph
+  // tile whenever `configCards` is on, which every site in this file passes.
+
+  // ISSUE 1509 FOLDED THE `ResolutionModeCard` SHIM AWAY, and the three call sites
+  // below render the primitive directly. `legendFallback`/`hintFallback` are its
+  // `legend`/`hint`, and `variant="config-card"` is `configCards={true}` — stated
+  // EXPLICITLY rather than left to the default, because the shim derived the flag
+  // from `variant` and defaulted it to FALSE while the primitive defaults it to
+  // TRUE, so an omission here would be a silent face change rather than a no-op.
   //
   // For a non-alchemy system these read as GATING (a recipe is hidden until the
   // mode's condition is met). An alchemy system is REVEAL-not-gate: brewing is never
@@ -201,24 +208,6 @@
   >
     <div class="crafting-settings-layout">
       <div class="crafting-settings-content">
-        <section class="manager-section-header">
-          <div class="manager-heading">
-            <p class="manager-kicker">{selectedSystem.name}</p>
-            <h2 class="manager-title">
-              {text(
-                'FABRICATE.Admin.Manager.Crafting.CraftingTabs.SettingsPlaceholderTitle',
-                'Crafting settings'
-              )}
-            </h2>
-            <p class="manager-subtitle">
-              {text(
-                'FABRICATE.Admin.Manager.Crafting.Settings.Subtitle',
-                'Control how players get access to the recipes in this system.'
-              )}
-            </p>
-          </div>
-        </section>
-
         <div class="crafting-settings-body">
           <section class="crafting-settings-section" data-crafting-resolution-section>
             <div class="crafting-settings-section-head">
@@ -236,18 +225,18 @@
                 'Choose how a crafting attempt is turned into a result. Applies to every recipe in the system.'
               )}
             </p>
-            <ResolutionModeCard
+            <RadioCardGroup
               cardId="manager-crafting-resolution-mode"
               legendKey="FABRICATE.Admin.SystemSettings.ResolutionMode"
-              legendFallback="Recipe resolution mode"
+              legend="Recipe resolution mode"
               hintKey="FABRICATE.Admin.Manager.SystemEdit.ResolutionModeHint"
-              hintFallback="Changing resolution mode migrates recipes to the new mode where possible and only deletes recipes that cannot be migrated, after a confirmation that reports the counts."
+              hint="Changing resolution mode migrates recipes to the new mode where possible and only deletes recipes that cannot be migrated, after a confirmation that reports the counts."
               options={resolutionModeOptions}
               selectedValue={systemResolutionModeValue}
               groupName="manager-crafting-resolution-mode"
               dataAttr="data-crafting-resolution-mode"
               optionDataAttr="data-crafting-resolution-mode-option"
-              variant="config-card"
+              configCards={true}
               onChange={handleResolutionModeChange}
             />
           </section>
@@ -263,16 +252,16 @@
               </h3>
             </div>
             <p class="crafting-settings-section-intro">{visibilityIntro}</p>
-            <ResolutionModeCard
+            <RadioCardGroup
               cardId="manager-crafting-visibility-mode"
               legendKey="FABRICATE.Admin.Manager.Crafting.Settings.VisibilityHeading"
-              legendFallback="Recipe visibility"
+              legend="Recipe visibility"
               options={visibilityModeOptions}
               selectedValue={visibilityMode}
               groupName="manager-crafting-visibility-mode"
               dataAttr="data-crafting-visibility-mode"
               optionDataAttr="data-crafting-visibility-mode-option"
-              variant="config-card"
+              configCards={true}
               onChange={(mode) => onSetVisibilityMode(mode)}
             />
           </section>
@@ -294,18 +283,18 @@
                   'Choose how a salvage attempt is turned into returned components.'
                 )}
               </p>
-              <ResolutionModeCard
+              <RadioCardGroup
                 cardId="manager-crafting-salvage-resolution-mode"
                 legendKey="FABRICATE.Admin.SystemSettings.SalvageResolutionMode"
-                legendFallback="Salvage resolution mode"
+                legend="Salvage resolution mode"
                 hintKey="FABRICATE.Admin.SystemSettings.SalvageResolutionModeHint"
-                hintFallback="Salvage has one ingredient, so only progressive and routed-by-check apply. Components incompatible with the new salvage mode will have salvage disabled."
+                hint="Salvage has one ingredient, so only progressive and routed-by-check apply. Components incompatible with the new salvage mode will have salvage disabled."
                 options={salvageResolutionModeOptions}
                 selectedValue={systemSalvageResolutionModeValue}
                 groupName="manager-crafting-salvage-resolution-mode"
                 dataAttr="data-crafting-salvage-resolution-mode"
                 optionDataAttr="data-crafting-salvage-resolution-mode-option"
-                variant="config-card"
+                configCards={true}
                 onChange={handleSalvageResolutionModeChange}
               />
             </section>
@@ -334,7 +323,7 @@
     flex-direction: column;
     min-width: 0;
     min-height: 0;
-    border-right: 1px solid var(--fab-mv2-border);
+    border-right: 1px solid var(--fab-border);
     overflow-y: auto;
   }
 
@@ -355,7 +344,7 @@
 
   .crafting-settings-section:not(:last-child) {
     padding-bottom: var(--fab-space-5);
-    border-bottom: 1px solid var(--fab-mv2-border);
+    border-bottom: 1px solid var(--fab-border);
   }
 
   .crafting-settings-section-head {
@@ -366,7 +355,7 @@
   }
 
   .crafting-settings-section-head > i {
-    color: var(--fab-mv2-accent);
+    color: var(--fab-accent);
     font-size: 0.85rem;
   }
 
@@ -375,7 +364,7 @@
     font-family: var(--font-primary);
     font-size: 1rem;
     font-weight: 600;
-    color: var(--fab-mv2-text);
+    color: var(--fab-text);
   }
 
   .crafting-settings-section-intro {
@@ -389,7 +378,7 @@
     font-size: 0.9rem;
   }
 
-  /* The shared ResolutionModeCard always renders a <legend> for its accessible
+  /* The shared RadioCardGroup always renders a <legend> for its accessible
      name; here the visible heading is the section <h3> above it, so the legend is
      collapsed to a screen-reader-only label to avoid a doubled title. */
   .crafting-settings-section :global(.manager-resolution-mode-legend) {
@@ -408,7 +397,7 @@
     min-width: 0;
     min-height: 0;
     padding: var(--fab-space-4);
-    background: var(--fab-mv2-surface-2);
+    background: var(--fab-bg-3);
     overflow-y: auto;
   }
 
@@ -425,7 +414,7 @@
     }
 
     .crafting-settings-context {
-      border-top: 1px solid var(--fab-mv2-border);
+      border-top: 1px solid var(--fab-border);
     }
   }
 </style>

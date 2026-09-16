@@ -9,6 +9,7 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
+  import Kicker from '../../../components/Kicker.svelte';
 
   let { check = null } = $props();
 
@@ -40,9 +41,9 @@
     data-check-usable={check.usable === true ? 'true' : 'false'}
   >
     <header class="crafting-check-head">
-      <p class="crafting-detail-section-title">
+      <Kicker as="p">
         {localize('FABRICATE.App.Crafting.Check.Title')}
-      </p>
+      </Kicker>
       <span class="crafting-check-pill" class:is-mandatory={mandatory}>
         {mandatory
           ? localize('FABRICATE.App.Crafting.Check.Mandatory')
@@ -170,14 +171,5 @@
     gap: 6px;
     font-style: normal;
     color: var(--fab-danger-text);
-  }
-
-  .crafting-detail-section-title {
-    margin: 0;
-    font-size: 12px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--fab-text-muted);
   }
 </style>

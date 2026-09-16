@@ -21,7 +21,11 @@ import { after, afterEach, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  SELECT_COMPILED_MODULES,
+  createMountedComponentHarness,
+} from '../helpers/svelte-component-harness.js';
 import { stepMigratedNumberField, stepNativeNumberInput } from '../helpers/numericKeyboardStep.js';
 import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 
@@ -32,33 +36,60 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-gathering-task-stepper-',
   rawModules: [
+    // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
+    ...SEARCHABLE_POPOVER_RAW_MODULES,
     // The SHARED subject check-modifier picker's resolver (issue 1095): it asks what an
     // ABSENT `maxModifierPicks` means rather than coercing it. These four close its graph.
+    'src/systems/characterLibraries.js',
     'src/systems/checkModifierResolver.js',
     'src/systems/salvageCheckUsability.js',
     'src/utils/checkModifierPicks.js',
     'src/systems/toolCheckBonus.js',
     'src/utils/craftingCheckExpression.js',
     'src/utils/rollExpressionAverage.js',
+    'src/utils/rollFormulaRollability.js',
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/components/stepperLabels.js',
     'src/ui/svelte/util/dropRateTier.js',
     'src/ui/svelte/actions/dragDrop.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
+    // The availability menus and `ModifierPillSelect`'s add menu are `SearchablePopover`
+    // now (issue 1458), which portals its panel and lays it out against the trigger.
+    'src/ui/svelte/actions/portal.js',
+    'src/ui/svelte/actions/anchoredPopover.js',
+    'src/ui/svelte/util/overlayBounds.js',
+    'src/ui/svelte/util/iconPickerPopover.js',
+    'src/ui/svelte/util/listboxNavigation.js',
+    'src/ui/svelte/util/overlayHost.js',
     'src/gatheringImageDefaults.js',
+    'src/utils/complicationSummary.js',
+    'src/systems/characterPrerequisites.js',
   ],
   // A component missing here does not fail this suite — it HANGS it, reported as `# cancelled`.
   compiledModules: [
     'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/components/ChanceSlider.svelte',
     'src/ui/svelte/components/Pagination.svelte',
-    'src/ui/svelte/apps/manager/Chip.svelte',
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
+    // Issue 1504: the shared `<Select>`'s whole compiled closure — also covers the manager's
+    // ONE labelled push-button (issue 1118), which the stamina Add modifier and both Add drop
+    // rule controls render, and the three availability add menus' shared primitive (issue 1458).
+    ...SELECT_COMPILED_MODULES,
+    'src/ui/svelte/components/RadioCardGroup.svelte',
+    'src/ui/svelte/components/RowDisclosure.svelte',
+    'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
+    'src/ui/svelte/apps/manager/recipe/RecipeResultsSection.svelte',
+    'src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte',
+    'src/ui/svelte/apps/manager/recipe/RecipeResultItemRow.svelte',
+    'src/ui/svelte/apps/manager/recipe/RecipeRoutingAssignment.svelte',
     // The SHARED subject check-modifier picker (issue 1095) and the two primitives it
     // renders. Omitting a `.svelte` the tree reaches HANGS the suite (# cancelled).
     'src/ui/svelte/apps/manager/SubjectModifierPicker.svelte',
     'src/ui/svelte/components/SelectionCheckbox.svelte',
+    'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/ModifierPillSelect.svelte',
+    'src/ui/svelte/components/StatusToggle.svelte',
+    'src/ui/svelte/components/ManagerSearchField.svelte',
     EDITOR_PATH,
   ],
   componentPath: EDITOR_PATH,
@@ -97,7 +128,7 @@ function taskFixture() {
 }
 
 /** Mount the editor and return its recorded `onUpdateTask` payloads plus a field lookup. */
-async function mountEditor() {
+async function mountEditor(resolutionMode = 'routed') {
   const updates = [];
   let task = taskFixture();
   const root = await harness.mount({
@@ -107,7 +138,7 @@ async function mountEditor() {
     // `routed`, because the DC override card renders only under a routed gathering check
     // (`dcOverrideEnabled`) — under `d100` the field this suite's headline case drives does not
     // exist at all.
-    resolutionMode: 'routed',
+    resolutionMode,
     characterModifierLibrary: [{ id: 'mod-a', label: 'Herbalism' }],
     onUpdateTask: (patch) => {
       updates.push(patch);
@@ -115,6 +146,7 @@ async function mountEditor() {
     },
   });
   return {
+    root,
     updates,
     /**
      * Feed the recorded patches back in, the way the real host does.
@@ -205,6 +237,64 @@ const NEVER_RECEIVES_NULL = [
 ];
 
 describe('Gathering task editor steppers (issue 1050)', () => {
+  // ── Two adds on one screen, two roles, and both were wrong (issue 1118) ──────────────
+  //
+  // Audit rows 34 and 35. The gathering task editor renders two ADD verbs, and the sweep found
+  // them spelt as one bare `manager-button` each:
+  //
+  //  - Add modifier appends to the stamina modifier list directly above it, which is `dashed`:
+  //    a dashed outline reads as the empty slot the next row will fill. It takes NO `fullWidth`
+  //    — that is the delta's per-row ruling, and it is about the container: the list is a
+  //    column of grid rows, and a full-width dashed control under them reads as a fourth row
+  //    rather than as the thing that adds one. Its scoped `justify-self: start` went with the
+  //    conversion rather than being fought for; `justify-self` is a grid property and the
+  //    button's parent is a column flex container, so it had never done anything.
+  //  - Add drop rule is the drops section's CREATE action in toolbar chrome, which is
+  //    `primary`. The proof it was a mistake rather than a choice is on the SAME screen: the
+  //    identical verb in the drops empty state calls the same `onAddDrop` with the same label
+  //    and already shipped `is-primary`. Two spellings of one verb on one screen.
+  //
+  // Each is addressed by its own hook, and the two are asserted against EACH OTHER: moving
+  // either role onto the other control reds this, where "the editor contains a dashed button"
+  // and "the editor contains a primary button" would both still pass.
+  it('paints Add modifier as a dashed append and Add drop rule as the toolbar primary', async () => {
+    const { root } = await mountEditor('d100');
+
+    const addModifier = root.querySelector('[data-gathering-add-stamina-modifier]');
+    assert.ok(Boolean(addModifier), 'the stamina card renders its Add modifier control');
+    assert.ok(
+      addModifier.classList.contains('fab-manager-button'),
+      `Add modifier renders through the ManagerButton primitive, got ${addModifier.className}`
+    );
+    assert.ok(
+      addModifier.classList.contains('is-dashed'),
+      `Add modifier takes the dashed append role, got ${addModifier.className}`
+    );
+    assert.ok(
+      !addModifier.classList.contains('is-full-width'),
+      `and is deliberately NOT full width, got ${addModifier.className}`
+    );
+
+    const addDrop = root.querySelector('[data-gathering-add-drop="toolbar"]');
+    assert.ok(Boolean(addDrop), 'the drops toolbar renders its Add drop rule control');
+    assert.ok(
+      addDrop.classList.contains('fab-manager-button'),
+      `Add drop rule renders through the ManagerButton primitive, got ${addDrop.className}`
+    );
+    assert.ok(
+      addDrop.classList.contains('is-primary'),
+      `Add drop rule takes the primary role, got ${addDrop.className}`
+    );
+    assert.ok(
+      !addDrop.classList.contains('is-dashed'),
+      `and not the append role that belongs to the control above, got ${addDrop.className}`
+    );
+    assert.ok(
+      !addModifier.classList.contains('is-primary'),
+      `nor Add modifier the toolbar create role, got ${addModifier.className}`
+    );
+  });
+
   it('renders every migrated field as a real number input inside a Stepper', async () => {
     // Fail closed: if a selector stopped resolving, every table-driven assertion below would
     // silently assert nothing, and `field()` throwing here says so in one place.
@@ -270,13 +360,35 @@ describe('Gathering task editor steppers (issue 1050)', () => {
     assert.equal(lastWrite(updates, (patch) => patch.dcOverride), 14, 'and commits that too');
   });
 
+  it('commits a four-digit interval, steps it and preserves the amount when its unit changes', async () => {
+    const { root, field, updates, sync } = await mountEditor();
+    const input = field('[data-gathering-task-node-interval]');
+    const read = (patch) => patch.nodes?.respawn;
+    input.value = '1440';
+    input.dispatchEvent(new globalThis.Event('input', { bubbles: true }));
+    await sync();
+    assert.equal(input.value, '1440');
+    assert.equal(lastWrite(updates, read).intervalAmount, 1440);
+
+    input.closest('.fab-stepper').querySelectorAll('button')[1].click();
+    await sync();
+    assert.equal(input.value, '1441');
+    assert.equal(lastWrite(updates, read).intervalAmount, 1441);
+    stepNativeNumberInput(input, 'down');
+    await sync();
+
+    const unit = root.querySelector('[data-gathering-task-node-interval-unit]');
+    assert.equal(unit.tagName, 'SELECT');
+    unit.value = 'minutes';
+    unit.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
+    await sync();
+    assert.equal(lastWrite(updates, read).intervalUnit, 'minutes');
+    assert.equal(lastWrite(updates, read).intervalAmount, 1440);
+    assert.equal(input.value, '1440');
+    assert.equal(unit.value, 'minutes');
+  });
+
   it('lets the respawn unit select size to its content, on specificity not source order', () => {
-    // The interval row is `display: flex` with two `width: 100%` children — the filled stepper
-    // and the unit `<select>`, which takes its width from the blanket
-    // `.fabricate-manager .manager-field select` rule. They split the track 50/50, leaving the
-    // typeable half at ~22-42px: under half of what an unfilled stepper offers, and not enough
-    // for "1440". The remedy pins the SIBLING, so the stepper keeps `fill` and takes the rest.
-    //
     // The attribute qualifier in that rule is what makes it work, and it is easy to delete as
     // redundant because `select` alone reads like it says the same thing. It does not. Svelte 5
     // emits its scoping class as `:where(.svelte-hash)` on every compound after the first, and
@@ -294,7 +406,7 @@ describe('Gathering task editor steppers (issue 1050)', () => {
     const classColumn = selector.replace(/:where\([^)]*\)/g, '').match(/\.[\w-]+|\[[^\]]+\]/g);
     assert.ok(
       classColumn.length > 2,
-      `${selector.trim()} must out-specify \`.fabricate-manager .manager-field select\` (0,2,1), `
+      `${selector.trim()} must out-specify \`.fabricate-field.manager-field select\` (0,2,1), `
         + `but its class column is ${classColumn.length}`
     );
     assert.match(rule[0], /width: auto/, 'and it is the width that is being released');

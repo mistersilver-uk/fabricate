@@ -1,14 +1,18 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import Field from '../../components/Field.svelte';
   import ChanceSlider from '../../components/ChanceSlider.svelte';
+  import StatusToggle from '../../components/StatusToggle.svelte';
+  import Chip from '../../components/Chip.svelte';
   import EmptyState from './EmptyState.svelte';
   import { DEFAULT_GATHERING_EVENT_IMG } from '../../../../gatheringImageDefaults.js';
-  import { dismissOnOutsideClick } from '../../actions/dismissOnOutsideClick.js';
   import { dragDrop } from '../../actions/dragDrop.js';
-  import { localize, viewScene } from '../../util/foundryBridge.js';
+  import { formatList, localize, viewScene } from '../../util/foundryBridge.js';
   import { resolveDropData } from '../../util/dropUtils.js';
   import { dropRateTierClass, dropRateTierColor } from '../../util/dropRateTier.js';
   import { sceneDocumentImage } from '../../util/sceneImages.js';
+  import IconButton from '../../components/IconButton.svelte';
+  import SearchablePopover from '../../components/SearchablePopover.svelte';
 
   let {
     event = null,
@@ -20,8 +24,6 @@
   } = $props();
 
   const DEFAULT_DANGER_TAGS = ['safe', 'unsafe', 'hazardous', 'dangerous', 'deadly', 'extreme'];
-
-  let openAvailabilityMenu = $state('');
 
   const rawDangerTags = $derived(Array.isArray(event?.dangerTags) ? event.dangerTags : []);
   const dangerTags = $derived(
@@ -145,6 +147,32 @@
     });
   }
 
+  /**
+   * The still-unselected conditions, shaped for `SearchablePopover` (issue 1458).
+   *
+   * Both `data` entries are hooks this VIEW owns rather than the primitive's own
+   * `data-popover-option`, and both are load-bearing. `data-gathering-event-availability-option`
+   * says which of the three menus a row belongs to — the three are rendered by one `{#each}`
+   * and the popover is portaled out of the field that anchors it, so without it a row cannot
+   * be told from its sibling menu's row. `data-condition-id` is the same attribute the
+   * SELECTED pills below carry, which is what lets one selector read a choice and its
+   * resulting pill.
+   *
+   * @param {string} kind `biomes`, `timeOfDay` or `weather`
+   * @returns {Array<object>} popover options in menu order
+   */
+  function availabilityMenuOptions(kind) {
+    return availableConditionOptions(kind).map((option) => ({
+      id: conditionId(option),
+      label: conditionLabel(option),
+      icon: conditionIcon(option),
+      data: {
+        'data-gathering-event-availability-option': kind,
+        'data-condition-id': conditionId(option),
+      },
+    }));
+  }
+
   function availabilityFieldLabel(kind) {
     if (kind === 'weather')
       return text('FABRICATE.Admin.Manager.Environment.Events.Weather', 'Weather');
@@ -188,6 +216,30 @@
     return text('FABRICATE.Admin.Manager.Environment.Events.AnyTimeTitle', 'Any Time');
   }
 
+  // ONE live region per host row, and it is the CALLER'S to own: `Chip.svelte`'s `removable`
+  // note records that a bare chip cannot have one, because neither adding nor removing a member
+  // moves focus into the row. This is the same summary `ModifierPillSelect` books beside its own
+  // pill row, restated on every change to the set rather than announced as an event: a region
+  // wrapped around the row would read each added chip's whole subtree - its remove control's
+  // label included - and say nothing at all on a removal, since `aria-relevant` defaults to
+  // `additions text`. The names come through the active language's list conventions.
+  function availabilitySummary(kind) {
+    const options = selectedConditionOptions(kind);
+    const body =
+      options.length > 0
+        ? formatList(options.map((option) => conditionLabel(option)))
+        : emptyAvailabilityLabel(kind);
+    return `${availabilityFieldLabel(kind)}: ${body}`;
+  }
+
+  // The danger-tag row's own region, on the same terms.
+  function dangerSummary() {
+    if (dangerTags.length === 0) {
+      return text('FABRICATE.Admin.Manager.Environment.Events.AnyDanger', 'Any danger profile');
+    }
+    return formatList(dangerTags.map((tag) => dangerLabel(tag)));
+  }
+
   function removeAvailabilityLabel(option) {
     return text(
       'FABRICATE.Admin.Manager.Environment.Events.RemoveAvailabilityCondition',
@@ -201,7 +253,6 @@
     const selectedIds = selectedConditionIds(kind);
     if (selectedIds.includes(normalizedId)) return;
     onUpdateEvent({ [kind]: [...selectedIds, normalizedId] });
-    openAvailabilityMenu = '';
   }
 
   function removeAvailability(kind, id) {
@@ -271,12 +322,12 @@
           </button>
 
           <div class="manager-task-core-status">
-            <button
-              type="button"
-              class={`manager-status-toggle ${event.enabled === false ? 'is-off' : 'is-on'}`}
-              data-gathering-event-field="enabled"
-              aria-pressed={event.enabled !== false}
-              aria-label={text(
+            <StatusToggle
+              on={event.enabled !== false}
+              label={event.enabled === false
+                ? text('FABRICATE.Admin.Manager.StatusOff', 'Off')
+                : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
+              ariaLabel={text(
                 'FABRICATE.Admin.Manager.Environment.Events.ToggleNamed',
                 'Toggle {name}'
               ).replace(
@@ -284,17 +335,9 @@
                 event.name ||
                   text('FABRICATE.Admin.Manager.Environment.Events.UnnamedEvent', 'Unnamed event')
               )}
+              data-gathering-event-field="enabled"
               onclick={() => onUpdateEvent({ enabled: event.enabled === false })}
-            >
-              <span class="manager-status-toggle-track" aria-hidden="true">
-                <span class="manager-status-toggle-knob"></span>
-              </span>
-              <span class="manager-status-toggle-label">
-                {event.enabled === false
-                  ? text('FABRICATE.Admin.Manager.StatusOff', 'Off')
-                  : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
-              </span>
-            </button>
+            />
             <p class="manager-muted">
               {event.enabled === false
                 ? text(
@@ -310,7 +353,7 @@
         </div>
 
         <div class="manager-task-identity-fields">
-          <label class="manager-field">
+          <Field as="label">
             <span>{text('FABRICATE.Admin.Manager.Environment.Events.Name', 'Name')}</span>
             <input
               data-gathering-event-field="name"
@@ -325,8 +368,8 @@
                 )}</span
               >
             {/if}
-          </label>
-          <label class="manager-field">
+          </Field>
+          <Field as="label">
             <span
               >{text('FABRICATE.Admin.Manager.Environment.Events.Description', 'Description')}</span
             >
@@ -335,7 +378,7 @@
               value={event.description || ''}
               oninput={(event) => onUpdateEvent({ description: event.currentTarget.value })}
             ></textarea>
-          </label>
+          </Field>
         </div>
       </div>
     </section>
@@ -356,84 +399,49 @@
       </div>
       <div class="manager-task-availability-row" data-gathering-event-availability>
         {#each ['biomes', 'timeOfDay', 'weather'] as kind (kind)}
-          <div class="manager-field manager-availability-multi" data-gathering-event-field={kind}>
+          <Field as="div" data-gathering-event-field={kind}>
             <span>{availabilityFieldLabel(kind)}</span>
-            <div
-              class="manager-availability-picker"
-              use:dismissOnOutsideClick={{
-                enabled: openAvailabilityMenu === kind,
-                onDismiss: () => {
-                  if (openAvailabilityMenu === kind) openAvailabilityMenu = '';
-                },
-              }}
-            >
-              <button
-                type="button"
-                class="manager-availability-menu-button"
-                aria-haspopup="listbox"
-                aria-expanded={openAvailabilityMenu === kind}
-                onclick={() => (openAvailabilityMenu = openAvailabilityMenu === kind ? '' : kind)}
-              >
-                <span>{availabilityMenuLabel(kind)}</span>
-                <i class="fas fa-chevron-down" aria-hidden="true"></i>
-              </button>
-              {#if openAvailabilityMenu === kind}
-                <div
-                  class="manager-availability-menu"
-                  role="listbox"
-                  aria-label={availabilityFieldLabel(kind)}
-                >
-                  {#if availableConditionOptions(kind).length > 0}
-                    {#each availableConditionOptions(kind) as option (conditionId(option))}
-                      <button
-                        type="button"
-                        class="manager-availability-option"
-                        role="option"
-                        aria-selected="false"
-                        data-gathering-event-availability-option={kind}
-                        data-condition-id={conditionId(option)}
-                        onclick={() => addAvailability(kind, conditionId(option))}
-                      >
-                        <i class={conditionIcon(option)} aria-hidden="true"></i>
-                        <span>{conditionLabel(option)}</span>
-                      </button>
-                    {/each}
-                  {:else}
-                    <span class="manager-availability-empty">{availabilityMenuLabel(kind)}</span>
-                  {/if}
-                </div>
-              {/if}
-            </div>
-            <div
-              class="manager-availability-pill-row"
-              data-gathering-event-availability-pills={kind}
-            >
+            <!-- The add-condition menu is `SearchablePopover` (issue 1458), not a
+                 hand-rolled trigger-plus-listbox. `showSearch={false}` because a menu of
+                 at most a handful of biomes needs no query field, and because it is what
+                 keeps `triggerHasPopup="listbox"` truthful: with a field, the panel is a
+                 dialog CONTAINING a listbox and the trigger would promise a control the
+                 GM never gets. The `.manager-availability-picker` wrapper is GONE rather
+                 than passed as `pickerClass`: it carried `position: relative; min-width:
+                 0`, which is `.manager-travel-picker`'s own declaration verbatim, so
+                 keeping it would state the primitive's layout twice. -->
+            <SearchablePopover
+              options={availabilityMenuOptions(kind)}
+              showSearch={false}
+              triggerHasPopup="listbox"
+              triggerClass="manager-condition-menu-button"
+              triggerData={{ 'data-chip-remove-fallback': '' }}
+              triggerLabel={availabilityMenuLabel(kind)}
+              dialogAriaLabel={availabilityFieldLabel(kind)}
+              emptyHint={availabilityMenuLabel(kind)}
+              onChoose={(id) => addAvailability(kind, id)}
+            />
+            <div class="manager-chip-row" data-gathering-event-availability-pills={kind}>
               {#if selectedConditionOptions(kind).length > 0}
                 {#each selectedConditionOptions(kind) as option (conditionId(option))}
-                  <span
-                    class="manager-availability-pill"
+                  <Chip
+                    tone="warning"
+                    icon={conditionIcon(option)}
+                    removable
+                    removeLabel={removeAvailabilityLabel(option)}
+                    onRemove={() => removeAvailability(kind, conditionId(option))}
                     data-gathering-event-availability-pill={kind}
-                    data-condition-id={conditionId(option)}
+                    data-condition-id={conditionId(option)}>{conditionLabel(option)}</Chip
                   >
-                    <i class={conditionIcon(option)} aria-hidden="true"></i>
-                    <span>{conditionLabel(option)}</span>
-                    <button
-                      type="button"
-                      class="manager-availability-remove"
-                      aria-label={removeAvailabilityLabel(option)}
-                      onclick={() => removeAvailability(kind, conditionId(option))}
-                    >
-                      <i class="fas fa-xmark" aria-hidden="true"></i>
-                    </button>
-                  </span>
                 {/each}
               {:else}
-                <span class="manager-muted manager-availability-any"
-                  >{emptyAvailabilityLabel(kind)}</span
-                >
+                <EmptyState inline field hint={emptyAvailabilityLabel(kind)} />
               {/if}
             </div>
-          </div>
+            <p class="visually-hidden" aria-live="polite" data-gathering-event-availability-status>
+              {availabilitySummary(kind)}
+            </p>
+          </Field>
         {/each}
       </div>
     </section>
@@ -452,14 +460,35 @@
           </div>
         </div>
         <div class="manager-task-availability-row">
-          <div class="manager-field manager-availability-multi">
+          <Field as="div">
             <span
               >{text(
                 'FABRICATE.Admin.Manager.Environment.Events.DangerTagsField',
                 'Current tags'
               )}</span
             >
-            <div class="manager-availability-pill-row" data-gathering-event-danger-pills>
+            <!-- THE DANGER TAG IS NOT A CHIP YET, and it is a TRACKED DIVERGENCE rather than an
+                 impossibility (issue 1515). Its six levels are a RAMP -
+                 `.manager-danger-tag-pill.is-safe` through `.is-extreme` in
+                 `styles/fabricate.css`, four of which MIX two semantic families per level - and
+                 no `Chip` tone states a mix.
+
+                 An earlier note here claimed the conversion could not work at all, because
+                 `styles/fabricate.css` imports at `layer(modules)` while the primitive's scoped
+                 block is unlayered, so the chip's own fill would beat all six rules. That is
+                 true of a rule in the SHEET and false of the route the family actually has: the
+                 biome chip beside this one is a `<Chip tint=… style=…>` that delivers a
+                 per-record colour through an inline `--fab-chip-color`, and an inline custom
+                 property outranks every layered and unlayered rule alike. So the ramp IS
+                 expressible.
+
+                 What it is NOT is in scope here. Six ramp levels, four of them two-family mixes,
+                 have to be authored as chip tints and re-measured against the design system
+                 before the pill can be retired, and this change's remit was the availability
+                 sweep beside it. The remove control is re-pointed into this pill's OWN family
+                 instead, so that sweep can take the shared family without un-styling this row,
+                 and the re-skin is left as named debt rather than as a refusal. -->
+            <div class="manager-chip-row" data-gathering-event-danger-pills>
               {#if dangerTags.length > 0}
                 {#each dangerTags as tag (tag)}
                   <span class={`manager-danger-tag-pill is-${tag}`} data-danger-tag={tag}>
@@ -467,7 +496,8 @@
                     <span>{dangerLabel(tag)}</span>
                     <button
                       type="button"
-                      class="manager-availability-remove"
+                      class="manager-danger-tag-remove"
+                      data-keyboard-focus="true"
                       aria-label={text(
                         'FABRICATE.Admin.Manager.Environment.Events.RemoveDangerTag',
                         'Remove {name}'
@@ -479,16 +509,20 @@
                   </span>
                 {/each}
               {:else}
-                <span class="manager-muted manager-availability-any"
-                  >{text(
+                <EmptyState
+                  inline
+                  hint={text(
                     'FABRICATE.Admin.Manager.Environment.Events.AnyDanger',
                     'Any danger profile'
-                  )}</span
-                >
+                  )}
+                />
               {/if}
             </div>
+            <p class="visually-hidden" aria-live="polite" data-gathering-event-danger-status>
+              {dangerSummary()}
+            </p>
             {#if suggestedDangerTags.length > 0}
-              <div class="manager-availability-pill-row" data-gathering-event-danger-suggestions>
+              <div class="manager-chip-row" data-gathering-event-danger-suggestions>
                 {#each suggestedDangerTags as tag (tag)}
                   <button
                     type="button"
@@ -503,7 +537,7 @@
                 {/each}
               </div>
             {/if}
-          </div>
+          </Field>
         </div>
       </section>
 
@@ -520,7 +554,7 @@
           </div>
         </div>
         <div class="manager-task-availability-row">
-          <label class="manager-field manager-drop-rate-editor">
+          <Field as="label" class="manager-drop-rate-editor">
             <span
               >{text(
                 'FABRICATE.Admin.Manager.Environment.Events.DropRatePercent',
@@ -567,7 +601,7 @@
                 )}</span
               >
             {/if}
-          </label>
+          </Field>
         </div>
       </section>
     </div>
@@ -622,10 +656,9 @@
               viewScene(linkedSceneUuid);
             }}>{linkedSceneLabel}</button
           >
-          <button
-            type="button"
-            class="manager-icon-button is-danger"
-            aria-label={text(
+          <IconButton
+            class="is-danger"
+            ariaLabel={text(
               'FABRICATE.Admin.Manager.Environment.Events.SceneUnlink',
               'Unlink scene'
             )}
@@ -633,7 +666,7 @@
             onclick={unlinkScene}
           >
             <i class="fas fa-link-slash" aria-hidden="true"></i>
-          </button>
+          </IconButton>
         </div>
       {:else}
         <div

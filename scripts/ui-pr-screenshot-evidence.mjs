@@ -7,7 +7,7 @@ import { spawnSync } from 'node:child_process';
 // The refusal diagnostic lives beside `evaluateSmokeOutcome` in the lib, NOT here (issue
 // #1019). Two reasons, both structural: the producer and this consumer then share one
 // `formatFailedStep`, so the gate quotes a failing step exactly as the harness's own throw
-// does; and this file is in `KNOWN_UNGATED_SCRIPTS`, outside both the `lint` and the
+// does; and this file's remaining findings are carried in `eslint-debt.txt`, so it is inside the
 // `format:check` globs, while `scripts/lib/foundrySmokeSignal.js` is inside both.
 import { explainSmokeSummaryRefusal } from './lib/foundrySmokeSignal.js';
 // The `check` gate's composed decision — await the capture run for this head, then match what it
@@ -17,6 +17,17 @@ import { explainSmokeSummaryRefusal } from './lib/foundrySmokeSignal.js';
 // cycle and `VIEW_RECIPES` above is a top-level `Object.freeze([...])` a cyclic partial-evaluation
 // order can observe as `undefined`.
 import { decideScreenshotGate } from './lib/screenshotEvidenceMatching.js';
+// The View Lab's own case registry, for the two things a published frame needs and this file
+// cannot derive: what to CALL it, and whether it needs a caption. Its only non-builtin import is
+// `scripts/lib/designSystemPrimitives.js`, a leaf that imports no repository module, so it still makes
+// no cycle of the kind the `decideScreenshotGate` note above warns about.
+//
+// `labelForCaseId` has always documented itself as wired into this path and never was: the
+// lookup fell through `VIEW_RECIPES` — a table keyed on SMOKE recipe ids, which a View Lab case
+// id is not — and landed on the bare id. Every lab frame in every PR body has therefore been
+// captioned `manager-world-downtime-test-companion-installed` rather than with the sentence the
+// registry already held.
+import { evidenceNoteForCaseId, labelForCaseId } from './lib/viewLabCases.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif']);
@@ -61,7 +72,11 @@ const toolStudioFrame = (id, label, smokeLabel, matches) => ({
 // owned-copy and learned row; `styles/` is deliberately NOT, so a broad stylesheet
 // change keeps routing to the existing theme-or-global-ui fallback.
 const KNOWLEDGE_MATCHES = [
-  /^src\/ui\/svelte\/apps\/manager\/(?:KnowledgeView|ArmedDangerButton)\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/KnowledgeView\.svelte$/,
+  // Issue 1509 moved the armed control into `components/`, so it can no longer ride the
+  // manager-directory alternation above and takes a pattern of its own. The trigger set is
+  // unchanged: a change to this file still publishes both Knowledge frames.
+  /^src\/ui\/svelte\/components\/ArmedDangerButton\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/knowledge\/.+\.svelte$/,
   // Every plain-JS module in the surface's own folder: the pure projection
   // (`knowledgeStudio.js`) and the mutation collaborator (`knowledgeMutations.js`)
@@ -90,25 +105,49 @@ const TOOL_STUDIO_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/(?:ExplainerCard|IconFactRow)\.svelte$/,
 ];
 
+// The shared bulk-edit primitives (issue 1010) and the shared bulk-DELETE card (issue 1132).
+// They sit directly under `apps/manager/`, beside `Chip` and `Callout`, so they fall through
+// BOTH studios' directory globs — a change to any of them would otherwise map to no view at all
+// and fall to the broad `theme-or-global-ui` recipe, publishing frames that cannot show the
+// change. Enumerated by name rather than widened to a directory glob, because
+// `apps/manager/*.svelte` is the whole manager and would conscript these frames as the evidence
+// for every screen in it.
+//
+// `BulkDeleteCard` is named in the ESSENCES recipe too. That is not over-claiming: unlike the
+// four chrome primitives, the delete card renders in all three studios, and
+// `scripts/lib/viewLabCases.js` claims it on all three studios' delete frames. The two
+// registries must not disagree about what evidence a change to one file requires.
+//
+// HOISTED to one constant (issue 1378). It was written out twice, once in each studio's match
+// list, which made this file hold two copies of the answer to "which shared surfaces do both
+// studios render" — a mirror with nothing checking the copies agreed, and a literal Sonar's
+// Automatic Analysis counts twice besides. There is now one.
+//
+// The four files it names are `evidence: 'targeted'` rows in
+// `scripts/lib/designSystemPrimitives.js`, which is the same judgement stated from the design
+// system's side: these are shared primitives whose consumers are few enough to attribute a frame
+// to. `tests/design-system-primitives.test.js` binds the two, so promoting one of them to a broad
+// signal there — which would route it to the representative pair and away from the bulk frames
+// this list sends it to — fails rather than silently splitting the two registries' answers.
+//
+// `BulkEditSelect` LEFT this pattern for issue 1371 r16-list (maintainer ruling M23): the system
+// Component Rules bulk panel stopped rendering a select when its category axis became the
+// reference's inline inset, so the Recipe Studio is its one caller and it is routed to the recipe
+// frames alone, below. It is a `notAPrimitive` row now, with that caller named.
+const BULK_STUDIO_SURFACE_PATTERN =
+  /^src\/ui\/svelte\/apps\/manager\/(?:BulkSelectionToolbar|BulkEditPanelShell|BulkEditSection|BulkDeleteCard)\.svelte$/;
+const RECIPE_BULK_SELECT_PATTERN = /^src\/ui\/svelte\/apps\/manager\/BulkEditSelect\.svelte$/;
+
 // The Component Studio BROWSER's own files (issue 676): the view and every component in
 // `components/`, which is the browser's directory (`component/` is the EDITOR's, mirroring
 // the Recipe Studio's `recipes/` vs `recipe/` split). Shared by every browser frame below.
 const COMPONENTS_BROWSER_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/ComponentsBrowserView\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/components\/.+\.svelte$/,
-  // The shared bulk-edit primitives (issue 1010) and the shared bulk-DELETE card (issue
-  // 1132). They sit directly under `apps/manager/`, beside `Chip` and `Callout`, so they fall
-  // through BOTH the `components/` glob above and the `recipes/` one — a change to any of them
-  // would otherwise map to no view at all and fall to the broad `theme-or-global-ui` recipe,
-  // publishing frames that cannot show the change. Enumerated by name rather than widened to a
-  // directory glob, because `apps/manager/*.svelte` is the whole manager and would conscript
-  // these frames as the evidence for every screen in it.
-  //
-  // `BulkDeleteCard` is named in the ESSENCES recipe too. That is not over-claiming: unlike the
-  // four chrome primitives, the delete card renders in all three studios, and
-  // `scripts/lib/viewLabCases.js` claims it on all three studios' delete frames. The two
-  // registries must not disagree about what evidence a change to one file requires.
-  /^src\/ui\/svelte\/apps\/manager\/(?:BulkSelectionToolbar|BulkEditPanelShell|BulkEditSection|BulkEditSelect|BulkDeleteCard)\.svelte$/,
+  BULK_STUDIO_SURFACE_PATTERN,
+  // The Component Studio's three staging insets (issue 1371 r16-list, M23) render through this
+  // one component, which sits directly under `apps/manager/` and would otherwise map to no view.
+  /^src\/ui\/svelte\/apps\/manager\/BulkStagingInset\.svelte$/,
 ];
 
 // A single-frame components-browser view: one same-named smoke label over the shared
@@ -139,15 +178,19 @@ const BULK_EDIT_MODEL_MATCHES = [
 // so a browser-side component placed in the latter would republish the editor frames and never
 // this one — the split is load-bearing and stated on `manager-recipes` below too.
 //
-// The four shared bulk-edit primitives are enumerated here for the same reason they are
-// enumerated in the components list: they sit directly under `apps/manager/`, so they fall
-// through BOTH studios' directory globs and a change to one of them would otherwise map to no
-// recipe view at all. Widening to `apps/manager/*.svelte` instead would conscript these frames
-// as the evidence for every screen in the manager.
+// The shared bulk surfaces are named here for the same reason they are named in the components
+// list: they sit directly under `apps/manager/`, so they fall through BOTH studios' directory
+// globs and a change to one of them would otherwise map to no recipe view at all. Widening to
+// `apps/manager/*.svelte` instead would conscript these frames as the evidence for every screen
+// in the manager. It is the SAME constant both studios use — see `BULK_STUDIO_SURFACE_PATTERN`,
+// which was written out twice here until issue 1378.
 const RECIPES_BROWSER_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/RecipesBrowserView\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/recipes\/.*\.svelte$/,
-  /^src\/ui\/svelte\/apps\/manager\/(?:BulkSelectionToolbar|BulkEditPanelShell|BulkEditSection|BulkEditSelect|BulkDeleteCard)\.svelte$/,
+  BULK_STUDIO_SURFACE_PATTERN,
+  // The Recipe Studio's leave-unchanged select, which is ITS alone since issue 1371 r16-list — see
+  // `BULK_STUDIO_SURFACE_PATTERN`.
+  RECIPE_BULK_SELECT_PATTERN,
 ];
 
 // A single-frame recipes-browser view: one same-named smoke label over the shared browser match
@@ -485,7 +528,7 @@ export const VIEW_RECIPES = Object.freeze([
       // Naming them here is what makes a change to either republish the frame that DOES
       // exist, rather than publishing nothing at all for this screen.
       /^src\/ui\/svelte\/apps\/manager\/checks\/SimpleCraftingCheckEditor\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/ItemDropZone\.svelte$/,
+      /^src\/ui\/svelte\/components\/ItemDropZone\.svelte$/,
     ],
   },
   {
@@ -500,6 +543,10 @@ export const VIEW_RECIPES = Object.freeze([
     matches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\/ChecksView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/checks\/CraftingModifierCatalogueCard\.svelte$/,
+      // The catalogue's ENTRY ROW, extracted out of that card at issue 1373's round 4 so the
+      // Tool Studio's check-bonus picker draws the same one. It is the part of this frame a
+      // reader looks at, and the exact-path pattern above cannot reach a file that moved.
+      /^src\/ui\/svelte\/apps\/manager\/ModifierLibraryRow\.svelte$/,
       /^src\/ui\/svelte\/components\/ModifierPillSelect\.svelte$/,
     ],
   },
@@ -509,6 +556,10 @@ export const VIEW_RECIPES = Object.freeze([
     smokeLabels: ['manager-tags-categories-normal', 'manager-tags-categories-stacked'],
     matches: [
       /^src\/ui\/svelte\/apps\/manager\/TagsCategoriesView\.svelte$/,
+      // The vocabulary tab strip, extracted out of the view in issue 1429. The exact-path
+      // pattern above cannot reach a file that is no longer named `TagsCategories*`, and an
+      // uncovered state publishes an unrelated frame rather than none.
+      /^src\/ui\/svelte\/apps\/manager\/VocabularyTabs\.svelte$/,
       // The inspector rail's contextual help and reference-safety card render through the
       // shared explainer primitive (issue 881), whose CSS is co-located in its own scoped
       // block; these frames are the ones that show it on this screen.
@@ -526,6 +577,7 @@ export const VIEW_RECIPES = Object.freeze([
     smokeLabels: ['manager-tags-categories-tags-tab'],
     matches: [
       /^src\/ui\/svelte\/apps\/manager\/TagsCategoriesView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/VocabularyTabs\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/VocabularyPanel\.svelte$/,
     ],
   },
@@ -591,7 +643,7 @@ export const VIEW_RECIPES = Object.freeze([
   },
   toolStudioFrame('01-library-1280x720', 'Tool Studio — library parity', 'manager-tool-parity-01-library-1280x720', TOOL_STUDIO_MATCHES),
   toolStudioFrame('zero-state-empty-library-1280x720', 'Tool Studio — empty library zero state', 'manager-tool-zero-state-empty-library-1280x720', TOOL_STUDIO_MATCHES),
-  toolStudioFrame('02-overview-1280x720', 'Tool Studio — Overview parity', 'manager-tool-parity-02-overview-1280x720', TOOL_STUDIO_MATCHES),
+  toolStudioFrame('02-remove-1280x720', 'Tool Studio — remove from system', 'manager-tool-parity-02-remove-1280x720', TOOL_STUDIO_MATCHES),
   toolStudioFrame('03-breakage-1280x720', 'Tool Studio — Breakage parity', 'manager-tool-parity-03-breakage-1280x720', TOOL_STUDIO_MATCHES),
   toolStudioFrame('04-requirements-1280x720', 'Tool Studio — Requirements parity', 'manager-tool-parity-04-requirements-1280x720', TOOL_STUDIO_MATCHES),
   toolStudioFrame('05-validation-1280x720', 'Tool Studio — all-pass Validation parity', 'manager-tool-parity-05-validation-1280x720', TOOL_STUDIO_MATCHES),
@@ -932,37 +984,37 @@ export const VIEW_RECIPES = Object.freeze([
     id: 'player-crafting-essence-legacy',
     label: 'Player crafting — legacy set-level essence authored icon',
     smokeLabels: ['player-crafting-essence-legacy'],
-    matches: [
-      /^src\/ui\/svelte\/apps\/crafting\/CraftingEssenceThumb\.svelte$/,
-      /^src\/ui\/svelte\/apps\/crafting\/detail\/IoTable\.svelte$/,
-    ],
+    // Issue 1506 DELETED the second matcher, which named the crafting essence thumbnail,
+    // rather than re-pointing it: that component was retired into the shared art tile, so the
+    // pattern could never match again while this test went on passing — a mirror whose guard
+    // cannot see its own staleness. Re-pointing it at the shared tile would hang four
+    // smoke-only labels on every future change to a primitive with 42 importers, and those
+    // labels are producible only by the local ~26-minute Foundry run. The surviving
+    // co-located matcher carries the recipe on its own: legacy set-level essences keep their
+    // row presentation inside the IO table.
+    matches: [/^src\/ui\/svelte\/apps\/crafting\/detail\/IoTable\.svelte$/],
   },
   {
     id: 'player-crafting-essence-ingredient',
     label: 'Player crafting — first-class essence ingredient authored icon',
     smokeLabels: ['player-crafting-essence-ingredient'],
-    matches: [
-      /^src\/ui\/svelte\/apps\/crafting\/CraftingEssenceThumb\.svelte$/,
-      /^src\/ui\/svelte\/apps\/crafting\/detail\/IoTable\.svelte$/,
-    ],
+    // The essence-thumb matcher is deleted here too; see the block above for why, and for why
+    // the IO table alone still carries this recipe.
+    matches: [/^src\/ui\/svelte\/apps\/crafting\/detail\/IoTable\.svelte$/],
   },
   {
     id: 'player-crafting-essence-alternative',
     label: 'Player crafting — essence OR-alternative authored icon',
     smokeLabels: ['player-crafting-essence-alternative'],
-    matches: [
-      /^src\/ui\/svelte\/apps\/crafting\/CraftingEssenceThumb\.svelte$/,
-      /^src\/ui\/svelte\/apps\/crafting\/detail\/IngredientOptionSelector\.svelte$/,
-    ],
+    // Essence-thumb matcher deleted; see above. The option card is this recipe's own surface.
+    matches: [/^src\/ui\/svelte\/apps\/crafting\/detail\/IngredientOptionSelector\.svelte$/],
   },
   {
     id: 'player-crafting-essence-shopping',
     label: 'Player crafting — Shopping List essence shortage authored icon',
     smokeLabels: ['player-crafting-essence-shopping'],
-    matches: [
-      /^src\/ui\/svelte\/apps\/crafting\/CraftingEssenceThumb\.svelte$/,
-      /^src\/ui\/svelte\/apps\/crafting\/ShoppingList\.svelte$/,
-    ],
+    // Essence-thumb matcher deleted; see above. The shopping list is this recipe's own surface.
+    matches: [/^src\/ui\/svelte\/apps\/crafting\/ShoppingList\.svelte$/],
   },
   {
     id: 'player-crafting-stacked',
@@ -1135,7 +1187,7 @@ export const VIEW_RECIPES = Object.freeze([
   },
   {
     // Issue 777: the pre-roll required-tools disclosure — the `SalvageToolRequirements`
-    // section with one AVAILABLE (green) and one UNAVAILABLE (red) StatusPill row, the
+    // section with one AVAILABLE (green) and one UNAVAILABLE (red) chip row, the
     // state the existing player-salvage capture walk cannot reach. Its OWN view (one file
     // per view id) so `collect` publishes the dedicated frame; appending its label to the
     // existing `player-salvage` view would never publish it. Narrowly matched to the tool
@@ -1253,11 +1305,13 @@ export const VIEW_RECIPES = Object.freeze([
     // stylesheet, a theme block, or the manager router that hosts every manager view.
     //
     // Chosen to sample every app-AREA shell rather than to enumerate screens, because
-    // `styles/fabricate.css` is namespaced per area and its Foundry-override blocks
-    // (button height/alignment, focus rings) are written per area class — so a
-    // regression in one area is invisible in another. Rule counts in that file, which
-    // are a fair proxy for blast radius: `.fabricate-manager` ~2694,
-    // `.fabricate-interactables-manager` ~41, `.fabricate-app` ~18.
+    // `styles/fabricate.css` is namespaced per area and its Foundry-override blocks for
+    // button height and alignment are written per area class — so a regression in one area
+    // is invisible in another. The focus pair is no longer among them: issue 1501
+    // collapsed it onto the module root, which reaches every area at once. Selectors
+    // naming an area class in that file are a fair proxy for blast radius; counted
+    // comma-split at every nesting level, `.fabricate-manager` takes 2747 of them,
+    // `.fabricate-interactables-manager` 41 and `.fabricate-app` 11.
     //
     // 1 `manager-default-selection`   — `.fabricate-manager` shell: window chrome, rail,
     //                                   and the crafting-system library rows.
@@ -1622,10 +1676,22 @@ export function sanitizeLabel(label = '') {
   );
 }
 
+// A frame's caption, when it has one, sits BENEATH the image as its own paragraph rather than
+// inside the alt text. Alt text is read by a screen reader and by nothing else a PR reviewer uses,
+// so a warning hidden there is a warning most readers never meet — which is the whole failure this
+// caption exists to fix. It is sanitized on the same terms the label is: the text is this
+// repository's own today, and a caption that could break the managed block is a hazard whoever
+// wrote it.
 export function buildScreenshotMarkdown(prNumber, uploaded = []) {
   const normalizedPrNumber = normalizeOptionalPrNumber(prNumber);
   const prefix = normalizedPrNumber ? `pr-${normalizedPrNumber} ` : '';
-  return uploaded.map(({ label, url }) => `![${prefix}${sanitizeLabel(label)}](${url})`).join('\n\n');
+  return uploaded
+    .map(({ label, note, url }) => {
+      const image = `![${prefix}${sanitizeLabel(label)}](${url})`;
+      const caption = sanitizeLabel(note ?? '');
+      return caption ? `${image}\n\n> ${caption}` : image;
+    })
+    .join('\n\n');
 }
 
 export function upsertScreenshotsBlock(body = '', blockMarkdown = '') {
@@ -1713,7 +1779,7 @@ function normalizeHeadShaSegment(headSha) {
 // caller supply labels from its own registry; otherwise labels resolve from
 // `VIEW_RECIPES` and fall back to the id (the id is DERIVED from the filename here, so
 // the pairing is unambiguous by construction).
-export async function uploadScreenshotObjects({ prNumber, files = [], root = ROOT, config, putObject, headSha, labelForId } = {}) {
+export async function uploadScreenshotObjects({ prNumber, files = [], root = ROOT, config, putObject, headSha, labelForId = labelForCaseId, noteForId = evidenceNoteForCaseId } = {}) {
   const normalizedPrNumber = requirePrNumber(prNumber, 'publish');
   const shaSegment = normalizeHeadShaSegment(headSha);
   const cfg = config || loadS3Config(root);
@@ -1732,7 +1798,8 @@ export async function uploadScreenshotObjects({ prNumber, files = [], root = ROO
     await put({ bucket: cfg.bucket, key, body: readFileSync(file), contentType: contentTypeFor(file) });
     const recipe = VIEW_RECIPES.find(item => item.id === viewId);
     const label = (labelForId && labelForId(viewId)) || (recipe ? recipe.label : viewId);
-    uploaded.push({ viewId, label, url: `${cfg.baseUrl}/${key}`, key, file });
+    const note = (noteForId && noteForId(viewId)) || '';
+    uploaded.push({ viewId, label, note, url: `${cfg.baseUrl}/${key}`, key, file });
   }
   return uploaded;
 }

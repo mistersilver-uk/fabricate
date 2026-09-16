@@ -1,7 +1,10 @@
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  SELECT_COMPILED_MODULES,
+  createMountedComponentHarness,
+} from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -10,23 +13,37 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-import-mapping-',
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/utils/matchFolderVocabulary.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     'src/ui/svelte/actions/portal.js',
+    'src/ui/svelte/actions/anchoredPopover.js',
+    'src/ui/svelte/util/overlayBounds.js',
     'src/ui/svelte/util/iconPickerPopover.js',
+    'src/ui/svelte/util/listboxNavigation.js',
+    'src/ui/svelte/util/overlayHost.js',
     'src/ui/svelte/util/essenceIcons.js',
     'src/ui/svelte/util/foundryIconVocabulary.js',
   'src/ui/svelte/util/foundryIconCatalogue.js'
   ],
   compiledModules: [
-    'src/ui/svelte/apps/manager/Chip.svelte',
+    // THE APP'S ONE SELECT AND ITS WHOLE COMPILED CLOSURE (issue 1510), spread rather than copied.
+    // This tree renders `components/Select.svelte` now, and a `.svelte` the tree renders but the
+    // harness omits HANGS the suite (`# cancelled`) rather than failing it.
+    ...SELECT_COMPILED_MODULES,
+    'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/components/SelectionCheckbox.svelte',
     'src/ui/svelte/components/IconPicker.svelte',
     'src/ui/svelte/apps/manager/ManagerModal.svelte',
     'src/ui/svelte/apps/manager/InlineVocabularyAdd.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeRoutingAssignment.svelte',
-    'src/ui/svelte/apps/manager/SearchablePopover.svelte',
+    'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/apps/manager/EmptyState.svelte',
+    'src/ui/svelte/components/Field.svelte',
+    // THE manager's labelled push-button (issue 1118). Skip, New, the footer pair and InlineVocabularyAdd`s Add all render it.
+    // Omitting a rendered `.svelte` HANGS the suite (# cancelled) rather than failing it.
+    'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/apps/manager/ImportFolderMappingModal.svelte'
   ],
   componentPath: 'src/ui/svelte/apps/manager/ImportFolderMappingModal.svelte'

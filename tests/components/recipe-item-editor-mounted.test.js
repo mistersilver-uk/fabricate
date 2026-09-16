@@ -2,7 +2,14 @@ import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  MARKS_AND_NOTICES_COMPILED_MODULES,
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  SELECT_COMPILED_MODULES,
+  STATUS_TONE_RAW_MODULES,
+  createMountedComponentHarness,
+} from '../helpers/svelte-component-harness.js';
+import { ANNOUNCE_AFTER_FOCUS_MS } from '../../src/ui/svelte/util/announceAfterFocus.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -10,7 +17,23 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-recipe-item-editor-',
   rawModules: [
+    // Issue 1506: the one tone map the converted status pills read at a dynamic site.
+    ...STATUS_TONE_RAW_MODULES,
+    // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
+    ...SEARCHABLE_POPOVER_RAW_MODULES,
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/util/listReorderAnnouncement.js',
+    // RecipeItemEditor/ToolEditView/EssenceEditView resolve, focus and mark the control a
+    // validation row addresses through this pure leaf (issue 1517). This harness validates its
+    // dependency graph, so an omission throws a named "add it to rawModules" error rather than
+    // hanging — but the error arrives from `before()`, which reports as `# cancelled`.
+    'src/ui/svelte/apps/manager/validationFocus.js',
+    // …and the announcement half beside it (issue 1517, review r1): the panel fallback for a
+    // route-only row, the control's accessible name, and the handoff to the module's shared
+    // "move focus, then announce" ordering rule — which is why `util/announceAfterFocus.js` is
+    // a raw module here too. It was five copies inside five hosts before it was one leaf.
+    'src/ui/svelte/apps/manager/validationAnnouncement.js',
+    'src/ui/svelte/util/announceAfterFocus.js',
     'src/ui/svelte/util/recipeItemAccessBadge.js',
     // The Limits tab's character-prerequisite picker imports the pure engine (issue 544).
     'src/systems/characterPrerequisites.js',
@@ -18,11 +41,18 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/actions/dragDrop.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     'src/ui/svelte/actions/portal.js',
+    'src/ui/svelte/actions/anchoredPopover.js',
+    'src/ui/svelte/util/overlayBounds.js',
     // The rail's "How players see it" preview builds a synthetic row (pure helper) and
-    // embeds the REAL player InventoryDetail, which pulls in CraftingThumb →
-    // craftingImageDefaults (issue 544).
+    // embeds the REAL player InventoryDetail, which pulls in the shared art tile and the
+    // resolution behind it (issue 544; retargeted by issue 1506).
     'src/ui/svelte/util/recipeItemPreviewRow.js',
     'src/ui/svelte/util/craftingImageDefaults.js',
+    'src/ui/svelte/util/craftingArtResolution.js',
+    // `SearchablePopover` lays its portaled panel out against the trigger (issue 1458).
+    'src/ui/svelte/util/iconPickerPopover.js',
+    'src/ui/svelte/util/listboxNavigation.js',
+    'src/ui/svelte/util/overlayHost.js',
     // The essence colour fold, reached through the embedded player inventory detail.
     'src/ui/svelte/util/essenceTint.js',
     // NOTE: the progressive order/threshold leaves are deliberately NOT listed.
@@ -30,19 +60,21 @@ const harness = createMountedComponentHarness({
     // importer is `inventoryStore.svelte.js`, which no mounted suite loads.
   ],
   compiledModules: [
-    // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the harness
-    // omits HANGS the suite (# cancelled) rather than failing it.
-    'src/ui/svelte/apps/manager/Chip.svelte',
-    // The shared no-state primitive (issue 785). A `.svelte` the tree renders but
-    // the harness omits HANGS the suite (# cancelled) rather than failing it.
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
+    'src/ui/svelte/components/Medallion.svelte',
+    // The actor portrait (issue 1514), reached through the EMBEDDED player inventory detail
+    // below: the component branch draws a source actor's portrait through it. The preview only
+    // ever renders the BOOK branch, but module resolution is not rendering — the compiled
+    // router imports every child statically.
+    'src/ui/svelte/components/Avatar.svelte',
     'src/ui/svelte/components/Pagination.svelte',
-    // The salvage bodies render the house chip primitive. The preview never reaches them,
-    // but the compiled router imports them statically, so it is still in the graph.
-    'src/ui/svelte/components/StatusPill.svelte',
-    'src/ui/svelte/apps/manager/ItemDropZone.svelte',
+    // Issue 1504: the shared `<Select>`'s whole compiled closure — also covers the manager's
+    // ONE chip (issue 883) and the shared no-state primitive (issue 785).
+    ...SELECT_COMPILED_MODULES,
+    'src/ui/svelte/components/IconButton.svelte',
+    'src/ui/svelte/components/StatusToggle.svelte',
+    ...MARKS_AND_NOTICES_COMPILED_MODULES,
+    'src/ui/svelte/components/ItemDropZone.svelte',
     'src/ui/svelte/apps/manager/SegmentedControl.svelte',
-    'src/ui/svelte/apps/crafting/CraftingThumb.svelte',
     // InventoryDetail routes (issue 675) rather than rendering both bodies itself. The
     // preview only ever reaches the BOOK branch, but module resolution is not rendering:
     // the compiled router imports every child statically, so the whole `detail/` tree
@@ -54,6 +86,12 @@ const harness = createMountedComponentHarness({
     // The preview NEVER renders the salvage tree (a book is never salvageable), but the
     // component branch statically imports it, so it must still be compiled here.
     'src/ui/svelte/apps/crafting/detail/ProgressiveStageList.svelte',
+    // The shared complication summary row and the leaf it renders (issue 1286).
+    // `ProgressiveStageList` draws the per-stage complication band through it, and `Chip` is
+    // already above via the `SELECT_COMPILED_MODULES` spread — so omitting either HANGS this
+    // suite (# cancelled) rather than failing it.
+    'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
+    'src/ui/svelte/components/RowDisclosure.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageRollSummary.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageSimpleBody.svelte',
     'src/ui/svelte/apps/inventory/detail/salvage/SalvageRoutedBody.svelte',
@@ -65,10 +103,20 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/inventory/detail/InventorySystemSelector.svelte',
     'src/ui/svelte/apps/inventory/detail/InventoryComponentDetail.svelte',
     'src/ui/svelte/apps/inventory/InventoryDetail.svelte',
+    // The promoted tab-strip primitive (issue 1362), a dependency of the tab strip below.
+    'src/ui/svelte/components/EditorTabs.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemEditorTabs.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemOverviewTab.svelte',
+    // The Contents tab's Link-recipe menu is a `SearchablePopover` (issue 1458).
+    // `Chip`, `EmptyState`, `SearchablePopover` and the popover's raw dependencies are already
+    // listed above via the `SELECT_COMPILED_MODULES` spread.
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemContentsTab.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemLimitsTab.svelte',
+    // THE validation surface and the push-button its View rows render (issue 1444). The
+    // Validation tab hands the surface its checks and renders no markup itself, so omitting
+    // either HANGS this suite (# cancelled) rather than failing it. `ManagerButton` is already
+    // listed above via the `SELECT_COMPILED_MODULES` spread.
+    'src/ui/svelte/components/EditorValidationSurface.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemValidationTab.svelte',
     'src/ui/svelte/apps/manager/RecipeItemEditor.svelte',
   ],
@@ -491,6 +539,145 @@ describe('RecipeItemEditor (mounted)', () => {
       root.querySelector('[data-recipe-item-preview] [data-inventory-requirement]'),
       null,
       'no preview requirement chips when off'
+    );
+  });
+});
+// ── THE ROW ACTION MOVES FOCUS, END TO END (issue 1517, review r1) ──────────────────────────
+//
+// The recipe-item editor was the one host of the five whose row action was proved only by SOURCE
+// READS — `describeValidationHostContract` in `recipe-item-validation-tab-mounted.test.js` reads
+// the ordering out of the file, and the address pairing reads the producer's table against the
+// destination tabs. Neither watches the keyboard actually move, and neither can: the pairing scan
+// reads the ELEMENT a stamp is written on, and two of this editor's four addresses reach the DOM
+// through a primitive's attribute bag, where there is no element in this source to read.
+//
+// `recipe-item-source` IS ONE OF THOSE TWO, and it was the hole. It rides `ItemDropZone`'s
+// `hookAttrs.root` with `tabindex: '-1'` and `'data-keyboard-focus': 'true'` as BAG KEYS — object
+// properties, invisible to `design-system-keyboard-focus`'s AST walk, which reads written
+// attributes — so deleting both from `RecipeItemOverviewTab` left every gate in the repository
+// green while a real browser focused nothing. The pairing suite's `focusProvenElsewhere` list
+// DECLARED that its focusability was "proved by a mounted suite"; no such clause existed. It does
+// now, and it reads the two attributes off the rendered element, which is the only place they can
+// be seen.
+describe('RecipeItemEditor — the validation row action reaches the control (issue 1517)', () => {
+  // Identity, asserted as a BOOLEAN. Handing a live happy-dom element to `node:assert` renders its
+  // subtree, its parents and its owner document when the assertion fails, which takes the process
+  // out with a heap OOM — a real failure wearing a crash's costume.
+  const assertIs = (actual, expected, message) => assert.equal(actual === expected, true, message);
+
+  /**
+   * Mount the editor on its Validation tab with the shell's own route write wired back into the
+   * `activeTab` prop, exactly as `RecipeItemEditView` does: this editor does not own its route,
+   * so a test that dropped `onSelectTab` would prove the action changed nothing.
+   */
+  async function openValidation(props) {
+    const root = await harness.mount({
+      activeTab: 'validation',
+      visibilityMode: 'item',
+      onSelectTab: (tab) => harness.setProps({ activeTab: tab }),
+      ...props,
+    });
+    return root;
+  }
+
+  async function activateIssueView(root, checkId) {
+    const button = root.querySelector(
+      `[data-recipe-item-check="${checkId}"] [data-recipe-item-validation-view]`
+    );
+    assert.ok(Boolean(button), `the ${checkId} row renders a View button`);
+    button.click();
+    // NO `flushSync` BEFORE THE AWAIT, deliberately. The mechanism is that the route change's own
+    // flush is queued as a microtask BEFORE the focus helper's, so draining microtasks is what
+    // proves the ordering rather than a synchronous flush papering over it.
+    for (let i = 0; i < 6; i += 1) await Promise.resolve();
+    flushSync();
+    return button;
+  }
+
+  const announcement = (root) =>
+    root.querySelector('[data-recipe-item-issue-announcement]').textContent.trim();
+
+  /**
+   * Wait for a sentence that is QUEUED BEHIND A FOCUS UTTERANCE (issue 1157). A `polite` region is
+   * queued speech and a focus change CANCELS queued speech, so the sentence is written after the
+   * move — the rule `src/ui/svelte/util/announceAfterFocus.js` owns for the whole module. The
+   * delay is IMPORTED: a local copy would silently start asserting the un-delayed state.
+   */
+  async function flushAnnouncement() {
+    await new Promise((resolve) => setTimeout(resolve, ANNOUNCE_AFTER_FOCUS_MS + 40));
+    flushSync();
+  }
+
+  it('routes to Overview and focuses the DROP ZONE, whose focusability rides an attribute bag', async () => {
+    const root = await openValidation({
+      recipeItem: draft({ originItemUuid: '' }),
+      linkedItem: null,
+      linkedRecipes: [],
+    });
+
+    await activateIssueView(root, 'itemLinked');
+
+    assert.ok(Boolean(root.querySelector('[data-recipe-item-tab="overview"]')), 'the route changed');
+    const zone = root.querySelector('[data-validation-target="recipe-item-source"]');
+    assert.ok(Boolean(zone), 'the Overview tab carries the addressed zone');
+    assertIs(document.activeElement, zone, 'and it holds focus');
+    // THE TWO ATTRIBUTES, READ OFF THE RENDERED ELEMENT. happy-dom focuses anything, so the line
+    // above is vacuous on its own — and the AST walk that would otherwise catch a missing
+    // `tabindex` cannot see these two, because they are bag keys rather than written attributes.
+    // This is the only reading of them there is. Named mutation: delete either from
+    // `RecipeItemOverviewTab`'s `linkHooks.root` and this clause reds.
+    assert.equal(zone.tagName, 'DIV', 'a zone root is not natively focusable');
+    assert.equal(zone.getAttribute('tabindex'), '-1', 'so it declares the tabindex that makes the focus real');
+    assert.equal(
+      zone.getAttribute('data-keyboard-focus'),
+      'true',
+      'and the attribute that tells Foundry the window is focused — without which Space pauses ' +
+        'the game and the arrows pan the canvas behind the open application'
+    );
+    assert.equal(
+      zone.getAttribute('data-validation-focused'),
+      '',
+      'and it is marked, so a POINTER activation paints a ring the :focus reset would strip'
+    );
+    assert.equal(
+      announcement(root),
+      '',
+      'and the region is EMPTY while the move is in flight: it is cleared before the move and ' +
+        'written after it, so a repeat activation of the same row is a CHANGE the region announces'
+    );
+
+    await flushAnnouncement();
+    assert.equal(
+      announcement(root),
+      'Overview',
+      'the region names the destination it reached; the zone carries no accessible name of its ' +
+        'own, so there is no control to name beside it'
+    );
+  });
+
+  it('changes route and focuses the destination PANEL for a route-only row', async () => {
+    // `recipeLinked` names the CONTENTS tab and no control: the remedy is that tab's own
+    // Link-recipe menu, and the check is about the list rather than about one control in it.
+    // Activating it unmounts the Validation panel the button was in, so with nothing to fall back
+    // to focus lands on `<body>`, where every Foundry keybinding is live.
+    const root = await openValidation({
+      recipeItem: draft(),
+      linkedItem: LINKED_ITEM,
+      linkedRecipes: [],
+    });
+
+    await activateIssueView(root, 'recipeLinked');
+
+    assert.ok(Boolean(root.querySelector('[data-recipe-item-tab="contents"]')), 'the route changed');
+    const panel = root.querySelector('.manager-recipe-item-editor-panel');
+    assert.ok(Boolean(panel), 'the editor renders its tab panel');
+    assertIs(document.activeElement, panel, 'and the panel holds focus, not `<body>`');
+    assert.equal(panel.getAttribute('tabindex'), '-1', 'a programmatic destination, not a tab stop');
+    assert.equal(panel.getAttribute('data-keyboard-focus'), 'true', 'and it declares itself focused');
+    assert.ok(
+      !root.querySelector('[data-validation-focused]'),
+      'nothing is MARKED: the accent ring names the control a row addressed, and this row ' +
+        'addressed none — the panel is where focus went, not what the row was about'
     );
   });
 });

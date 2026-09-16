@@ -4,10 +4,20 @@
  *
  *   node scripts/visual-parity/compare.mjs --spec <spec.mjs> --fixture <fixture.json>
  *                                          [--screen <name>]
+ *   node scripts/visual-parity/compare.mjs --spec <spec.mjs> --assert-locators
  *
  * Exits non-zero on any drift, any coverage hole, any malformed exemption, any chrome element
  * painting a forbidden colour, and any alignment the prototype draws and the subject breaks.
  * Screen-agnostic; see `README.md`.
+ *
+ * ── `--assert-locators`: the standing guard over the locator map ─────────────────────────
+ * The subject half of a spec is a HAND-MAINTAINED MIRROR of the product's own selectors, and a
+ * mirror rots silently. It rotted here: eighteen regions named hooks no source file has ever
+ * emitted, so a third of one screen's regions measured NOTHING while the report said `nothing
+ * matched` in among a hundred drift lines and read like more of the same. This mode asks the
+ * one question that separates the two — does every subject locator resolve against the running
+ * app at least once, or is it marked `unreachable` with a stated reason — and reports nothing
+ * else. It is a full-screen-set run by definition, and it needs no fixture.
  *
  * ── Its subject is the app, not a fixture ────────────────────────────────────────────────
  * This pass used to render a hand-authored markup fixture. That fixture was a MIRROR, and a
@@ -27,11 +37,12 @@ import { installRuntime } from './lib/page-runtime.js';
 import {
   EDGE_TOLERANCE_PX,
   MINIMUM_REASON_LENGTH,
+  classifyDifference,
   coverageProblems,
   edgeSpread,
   exemptionProblems,
   locatorProblems,
-  sameComputedValue,
+  toleranceProblems,
   validateSpec,
 } from './lib/schema.js';
 import { openLiveSubject, subjectProblems } from './lib/subject.js';
@@ -39,6 +50,10 @@ import { openLiveSubject, subjectProblems } from './lib/subject.js';
 function argument(name, fallback = null) {
   const index = process.argv.indexOf(`--${name}`);
   return index === -1 ? fallback : process.argv[index + 1];
+}
+
+function flag(name) {
+  return process.argv.includes(`--${name}`);
 }
 
 /**
@@ -120,14 +135,28 @@ async function main() {
   const specPath = argument('spec');
   const fixturePath = argument('fixture');
   const only = argument('screen');
-  if (!specPath || !fixturePath) {
+  const assertLocators = flag('assert-locators');
+  if (!specPath || (!fixturePath && !assertLocators)) {
     process.stderr.write(
-      'usage: compare.mjs --spec <spec.mjs> --fixture <fixture.json> [--screen <name>]\n'
+      'usage: compare.mjs --spec <spec.mjs> --fixture <fixture.json> [--screen <name>]\n' +
+        '       compare.mjs --spec <spec.mjs> --assert-locators\n'
+    );
+    return 2;
+  }
+  if (assertLocators && only) {
+    process.stderr.write(
+      '--assert-locators is a claim about the WHOLE map ("resolves at least once"), so it ' +
+        'cannot be scoped to one screen: a region measured on another screen would be ' +
+        "reported unresolved for a reason that is the run's, not the map's\n"
     );
     return 2;
   }
   const spec = await import(pathToFileURL(resolve(process.cwd(), specPath)).href);
-  const fixture = JSON.parse(readFileSync(resolve(process.cwd(), fixturePath), 'utf8'));
+  // The locator guard reads the SPEC's own region list, so it can audit a region added since
+  // the last `extract` — which is exactly when a new locator is most likely to be wrong.
+  const fixture = fixturePath
+    ? JSON.parse(readFileSync(resolve(process.cwd(), fixturePath), 'utf8'))
+    : { screens: spec.screens, regions: {}, alignments: {} };
 
   // Both directions of the locator map, for the same reason as the screen set: a region with
   // no subject locator is measured against the prototype and compared to nothing, and a
@@ -136,33 +165,54 @@ async function main() {
   const mapped = Object.keys(spec.subject.locators).sort(byName);
   const measured = Object.keys(fixture.regions).sort(byName);
 
+  // THE FIXTURE-DERIVED HALF, which `--assert-locators` does not run: that mode asks whether
+  // the map resolves against the app, and it deliberately does not need a measured prototype
+  // — a spec whose fixture is one region out of date is the state a new locator is added in.
+  const fixtureProblems = assertLocators
+    ? []
+    : [
+        // The fixture carries its OWN screen list and its own region screens, so a fixture that
+        // came back one screen narrower fails here even if the spec was edited to match.
+        ...coverageProblems(
+          fixture.screens ?? [],
+          Object.entries(fixture.regions).map(([name, region]) => ({
+            name,
+            screen: region.screen,
+          }))
+        ),
+        ...(JSON.stringify(fixture.screens ?? []) === JSON.stringify(spec.screens)
+          ? []
+          : [
+              `the fixture's screens ${JSON.stringify(fixture.screens)} are not the spec's ` +
+                `${JSON.stringify(spec.screens)}: regenerate rather than hand-editing`,
+            ]),
+        ...exemptionProblems(fixture),
+        ...toleranceProblems(spec),
+        ...alignmentCoverage(spec, fixture),
+        ...measured
+          .filter((name) => !mapped.includes(name))
+          .map((name) => `region "${name}" has no subject locator`),
+        ...mapped
+          .filter((name) => !measured.includes(name))
+          .map((name) => `subject locator "${name}" measures no region`),
+      ];
   const failures = [
     ...validateSpec(spec),
     ...subjectProblems(spec),
     ...unreachableProblems(spec),
-    // The fixture carries its OWN screen list and its own region screens, so a fixture that
-    // came back one screen narrower fails here even if the spec was edited to match.
-    ...coverageProblems(
-      fixture.screens ?? [],
-      Object.entries(fixture.regions).map(([name, region]) => ({ name, screen: region.screen }))
-    ),
-    ...(JSON.stringify(fixture.screens ?? []) === JSON.stringify(spec.screens)
-      ? []
-      : [
-          `the fixture's screens ${JSON.stringify(fixture.screens)} are not the spec's ` +
-            `${JSON.stringify(spec.screens)}: regenerate rather than hand-editing`,
-        ]),
-    ...exemptionProblems(fixture),
-    ...alignmentCoverage(spec, fixture),
+    ...fixtureProblems,
+    // BOTH DIRECTIONS, IN THE GUARD TOO. The loop below skips a spec region that has no subject
+    // locator at all, because there is nothing to resolve — and a guard that SILENTLY skipped
+    // one would answer "every locator resolves" about a map with a hole in it, which is the
+    // vacuity it exists to prevent. In a measuring run `fixtureProblems` says this already.
+    ...(assertLocators
+      ? spec.regions
+          .filter((region) => !spec.subject.locators[region.name])
+          .map((region) => `region "${region.name}" has no subject locator to resolve`)
+      : []),
     ...Object.entries(spec.subject.locators ?? {}).flatMap(([name, entry]) =>
       locatorProblems(entry.locator, `subject locator "${name}"`)
     ),
-    ...measured
-      .filter((name) => !mapped.includes(name))
-      .map((name) => `region "${name}" has no subject locator`),
-    ...mapped
-      .filter((name) => !measured.includes(name))
-      .map((name) => `subject locator "${name}" measures no region`),
   ];
   if (failures.length > 0) {
     process.stdout.write(`GATE PROBLEMS\n  ${failures.join('\n  ')}\n`);
@@ -177,8 +227,18 @@ async function main() {
     if (!byScreen.has(screen)) byScreen.set(screen, { regions: {}, alignments: {} });
     return byScreen.get(screen);
   };
-  for (const [name, region] of Object.entries(fixture.regions)) {
+  // In the locator guard the roster is the SPEC's regions and no property is read; in a
+  // measuring run it is the fixture's, because the fixture is what holds the values to compare
+  // against. One loop either way, so the two modes cannot drive the app differently.
+  const roster = assertLocators
+    ? spec.regions.map((region) => [
+        region.name,
+        { screen: region.screen, measuredOn: region.measuredOn, properties: {} },
+      ])
+    : Object.entries(fixture.regions);
+  for (const [name, region] of roster) {
     const entry = spec.subject.locators[name];
+    if (!entry) continue;
     const screen = subjectScreenOf(name, region);
     if (only && screen !== only) continue;
     screenOf(screen).regions[name] = {
@@ -188,7 +248,7 @@ async function main() {
       properties: Object.keys(region.properties),
     };
   }
-  for (const [name, group] of Object.entries(fixture.alignments ?? {})) {
+  for (const [name, group] of assertLocators ? [] : Object.entries(fixture.alignments ?? {})) {
     if (only && group.measuredOn !== only) continue;
     // Only the edges the PROTOTYPE actually shares are asserted; the rest were measured and
     // recorded as `false`, which is a fact about the design rather than a rule for the app.
@@ -200,7 +260,18 @@ async function main() {
 
   const browser = await chromium.launch();
   const drift = [];
+  // ROUNDING IS REPORTED, NOT SUPPRESSED. A declared per-property tolerance answers one thing —
+  // the two documents write the same type ramp in different UNITS — and the moment it stops
+  // printing what it absorbed it becomes a gate that quietly cannot fail. Its own block, its own
+  // count, and every line carries its measured delta.
+  const rounding = [];
   const notes = [];
+  // The locator guard's three buckets. A locator belongs in exactly one of them, which is the
+  // whole content of the claim: it RESOLVED somewhere, or it is a stated `unreachable`, or
+  // nothing in the running app answers it and nobody has said why.
+  const resolved = [];
+  const excused = [];
+  const unresolved = [];
   let session = null;
   try {
     session = await openLiveSubject(browser, spec);
@@ -229,6 +300,23 @@ async function main() {
       for (const [name, actual] of Object.entries(result.regions)) {
         const region = fixture.regions[name];
         const entry = spec.subject.locators[name];
+        if (assertLocators) {
+          if (actual.reachableAfterAll) {
+            failures.push(
+              `${name}: marked unreachable, and the app renders it — an excuse that outlives ` +
+                `its constraint is the same defect as an exemption that outlives its difference`
+            );
+          } else if (actual.unreachable) {
+            excused.push(`${name} (${screen}): ${entry.unreachable}`);
+          } else if (actual.missing) {
+            unresolved.push(
+              `${name}: ${describeLocator(entry.locator)} matched nothing on screen "${screen}"`
+            );
+          } else {
+            resolved.push(name);
+          }
+          continue;
+        }
         if (actual.unreachable) {
           notes.push(`[${screen}] ${name} is UNREACHABLE: ${entry.unreachable}`);
           continue;
@@ -249,12 +337,25 @@ async function main() {
         const exemptions = region.exemptions ?? {};
         for (const [property, expected] of Object.entries(region.properties)) {
           if (Object.hasOwn(exemptions, property)) continue;
-          if (!sameComputedValue(property, actual.properties[property], expected)) {
-            drift.push(
+          const verdict = classifyDifference(
+            property,
+            actual.properties[property],
+            expected,
+            spec.tolerances
+          );
+          if (verdict.verdict === 'same') continue;
+          if (verdict.verdict === 'rounding') {
+            rounding.push(
               `[${region.screen}] ${name}.${property}: subject ${actual.properties[property]} ` +
-                `!== prototype ${expected}`
+                `~= prototype ${expected} (${verdict.delta.toFixed(3)}px, under the ` +
+                `${verdict.px}px declared tolerance)`
             );
+            continue;
           }
+          drift.push(
+            `[${region.screen}] ${name}.${property}: subject ${actual.properties[property]} ` +
+              `!== prototype ${expected}`
+          );
         }
       }
       for (const [name, group] of Object.entries(result.alignments)) {
@@ -282,6 +383,36 @@ async function main() {
     await browser.close();
   }
 
+  if (assertLocators) {
+    // NON-VACUITY IS PART OF THE REPORT. "0 unresolved" out of 0 locators is what a guard
+    // pointed at nothing prints, and it is indistinguishable from a clean run unless the
+    // denominator is on the line beside it.
+    process.stdout.write(
+      `locator guard: ${resolved.length} resolved, ${excused.length} unreachable ` +
+        `(with a stated reason), ${unresolved.length} unresolved, of ` +
+        `${resolved.length + excused.length + unresolved.length} subject locators\n`
+    );
+    if (excused.length > 0) {
+      process.stdout.write(
+        `\nUNREACHABLE (${excused.length}, each asserted — the run fails when the app starts ` +
+          `rendering one)\n  ${excused.join('\n  ')}\n`
+      );
+    }
+    if (unresolved.length > 0) {
+      process.stdout.write(
+        `\nUNRESOLVED (${unresolved.length})\n  ${unresolved.join('\n  ')}\n\n` +
+          `Each of these measures NOTHING. Re-point it at the hook the product emits, delete ` +
+          `it, or mark it \`unreachable\` with a reason of at least ${MINIMUM_REASON_LENGTH} ` +
+          `characters saying which state the app cannot reach.\n`
+      );
+    }
+    if (failures.length > 0) process.stdout.write(`\nGATE PROBLEMS\n  ${failures.join('\n  ')}\n`);
+    if (unresolved.length === 0 && failures.length === 0) {
+      process.stdout.write('locator guard: every subject locator resolves or is excused\n');
+    }
+    return unresolved.length + failures.length > 0 ? 1 : 0;
+  }
+
   const byScreenCount = {};
   for (const region of Object.values(fixture.regions)) {
     byScreenCount[region.screen] = (byScreenCount[region.screen] ?? 0) + 1;
@@ -292,6 +423,11 @@ async function main() {
   if (failures.length > 0) process.stdout.write(`\nGATE PROBLEMS\n  ${failures.join('\n  ')}\n`);
   if (drift.length > 0)
     process.stdout.write(`\nDRIFT (${drift.length})\n  ${drift.join('\n  ')}\n`);
+  if (rounding.length > 0)
+    process.stdout.write(
+      `\nROUNDING (${rounding.length}, under a declared per-property tolerance)\n  ` +
+        `${rounding.join('\n  ')}\n`
+    );
   if (notes.length > 0)
     process.stdout.write(
       `\nNOT MEASURED (${notes.length}, each with a stated reason)\n  ${notes.join('\n  ')}\n`

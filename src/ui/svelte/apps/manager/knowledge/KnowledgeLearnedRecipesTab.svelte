@@ -33,10 +33,12 @@
 </script>
 
 <div class="manager-knowledge-tab-body">
-  <!-- The erase caveat is the standing statement of how this tab behaves, so it is INFO,
-       matching the sibling tab's permanent hint. It is not a conditional hazard: nothing
-       is at risk until the GM arms a row, and that row raises its own confirmation. -->
+  <!-- The erase caveat is the standing statement of how this tab behaves, so it is NEUTRAL
+       (issue 1505): the specimen reserves the info tint for a note about LIVE state, and this
+       one is true before the GM has selected anything. It is not a conditional hazard either:
+       nothing is at risk until the GM arms a row, and that row raises its own confirmation. -->
   <Callout
+    tone="neutral"
     text={text(
       'FABRICATE.Admin.Manager.Knowledge.LearnedBanner',
       'Erasing a memory removes the recipe from this character. It frees a learn slot only when the copy it was learned from is still owned.'

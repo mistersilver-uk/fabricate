@@ -16,9 +16,12 @@
   salvage check's default — resolved builder-side, exactly as the engine resolves it.
 -->
 <script>
+  import Medallion from '../../../../components/Medallion.svelte';
+  import { resolveCraftingArt } from '../../../../util/craftingArtResolution.js';
   import { localize } from '../../../../util/foundryBridge.js';
-  import StatusPill from '../../../../components/StatusPill.svelte';
-  import CraftingThumb from '../../../crafting/CraftingThumb.svelte';
+  import Chip from '../../../../components/Chip.svelte';
+  import EmptyState from '../../../manager/EmptyState.svelte';
+  import Kicker from '../../../../components/Kicker.svelte';
 
   let { salvage = null } = $props();
 
@@ -29,9 +32,11 @@
 
 <div class="salvage-body" data-inventory-salvage-body={checkUsable ? 'simple-check' : 'no-check'}>
   <p class="salvage-body-title">
-    {checkUsable
-      ? localize('FABRICATE.App.Inventory.Salvage.OnASuccess')
-      : localize('FABRICATE.App.Inventory.Salvage.YouWillRecover')}
+    <Kicker as="span"
+      >{checkUsable
+        ? localize('FABRICATE.App.Inventory.Salvage.OnASuccess')
+        : localize('FABRICATE.App.Inventory.Salvage.YouWillRecover')}</Kicker
+    >
     {#if checkUsable && dc !== null}
       <span class="salvage-dc" data-inventory-salvage-dc={String(dc)}>
         {localize('FABRICATE.App.Inventory.Salvage.Dc', { dc })}
@@ -40,22 +45,21 @@
   </p>
 
   {#if results.length === 0}
-    <p class="salvage-empty">{localize('FABRICATE.App.Inventory.Salvage.NoResults')}</p>
+    <EmptyState note hint={localize('FABRICATE.App.Inventory.Salvage.NoResults')} />
   {:else}
     <ul class="salvage-result-list" data-inventory-salvage-results>
       {#each results as entry, index (entry.id ?? entry.componentId ?? index)}
         <li class="salvage-result-row" data-inventory-salvage-result={entry.componentId}>
-          <!-- CraftingThumb, not a raw <img>: a result whose component has no authored
-               art renders the house fallback rather than a broken-image glyph. -->
-          <CraftingThumb src={entry.img ?? ''} alt="" size={24} />
+          <!-- The shared tile through `resolveCraftingArt`, not a raw <img>: a result whose
+               component has no authored art renders the house fallback rather than a
+               broken-image glyph. -->
+          <Medallion {...resolveCraftingArt(entry.img ?? '')} alt="" size={24} />
           <span class="salvage-result-name">{entry.name}</span>
           <span class="salvage-result-qty">×{entry.quantity}</span>
           {#if !checkUsable}
-            <StatusPill
-              tone="success"
-              icon="fas fa-circle-check"
-              label={localize('FABRICATE.App.Inventory.Salvage.Guaranteed')}
-            />
+            <Chip tone="positive" icon="fas fa-circle-check"
+              >{localize('FABRICATE.App.Inventory.Salvage.Guaranteed')}</Chip
+            >
           {/if}
         </li>
       {/each}
@@ -77,31 +81,29 @@
     gap: 8px;
   }
 
+  /* THE ROW ONLY (issue 1514). The eyebrow itself is the shared `Kicker` now, which declares
+     every type property this rule used to — the size, the weight, the tracking, the transform
+     and the ink — so what is left here is what was genuinely the CALLER's: the flex row that
+     places the label beside its trailing figure, and the `line-height` that sets THAT figure's
+     leading. The kicker declares its own 1.3 and is unaffected by the inherited value. */
   .salvage-body-title {
     display: flex;
     align-items: center;
     gap: 6px;
     margin: 0;
-    font-size: 10px;
-    font-weight: 700;
     line-height: 1;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    color: var(--fab-text-muted);
   }
 
+  /* `letter-spacing: 0` used to be a RESET of the 0.12em the eyebrow rule above set on the row;
+     that tracking moved onto the `Kicker` with the rest of the label's type, so this reaches
+     nothing now and is kept only because the mono figure is authored untracked either way. The
+     string is "DC {dc}", already capital, so the eyebrow's `text-transform` never reached it. */
   .salvage-dc {
     font-family: var(--fab-font-mono);
     font-size: 8.5px;
     font-weight: 700;
     letter-spacing: 0;
     color: var(--fab-text-secondary);
-  }
-
-  .salvage-empty {
-    margin: 0;
-    font-size: 12px;
-    color: var(--fab-text-muted);
   }
 
   .salvage-result-list {

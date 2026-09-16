@@ -9,12 +9,14 @@ import {
   buildInteractiveRollOptions,
   promptCheckRoll,
 } from '../ui/svelte/apps/crafting/rollPrompt.js';
+import { planComplications, publicComplications } from '../utils/complicationPlan.js';
 import { activityPermitsFailureResults } from '../utils/failureResultPolicy.js';
 import { resolveProgressiveAward as resolveProgressiveAwardLoop } from '../utils/progressiveAward.js';
 import { matchResultGroupsByName, normalizeRoutedName } from '../utils/routedOutcomeKeywords.js';
 
 import { buildCheckModifierContext } from './checkModifierResolver.js';
 import { evaluateSituationalBonus, runFormulaProgressive, runFormulaRouted } from './checkRoll.js';
+import { fireComplications } from './complicationRuntime.js';
 import { BLIND_RESERVATION_UNITS } from './GatheringBlindRunStore.js';
 import { buildGatheringChatContent } from './GatheringChatCard.js';
 import {
@@ -47,7 +49,16 @@ import { evaluateEnvironmentMatch } from './gatheringMatch.js';
 import { getDiscoveredRealmIds } from './gatheringRealmDiscovery.js';
 import { getRealmRevealMode, isGatheringRealmsEnabled } from './gatheringRealms.js';
 import { GatheringWorldTimeProcessor } from './GatheringWorldTimeProcessor.js';
-import { readStoredStackQuantity } from './itemStackQuantity.js';
+import { resolveCheckTriggerMatches } from './ResolutionModeService.js';
+import { getCommittedExecutionOutcome } from './runExecutionJournal.js';
+import {
+  itemReceipt,
+  linkResultGroups,
+  receiptQuantity,
+  unconfirmedHistoryError,
+} from './runHistoryEvidence.js';
+import { getRunLifecycleContract } from './runLifecycleState.js';
+import { resolvedComponentsFor } from './scopedEntityReads.js';
 import { computeSystemVisibility } from './systemValidation.js';
 
 const DEFAULT_BLOCKED_REASON_KEYS = Object.freeze({
@@ -80,6 +91,14 @@ const DEFAULT_BLOCKED_REASON_KEYS = Object.freeze({
 const BLIND_TASK_LABEL_KEY = 'FABRICATE.Gathering.BlindTaskLabel';
 const UNKNOWN_TOOL_LABEL_KEY = 'FABRICATE.App.Gathering.Detail.UnknownTool';
 const DEFAULT_TOOL_IMG = 'icons/svg/item-bag.svg';
+const VERSIONED_START_CONTEXT = Symbol('versionedGatheringStartContext');
+
+class GatheringLifecycleExecutionError extends Error {
+  constructor(message, code, cause) {
+    super(message, cause ? { cause } : {});
+    this.code = code;
+  }
+}
 const FAILURE_KEYWORDS = new Set([
   'f',
   'fail',
@@ -136,6 +155,17 @@ export class GatheringEngine {
    * @type {Function|null}
    */
   relayBlindStart = null;
+
+  /**
+   * Complication delivery writer (issue 1286). Declared here and installed by
+   * {@link GatheringEngine#installComplicationDelivery} for the same
+   * constructor-complexity reason as the two fields above.
+   * @type {?{deliver: (args: object) => boolean}}
+   */
+  complicationDeliveryWriter = null;
+
+  /** @type {object|null} Authoritative command adapter for lifecycle-v1 mutations. */
+  versionedRunAuthority = null;
 
   constructor({
     environmentStore,
@@ -316,6 +346,133 @@ export class GatheringEngine {
     return this;
   }
 
+  installVersionedRunAuthority(authority = null) {
+    this.versionedRunAuthority = authority && typeof authority === 'object' ? authority : null;
+    return this;
+  }
+
+  /**
+   * Install the complication delivery writer (issue 1286).
+   *
+   * Post-construction for exactly the reason {@link installBlindRunRelay} records: this
+   * constructor already sits at the cognitive-complexity ceiling, and the repo's rule is
+   * to extract rather than add one more branch to a giant.
+   *
+   * Progressive gathering remains unavailable from the current authoring surface, so this
+   * writer is reached only through legacy or externally-authored progressive tasks for now.
+   *
+   * @param {object} deps
+   * @param {?{deliver: (args: object) => boolean}} [deps.writer] The delivery writer
+   *   composed in `main.js`, which owns the emit and mints the resolution id.
+   * @returns {GatheringEngine} this, for chaining at the bootstrap site.
+   */
+  installComplicationDelivery({ writer = null } = {}) {
+    this.complicationDeliveryWriter = writer;
+    return this;
+  }
+
+  /**
+   * The complication delivery writer, injected or ambient — the same
+   * `this.x || game.fabricate?.x` idiom the recipe manager read above it uses.
+   * @private
+   * @returns {?{deliver: (args: object) => boolean}}
+   */
+  _complicationWriter() {
+    return (
+      this.complicationDeliveryWriter ||
+      globalThis.game?.fabricate?.complicationDeliveryWriter ||
+      null
+    );
+  }
+
+  /**
+   * FIRE the component complications a committed progressive gathering award earned
+   * (issue 1286).
+   *
+   * ## Progressive authoring remains dormant, and its test drives this path directly
+   *
+   * The current gathering authoring surface does not expose progressive tasks (see
+   * {@link installComplicationDelivery}). The suite therefore drives
+   * `_resolveProgressiveOutcome` and `_commitTerminalSideEffects` directly, exactly as
+   * the other dormant seams in this file are exercised.
+   *
+   * ## Everything is guarded
+   *
+   * A complication is strictly downstream of a committed award: the items are on the
+   * actor, the run record is written. Nothing here may turn that into a thrown attempt,
+   * so the plan, the trigger evaluation, the firing and the delivery are all inside one
+   * `try` (guard 3 of 3 — the per-complication and per-effect guards live inside
+   * {@link fireComplications}, which resolves rather than rejects).
+   *
+   * The delivery writer owns the emit AND mints the resolution id; this engine does
+   * neither.
+   *
+   * @private
+   * @param {object} options
+   * @param {?object} options.actor the acting actor
+   * @param {?object} options.system the owning crafting system
+   * @param {?object} options.task the runtime task, whose FIRST result group is the
+   *   ordered stage list — gathering has no player reorder, so authored order IS fire
+   *   order
+   * @param {?object} options.outcome the terminal outcome, carrying the award report on
+   *   `checkResult.resolutionMeta`
+   * @returns {Promise<?object>} `fireComplications`'s return, or null when nothing ran.
+   */
+  async _fireGatheringComplications({ actor, system, task, outcome }) {
+    try {
+      if (stringOrNull(task?.resolutionMode) !== 'progressive') return null;
+      const meta = outcome?.checkResult?.resolutionMeta;
+      if (!Array.isArray(meta?.awardedResultIds)) return null;
+      const group = normalizeList(task?.resultGroups)[0];
+      const stages = normalizeList(group?.results).map((result) => {
+        const componentId = stringOrNull(result?.componentId ?? result?.systemItemId);
+        return {
+          resultId: stringOrNull(result?.id),
+          componentId,
+          component: componentId
+            ? (resolvedComponentsFor(system).find((entry) => entry?.id === componentId) ?? null)
+            : null,
+        };
+      });
+      if (stages.length === 0) return null;
+      const plan = planComplications({
+        activity: 'gathering',
+        stages,
+        award: {
+          awarded: meta.awardedResultIds,
+          remaining: Number(meta.remaining ?? 0),
+          partialResult: meta.partialResultId ?? null,
+          haltedResult: meta.haltedResultId ?? null,
+          skippedResults: normalizeList(meta.skippedResultIds),
+        },
+        ...resolveCheckTriggerMatches(
+          system?.gatheringCraftingCheck?.progressive?.checkBreakage,
+          outcome?.checkResult
+        ),
+      });
+      const fired = await fireComplications({
+        plan,
+        actor,
+        context: {
+          craftingSystemId: stringOrNull(system?.id),
+          actorUuid: stringOrNull(actor?.uuid),
+          speaker: globalThis.ChatMessage?.getSpeaker?.({ actor }),
+        },
+      });
+      if (fired.gmRequests.length > 0) {
+        this._complicationWriter()?.deliver({
+          craftingSystemId: stringOrNull(system?.id),
+          actorUuid: stringOrNull(actor?.uuid),
+          complications: fired.gmRequests,
+        });
+      }
+      return fired;
+    } catch (error) {
+      console.error('Fabricate | Component complications failed to fire', error);
+      return null;
+    }
+  }
+
   /**
    * Public start entry point (issue 901). Routes a blind start this client may
    * not write to the active GM, and otherwise starts the attempt locally.
@@ -331,8 +488,388 @@ export class GatheringEngine {
    *   write replicates.
    */
   async requestStart(options = {}) {
+    if (Object.hasOwn(options, 'lifecycleVersion')) {
+      if (options.lifecycleVersion !== 1) {
+        return versionedGatheringFailure('The gathering run lifecycle version is unsupported.');
+      }
+      const requestStart = this.versionedRunAuthority?.requestStart;
+      if (typeof requestStart !== 'function') return gatheringAuthorityUnavailable();
+      return requestStart({
+        actor: options.actor,
+        environmentId: options.environmentId,
+        taskId: options.taskId,
+        rememberedActorId: options.rememberedActorId,
+        presentTools: options.presentTools,
+        interactableRef: options.interactableRef,
+        completionMode: options.completionMode || 'manual',
+      });
+    }
     const relayed = await this._relayBlindStartIfNeeded(options);
     return relayed ?? this.startAttempt(options);
+  }
+
+  async startVersionedRun({
+    viewer = null,
+    actor = null,
+    rememberedActorId = null,
+    environmentId = null,
+    taskId = null,
+    presentTools = null,
+    interactableRef = null,
+    completionMode = 'manual',
+    executionGrant,
+    requestId,
+  } = {}) {
+    const trusted = await this._consumeVersionedGrant(executionGrant, {
+      operation: 'start',
+      actor,
+      runId: null,
+      expectedRevision: null,
+      requestId,
+    });
+    if (!['manual', 'worldTime'].includes(completionMode)) {
+      return versionedGatheringFailure(
+        'The gathering completion mode is unsupported.',
+        'INVALID_COMPLETION_MODE'
+      );
+    }
+    this.runManager?.invalidateCache?.(idOf(actor));
+    const retainedStart = this._findVersionedStartRun({
+      actor,
+      operationId: trusted.operationId,
+      requestId,
+    });
+    if (retainedStart) {
+      const committed = getCommittedExecutionOutcome(retainedStart.executionJournal, requestId);
+      if (committed) return committed;
+      await this._markVersionedGatheringRecovery(actor, retainedStart, trusted.operationId);
+      throw gatheringLifecycleError('The gathering start requires recovery', 'RECOVERY_REQUIRED');
+    }
+    const result = await this.startAttempt(
+      {
+        viewer,
+        actor,
+        rememberedActorId,
+        environmentId,
+        taskId,
+        presentTools,
+        interactableRef,
+        interactive: false,
+        lifecycleVersion: 1,
+      },
+      {
+        [VERSIONED_START_CONTEXT]: true,
+        operationId: trusted.operationId,
+        requestId,
+        completionMode,
+      }
+    );
+    return asVersionedGatheringResult(result);
+  }
+
+  _findVersionedStartRun({ actor, operationId, requestId }) {
+    const runs = [
+      ...normalizeList(this.runManager?.getActiveRuns?.(actor)),
+      ...normalizeList(this.runManager?.getRunHistory?.(actor)),
+    ];
+    return (
+      runs.find(
+        (run) =>
+          getRunLifecycleContract(run) === 'current' &&
+          run.executionJournal?.operationId === operationId &&
+          run.executionJournal?.requestId === String(requestId ?? '').trim() &&
+          run.executionJournal?.intent?.trigger === 'start'
+      ) ?? null
+    );
+  }
+
+  async describeVersionedStageCheck({ actor, runId, preparationGrant, requestId } = {}) {
+    await this._consumeVersionedGrant(
+      preparationGrant,
+      {
+        operation: 'describeCheck',
+        actor,
+        runId,
+        expectedRevision: null,
+        requestId,
+      },
+      { requireOperationId: false }
+    );
+    this.runManager?.invalidateCache?.(idOf(actor));
+    const run = this.runManager?.getActiveRun?.(actor, runId) ?? null;
+    this._assertVersionedRunExecutable(run, { requireReady: true });
+    const resolvedRun = this._hydrateBlindWaitingRun(run);
+    const resolved = this._resolveWaitingRunContext({ actor, run: resolvedRun });
+    if (
+      resolved.missingReference ||
+      this._validateStartTask(resolved.task, resolved.system).valid !== true
+    ) {
+      return { required: false };
+    }
+    return this._versionedCheckDescriptor({ actor, run, ...resolved });
+  }
+
+  evaluatePreparedVersionedCheck({ actor, privateEvaluation, decision = {} } = {}) {
+    const evaluate = this.versionedRunAuthority?.evaluatePreparedRunCheck;
+    if (typeof evaluate !== 'function') {
+      throw gatheringLifecycleError(
+        'Versioned gathering check evaluation is unavailable',
+        'AUTHORITY_UNAVAILABLE'
+      );
+    }
+    return evaluate(privateEvaluation, actor, decision, {
+      secret: privateEvaluation?.secret === true,
+      failureMessage: 'Gathering check failed',
+    });
+  }
+
+  async executeVersionedStage({
+    actor,
+    runId,
+    expectedRevision,
+    executionGrant,
+    requestId,
+    trigger = 'manual',
+  } = {}) {
+    const trusted = await this._consumeVersionedGrant(executionGrant, {
+      operation: 'execute',
+      actor,
+      runId,
+      expectedRevision,
+      requestId,
+    });
+    this.runManager?.invalidateCache?.(idOf(actor));
+    const anyRun = this.runManager?.getRun?.(actor, runId) ?? null;
+    const committed = anyRun?.executionJournal
+      ? getCommittedExecutionOutcome(anyRun.executionJournal, requestId)
+      : null;
+    if (committed) return committed;
+
+    const run = this.runManager?.getActiveRun?.(actor, runId) ?? null;
+    this._assertVersionedRunExecutable(run, { expectedRevision, requireReady: true });
+    if (this._gamePaused()) {
+      return versionedGatheringFailure('Gathering cannot advance while the game is paused.');
+    }
+    if (trigger === 'worldTime' && run.completionMode !== 'worldTime') {
+      return versionedGatheringFailure('This gathering run is set to manual completion.');
+    }
+
+    const resolvedRun = this._hydrateBlindWaitingRun(run);
+    const resolved = this._resolveWaitingRunContext({ actor, run: resolvedRun });
+    if (resolved.missingReference) {
+      const viewer = await this._viewerForRun({ actor, run: resolvedRun });
+      return asVersionedGatheringResult(
+        await this._cancelInvalidVersionedRun({
+          viewer,
+          actor,
+          run,
+          resolved,
+          reason: resolved.missingReference,
+          versionedContext: { operationId: trusted.operationId, requestId, trigger },
+        })
+      );
+    }
+    const resolvedTools = this._resolveTaskTools({
+      environment: resolved.environment,
+      task: resolved.task,
+    });
+    if (this._hasBlockedToolReferences(resolvedTools)) {
+      const viewer = await this._viewerForRun({ actor, run: resolvedRun });
+      return asVersionedGatheringResult(
+        await this._clearInvalidVersionedRun({
+          viewer,
+          actor,
+          run,
+          environment: resolved.environment,
+          task: resolved.task,
+          errors: ['The gathering tool references are stale.'],
+          versionedContext: { operationId: trusted.operationId, requestId, trigger },
+        })
+      );
+    }
+    if (resolvedTools.tools.length > 0) {
+      const viewer = await this._viewerForRun({ actor, run: resolvedRun });
+      const availability = await this._checkTools({
+        actor,
+        viewer,
+        system: resolved.system,
+        environment: resolved.environment,
+        task: resolved.task,
+        tools: resolvedTools.tools,
+        presentTools: null,
+      });
+      if (availability.available !== true) {
+        return versionedGatheringFailure('The gathering tools are no longer available.');
+      }
+    }
+    if (trigger === 'worldTime' && gatheringTaskRequiresPlayerCheck(resolved.task)) {
+      return versionedGatheringFailure('This gathering run requires a player check.');
+    }
+    if (
+      gatheringTaskRequiresPlayerCheck(resolved.task) &&
+      (!trusted.resolvedCheckResult || typeof trusted.resolvedCheckResult !== 'object')
+    ) {
+      throw gatheringLifecycleError(
+        'A validated gathering check result is required',
+        'CHECK_RESULT_REQUIRED'
+      );
+    }
+
+    const result = await this._processMaturedWaitingRun({
+      actor,
+      run,
+      versionedContext: {
+        operationId: trusted.operationId,
+        requestId,
+        expectedRevision,
+        resolvedCheckResult: trusted.resolvedCheckResult ?? null,
+        trigger,
+      },
+    });
+    return asVersionedGatheringResult(result);
+  }
+
+  async cancelVersionedRun({ actor, runId, expectedRevision, executionGrant, requestId } = {}) {
+    const trusted = await this._consumeVersionedGrant(executionGrant, {
+      operation: 'cancel',
+      actor,
+      runId,
+      expectedRevision,
+      requestId,
+    });
+    this.runManager?.invalidateCache?.(idOf(actor));
+    const run = this.runManager?.getActiveRun?.(actor, runId) ?? null;
+    this._assertVersionedRunExecutable(run, {
+      expectedRevision,
+      requireReady: false,
+      allowPaused: true,
+    });
+    const cancelled = await this.runManager.cancelRun(actor, runId, {
+      expectedRevision,
+      executionOperationId: trusted.operationId,
+    });
+    if (!cancelled) return versionedGatheringFailure('The gathering run is no longer active.');
+    await this._releaseBlindReservation(run);
+    return {
+      success: true,
+      accepted: true,
+      cancelled: true,
+      refunded: false,
+      restoredCount: 0,
+      run: stripRuntimeSnapshotFromRun(cancelled),
+      runId: cancelled.id,
+      state: 'cancelled',
+    };
+  }
+
+  _consumeVersionedGrant(executionGrant, context, { requireOperationId = true } = {}) {
+    const consume = this.versionedRunAuthority?.consumeExecutionGrant;
+    if (typeof consume !== 'function') {
+      throw gatheringLifecycleError(
+        'Versioned gathering authority is unavailable',
+        'AUTHORITY_UNAVAILABLE'
+      );
+    }
+    return Promise.resolve(consume(executionGrant, context)).then((trusted) => {
+      if (!trusted || typeof trusted !== 'object') {
+        throw gatheringLifecycleError(
+          'Versioned gathering authority is unavailable',
+          'AUTHORITY_UNAVAILABLE'
+        );
+      }
+      const operationId = stringOrNull(trusted.operationId);
+      if (requireOperationId && !operationId) {
+        throw gatheringLifecycleError(
+          'Versioned gathering authority is unavailable',
+          'AUTHORITY_UNAVAILABLE'
+        );
+      }
+      return { ...trusted, operationId };
+    });
+  }
+
+  _assertVersionedRunExecutable(
+    run,
+    { expectedRevision, requireReady = false, allowPaused = false } = {}
+  ) {
+    if (!run) throw gatheringLifecycleError('The gathering run is not active', 'RUN_NOT_FOUND');
+    const contract = getRunLifecycleContract(run);
+    if (contract !== 'current') {
+      throw gatheringLifecycleError(
+        contract === 'unsupported'
+          ? 'The gathering run lifecycle version is unsupported'
+          : 'The gathering run is not versioned',
+        contract === 'unsupported' ? 'UNSUPPORTED_RUN' : 'LEGACY_RUN'
+      );
+    }
+    if (!allowPaused && run.pauseState) {
+      throw gatheringLifecycleError('The gathering run is paused', 'RUN_PAUSED');
+    }
+    if (run.executionJournal?.status === 'recoveryRequired') {
+      throw gatheringLifecycleError('The gathering run requires recovery', 'RECOVERY_REQUIRED');
+    }
+    if (run.executionJournal?.effects?.some((effect) => effect?.phase === 'applying')) {
+      throw gatheringLifecycleError(
+        'The gathering run has an uncertain execution effect',
+        'RECOVERY_REQUIRED'
+      );
+    }
+    if (expectedRevision !== undefined && Number(expectedRevision) !== Number(run.runRevision)) {
+      throw gatheringLifecycleError('The gathering run revision is stale', 'STALE_RUN_REVISION');
+    }
+    if (requireReady && this.runManager?.canExecuteRun?.(run) !== true) {
+      throw gatheringLifecycleError('The gathering run is not ready', 'RUN_NOT_READY');
+    }
+    return run;
+  }
+
+  _versionedCheckDescriptor({ actor, run, system, environment, task }) {
+    const secret = isBlindWaitingTaskId(run?.taskId);
+    const mode = stringOrNull(task?.resolutionMode) || 'd100';
+    const config =
+      mode === 'routed'
+        ? plainObjectOrNull(system?.gatheringCraftingCheck?.routed)
+        : mode === 'progressive'
+          ? plainObjectOrNull(system?.gatheringCraftingCheck?.progressive)
+          : null;
+    const rollFormula = stringOrNull(config?.rollFormula);
+    const requiresCheck = gatheringTaskRequiresPlayerCheck(task);
+    const slot = mode === 'routed' ? 'routed' : mode === 'progressive' ? 'progressive' : null;
+    const checkMode = mode === 'routed' ? 'routedByCheck' : mode;
+    const dc = mode === 'routed' ? this._resolveGatheringRoutedDc(config, task) : null;
+    const label = secret ? this.localize(BLIND_TASK_LABEL_KEY) : stringOrEmpty(task?.name);
+    const dcLabel = Number.isFinite(dc) ? ` (DC ${dc})` : '';
+    return {
+      required: requiresCheck,
+      publicPrompt: {
+        label,
+        mode: checkMode,
+        allowsSituationalModifier: Boolean(rollFormula),
+        allowAdvantage: Boolean(rollFormula && /(?:^|\W)d20(?:\W|$)/i.test(rollFormula)),
+      },
+      privateEvaluation: {
+        secret,
+        actorUuid: stringOrNull(actor?.uuid),
+        flavor: `${label ? `${label} — ` : ''}Gathering check${dcLabel}`,
+        speaker: cloneJson(globalThis.ChatMessage?.getSpeaker?.({ actor })) ?? null,
+        craftingSystemId: stringOrNull(system?.id),
+        environmentId: stringOrNull(environment?.id),
+        taskId: stringOrNull(task?.id),
+        mode: checkMode,
+        slot,
+        rollFormula,
+        checkConfig: config ? cloneJson(config) : null,
+        decisionPolicy: {
+          dc: Number.isFinite(dc) ? dc : null,
+          thresholdMode: stringOrNull(config?.thresholdMode),
+          type: stringOrNull(config?.type),
+          relativeOutcomes: cloneJson(normalizeList(config?.relativeOutcomes)),
+          fixedOutcomes: cloneJson(normalizeList(config?.fixedOutcomes)),
+          clampToNearest: mode === 'routed',
+          minOutcomeId: null,
+        },
+      },
+    };
   }
 
   /**
@@ -370,7 +907,10 @@ export class GatheringEngine {
       if (!actor || !run?.id || run.status !== 'waitingTime') continue;
 
       try {
-        const result = await this._processMaturedWaitingRun({ actor, run });
+        const result =
+          getRunLifecycleContract(run) === 'current'
+            ? await this._requestVersionedWorldTimeExecution({ actor, run })
+            : await this._processMaturedWaitingRun({ actor, run });
         if (!result) continue;
         processed.push(result);
         if (result.state === 'cancelled') cancelled.push(result);
@@ -410,6 +950,45 @@ export class GatheringEngine {
     };
   }
 
+  async _requestVersionedWorldTimeExecution({ actor, run }) {
+    if (this._gamePaused()) {
+      throw gatheringLifecycleError(
+        'Automatic gathering stopped while the game is paused',
+        'GAME_PAUSED'
+      );
+    }
+    const resolved = this._resolveWaitingRunContext({
+      actor,
+      run: this._hydrateBlindWaitingRun(run),
+    });
+    if (!resolved.missingReference && gatheringTaskRequiresPlayerCheck(resolved.task)) {
+      throw gatheringLifecycleError(
+        'Automatic gathering stopped for a required player check',
+        'AUTOMATIC_CHECK_REQUIRED'
+      );
+    }
+    const requestExecute = this.versionedRunAuthority?.requestExecute;
+    if (typeof requestExecute !== 'function') {
+      throw gatheringLifecycleError(
+        'Versioned gathering authority is unavailable',
+        'AUTHORITY_UNAVAILABLE'
+      );
+    }
+    const result = await requestExecute({
+      actor,
+      runId: run.id,
+      expectedRevision: run.runRevision,
+      trigger: 'worldTime',
+    });
+    if (result?.success === false && !['cancelled', 'cleared'].includes(result?.state)) {
+      throw gatheringLifecycleError(
+        stringOrNull(result.message) || 'Automatic gathering execution was refused',
+        stringOrNull(result.code) || 'AUTOMATIC_EXECUTION_REFUSED'
+      );
+    }
+    return result;
+  }
+
   /**
    * Thin delegate to the world-time processor's interactable-scoped node respawn
    * pass (issue 374). Kept so callers that drive the pass directly — notably the
@@ -422,26 +1001,38 @@ export class GatheringEngine {
     return this.worldTimeProcessor._processInteractableNodeRespawn(...args);
   }
 
-  async startAttempt({
-    viewer = null,
-    actor = null,
-    rememberedActorId = null,
-    environmentId = null,
-    taskId = null,
-    // Virtual-present tools injected by an active canvas Tool station (Phase 4):
-    // a `{ systemId, componentIds }` payload whose componentIds satisfy a tool
-    // prerequisite WITHOUT an owned item (and are excluded from breakage/usage)
-    // ONLY for tasks in the matching crafting system — componentId is per-system.
-    presentTools = null,
-    // Optional scene-interactable ref ({sceneId, regionId, behaviorId}) when the
-    // attempt was opened against an interactable that owns its own scoped node
-    // pool (issue 302). Null for the default environment-scoped flow.
-    interactableRef = null,
-    // Opt-in interactive roll (UI-triggered attempt): surfaces the confirm-roll
-    // dialog + posts the roll to chat for the routed/progressive check paths.
-    // Defaults false so the programmatic API and timed maturation stay silent.
-    interactive = false,
-  } = {}) {
+  async startAttempt(
+    {
+      viewer = null,
+      actor = null,
+      rememberedActorId = null,
+      environmentId = null,
+      taskId = null,
+      // Virtual-present tools injected by an active canvas Tool station (Phase 4):
+      // a `{ systemId, componentIds }` payload whose componentIds satisfy a tool
+      // prerequisite WITHOUT an owned item (and are excluded from breakage/usage)
+      // ONLY for tasks in the matching crafting system — componentId is per-system.
+      presentTools = null,
+      // Optional scene-interactable ref ({sceneId, regionId, behaviorId}) when the
+      // attempt was opened against an interactable that owns its own scoped node
+      // pool (issue 302). Null for the default environment-scoped flow.
+      interactableRef = null,
+      // Opt-in interactive roll (UI-triggered attempt): surfaces the confirm-roll
+      // dialog + posts the roll to chat for the routed/progressive check paths.
+      // Defaults false so the programmatic API and timed maturation stay silent.
+      interactive = false,
+      lifecycleVersion,
+    } = {},
+    versionedContext = null
+  ) {
+    if (versionedContext && versionedContext[VERSIONED_START_CONTEXT] !== true) {
+      return gatheringAuthorityUnavailable();
+    }
+    if (lifecycleVersion !== undefined && !versionedContext) {
+      return lifecycleVersion === 1
+        ? gatheringAuthorityUnavailable()
+        : versionedGatheringFailure('The gathering run lifecycle version is unsupported.');
+    }
     const resolved = await this._resolveStartContext({
       viewer,
       actor,
@@ -670,6 +1261,20 @@ export class GatheringEngine {
         task,
         richAttempt,
         interactableRef,
+        versionedContext,
+      });
+    }
+
+    if (versionedContext) {
+      return this._startReadyVersionedAttempt({
+        viewer,
+        actor: selectedActor,
+        system,
+        environment,
+        task,
+        richAttempt,
+        interactableRef,
+        versionedContext,
       });
     }
 
@@ -686,7 +1291,13 @@ export class GatheringEngine {
     });
   }
 
-  async _processMaturedWaitingRun({ actor, run }) {
+  async _processMaturedWaitingRun({ actor, run, versionedContext = null }) {
+    if (getRunLifecycleContract(run) === 'current' && !versionedContext) {
+      throw gatheringLifecycleError(
+        'Versioned gathering execution requires authority',
+        'AUTHORITY_UNAVAILABLE'
+      );
+    }
     const viewer = await this._viewerForRun({ actor, run });
     // A blind run's task and start-time snapshot live in the GM-owned blind-run
     // store, not on the actor flag. Fold them back in here so the whole maturity
@@ -696,12 +1307,33 @@ export class GatheringEngine {
     const resolvedRun = this._hydrateBlindWaitingRun(run);
     const resolved = this._resolveWaitingRunContext({ actor, run: resolvedRun });
     if (resolved.missingReference) {
+      if (versionedContext) {
+        return this._cancelInvalidVersionedRun({
+          viewer,
+          actor,
+          run,
+          resolved,
+          reason: resolved.missingReference,
+          versionedContext,
+        });
+      }
       return this._cancelMissingReferenceRun({ viewer, actor, run: resolvedRun, resolved });
     }
 
     const { system, environment, task, interactableRef } = resolved;
     const configuration = this._validateStartTask(task, system);
     if (configuration.valid !== true) {
+      if (versionedContext) {
+        return this._clearInvalidVersionedRun({
+          viewer,
+          actor,
+          run,
+          environment,
+          task,
+          errors: configuration.errors,
+          versionedContext,
+        });
+      }
       return this._clearMisconfiguredWaitingRun({
         viewer,
         actor,
@@ -712,13 +1344,26 @@ export class GatheringEngine {
       });
     }
 
-    const outcome =
-      task.resolutionMode === 'd100'
-        ? await this._resolveD100Outcome({ viewer, actor, system, environment, task })
-        : task.resolutionMode === 'progressive'
-          ? await this._resolveProgressiveOutcome({ viewer, actor, system, environment, task })
-          : await this._resolveRoutedOutcome({ viewer, actor, system, environment, task });
+    const outcome = await this._resolveTaskOutcome({
+      viewer,
+      actor,
+      system,
+      environment,
+      task,
+      resolvedCheckResult: versionedContext?.resolvedCheckResult ?? null,
+    });
     if (outcome.status === 'misconfigured') {
+      if (versionedContext) {
+        return this._clearInvalidVersionedRun({
+          viewer,
+          actor,
+          run,
+          environment,
+          task,
+          outcome,
+          versionedContext,
+        });
+      }
       return this._clearMisconfiguredWaitingRun({
         viewer,
         actor,
@@ -740,6 +1385,17 @@ export class GatheringEngine {
       checkResult,
     });
     if (plan.status === 'misconfigured') {
+      if (versionedContext) {
+        return this._clearInvalidVersionedRun({
+          viewer,
+          actor,
+          run,
+          environment,
+          task,
+          outcome: plan,
+          versionedContext,
+        });
+      }
       return this._clearMisconfiguredWaitingRun({
         viewer,
         actor,
@@ -760,6 +1416,25 @@ export class GatheringEngine {
       checkResult,
       plan,
     });
+    if (versionedContext) {
+      return this._persistAndApplyVersionedTerminal({
+        viewer,
+        actor,
+        system,
+        environment,
+        task,
+        outcome,
+        checkResult,
+        plan,
+        runData,
+        payload,
+        activeRun: resolvedRun,
+        interactableRef,
+        versionedContext,
+        phase: maturityCommitPhase(run),
+        initiatedBy: 'timed',
+      });
+    }
     const completedRun = await this.runManager.completeRun(
       actor,
       resolvedRun,
@@ -773,33 +1448,8 @@ export class GatheringEngine {
       });
     }
 
-    const richEvidence = await this._commitRichAttempt({
-      actor,
-      system,
-      environment,
-      task,
-      outcome,
-      viewer,
-      interactableRef,
-      // Second of this run's two commits: the node was already consumed at
-      // `waitingStart` unless the task defers it to `onSuccess`. A BLIND run is
-      // the exception — it holds a reservation rather than a decrement — so it
-      // commits as `immediate` here and converts that reservation into the one
-      // real decrement it is owed. See `maturityCommitPhase`.
-      phase: maturityCommitPhase(run),
-    });
-    const completedRunWithRichEvidence =
-      richEvidence && typeof richEvidence === 'object'
-        ? {
-            ...completedRun,
-            economyEvidence: {
-              ...completedRun.economyEvidence,
-              ...richEvidence,
-            },
-          }
-        : completedRun;
-
-    await this._commitTerminalSideEffects({
+    const settlement = await this._commitLegacyTerminal({
+      run: completedRun,
       viewer,
       actor,
       system,
@@ -807,6 +1457,8 @@ export class GatheringEngine {
       task,
       outcome,
       checkResult,
+      interactableRef,
+      phase: maturityCommitPhase(run),
     });
     // The reservation has now been converted into the real decrement (or was
     // never owed, for a failed `onSuccess` task), so the claim is spent.
@@ -819,10 +1471,11 @@ export class GatheringEngine {
       environment,
       task,
       status: outcome.status,
-      run: completedRunWithRichEvidence,
-      createdResults: plan.createdResults,
+      run: settlement.run,
+      createdResults: settlement.createdResults,
       usedTools: plan.usedTools ?? [],
       checkResult,
+      complications: settlement.complications,
       initiatedBy: 'timed',
     });
   }
@@ -1098,7 +1751,7 @@ export class GatheringEngine {
     const recipes = recipeManager?.getRecipes?.({ craftingSystemId: systemId }) || [];
     const { blocksSystem } = computeSystemVisibility(system, {
       recipes,
-      components: system.components || [],
+      components: resolvedComponentsFor(system),
     });
     cache.set(systemId, blocksSystem === true);
     return blocksSystem === true;
@@ -1645,10 +2298,20 @@ export class GatheringEngine {
 
   _componentsById(system) {
     const map = new Map();
-    if (!system?.id || typeof this.systemManager?.getItems !== 'function') return map;
+    if (!system?.id) return map;
+    // MOVED OFF `getItems` at issue 1370. `getItems` is the AUTHORING and browse accessor and
+    // stays on the persisted record; `getComponentsForSystem` is the repointed READ accessor.
+    // A manager double that stubs only `getItems` still answers, and a record-only fixture
+    // falls through to the shared read seam.
     let components;
     try {
-      components = normalizeList(this.systemManager.getItems(system.id));
+      if (typeof this.systemManager?.getComponentsForSystem === 'function') {
+        components = normalizeList(this.systemManager.getComponentsForSystem(system.id));
+      } else if (typeof this.systemManager?.getItems === 'function') {
+        components = normalizeList(this.systemManager.getItems(system.id));
+      } else {
+        components = resolvedComponentsFor(system);
+      }
     } catch {
       return map;
     }
@@ -1886,6 +2549,22 @@ export class GatheringEngine {
    * @param {?object} args.task Resolved task.
    * @returns {boolean} True when the real task identity must not be disclosed.
    */
+  /**
+   * Whether run HISTORY must still name this run's task generically for this viewer (D-027).
+   *
+   * Owning the actor never discloses a blind task, and a run the GM executed persists the REAL
+   * task id, so the record's marker cannot answer it — the environment plus the recorded reveal
+   * can, which is exactly what {@link GatheringEngine#_isBlindIdentityHidden} answers for the card.
+   *
+   * @param {{actor: ?object, viewer: ?object, environmentId: ?string, taskId: ?string}} args
+   * @returns {boolean} True when history must show the generic blind label.
+   */
+  isHistoricalBlindIdentityHidden({ actor = null, viewer = null, environmentId, taskId } = {}) {
+    const environment = this._findEnvironment(environmentId);
+    const task = { id: stringOrNull(taskId) };
+    return environment ? this._isBlindIdentityHidden({ environment, viewer, actor, task }) : false;
+  }
+
   _isBlindIdentityHidden({ environment, viewer, actor, task }) {
     if (!this._isOpaqueBlindTask({ environment, viewer })) return false;
     const taskId = stringOrNull(task?.id);
@@ -2230,6 +2909,51 @@ export class GatheringEngine {
     };
   }
 
+  async _startReadyVersionedAttempt({
+    viewer,
+    actor,
+    system,
+    environment,
+    task,
+    richAttempt,
+    interactableRef,
+    versionedContext,
+  }) {
+    if (typeof this.runManager?.createRun !== 'function') {
+      return versionedGatheringFailure('Gathering runs are unavailable.');
+    }
+    const opaqueBlind = this._isOpaqueBlindTask({ environment, viewer });
+    const runData = this._waitingRunData({
+      system,
+      environment,
+      task,
+      richAttempt,
+      viewer,
+      interactableRef,
+      opaqueBlind,
+      versionedContext,
+    });
+    const blindGuard = opaqueBlind
+      ? this._blindWaitingStartGuard({ viewer, actor, environment, task, runData })
+      : null;
+    if (blindGuard) return blindGuard;
+
+    return this._persistAndApplyVersionedStart({
+      viewer,
+      actor,
+      system,
+      environment,
+      task,
+      interactableRef,
+      opaqueBlind,
+      versionedContext,
+      status: 'inProgress',
+      createRun: (executionPlan) => this.runManager.createRun(actor, runData, { executionPlan }),
+      buildResponse: (run) =>
+        this._startedVersionedReadyStart({ viewer, actor, system, environment, task, run }),
+    });
+  }
+
   async _startWaitingAttempt({
     viewer,
     actor,
@@ -2238,6 +2962,7 @@ export class GatheringEngine {
     task,
     richAttempt = null,
     interactableRef = null,
+    versionedContext = null,
   }) {
     if (typeof this.runManager?.createWaitingRun !== 'function') {
       return this._blockedStart({
@@ -2265,12 +2990,31 @@ export class GatheringEngine {
       viewer,
       interactableRef,
       opaqueBlind,
+      versionedContext,
     });
     const blindGuard = opaqueBlind
       ? this._blindWaitingStartGuard({ viewer, actor, environment, task, runData })
       : null;
     if (blindGuard) return blindGuard;
     const timeRequirement = normalizeTimeRequirement(task.timeRequirement);
+
+    if (versionedContext) {
+      return this._persistAndApplyVersionedStart({
+        viewer,
+        actor,
+        system,
+        environment,
+        task,
+        interactableRef,
+        opaqueBlind,
+        versionedContext,
+        status: 'waitingTime',
+        createRun: (executionPlan) =>
+          this.runManager.createWaitingRun(actor, runData, timeRequirement, { executionPlan }),
+        buildResponse: (run) =>
+          this._startedWaitingStart({ viewer, actor, system, environment, task, run }),
+      });
+    }
 
     try {
       const run = await this.runManager.createWaitingRun(actor, runData, timeRequirement);
@@ -2372,6 +3116,97 @@ export class GatheringEngine {
     }
   }
 
+  async _persistAndApplyVersionedStart({
+    viewer,
+    actor,
+    system,
+    environment,
+    task,
+    interactableRef,
+    opaqueBlind,
+    versionedContext,
+    status,
+    createRun,
+    buildResponse,
+  }) {
+    const state = { run: null, richEvidence: null };
+    const definitions = [];
+    if (opaqueBlind) {
+      definitions.push(
+        versionedEffect('blind', 'recordGatheringBlindRun', null, async () => {
+          const stored = await this._recordBlindRunSecret({
+            run: state.run,
+            actor,
+            system,
+            environment,
+            task,
+            interactableRef,
+            opaqueBlind,
+          });
+          if (stored === false) {
+            throw gatheringLifecycleError(
+              'The blind gathering run could not be recorded',
+              'BLIND_RUN_NOT_RECORDED'
+            );
+          }
+          return {
+            recorded: true,
+            reservationUnits: Number(stored?.reservation?.units) || 0,
+          };
+        })
+      );
+    }
+    definitions.push(
+      versionedEffect('economy', 'commitGatheringEconomy', { phase: 'waitingStart' }, async () => {
+        state.richEvidence = await this._commitRichAttempt({
+          actor,
+          system,
+          environment,
+          task: waitingStartCommitTask(task, opaqueBlind),
+          outcome: { status },
+          viewer,
+          interactableRef,
+          phase: 'waitingStart',
+        });
+        return opaqueBlind
+          ? redactRichEvidence(state.richEvidence || {}, { viewer })
+          : (cloneJson(state.richEvidence) ?? null);
+      })
+    );
+    const executionPlan = {
+      operationId: versionedContext.operationId,
+      requestId: versionedContext.requestId,
+      baseRunRevision: 0,
+      intent: {
+        activity: 'gathering',
+        trigger: 'start',
+        status,
+        taskId: opaqueBlind ? 'blind' : stringOrNull(task.id),
+      },
+      effects: definitions.map(({ effectId, kind, planned }) => ({ effectId, kind, planned })),
+    };
+    state.run = await createRun(executionPlan);
+    for (const definition of definitions) {
+      await this._applyVersionedGatheringEffect({
+        actor,
+        definition,
+        operationId: versionedContext.operationId,
+        state,
+      });
+    }
+    const response = buildResponse(mergeRunEconomyEvidence(state.run, state.richEvidence));
+    state.run = await this.runManager.updateExecutionJournal(
+      actor,
+      state.run.id,
+      { type: 'commit', outcome: versionedJournalOutcome(response) },
+      {
+        expectedRevision: state.run.runRevision,
+        executionOperationId: versionedContext.operationId,
+      }
+    );
+    return buildResponse(mergeRunEconomyEvidence(state.run, state.richEvidence));
+  }
+
   /**
    * Build the payload persisted on the ACTOR for a waiting run.
    *
@@ -2400,18 +3235,30 @@ export class GatheringEngine {
     viewer = null,
     interactableRef = null,
     opaqueBlind = false,
+    versionedContext = null,
   }) {
     const runData = {
       craftingSystemId: stringOrNull(system.id),
       environmentId: stringOrNull(environment.id),
       taskId: opaqueBlind ? blindWaitingTaskId(environment) : stringOrNull(task.id),
+      // The run belongs to the VIEWER who requested it, not to whoever is running this
+      // (issue 1288). A relayed blind start executes on the elected GM's client, and the
+      // run manager's fallback would otherwise stamp the GM — which `getGatheringRunViewer`
+      // reads back at maturity as a GM viewer, un-blinding the terminal history it writes
+      // to the player's own actor flag. Null falls back to the manager's ambient default,
+      // which is right for the direct in-session start that supplies no viewer.
+      userId: idOf(viewer),
     };
+    if (versionedContext) {
+      runData.lifecycleVersion = 1;
+      runData.completionMode = versionedContext.completionMode || 'manual';
+    }
     // Persist the scene-interactable ref so a timed run that matures later
     // decrements the SAME scoped node it gated against (issue 302). Null/absent
     // for the environment-scoped flow (no behaviour stored).
     const persistedRef = normalizeInteractableRef(interactableRef);
     if (persistedRef) runData.interactableRef = persistedRef;
-    if (hasRichGatheringData(environment, task) || task.resolutionMode === 'd100') {
+    if (!opaqueBlind || hasRichGatheringData(environment, task) || task.resolutionMode === 'd100') {
       const richPayload = this._richHistoryPayload({ environment, task, richAttempt, viewer });
       if (opaqueBlind) {
         richPayload.riskLevel = stringOrNull(environment?.risk) || 'safe';
@@ -2582,26 +3429,14 @@ export class GatheringEngine {
     interactableRef = null,
     interactive = false,
   }) {
-    const outcome =
-      task.resolutionMode === 'd100'
-        ? await this._resolveD100Outcome({ viewer, actor, system, environment, task, interactive })
-        : task.resolutionMode === 'progressive'
-          ? await this._resolveProgressiveOutcome({
-              viewer,
-              actor,
-              system,
-              environment,
-              task,
-              interactive,
-            })
-          : await this._resolveRoutedOutcome({
-              viewer,
-              actor,
-              system,
-              environment,
-              task,
-              interactive,
-            });
+    const outcome = await this._resolveTaskOutcome({
+      viewer,
+      actor,
+      system,
+      environment,
+      task,
+      interactive,
+    });
 
     // The player dismissed the interactive roll dialog: a user choice, not a
     // blocked attempt. Return a quiet, non-notifying result BEFORE any run
@@ -2701,26 +3536,8 @@ export class GatheringEngine {
       });
     }
 
-    const richEvidence = await this._commitRichAttempt({
-      actor,
-      system,
-      environment,
-      task,
-      outcome,
-      viewer,
-      interactableRef,
-    });
-    if (richEvidence && typeof richEvidence === 'object') {
-      run = {
-        ...run,
-        economyEvidence: {
-          ...run.economyEvidence,
-          ...richEvidence,
-        },
-      };
-    }
-
-    await this._commitTerminalSideEffects({
+    const settlement = await this._commitLegacyTerminal({
+      run,
       viewer,
       actor,
       system,
@@ -2729,6 +3546,7 @@ export class GatheringEngine {
       outcome,
       checkResult,
       presentTools,
+      interactableRef,
     });
 
     return await this._terminalStart({
@@ -2738,11 +3556,111 @@ export class GatheringEngine {
       environment,
       task,
       status: outcome.status,
-      run,
-      createdResults: plan.createdResults,
+      run: settlement.run,
+      createdResults: settlement.createdResults,
       usedTools: plan.usedTools ?? [],
       checkResult,
+      complications: settlement.complications,
     });
+  }
+
+  async _resolveTaskOutcome({
+    viewer,
+    actor,
+    system,
+    environment,
+    task: sourceTask,
+    interactive = false,
+    resolvedCheckResult = null,
+  }) {
+    const task = { ...sourceTask, resultGroups: linkResultGroups(sourceTask.resultGroups) };
+    let outcome;
+    switch (task.resolutionMode) {
+      case 'straight': {
+        outcome = {
+          status: 'succeeded',
+          resultGroups: normalizeList(task.resultGroups),
+          checkResult: null,
+        };
+        break;
+      }
+      case 'd100': {
+        return this._resolveD100Outcome({ viewer, actor, system, environment, task, interactive });
+      }
+      case 'progressive': {
+        return this._resolveProgressiveOutcome({
+          viewer,
+          actor,
+          system,
+          environment,
+          task,
+          interactive,
+          resolvedCheckResult,
+        });
+      }
+      default: {
+        outcome = await this._resolveRoutedOutcome({
+          actor,
+          system,
+          task,
+          interactive,
+          resolvedCheckResult,
+        });
+      }
+    }
+    return this._resolveEnvironmentalEventsForOutcome({
+      viewer,
+      actor,
+      system,
+      environment,
+      task,
+      outcome,
+    });
+  }
+
+  async _resolveEnvironmentalEventsForOutcome({
+    viewer,
+    actor,
+    system,
+    environment,
+    task,
+    outcome,
+  }) {
+    if (!['succeeded', 'failed'].includes(outcome?.status)) return outcome;
+    if (typeof this.richState?.resolveEnvironmentalEvents !== 'function') return outcome;
+    const eventModifier = Number(
+      environment?.eventModifier?.value ?? environment?.eventModifier ?? 0
+    );
+    const resolved = await this.richState.resolveEnvironmentalEvents({
+      task,
+      environment,
+      actor,
+      viewer,
+      system,
+      eventModifier: Number.isFinite(eventModifier) ? eventModifier : 0,
+    });
+    if (resolved?.status === 'misconfigured') {
+      return misconfiguredOutcome({
+        code: 'CHARACTER_MODIFIER_MISCONFIGURED',
+        diagnostics: normalizeList(resolved.diagnostics),
+      });
+    }
+
+    const characterModifierSnapshot = mergeCharacterModifierSnapshots(
+      outcome.characterModifierSnapshot,
+      resolved?.characterModifierSnapshot
+    );
+    return {
+      ...outcome,
+      status: resolved?.status === 'failed' ? 'failed' : outcome.status,
+      characterModifierSnapshot,
+      checkResult: {
+        ...plainObjectOrNull(outcome.checkResult),
+        events: normalizeList(resolved?.events),
+        eventPolicy: stringOrNull(resolved?.eventPolicy),
+        characterModifierSnapshot,
+      },
+    };
   }
 
   async _terminalSideEffectPlan({
@@ -2808,6 +3726,7 @@ export class GatheringEngine {
           craftingSystemId: stringOrNull(system.id),
           environmentId: stringOrNull(environment.id),
           taskId: 'blind',
+          userId: idOf(viewer),
         },
         payload: {
           createdResults: [],
@@ -2819,7 +3738,12 @@ export class GatheringEngine {
     }
 
     const payload = {
-      createdResults: plan.createdResults,
+      createdResults: [],
+      historySettlement: { awards: 'pending' },
+      resolutionSnapshot: {
+        kind: task.resolutionMode === 'straight' ? 'none' : 'check',
+        mode: task.resolutionMode,
+      },
       usedTools: plan.usedTools ?? [],
     };
     if (checkResult !== undefined) payload.checkResult = checkResult;
@@ -2833,6 +3757,7 @@ export class GatheringEngine {
         craftingSystemId: stringOrNull(system.id),
         environmentId: stringOrNull(environment.id),
         taskId: stringOrNull(task.id),
+        userId: idOf(viewer),
       },
       payload,
     };
@@ -2911,6 +3836,316 @@ export class GatheringEngine {
     });
   }
 
+  async _persistAndApplyVersionedTerminal({
+    viewer,
+    actor,
+    system,
+    environment,
+    task,
+    outcome,
+    checkResult,
+    plan,
+    runData,
+    payload,
+    activeRun,
+    interactableRef,
+    versionedContext,
+    phase,
+    initiatedBy,
+  }) {
+    const opaqueBlind = this._isOpaqueBlindTask({ environment, viewer });
+    const state = { run: null, richEvidence: null, complications: [], response: null };
+    const definitions = this._versionedGatheringEffects({
+      viewer,
+      actor,
+      system,
+      environment,
+      task,
+      outcome,
+      checkResult,
+      plan,
+      activeRun,
+      interactableRef,
+      phase,
+      initiatedBy,
+      opaqueBlind,
+      state,
+    });
+    const executionPlan = {
+      operationId: versionedContext.operationId,
+      requestId: versionedContext.requestId,
+      baseRunRevision: activeRun.runRevision,
+      intent: {
+        activity: 'gathering',
+        trigger: versionedContext.trigger || 'manual',
+        status: outcome.status,
+        taskId: opaqueBlind ? 'blind' : stringOrNull(task.id),
+      },
+      effects: definitions.map(({ effectId, kind, planned }) => ({ effectId, kind, planned })),
+    };
+    state.run = await this.runManager.completeRun(actor, activeRun, outcome.status, payload, {
+      terminalRunData: runData,
+      executionPlan,
+      expectedRevision: activeRun.runRevision,
+      executionOperationId: versionedContext.operationId,
+    });
+    if (!state.run) {
+      throw gatheringLifecycleError(
+        'Gathering terminal history was not written',
+        'TERMINAL_HISTORY_NOT_WRITTEN'
+      );
+    }
+
+    for (const definition of definitions) {
+      await this._applyVersionedGatheringEffect({
+        actor,
+        definition,
+        operationId: versionedContext.operationId,
+        state,
+      });
+    }
+    state.run = await this.runManager.updateExecutionJournal(
+      actor,
+      state.run.id,
+      { type: 'commit', outcome: versionedJournalOutcome(state.response) },
+      {
+        expectedRevision: state.run.runRevision,
+        executionOperationId: versionedContext.operationId,
+      }
+    );
+    return refreshVersionedTerminalResponse(state.response, state.run, {
+      opaqueBlind,
+      createdResults: state.createdResults ?? [],
+      usedTools: plan.usedTools ?? [],
+      checkResult,
+    });
+  }
+
+  _versionedGatheringEffects(context) {
+    const {
+      viewer,
+      actor,
+      system,
+      environment,
+      task,
+      outcome,
+      checkResult,
+      plan,
+      activeRun,
+      interactableRef,
+      phase,
+      initiatedBy,
+      opaqueBlind,
+      state,
+    } = context;
+    const safeResults = opaqueBlind ? [] : plan.createdResults;
+    const safeTools = opaqueBlind ? [] : (plan.usedTools ?? []);
+    const effects = [
+      versionedEffect('economy', 'commitGatheringEconomy', { phase }, async () => {
+        state.richEvidence = await this._commitRichAttempt({
+          actor,
+          system,
+          environment,
+          task,
+          outcome,
+          viewer,
+          interactableRef,
+          phase,
+        });
+        return opaqueBlind ? { applied: true } : (cloneJson(state.richEvidence) ?? null);
+      }),
+      versionedEffect('results', 'createGatheredResults', safeResults, async () => {
+        if (!awardsResultsFor(outcome, system) || !hasAwardedResults(outcome.resultGroups)) {
+          state.createdResults = [];
+          return opaqueBlind ? { count: 0 } : [];
+        }
+        const created = await this._createGatheredResults({
+          viewer,
+          actor,
+          system,
+          environment,
+          task,
+          outcome,
+        });
+        const actual = normalizeRunItems(created, { actor });
+        state.createdResults = actual;
+        return opaqueBlind ? { count: actual.length } : actual;
+      }),
+    ];
+    if (awardsResultsFor(outcome, system) && hasAwardedResults(outcome.resultGroups)) {
+      effects.push(
+        versionedEffect('complications', 'fireGatheringComplications', null, async () => {
+          const fired = await this._fireGatheringComplications({ actor, system, task, outcome });
+          state.complications = publicComplications(fired?.fired);
+          return opaqueBlind ? { count: state.complications.length } : state.complications;
+        })
+      );
+    }
+    effects.push(
+      versionedEffect('tools', 'applyGatheringTools', safeTools, async () => {
+        const applied = await this._applyTerminalTools({
+          viewer,
+          actor,
+          system,
+          environment,
+          task,
+          outcome,
+        });
+        const actual = cloneJson(normalizeList(applied));
+        return opaqueBlind ? { count: actual.length } : actual;
+      })
+    );
+    if (outcome.status === 'failed') {
+      effects.push(
+        versionedEffect('failure', 'applyGatheringFailure', null, async () => {
+          const applied = await this._applyFailureFeedback({
+            viewer,
+            actor,
+            system,
+            environment,
+            task,
+            outcome,
+            checkResult,
+          });
+          return opaqueBlind ? { applied: true } : (cloneJson(applied) ?? { applied: true });
+        })
+      );
+    }
+    effects.push(
+      versionedEffect('events', 'applyGatheringEvents', null, async () => {
+        const applied = await this.eventSceneTrigger?.apply?.({
+          events: checkResult?.events,
+          viewer,
+          actor,
+          system,
+          environment,
+          task,
+        });
+        const receipt = {
+          applied: true,
+          eventCount: normalizeList(checkResult?.events).length,
+        };
+        if (!opaqueBlind && applied !== undefined) receipt.result = cloneJson(applied);
+        return receipt;
+      })
+    );
+    if (activeRun) {
+      effects.push(
+        versionedEffect('reservation', 'releaseGatheringReservation', null, async () => ({
+          released: Boolean(await this._releaseBlindReservation(activeRun)),
+        }))
+      );
+    }
+    effects.push(
+      versionedEffect('presentation', 'publishGatheringCompletion', null, async () => {
+        const displayRun = mergeRunEconomyEvidence(state.run, state.richEvidence);
+        state.response = await this._terminalStart({
+          viewer,
+          actor,
+          system,
+          environment,
+          task,
+          status: outcome.status,
+          run: displayRun,
+          createdResults: state.createdResults ?? [],
+          usedTools: plan.usedTools ?? [],
+          checkResult,
+          complications: state.complications,
+          initiatedBy,
+        });
+        return versionedJournalOutcome(state.response);
+      })
+    );
+    return effects;
+  }
+
+  async _applyVersionedGatheringEffect({ actor, definition, operationId, state }) {
+    state.run = await this.runManager.updateExecutionJournal(
+      actor,
+      state.run.id,
+      { type: 'effectApplying', effectId: definition.effectId },
+      { expectedRevision: state.run.runRevision, executionOperationId: operationId }
+    );
+    let receipt;
+    try {
+      receipt = (await definition.apply()) ?? null;
+    } catch (error) {
+      if (error.receipts?.length > 0 && state.run.checkResult?.blind !== true) {
+        state.run = await this.runManager.retainUncertainReceipt(
+          actor,
+          state.run.id,
+          definition.effectId,
+          error.receipts,
+          { executionOperationId: operationId }
+        );
+      }
+      await this._markVersionedGatheringRecovery(actor, state.run, operationId);
+      throw gatheringLifecycleError(
+        `Gathering effect "${definition.effectId}" requires recovery`,
+        'RECOVERY_REQUIRED',
+        error
+      );
+    }
+    try {
+      state.run = await this.runManager.updateExecutionJournal(
+        actor,
+        state.run.id,
+        { type: 'effectApplied', effectId: definition.effectId, receipt },
+        { expectedRevision: state.run.runRevision, executionOperationId: operationId }
+      );
+    } catch (error) {
+      await this._markVersionedGatheringRecovery(actor, state.run, operationId);
+      throw gatheringLifecycleError(
+        `Gathering effect "${definition.effectId}" receipt could not be persisted`,
+        'RECOVERY_REQUIRED',
+        error
+      );
+    }
+  }
+
+  async _markVersionedGatheringRecovery(actor, run, operationId) {
+    try {
+      await this.runManager.updateExecutionJournal(
+        actor,
+        run.id,
+        { type: 'recoveryRequired' },
+        { expectedRevision: run.runRevision, executionOperationId: operationId }
+      );
+    } catch {
+      // The persisted applying phase already prevents replay if recovery persistence fails.
+    }
+  }
+
+  async _commitLegacyTerminal({ run, ...context }) {
+    const opaque = this._isOpaqueBlindTask(context);
+    let createdResults;
+    let complications = [];
+    let richEvidence = null;
+    let failure = null;
+    try {
+      richEvidence = await this._commitRichAttempt(context);
+      ({ createdResults, complications } = await this._commitTerminalSideEffects(context));
+    } catch (error) {
+      createdResults = normalizeList(error.receipts).map(itemReceipt);
+      failure = error;
+    }
+    const settled = await this.runManager.settleHistory(context.actor, run.id, {
+      createdResults: opaque ? [] : createdResults,
+      ...(!opaque && { historySettlement: { awards: failure ? 'uncertain' : 'complete' } }),
+      economyEvidence: {
+        ...run.economyEvidence,
+        ...(opaque ? redactRichEvidence(richEvidence, { viewer: context.viewer }) : richEvidence),
+      },
+    });
+    if (failure)
+      throw unconfirmedHistoryError(
+        'Gathering effects require reconciliation',
+        opaque ? [] : createdResults,
+        failure
+      );
+    return { run: settled, createdResults, complications };
+  }
+
   async _commitTerminalSideEffects({
     viewer,
     actor,
@@ -2926,40 +4161,75 @@ export class GatheringEngine {
     // the run record, `response.createdResults` and the posted chat card. Gating only
     // this half would create items on the actor that all three report as zero — a state
     // an item-count-only assertion cannot detect — so the two read the SAME predicate.
-    if (awardsResultsFor(outcome, system)) {
-      await this._createGatheredResults({ viewer, actor, system, environment, task, outcome });
-    }
-    await this._applyTerminalTools({
-      viewer,
-      actor,
-      system,
-      environment,
-      task,
-      outcome,
-      presentTools,
-    });
-    if (outcome.status === 'failed') {
-      await this._applyFailureFeedback({
+    //
+    // REDACTED AT THE SOURCE (issue 1286): the raw fired list never leaves this method.
+    // What comes back is `publicComplications`' output, so the caller — which threads it
+    // into the terminal response a player reads and into the chat card a player sees —
+    // has no unredacted list to thread by mistake, whatever the acting user's role is.
+    let complications = [];
+    let createdResults = [];
+    try {
+      if (awardsResultsFor(outcome, system)) {
+        createdResults = await this._createGatheredResults({
+          viewer,
+          actor,
+          system,
+          environment,
+          task,
+          outcome,
+        });
+        // Component complications (issue 1286), INSIDE the award gate and immediately after
+        // the award: an outcome this predicate refuses awarded nothing, so its stages never
+        // happened. Progressive attempts only — every d100 and routed outcome returns
+        // without planning anything. The chat card is posted by the caller, after this.
+        const fired = await this._fireGatheringComplications({ actor, system, task, outcome });
+        complications = publicComplications(fired?.fired);
+      }
+      await this._applyTerminalTools({
         viewer,
         actor,
         system,
         environment,
         task,
         outcome,
-        checkResult,
+        presentTools,
       });
+      if (outcome.status === 'failed') {
+        await this._applyFailureFeedback({
+          viewer,
+          actor,
+          system,
+          environment,
+          task,
+          outcome,
+          checkResult,
+        });
+      }
+      await this.eventSceneTrigger?.apply?.({
+        events: checkResult?.events,
+        viewer,
+        actor,
+        system,
+        environment,
+        task,
+      });
+      return { complications, createdResults };
+    } catch (error) {
+      throw unconfirmedHistoryError(
+        'Gathering terminal effects are uncertain',
+        error.receipts ?? createdResults,
+        error
+      );
     }
-    await this.eventSceneTrigger?.apply?.({
-      events: checkResult?.events,
-      viewer,
-      actor,
-      system,
-      environment,
-      task,
-    });
   }
 
-  async _resolveRoutedOutcome({ actor, system, task, interactive = false }) {
+  async _resolveRoutedOutcome({
+    actor,
+    system,
+    task,
+    interactive = false,
+    resolvedCheckResult = null,
+  }) {
     // Routed gathering resolves exclusively through the system-level gathering
     // check (Checks editor): roll the configured routed formula and map its total
     // onto a named outcome tier, then route that tier name to a result group by
@@ -2981,6 +4251,7 @@ export class GatheringEngine {
       system,
       task,
       interactive,
+      resolvedCheckResult,
     });
   }
 
@@ -3002,39 +4273,36 @@ export class GatheringEngine {
     system = null,
     task,
     interactive = false,
+    resolvedCheckResult = null,
   }) {
     const dc = this._resolveGatheringRoutedDc(routed, task);
-    // THIS SEAM IS DORMANT (issue 1095, decision 8) — unreachable, not dead. No
-    // GM-selectable configuration reaches it today: `_libraryTaskToRuntimeTask` hardcodes
-    // `resolutionMode: 'd100'` pending issue 683 and `GatheringEconomyView` renders both
-    // formula-rolled modes `disabled`. The check-modifier context lands here now so the
-    // capability is complete when 683 flips the switch, and so this path is not the one
-    // place the shape was forgotten. Gathering has no tool-bonus seam, so nothing is
-    // appended before the modifier term (a named out-of-scope follow-up on issue 1093).
+    // Gathering has no tool-bonus seam, so nothing is appended before the modifier term.
     const craftingModifier = buildCheckModifierContext(system, 'gathering', task);
-    const rolled = await runFormulaRouted({
-      formula: rollFormula,
-      dc,
-      thresholdMode: routed.thresholdMode,
-      type: routed.type,
-      relativeOutcomes: routed.relativeOutcomes,
-      fixedOutcomes: routed.fixedOutcomes,
-      triggers: routed.checkBreakage?.triggers,
-      actor,
-      label: 'Gathering',
-      craftingModifier,
-      // Clamp a below-lowest relative total to the closest tier (as crafting/salvage);
-      // a per-task dcOverride never opens a null-outcome dead zone.
-      clampToNearest: true,
-      rollOptions: buildInteractiveRollOptions({
-        interactive,
-        actor,
-        name: task?.name,
-        activity: 'Gathering',
-        img: task?.img,
+    const rolled =
+      resolvedCheckResult ??
+      (await runFormulaRouted({
+        formula: rollFormula,
         dc,
-      }),
-    });
+        thresholdMode: routed.thresholdMode,
+        type: routed.type,
+        relativeOutcomes: routed.relativeOutcomes,
+        fixedOutcomes: routed.fixedOutcomes,
+        triggers: routed.checkBreakage?.triggers,
+        actor,
+        label: 'Gathering',
+        craftingModifier,
+        // Clamp a below-lowest relative total to the closest tier (as crafting/salvage);
+        // a per-task dcOverride never opens a null-outcome dead zone.
+        clampToNearest: true,
+        rollOptions: buildInteractiveRollOptions({
+          interactive,
+          actor,
+          name: task?.name,
+          activity: 'Gathering',
+          img: task?.img,
+          dc,
+        }),
+      }));
 
     // The player cancelled the interactive roll: propagate a cancelled outcome so
     // `_resolveImmediateAttempt` aborts with zero mutation.
@@ -3069,13 +4337,21 @@ export class GatheringEngine {
             firstOnly: false,
           })
         : [];
+      const matchError = outcomeName
+        ? routedGroupMatchError({
+            outcomeName,
+            matched: failureGroups,
+            task,
+            checkResult,
+            allowMissing: true,
+          })
+        : null;
+      if (matchError) return matchError;
       return normalizeTerminalOutcome(
         { status: 'failed', outcome: outcomeName, resultGroups: failureGroups, checkResult },
         { retainFailureResultGroups: true }
       );
     }
-    // Gathering keeps ALL same-named groups (`firstOnly: false`); the per-system
-    // routing key (the success tier name) stays in the caller above.
     const matched = matchResultGroupsByName(outcomeName, normalizeList(task.resultGroups), {
       firstOnly: false,
     });
@@ -3095,17 +4371,8 @@ export class GatheringEngine {
     // A group that EXISTS and is empty is deliberate authoring ("this tier succeeds and
     // awards nothing") and is left alone: it matches by name, so it never reaches here,
     // and it renders the explicit nothing-found card from issue 1027.
-    if (matched.length === 0) {
-      return misconfiguredOutcome({
-        code: 'ROUTED_TIER_UNROUTED',
-        checkResult,
-        diagnostic: {
-          code: 'ROUTED_TIER_UNROUTED',
-          messageKey: 'FABRICATE.Gathering.Diagnostics.RoutedTierUnrouted',
-          message: `Gathering success tier "${outcomeName}" has no result group of that name on task "${task?.name || task?.id || 'unnamed'}"`,
-        },
-      });
-    }
+    const matchError = routedGroupMatchError({ outcomeName, matched, task, checkResult });
+    if (matchError) return matchError;
     return normalizeTerminalOutcome({
       status: 'succeeded',
       outcome: outcomeName,
@@ -3205,6 +4472,7 @@ export class GatheringEngine {
         name: task.name || 'Gathered',
         results: normalizeList(resolved?.items).map((item) => ({
           id: item.id,
+          resultRowId: item.resultRowId,
           componentId: stringOrNull(item.componentId),
           itemUuid: stringOrNull(item.itemUuid),
           quantity: Number(item.quantity || 1),
@@ -3217,6 +4485,8 @@ export class GatheringEngine {
       characterModifierSnapshot: resolved?.characterModifierSnapshot || null,
       checkResult: {
         provider: 'd100',
+        roll: Number.isFinite(resolved?.roll) ? resolved.roll : null,
+        itemRows: normalizeList(resolved?.itemRows),
         items: normalizeList(resolved?.items),
         events: normalizeList(resolved?.events),
         eventPolicy: stringOrNull(resolved?.eventPolicy),
@@ -3232,15 +4502,18 @@ export class GatheringEngine {
     environment,
     task,
     interactive = false,
+    resolvedCheckResult = null,
   }) {
-    const checkResult = await this._evaluateGatheringCheck({
-      actor,
-      viewer,
-      system,
-      environment,
-      task,
-      interactive,
-    });
+    const checkResult =
+      resolvedCheckResult ??
+      (await this._evaluateGatheringCheck({
+        actor,
+        viewer,
+        system,
+        environment,
+        task,
+        interactive,
+      }));
     // The player cancelled the interactive roll: propagate a cancelled outcome so
     // `_resolveImmediateAttempt` aborts with zero mutation (before normalization,
     // which does not model a cancel).
@@ -3305,10 +4578,8 @@ export class GatheringEngine {
     const progressive = system?.gatheringCraftingCheck?.progressive;
     const rollFormula = stringOrNull(progressive?.rollFormula);
     if (rollFormula) {
-      // DORMANT, exactly as the routed seam above is (issue 1095, decision 8): progressive
-      // gathering is rendered `disabled` in the economy editor and no runtime task ever
-      // carries the mode, so this modifier context is unreachable pending issue 683. It
-      // lands now so the shape is complete on arrival rather than half-threaded.
+      // Progressive gathering remains unavailable from the current authoring surface, but
+      // legacy and externally-authored runtime tasks can still reach this compatibility path.
       const rolled = await runFormulaProgressive({
         formula: rollFormula,
         triggers: progressive.checkBreakage?.triggers,
@@ -3358,9 +4629,9 @@ export class GatheringEngine {
   async _createGatheredResults({ viewer, actor, system, environment, task, outcome }) {
     if (!hasAwardedResults(outcome.resultGroups)) return [];
     if (typeof this.resultCreator?.create !== 'function') {
-      return [];
+      throw unconfirmedHistoryError('Gathering result creation is unavailable');
     }
-    return this.resultCreator.create({
+    const created = await this.resultCreator.create({
       actor,
       viewer,
       system,
@@ -3370,6 +4641,16 @@ export class GatheringEngine {
       checkResult: outcome.checkResult ?? null,
       outcome,
     });
+    if (
+      !Array.isArray(created) ||
+      created.some((entry) => receiptQuantity(entry?.quantity) === null || !entry?.itemUuid)
+    ) {
+      throw unconfirmedHistoryError(
+        'Invalid gathering creation receipts',
+        normalizeList(created).filter((entry) => receiptQuantity(entry?.quantity) !== null)
+      );
+    }
+    return created.map(itemReceipt);
   }
 
   async _planGatheredResults({ viewer, actor, system, environment, task, outcome }) {
@@ -3513,6 +4794,9 @@ export class GatheringEngine {
     createdResults,
     usedTools = [],
     checkResult,
+    // ALREADY REDACTED by `_commitTerminalSideEffects`, which applies `publicComplications`
+    // at the source (issue 1286). Nothing here re-filters, and nothing here may widen it.
+    complications = [],
     initiatedBy = 'immediate',
   }) {
     await this._maybeRevealBlindTask({ actor, environment, task, status });
@@ -3547,6 +4831,10 @@ export class GatheringEngine {
       response.createdResults = createdResults;
       response.usedTools = usedTools;
       if (checkResult !== undefined) response.checkResult = checkResult;
+      // Inside the opaque-blind guard with everything else a blind attempt withholds, and
+      // set only when something fired, so a transparent attempt with no complications
+      // returns exactly the response it did before this feature existed.
+      if (complications.length > 0) response.complications = complications;
     }
 
     // Posted for EVERY terminal attempt, blind included. Suppressing it for blind runs
@@ -3567,6 +4855,7 @@ export class GatheringEngine {
       usedTools,
       checkResult,
       run,
+      complications,
       identityHidden,
     });
 
@@ -3622,6 +4911,10 @@ export class GatheringEngine {
    * @param {Array}   params.usedTools      - Tool breakage plan entries.
    * @param {object}  [params.checkResult]  - Outcome detail (events, items).
    * @param {object}  params.run            - Terminal run (carries economyEvidence).
+   * @param {Array}   [params.complications] - Fired component complications, ALREADY
+   *   redacted to the player-visible set by `_commitTerminalSideEffects` (issue 1286).
+   *   The component name each row shows is resolved here, against the same
+   *   `componentsById` index the awarded components use.
    * @private
    */
   async _postGatheringChatMessage({
@@ -3633,6 +4926,7 @@ export class GatheringEngine {
     usedTools,
     checkResult,
     run,
+    complications = [],
     identityHidden = false,
   }) {
     if (!system || system.features?.chatOutput !== true) return;
@@ -3667,7 +4961,7 @@ export class GatheringEngine {
             stringOrNull(resolvedDoc?.img) ||
             stringOrNull(entry?.img) ||
             'icons/svg/item-bag.svg',
-          quantity: Number(entry?.quantity) || 1,
+          quantity: receiptQuantity(entry?.quantity),
         };
       });
 
@@ -3692,6 +4986,19 @@ export class GatheringEngine {
           };
         });
 
+      // `position` is where this firing's entry sits in the ordered stage list — gathering
+      // has no player reorder, so that is the AUTHORED order, which is also the order this
+      // task's results are shown in. It rides along so the shared renderer can tell two
+      // legitimate firings of one complication on one twice-staged component apart; the
+      // renderer decides whether to draw it, because only it sees the final row set.
+      const complicationRows = normalizeList(complications).map((entry) => ({
+        name: stringOrEmpty(entry?.name),
+        description: stringOrEmpty(entry?.description),
+        severity: stringOrEmpty(entry?.severity),
+        componentName: stringOrEmpty(componentsById.get(stringOrNull(entry?.componentId))?.name),
+        position: entry?.position ?? null,
+      }));
+
       const content = buildGatheringChatContent(
         {
           status,
@@ -3702,6 +5009,7 @@ export class GatheringEngine {
           components,
           events,
           brokenTools,
+          complications: complicationRows,
           staminaSpent: run?.economyEvidence?.stamina?.spent ?? null,
           // A chat message is a permanent world document, so never state a node count
           // this client only guessed. When the depletion was relayed to the active GM
@@ -3720,7 +5028,6 @@ export class GatheringEngine {
       );
 
       await ChatMessage.create({
-        user: game.user?.id,
         speaker: ChatMessage.getSpeaker({ actor }),
         content,
       });
@@ -3761,6 +5068,169 @@ export class GatheringEngine {
     };
   }
 
+  async _cancelInvalidVersionedRun({ viewer, actor, run, resolved, reason, versionedContext }) {
+    const persistence = this._cancelledRunWriteData({
+      run,
+      environment: resolved.environment,
+      viewer,
+    });
+    const state = { run: null };
+    const definitions = [
+      versionedEffect('reservation', 'releaseGatheringReservation', null, async () => {
+        const released = await this._releaseBlindReservation(run);
+        return {
+          released: Boolean(released),
+          reservationUnits: Number(released?.reservation?.units) || 0,
+        };
+      }),
+    ];
+    const executionPlan = {
+      operationId: versionedContext.operationId,
+      requestId: versionedContext.requestId,
+      baseRunRevision: run.runRevision,
+      intent: {
+        activity: 'gathering',
+        trigger: versionedContext.trigger || 'manual',
+        status: 'cancelled',
+        reason: 'missingReference',
+        taskId: persistence.opaqueBlind ? 'blind' : stringOrNull(run.taskId),
+      },
+      effects: definitions.map(({ effectId, kind, planned }) => ({ effectId, kind, planned })),
+    };
+    state.run = await this.runManager.completeRun(actor, run, 'cancelled', persistence.payload, {
+      terminalRunData: persistence.terminalRunData,
+      executionPlan,
+      expectedRevision: run.runRevision,
+      executionOperationId: versionedContext.operationId,
+    });
+    if (!state.run) {
+      throw gatheringLifecycleError(
+        'Gathering cancellation history was not written',
+        'TERMINAL_HISTORY_NOT_WRITTEN'
+      );
+    }
+    for (const definition of definitions) {
+      await this._applyVersionedGatheringEffect({
+        actor,
+        definition,
+        operationId: versionedContext.operationId,
+        state,
+      });
+    }
+    let response = this._timedCancellation({
+      viewer,
+      actor,
+      run,
+      cancelledRun: state.run,
+      reason,
+      environment: resolved.environment ?? null,
+    });
+    state.run = await this.runManager.updateExecutionJournal(
+      actor,
+      state.run.id,
+      { type: 'commit', outcome: versionedJournalOutcome(response) },
+      {
+        expectedRevision: state.run.runRevision,
+        executionOperationId: versionedContext.operationId,
+      }
+    );
+    response = this._timedCancellation({
+      viewer,
+      actor,
+      run,
+      cancelledRun: state.run,
+      reason,
+      environment: resolved.environment ?? null,
+    });
+    return response;
+  }
+
+  async _clearInvalidVersionedRun({
+    viewer,
+    actor,
+    run,
+    environment,
+    task,
+    errors = null,
+    outcome = null,
+    versionedContext,
+  }) {
+    const definitions = [
+      versionedEffect('reservation', 'releaseGatheringReservation', null, async () => {
+        const released = await this._releaseBlindReservation(run);
+        return {
+          released: Boolean(released),
+          reservationUnits: Number(released?.reservation?.units) || 0,
+        };
+      }),
+      versionedEffect('cleanup', 'clearInvalidGatheringRun', null, async () => null),
+    ];
+    const executionPlan = {
+      operationId: versionedContext.operationId,
+      requestId: versionedContext.requestId,
+      baseRunRevision: run.runRevision,
+      intent: {
+        activity: 'gathering',
+        trigger: versionedContext.trigger || 'manual',
+        status: 'cleared',
+        reason: 'misconfigured',
+        taskId: isBlindWaitingTaskId(run.taskId) ? 'blind' : stringOrNull(run.taskId),
+      },
+      effects: definitions.map(({ effectId, kind, planned }) => ({ effectId, kind, planned })),
+    };
+    const state = {
+      run: await this.runManager.updateExecutionJournal(
+        actor,
+        run.id,
+        { type: 'plan', plan: executionPlan },
+        { expectedRevision: run.runRevision, executionOperationId: versionedContext.operationId }
+      ),
+    };
+    await this._applyVersionedGatheringEffect({
+      actor,
+      definition: definitions[0],
+      operationId: versionedContext.operationId,
+      state,
+    });
+    state.run = await this.runManager.updateExecutionJournal(
+      actor,
+      state.run.id,
+      { type: 'effectApplying', effectId: 'cleanup' },
+      {
+        expectedRevision: state.run.runRevision,
+        executionOperationId: versionedContext.operationId,
+      }
+    );
+    try {
+      const cleared = await this.runManager.clearActiveRun(actor, state.run.id, {
+        expectedRevision: state.run.runRevision,
+        executionOperationId: versionedContext.operationId,
+      });
+      if (!cleared) {
+        throw gatheringLifecycleError(
+          'Gathering invalid-run cleanup was not written',
+          'RUN_CLEANUP_NOT_WRITTEN'
+        );
+      }
+    } catch (error) {
+      await this._markVersionedGatheringRecovery(actor, state.run, versionedContext.operationId);
+      throw gatheringLifecycleError(
+        'Gathering invalid-run cleanup requires recovery',
+        'RECOVERY_REQUIRED',
+        error
+      );
+    }
+    return this._misconfiguredWaitingResult({
+      viewer,
+      actor,
+      run,
+      environment,
+      task,
+      errors,
+      outcome,
+    });
+  }
+
   async _clearMisconfiguredWaitingRun({
     viewer,
     actor,
@@ -3783,6 +5253,18 @@ export class GatheringEngine {
     }
 
     await this.runManager.clearActiveRun(actor, run.id);
+    return this._misconfiguredWaitingResult({
+      viewer,
+      actor,
+      run,
+      environment,
+      task,
+      errors,
+      outcome,
+    });
+  }
+
+  _misconfiguredWaitingResult({ viewer, actor, run, environment, task, errors, outcome }) {
     const reason = this._blockedReason('TASK_MISCONFIGURED', {
       data: this._terminalMisconfigurationData({
         environment,
@@ -3812,38 +5294,47 @@ export class GatheringEngine {
     };
   }
 
+  _cancelledRunWriteData({ run, environment, viewer }) {
+    const opaqueBlind =
+      isBlindWaitingTaskId(run?.taskId) ||
+      Boolean(environment && this._isOpaqueBlindTask({ environment, viewer }));
+    const economyEvidence = opaqueBlind
+      ? redactRichEvidence(run?.economyEvidence || {})
+      : stripRuntimeSnapshotFromRun({ economyEvidence: run?.economyEvidence || {} })
+          .economyEvidence;
+    return {
+      opaqueBlind,
+      terminalRunData: opaqueBlind
+        ? {
+            craftingSystemId: stringOrNull(run?.craftingSystemId),
+            environmentId: stringOrNull(run?.environmentId),
+            taskId: 'blind',
+          }
+        : undefined,
+      payload: opaqueBlind
+        ? {
+            economyEvidence,
+            createdResults: [],
+            usedTools: [],
+            checkResult: { blind: true, status: 'cancelled' },
+          }
+        : { economyEvidence },
+    };
+  }
+
   async _cancelMissingReferenceRun({ viewer, actor, run, resolved }) {
     // A cancelled run is terminal for the pool: release its provisional claim
     // without the real `nodeRuntime` count ever having moved (issue 901).
     await this._releaseBlindReservation(run);
-    const opaqueBlind =
-      resolved.environment &&
-      this._isOpaqueBlindTask({ environment: resolved.environment, viewer });
-    const cancellationPayload = {
-      economyEvidence: opaqueBlind
-        ? redactRichEvidence(run?.economyEvidence || {})
-        : stripRuntimeSnapshotFromRun({ economyEvidence: run?.economyEvidence || {} })
-            .economyEvidence,
-    };
-    const cancelledRun = await this.runManager.cancelRun(
-      actor,
-      run.id,
-      opaqueBlind
-        ? {
-            terminalRunData: {
-              craftingSystemId: stringOrNull(run?.craftingSystemId),
-              environmentId: stringOrNull(run?.environmentId),
-              taskId: 'blind',
-            },
-            payload: {
-              ...cancellationPayload,
-              createdResults: [],
-              usedTools: [],
-              checkResult: { blind: true, status: 'cancelled' },
-            },
-          }
-        : { payload: cancellationPayload }
-    );
+    const persistence = this._cancelledRunWriteData({
+      run,
+      environment: resolved.environment,
+      viewer,
+    });
+    const cancelledRun = await this.runManager.cancelRun(actor, run.id, {
+      terminalRunData: persistence.terminalRunData,
+      payload: persistence.payload,
+    });
     if (!cancelledRun) {
       throw Object.assign(new Error('Timed gathering cancellation history was not written'), {
         code: 'TERMINAL_HISTORY_NOT_WRITTEN',
@@ -3861,7 +5352,9 @@ export class GatheringEngine {
   }
 
   _timedCancellation({ viewer, actor, run, cancelledRun, reason, environment = null }) {
-    const opaqueBlind = environment && this._isOpaqueBlindTask({ environment, viewer });
+    const opaqueBlind =
+      isBlindWaitingTaskId(run?.taskId) ||
+      Boolean(environment && this._isOpaqueBlindTask({ environment, viewer }));
     return {
       accepted: true,
       started: true,
@@ -3926,6 +5419,35 @@ export class GatheringEngine {
       timeGate: plainObjectOrNull(run?.timeGate),
       run: publicRun,
       blockedReasons: [],
+      // Execution is still required, but not yet: this one matures at GM-gated world time, and
+      // completing it early would spend the wait the task declares.
+      requiresExecution: true,
+      canExecuteImmediately: false,
+    };
+  }
+
+  _startedVersionedReadyStart({ viewer, actor, system, environment, task, run }) {
+    const opaqueBlind = this._isOpaqueBlindTask({ environment, viewer });
+    return {
+      accepted: true,
+      started: true,
+      state: 'ready',
+      viewerId: idOf(viewer),
+      actorId: idOf(actor),
+      craftingSystemId: stringOrNull(system.id),
+      environmentId: stringOrNull(environment.id),
+      taskId: opaqueBlind ? null : stringOrNull(task.id),
+      runId: stringOrNull(run?.id),
+      runStatus: stringOrNull(run?.status) || 'inProgress',
+      run: opaqueBlind ? redactBlindRun(run) : stripRuntimeSnapshotFromRun(run),
+      blockedReasons: [],
+      // Said in the crafting engine's vocabulary on purpose. `state` is the gathering-native
+      // word and the journal command layer's result normaliser drops it, so a caller reading a
+      // normalised start -- which is every public caller -- could not tell a run that can
+      // execute now from one waiting on the clock. These two fields it does forward, and
+      // `executePublicGather` keys the one-call completion on them (issue 1759).
+      requiresExecution: true,
+      canExecuteImmediately: true,
     };
   }
 
@@ -4216,16 +5738,21 @@ function resolveProgressiveAward({ system, task, checkResult }) {
   // short-circuits with `invalidResultId`, which we raise as a misconfiguration
   // here (the loop never builds that shape). Divergence 2 zeroes the budget after a
   // `partial` tail award (`zeroRemainingOnPartial: true`).
-  const { awarded, remaining, invalidResultId } = resolveProgressiveAwardLoop({
-    results: normalizeList(group.results),
-    initialRemaining: Math.max(0, value),
-    costFor: (result) => difficultyForResult(system, result),
-    awardMode,
-    invalidCost: 'fail',
-    zeroRemainingOnPartial: true,
-  });
+  const { awarded, remaining, invalidResultId, partialResult, haltedResult, skippedResults } =
+    resolveProgressiveAwardLoop({
+      results: normalizeList(group.results),
+      initialRemaining: Math.max(0, value),
+      costFor: (result) => difficultyForResult(system, result),
+      awardMode,
+      invalidCost: 'fail',
+      zeroRemainingOnPartial: true,
+    });
 
   if (invalidResultId !== undefined) {
+    // A gathering resolution aborted on an invalid cost fires NO complications, matching
+    // the crafting misconfiguration gate: a GM authoring gap is not a narrative outcome
+    // (issue 1286). Nothing needs to enforce that here — the abort returns before the
+    // award, so `_commitTerminalSideEffects` is never reached.
     return misconfiguredOutcome({
       code: 'INVALID_PROGRESSIVE_DIFFICULTY',
       message: 'Progressive gathering result references a component without valid difficulty',
@@ -4238,9 +5765,15 @@ function resolveProgressiveAward({ system, task, checkResult }) {
     resultGroups: [{ ...group, results: awarded }],
     checkResult: {
       ...checkResult,
+      // The same FLAT five keys `ResolutionModeService._resolveProgressiveResultGroups`
+      // publishes (issue 1286), so a consumer classifying stages reads one shape across
+      // all three activities rather than one per activity.
       resolutionMeta: {
         awardedResultIds: awarded.map((result) => result.id),
         remaining,
+        partialResultId: partialResult?.id ?? null,
+        haltedResultId: haltedResult?.id ?? null,
+        skippedResultIds: skippedResults.map((result) => result.id),
       },
     },
   };
@@ -4249,7 +5782,7 @@ function resolveProgressiveAward({ system, task, checkResult }) {
 function difficultyForResult(system, result) {
   const componentId = stringOrNull(result?.componentId ?? result?.systemItemId);
   if (!componentId) return null;
-  const component = normalizeList(system?.components).find((entry) => entry?.id === componentId);
+  const component = resolvedComponentsFor(system).find((entry) => entry?.id === componentId);
   const difficulty = Number(component?.difficulty);
   return Number.isFinite(difficulty) ? difficulty : null;
 }
@@ -4278,10 +5811,6 @@ function hasAwardedResults(resultGroups) {
  *    `normalizeTerminalOutcome` only for the routed failure seam, and d100 outcomes do
  *    not pass through it at all.
  *
- * THE WHOLE PATH SHIPS DORMANT pending issue 683 (decision 8): `_libraryTaskToRuntimeTask`
- * hardcodes `resolutionMode: 'd100'` and `GatheringEconomyView` renders both
- * formula-rolled modes disabled, so no configuration a GM can select reaches it today.
- *
  * @param {?{status?: string, resultGroups?: Array}} outcome
  * @param {?object} system
  * @returns {boolean}
@@ -4292,6 +5821,15 @@ function awardsResultsFor(outcome, system) {
   if (outcome?.failureAward !== true) return false;
   if (!activityPermitsFailureResults(system, 'gathering')) return false;
   return normalizeList(outcome?.resultGroups).length > 0;
+}
+
+function mergeCharacterModifierSnapshots(base, environmental) {
+  const baseSnapshot = plainObjectOrNull(base) ?? {};
+  const environmentalSnapshot = plainObjectOrNull(environmental) ?? {};
+  return {
+    rows: normalizeList(baseSnapshot.rows),
+    events: normalizeList(environmentalSnapshot.events),
+  };
 }
 
 function normalizeVisibilityResult(result) {
@@ -4307,17 +5845,35 @@ function normalizeVisibilityResult(result) {
   };
 }
 
+function routedGroupMatchError({ outcomeName, matched, task, checkResult, allowMissing = false }) {
+  if (matched.length === 1 || (allowMissing && matched.length === 0)) return null;
+  const missing = matched.length === 0;
+  const code = missing ? 'ROUTED_TIER_UNROUTED' : 'ROUTED_TIER_AMBIGUOUS';
+  return misconfiguredOutcome({
+    code,
+    checkResult,
+    diagnostic: {
+      code,
+      ...(missing && { messageKey: 'FABRICATE.Gathering.Diagnostics.RoutedTierUnrouted' }),
+      message: missing
+        ? `Gathering success tier "${outcomeName}" has no result group of that name on task "${task?.name || task?.id || 'unnamed'}"`
+        : `Gathering tier "${outcomeName}" matches more than one result group on task "${task?.name || task?.id || 'unnamed'}"`,
+    },
+  });
+}
+
 function validateTaskConfiguration(task, system = null) {
   const errors = [];
   const resolutionMode = stringOrNull(task?.resolutionMode);
   const resultGroups = normalizeList(task?.resultGroups);
 
   if (
+    resolutionMode !== 'straight' &&
     resolutionMode !== 'routed' &&
     resolutionMode !== 'progressive' &&
     resolutionMode !== 'd100'
   ) {
-    errors.push('Gathering task requires a routed, progressive, or d100 resolution mode');
+    errors.push('Gathering task requires a straight, d100, progressive, or routed resolution mode');
     return errors;
   }
 
@@ -4326,6 +5882,9 @@ function validateTaskConfiguration(task, system = null) {
   }
   if (resolutionMode !== 'd100') {
     errors.push(...validateResultGroupNames(resultGroups));
+    if (hasInvalidFixedResultQuantity(resultGroups)) {
+      errors.push('Gathering results require finite positive numeric quantities');
+    }
   }
 
   if (resolutionMode === 'd100') {
@@ -4347,6 +5906,15 @@ function validateTaskConfiguration(task, system = null) {
       if (!Number.isFinite(quantity) || quantity <= 0) {
         errors.push('D100 gathering item drop rows require positive quantity');
       }
+    }
+  }
+
+  if (resolutionMode === 'straight') {
+    if (resultGroups.length !== 1) {
+      errors.push('Straight gathering task requires exactly one result group');
+    }
+    if (resultGroups.length === 1 && normalizeList(resultGroups[0]?.results).length === 0) {
+      errors.push('Straight gathering task requires at least one result');
     }
   }
 
@@ -4381,6 +5949,19 @@ function validateTaskConfiguration(task, system = null) {
   }
 
   return errors;
+}
+
+function hasInvalidFixedResultQuantity(resultGroups) {
+  return resultGroups.some((group) =>
+    normalizeList(group?.results).some((result) => {
+      if (!result || typeof result !== 'object' || !Object.hasOwn(result, 'quantity')) return false;
+      return (
+        typeof result.quantity !== 'number' ||
+        !Number.isFinite(result.quantity) ||
+        result.quantity <= 0
+      );
+    })
+  );
 }
 
 function validateFailureOutcome(failureOutcome) {
@@ -4602,6 +6183,7 @@ function hasRichGatheringData(environment, task) {
       stringOrNull(value)
     ) ||
     task?.nodes ||
+    normalizeList(environment?.events).length > 0 ||
     Number(task?.staminaCost || 0) > 0 ||
     stringOrNull(task?.riskOverride) ||
     task?.encounters ||
@@ -4611,43 +6193,96 @@ function hasRichGatheringData(environment, task) {
 }
 
 function normalizeRunItems(items, { actor = null } = {}) {
-  return (
-    normalizeList(items)
-      .filter((item) => item && typeof item === 'object')
-      .map((item) => {
-        const source = item.item && typeof item.item === 'object' ? item.item : item;
-        const actorUuid =
-          stringOrNull(item.actorUuid) ||
-          stringOrNull(item.actor?.uuid) ||
-          stringOrNull(actor?.uuid);
-        const itemUuid = stringOrNull(item.itemUuid) || stringOrNull(source.uuid);
-        const componentId = stringOrNull(item.componentId);
-        // Only the SOURCE term is a stack read; `item.quantity` is the run entry's own
-        // awarded amount and is preferred whenever it is present.
-        const quantity = Number(
-          item.quantity ?? readStoredStackQuantity(source, { absentDefault: 1 })
-        );
-        const entry = {
-          actorUuid,
-          itemUuid,
-          quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
-        };
-        if (componentId) entry.componentId = componentId;
-        // Carry name/img (when known) so the run journal can list the gathered items,
-        // not just a count — the awarded item document is in hand here.
-        const name = stringOrNull(item.name) || stringOrNull(source.name);
-        const img = stringOrNull(item.img) || stringOrNull(source.img);
-        if (name) entry.name = name;
-        if (img) entry.img = img;
-        return entry;
-      })
-      // A ref needs SOME identity, but not necessarily a uuid. Planned awards are built
-      // before their documents exist, so a result resolving to a bare component has no
-      // uuid yet and a uuid-only filter discarded it — emptying the chat card and the run
-      // journal for a gather that really did award items. `componentId` is that missing
-      // pre-creation identity.
-      .filter((item) => item.actorUuid && (item.itemUuid || item.componentId))
+  return normalizeList(items)
+    .filter((item) => item && typeof item === 'object')
+    .map((item) => {
+      const source = item.item ?? item;
+      return itemReceipt({
+        ...item,
+        actorUuid: item.actorUuid ?? item.actor?.uuid ?? actor?.uuid,
+        itemUuid: item.itemUuid ?? source.uuid,
+        name: item.name ?? source.name,
+        img: item.img ?? source.img,
+      });
+    })
+    .filter((item) => item.actorUuid && (item.itemUuid || item.componentId));
+}
+
+function gatheringTaskRequiresPlayerCheck(task) {
+  return ['routed', 'progressive'].includes(stringOrNull(task?.resolutionMode));
+}
+
+function versionedEffect(effectId, kind, planned, apply) {
+  return { effectId, kind, planned: cloneJson(planned) ?? null, apply };
+}
+
+function mergeRunEconomyEvidence(run, richEvidence) {
+  if (!richEvidence || typeof richEvidence !== 'object') return run;
+  return {
+    ...run,
+    economyEvidence: {
+      ...plainObjectOrNull(run?.economyEvidence),
+      ...richEvidence,
+    },
+  };
+}
+
+function versionedJournalOutcome(response) {
+  if (!response || typeof response !== 'object') return null;
+  const outcome = { ...response };
+  delete outcome.run;
+  outcome.success ??= outcome.accepted === true;
+  return cloneJson(outcome);
+}
+
+function refreshVersionedTerminalResponse(
+  response,
+  run,
+  { opaqueBlind, createdResults, usedTools, checkResult }
+) {
+  if (!response || typeof response !== 'object') return asVersionedGatheringResult(response);
+  const publicRun = opaqueBlind
+    ? redactBlindTerminalRun(run)
+    : enrichPublicTerminalRun(stripRuntimeSnapshotFromRun(run), {
+        createdResults,
+        usedTools,
+        checkResult,
+      });
+  return {
+    ...response,
+    success: true,
+    runStatus: run?.status ?? response.runStatus,
+    run: publicRun,
+  };
+}
+
+function asVersionedGatheringResult(result) {
+  if (!result || typeof result !== 'object') return versionedGatheringFailure('Gathering failed.');
+  if (Object.hasOwn(result, 'success')) return result;
+  return { ...result, success: result.accepted === true };
+}
+
+function versionedGatheringFailure(message, code = 'GATHERING_EXECUTION_REFUSED') {
+  return {
+    success: false,
+    accepted: false,
+    started: false,
+    state: 'blocked',
+    code,
+    message,
+    blockedReasons: [],
+  };
+}
+
+function gatheringAuthorityUnavailable() {
+  return versionedGatheringFailure(
+    'Versioned gathering authority is unavailable.',
+    'AUTHORITY_UNAVAILABLE'
   );
+}
+
+function gatheringLifecycleError(message, code, cause = null) {
+  return new GatheringLifecycleExecutionError(message, code, cause);
 }
 
 function normalizeOutcomeText(value) {

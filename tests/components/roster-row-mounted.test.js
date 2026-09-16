@@ -9,7 +9,7 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-roster-row-',
   rawModules: ['src/ui/svelte/util/foundryBridge.js'],
-  compiledModules: ['src/ui/svelte/apps/manager/RosterRow.svelte'],
+  compiledModules: ['src/ui/svelte/components/StatusToggle.svelte', 'src/ui/svelte/apps/manager/RosterRow.svelte'],
   componentPath: 'src/ui/svelte/apps/manager/RosterRow.svelte'
 });
 

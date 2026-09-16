@@ -11,7 +11,7 @@ import {
 } from './models/toolDisplay.js';
 import { findById, getDefinitionIndex } from './utils/definitionIndex.js';
 import { RecipeManager } from './systems/RecipeManager.js';
-import { CompendiumImporter } from './systems/CompendiumImporter.js';
+import { CompendiumImporter, scopeStoreDelegate } from './systems/CompendiumImporter.js';
 import { CraftingEngine } from './systems/CraftingEngine.js';
 import { CraftingSystemManager } from './systems/CraftingSystemManager.js';
 import { CraftingRunManager } from './systems/CraftingRunManager.js';
@@ -20,6 +20,13 @@ import { SalvageRunManager } from './systems/SalvageRunManager.js';
 import { runContainersChanged } from './systems/runFlagInvalidation.js';
 import { GatheringEnvironmentStore } from './systems/GatheringEnvironmentStore.js';
 import { GatheringRealmStore } from './systems/GatheringRealmStore.js';
+import { CharacterLibrariesStore } from './systems/CharacterLibrariesStore.js';
+import {
+  createComponentScopeStore,
+  createEssenceScopeStore,
+  createToolScopeStore
+} from './systems/worldScopeStores.js';
+import { createWorldVocabularyStore } from './systems/WorldVocabularyStore.js';
 import { CurrencyConfigStore } from './systems/CurrencyConfigStore.js';
 import { GatheringPartyStore } from './systems/GatheringPartyStore.js';
 import { GatheringLocationService } from './systems/GatheringLocationService.js';
@@ -37,8 +44,10 @@ import { EVENT_SCENE_SOCKET, createEventSceneTrigger, routeEventSceneSocketMessa
 import { createDepletionRateLimiter, createGatheringNodeDepletionWriter, routeGatheringNodeDepleteMessage } from './systems/gatheringNodeSocket.js';
 import { GatheringBlindRunStore } from './systems/GatheringBlindRunStore.js';
 import { createBlindStartRateLimiter, createGatheringBlindStartWriter, routeGatheringBlindStartMessage } from './systems/gatheringBlindRunSocket.js';
+import { applyAuthoredComplications, buildComplicationMacroContext, createComplicationDeliveryDedupe, createComplicationDeliveryWriter, createComplicationRateLimiter, isRunnableComplicationMacro, routeComplicationDeliveryMessage } from './systems/complicationSocket.js';
+import { buildGmComplicationCardContent, gmComplicationCardEntries, rollGmComplicationEffect } from './systems/complicationRuntime.js';
 import { renderDialog, viewScene, localize as bridgeLocalize, enrichToHtml, primeEnricherCache } from './ui/svelte/util/foundryBridge.js';
-import { promptBulkCheckRoll } from './ui/svelte/apps/crafting/rollPrompt.js';
+import { buildInteractiveRollOptions, promptBulkCheckRoll, promptCheckRoll } from './ui/svelte/apps/crafting/rollPrompt.js';
 import { RecipeVisibilityService } from './systems/RecipeVisibilityService.js';
 import { runStartupMaintenance } from './systems/startupMaintenance.js';
 import { composeStartupPassList } from './systems/startupPassComposition.js';
@@ -50,7 +59,28 @@ import { BulkSalvageService } from './systems/BulkSalvageService.js';
 import { BulkDestroyService } from './systems/BulkDestroyService.js';
 import { applyBulkChatVisibility } from './systems/bulkChatVisibility.js';
 import { AlchemyListingBuilder } from './systems/AlchemyListingBuilder.js';
-import { resolveCheckFormulaDisplay } from './systems/checkRoll.js';
+import {
+  evaluatePreparedCraftingCheck,
+  evaluatePreparedRunCheck,
+  postCheckRollHandoff,
+  resolveCheckFormulaDisplay,
+  runFormulaPassFail,
+  runFormulaProgressive,
+} from './systems/checkRoll.js';
+import { createFoundryJournalRunAuthority } from './systems/journalRunAuthority.js';
+import {
+  JOURNAL_RUN_SOCKET_KIND,
+  authorityUnavailableAvailability,
+  authorityUnavailableRefusal,
+  createGatheringJournalRunOperations,
+  createJournalExecutionReconstructor,
+  createJournalRunCommandService,
+  createManagerMutation,
+  executePublicCraft,
+  executePublicGather,
+  installCraftingJournalRunAuthority,
+  installGatheringJournalRunAuthority,
+} from './systems/journalRunCommands.js';
 import { SignatureValidator } from './systems/SignatureValidator.js';
 import { Recipe } from './models/Recipe.js';
 import { Ingredient } from './models/Ingredient.js';
@@ -65,7 +95,7 @@ import {
 import { resolveAlchemySubmissions } from './utils/alchemySubmissions.js';
 // The item -> managed-component resolver the crafting listing's summary phase tallies held
 // stacks with (issue 1075), shared with InventoryListingBuilder's owned-row matching.
-import { findMatchingComponent } from './utils/essenceResolver.js';
+import { findMatchingComponent, resolveItemEssences } from './utils/essenceResolver.js';
 import { progressiveOrderKey } from './utils/progressiveResultOrder.js';
 import { findStackableMatch } from './utils/sourceUuid.js';
 import { STARTUP_PHASES, createStartupMarks } from './utils/startupMarks.js';
@@ -107,16 +137,39 @@ import { playerExtensions } from './ui/playerExtensions.js';
 import { applyCurrentFabricateTheme } from './ui/theme.js';
 import { findItemsDirectoryActionsContainer, syncGatheringDirectoryButton } from './ui/itemsDirectoryButtons.js';
 import { buildCompendiumImportContextOption, promptSelectCraftingSystem } from './ui/compendiumDirectoryContext.js';
-import { registerFabricateSettings, getSetting, setSetting, SETTING_KEYS, FABRICATE_SETTINGS_NAMESPACE, RECIPE_ITEM_FLAG_STAMP_TARGET, COMPONENT_FLAG_STAMP_TARGET, TOOL_FLAG_STAMP_TARGET, OWNED_ITEM_COMPONENT_STAMP_TARGET } from './config/settings.js';
+import { registerFabricateSettings, getSetting, setSetting, SETTING_KEYS, FABRICATE_SETTINGS_NAMESPACE, RECIPE_ITEM_FLAG_STAMP_TARGET, COMPONENT_FLAG_STAMP_TARGET, TOOL_FLAG_STAMP_TARGET, OWNED_ITEM_COMPONENT_STAMP_TARGET, WORLD_SCOPE_IDENTITY_FLAG_TARGET, WORLD_ESSENCE_MERGE_FLAG_TARGET } from './config/settings.js';
 import { notifyUnresolvedItemDescriptions } from './config/repairItemData.js';
-import { setFabricateFlag } from './config/flags.js';
+import { getFabricateFlag, setFabricateFlag } from './config/flags.js';
 import { isPlayerCharacterActor } from './config/playerCharacterTypes.js';
 import { handleFabricateSettingChange } from './config/settingChangeBridge.js';
 import { configureItemStackQuantityPath, probeStackQuantityPath, stackQuantityAdvisory } from './systems/itemStackQuantity.js';
 import { stackQuantityPathPresetFor } from './config/stackQuantityPathPresets.js';
 import { FABRICATE_HOOKS } from './config/hooks.js';
 import { MIGRATION_DEFERRAL_REASONS, MigrationRunner } from './migration/MigrationRunner.js';
+// ALIASED, because the facade below exposes a PUBLIC method of the same name that wraps this
+// one with the active-GM gate and the pending-map check. Two same-named callables in one
+// module is a readability trap on a public surface: a reader of `applyWorldScope...` cannot
+// tell which is which, and the wrong one is the ungated one.
+import {
+  buildWorldEssenceMergeRemapNotice,
+  forcedReplacementFlagPath,
+  hasPendingWorldEssenceMerge,
+  mayClearWorldEssenceMergeMap,
+  mayClearWorldScopeRekeyMap,
+  remapCompletedCleanly,
+  remapWorldEssenceIdentityFlags as remapEssenceFlagsAcrossActors,
+  remapWorldScopeIdentityFlags as remapIdentityFlagsAcrossActors,
+} from './migration/remapWorldScopeIdentityFlags.js';
+import { hasPendingWorldScopeRekey } from './systems/worldScopeRekeyPending.js';
+// THE SHARED READ SEAM (issue 1370). Seven call sites in this file enter through it, and this
+// file is outside the CI lint glob - so an omitted import here is a ReferenceError that no
+// lint, no test and no build reports. `tests/main-undefined-identifiers.test.js` is the guard.
+import { resolvedComponentsFor, resolvedToolsFor } from './systems/scopedEntityReads.js';
+import { readPersistedCraftingSystems } from './systems/SettingsCraftingDefinitionRepository.js';
+import { reportWorldIdentityDrift } from './systems/worldIdentityDrift.js';
 import { restampOwnedItemComponentIdentity } from './migration/restampOwnedItemComponentIdentity.js';
+import { buildWorldEssenceMergeNotice, buildWorldScopeEntityNotice, buildWorldScopeIdentityRemapNotice, describeWorldIdentityDrift } from './migration/worldScopeEntityNotice.js';
+import { composeMigrationNotice, logMigrationNoticeDetail } from './migration/migrationNoticeDetail.js';
 import { buildMigrationRecoveryPrompt } from './migration/migrationRecoveryPrompt.js';
 import { buildRetiredCraftingModNotice } from './migration/migrateRetireCraftingModToken.js';
 import { ItemPilesIntegration } from './integrations/ItemPilesIntegration.js';
@@ -125,6 +178,94 @@ import {
   ActorPropertyCoinSpender,
 } from './systems/CoinSpenders.js';
 import { Pf2eInventoryCoinAdapter } from './systems/Pf2eInventoryCoinAdapter.js';
+import {
+  AFFORDABILITY_MESSAGE_KEYS,
+  CHECK_ROLL_MESSAGE_KEYS,
+  COMPANION_CONTRACT,
+  COMPANION_OUTCOMES,
+  COMPONENT_AWARD_MESSAGE_KEYS,
+  CURRENCY_CREDIT_MESSAGE_KEYS,
+  KNOWLEDGE_GRANT_MESSAGE_KEYS,
+  affordabilityResult,
+  bulkCheckDecisionResult,
+  checkRollResult,
+  componentAwardResult,
+  currencyCreditResult,
+  gatePooledActorUuids,
+  knowledgeGrantResult,
+  pooledHoldingsConsumeResult,
+  pooledHoldingsReadResult
+} from './systems/companionContract.js';
+// Aliased on import because the facade delegator below carries the SAME name. A class
+// method is not a bare identifier in its own body, so the unaliased import would resolve
+// correctly and read as a recursive call to every human who met it.
+import { grantRecipeKnowledge as grantRecipeKnowledgeToActor } from './systems/companionKnowledgeGrant.js';
+// Aliased for the same reason as the grant above.
+import { awardComponents as awardComponentsToActor } from './systems/companionComponentAward.js';
+// Aliased for the same reason as the grant above: both facade delegators carry the SAME
+// names as the free functions they delegate to.
+import {
+  resolveBulkCheckDecision as resolveStandaloneBulkCheckDecision,
+  rollActorCheck as rollStandaloneActorCheck
+} from './systems/companionCheckRoll.js';
+// Aliased for the same reason again (issue 1342): both facade delegators carry the SAME names
+// as the leaves they delegate to, and the alias says which side of the boundary is which.
+import { readPooledHoldings as readPooledHoldingsAcrossActors } from './systems/companionPooledHoldings.js';
+import { consumePooledHoldings as consumePooledHoldingsFromActors } from './systems/companionPooledConsumption.js';
+
+/**
+ * `rollActorCheck`'s OWN refusal strings for the shared authorization preamble.
+ *
+ * Hoisted to module scope so the delegator reads `this._requireGmActor(actorId, KEYS)` on one
+ * line rather than restating a four-line object literal — the same duplicated run between
+ * `src/main.js` and its harness mirror that the shipped two members already carry.
+ *
+ * There is deliberately NO second pair for `resolveBulkCheckDecision`: that member takes no
+ * `actorId`, never reaches the preamble, and derives its own `gmOnly` string from its message
+ * table, so a pair for it would be dead.
+ */
+const ROLL_ACTOR_CHECK_GATE_KEYS = Object.freeze({
+  gmOnlyKey: CHECK_ROLL_MESSAGE_KEYS[COMPANION_OUTCOMES.gmOnly],
+  noActorKey: CHECK_ROLL_MESSAGE_KEYS[COMPANION_OUTCOMES.noActor]
+});
+
+/**
+ * `awardComponents`' and `creditCurrency`'s OWN refusal strings, hoisted for the same reason
+ * (issue 1301).
+ *
+ * Two pairs and not one: the whole point of parameterising the preamble is that a refused
+ * award reports itself in the award's words and a refused credit in the credit's, and a shared
+ * pair would be the cross-member vocabulary leak the parameter exists to prevent.
+ */
+const AWARD_COMPONENTS_GATE_KEYS = Object.freeze({
+  gmOnlyKey: COMPONENT_AWARD_MESSAGE_KEYS[COMPANION_OUTCOMES.gmOnly],
+  noActorKey: COMPONENT_AWARD_MESSAGE_KEYS[COMPANION_OUTCOMES.noActor]
+});
+
+const CREDIT_CURRENCY_GATE_KEYS = Object.freeze({
+  gmOnlyKey: CURRENCY_CREDIT_MESSAGE_KEYS[COMPANION_OUTCOMES.gmOnly],
+  noActorKey: CURRENCY_CREDIT_MESSAGE_KEYS[COMPANION_OUTCOMES.noActor]
+});
+
+/**
+ * The two pooled members carry NO hoisted refusal-string trio, and that absence is deliberate
+ * (issue 1342).
+ *
+ * Every member above hands its preamble its own keys because the SINGULAR preamble's `message`
+ * is read: `resetActorKnowledge` answers `{ success: false, message: gate.message }` verbatim.
+ * The SET-valued preamble's is not. Both pooled delegators branch on `gate.outcome` alone and
+ * answer through their own result builder, which resolves the member's own message table by
+ * outcome — so a key threaded through the gate could only ever restate, in a second place, the
+ * string the builder is about to derive. Three parameters, two frozen constants and a mirror
+ * copy of both bought exactly one failure mode: someone editing a string. The builder is the one
+ * home of a member's words, and the gate now answers `{ actors, outcome, messageData }`.
+ */
+import {
+  affordsCurrencySpends,
+  buildCurrencyAffordProbe,
+  checkWorldCurrencyAffordability,
+  creditWorldCurrency,
+} from './systems/currencyAffordance.js';
 import { isGatheringActorSelectableByUser } from './config/preferencesCleanup.js';
 import { registerFragmentDiscoveryHook } from './systems/FragmentDiscoveryHook.js';
 import { registerRecipeItemLearningHook } from './systems/RecipeItemLearningHook.js';
@@ -172,6 +313,358 @@ const gatheringDepletionRateLimiter = createDepletionRateLimiter();
 // Separate budget for the blind-start relay (issue 901) so a burst of gathers and
 // a burst of starts cannot starve one another through a shared allowance.
 const gatheringBlindStartRateLimiter = createBlindStartRateLimiter();
+// Third budget, for the complication relay (issue 1286). Charged per MESSAGE, and one
+// resolution — including a whole bulk salvage — emits exactly one.
+const complicationDeliveryRateLimiter = createComplicationRateLimiter();
+// Suppresses a complication re-delivered to THIS context. Module scope for the same
+// reason the limiters are: a per-message set would remember nothing. It cannot cover an
+// elected GM with the world open in two tabs — two realms, two sets — which is a stated,
+// accepted residual rather than an oversight (see `complicationSocket.js`).
+const complicationDeliveryDedupe = createComplicationDeliveryDedupe();
+
+async function resolveJournalSourceActors(run, payload = {}, fallbackActor = null) {
+  const supplied = Array.isArray(payload.sourceActorUuids) ? payload.sourceActorUuids : null;
+  const persisted = Array.isArray(run?.componentSourceActorUuids)
+    ? run.componentSourceActorUuids
+    : null;
+  const uuids = persisted ?? supplied ?? [];
+  const actors = [];
+  for (const uuid of uuids) {
+    try {
+      const actor = await globalThis.fromUuid?.(uuid);
+      if (actor) actors.push(actor);
+    } catch (_error) {
+      return null;
+    }
+  }
+  return actors.length > 0 ? actors : (fallbackActor ? [fallbackActor] : []);
+}
+
+function journalSourcesOwnedBy(sender, actors) {
+  return sender?.isGM === true || actors.every(
+    (actor) => actor?.testUserPermission?.(sender, 'OWNER') === true
+  );
+}
+
+function consumeJournalGrant(service, grant, context) {
+  return service?.consumeExecutionGrant?.(grant, context) ?? null;
+}
+
+function createCraftingJournalOperations(fabricate, getService) {
+  const authorizeRollHandoff = async ({ actor, run, payload, sender, privateEvaluation }) => {
+    const componentSourceActors = await resolveJournalSourceActors(run, payload, actor);
+    if (!componentSourceActors) return false;
+    const recipeId = privateEvaluation?.recipeId ?? run?.recipeId;
+    const recipe = fabricate.recipeManager?.getRecipe?.(recipeId) ?? null;
+    if (!recipe) return false;
+    if (sender?.isGM === true) return true;
+    if (!sender) return false;
+    return Boolean(
+      fabricate.recipeVisibilityService?.getVisibleRecipes?.({
+        viewer: sender,
+        craftingActor: actor,
+        componentSourceActors,
+        craftingSystemId: recipe.craftingSystemId,
+      })?.some?.((candidate) => candidate?.recipe?.id === recipe.id)
+    );
+  };
+  const managerMutation = createManagerMutation((grant, context) =>
+    consumeJournalGrant(getService(), grant, context));
+  return {
+    getRun: ({ actor, runId }) => {
+      fabricate.craftingRunManager?.invalidateCache?.(actor?.id);
+      return fabricate.craftingRunManager?.getRun?.(actor, runId)
+        ?? fabricate.craftingRunManager?.getActiveRun?.(actor, runId)
+        ?? null;
+    },
+    authorize: async ({ actor, run, payload, sender }) => {
+      const sourceActors = await resolveJournalSourceActors(run, payload, actor);
+      return Boolean(sourceActors && journalSourcesOwnedBy(sender, sourceActors));
+    },
+    prepareStart: async ({ actor, payload, preparationGrant, requestId }) => {
+      if (payload.activityKind !== 'alchemy') return { success: true, payload };
+      const sourceActors = await resolveJournalSourceActors(null, payload, actor);
+      if (!sourceActors) return { success: false, reason: 'source-actor-not-found' };
+      const system = fabricate.craftingSystemManager?.getSystem?.(payload.craftingSystemId) ?? null;
+      if (!system || system.resolutionMode !== 'alchemy') {
+        return { success: false, reason: 'alchemy-system-not-found' };
+      }
+      const submitted = Array.isArray(payload.submittedItems) ? payload.submittedItems : [];
+      const componentIds = submitted.map((record) => record?.componentId);
+      if (componentIds.some((id) => typeof id !== 'string' || id.length === 0)) {
+        return { success: false, reason: 'alchemy-submission-invalid' };
+      }
+      const canonicalSubmissions = resolveAlchemySubmissions(
+        sourceActors,
+        resolvedComponentsFor(system),
+        componentIds,
+        payload.craftingSystemId
+      );
+      if (
+        canonicalSubmissions.length !== submitted.length ||
+        canonicalSubmissions.some((record, index) => record.item?.uuid !== submitted[index]?.itemUuid)
+      ) {
+        return { success: false, reason: 'alchemy-submission-invalid' };
+      }
+      const prepare = fabricate.craftingEngine?.prepareVersionedAlchemyStart;
+      if (typeof prepare !== 'function') return { success: false, reason: 'unsupported-operation' };
+      const prepared = await prepare.call(fabricate.craftingEngine, {
+        actor,
+        sourceActors,
+        craftingSystemId: payload.craftingSystemId,
+        submittedItems: canonicalSubmissions,
+        executionGrant: preparationGrant,
+        requestId,
+      });
+      if (!prepared?.matched) {
+        return {
+          success: true,
+          executionOperation: 'executeAlchemyFizzle',
+          payload,
+          trustedContext: {
+            ...prepared,
+            alchemySubmittedItems: canonicalSubmissions,
+          },
+        };
+      }
+      return {
+        success: true,
+        payload: {
+          ...payload,
+          recipeId: prepared.recipeId,
+          selectionPlan: prepared.selectionPlan,
+        },
+        trustedContext: {
+          ...prepared,
+          alchemySubmittedItems: canonicalSubmissions,
+        },
+      };
+    },
+    start: async ({ actor, payload, executionGrant, requestId, sender }) => {
+      const sourceActors = await resolveJournalSourceActors(null, payload, actor);
+      if (!sourceActors) return { success: false, reason: 'source-actor-not-found' };
+      const start = fabricate.craftingEngine?.startVersionedRun;
+      if (typeof start !== 'function') return { success: false, reason: 'unsupported-operation' };
+      return start.call(fabricate.craftingEngine, {
+        viewer: sender,
+        actor,
+        sourceActors,
+        recipeId: payload.recipeId,
+        selectionPlan: payload.selectionPlan,
+        completionMode: payload.completionMode,
+        executionGrant,
+        requestId,
+      });
+    },
+    executeAlchemyFizzle: async ({ actor, payload, executionGrant, requestId, sender }) => {
+      const sourceActors = await resolveJournalSourceActors(null, payload, actor);
+      if (!sourceActors) return { success: false, reason: 'source-actor-not-found' };
+      const system = fabricate.craftingSystemManager?.getSystem?.(payload.craftingSystemId) ?? null;
+      const submitted = Array.isArray(payload.submittedItems) ? payload.submittedItems : [];
+      const submittedItems = resolveAlchemySubmissions(
+        sourceActors,
+        resolvedComponentsFor(system),
+        submitted.map((record) => record?.componentId),
+        payload.craftingSystemId
+      );
+      if (
+        submittedItems.length !== submitted.length ||
+        submittedItems.some((record, index) => record.item?.uuid !== submitted[index]?.itemUuid)
+      ) {
+        return { success: false, reason: 'alchemy-submission-invalid' };
+      }
+      const execute = fabricate.craftingEngine?.executeVersionedAlchemyFizzle;
+      if (typeof execute !== 'function') return { success: false, reason: 'unsupported-operation' };
+      return execute.call(fabricate.craftingEngine, {
+        viewer: sender,
+        actor,
+        sourceActors,
+        craftingSystemId: payload.craftingSystemId,
+        submittedItems,
+        executionGrant,
+        requestId,
+      });
+    },
+    describeCheck: async ({ actor, run, payload, sender, preparationGrant, requestId }) => {
+      const componentSourceActors = await resolveJournalSourceActors(run, payload, actor);
+      if (!componentSourceActors) return { required: false, blocked: 'source-actor-not-found' };
+      const describe = fabricate.craftingEngine?.describeVersionedStageCheck;
+      if (typeof describe !== 'function') {
+        return { required: false, blocked: 'unsupported-operation' };
+      }
+      const descriptor = await describe.call(fabricate.craftingEngine, {
+        actor,
+        componentSourceActors,
+        runId: run.id,
+        selectionPlan: payload.selectionPlan,
+        preparationGrant,
+        requestId,
+      });
+      if (!descriptor?.required) return descriptor;
+      const visible = await authorizeRollHandoff({
+        actor, run, payload, sender, privateEvaluation: descriptor.privateEvaluation,
+      });
+      if (visible) return descriptor;
+      // The engine describes the check on the GM. Only the attested initiator's
+      // entitlement permits its subject or modifiers to enter the initial reply.
+      // An unnamed descriptor uses the local prompt's generic check title.
+      return {
+        ...descriptor,
+        publicPrompt: {
+          allowsSituationalModifier: descriptor.publicPrompt?.allowsSituationalModifier === true,
+          allowAdvantage: descriptor.publicPrompt?.allowAdvantage === true,
+        },
+      };
+    },
+    evaluateCheck: async ({ actor, privateEvaluation, decision, sender }) => {
+      const componentSourceActors = await resolveJournalSourceActors(null, {
+        sourceActorUuids: privateEvaluation?.componentSourceActorUuids,
+      }, actor) ?? [];
+      const recipe = fabricate.recipeManager?.getRecipe?.(privateEvaluation?.recipeId) ?? null;
+      const visible = sender?.isGM === true || Boolean(
+        recipe && fabricate.recipeVisibilityService?.getVisibleRecipes?.({
+          viewer: sender,
+          craftingActor: actor,
+          componentSourceActors,
+          craftingSystemId: recipe.craftingSystemId,
+        })?.some?.((candidate) => candidate?.recipe?.id === recipe.id)
+      );
+      return evaluatePreparedCraftingCheck(privateEvaluation, actor, decision, {
+        secret: !visible,
+      });
+    },
+    authorizeRollHandoff,
+    execute: async ({ actor, run, payload, executionGrant, requestId, expectedRevision, sender }) => {
+      const componentSourceActors = await resolveJournalSourceActors(run, payload, actor);
+      if (!componentSourceActors) return { success: false, reason: 'source-actor-not-found' };
+      const execute = fabricate.craftingEngine?.executeVersionedStage;
+      if (typeof execute !== 'function') return { success: false, reason: 'unsupported-operation' };
+      return execute.call(fabricate.craftingEngine, {
+        viewer: sender,
+        actor,
+        componentSourceActors,
+        runId: run.id,
+        expectedRevision,
+        selectionPlan: payload.selectionPlan,
+        trigger: payload.trigger === 'worldTime' ? 'worldTime' : 'manual',
+        executionGrant,
+        requestId,
+      });
+    },
+    beginStep: async ({ actor, run, payload, executionGrant, requestId, expectedRevision, sender }) => {
+      const componentSourceActors = await resolveJournalSourceActors(run, payload, actor);
+      if (!componentSourceActors) return { success: false, reason: 'source-actor-not-found' };
+      const begin = fabricate.craftingEngine?.beginVersionedStage;
+      if (typeof begin !== 'function') return { success: false, reason: 'unsupported-operation' };
+      return begin.call(fabricate.craftingEngine, {
+        viewer: sender,
+        actor,
+        componentSourceActors,
+        runId: run.id,
+        expectedRevision,
+        selectionPlan: payload.selectionPlan,
+        executionGrant,
+        requestId,
+      });
+    },
+    cancel: async ({ actor, run, payload, executionGrant, requestId, expectedRevision }) => {
+      const componentSourceActors = await resolveJournalSourceActors(run, payload, actor);
+      if (!componentSourceActors) return { success: false, reason: 'source-actor-not-found' };
+      const cancel = fabricate.craftingEngine?.cancelVersionedRun;
+      if (typeof cancel !== 'function') return { success: false, reason: 'unsupported-operation' };
+      return cancel.call(fabricate.craftingEngine, {
+        actor,
+        runId: run.id,
+        expectedRevision,
+        executionGrant,
+        requestId,
+      });
+    },
+    pause: (args) => managerMutation(args, 'pause', () =>
+      fabricate.craftingRunManager?.pauseRun?.(args.actor, args.runId, {
+        expectedRevision: args.expectedRevision,
+      })),
+    resume: (args) => managerMutation(args, 'resume', () =>
+      fabricate.craftingRunManager?.resumeRun?.(args.actor, args.runId, {
+        expectedRevision: args.expectedRevision,
+      })),
+    setCompletionMode: (args) => managerMutation(args, 'setCompletionMode', () =>
+      fabricate.craftingRunManager?.setCompletionMode?.(
+        args.actor,
+        args.runId,
+        args.payload.completionMode,
+        { expectedRevision: args.expectedRevision }
+      )),
+    setSelection: (args) => {
+      const recipe = fabricate.recipeManager?.getRecipe?.(args.run.recipeId);
+      const step = recipe?.getExecutionSteps?.()?.[args.payload.stepIndex];
+      const selection = args.payload.selectionPlan ?? {};
+      const selectedId = String(selection.selectedIngredientSetId ?? '').trim();
+      const selectedSet = step?.ingredientSets?.find((set) => set.id === selectedId);
+      if (!selectedSet) return { success: false, reason: 'ingredient-set-not-found' };
+      // This callback runs inside the authority claim, after actor/source ownership
+      // and revision checks. Snapshot the authored route here, never client evidence.
+      return managerMutation(args, 'setSelection', () =>
+        fabricate.craftingRunManager?.setStepSelectionPlan?.(
+          args.actor,
+          args.runId,
+          args.payload.stepIndex,
+          {
+            ...selection,
+            selectedIngredientSetId: selectedSet.id,
+            selectedRequirementSnapshot: selectedSet.toJSON?.() ?? selectedSet,
+          },
+          { expectedRevision: args.expectedRevision }
+        ));
+    },
+  };
+}
+
+function createJournalCommandsForFabricate(fabricate) {
+  const authority = createFoundryJournalRunAuthority({
+    reconstructExecutions: createJournalExecutionReconstructor({
+      getCraftingRunManager: () => fabricate.craftingRunManager,
+      getGatheringRunManager: () => fabricate.gatheringRunManager,
+    }),
+    // A refusal that has LIFTED invalidates every surface that captured it. The Journal reads
+    // availability when it builds its listing, so a `claim-held` captured while a command ran
+    // would otherwise keep refusing every run until something unrelated rebuilt the view
+    // (issue 1648, M25). Broadcast the lift, never the refusal: a refusal is true while it
+    // holds, and announcing it would only repaint the Journal mid-command.
+    onAvailabilityRestored: () => Hooks.callAll('fabricate.journalRunAuthorityRestored'),
+  });
+  let service = null;
+  service = createJournalRunCommandService({
+    authority,
+    operations: {
+      crafting: createCraftingJournalOperations(fabricate, () => service),
+      gathering: createGatheringJournalRunOperations({
+        getEngine: () => gatheringEngine,
+        runManager: fabricate.gatheringRunManager,
+        getService: () => service,
+        getUser: (userId) => game.users?.get(userId) ?? null,
+      }),
+    },
+    currentUser: () => game.user,
+    activeGM: () => game.users?.activeGM ?? null,
+    getUser: (userId) => game.users?.get(userId) ?? null,
+    resolveUuid: (uuid) => globalThis.fromUuid?.(uuid),
+    emit: (message, options) => game.socket?.emit(EVENT_SCENE_SOCKET, message, options ?? {}),
+    randomId: () => foundry.utils.randomID(),
+    promptCheck: (descriptor) => promptCheckRoll({
+      name: descriptor?.label,
+      activity: descriptor?.label,
+      allowAdvantage: descriptor?.allowAdvantage === true,
+      modifierChoice: descriptor?.modifierChoice ?? null,
+    }),
+    postRollHandoff: (handoff) => postCheckRollHandoff(handoff),
+    getDismissals: () => getSetting(SETTING_KEYS.JOURNAL_RUN_DISMISSALS),
+    setDismissals: (value) => setSetting(SETTING_KEYS.JOURNAL_RUN_DISMISSALS, value),
+    onDismissalsChanged: (payload) => Hooks.callAll('fabricate.journalDismissalsChanged', payload),
+  });
+  installCraftingJournalRunAuthority({ engine: fabricate.craftingEngine, service });
+  return service;
+}
 
 // The GM notice for each way a startup migration pass can DEFER (issue 1242): a corpus
 // could not be read, or could not be written. One complete localized sentence per reason,
@@ -453,6 +946,354 @@ async function applyGatheringBlindStart({ senderId, environmentId, actorUuid, ta
 }
 
 /**
+ * Resolve an addressed actor synchronously, or `null` when it names nothing reachable.
+ *
+ * @param {string} actorUuid
+ * @returns {object|null}
+ */
+function resolveComplicationActor(actorUuid) {
+  const resolve = globalThis.fromUuidSync;
+  if (typeof resolve !== 'function' || !actorUuid) return null;
+  try { return resolve(String(actorUuid)) ?? null; } catch (_) { return null; }
+}
+
+/**
+ * The components the ADDRESSED crafting system holds on THIS client — the corpus the
+ * GM-side re-read resolves against (issue 1286).
+ *
+ * Split out so `applyComplicationDelivery` reads as authorize-then-apply and so the
+ * addressing-only contract itself is enforced by `findAuthoredComplication`, which is pure
+ * and lives in `complicationSocket.js` where it can be driven with real inputs.
+ *
+ * @param {string} craftingSystemId
+ * @returns {object[]}
+ */
+function complicationComponentsFor(craftingSystemId) {
+  return fabricate.craftingSystemManager?.getComponentsForSystem?.(craftingSystemId) ?? [];
+}
+
+/**
+ * The token and speaker the GM side resolves for an addressed actor, NEVER read from the
+ * payload — a payload carries no speaker, so a forged one cannot make the GM's card or a
+ * macro's scope speak as anything.
+ *
+ * Guarded because it is on the delivery path: a `getSpeaker` that threw would otherwise
+ * reject out of the writer's fire-and-forget local apply, where nothing catches it.
+ *
+ * @param {object|null} actor
+ * @returns {{token: object|null, speaker: object|null}}
+ */
+function resolveComplicationSpeaker(actor) {
+  try {
+    const token = actor?.token ?? actor?.getActiveTokens?.(false, true)?.[0] ?? null;
+    return { token, speaker: globalThis.ChatMessage?.getSpeaker?.({ actor, token }) ?? null };
+  } catch (error) {
+    console.warn('Fabricate | Could not resolve a complication speaker', error);
+    return { token: null, speaker: null };
+  }
+}
+
+/**
+ * Run one complication's authored macro on this (elected GM) client, and REPORT what
+ * happened. Never throws: one bad complication must not cost a resolution its others.
+ *
+ * The `type === 'script'` gate is a CALL-SITE check and this is the call site. It sits HERE
+ * rather than on the acting client because compendium ownership is GM-configurable per role,
+ * so a player's `fromUuid` can miss a macro the GM resolves fine, which would silently drop a
+ * valid macro. The uuid is resolved here AND again inside `MacroExecutor.run` for the reason
+ * the essence-property macro records: only settling "is this a script macro at all" before the
+ * try can tell a broken link from a macro that blew up.
+ *
+ * The return is a REPORT rather than the macro's own return value, for two reasons. Nothing in
+ * Fabricate may read a macro's return (`recipes-and-steps/spec.md` § Extend, never constitute),
+ * and the miss has to be reportable: `recipes-and-steps/spec.md` § "The `script` gate is a
+ * call-site check" requires a uuid that does not resolve to a script macro to be "skipped and
+ * reported on the GM-facing output", and a `console.warn` on the one client that can fix the
+ * link is not a report.
+ *
+ * @param {object} args
+ * @returns {Promise<{status: 'none'|'skipped'|'ran'|'failed', macroUuid: string|null}>}
+ */
+async function runComplicationMacro({ craftingSystemId, component, complication, entry, actor, token, speaker, senderUser, resolutionId }) {
+  const macroUuid = complication.macroUuid;
+  if (!macroUuid) return { status: 'none', macroUuid: null };
+  let macro;
+  try {
+    macro = await fromUuid(macroUuid);
+  } catch {
+    macro = null;
+  }
+  if (!isRunnableComplicationMacro(macro)) {
+    console.warn(
+      `Fabricate | Complication "${complication.name || complication.id}" names a macro that could not be resolved to a script macro and was skipped (${macroUuid})`
+    );
+    return { status: 'skipped', macroUuid };
+  }
+  try {
+    await MacroExecutor.run(macroUuid, buildComplicationMacroContext({
+      craftingSystemId, component, complication, entry, actor, token, speaker, senderUser, resolutionId
+    }));
+    return { status: 'ran', macroUuid };
+  } catch (error) {
+    console.error(`Fabricate | Complication macro failed (${macroUuid})`, error);
+    return { status: 'failed', macroUuid };
+  }
+}
+
+/**
+ * Everything the elected GM DOES for one re-read complication: roll a `gmOnly` effect roll,
+ * then run the macro.
+ *
+ * Both are effects of the same authored complication and are independent of each other, so
+ * each carries its own guard and neither can cost the other. The effect roll goes first only
+ * because the card reports it; the macro is explicitly unordered relative to any chat output.
+ *
+ * @param {object} args
+ * @returns {Promise<{effect: object, macro: object}>}
+ */
+async function runComplicationDelivery({ craftingSystemId, component, complication, entry, actor, token, speaker, senderUser, resolutionId }) {
+  const effect = await rollGmComplicationEffect({ complication, actor, speaker });
+  const macro = await runComplicationMacro({
+    craftingSystemId, component, complication, entry, actor, token, speaker, senderUser, resolutionId
+  });
+  return { effect, macro };
+}
+
+/**
+ * Whether the ADDRESSED crafting system narrates to chat at all (issue 1286).
+ *
+ * `features.chatOutput` is a per-system GM toggle and every other Fabricate chat poster
+ * consults it — `CraftingEngine#_postCraftChatMessage`, its salvage sibling,
+ * `GatheringEngine`'s poster and `BulkSalvageService#_postAggregateCard`. The GM
+ * complication card is unambiguously chat, so it consults it too; a GM who turned Fabricate's
+ * narration off would otherwise still be whispered a card per resolution.
+ *
+ * NEITHER the macro NOR the effect roll is gated by this, and the rule is card-vs-dice-message
+ * rather than chat-vs-not-chat. `features.chatOutput` has only ever gated the cards Fabricate
+ * composes about its own resolutions; it has never gated a die. `evaluateCheckRoll` posts a
+ * crafting check roll on `options.interactive` alone (`checkRoll.js`), so a `chatOutput: false`
+ * system already puts check rolls in chat with no card, and gating a complication's effect roll
+ * would make this one path stricter than every other roll in the module. The effect roll is not
+ * orphaned without the card either: its message carries `flavor: effectRoll.label ||
+ * complication.name`, so the GM can attribute it.
+ *
+ * Note the argument is NOT "the roll and its posting are one call, so gating would suppress the
+ * roll itself". That is false here — `evaluateSideRoll` takes an explicit `post` option and a
+ * gated variant that evaluates without posting is one argument away. The reason is the rule
+ * above, not an inability to separate them.
+ *
+ * The toggle is NARROWER than "the card is chat", and deliberately so. What it suppresses is
+ * the result NARRATION Fabricate composes about its own resolutions; it has never been a
+ * request to stop being told that a configuration is broken. A `macroUuid` that does not
+ * resolve to a script macro is a configuration error only the GM can repair, and
+ * `recipes-and-steps/spec.md` § "The `script` gate is a call-site check" requires it to be
+ * "reported on the GM-facing output" without qualifying that on any toggle. So this predicate
+ * does not veto the card: {@link postGmComplicationCard} consults it to choose which ROWS the
+ * card is built from, and a faulted row is reported whichever way it answers.
+ *
+ * Read from THIS client's own copy of the world setting, like every other GM-side re-read on
+ * this path, and defaulted CLOSED for a system that does not resolve — an addressing that
+ * names no system on this client has nothing to narrate about.
+ *
+ * @param {string} craftingSystemId
+ * @returns {boolean}
+ */
+function complicationChatOutputEnabled(craftingSystemId) {
+  return fabricate.craftingSystemManager?.getSystem?.(craftingSystemId)?.features?.chatOutput === true;
+}
+
+/**
+ * Whether one delivered row's macro reports a CONFIGURATION FAULT rather than an outcome.
+ *
+ * `skipped` is a `macroUuid` that did not resolve to a script macro — a broken link, a pack
+ * this client cannot see, or a `chat`-type macro authored where a `script` was meant. `failed`
+ * is a script macro whose body threw. Both are the GM's OWN authorship to repair, and both are
+ * invisible everywhere else: the acting client is never told, and {@link runComplicationMacro}'s
+ * `console.warn` and `console.error` reach only the elected GM's dev tools. `none` (no macro
+ * authored) and `ran` are outcomes rather than faults and report nothing on their own.
+ *
+ * @param {{report?: {macro?: {status?: string}}}} row One applied-complication row.
+ * @returns {boolean}
+ */
+function hasComplicationMacroFault(row) {
+  const status = row?.report?.macro?.status;
+  return status === 'skipped' || status === 'failed';
+}
+
+/**
+ * The GM-only chat card for one delivered resolution — the OUTPUT half of a `gmOnly`
+ * complication (issue 1286).
+ *
+ * `gmOnly` is the AUTHORED DEFAULT, so this is the common case rather than an edge: without
+ * it a `gmOnly` complication with no macro fires, pays the whole socket cost, and produces
+ * nothing observable anywhere.
+ *
+ * ## Every DELIVERED complication gets a row, not only the `gmOnly` ones
+ *
+ * A delivery only reaches this client for a complication that is `gmOnly` OR carries a macro,
+ * so the `visible` rows here are exactly the ones that asked this GM to run something. Their
+ * macro outcome has to be reported somewhere — `recipes-and-steps/spec.md` says the GM-facing
+ * output — and a card reporting "macro skipped" against a complication it does not name would
+ * be unreadable. One whisper per resolution is the price; the alternative is a report the GM
+ * cannot act on.
+ *
+ * ## `features.chatOutput` selects the ROWS; it does not veto the card
+ *
+ * The toggle suppresses per-resolution NARRATION — a card carrying a row for every
+ * complication this GM was asked to run. It is not a request to stop being told that a macro
+ * link is broken. `recipes-and-steps/spec.md` § "The `script` gate is a call-site check"
+ * states without qualification that a uuid which does not resolve to a script macro "is
+ * skipped and reported on the GM-facing output", and this card is the only GM-facing output
+ * there is; a gate that vetoed the card outright left that report in the elected GM's console,
+ * which is the very thing {@link runComplicationMacro}'s docblock refuses to call a report.
+ *
+ * So the gate chooses the SET OF ROWS the card is built from: every delivered row when the
+ * system narrates, and the faulted rows ALONE when it does not. A GM who switched narration
+ * off and has a broken link is whispered a card naming exactly the complications whose macros
+ * did not run, and nothing about the ones that did. `failed` joins `skipped` in
+ * {@link hasComplicationMacroFault} because a macro body that threw is equally the GM's own
+ * authorship to repair and equally invisible anywhere else.
+ *
+ * A surviving row is NOT re-projected for that case, and the residual is stated rather than
+ * hidden: it still carries the acting client's claimed stage and this client's effect roll,
+ * which are narration. That is accepted for two reasons. A fault row naming only a uuid could
+ * not be acted on — the GM has to locate that complication, on that component, in the editor
+ * to fix it — so the identity fields have to survive anyway; and a second, hand-rolled row
+ * model would sit in `main.js`, which cannot be imported under `node --test` and could
+ * therefore only ever be pinned by a text search. The bound that matters is met: this is one
+ * row per broken link, not one card per resolution.
+ *
+ * ## Four steps, in an order that is load-bearing
+ *
+ * 1. **The `chatOutput` gate first, over the ROW SET rather than over the card** — see
+ *    {@link complicationChatOutputEnabled} and the section above. A gated-off system with
+ *    nothing faulted still costs this client nothing at all: the selection is taken from
+ *    `applied` itself, so that case returns before the projection and before any
+ *    localization. The gate has never reached the macro, which has already run by the time
+ *    this is called.
+ * 2. **Speaker before the visibility pass.** `applyBulkChatVisibility` states as a caller
+ *    contract that `chatData.speaker` is already set, so the speaker is built onto `chatData`
+ *    at its construction rather than after it. (V14's `applyMode` reads `speaker.actor` only
+ *    inside its `ic` branch, which the literal `'gmroll'` below cannot reach — the ordering
+ *    is the module's contract, not a live crash on this call site.)
+ * 3. **Visibility before `create`**, through `applyBulkChatVisibility` with an EXPLICIT
+ *    `gmroll` — never `core.rollMode`, which is `scope: "client"` and would be the GM's own
+ *    selector. The legacy `rollMode` CREATE OPTION is honoured only for a message carrying
+ *    rolls and this card carries none, so passing it to `create` would post the card publicly.
+ * 4. **`create` inside the same guard**, so a token the running Foundry cannot map throws
+ *    BEFORE the message exists. Failing closed matters here in a way it does not for the bulk
+ *    card: a GM-only card that could not be made GM-only must not be posted at all.
+ *
+ * The row MODEL is `gmComplicationCardEntries`, in `complicationRuntime.js`, so that a suite
+ * can drive it with rows that disagree; what is left here is the Foundry edge only.
+ *
+ * The whole body is contained, because a complication is strictly downstream of a committed
+ * award and a chat failure must never propagate — and there is nothing to propagate it TO: the
+ * acting client has already returned.
+ *
+ * @param {object} args
+ * @returns {Promise<object|null>} the created message, or null when none was posted.
+ */
+async function postGmComplicationCard({ craftingSystemId, actor, speaker, senderUser, applied = [] }) {
+  try {
+    // The toggle SELECTS rows; it does not veto the card. A configuration error is reported
+    // whatever it says, narration is not. The filter runs over `applied` rather than over the
+    // projected entries so that the suppressed case — gate off, nothing faulted — still
+    // returns before any projection or localization, which is what made an early gate worth
+    // having in the first place.
+    const delivered = Array.isArray(applied) ? applied : [];
+    const reported = complicationChatOutputEnabled(craftingSystemId)
+      ? delivered
+      : delivered.filter((row) => hasComplicationMacroFault(row));
+    if (reported.length === 0) return null;
+    // `gmComplicationCardEntries` — the GM-facing projection (the counterpart to
+    // `publicComplications`, and deliberately the only one that may carry an authored
+    // description or a severity to a GM surface) augmented with what THIS client did, which
+    // is the half no projection of the acting client's report could ever hold.
+    const entries = gmComplicationCardEntries(reported);
+    const content = buildGmComplicationCardContent(
+      { entries, actorName: actor?.name ?? '', reporterName: senderUser?.name ?? '' },
+      (key) => game.i18n?.localize?.(key) ?? key
+    );
+    if (!content) return null;
+
+    const chatData = { author: game.user?.id, speaker, content };
+    applyBulkChatVisibility(chatData, 'gmroll');
+    return await ChatMessage.create(chatData);
+  } catch (error) {
+    console.error('Fabricate | Failed to post the GM complication card', error);
+    return null;
+  }
+}
+
+/**
+ * ELECTED-GM edge for a relayed complication delivery (issue 1286).
+ *
+ * Runs strictly downstream of an award the acting client has already committed, so it
+ * never influences one and never reports back: the acting client has returned. What it
+ * adds is AUTHORITY — the macro runs on a GM client, the GM-only card is authored by a GM,
+ * and both come from the complication the GM's OWN world setting holds.
+ *
+ * The `senderId` is Foundry's server-attested socket sender, never a payload field, and
+ * the actor is re-authorized against THAT user rather than against this client's own
+ * ambient permissions. Each complication is isolated: one that resolves to nothing is
+ * dropped and the rest still run.
+ *
+ * This function is the Foundry EDGE only. The addressing-only re-read, the `script`
+ * discriminant, the macro scope and the per-entry isolation are pure and live in
+ * `complicationSocket.js`, where a test can drive them with real inputs — a source-text pin
+ * on this file cannot tell an exact id match apart from one with a positional fallback.
+ *
+ * @param {object} payload Validated delivery request plus the attested sender.
+ * @returns {Promise<Array<{component: object, complication: object, entry: object,
+ *   report: ?object}>|null>} One row per complication that RESOLVED against this client's
+ *   own record, or null when the delivery was refused outright. Returned for testability and
+ *   symmetry only: the acting client has already returned and nothing reads this.
+ */
+async function applyComplicationDelivery({ senderId, craftingSystemId, actorUuid, resolutionId, complications = [] } = {}) {
+  const senderUser = game.users?.get?.(senderId) ?? null;
+  if (!senderUser) return null;
+  const actor = resolveComplicationActor(actorUuid);
+  // Failing CLOSED is right — nothing may run against an actor whose permissions cannot be
+  // asked — but the drop has to be VISIBLE. `fromUuidSync` resolves a compendium uuid to a
+  // plain index entry, which carries no `testUserPermission` at all, so a perfectly
+  // well-formed delivery addressed at a compendium actor is refused here with no roll, no
+  // macro, no card and, until this line, no trace anywhere for the one client that could
+  // diagnose it.
+  if (!actor || typeof actor.testUserPermission !== 'function') {
+    console.warn('Fabricate | Refused a complication delivery: the addressed actor could not be resolved to a permission-testable document', {
+      senderId, actorUuid
+    });
+    return null;
+  }
+  // Ask the ATTESTED SENDER's own permission, directly. Any predicate whose first
+  // disjunct reads `actor.isOwner` resolves that disjunct against the AMBIENT
+  // `game.user`, which on the elected GM's client (the only client that runs this) owns
+  // every actor in the world. Such a predicate passes for a sender who owns nothing and
+  // never consults the sender at all, reintroducing exactly the escalation the
+  // addressing-only contract exists to remove. The blind-gather relay shipped with that
+  // defect and issue 1288 removed it from `isGatheringActorSelectableByUser`; the rule
+  // it recorded is that NO ownership predicate on a GM-side apply path may read
+  // `isOwner`, so do not reintroduce one here either.
+  if (actor.testUserPermission(senderUser, 'OWNER') !== true) {
+    console.warn('Fabricate | Refused a complication delivery: the sender does not own the addressed actor', {
+      senderId, actorUuid
+    });
+    return null;
+  }
+  const { token, speaker } = resolveComplicationSpeaker(actor);
+  const applied = await applyAuthoredComplications({
+    components: complicationComponentsFor(craftingSystemId),
+    complications,
+    execute: ({ component, complication, entry }) => runComplicationDelivery({
+      craftingSystemId, component, complication, entry, actor, token, speaker, senderUser, resolutionId
+    })
+  });
+  await postGmComplicationCard({ craftingSystemId, actor, speaker, senderUser, applied });
+  return applied;
+}
+
+/**
  * Execute a gathering macro through the shared macro runner.
  *
  * @param {string} macroUuid Macro document UUID.
@@ -583,7 +1424,10 @@ function processFabricateWorldTime(worldTime = Number(game.time?.worldTime || 0)
   return Promise.all(processWorldTimeCallbacksSafely([
     {
       label: 'Crafting',
-      callback: () => game.fabricate?.getCraftingRunManager?.()?.processWorldTime?.(worldTime)
+      callback: async () => {
+        await game.fabricate?.getCraftingRunManager?.()?.processWorldTime?.(worldTime);
+        await game.fabricate?.getCraftingEngine?.()?.processVersionedWorldTime?.({ worldTime });
+      }
     },
     {
       label: 'Salvage',
@@ -627,6 +1471,7 @@ class Fabricate {
     this.craftingRunManager = null;
     this.salvageRunManager = null;
     this._runJournalBuilder = null;
+    this.journalRunCommands = null;
     this.gatheringEnvironmentStore = null;
     this.gatheringNodeDepletionWriter = null;
     this.gatheringBlindRunStore = null;
@@ -714,6 +1559,90 @@ class Fabricate {
       randomID: () => foundry.utils.randomID()
     });
     this.currencyConfigStore.load();
+    // Issue 1308: the world character libraries — the character-prerequisite library and the
+    // modifier library. Constructed and loaded HERE, before both managers, because
+    // `CraftingSystemManager` derives its Valid Id Basis from this store on every normalize; a
+    // manager built ahead of it would prune every reference against an empty basis.
+    //
+    // Note this is NOT where the travel store sits (it is constructed well after the manager).
+    // Copying that placement would be wrong: realms are read on demand, whereas these libraries
+    // are read during normalization itself.
+    this.characterLibrariesStore = new CharacterLibrariesStore({
+      getSetting,
+      setSetting,
+      randomID: () => foundry.utils.randomID()
+    });
+    this.characterLibrariesStore.load();
+    // Issue 1359 (epic 1357): the three WORLD-SCOPE entity stores. Constructed and loaded HERE —
+    // AFTER `registerSettings()`, AFTER `await this._runMigrations()`, and BEFORE both managers —
+    // and the ORDER IS SILENT WHEN WRONG, which is why it is stated rather than left to the
+    // reader. Reading an unregistered key throws inside `ClientSettings##assertSetting`; because
+    // `load()` is guarded, a mis-ordering degrades to a permanently UNSEEDED store and a `null`
+    // Valid Id Basis with no crash and nothing in the console. `CraftingSystemManager` derives
+    // that basis on every normalize, so a manager built ahead of these would prune every world
+    // reference against an empty basis.
+    //
+    // A source-order assertion in `tests/scoped-definition-read-and-basis.test.js` pins it,
+    // because `src/main.js` is not otherwise reachable by a unit test.
+    this.componentScopeStore = createComponentScopeStore({ getSetting, setSetting });
+    this.componentScopeStore.load();
+    this.essenceScopeStore = createEssenceScopeStore({ getSetting, setSetting });
+    this.essenceScopeStore.load();
+    this.toolScopeStore = createToolScopeStore({ getSetting, setSetting });
+    this.toolScopeStore.load();
+    // Issue 1392 (epic 1357, PR 7a): the WORLD VOCABULARY store, beside the three above for
+    // consistency and for the shipped source-order assertion. Its own HARD ordering constraint is
+    // only "after `registerSettings()`", because `ClientSettings#assertSetting` throws on an
+    // unregistered key; the prune-basis rationale above belongs to the three entity stores, and
+    // this store is deliberately wired into no basis at all (`## World Vocabulary` requirement
+    // 6). A mis-order here therefore degrades to a permanently unseeded store, an empty Tags &
+    // Categories screen and a rail badge reading 0 — visible, not destructive.
+    this.worldVocabularyStore = createWorldVocabularyStore({ getSetting, setSetting });
+    this.worldVocabularyStore.load();
+    // 1.30.0 (issue 1370, epic 1357): THE WORLD IDENTITY DRIFT AUDIT, run once per session.
+    //
+    // HERE, AND NOT IN THE MIGRATION'S NOTICE SLOT. That slot sits inside `_runMigrations()`,
+    // which has already returned by the time these three stores load, returns early on a
+    // non-active-GM client, and is guarded on a report that is `null` unless the migration ran
+    // this session. Drift is not a migration event: it appears on the GM's FIRST identity edit
+    // after the migration and every session thereafter, so the audit belongs after the loads and
+    // before either manager — which is also the last point at which nothing has read the union.
+    //
+    // ACTIVE GM, NOT `isGM`. `User#isGM` is `hasRole(ASSISTANT)`, so an `isGM` gate posts this
+    // notice once per assistant as well as once for the full GM.
+    //
+    // INFO, NEVER WARN. Nothing is wrong: the read union re-derives identity from the in-system
+    // record, so this discloses which of the GM's edits the shared world record has not caught up
+    // with. A permanent warning would also redden every View Lab capture, which runs this path on
+    // every build.
+    //
+    // The COMPOSITION is not here, for the same reason the migration's is not: nothing in this
+    // file can be executed by a unit test, and a source-text grep can pin a DISPATCH but never
+    // a SUM.
+    if (game.users?.activeGM?.id === game.user?.id) {
+      const worldIdentityDrift = reportWorldIdentityDrift(readPersistedCraftingSystems(), {
+        components: this.componentScopeStore.corpus(),
+        essences: this.essenceScopeStore.corpus(),
+        tools: this.toolScopeStore.corpus()
+      });
+      // THE FULL LEDGER GOES TO THE CONSOLE, AND FABRICATE HAS TO PUT IT THERE ITSELF.
+      // `ui.notifications.info` defaults `console: true`, but what core logs is the
+      // notification element's own `textContent` - i.e. the CAPPED message it was handed. So
+      // the toast's "the full list is in the console" clause is only true because of this
+      // line; without it a GM with 200 drifted components opens the console and finds the
+      // same truncated sentence, with the withheld records unrecoverable from a running
+      // client. Verified against V14.365.0.
+      //
+      // `info`, NOT `debug`: `console.debug` maps to DevTools' VERBOSE level, which Chromium's
+      // default level filter EXCLUDES. Written through `logMigrationNoticeDetail` because a bare
+      // `console.info(...)` statement is stripped from the release bundle (issue 1737). The View
+      // Lab's console gate is fatal on `error` and `Fabricate |`-prefixed `warning` only.
+      const driftDetail = describeWorldIdentityDrift(worldIdentityDrift);
+      logMigrationNoticeDetail('world identity drift', driftDetail);
+      // CONSOLE ONLY (maintainer, 2026-09-06): the toast this used to raise repeated the whole
+      // drifted list in the notification bar and read as an alarm for a state that is, by its own
+      // copy, harmless. The `info` line above is the whole report; nothing is shown in the UI.
+    }
     this.recipeManager = new RecipeManager({
       getCraftingSystem: (systemId) => this.craftingSystemManager?.getSystem?.(systemId) ?? null,
       getCraftingSystemManager: () => this.craftingSystemManager ?? null,
@@ -776,7 +1705,17 @@ class Fabricate {
       },
       getSetting: (key) => getSetting(key),
       setSetting: (key, value) => setSetting(key, value),
-      isGM: () => game.user?.isGM === true
+      isGM: () => game.user?.isGM === true,
+      // The three world-scope entity stores (issue 1364) resolve lazily through thin delegating
+      // objects, for the environment store's reason above and one of its own. The merge fails
+      // CLOSED on an absent store, so a seam that captured a still-undefined field would make
+      // every world-scope import merge NOTHING and still report success — which is exactly the
+      // failure deleting the `game.fabricate` accessor mirror was meant to end. A delegator closes
+      // over the FIELD rather than an accessor name, so it needs no ordering comment to stay true
+      // and a rename cannot slip past it.
+      componentScopeStore: scopeStoreDelegate(() => this.componentScopeStore),
+      essenceScopeStore: scopeStoreDelegate(() => this.essenceScopeStore),
+      toolScopeStore: scopeStoreDelegate(() => this.toolScopeStore)
     });
     this.craftingEngine = new CraftingEngine(
       this.recipeManager,
@@ -793,6 +1732,7 @@ class Fabricate {
         currencyConfigStore: this.currencyConfigStore
       }
     );
+    this.journalRunCommands = createJournalCommandsForFabricate(this);
 
     // Initialize recipe manager. Both `initialize()` calls deserialize a whole world-setting
     // payload, so this span is the corpus-proportional half of startup.
@@ -955,6 +1895,12 @@ class Fabricate {
           update
         })
     });
+    installGatheringJournalRunAuthority({
+      engine: gatheringEngine,
+      service: this.journalRunCommands,
+      evaluatePreparedRunCheck,
+    });
+    await this.journalRunCommands?.bootstrapJournalRunAuthority?.();
     // Issue 901. A blind run's secret state — the drawn task, its start-time
     // snapshot, and its provisional node reservation — lives in the
     // `gatheringBlindRuns` WORLD setting, which only a GM may update. That is the
@@ -1005,6 +1951,41 @@ class Fabricate {
       store: this.gatheringBlindRunStore,
       relayStart: (args) => this.gatheringBlindStartWriter.start(args)
     });
+    // A complication's GM-only card and its macro must happen on a GM client: a player
+    // cannot author a message as the GM (it would render in the player's own sidebar),
+    // and a macro run on the acting client would carry the acting client's authority.
+    // Relayed over the same `module.fabricate` channel, addressing only — the elected GM
+    // re-reads the authored complication from its own `craftingSystems` record (issue
+    // 1286). On the elected GM's own client the writer applies locally, because a
+    // broadcast excludes the emitter.
+    this.complicationDeliveryWriter = createComplicationDeliveryWriter({
+      isActiveGM: () => game.user?.id === game.users?.activeGM?.id,
+      hasActiveGM: () => !!game.users?.activeGM,
+      // Unlike the blind-start relay this DROPS rather than blocks: a complication is
+      // strictly downstream of a committed award, so refusing it would strand a
+      // completed craft. The award, the player-facing card and the run record are
+      // already written and stay unaffected; only the GM-only card and the macro are
+      // lost, and there is no store to defer them into.
+      onUnroutable: ({ resolutionId }) => console.warn(
+        'Fabricate | Complications were not delivered: no active GM is connected to run them',
+        { resolutionId }
+      ),
+      // Minted here rather than inside the socket module, which touches no Foundry
+      // global. `randomID` and not `Math.random()`.
+      mintResolutionId: () => globalThis.foundry?.utils?.randomID?.(),
+      emitComplications: (message) => game.socket?.emit(EVENT_SCENE_SOCKET, message),
+      // The local-apply branch (this client IS the elected GM) has no socket sender to
+      // attest, so supply the current user — who is, on that branch, the acting user.
+      applyComplications: (payload) => applyComplicationDelivery({ senderId: game.user?.id, ...payload })
+    });
+    // EXPLICIT injection into both engines that fire complications. Each engine also falls
+    // back to `game.fabricate.complicationDeliveryWriter`, but a seam only the fallback ever
+    // satisfies is not a seam: it cannot be substituted in a test that constructs its own
+    // engine, and it makes the wiring invisible at the bootstrap site. Optional-chained
+    // because `craftingEngine` is assigned during `initialize()` and a future reorder must
+    // not be able to take the whole boot down over a narrative beat.
+    this.craftingEngine?.installComplicationDelivery({ writer: this.complicationDeliveryWriter });
+    gatheringEngine?.installComplicationDelivery({ writer: this.complicationDeliveryWriter });
     // Housekeeping that drops entries naming deleted content. Each pass is
     // INDEPENDENTLY guarded (issue 970): they write to actor documents, and a
     // refused or otherwise failed write must never prevent `this.ready` below —
@@ -1076,6 +2057,7 @@ class Fabricate {
       promptRecovery: (context) => this._promptMigrationRecovery(context)
     });
     const summary = await runner.run();
+    const localize = (key, data) => (data ? game.i18n?.format?.(key, data) : game.i18n?.localize?.(key));
 
     // Deferred pass (issue 1242): a corpus could not be read, or a writeback
     // leg failed, so the pass persisted nothing and left `migrationVersion` where it found it.
@@ -1083,17 +2065,16 @@ class Fabricate {
     // to recommend — so it gets its own permanent GM notice rather than the recovery dialog.
     // Placed ABOVE the abort branch because a deferred summary reports `aborted: false`.
     if (summary?.deferred === true) {
-      console.error(`Fabricate | migration pass deferred (${summary.deferredReason})`, summary.deferredError ?? '');
-      if (game.user?.isGM) {
-        // A COMPLETE localized sentence per reason; only the writeback failure instructs a
-        // reload, and that distinction is the point. On a writeback failure the migrations
-        // have already transformed this session's live setting values, so a GM who keeps
-        // working writes migrated records back under an un-advanced version. The read
-        // failure refuses before any migration runs, so nothing in the session was touched.
-        const key = MIGRATION_DEFERRAL_NOTICES[summary.deferredReason] ?? MIGRATION_DEFERRAL_NOTICES[MIGRATION_DEFERRAL_REASONS.CORPUS_READ_FAILED];
-        const message = game.i18n?.localize?.(key) || key;
-        ui.notifications?.error?.(message, { permanent: true });
-      }
+      // A COMPLETE localized sentence per reason; only the writeback failure instructs a
+      // reload, and that distinction is the point. On a writeback failure the migrations
+      // have already transformed this session's live setting values, so a GM who keeps
+      // working writes migrated records back under an un-advanced version. The read
+      // failure refuses before any migration runs, so nothing in the session was touched.
+      // The explanation rides the `console.error` line, which the concise toast points at.
+      const key = MIGRATION_DEFERRAL_NOTICES[summary.deferredReason] ?? MIGRATION_DEFERRAL_NOTICES[MIGRATION_DEFERRAL_REASONS.CORPUS_READ_FAILED];
+      const notice = composeMigrationNotice(key, undefined, localize);
+      console.error(`Fabricate | migration pass deferred (${summary.deferredReason}): ${notice.detail}`, summary.deferredError ?? '');
+      if (game.user?.isGM) ui.notifications?.error?.(notice.message, { permanent: true });
       return;
     }
 
@@ -1103,9 +2084,7 @@ class Fabricate {
     // per-document recovery guidance is already emitted to the console by the runner.
     if (summary?.aborted === true) {
       if (game.user?.isGM) {
-        const message = game.i18n?.localize?.('FABRICATE.Migration.Aborted.Notice')
-          || "Fabricate migration aborted. This pass saved nothing: your stored data is exactly as it was before this startup. Reload Foundry to discard this session's partly-migrated copy, then see the console (F12) for per-document recovery guidance.";
-        ui.notifications?.error?.(message);
+        ui.notifications?.error?.(composeMigrationNotice('FABRICATE.Migration.Aborted.Notice', undefined, localize).message);
       }
       return;
     }
@@ -1126,10 +2105,9 @@ class Fabricate {
     // appear in more environments. GM-only; only when something was migrated.
     const unifiedRegionSystems = Array.isArray(summary?.unifiedRegionSystems) ? summary.unifiedRegionSystems : [];
     if (unifiedRegionSystems.length > 0 && game.user?.isGM) {
-      const systemList = unifiedRegionSystems.join(', ');
-      const message = game.i18n?.format?.('FABRICATE.Migration.UnifyRegions.Notice', { systems: systemList })
-        || `Fabricate unified gathering realms for: ${systemList}. Travel & Realms is disabled by default — enable it per system. Realm-scoped tasks/events may now appear in more environments.`;
-      ui.notifications?.info?.(message);
+      const notice = composeMigrationNotice('FABRICATE.Migration.UnifyRegions.Notice', { systems: unifiedRegionSystems.join(', ') }, localize);
+      logMigrationNoticeDetail('0.9.0 unified gathering realms', notice.detail);
+      ui.notifications?.info?.(notice.message);
     }
 
     // One-time GM-facing notice: when the 1.6.0 migration removed the legacy routed
@@ -1164,11 +2142,12 @@ class Fabricate {
       ? summary.essenceCollisionDisabledRecipes
       : [];
     if (essenceCollisionDisabledRecipes.length > 0 && game.user?.isGM) {
-      const recipeList = essenceCollisionDisabledRecipes.join(', ');
-      const message = game.i18n?.format?.('FABRICATE.Migration.EssenceGroups.CollisionNotice', {
-        recipes: recipeList,
-      }) || `Fabricate disabled ${essenceCollisionDisabledRecipes.length} alchemy recipe(s) whose essence requirements now collide: ${recipeList}. Rework their ingredients and re-enable them.`;
-      ui.notifications?.warn?.(message);
+      const notice = composeMigrationNotice('FABRICATE.Migration.EssenceGroups.CollisionNotice', {
+        count: essenceCollisionDisabledRecipes.length,
+        recipes: essenceCollisionDisabledRecipes.join(', '),
+      }, localize);
+      logMigrationNoticeDetail('1.17.0 essence-group collisions', notice.detail);
+      ui.notifications?.warn?.(notice.message);
     }
 
     // One-time GM-facing notice: the 1.21.0 migration retired the check-modifier
@@ -1186,10 +2165,8 @@ class Fabricate {
     const retiredCraftingModCounts = Array.isArray(summary?.retiredCraftingModCounts)
       ? summary.retiredCraftingModCounts : [];
     if (retiredCraftingModCounts.length > 0 && game.user?.isGM) {
-      const notice = buildRetiredCraftingModNotice(
-        retiredCraftingModCounts,
-        (key, data) => game.i18n?.format?.(key, data)
-      );
+      const notice = buildRetiredCraftingModNotice(retiredCraftingModCounts, localize);
+      logMigrationNoticeDetail('1.21.0 retired check-modifier placeholder', notice.detail);
       if (notice.severity === 'warn') ui.notifications?.warn?.(notice.message, { permanent: true });
       else ui.notifications?.info?.(notice.message);
     }
@@ -1204,13 +2181,63 @@ class Fabricate {
     const unifiedModifierCollisions = Array.isArray(summary?.unifiedModifierCollisions)
       ? summary.unifiedModifierCollisions : [];
     if (unifiedModifierCollisions.length > 0 && game.user?.isGM) {
-      const total = unifiedModifierCollisions.reduce((sum, entry) => sum + entry.collisions, 0);
-      const systemList = unifiedModifierCollisions.map((entry) => entry.system).join(', ');
-      const message = game.i18n?.format?.('FABRICATE.Migration.UnifyModifiers.CollisionNotice', {
-        count: total,
-        systems: systemList,
-      }) || `Fabricate merged each system's check modifiers and gathering character modifiers into one Modifiers library. ${total} gathering modifier(s) in ${systemList} shared an id with a check modifier and were renamed with a "-gathering" suffix; every reference to them was updated. Review them under System settings › Modifiers.`;
-      ui.notifications?.warn?.(message, { permanent: true });
+      const notice = composeMigrationNotice('FABRICATE.Migration.UnifyModifiers.CollisionNotice', {
+        count: unifiedModifierCollisions.reduce((sum, entry) => sum + entry.collisions, 0),
+        systems: unifiedModifierCollisions.map((entry) => entry.system).join(', '),
+      }, localize);
+      logMigrationNoticeDetail('1.23.0 unified modifier collisions', notice.detail);
+      ui.notifications?.warn?.(notice.message, { permanent: true });
+    }
+
+    // 1.28.0 (issue 1308): the character-library id collisions where two systems disagreed about
+    // what an id MEANS. Identical copies are filtered out upstream, so everything here changed a
+    // real rule — and the change is INVISIBLE without this notice, because the reference still
+    // resolves. It resolves to the other system's definition, so a book that gated learning at
+    // rank 2 now gates at rank 1 with nothing on screen to say so. The migration's own label
+    // promises the GM this report by name; permanent, for the reason the sibling above is.
+    const characterLibraryCollisions = Array.isArray(summary?.characterLibraryCollisions)
+      ? summary.characterLibraryCollisions : [];
+    if (characterLibraryCollisions.length > 0 && game.user?.isGM) {
+      const notice = composeMigrationNotice('FABRICATE.Migration.CharacterLibraries.CollisionNotice', {
+        count: characterLibraryCollisions.length,
+        entries: [...new Set(characterLibraryCollisions.map((entry) => entry.entryId))].join(', '),
+      }, localize);
+      logMigrationNoticeDetail('1.28.0 character library collisions', notice.detail);
+      ui.notifications?.warn?.(notice.message, { permanent: true });
+    }
+
+    // 1.30.0 (issue 1363): what the world-scope entity migration actually did. The composition
+    // is NOT here — the counts, the rename list, the refusals and the references that already
+    // resolve to nothing (which the pass REPORTS and never prunes) all live in
+    // `buildWorldScopeEntityNotice`, because nothing in this file can be executed by
+    // a unit test and a source-text grep can pin a DISPATCH but never a SUM. What remains here is
+    // the Foundry edge: the GM gate, the localizer, and the channel.
+    //
+    // The report is `null` unless the migration ran, and this consumer is guarded on it, so an
+    // omission anywhere in the four threading legs fails SILENT and the notice simply never
+    // appears — which is why the notice's PRESENCE is asserted by test rather than inferred.
+    const worldScopeEntityReport = summary?.worldScopeEntityReport ?? null;
+    if (worldScopeEntityReport && game.user?.isGM) {
+      const notice = buildWorldScopeEntityNotice(worldScopeEntityReport, localize);
+      if (notice.message) {
+        logMigrationNoticeDetail('1.30.0 world-scope entities', notice.detail);
+        if (notice.severity === 'warn') ui.notifications?.warn?.(notice.message, { permanent: true });
+        else ui.notifications?.info?.(notice.message);
+      }
+    }
+
+    // 1.34.0 (issue 1654): the equivalent-essence merge notice, read off the runner summary's
+    // `worldEssenceMergeReport` key. Always a permanent warning, because every case that produces
+    // a message is one the GM must act on: the merge is irreversible and a refusal is not retried.
+    // The toast names the groups under a cap; the explanation, the item-override scope and every id
+    // go to the console at `info` (issue 1737).
+    const worldEssenceMergeReport = summary?.worldEssenceMergeReport ?? null;
+    if (worldEssenceMergeReport && game.user?.isGM) {
+      const essenceNotice = buildWorldEssenceMergeNotice(worldEssenceMergeReport, localize);
+      if (essenceNotice.message) {
+        logMigrationNoticeDetail('1.34.0 equivalent essence merge', essenceNotice.detail);
+        ui.notifications?.warn?.(essenceNotice.message, { permanent: true });
+      }
     }
   }
 
@@ -1272,10 +2299,92 @@ class Fabricate {
   }
 
   /**
-   * Get the crafting engine instance
+   * Get the crafting engine instance.
+   *
+   * `COMPANION`'s `handle` tier (issue 1289): the promise is the accessor's name and that it
+   * answers the object Fabricate itself uses, or `null` before {@link Fabricate#initialize}
+   * has run, not a promise about `CraftingEngine`'s method surface. The one carved-out
+   * exception is `findComponentItems`, declared at the same tier with its own deviations —
+   * it takes documents, not ids, and throws on a null actor or a null component.
+   *
+   * `craftingEngine` is `null` from the constructor and reassigned in `initialize()`, so this
+   * answers `null` before readiness because it is never ready-gated, not because it checks.
+   *
+   * @returns {CraftingEngine|null}
    */
   getCraftingEngine() {
     return this.craftingEngine;
+  }
+
+  /**
+   * Re-run the `1.30.0` world-scope identity-flag repair (issue 1363).
+   *
+   * A GM-FACING RECOVERY ACTION, not a test hook. It is reachable exactly when the boot-time
+   * one-shot has WITHHELD itself, which it does in two states it reports rather than hides:
+   *
+   * - a TORN MIGRATION leaves the re-key map pending, and the pass declines to consume a
+   *   decision record the next boot may still need;
+   * - a PARTIAL REMAP - one or more documents whose write was rejected, counted as
+   *   `skippedErrors` - withholds the clear too, because a transient rejection is a failure a
+   *   re-run can genuinely fix.
+   *
+   * Both states leave the map PENDING, which is what makes this method reachable at all: once
+   * the boot pass clears the map there is nothing left to remap and this answers `null`. A
+   * LOCKED-PACK skip is deliberately not one of those states - a locked compendium is a standing
+   * condition a re-run cannot improve, so it is reported and the map is still cleared.
+   *
+   * **ACTIVE-GM ONLY**, matching {@link runWorldScopeIdentityFlagRemap}. That is a
+   * SINGLE-WRITER rule rather than a permission check: `game.fabricate` is bound on every
+   * client and the pass walks the UNFILTERED actor collection, so a player invoking it would
+   * have every write it does not own rejected by the server - one red toast per refusal, and
+   * every one of them mis-booked as a locked-pack skip.
+   *
+   * IDEMPOTENT. It performs the remap ONLY; it does not clear the map or advance the one-shot
+   * version, so the ordinary boot-time gating still decides when the decision record may be
+   * destroyed.
+   *
+   * @returns {Promise<object|null>} the pass summary; `null` when this client is not the active
+   *   GM, or when no re-key is pending.
+   */
+  async remapWorldScopeIdentityFlags() {
+    if (game.users?.activeGM?.id !== game.user?.id) {
+      console.warn(
+        'Fabricate | world-scope identity repair declined: it writes across every actor in the world, so it runs on the ACTIVE GM alone. Ask the active GM to run it, or take over as active GM first.'
+      );
+      return null;
+    }
+    const rekeyMap = getSetting(SETTING_KEYS.WORLD_SCOPE_REKEY_MAP) ?? {};
+    if (!hasPendingWorldScopeRekey(() => rekeyMap)) return null;
+    return applyWorldScopeIdentityFlagRemap(rekeyMap);
+  }
+
+  /**
+   * Re-run the `1.34.0` equivalent-essence merge's durable-flag repair (issue 1654).
+   *
+   * A GM-facing recovery action for the two states its `1.30.0` sibling
+   * {@link remapWorldScopeIdentityFlags} also serves: a torn migration leaves the merge map
+   * pending, and a partial remap withholds the clear. A locked-pack skip is not one of them.
+   *
+   * Active-GM only, and it warns rather than returning silently, because a player's writes across
+   * the unfiltered actor collection would all be rejected by the server and a silent `null` would
+   * read as success.
+   *
+   * Idempotent: it remaps only, neither clearing the map nor advancing the one-shot version, so
+   * boot-time gating still decides when the decision record may be destroyed.
+   *
+   * @returns {Promise<object|null>} the pass summary; `null` on a non-active-GM client, or when no
+   *   essence merge is pending.
+   */
+  async remapWorldEssenceIdentityFlags() {
+    if (game.users?.activeGM?.id !== game.user?.id) {
+      console.warn(
+        'Fabricate | world essence merge repair declined: it writes across every actor in the world, so it runs on the ACTIVE GM alone. Ask the active GM to run it, or take over as active GM first.'
+      );
+      return null;
+    }
+    const mergeMap = getSetting(SETTING_KEYS.WORLD_ESSENCE_MERGE_MAP) ?? {};
+    if (!hasPendingWorldEssenceMerge(mergeMap)) return null;
+    return applyWorldEssenceMergeFlagRemap(mergeMap);
   }
 
   /**
@@ -1334,6 +2443,89 @@ class Fabricate {
    */
   getCurrencyConfigStore() {
     return this.currencyConfigStore ?? null;
+  }
+
+  /**
+   * Get the world character libraries store (issue 1308): the character-prerequisite library and
+   * the modifier library.
+   *
+   * World scope, not per crafting system, because both resolve against the acting CHARACTER.
+   * Nothing stays per system — there is no participation flag to consult.
+   *
+   * DELIBERATELY NOT `_requireReady()`-gated, for the reason `getCurrencyConfigStore` above is
+   * not: these libraries gate craftability, learning and tool usability, and every call site
+   * guards with optional chaining, which catches an absent accessor but NOT a throw. A readiness
+   * throw here would surface as a crash on the craftability path rather than the unknown basis
+   * those callers are written to tolerate.
+   *
+   * @returns {CharacterLibrariesStore|null}
+   */
+  getCharacterLibrariesStore() {
+    return this.characterLibrariesStore ?? null;
+  }
+
+  /**
+   * Get the world COMPONENT scope store (issue 1359, epic 1357).
+   *
+   * DELIBERATELY NOT `_requireReady()`-gated, matching {@link Fabricate#getCurrencyConfigStore} and
+   * {@link Fabricate#getCharacterLibrariesStore} and emphatically NOT
+   * {@link Fabricate#getGatheringRealmStore}: `CraftingSystemManager` resolves this lazily during
+   * `initialize()`, and its call site guards with optional chaining, which absorbs an ABSENT
+   * accessor but not a THROW. A readiness throw here would surface as a crash inside
+   * `_normalizeSystem` — the issue-970 shape, where the manager never initializes at all — rather
+   * than as the unknown basis that call site is written to tolerate.
+   *
+   * @returns {object|null}
+   */
+  getComponentScopeStore() {
+    return this.componentScopeStore ?? null;
+  }
+
+  /**
+   * Get the world ESSENCE scope store (issue 1359). Ungated, for
+   * {@link Fabricate#getComponentScopeStore}'s reason.
+   *
+   * @returns {object|null}
+   */
+  getEssenceScopeStore() {
+    return this.essenceScopeStore ?? null;
+  }
+
+  /**
+   * Get the world TOOL scope store (issue 1359). Ungated, for
+   * {@link Fabricate#getComponentScopeStore}'s reason. It carries the WORLD tool-breakage
+   * authority beside the three sub-keys.
+   *
+   * @returns {object|null}
+   */
+  getToolScopeStore() {
+    return this.toolScopeStore ?? null;
+  }
+
+  /**
+   * Get the world VOCABULARY store (issue 1392, epic 1357, PR 7a).
+   *
+   * DELIBERATELY UNGATED, and for its OWN reason rather than the borrowed one above. (The
+   * readiness helper is not named here in full: `scoped-definition-read-and-basis.test.js` reads
+   * a fixed-length slice after each accessor, so the token would land inside its NEIGHBOUR's
+   * window and redden a guard about a different method.) Nothing normalizes against this store,
+   * so the issue-970 shape the three entity accessors guard against does not apply.
+   * What does apply is `worldScopeProjection`'s `readCorpus`, which reaches it through
+   * `adminStore` inside a `try`/`catch` that converts ANY throw into `{corpus: null}` — and that
+   * publishes as `{available: false, total: 0}`, a legitimate shape with no error, no console
+   * line and no failing test. A readiness throw here would therefore not surface as a crash; it
+   * would silently blank the world Tags & Categories screen and its rail badge on any client
+   * that opened the manager a moment early.
+   *
+   * THE NAME IS FIXED BY ITS CONSUMER. `adminStore`'s read and write legs both resolve it as
+   * `services.getVocabularyScopeStore?.() ?? null`, and both shipped ahead of this store inside
+   * a gateway file `### GM World Scoped Entity Routes` requirement 7 closes to this lane — so a
+   * differently-named accessor could only be reconciled by reopening that file.
+   *
+   * @returns {object|null}
+   */
+  getVocabularyScopeStore() {
+    return this.worldVocabularyStore ?? null;
   }
 
   /**
@@ -1543,10 +2735,36 @@ class Fabricate {
     return this.itemPilesIntegration;
   }
 
+  /**
+   * Get the `actorInventory` strategy's coin spender.
+   *
+   * `COMPANION`'s `handle` tier (issue 1289): the promise is the accessor's name and that it
+   * answers the object Fabricate itself uses, or `null` before readiness, not a promise about
+   * `ActorInventoryCoinSpender`'s method surface.
+   *
+   * DELIBERATELY NOT `_requireReady()`-gated, matching {@link Fabricate#getCurrencyConfigStore}
+   * and for the same reason: `actorInventoryCoinSpender` is `null` from the constructor and
+   * reassigned in `initialize()`, so a pre-readiness read answers `null` rather than throwing.
+   *
+   * @returns {ActorInventoryCoinSpender|null}
+   */
   getActorInventoryCoinSpender() {
     return this.actorInventoryCoinSpender;
   }
 
+  /**
+   * Get the `actorProperty` strategy's coin spender.
+   *
+   * `COMPANION`'s `handle` tier (issue 1289): the promise is the accessor's name and that it
+   * answers the object Fabricate itself uses, or `null` before readiness, not a promise about
+   * `ActorPropertyCoinSpender`'s method surface.
+   *
+   * DELIBERATELY NOT `_requireReady()`-gated, matching {@link Fabricate#getCurrencyConfigStore}
+   * and for the same reason: `actorPropertyCoinSpender` is `null` from the constructor and
+   * reassigned in `initialize()`, so a pre-readiness read answers `null` rather than throwing.
+   *
+   * @returns {ActorPropertyCoinSpender|null}
+   */
   getActorPropertyCoinSpender() {
     return this.actorPropertyCoinSpender;
   }
@@ -1972,6 +3190,114 @@ class Fabricate {
   }
 
   /**
+   * The ONE authorization rule every GM-gated, actor-targeted facade member applies:
+   * the caller is a GM, and the `actorId` resolves to an actor the caller may act as
+   * (issue 1289, D9).
+   *
+   * The order is normative and it is **GM -> actor -> readiness**, with readiness tested by
+   * each member AFTER this preamble rather than inside it. `_requireReady()` THROWS, and
+   * `recipe-visibility/spec.md` states that `resetActorKnowledge` returns its outcome without
+   * throwing, so a readiness-first preamble would make a pre-`ready` non-GM call throw where it
+   * returns `gmOnly` today. Neither gate here needs readiness: `game.user` and `game.actors`
+   * are both live from `init`.
+   *
+   * The message keys are PARAMETERS rather than constants, because a failed grant must not
+   * report itself in the words of a failed reset. Two representations of the one refusal come
+   * back, because this facade answers in two conventions: the legacy `{ success, message }`
+   * shape reads `message`, and the companion contract's `{ success, outcome, message }` builders
+   * read `outcome` and re-derive the identical key from their own table.
+   *
+   * Resolution goes through {@link Fabricate#_resolveCraftingActor}, whose predicate is a generic
+   * may-this-user-act-as-this-actor test with a GM bypass. Because the GM gate above has already
+   * passed, that bypass makes it exactly `game.actors.get` for every reachable caller — so
+   * adopting it here is a behavioural no-op that stops the resolver disagreeing with itself
+   * between members.
+   *
+   * A SECOND copy of this rule lives on the GM Knowledge surface's shell
+   * (`SvelteCraftingSystemManagerApp.svelte.js`'s `_knowledgeActor`). Unifying the two crosses
+   * the facade/UI-shell boundary and is a follow-up; this comment names it so the author of a
+   * THIRD copy meets it at the site.
+   *
+   * @param {string|null} actorId The target actor id (never an actor uuid).
+   * @param {{gmOnlyKey: string, noActorKey: string}} keys This member's own refusal strings.
+   * @returns {{actor: Actor|null, outcome: string|null, message: string|null}}
+   * @private
+   */
+  _requireGmActor(actorId, { gmOnlyKey, noActorKey }) {
+    if (game.user?.isGM !== true) {
+      return { actor: null, outcome: COMPANION_OUTCOMES.gmOnly, message: gmOnlyKey };
+    }
+    const actor = this._resolveCraftingActor(actorId);
+    if (!actor) {
+      return { actor: null, outcome: COMPANION_OUTCOMES.noActor, message: noActorKey };
+    }
+    return { actor, outcome: null, message: null };
+  }
+
+  /**
+   * The SET-VALUED extension of {@link Fabricate#_requireGmActor}, for the two pooled members
+   * (issue 1342).
+   *
+   * An extension rather than a parallel gate: the GM half is the same rule in the same words and
+   * runs first, and everything below it — the bound, the shape, the split between "not one
+   * resolved" and "the request was wrong" — is DELEGATED to the one place that rule exists,
+   * {@link gatePooledActorUuids} in the Foundry-free contract leaf. This method owns exactly the
+   * two things a leaf may not touch: `game.user`, and the Foundry resolver.
+   *
+   * **Addressed by UUID, and never by id.** Every member above resolves an `actorId` through
+   * `game.actors.get`, which CANNOT distinguish an unlinked token actor from its world
+   * prototype — a synthetic token actor's `id` IS the base actor's. That is a tolerable ambiguity
+   * for a member that GIVES and a corrupting one for a member that DELETES: deleting from the
+   * prototype damages every other token derived from it while the token that should have paid
+   * keeps its items. So these two take addresses, and the read takes the same addresses the
+   * consume will, so the two can never disagree about which documents the answer was about.
+   *
+   * The resolved document must BE an actor, and must be a WORLD actor. `fromUuidSync` answers
+   * whatever the address names, and an Item or a Scene handed to the pooled leaves would be
+   * scanned for components and then written to; a `documentName` test is what makes a mistyped
+   * address a refusal rather than a write against the wrong document.
+   *
+   * The compendium test beside it is the same rule about a different mistake, and it guards the
+   * member that DELETES. `fromUuidSync` resolves a pack address as
+   * `collection.get(id) ?? collection.index.get(id)`, so the answer depends on whether anything
+   * has loaded that pack: an index entry is a plain object with no `documentName` and is refused,
+   * while the SAME address answers a real `Actor` once the pack is loaded — and the consume would
+   * then issue `deleteEmbeddedDocuments` against a compendium TEMPLATE. The pack's `locked` flag
+   * does not save it; that is a client-side guard on the collection's own management methods and
+   * the server backend never consults it. `Document#inCompendium` is `!!this.pack` and is
+   * documented from v13, which is this module's declared minimum.
+   *
+   * `globalThis.fromUuidSync` rather than the bare global this file uses elsewhere, for the
+   * reason recorded on {@link Fabricate#_postBulkSalvageChatMessage}: optional chaining does not
+   * rescue an UNDECLARED identifier, so a bare `fromUuidSync?.()` still throws a ReferenceError
+   * where the global has not been installed — and a `stable` member may not throw. The throw that
+   * a shipped world actually reaches is a different one and is handled a layer down, by
+   * `resolveOnePooledActor`'s `try`: `fromUuidSync` RAISES on a pack-sourced embedded address
+   * such as `Compendium.<pack>.Actor.<id>.Item.<id>`, because its `strict` parameter defaults to
+   * `true` on both v13.350 and v14.365.
+   *
+   * It takes NO refusal strings. See the comment where the pooled trios used to be hoisted: this
+   * preamble's `message` was read by nobody, because each pooled delegator answers through its
+   * own result builder and that builder is the one home of the member's words.
+   *
+   * @param {*} actorUuids The target actors, by UUID (never by id).
+   * @returns {{actors: Array<Actor>|null, outcome: string|null, messageData: object|null}}
+   * @private
+   */
+  _requireGmActors(actorUuids) {
+    if (game.user?.isGM !== true) {
+      return { actors: null, outcome: COMPANION_OUTCOMES.gmOnly, messageData: null };
+    }
+    return gatePooledActorUuids(actorUuids, {
+      resolveActor: (uuid) => {
+        const addressed = globalThis.fromUuidSync?.(uuid) ?? null;
+        if (addressed?.documentName !== 'Actor') return null;
+        return addressed.inCompendium === true ? null : addressed;
+      }
+    });
+  }
+
+  /**
    * GM-only crafting-knowledge reset (issue 773). This is the GM API that the
    * Knowledge surface's per-character reset control routes through (issue 785, both
    * the "This system" and "All systems" grains), and it remains available to macros
@@ -1982,8 +3308,11 @@ class Fabricate {
    *
    * Explicitly GM-gated even though it is GM-only: it mutates player-owned actor
    * state and, for `total`-scope books, a world setting. Takes an `actorId` (never an
-   * actor uuid), resolves it via `game.actors.get`, and never throws — it returns the
-   * `{ success, message }` facade convention so a macro can branch on the outcome.
+   * actor uuid), resolves it through the shared {@link Fabricate#_requireGmActor} preamble,
+   * and never throws — it returns the `{ success, message }` facade convention so a macro can
+   * branch on the outcome. That preamble is a behavioural no-op here: this member's own gate
+   * was the first of the two copies the preamble unified, and its resolver's ownership
+   * predicate is bypassed for the GM this method already requires.
    *
    * @param {object} options
    * @param {string} options.actorId The actor whose knowledge is reset.
@@ -1993,13 +3322,12 @@ class Fabricate {
    * @returns {Promise<{ success: boolean, message: string, messageData?: object }>}
    */
   async resetActorKnowledge({ actorId = null, systemId = null, freeLearnBudget = true } = {}) {
-    if (game.user?.isGM !== true) {
-      return { success: false, message: 'FABRICATE.Knowledge.Reset.GMOnly' };
-    }
-    const actor = game.actors?.get?.(actorId);
-    if (!actor) {
-      return { success: false, message: 'FABRICATE.Knowledge.Reset.NoActor' };
-    }
+    const gate = this._requireGmActor(actorId, {
+      gmOnlyKey: 'FABRICATE.Knowledge.Reset.GMOnly',
+      noActorKey: 'FABRICATE.Knowledge.Reset.NoActor'
+    });
+    if (gate.outcome) return { success: false, message: gate.message };
+    const actor = gate.actor;
     const service = this.recipeVisibilityService;
     const result = systemId
       ? await service.forgetSystemLearnedRecipes(actor, systemId, { freeLearnBudget })
@@ -2012,30 +3340,444 @@ class Fabricate {
   }
 
   /**
+   * `COMPANION.grantRecipeKnowledge` — teach one actor one recipe with NO owned book
+   * required (issue 1289).
+   *
+   * A downtime activity's reward is "you learned this by doing the work", and every write path
+   * Fabricate already had onto `learnedRecipes` is anchored on a real owned recipe item. This
+   * one is unbounded by design, which is why the behaviour lives in a free function
+   * ({@link grantRecipeKnowledgeToActor}) rather than on `RecipeVisibilityService`: that service
+   * is handed out LIVE and UNGATED by `getRecipeVisibilityService()`, so an unbounded
+   * self-benefiting write placed there would be reachable by any player from the console.
+   *
+   * This member owns preconditions 1-3 only — GM, actor, readiness, in that order — and injects
+   * the four seams the grant needs. `notReady` is a refusal rather than a throw because a
+   * `stable` contract member is called inside a GM's automation tick, where a throw aborts work
+   * mid-flight; callers steer through `whenReady()`.
+   *
+   * @param {object} options
+   * @param {string|null} [options.actorId] The actor to teach (never an actor uuid).
+   * @param {string|null} [options.recipeId] The recipe to grant, by id.
+   * @param {*} [options.grantedBy] Optional provenance label; refused, never coerced.
+   * @returns {Promise<Readonly<{success: boolean, outcome: string, message: string,
+   *   messageData?: object}>>}
+   */
+  async grantRecipeKnowledge({ actorId = null, recipeId = null, grantedBy = null } = {}) {
+    const gate = this._requireGmActor(actorId, {
+      gmOnlyKey: KNOWLEDGE_GRANT_MESSAGE_KEYS[COMPANION_OUTCOMES.gmOnly],
+      noActorKey: KNOWLEDGE_GRANT_MESSAGE_KEYS[COMPANION_OUTCOMES.noActor]
+    });
+    // ONE guard, holding D5's normative order: the preamble's refusal decides first and
+    // readiness only where it passed, because `_requireReady()` throws and this member may not.
+    if (gate.outcome || this.ready !== true) {
+      return knowledgeGrantResult(gate.outcome ?? COMPANION_OUTCOMES.notReady);
+    }
+    return await grantRecipeKnowledgeToActor({ actor: gate.actor, recipeId, grantedBy }, {
+      resolveRecipe: (id) => this.recipeManager?.getRecipe?.(id) ?? null,
+      resolveSystem: (recipe) => this.craftingSystemManager?.getSystem?.(recipe?.craftingSystemId) ?? null,
+      isObservable: (system) => this.recipeVisibilityService?.isLearnedKnowledgeObservable?.(system) === true,
+      readFlag: (actor, key, fallback) => getFabricateFlag(actor, key, fallback),
+      writeFlag: (actor, key, value) => setFabricateFlag(actor, key, value)
+    });
+  }
+
+  /**
+   * `COMPANION.checkAffordability` — can this actor afford `amount` of `unitId` against the
+   * WORLD coin ladder (issue 1289)?
+   *
+   * World scope, never a crafting system: a downtime activity is not a recipe and belongs to no
+   * system, so the answer consults no `requirements.currency` toggle and reaches no system
+   * manager. Ladder-aware, so one `{ unitId, amount }` is compared against the actor's total
+   * base value and the caller aggregates nothing. Performs no write.
+   *
+   * GM-gated for the same one reason the grant is, plus one of its own: on a `macro`-strategy
+   * world the check triggers GM-authored macro code with caller-chosen arguments, and a
+   * player-reachable trigger for that is a new hazard rather than a new convenience.
+   *
+   * @param {object} options
+   * @param {string|null} [options.actorId] The actor whose purse is read (never an actor uuid).
+   * @param {string|null} [options.unitId] The coin unit the cost is denominated in.
+   * @param {number|null} [options.amount] How many of that unit, positive and finite.
+   * @returns {Promise<Readonly<{success: boolean, affordable: boolean|null, outcome: string,
+   *   message: string, messageData?: object}>>}
+   */
+  async checkAffordability({ actorId = null, unitId = null, amount = null } = {}) {
+    const gate = this._requireGmActor(actorId, {
+      gmOnlyKey: AFFORDABILITY_MESSAGE_KEYS[COMPANION_OUTCOMES.gmOnly],
+      noActorKey: AFFORDABILITY_MESSAGE_KEYS[COMPANION_OUTCOMES.noActor]
+    });
+    if (gate.outcome || this.ready !== true) {
+      return affordabilityResult(gate.outcome ?? COMPANION_OUTCOMES.notReady);
+    }
+    return await checkWorldCurrencyAffordability(gate.actor, { unitId, amount }, this._worldCurrencySeams());
+  }
+
+  /**
+   * The ONE seam bag both WORLD-scoped currency members inject (issue 1301).
+   *
+   * Hoisted for the reason {@link Fabricate#_companionCheckSeams} is: neither delegator
+   * restates it, and the harness mirror has one thing to keep faithful rather than two. It
+   * removes an existing duplicated run as well as shortening both bodies — this literal was
+   * already spelled twice, here and in the mirror.
+   *
+   * `isElectedExecutor` is deliberately NOT here. The check does not gate on a call site — it
+   * writes nothing, so N clients answering the same question is harmless — and a seam present
+   * in the bag but read by only one of its two consumers is how a gate ends up being assumed
+   * rather than declared. `creditCurrency` spreads this bag and adds it.
+   *
+   * @returns {object}
+   * @private
+   */
+  _worldCurrencySeams() {
+    return {
+      getCurrencyConfig: () => this.currencyConfigStore?.get?.() ?? null,
+      actorPropertyCoinSpender: this.actorPropertyCoinSpender,
+      actorInventoryCoinSpender: this.actorInventoryCoinSpender
+    };
+  }
+
+  /**
+   * `COMPANION.creditCurrency` — credit `amount` of `unitId` to an actor against the WORLD coin
+   * ladder (issue 1301).
+   *
+   * Sited beside {@link Fabricate#checkAffordability} and the bag they share, rather than after
+   * `awardComponents`, so the two WORLD-CURRENCY members read together — and so the two new
+   * delegators are not adjacent in either this file or its harness mirror. That second effect
+   * is measured rather than incidental: adjacent, near-identical delegators concatenate into
+   * ONE duplicated run across the two files, and the pair measured over the bar while each
+   * member alone measures under it.
+   *
+   * World scope, never a crafting system, exactly as {@link Fabricate#checkAffordability} is —
+   * the two share their request resolution through {@link Fabricate#_worldCurrencySeams} and
+   * the leaf's own shared resolver, so they can never disagree about what `50 gp` means.
+   *
+   * It routes through the resolved spender's `refund`, which under `spendStrategy: 'macro'`
+   * runs the GM's `increment` macro — a macro that until now ran only on the player-cancel
+   * refund. The `caller: 'award'` token the leaf passes is what lets that macro tell a
+   * companion credit from a cancelled craft.
+   *
+   * NOT IDEMPOTENT, for the same reason the award is not: crediting 50 gp twice is legitimately
+   * 100 gp, and nothing Fabricate can read tells a duplicate from a second, intended credit.
+   *
+   * @param {object} options the CLOSED request key set; nothing else is read
+   * @param {string|null} [options.actorId] The actor to credit (never an actor uuid).
+   * @param {string|null} [options.unitId] The coin unit the credit is denominated in.
+   * @param {number|string|null} [options.amount] A whole positive number of that unit.
+   * @param {string|null} [options.callSite] `'gmAction'` or `'broadcast'`; required, no default.
+   * @returns {Promise<Readonly<object>>}
+   */
+  async creditCurrency({ actorId = null, unitId = null, amount = null, callSite = null } = {}) {
+    const gate = this._requireGmActor(actorId, CREDIT_CURRENCY_GATE_KEYS);
+    if (gate.outcome || this.ready !== true) {
+      return currencyCreditResult(gate.outcome ?? COMPANION_OUTCOMES.notReady);
+    }
+    return await creditWorldCurrency(gate.actor, { unitId, amount, callSite }, {
+      ...this._worldCurrencySeams(),
+      isElectedExecutor: () => game.users?.activeGM?.id === game.user?.id
+    });
+  }
+
+  /**
+   * The seam bag {@link Fabricate#readPooledHoldings} injects (issue 1342).
+   *
+   * It SPREADS {@link Fabricate#_worldCurrencySeams} rather than restating the coin bindings,
+   * because the read's currency axis is the same WORLD ladder `checkAffordability` reads and a
+   * second spelling of that resolution is how the two come to disagree about what `50 gp` means.
+   *
+   * `findComponentItems` is the PUBLISHED matcher a companion can already reach for itself,
+   * which is what keeps what this read COUNTS and what the consume TAKES from disagreeing. The
+   * `?? []` floor mirrors the award bag's: the engine is `null` before readiness, and the
+   * member's own readiness refusal runs first.
+   *
+   * `craftingSystemManager` is the raw collaborator rather than a function, because the tool
+   * classifier this read drives takes the manager itself.
+   *
+   * Three seams the leaf declares are deliberately ABSENT — `classifyToolStates`,
+   * `readCurrencyBalance` and `resolveUnitByName` — for the reason `createOrStack` is absent
+   * from the award bag: the leaf defaults each to the shipped collaborator, so binding them here
+   * would give a shipped primitive two spellings. They stay injectable for tests.
+   *
+   * @returns {object}
+   * @private
+   */
+  _pooledHoldingsSeams() {
+    return {
+      ...this._worldCurrencySeams(),
+      listSystems: () => this.craftingSystemManager?.getSystems?.() ?? [],
+      craftingSystemManager: this.craftingSystemManager,
+      findComponentItems: (actor, component, system) => this.craftingEngine?.findComponentItems?.(actor, component, system) ?? []
+    };
+  }
+
+  /**
+   * `COMPANION.readPooledHoldings` — what a SET of characters holds between them (issue 1342).
+   *
+   * Sited HERE, beside the world-currency members whose bag it spreads, rather than beside the
+   * consume it pairs with. That siting is measured rather than aesthetic, and it is the same
+   * decision recorded on {@link Fabricate#creditCurrency}: adjacent, near-identical delegators
+   * concatenate into ONE duplicated run across this file and its harness mirror, and the pair
+   * measures over the bar where each member alone measures under it.
+   *
+   * The first member that answers over a set of actors, and the first addressed by actor UUID —
+   * see {@link Fabricate#_requireGmActors} for why the address rather than the id. It owns
+   * preconditions 1-3 only — GM, actors, readiness, in that order — and hands the RESOLVED actor
+   * documents plus the seam bag to the leaf, which owns the `costs` validation, the per-axis
+   * resolution and every per-cost refusal, because those are request validation and sit where
+   * every other member's request validation sits.
+   *
+   * **It writes nothing, takes no `callSite`, and is NOT a reservation.** The election gate
+   * exists to stop N clients each applying a consequence Fabricate cannot reconcile, and N
+   * clients answering the same question is harmless; nothing stops an item moving between this
+   * answer and a consume, so a caller that must not overdraw reads the CONSUME's refusal.
+   *
+   * @param {object} options the CLOSED request key set; nothing else is read
+   * @param {Array<string>|null} [options.actorUuids] The party, by actor UUID (never by id).
+   * @param {Array<object>|null} [options.costs] `{ type, name, quantity }` entries, in order.
+   * @returns {Promise<Readonly<object>>}
+   */
+  async readPooledHoldings({ actorUuids = null, costs = null } = {}) {
+    const gate = this._requireGmActors(actorUuids);
+    if (gate.outcome || this.ready !== true) {
+      return pooledHoldingsReadResult(gate.outcome ?? COMPANION_OUTCOMES.notReady, gate.messageData);
+    }
+    return await readPooledHoldingsAcrossActors(gate.actors, { costs }, this._pooledHoldingsSeams());
+  }
+
+  /**
+   * The ONE seam bag both Standalone Check Roll members inject.
+   *
+   * Hoisted to a single private so neither delegator restates it, and so the harness mirror
+   * has one thing to substitute rather than two. Seven seams, and `resolveActor` and `isGm`
+   * are deliberately ABSENT from it: both gates live in the facade, so the leaf resolves
+   * nothing and reads no collection — there is no second resolver to disagree with the first.
+   *
+   * `prompt` and `promptBulk` exist because both prompt functions AUTO-CONFIRM where there is
+   * no `DialogV2`. Without the seams, the dismissal case — the one property this capability
+   * exists to preserve — would be unreachable under test.
+   *
+   * `localize` is here because the leaf may not touch `game.i18n`: it needs the default label
+   * localized, and `foundryBridge.localize` answers the KEY when there is no `game.i18n` (as
+   * Foundry's own `localize` does for a missing string), so the fallback is applied at the one
+   * seam that needs it.
+   *
+   * @returns {object}
+   * @private
+   */
+  _companionCheckSeams() {
+    return {
+      isElectedExecutor: () => game.users?.activeGM?.id === game.user?.id,
+      hasDiceEngine: () => typeof globalThis.Roll === 'function',
+      localize: (key, fallback) => {
+        const resolved = bridgeLocalize(key);
+        return typeof resolved === 'string' && resolved !== '' && resolved !== key ? resolved : fallback;
+      },
+      prompt: promptCheckRoll,
+      promptBulk: promptBulkCheckRoll,
+      runPassFail: runFormulaPassFail,
+      runProgressive: runFormulaProgressive,
+      buildRollOptions: buildInteractiveRollOptions
+    };
+  }
+
+  /**
+   * `COMPANION.rollActorCheck` — roll ONE formula for ONE actor, graded against a `dc` or
+   * ungraded, and answer what was rolled (issue 1293).
+   *
+   * A **Standalone Check Roll**: the check-roll mechanics without a crafting system's derived
+   * terms. See {@link rollStandaloneActorCheck} for what that does and does not include.
+   *
+   * This member owns preconditions 1-3 only — GM, actor, readiness, in that order, reusing the
+   * shared preamble VERBATIM — and hands the resolved actor plus the seam bag to the leaf,
+   * which owns the call-site and election gates because they are request validation and sit
+   * where every other member's request validation sits.
+   *
+   * @param {object} options the CLOSED request key set; nothing else is read
+   * @param {string|null} [options.actorId] The rolling actor (never an actor uuid).
+   * @param {string|null} [options.callSite] `'gmAction'` or `'broadcast'`; required, no default.
+   * @param {string|null} [options.formula] The authored roll formula.
+   * @param {number|null} [options.dc] A finite DC selects the graded arm.
+   * @param {string|null} [options.compare] `'meet'` (default) or `'exceed'`.
+   * @param {string|null} [options.label] Display label; defaults to a localized activity noun.
+   * @param {boolean} [options.interactive] Open the roll prompt; defaults to false.
+   * @param {object|null} [options.rollDecision] A pre-resolved decision; refused unless interactive.
+   * @returns {Promise<Readonly<object>>}
+   */
+  async rollActorCheck({ actorId = null, callSite = null, formula = null, dc = null, compare = null, label = null, interactive = false, rollDecision = null } = {}) {
+    const gate = this._requireGmActor(actorId, ROLL_ACTOR_CHECK_GATE_KEYS);
+    if (gate.outcome || this.ready !== true) {
+      return checkRollResult(gate.outcome ?? COMPANION_OUTCOMES.notReady);
+    }
+    return await rollStandaloneActorCheck({ actor: gate.actor, callSite, formula, dc, compare, label, interactive, rollDecision }, this._companionCheckSeams());
+  }
+
+  /**
+   * `COMPANION.resolveBulkCheckDecision` — answer ONE roll decision to be applied to N rolls
+   * the caller will make (issue 1293). It rolls nothing.
+   *
+   * GM-gated INLINE rather than through {@link Fabricate#_requireGmActor}, and that is not a
+   * second copy of the rule: the shared preamble is scoped by its own comment to every
+   * GM-gated, ACTOR-TARGETED facade member, and this member targets no actor. It cannot use
+   * the preamble in any case — `_resolveCraftingActor(null)` returns `null`, so
+   * `_requireGmActor(undefined, …)` would always answer `noActor` for a member that reads no
+   * actor and can never legitimately emit one.
+   *
+   * @param {object} options the CLOSED request key set; nothing else is read
+   * @param {string|null} [options.callSite] `'gmAction'` or `'broadcast'`; required, no default.
+   * @param {Array<string>|null} [options.formulas] The batch's authored formulas, in order.
+   * @returns {Promise<Readonly<object>>}
+   */
+  async resolveBulkCheckDecision({ callSite = null, formulas = null } = {}) {
+    const gmOnly = game.user?.isGM !== true ? COMPANION_OUTCOMES.gmOnly : null;
+    if (gmOnly || this.ready !== true) {
+      return bulkCheckDecisionResult(gmOnly ?? COMPANION_OUTCOMES.notReady);
+    }
+    return await resolveStandaloneBulkCheckDecision({ callSite, formulas }, this._companionCheckSeams());
+  }
+
+  /**
+   * The seam bag {@link Fabricate#awardComponents} injects (issue 1301).
+   *
+   * FIVE seams, and the sixth the leaf declares — `createOrStack` — is deliberately absent:
+   * the leaf defaults it to the shared `createOrStackComponentItem` import, so passing it here
+   * would give the create primitive two spellings and let a facade change silently route the
+   * award past the seam whose `[created] ?? null` normalisation the answer's truthfulness rests
+   * on. It stays injectable for tests and defaulted in production.
+   *
+   * `findComponentItems` is the PUBLISHED resolver a companion can already reach for itself,
+   * which is what keeps what an award stacks onto and what salvage consumes from disagreeing.
+   * It is guarded with `?? []` because the engine is `null` before readiness — the member's own
+   * readiness refusal runs first, so this is a floor rather than a path.
+   *
+   * @returns {object}
+   * @private
+   */
+  _componentAwardSeams() {
+    return {
+      resolveSystem: (systemId) => this.craftingSystemManager?.getSystem?.(systemId) ?? null,
+      resolveComponent: (system, componentId) => findById(getDefinitionIndex(resolvedComponentsFor(system)), componentId) ?? null,
+      findComponentItems: (actor, component, system) => this.craftingEngine?.findComponentItems?.(actor, component, system) ?? [],
+      resolveSourceItem: (uuid) => fromUuid(uuid),
+      isElectedExecutor: () => game.users?.activeGM?.id === game.user?.id
+    };
+  }
+
+  /**
+   * `COMPANION.awardComponents` — place one or more of a crafting system's components onto an
+   * actor's sheet (issue 1301).
+   *
+   * The write half of a pair the contract has published half of since issue 1289:
+   * `getCraftingEngine().findComponentItems` resolves an actor's existing stacks "so an award
+   * can stack rather than duplicate", and until now nothing published could perform that award.
+   *
+   * This member owns preconditions 1-3 only — GM, actor, readiness, in that order, reusing the
+   * shared preamble VERBATIM — and hands the resolved actor plus the seam bag to the leaf,
+   * which owns the call-site gate, the election, the `awards` validation and the per-entry
+   * quantity domain, because those are request validation and sit where every other member's
+   * request validation sits.
+   *
+   * NOT IDEMPOTENT, and deliberately: an award has no natural key, so awarding three hides
+   * twice is legitimately six hides. The caller owns not double-awarding.
+   *
+   * @param {object} options the CLOSED request key set; nothing else is read
+   * @param {string|null} [options.actorId] The actor to award to (never an actor uuid).
+   * @param {string|null} [options.systemId] The crafting system every entry resolves within.
+   * @param {Array<object>|null} [options.awards] `{ componentId, quantity }` entries, in order.
+   * @param {string|null} [options.callSite] `'gmAction'` or `'broadcast'`; required, no default.
+   * @returns {Promise<Readonly<object>>}
+   */
+  async awardComponents({ actorId = null, systemId = null, awards = null, callSite = null } = {}) {
+    const gate = this._requireGmActor(actorId, AWARD_COMPONENTS_GATE_KEYS);
+    if (gate.outcome || this.ready !== true) {
+      return componentAwardResult(gate.outcome ?? COMPANION_OUTCOMES.notReady);
+    }
+    return await awardComponentsToActor(gate.actor, { systemId, awards, callSite }, this._componentAwardSeams());
+  }
+
+  /**
+   * The seam bag {@link Fabricate#consumePooledHoldings} injects (issue 1342).
+   *
+   * It spreads {@link Fabricate#_worldCurrencySeams} for the reason the read's bag does — the
+   * coin the take debits and the coin it gives back are the same WORLD ladder every other
+   * currency member reads — and adds the election, exactly as {@link Fabricate#creditCurrency}
+   * does, because this member WRITES and a broadcast handler fires on every connected client.
+   *
+   * The component trio is bound identically to the award's, and that identity is the point
+   * rather than a copy: what an award STACKS ONTO, what salvage consumes and what this TAKES
+   * must resolve through one matcher, or a read predicts a write against a different set of
+   * documents. `resolveSourceItem` is absent because nothing here creates from a template.
+   *
+   * @returns {object}
+   * @private
+   */
+  _pooledConsumptionSeams() {
+    return {
+      ...this._worldCurrencySeams(),
+      isElectedExecutor: () => game.users?.activeGM?.id === game.user?.id,
+      resolveSystem: (systemId) => this.craftingSystemManager?.getSystem?.(systemId) ?? null,
+      resolveComponent: (system, componentId) => findById(getDefinitionIndex(resolvedComponentsFor(system)), componentId) ?? null,
+      findComponentItems: (actor, component, system) => this.craftingEngine?.findComponentItems?.(actor, component, system) ?? []
+    };
+  }
+
+  /**
+   * `COMPANION.consumePooledHoldings` — take a set of costs from what a SET of characters holds
+   * between them (issue 1342).
+   *
+   * The first published member that REMOVES value rather than placing it. Every companion writer
+   * before it gives: the grant teaches, the award places, the credit pays.
+   *
+   * Sited HERE rather than beside the read it pairs with, for the duplicated-run reason recorded
+   * on {@link Fabricate#readPooledHoldings} and first measured for {@link Fabricate#creditCurrency}.
+   *
+   * It owns preconditions 1-3 only — GM, actors, readiness, in that order, through the same
+   * set-valued preamble the read uses, answering in its OWN words through its OWN result builder
+   * rather than through a refusal string threaded into that preamble — and hands the RESOLVED
+   * actor documents plus the seam bag to the leaf, which owns the call-site gate, the election,
+   * the `costs` validation, the components-first ordering and the rollback.
+   *
+   * **Costs arrive as RESOLVED IDS**, which is what the read hands back, and the pair is designed
+   * to be called in that order. **NOT IDEMPOTENT**: calling it twice takes twice, and there is no
+   * natural key to absorb a repeat, so not double-consuming is the caller's own obligation.
+   *
+   * @param {object} options the CLOSED request key set; nothing else is read
+   * @param {Array<string>|null} [options.actorUuids] The party, by actor UUID (never by id).
+   * @param {string|null} [options.callSite] `'gmAction'` or `'broadcast'`; required, no default.
+   * @param {Array<object>|null} [options.costs] The costs to take, by resolved id, in order.
+   * @returns {Promise<Readonly<object>>}
+   */
+  async consumePooledHoldings({ actorUuids = null, callSite = null, costs = null } = {}) {
+    const gate = this._requireGmActors(actorUuids);
+    if (gate.outcome || this.ready !== true) {
+      return pooledHoldingsConsumeResult(gate.outcome ?? COMPANION_OUTCOMES.notReady, gate.messageData);
+    }
+    return await consumePooledHoldingsFromActors(gate.actors, { callSite, costs }, this._pooledConsumptionSeams());
+  }
+
+
+  /**
    * Craft a recipe for the current selection, delegating to {@link Fabricate#craft}.
    * Resolves the crafting actor + component sources from the supplied ids (or the
    * persisted defaults) so the attempt uses the same inventory scope the listing
    * was computed for.
+   * New starts use version 1 and preserve ready, fully supplied one-call execution.
+   * Waiting or unresolved choices leave the run in the Journal without editable-material spending.
+   * Unlike {@link Fabricate#craft}, this player-facing method accepts actor IDs, not documents.
    *
    * @param {object} options
    * @param {string|null} [options.actorId] Crafting actor id.
    * @param {string} options.recipeId Recipe id.
    * @param {string|null} [options.ingredientSetId] Chosen ingredient set id.
+   * @param {Object<string, {optionIndex: number, heldItemId?: string}>|null}
+   *   [options.ingredientOptionOverrides] Explicit ingredient-group choices.
    * @param {{stepId: string|null, ingredientSetId: string|null,
    *   allocation: Record<string, number>}|null} [options.ingredientEssenceAllocation]
-   *   The player's funding for the set's shared essence block (issue 917), scoped to
-   *   the step and set the rail was computed against. Passed straight through: the
-   *   ENGINE drops it when either id disagrees with the step it resolves from the
-   *   active run, because a facade-side guard would check an index that can move
-   *   between the derived rail and the click. Omitted (null) is today's behaviour.
+   *   Physical carrier units scoped to the current step and ingredient set.
+   *   Stale or mismatched intent blocks versioned execution until explicitly repaired.
    * @param {string[]|null} [options.componentSourceActorIds] Source actor ids.
-   * @param {boolean} [options.interactive] When true, prompt the player with the
-   *   confirm-roll dialog (optional situational modifier) and post the roll to chat
-   *   so Dice So Nice animates it. Defaults to false so macros and automation keep
-   *   the original silent behaviour. The Fabricate Crafting tab passes true. A
-   *   dismissed prompt returns `{ success: false, cancelled: true }` with zero
-   *   mutation (no ingredients, currency, or tools consumed, no run created).
-   * @returns {Promise<{success: boolean, results: Array|null, message: string, cancelled?: boolean}>}
+   * @param {boolean} [options.interactive=false] Forwarded crafting option.
+   *   Versioned required checks use the authority's prepare/prompt/resolve exchange regardless
+   *   of this legacy opt-in. Cancelling the prompt leaves the stage unexecuted, not the run absent.
+   * @returns {Promise<object>} Start/wait, execution, cancellation or refusal result.
    */
   async craftRecipe({ actorId = null, recipeId, ingredientSetId = null, ingredientOptionOverrides = null, ingredientEssenceAllocation = null, componentSourceActorIds = null, interactive = false } = {}) {
     this._requireReady();
@@ -2051,6 +3793,7 @@ class Fabricate {
     // post; omitted/false for macros/automation so they stay silent (no API break).
     return await this.craft(craftingActor, recipeId, {
       componentSourceActors: sources,
+      lifecycleVersion: 1,
       ingredientSetId,
       // Per-group player option overrides (issue 552); null keeps default resolution.
       ingredientOptionOverrides,
@@ -2125,6 +3868,24 @@ class Fabricate {
       getCraftingSystem: (systemId) => this.craftingSystemManager.getSystem(systemId),
       promptRollDecision: promptBulkCheckRoll,
       postChatMessage: (message) => this._postBulkSalvageChatMessage(message),
+      // The BATCHED complication relay (issue 1286). Read off `this` at call time like every
+      // other collaborator here, because the writer is composed during `initialize()` and
+      // this service is cached. The service collects each row's addressing-only requests and
+      // hands them over as one message per addressed (system, actor) pair, rather than the
+      // engine emitting per ROW. The pair is the batching unit because both halves of it are
+      // GM-side authorization inputs; `COMPLICATION_RATE_LIMIT` is sized against the
+      // fanned-out pair count a 25-target selection can produce, not against the row count.
+      deliverComplications: (message) => this.complicationDeliveryWriter?.deliver(message),
+      // The executing user's stored progressive stage order, read through the SAME edge
+      // `ResolutionModeService` and `CraftingEngine` are given (issue 1286). The bulk
+      // pre-run forecast consumes it to list a row's complications in the order the roll
+      // will actually be spent down; the RUN path never reads it here, because the order a
+      // row is resolved against is the one its own run captured at start.
+      //
+      // Left unwired the service falls back to `() => null` and the forecast quietly reads
+      // the AUTHORED order while the run reads the player's — a divergence with no symptom
+      // beyond a preview listing the right complications against the wrong stages.
+      getPlayerResultOrder: entry => this._readPlayerResultOrder(entry),
       // Key-only, matching every card module's `localize` contract; the aggregate card
       // substitutes its own counts.
       localize: (key) => game.i18n?.localize?.(key) ?? key
@@ -2275,7 +4036,7 @@ class Fabricate {
    */
   _buildNotPermittedRow(target) {
     const system = this.craftingSystemManager?.getSystem?.(target?.systemId) ?? null;
-    const component = findById(getDefinitionIndex(system?.components), target?.componentId);
+    const component = findById(getDefinitionIndex(resolvedComponentsFor(system)), target?.componentId);
     return {
       actorId: target?.actorId ?? null,
       actorName: '',
@@ -2581,7 +4342,7 @@ class Fabricate {
     }
     const sources = componentSourceActors.length > 0 ? componentSourceActors : [craftingActor];
     const system = this.craftingSystemManager?.getSystem?.(craftingSystemId) ?? null;
-    const components = Array.isArray(system?.components) ? system.components : [];
+    const components = resolvedComponentsFor(system);
     const submittedItems = resolveAlchemySubmissions(
       sources,
       components,
@@ -2593,6 +4354,7 @@ class Fabricate {
     }
     return await this.craftingEngine.craftAlchemy(craftingActor, sources, submittedItems, {
       craftingSystemId,
+      lifecycleVersion: 1,
       interactive,
     });
   }
@@ -2837,11 +4599,36 @@ class Fabricate {
     // the engine falls back to selectableActors[0] and silently mis-gates the
     // attempt — the player-app "nothing happens" bug. See _withRememberedActorDefault.
     const withRememberedActor = this._withRememberedActorDefault(options);
+    const selectableActors = getGatheringSelectableActors({ viewer: game.user });
+    const selectedActor = withRememberedActor.actor ?? (
+      withRememberedActor.rememberedActorId
+        ? selectableActors.find((actor) =>
+            [actor?.id, actor?.uuid].includes(withRememberedActor.rememberedActorId)) ?? null
+        : (selectableActors[0] ?? null)
+    );
+    Object.assign(withRememberedActor, { actor: selectedActor, lifecycleVersion: 1 });
 
     // `requestStart`, not `startAttempt`: a blind timed start this client may not
     // write is routed to the active GM before any task is drawn (issue 901). Every
     // other start delegates straight to `startAttempt` and is unchanged.
-    return callGatheringRuntimeWithCurrentViewer(gatheringEngine, 'requestStart', withRememberedActor, () => game.user);
+    //
+    // Wrapped in `executePublicGather` so a READY attempt still finishes in one call. The
+    // `lifecycleVersion: 1` stamped above routes a ready attempt into a started run awaiting
+    // execution instead of the engine's immediate resolution, so without this the public API
+    // answers `accepted: true` and awards nothing (issue 1759). A waiting or timed attempt is
+    // untouched and still matures at world time.
+    return executePublicGather({
+      requestStart: () =>
+        callGatheringRuntimeWithCurrentViewer(
+          gatheringEngine,
+          'requestStart',
+          withRememberedActor,
+          () => game.user
+        ),
+      actor: selectedActor,
+      executeCommand: (command, commandOptions) =>
+        this.executeJournalRunCommand(command, commandOptions),
+    });
   }
 
   /**
@@ -3040,6 +4827,104 @@ class Fabricate {
   }
 
   /**
+   * Submit a current-lifecycle operation through active-GM authority after initialization.
+   * Actor UUIDs address this authenticated command boundary, whose GM handler rechecks the
+   * attested sender's ownership. They do not replace actor IDs in the player crafting facades.
+   * A timeout is an unknown response, not proof that execution failed or permission to replay.
+   *
+   * `options` MUST be forwarded. It carries `interactive`, which decides whether a required
+   * check opens the roll dialog or settles on the engine's own defaults, and the public
+   * crafting API passes `false` because it has no user to answer one. This signature took only
+   * `command` while its caller below passed both, so the flag was dropped here and reverted to
+   * its interactive default: `game.fabricate.craft()` on a recipe with a check opened a dialog
+   * nobody could answer and waited forever. The source pin covering that caller went on passing,
+   * because it pinned the CALL and nothing pinned this signature (issue 1759).
+   * @param {{actorUuid: string, runType: 'crafting'|'gathering', runId: string,
+   *   expectedRevision: number, action: string, payload?: object}} command
+   *   Start uses an empty runId and revision zero. Alchemy uses runType `crafting`.
+   * @param {{interactive?: boolean}} [options] Forwarded verbatim to the command service.
+   * @returns {Promise<object>} Authoritative result or explicit refusal.
+   */
+  executeJournalRunCommand(command, options) {
+    this._requireReady();
+    return this.journalRunCommands?.executeJournalRunCommand(command, options)
+      ?? Promise.resolve(authorityUnavailableRefusal());
+  }
+
+  /**
+   * Hide a terminal entry for the current user in this world, preserving actor history.
+   * The awaited user-scoped setting write follows the user across devices and can reject.
+   * @param {{actorUuid: string, runType: string, runId: string}} options Native run identity.
+   * @returns {Promise<object>} `{success, key}` on persistence or a refusal for an invalid target.
+   */
+  dismissJournalRun(options) {
+    this._requireReady();
+    return this.journalRunCommands?.dismissJournalRun(options)
+      ?? Promise.resolve(authorityUnavailableRefusal());
+  }
+
+  /**
+   * Read this user's hidden native run keys for one actor, without changing history.
+   * @param {{actorUuid: string, viewerId?: string}} options A different viewer gets an empty set.
+   * @returns {Set<string>}
+   */
+  getDismissedJournalRunKeys(options) {
+    return this.journalRunCommands?.getDismissedJournalRunKeys(options) ?? new Set();
+  }
+
+  /**
+   * Read cached authority availability. This neither provisions a ledger nor releases a claim.
+   * @returns {{available: boolean, reason: string|null}}
+   */
+  getJournalRunAuthorityAvailability() {
+    return this.journalRunCommands?.getJournalRunAuthorityAvailability()
+      ?? authorityUnavailableAvailability();
+  }
+
+  /**
+   * Ensure the private run-authority ledger exists, as the active GM. Idempotent: an existing
+   * ledger is returned rather than refused, and no second ledger is ever created.
+   * Boot recovery and the command path already provision automatically, so this is a no-op in a
+   * healthy world. It never clears a retained execution claim.
+   * @returns {Promise<object>} `{success: true, ledgerId}` or `{success: false, reason}`.
+   */
+  setupJournalRunAuthority() {
+    return this.journalRunCommands?.setupJournalRunAuthority()
+      ?? Promise.resolve(authorityUnavailableRefusal());
+  }
+
+  /**
+   * Record manual disposition of an exact retained execution claim as the active GM.
+   * Inspect actual receipts and the uncertain applying boundary first, after confirming no
+   * other GM realm is still executing. Planned amounts are not proof of awards or spending.
+   * Matching run evidence is reconstructed and disposition persisted before releasing the claim.
+   * This releases authority only: the old request stays non-replayable and an uncertain run
+   * effect remains recovery-required. It performs no replay, compensation or automatic rollback.
+   * @param {{claimId: string, disposition: 'reconciled'|'abandoned'}} options
+   *   claimId is the claim's random token, not the fixed embedded page ID or a run ID.
+   * @returns {Promise<object>} `{success: true, disposition}` or `{success: false, reason}`.
+   * @example
+   * // Active-GM macro after reviewing the interrupted operation and its receipts.
+   * await game.fabricate.whenReady();
+   * const ledgers = [...game.journal].filter(
+   *   (entry) => entry.getFlag('fabricate', 'journalRunAuthorityLedger') === true
+   * );
+   * if (ledgers.length !== 1) throw new Error('Expected one authority ledger');
+   * const page = ledgers[0].pages.get('FabRunAuthority1');
+   * const claimId = page?.getFlag('fabricate', 'journalRunClaimId');
+   * if (!claimId) throw new Error('No retained claim to reconcile');
+   * const result = await game.fabricate.reconcileJournalRunAuthority({
+   *   claimId,
+   *   disposition: 'reconciled',
+   * });
+   * if (!result.success) throw new Error(result.reason);
+   */
+  reconcileJournalRunAuthority(options) {
+    return this.journalRunCommands?.reconcileJournalRunAuthority(options)
+      ?? Promise.resolve(authorityUnavailableRefusal());
+  }
+
+  /**
    * Current world time in seconds (the Foundry-facing read seam). Lives on this
    * edge so the Journal store and pure UI utils stay free of `game.*`.
    *
@@ -3098,6 +4983,10 @@ class Fabricate {
         // The builder consults it only for a GM viewer; a player's journal shows the
         // generic blind label, which is what the run record itself now carries.
         getGatheringBlindSecret: (runId) => this.gatheringBlindRunStore?.get(runId) ?? null,
+        // D-027: history names a blind task only once the reveal policy has disclosed it, never
+        // because the viewer owns the actor. The engine owns the chat card's identical decision.
+        isGatheringIdentityHidden: (args) =>
+          gatheringEngine?.isHistoricalBlindIdentityHidden?.(args) === true,
         getResultItem: (itemUuid) => this._resolveJournalResultItem(itemUuid),
         getComponent: (systemId, componentId) =>
           this._resolveJournalComponent(systemId, componentId),
@@ -3108,6 +4997,42 @@ class Fabricate {
         // never reads component tallies itself; this is here so its snapshot is the same
         // complete value every other pass builds.
         resolveComponentForItem: findMatchingComponent,
+        getComponentSourceActors: ({ actor, run }) => {
+          const uuids = Array.isArray(run?.componentSourceActorUuids)
+            ? run.componentSourceActorUuids
+            : [];
+          const sources = uuids
+            .map((uuid) => globalThis.fromUuidSync?.(uuid) ?? null)
+            .filter(Boolean);
+          return sources.length > 0 ? sources : (actor ? [actor] : []);
+        },
+        resolveItemEssences: ({ item, recipe }) => {
+          const system = this.craftingSystemManager?.getSystem(recipe?.craftingSystemId);
+          return resolveItemEssences(
+            item,
+            resolvedComponentsFor(system),
+            recipe?.craftingSystemId,
+            findMatchingComponent
+          );
+        },
+        affordCurrency: ({ actor, recipe, match }) =>
+          buildCurrencyAffordProbe(
+            actor,
+            recipe,
+            this.craftingEngine?._currencySeams?.() ?? {}
+          )(match),
+        // The AGGREGATE answer the per-option probe above cannot give: two currency ingredients
+        // each affordable alone but not together (issue 1648, F2).
+        affordCurrencySpends: ({ actor, recipe, currencySpends }) =>
+          affordsCurrencySpends(
+            actor,
+            recipe,
+            currencySpends,
+            this.craftingEngine?._currencySeams?.() ?? {}
+          ),
+        getDismissedRunKeys: ({ actorUuid, viewerId }) =>
+          this.getDismissedJournalRunKeys({ actorUuid, viewerId }),
+        getJournalActionAvailability: () => this.getJournalRunAuthorityAvailability(),
       });
     }
     return this._runJournalBuilder;
@@ -3124,9 +5049,9 @@ class Fabricate {
   _resolveJournalTool(systemId, toolId) {
     const system = this.craftingSystemManager?.getSystem(systemId);
     if (!system || !toolId) return null;
-    const tool = (system.tools || []).find((entry) => entry?.id === toolId);
+    const tool = resolvedToolsFor(system).find((entry) => entry?.id === toolId);
     if (!tool) return null;
-    const component = linkedComponentFor(tool, system.components || []);
+    const component = linkedComponentFor(tool, resolvedComponentsFor(system));
     const img = resolveToolDisplayImage(tool, component);
     return {
       id: tool.id,
@@ -3182,7 +5107,7 @@ class Fabricate {
   _resolveJournalComponent(systemId, componentId) {
     if (!systemId || !componentId) return null;
     const system = this.craftingSystemManager?.getSystem(systemId);
-    const component = findById(getDefinitionIndex(system?.components), componentId);
+    const component = findById(getDefinitionIndex(resolvedComponentsFor(system)), componentId);
     return component ? { name: component.name ?? null, img: component.img ?? null } : null;
   }
 
@@ -3310,10 +5235,29 @@ class Fabricate {
   }
 
   /**
-   * Quick craft helper - craft a recipe for an actor
-   * @param {Actor} actor - The actor performing the craft
-   * @param {string|Recipe} recipe - Recipe ID or Recipe object
-   * @param {Object} options - Crafting options
+   * Craft a recipe for a resolved Actor, preserving one-call execution when the stage is ready
+   * and all choices are supplied. New starts use version 1 through active-GM authority.
+   * Waiting stages or unresolved choices remain in the Journal without editable-material spending.
+   * Resuming an existing unversioned run preserves its legacy contract.
+   * Use {@link Fabricate#craftRecipe} for the player-facing actor-ID selection facade.
+   * Required versioned checks still use the authority's player prompt and GM evaluation.
+   * Secret checks use a generic prompt and GM private posting without player roll-data handoff.
+   * Foundry whisper/private-roll presentation is not a server confidentiality guarantee.
+   * @param {Actor} actor The Actor document performing the craft, not its ID or UUID string.
+   * @param {string|Recipe} recipe Recipe ID or resolved Recipe.
+   * @param {object} [options]
+   * @param {Actor[]} [options.componentSourceActors] Resolved source documents, defaulting to actor.
+   * @param {string} [options.runId] Existing active run to continue.
+   * @param {string|null} [options.ingredientSetId] Chosen ingredient route.
+   * @param {Object<string, {optionIndex: number, heldItemId?: string}>}
+   *   [options.ingredientOptionOverrides] Explicit group choices.
+   * @param {{stepId: string, ingredientSetId: string, allocation: Object<string, number>}}
+   *   [options.ingredientEssenceAllocation] Shared physical carrier allocation.
+   * @returns {Promise<object>} Execution, start/wait or refusal result.
+   * @example
+   * await game.fabricate.whenReady();
+   * const actor = game.actors.get('YOUR_ACTOR_ID');
+   * const result = await game.fabricate.craft(actor, 'YOUR_RECIPE_ID');
    */
   async craft(actor, recipe, options = {}) {
     if (!this.ready) {
@@ -3337,13 +5281,17 @@ class Fabricate {
 
     const ingredientSetId = options.ingredientSetId || null;
 
-    return await this.craftingEngine.craft(
+    return executePublicCraft({
+      engine: this.craftingEngine,
+      runManager: this.craftingRunManager,
       actor,
-      componentSourceActors,
+      sourceActors: componentSourceActors,
       recipe,
       ingredientSetId,
-      options
-    );
+      options,
+      executeCommand: (command, options) => this.executeJournalRunCommand(command, options),
+      resolveUuid: (uuid) => globalThis.fromUuid?.(uuid),
+    });
   }
 
   /**
@@ -3493,7 +5441,26 @@ function bindFabricateGlobal() {
     CraftingSystemExporter,
     // Public hook names module authors can subscribe to, e.g.
     // `Hooks.on(game.fabricate.api.HOOKS.gathering.ATTEMPT_COMPLETED, handler)`.
-    HOOKS: FABRICATE_HOOKS
+    HOOKS: FABRICATE_HOOKS,
+    // The named, versioned contract for outbound BEHAVIOURAL consumption (issue 1289):
+    // `{ schemaVersion, members, outcomes, callSites }`, frozen at module load. `callSites`
+    // was added by issue 1293 with no `schemaVersion` bump — the compatibility promise
+    // permits GAINING a field, never losing one. Assigned here and
+    // NOWHERE else, so its version is readable from Fabricate's own `init` onward, before
+    // any collaborator exists — that is the whole affordance, and it is what lets a
+    // companion version-check before it calls.
+    //
+    // The `stable` behavioural members it declares — `grantRecipeKnowledge` and
+    // `checkAffordability` from issue 1289, `rollActorCheck` and `resolveBulkCheckDecision`
+    // from issue 1293, `awardComponents` and `creditCurrency` from issue 1301, and
+    // `readPooledHoldings` and `consumePooledHoldings` from issue 1342 — are METHODS ON
+    // THE FACADE, not entries in this class bag, and
+    // deliberately so: everything above is a constructor a caller instantiates, while
+    // `grantRecipeKnowledge` is an unbounded, GM-gated write whose only authorised route is
+    // the gated facade method. Publishing a grant symbol beside these classes would hand out
+    // the same capability without the gate — the exact defect that keeps it off
+    // `RecipeVisibilityService` in the first place.
+    COMPANION: COMPANION_CONTRACT
   };
   managerExtensions.bindPublicApi(game.fabricate.api);
   // Both registries are page-session singletons imported at module scope, so the init and
@@ -3530,6 +5497,17 @@ function bindFabricateGlobal() {
     // every realm-gated environment in the payload lands in the destination world citing realm
     // ids that name nothing.
     const travelConfig = fabricate.gatheringRealmStore?.get?.() ?? {};
+    // And the world character libraries (issue 1308), for the same reason and with the same
+    // consequence: omit them and the export carries empty libraries, so every learning gate,
+    // tool requirement and check modifier in the payload lands unresolvable.
+    const characterLibraries = fabricate.characterLibrariesStore?.get?.() ?? {};
+    // And the three WORLD-SCOPE ENTITY settings (issue 1364), for the same reason and with a
+    // sharper consequence: these slices are membership-filtered to this system, so omitting them
+    // exports a system whose world roster, world defaults and membership records are all empty —
+    // and the destination's world corpus learns nothing about the system it just imported.
+    const componentScope = fabricate.getComponentScopeStore?.()?.get?.() ?? {};
+    const essenceScope = fabricate.getEssenceScopeStore?.()?.get?.() ?? {};
+    const toolScope = fabricate.getToolScopeStore?.()?.get?.() ?? {};
     return CraftingSystemExporter.buildExportPayload(
       system,
       recipes,
@@ -3537,7 +5515,11 @@ function bindFabricateGlobal() {
       gatheringEnvironments,
       gatheringConfig,
       currencyConfig,
-      travelConfig
+      travelConfig,
+      characterLibraries,
+      componentScope,
+      essenceScope,
+      toolScope
     );
   };
 
@@ -3547,7 +5529,11 @@ function bindFabricateGlobal() {
     const validation = CraftingSystemExporter.validateImportData(data);
     if (!validation.valid) throw new Error(`Invalid import data: ${validation.errors.join('; ')}`);
     const mode = options.copyMode ? 'copy' : 'keep';
-    const packData = CraftingSystemExporter.prepareForImport(data, mode);
+    // The DESTINATION world's entity roster (issue 1364). Copy mode REQUIRES it and never defaults
+    // it: without it every incoming component would mint a fresh id, creating a second world
+    // record for every item this world already holds.
+    const worldEntityIndex = buildWorldEntityIndex(fabricate);
+    const packData = CraftingSystemExporter.prepareForImport(data, mode, { worldEntityIndex });
     return fabricate.compendiumImporter.importFromPackData(packData, {
       overwriteExisting: options.overwriteExisting || false
     });
@@ -3563,6 +5549,27 @@ function bindFabricateGlobal() {
   // Exposed as a plain API method (no rendered UI control) so a GM can run it from a
   // macro/console; see docs/canvas-interactables.md "Uninstalling Fabricate cleanly".
   game.fabricate.cleanupInteractables = () => runInteractableWorldCleanup();
+}
+
+/**
+ * The DESTINATION world's entity roster, read from the three world-scope entity stores
+ * (issue 1364).
+ *
+ * A copy-mode import matches every incoming entity's SOURCE REFERENCES against this, binding to
+ * the world entity the destination already holds rather than minting a duplicate for the same
+ * item. An absent or unseeded store answers an empty list, which simply means every incoming
+ * entity mints — the correct behaviour for an unmigrated world, whose scope settings an import
+ * never seeds.
+ *
+ * @param {object} fabricate
+ * @returns {{components: object[], essences: object[], tools: object[]}}
+ */
+function buildWorldEntityIndex(fabricate) {
+  return {
+    components: fabricate?.getComponentScopeStore?.()?.listEntities?.() ?? [],
+    essences: fabricate?.getEssenceScopeStore?.()?.listEntities?.() ?? [],
+    tools: fabricate?.getToolScopeStore?.()?.listEntities?.() ?? [],
+  };
 }
 
 /**
@@ -3688,6 +5695,16 @@ Hooks.once('ready', async () => {
   // stamp so a fresh drag inherits the flag first, and reaches the copies already in
   // inventories that predate it.
   await runOwnedItemComponentIdentityRestamp();
+  // Issue 1363 (epic 1357, PR 3): remap the durable identity flags the 1.30.0 world-scope re-key
+  // invalidated. MUST run after the source-side component/tool stamps, whose targets this release
+  // bumps so a stale SOURCE leaf is rewritten by the stamp itself, and after the owned-item
+  // restamp, which never reaches this population because its planner returns early for any item
+  // already carrying a durable identity flag.
+  await runWorldScopeIdentityFlagRemap();
+  // Issue 1654: remap the durable essence references the 1.34.0 merge invalidated. Must run after
+  // the 1.30.0 remap above: both passes rewrite the same run containers, and this one writes a
+  // forced replacement, so a snapshot taken before the component/tool repair landed would undo it.
+  await runWorldEssenceMergeFlagRemap();
 
   // Issue 800: GM-only cue for a world whose stored descriptions predate write-time
   // resolution and still show raw `@UUID[…]` text. A DETECTOR only — it scans
@@ -3711,6 +5728,14 @@ Hooks.once('ready', async () => {
   InteractableManager.instance.register();
 
   game.socket?.on(EVENT_SCENE_SOCKET, (payload, senderId) => {
+    if (
+      payload?.kind === JOURNAL_RUN_SOCKET_KIND.REQUEST ||
+      payload?.kind === JOURNAL_RUN_SOCKET_KIND.REPLY
+    ) {
+      Promise.resolve(fabricate.journalRunCommands?.handleSocketMessage(payload, senderId)).catch(
+        (error) => console.error('Fabricate | Journal run socket command failed', error)
+      );
+    }
     // `senderId` is Foundry's server-attested sender user id (the trusted 2nd
     // callback arg of a custom module socket broadcast — set from the authenticated
     // session in `dist/server/sockets.mjs handleCustomSocket`, NOT from the client
@@ -3774,6 +5799,32 @@ Hooks.once('ready', async () => {
     } catch (_error) {
       // Defensive: never block the Interactable payload below.
     }
+    // Same channel carries a relayed COMPLICATION delivery (issue 1286): the GM-only
+    // card and the macro must run on a GM client, from the complication the GM's OWN
+    // `craftingSystems` record holds. Addressing only — nothing on the wire names a
+    // macro, a visibility or any content. Guarded for the same reason as the routes
+    // above: a throw here must not starve the Interactable payload.
+    try {
+      routeComplicationDeliveryMessage(payload, {
+        isActiveGM: () => game.user?.id === game.users?.activeGM?.id,
+        senderId,
+        // Applied LAST of the refusal gates, so a malformed or unauthenticated message
+        // never consumes a sender's budget. Charged per MESSAGE: one resolution — a whole
+        // bulk salvage included — emits exactly one.
+        allowSender: complicationDeliveryRateLimiter,
+        // An elected GM holding two sockets in ONE context receives the same message
+        // twice; two tabs are two contexts and remain a stated, accepted residual.
+        isFreshDelivery: complicationDeliveryDedupe,
+        applyComplications: (args) => {
+          // Nothing awaits a socket handler, so a rejected apply must be caught here or
+          // it lands as an unhandled rejection on the GM's client.
+          Promise.resolve(applyComplicationDelivery(args))
+            .catch(error => console.warn('Fabricate | Complication delivery failed', error));
+        }
+      });
+    } catch (_error) {
+      // Defensive: never block the Interactable payload below.
+    }
     // Same `module.fabricate` channel also carries the canvas Interactable
     // node-update action (player → active GM token-flag write) AND the region-first
     // activation round-trip. Only the active GM applies node/behaviour writes +
@@ -3790,7 +5841,7 @@ Hooks.once('ready', async () => {
 
   addModuleButtonsToItemsDirectory();
   Hooks.on('fabricate.craftingSystemsChanged', () => addModuleButtonsToItemsDirectory());
-  Hooks.on('renderItemDirectory', () => addModuleButtonsToItemsDirectory());
+  Hooks.on('renderItemDirectory', (app) => addModuleButtonsToItemsDirectory(app));
   Hooks.on('updateItem', (item, changes) => {
     void fabricate.craftingSystemManager?.refreshComponentMetadataForUpdatedItem(item, changes);
   });
@@ -3830,6 +5881,17 @@ Hooks.once('ready', async () => {
     gatheringEnvironmentStore: fabricate.gatheringEnvironmentStore,
     currencyConfigStore: fabricate.currencyConfigStore,
     travelStore: fabricate.gatheringRealmStore,
+    characterLibrariesStore: fabricate.characterLibrariesStore,
+    // Issue 1359. Without these three the bridge legs receive `undefined` and NO-OP silently: the
+    // key is still "handled", so nothing reports the miss, and the client's world corpus stays at
+    // whatever it read at boot for the rest of the session.
+    componentScopeStore: fabricate.componentScopeStore,
+    essenceScopeStore: fabricate.essenceScopeStore,
+    toolScopeStore: fabricate.toolScopeStore,
+    // Issue 1392. Same silent failure as the three above: without it the world vocabulary leg
+    // receives `undefined`, the key is still "handled", and the client's vocabulary stays at
+    // whatever it read at boot for the rest of the session.
+    worldVocabularyStore: fabricate.worldVocabularyStore,
     callAll: (hook, payload) => Hooks.callAll(hook, payload)
   });
   const handleFabricateSettingDocumentChange = (setting) => {
@@ -3843,6 +5905,15 @@ Hooks.once('ready', async () => {
         // probe would separate the advisory from the typo by an arbitrary amount of
         // destroyed inventory.
         applyItemStackQuantityPathSetting({ notify: true });
+      }
+      // Dismissals are `scope: 'user'`, so `updateSetting` delivers EVERY user's document to
+      // every client; only this user's own hiding changes what this client shows. `Setting#user`
+      // is an id (`idOnly: true` on V14.365); the `.id` read costs nothing and stays honest.
+      if (
+        key === `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.JOURNAL_RUN_DISMISSALS}`
+        && (setting?.user?.id ?? setting?.user) === game.user?.id
+      ) {
+        Hooks.callAll('fabricate.journalDismissalsChanged');
       }
       // Cross-client refresh: `craftingSystemsChanged` / `recipesChanged` are local
       // `Hooks.callAll`s fired only on the GM's client. The setting hooks fire on every
@@ -3868,6 +5939,19 @@ Hooks.once('ready', async () => {
   // downstream distinguishes a create from an update: both deliver the new value in the
   // document, and every branch reacts by re-reading the key.
   Hooks.on('createSetting', handleFabricateSettingDocumentChange);
+  const refreshJournalRunAuthorityAvailability = () => {
+    void fabricate.journalRunCommands?.refreshJournalRunAuthorityAvailability?.();
+  };
+  const bootstrapJournalRunAuthority = () => {
+    void fabricate.journalRunCommands?.bootstrapJournalRunAuthority?.();
+  };
+  Hooks.on('createJournalEntry', refreshJournalRunAuthorityAvailability);
+  Hooks.on('updateJournalEntry', refreshJournalRunAuthorityAvailability);
+  Hooks.on('deleteJournalEntry', refreshJournalRunAuthorityAvailability);
+  Hooks.on('createJournalEntryPage', refreshJournalRunAuthorityAvailability);
+  Hooks.on('deleteJournalEntryPage', refreshJournalRunAuthorityAvailability);
+  Hooks.on('updateUser', bootstrapJournalRunAuthority);
+  Hooks.on('userConnected', bootstrapJournalRunAuthority);
   Hooks.on('canvasReady', () => {
     void runInteractableMarkerSync();
   });
@@ -3914,6 +5998,12 @@ async function runRecipeItemFlagAutoStamp() {
  * metadata-refresh storm. Sources only — owned copies inherit the flag on future drags
  * and are otherwise covered by the manual "Repair item data" action. NOT a MigrationRunner
  * entry: that runner reads/writes only settings-data payloads and cannot write Item flags.
+ *
+ * ITS VERSION ADVANCE IS WITHHELD while the `1.30.0` migration has not completed (issue 1363).
+ * The target was bumped 1 -> 2 by that release so this pass repairs the source-side leaves the
+ * re-key invalidated, which makes it a one-shot that CONSUMES a migration's output — and any
+ * such pass must gate its irreversible step on migration completion rather than on a corpus
+ * predicate, because the deferred branch of the migration pass returns normally.
  */
 async function runComponentFlagAutoStamp() {
   try {
@@ -3926,6 +6016,15 @@ async function runComponentFlagAutoStamp() {
     if (!manager?.autoStampComponentSources) return;
     const summary = await manager.autoStampComponentSources();
     console.debug?.('Fabricate | component durable-flag auto-stamp complete', summary);
+    // ISSUE 1363 — WITHHOLD THE VERSION ADVANCE UNTIL THE PRODUCING MIGRATION HAS COMPLETED.
+    // This release bumps the stamp target precisely so this pass REPAIRS every source Item
+    // whose `roles[<systemId>]` leaf names an id `1.30.0` re-keyed. But a deferred migration
+    // returns NORMALLY, so this pass runs on the SAME BOOT as a torn one — against the OLD
+    // ids, changing nothing — and an unconditional advance would then gate it off FOREVER.
+    // `remapWorldScopeIdentityFlags` never touches source Items, so nothing else would ever
+    // repair them, and every later drag would copy the stale flag onto an owned item the
+    // owned-item restamp refuses because it already carries a durable identity flag.
+    if (!mayClearWorldScopeRekeyMap(getSetting(SETTING_KEYS.MIGRATION_VERSION))) return;
     await setSetting(SETTING_KEYS.COMPONENT_FLAG_STAMP_VERSION, COMPONENT_FLAG_STAMP_TARGET);
   } catch (error) {
     console.error('Fabricate | component durable-flag auto-stamp failed', error);
@@ -3935,7 +6034,9 @@ async function runComponentFlagAutoStamp() {
 /**
  * Issue 561 — one-shot, primary-GM-gated backfill that stamps the durable per-system
  * `flags.fabricate.roles[system.id].toolId` on every registered tool's writable source Item.
- * Keyed by the `TOOL_FLAG_STAMP_VERSION` world setting so it runs exactly once per world.
+ * Keyed by the `TOOL_FLAG_STAMP_VERSION` world setting so it runs exactly once per world, and
+ * its advance is WITHHELD until the `1.30.0` migration has completed, for the reason
+ * {@link runComponentFlagAutoStamp} states.
  * MUST run AFTER the `1.15.0` settings-data migration (`migrateToolsToFirstClass`) populates
  * each tool's source refs — the migration persists at init, this reads the live normalized
  * systems in the `ready` body — and BEFORE the `updateItem` hook registers. Sources only —
@@ -3953,6 +6054,15 @@ async function runToolFlagAutoStamp() {
     if (!manager?.autoStampToolSources) return;
     const summary = await manager.autoStampToolSources();
     console.debug?.('Fabricate | tool durable-flag auto-stamp complete', summary);
+    // ISSUE 1363 — WITHHOLD THE VERSION ADVANCE UNTIL THE PRODUCING MIGRATION HAS COMPLETED.
+    // This release bumps the stamp target precisely so this pass REPAIRS every source Item
+    // whose `roles[<systemId>]` leaf names an id `1.30.0` re-keyed. But a deferred migration
+    // returns NORMALLY, so this pass runs on the SAME BOOT as a torn one — against the OLD
+    // ids, changing nothing — and an unconditional advance would then gate it off FOREVER.
+    // `remapWorldScopeIdentityFlags` never touches source Items, so nothing else would ever
+    // repair them, and every later drag would copy the stale flag onto an owned item the
+    // owned-item restamp refuses because it already carries a durable identity flag.
+    if (!mayClearWorldScopeRekeyMap(getSetting(SETTING_KEYS.MIGRATION_VERSION))) return;
     await setSetting(SETTING_KEYS.TOOL_FLAG_STAMP_VERSION, TOOL_FLAG_STAMP_TARGET);
   } catch (error) {
     console.error('Fabricate | tool durable-flag auto-stamp failed', error);
@@ -4005,6 +6115,236 @@ async function runOwnedItemComponentIdentityRestamp() {
   } catch (error) {
     console.error('Fabricate | owned-item component identity re-stamp failed', error);
   }
+}
+
+/**
+ * Issue 1363 (epic 1357, PR 3) — one-shot, active-GM-gated pass that remaps every durable
+ * identity flag the `1.30.0` world-scope re-key invalidated, driven by the persisted
+ * `fabricate.worldScopeRekeyMap`. The pure logic lives in `remapWorldScopeIdentityFlags.js`;
+ * what is here is the Foundry edge and the two gates, which are DIFFERENT gates and must stay so.
+ *
+ * WHETHER THE PASS RUNS is corpus-derived — the world scope is seeded — plus its own Number
+ * version. WHETHER IT MAY CLEAR THE MAP is gated separately, on the producing migration having
+ * COMPLETED. That separation is not defensive style; it is the only thing that keeps a torn
+ * migration recoverable. `_runMigrations()` is awaited at startup and its DEFERRED branch returns
+ * NORMALLY, so this pass runs on the SAME BOOT as a torn migration. The reachable sequence
+ * without the gate: the three scope legs land (they precede `craftingSystems`), so the corpus
+ * reads as seeded; this pass remaps, clears the map and advances its version; the next boot finds
+ * an already-re-keyed `craftingSystems`, re-derives an EMPTY map, and NEVER rewrites
+ * `gatheringConfig`'s old ids — which are then permanently unrepairable, because the map that
+ * recorded what to rewrite is gone and this pass will not re-run either, its version having been
+ * advanced. (The loss is the lost DECISION RECORD, not a prune: nothing prunes those references at
+ * `1.30.0` — see the migration registry's requirement 18. They simply stop resolving, for good.)
+ *
+ * THE COMPARISON MUST BE `compareSemver`, NEVER A BARE JS `>=`. `migrationVersion` is a STRING
+ * setting, so `migrationVersion >= '1.30.0'` is LEXICOGRAPHIC and is TRUE for `'1.4.0'` through
+ * `'1.9.0'` — all six are registered migration versions, and they are the worlds running the
+ * longest multi-migration pass, i.e. the most tear-prone population there is. The gate would be
+ * defeated exactly where it is needed.
+ *
+ * AND WHEN THE CLEAR IS WITHHELD, THE VERSION ADVANCE IS WITHHELD WITH IT. The shipped one-shot
+ * precedent writes its version unconditionally at the end; a pass that skips the clear but
+ * advances its version short-circuits on every later boot and NEVER clears, leaving
+ * `fabricate.worldScopeRekeyMap` a permanently orphaned world setting. With both withheld the
+ * pass genuinely re-runs on a later boot and clears then, and re-running the remap is safe by the
+ * map-disjointness property the migration enforces.
+ */
+async function runWorldScopeIdentityFlagRemap() {
+  try {
+    // Active-GM only, so exactly one client performs the writes.
+    if (game.users?.activeGM?.id !== game.user?.id) return;
+    if (
+      Number(getSetting(SETTING_KEYS.WORLD_SCOPE_IDENTITY_FLAG_VERSION)) >=
+      WORLD_SCOPE_IDENTITY_FLAG_TARGET
+    ) {
+      return;
+    }
+    // THE RUN GATE IS CORPUS-DERIVED, and THIS is that predicate. It is equivalent-or-stronger
+    // than the `isSeeded('entities')` form the design names: a seeded scope with no pending map
+    // means the migration either re-keyed nothing or the map has already been consumed, and in
+    // both cases there is nothing here to remap. It also needs no store handle.
+    //
+    // A world with NOTHING to remap still falls through to the version advance below rather
+    // than returning here, so it stops re-checking on every boot forever. That advance is
+    // itself gated on migration completion, so a world whose migration deferred BEFORE writing
+    // the map re-runs on a later boot rather than short-circuiting.
+    const rekeyMap = getSetting(SETTING_KEYS.WORLD_SCOPE_REKEY_MAP) ?? {};
+    let summary = null;
+    if (hasPendingWorldScopeRekey(() => rekeyMap)) {
+      summary = await applyWorldScopeIdentityFlagRemap(rekeyMap);
+    }
+
+    // THE CLEAR, and the version advance, share ONE gate. See the docblock. The predicate lives
+    // in the pure module, on `compareSemver`, so it is unit-testable and so no reader can
+    // re-derive it as a bare JS `>=` on what is a STRING setting.
+    if (!mayClearWorldScopeRekeyMap(getSetting(SETTING_KEYS.MIGRATION_VERSION))) {
+      console.warn(
+        'Fabricate | world-scope re-key map RETAINED: the 1.30.0 migration has not completed on this world yet, so the decision record it may still need is not destroyed. This pass will run again after a successful migration pass.'
+      );
+      return;
+    }
+    // THE SECOND WITHHOLD, and it is a different question from the first. The gate above asks
+    // whether the PRODUCING migration completed; this asks whether THIS pass did. A rejected
+    // write leaves that actor naming retired ids, and destroying the map here would both strand
+    // it and un-withhold the startup prune that then deletes its runs on the next boot.
+    if (!remapCompletedCleanly(summary)) {
+      console.warn(
+        `Fabricate | world-scope re-key map RETAINED: ${summary.skippedErrors} document(s) could not be updated, so the repair is incomplete and its decision record is not destroyed. Fix the cause and reload, or run game.fabricate.remapWorldScopeIdentityFlags().`
+      );
+      return;
+    }
+    await setSetting(SETTING_KEYS.WORLD_SCOPE_REKEY_MAP, {});
+    await setSetting(
+      SETTING_KEYS.WORLD_SCOPE_IDENTITY_FLAG_VERSION,
+      WORLD_SCOPE_IDENTITY_FLAG_TARGET
+    );
+  } catch (error) {
+    console.error('Fabricate | world-scope identity flag remap failed', error);
+  }
+}
+
+/**
+ * Apply the remap itself and post its GM notice. Split out of the gating above so the two are
+ * separately readable: everything here is WORK, everything there is a DECISION.
+ *
+ * @param {object} rekeyMap The pending `fabricate.worldScopeRekeyMap`.
+ */
+async function applyWorldScopeIdentityFlagRemap(rekeyMap) {
+    const summary = await remapIdentityFlagsAcrossActors({
+      actors: game.actors ?? [],
+      rekeyMap,
+      // Two depths, deliberately: the crafting and salvage containers, the roles map, the legacy
+      // scalar and `alchemyDeadEnds` are DOUBLY nested under `flags.fabricate.fabricate.<key>`,
+      // while `gatheringRuns` is written with a bare `setFlag` and lives at the SINGLE-scope
+      // `flags.fabricate.gatheringRuns`.
+      readFlag: (document, key, fallback = null, options = {}) =>
+        options.bare
+          ? (document?.getFlag?.('fabricate', key) ?? fallback)
+          : getFabricateFlag(document, key, fallback),
+      writeFabricateFlag: (document, key, value) => setFabricateFlag(document, key, value),
+      writeBareFlag: (document, key, value) => document?.setFlag?.('fabricate', key, value),
+    });
+    console.debug?.('Fabricate | world-scope identity flag remap complete', summary);
+
+    const notice = buildWorldScopeIdentityRemapNotice(summary, (key, data) =>
+      data ? game.i18n?.format?.(key, data) : game.i18n?.localize?.(key)
+    );
+    if (notice.message && game.user?.isGM) {
+      logMigrationNoticeDetail('1.30.0 world-scope identity flag remap', notice.detail);
+      ui.notifications?.warn?.(notice.message, { permanent: true });
+    }
+    return summary;
+}
+
+/**
+ * Issue 1654 — one-shot, active-GM-gated pass that remaps every durable essence reference the
+ * `1.34.0` equivalent-essence merge invalidated, driven by the persisted
+ * `fabricate.worldEssenceMergeMap`. The pure logic lives in `remapWorldScopeIdentityFlags.js`;
+ * what is here is the Foundry edge and the gates.
+ *
+ * It mirrors `runWorldScopeIdentityFlagRemap`'s gates and GM channel: the same decision/work
+ * split, the same two withholds, the same `compareSemver` gate. It differs in carrying its own
+ * decision record, so a world that has consumed one may still owe the other, and in writing a
+ * forced replacement rather than a merge, because this half rewrites key sets. Its ordering
+ * against that sibling is stated at the `ready`-body call site.
+ */
+async function runWorldEssenceMergeFlagRemap() {
+  try {
+    // Active-GM only, so exactly one client performs the writes.
+    if (game.users?.activeGM?.id !== game.user?.id) return;
+    if (
+      Number(getSetting(SETTING_KEYS.WORLD_ESSENCE_MERGE_FLAG_VERSION)) >=
+      WORLD_ESSENCE_MERGE_FLAG_TARGET
+    ) {
+      return;
+    }
+    // The run gate. A world with nothing to remap still falls through to the version advance
+    // below rather than returning here, so it stops re-checking every boot; that advance is itself
+    // gated on migration completion, so a migration that deferred before writing the map re-runs.
+    const mergeMap = getSetting(SETTING_KEYS.WORLD_ESSENCE_MERGE_MAP) ?? {};
+    let summary = null;
+    if (hasPendingWorldEssenceMerge(mergeMap)) {
+      summary = await applyWorldEssenceMergeFlagRemap(mergeMap);
+    }
+
+    // The clear and the version advance share one gate. The predicate lives in the pure module, on
+    // `compareSemver`, so no reader re-derives it as a bare JS `>=` on a string setting.
+    if (!mayClearWorldEssenceMergeMap(getSetting(SETTING_KEYS.MIGRATION_VERSION))) {
+      console.warn(
+        'Fabricate | world essence merge map RETAINED: the 1.34.0 migration has not completed on this world yet, so the decision record it may still need is not destroyed. This pass will run again after a successful migration pass.'
+      );
+      return;
+    }
+    // The second withhold asks a different question from the first: the gate above asks whether
+    // the producing migration completed, this whether this pass did.
+    if (!remapCompletedCleanly(summary)) {
+      console.warn(
+        `Fabricate | world essence merge map RETAINED: ${summary.skippedErrors} document(s) could not be updated, so the repair is incomplete and its decision record is not destroyed. Fix the cause and reload, or run game.fabricate.remapWorldEssenceIdentityFlags().`
+      );
+      return;
+    }
+    // The `systems` leg only, with `retired` written back explicitly. `systems` holds the
+    // transient per-system re-key pairs this pass consumes; `retired` is the tombstone that keeps
+    // a retired essence id taken for the life of the world, so a clear that wrote `{}` would let
+    // `mintEssenceId` reissue a retired id.
+    const stored = getSetting(SETTING_KEYS.WORLD_ESSENCE_MERGE_MAP) ?? {};
+    await setSetting(SETTING_KEYS.WORLD_ESSENCE_MERGE_MAP, {
+      systems: {},
+      retired: stored.retired ?? {},
+    });
+    await setSetting(
+      SETTING_KEYS.WORLD_ESSENCE_MERGE_FLAG_VERSION,
+      WORLD_ESSENCE_MERGE_FLAG_TARGET
+    );
+  } catch (error) {
+    console.error('Fabricate | world essence merge flag remap failed', error);
+  }
+}
+
+/**
+ * Apply the essence remap itself. Split out of the gating above so the two are separately
+ * readable: everything here is work, everything there is a decision.
+ *
+ * Every write is a forced replacement (`forcedReplacementFlagPath`), never `setFabricateFlag`: an
+ * essence id is an object key, and `Document#update` merges inner objects recursively and performs
+ * no deletions, so a plain merge write would leave the retired key beside the new one. The case
+ * that needs it is the item override, where `flags.fabricate.fabricate.essences` is a plain
+ * `{[essenceId]: quantity}` map. A run container is shielded only incidentally, by
+ * `resolvedEssences` sitting under the `steps` array, and that shielding is not relied on.
+ *
+ * @param {object} mergeMap The pending `fabricate.worldEssenceMergeMap`.
+ */
+async function applyWorldEssenceMergeFlagRemap(mergeMap) {
+  // A write counts as landed on the strength of not throwing, so `remappedItemOverrides` and
+  // `remappedRunContainers` can overstate; deliberately, because the only tighter bucket is
+  // `skippedErrors`, which `remapCompletedCleanly` reads to withhold the merge-map clear. The
+  // overstatement reaches no gate and no GM notice.
+  const replace = (document, path, value) => document?.update?.({ [path]: value });
+  const summary = await remapEssenceFlagsAcrossActors({
+    actors: game.actors ?? [],
+    mergeMap,
+    // The same two read depths the `1.30.0` edge supplies, for the same reason.
+    readFlag: (document, key, fallback = null, options = {}) =>
+      options.bare
+        ? (document?.getFlag?.('fabricate', key) ?? fallback)
+        : getFabricateFlag(document, key, fallback),
+    replaceFabricateFlag: (document, key, value) =>
+      replace(document, forcedReplacementFlagPath(key), value),
+    replaceBareFlag: (document, key, value) =>
+      replace(document, forcedReplacementFlagPath(key, { bare: true }), value),
+  });
+  console.debug?.('Fabricate | world essence merge flag remap complete', summary);
+
+  // The GM channel: a refused group leaves the world merged in its settings and un-merged in its
+  // actor flags, which is the one outcome of this pass a GM must act on.
+  const notice = buildWorldEssenceMergeRemapNotice(summary, (key, data) =>
+    data ? game.i18n?.format?.(key, data) : game.i18n?.localize?.(key)
+  );
+  if (notice.message && game.user?.isGM) {
+    logMigrationNoticeDetail('1.34.0 essence flag remap', notice.detail);
+    ui.notifications?.warn?.(notice.message, { permanent: true });
+  }
+  return summary;
 }
 
 /**
@@ -4236,12 +6576,11 @@ function neutralizeInheritedInteractableLink(document) {
 
 /**
  * Add the Craft button to Items Directory header
- * Since sidebar is already rendered at module init, we inject directly
+ * Inject when an element exists; ready can precede the sidebar's first render.
+ * The renderItemDirectory hook retries for each rendered sidebar or popout instance.
  */
-function addModuleButtonsToItemsDirectory() {
-  const itemsDir = ui.items;
+function addModuleButtonsToItemsDirectory(itemsDir = ui.items) {
   if (!itemsDir?.element) {
-    console.error('Fabricate | Items directory not found or not rendered');
     return;
   }
 
@@ -4478,6 +6817,7 @@ export {
   runComponentFlagAutoStamp,
   runToolFlagAutoStamp,
   runOwnedItemComponentIdentityRestamp,
+  runWorldScopeIdentityFlagRemap,
 };
 
 export default fabricate;

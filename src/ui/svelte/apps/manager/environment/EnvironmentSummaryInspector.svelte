@@ -1,11 +1,13 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import { localize, viewScene } from '../../../util/foundryBridge.js';
-  import Chip from '../Chip.svelte';
+  import Chip from '../../../components/Chip.svelte';
+  import InspectorCard from '../../../components/InspectorCard.svelte';
   import { dragDrop } from '../../../actions/dragDrop.js';
   import { resolveDropData } from '../../../util/dropUtils.js';
   import { sceneDocumentImage } from '../../../util/sceneImages.js';
-  import { evaluateEnvironmentReadiness } from './environmentReadiness.js';
+  import { countReadiness, evaluateEnvironmentReadiness } from './environmentReadiness.js';
+  import IconButton from '../../../components/IconButton.svelte';
 
   let { environment = null, composition = { counts: {} }, onUpdate = () => {} } = $props();
 
@@ -21,10 +23,12 @@
     environment?.compositionMode === 'manual' ? 'manual' : 'automatic'
   );
   const readiness = $derived(evaluateEnvironmentReadiness(environment || {}, composition || {}));
-  const critical = $derived(
-    readiness.issues.filter((issue) => issue.severity === 'critical').length
-  );
-  const warning = $derived(readiness.issues.filter((issue) => issue.severity === 'warning').length);
+  // THE SAME TWO NUMBERS THE VALIDATION TAB AND THE TAB BADGE REPORT (issue 1517), through the
+  // one accessor all three read. Counting severities here made this card the third answer to one
+  // question: an `info` note appeared in the tab's Warnings tile and nowhere on this chip.
+  const validationCounts = $derived(countReadiness(readiness));
+  const critical = $derived(validationCounts.blocking);
+  const warning = $derived(validationCounts.warnings);
 
   const sceneUuid = $derived(String(environment?.sceneUuid || ''));
   let sceneThumb = $state('');
@@ -63,7 +67,7 @@
   }
 </script>
 
-<section class="manager-inspector-card" data-environment-summary-inspector>
+<InspectorCard data-environment-summary-inspector="">
   <p class="manager-kicker">
     {text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.Summary', 'Environment summary')}
   </p>
@@ -91,9 +95,9 @@
           )}</Chip
     >
   </div>
-</section>
+</InspectorCard>
 
-<section class="manager-inspector-card" data-environment-summary-scene>
+<InspectorCard data-environment-summary-scene="">
   <h3 class="manager-card-title">
     {text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.Scene', 'Linked scene')}
   </h3>
@@ -134,10 +138,9 @@
         title={text('FABRICATE.Admin.Manager.EnvironmentEditor.Overview.OpenScene', 'Open scene')}
         >{sceneLabel}</button
       >
-      <button
-        type="button"
-        class="manager-icon-button is-danger"
-        aria-label={text(
+      <IconButton
+        class="is-danger"
+        ariaLabel={text(
           'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.UnlinkScene',
           'Unlink scene'
         )}
@@ -148,7 +151,7 @@
         onclick={(event) => {
           event.stopPropagation();
           unlinkScene();
-        }}><i class="fas fa-link-slash" aria-hidden="true"></i></button
+        }}><i class="fas fa-link-slash" aria-hidden="true"></i></IconButton
       >
     </div>
   {:else}
@@ -165,26 +168,32 @@
       >
     </div>
   {/if}
-</section>
+</InspectorCard>
 
-<section class="manager-inspector-card">
+<InspectorCard>
   <h3 class="manager-card-title">
     {text(
       'FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.ValidationSummary',
       'Validation summary'
     )}
   </h3>
+  <!-- THE CHIPS NAME THE POPULATION THEY COUNT (issue 1517). They read `Critical` and `Warning`,
+       the domain's SEVERITY words, while counting two severities out of three — so an `info` note
+       appeared in neither chip and the Validation tab's own rail contradicted this card. They now
+       report the same two numbers the rail and the tab badge do, through the one accessor, and
+       take that vocabulary's words: what a GM is being told is how many things BLOCK enabling and
+       how many are worth a look, which is not a severity ranking. -->
   <div class="manager-chip-row">
     <Chip tone={critical > 0 ? 'danger' : 'positive'}
-      >{text('FABRICATE.Admin.Manager.EnvironmentEditor.Validation.Severity.critical', 'Critical')}: {critical}</Chip
+      >{text('FABRICATE.Admin.Manager.Validation.CountBlocking', 'Blocking')}: {critical}</Chip
     >
     <Chip tone={warning > 0 ? 'warning' : 'neutral'}
-      >{text('FABRICATE.Admin.Manager.EnvironmentEditor.Validation.Severity.warning', 'Warning')}: {warning}</Chip
+      >{text('FABRICATE.Admin.Manager.Validation.CountWarnings', 'Warnings')}: {warning}</Chip
     >
   </div>
-</section>
+</InspectorCard>
 
-<section class="manager-inspector-card">
+<InspectorCard>
   <h3 class="manager-card-title">
     {text('FABRICATE.Admin.Manager.EnvironmentEditor.Inspector.RuntimePreview', 'Runtime preview')}
   </h3>
@@ -244,16 +253,19 @@
         ></span
       >
     </div>
-    <div class="manager-fact" data-runtime-fact="unavailable-included">
+    <div class="manager-fact" data-runtime-fact="included-not-matching">
       <span class="manager-fact-line"
-        ><strong>{(counts.unavailableTasks || 0) + (counts.unavailableEvents || 0)}</strong>
+        ><strong
+          >{(counts.includedNotMatchingTasks || 0) +
+            (counts.includedNotMatchingEvents || 0)}</strong
+        >
         <span class="manager-fact-label"
           >{text(
-            'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.UnavailableIncluded',
-            'Included but unavailable'
+            'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.IncludedNotMatching',
+            'Included, not matching'
           )}</span
         ></span
       >
     </div>
   </div>
-</section>
+</InspectorCard>

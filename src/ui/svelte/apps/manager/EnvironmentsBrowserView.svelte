@@ -1,19 +1,32 @@
 <!-- Svelte 5 runes mode -->
 <script>
-  import Chip from './Chip.svelte';
+  import Field from '../../components/Field.svelte';
+  import Chip from '../../components/Chip.svelte';
   import EmptyState from './EmptyState.svelte';
   import { DEFAULT_GATHERING_ENVIRONMENT_IMG } from '../../../../gatheringImageDefaults.js';
   import { localize } from '../../util/foundryBridge.js';
+  import { anchoredPopover, hostRelativePopoverLayout } from '../../actions/anchoredPopover.js';
   import { computeIconPickerPopoverLayout } from '../../util/iconPickerPopover.js';
+  import { MANAGER_MAIN_SELECTOR } from '../../util/overlayBounds.js';
   import Pagination from '../../components/Pagination.svelte';
+  import ManagerButton from '../../components/ManagerButton.svelte';
   import IconPicker from '../../components/IconPicker.svelte';
   import ManagerColorPicker from '../../components/ManagerColorPicker.svelte';
   import ManagerColorPopover from '../../components/ManagerColorPopover.svelte';
+  import StatusToggle from '../../components/StatusToggle.svelte';
   import { dismissOnOutsideClick } from '../../actions/dismissOnOutsideClick.js';
   import GatheringTasksBrowserView from './GatheringTasksBrowserView.svelte';
   import GatheringEventsBrowserView from './GatheringEventsBrowserView.svelte';
+  import {
+    DEFAULT_BROWSER_PAGE_SIZE,
+    createEnvironmentsBrowserState,
+  } from '../../../../utils/managerBrowserViewState.js';
   import GatheringEconomyView from './GatheringEconomyView.svelte';
   import GatheringPartiesTab from './GatheringPartiesTab.svelte';
+  import IconButton from '../../components/IconButton.svelte';
+  import ActionMenu from '../../components/ActionMenu.svelte';
+  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
+  import ManagerToolbar from '../../components/ManagerToolbar.svelte';
 
   let {
     environments = [],
@@ -23,7 +36,6 @@
     environmentDraftDirty = false,
     environmentValidationCount = 0,
     selectedEnvironmentId = '',
-    selectedSystemName = '',
     selectedSystemId = '',
     gatheringConfig = null,
     sceneOptions = [],
@@ -31,7 +43,6 @@
     shouldUseEnvironmentDraftForDisplay = false,
     activeGatheringTab = 'environments',
     activeTravelTab = 'parties',
-    worldParties = false,
     services = null,
     selectedTaskId = '',
     selectedEventId = '',
@@ -103,16 +114,35 @@
     onClearStaleTravelActor = () => {},
     // eslint-disable-next-line no-unused-vars -- retained unwired Travel CRUD; see note above
     onDropStaleOverrideRealm = () => {},
+    // The lifted browse view-state (issue 1438); see the block below the destructure.
+    browserState = $bindable(null),
+    // The two gathering child browsers' own lifted state, threaded straight through. They are
+    // rendered HERE but owned by the root for the same reason this one is: their editor routes
+    // unmount this whole subtree, so a slot held one level up would die with it.
+    gatheringTasksBrowserState = $bindable(null),
+    gatheringEventsBrowserState = $bindable(null),
   } = $props();
 
-  let searchTerm = $state('');
-  let statusFilter = $state('all');
-  let selectionFilter = $state('all');
-  let riskFilter = $state('all');
-  let biomeFilter = $state('all');
-  let lastSystemId = $state('');
-  let pageIndex = $state(0);
-  let pageSize = $state(10);
+  // ── THE BROWSE VIEW-STATE IS LIFTED (issue 1438) ──────────────────────────────────────
+  // Search, the four filter axes, the page AND the system-switch sentinel live on one object
+  // the manager root owns and binds through `browserState`. Opening an environment, a task or
+  // an encounter switches `currentView` to that editor route, which unmounts this component;
+  // held locally, every control was reset by the trip out and back. The SENTINEL comes too: a
+  // component-local one re-initialises to '' on the remount, so the effect below would read
+  // the return as a system switch and wipe the state the lift exists to preserve.
+  //
+  // The vocabulary ADD-FORM inputs below are deliberately NOT lifted. A half-typed biome name
+  // is one sitting's work, not a filter, and it is still cleared by a system switch.
+  let ownBrowserState = $state(createEnvironmentsBrowserState());
+  const ui = $derived(browserState ?? ownBrowserState);
+
+  const searchTerm = $derived(String(ui.searchTerm || ''));
+  const statusFilter = $derived(ui.statusFilter || 'all');
+  const selectionFilter = $derived(ui.selectionFilter || 'all');
+  const riskFilter = $derived(ui.riskFilter || 'all');
+  const biomeFilter = $derived(ui.biomeFilter || 'all');
+  const pageIndex = $derived(ui.pageIndex || 0);
+  const pageSize = $derived(ui.pageSize || DEFAULT_BROWSER_PAGE_SIZE);
   let weatherInput = $state('');
   let timeOfDayInput = $state('');
   let biomeInput = $state('');
@@ -123,15 +153,16 @@
   let biomeCustomColorInput = $state('');
   let openBiomeColorPickerId = $state('');
   let biomeColorTriggerButton = $state(null);
-  // The portaled popover root, registered via registerBiomeColorPopoverNode. It is fed as
-  // an `additionalNodes` entry to the dismissOnOutsideClick wrapping the trigger below, the
-  // same pattern ManagerColorPicker uses for its own portaled popover. ManagerColorPopover's
-  // own internal dismissal is disabled here (`manageDismiss={false}`) so this is the single
-  // outside-click authority; without it, a mousedown on the trigger itself would count as
-  // "outside" (the trigger is not inside the portaled popover), dismiss on mousedown, then
-  // the trigger's own contextmenu handler would reopen it in the same gesture.
+  // The popover root, registered via registerBiomeColorPopoverNode. It is what `anchoredPopover`
+  // portals and positions below, and it is ALSO fed as an `additionalNodes` entry to the
+  // dismissOnOutsideClick wrapping the trigger, the same pattern ManagerColorPicker uses for its
+  // own popover. ManagerColorPopover's own internal dismissal is disabled here
+  // (`manageDismiss={false}`) so this is the single outside-click authority; without it, a
+  // mousedown on the trigger itself would count as "outside" (the trigger is not inside the
+  // portaled popover), dismiss on mousedown, then the trigger's own contextmenu handler would
+  // reopen it in the same gesture.
   let biomeColorPopoverRoot = $state(null);
-  let biomeColorPopoverStyle = $state('');
+  const biomeColorPopoverLayout = hostRelativePopoverLayout(computeIconPickerPopoverLayout);
 
   const gatheringTabs = [
     {
@@ -173,12 +204,12 @@
   ];
 
   $effect(() => {
-    if (selectedSystemId === lastSystemId) return;
-    searchTerm = '';
-    statusFilter = 'all';
-    selectionFilter = 'all';
-    riskFilter = 'all';
-    biomeFilter = 'all';
+    if (selectedSystemId === ui.systemId) return;
+    ui.searchTerm = '';
+    ui.statusFilter = 'all';
+    ui.selectionFilter = 'all';
+    ui.riskFilter = 'all';
+    ui.biomeFilter = 'all';
     weatherInput = '';
     timeOfDayInput = '';
     biomeInput = '';
@@ -188,7 +219,7 @@
     biomeColorTokenInput = 'sage';
     biomeCustomColorInput = '';
     openBiomeColorPickerId = '';
-    lastSystemId = selectedSystemId;
+    ui.systemId = selectedSystemId;
   });
 
   const environmentList = $derived(environments || []);
@@ -218,9 +249,6 @@
     selectedGatheringSystemConfig.vocabularies?.biomes || {
       values: gatheringConfig?.vocabularies?.biomes || [],
     }
-  );
-  const activeGatheringTabConfig = $derived(
-    gatheringTabs.find((tab) => tab.id === activeGatheringTab) || gatheringTabs[0]
   );
   const biomeOptions = $derived(
     uniqueSorted(
@@ -275,7 +303,7 @@
 
   $effect(() => {
     if (pageIndex > 0 && pageIndex * pageSize >= filteredEnvironments.length) {
-      pageIndex = 0;
+      ui.pageIndex = 0;
     }
   });
 
@@ -330,6 +358,33 @@
     return Boolean(environmentSceneImage(environment) || explicitImage);
   }
 
+  // The two commands that left the row's three-button cluster for the overflow menu (issue 1515).
+  // Edit stays an `<IconButton>` — it is the row's primary act — and Duplicate and Delete are
+  // built as data so the shared `<ActionMenu>` owns the trigger, the portaled panel and the
+  // keyboard contract that three loose buttons never had.
+  // THE MENU ITEMS NAME THE COMMAND, NOT THE ROW (issue 1515). `ActionMenu`'s `label` is both the
+  // visible text and the `menuitem`'s accessible name, and the shipped callers that predate this
+  // conversion — `ComponentBrowserInspector` and `environment/CompositionList` — both spell it as a
+  // generic verb ("Delete component", "Move up"). The row is identified by the trigger the menu was
+  // opened from, so repeating its name in every item widens the panel to restate what the reader
+  // just acted on. This is also why `Recipe.DuplicateNamed` and `Component.DeleteNamed` are already
+  // dead in `tests/lang-known-orphans.js`: the earlier conversions retired the same `{name}` copy.
+  function rowMenuItems() {
+    return [
+      {
+        id: 'duplicate',
+        label: text('FABRICATE.Admin.Manager.Environment.Duplicate', 'Duplicate environment'),
+        icon: 'fas fa-copy',
+      },
+      {
+        id: 'delete',
+        label: text('FABRICATE.Admin.Manager.Environment.Delete', 'Delete environment'),
+        icon: 'fas fa-trash',
+        danger: true,
+      },
+    ];
+  }
+
   function environmentSelectionModeLabel(environment) {
     return environment?.selectionMode === 'blind'
       ? text('FABRICATE.Admin.Environments.SelectionBlind', 'Blind')
@@ -364,11 +419,11 @@
   }
 
   function clearFilters() {
-    searchTerm = '';
-    statusFilter = 'all';
-    selectionFilter = 'all';
-    riskFilter = 'all';
-    biomeFilter = 'all';
+    ui.searchTerm = '';
+    ui.statusFilter = 'all';
+    ui.selectionFilter = 'all';
+    ui.riskFilter = 'all';
+    ui.biomeFilter = 'all';
   }
 
   function selectGatheringTab(tabId) {
@@ -526,9 +581,6 @@
     const shouldOpen = openBiomeColorPickerId !== id;
     openBiomeColorPickerId = shouldOpen ? id : '';
     biomeColorTriggerButton = shouldOpen ? (event?.currentTarget ?? null) : null;
-    if (shouldOpen) {
-      updateBiomeColorPopoverPosition();
-    }
   }
 
   function handleBiomeIconKeydown(event, id) {
@@ -541,101 +593,33 @@
     biomeColorTriggerButton = null;
   }
 
-  function getBiomeColorPopoverHost() {
-    if (!biomeColorTriggerButton || typeof document === 'undefined') return null;
-
-    return biomeColorTriggerButton.closest('.fabricate-manager');
-  }
-
-  function getBiomeColorPopoverHorizontalBounds(hostRect) {
-    if (!biomeColorTriggerButton) return {};
-
-    const mainPanel = biomeColorTriggerButton.closest('.manager-main');
-    const mainPanelRect = mainPanel?.getBoundingClientRect?.();
-    if (!mainPanelRect) return {};
-
-    return {
-      minLeft: mainPanelRect.left - hostRect.left + 16,
-      maxRight: mainPanelRect.right - hostRect.left - 16,
-    };
-  }
-
-  function updateBiomeColorPopoverPosition() {
-    if (!openBiomeColorPickerId || !biomeColorTriggerButton || typeof window === 'undefined')
-      return;
-
-    const popoverHost = getBiomeColorPopoverHost();
-    const hostRect = popoverHost?.getBoundingClientRect?.() ?? {
-      left: 0,
-      top: 0,
-      width: window.innerWidth,
-      height: window.innerHeight,
-    };
-    const triggerRect = biomeColorTriggerButton.getBoundingClientRect();
-    const horizontalBounds = getBiomeColorPopoverHorizontalBounds(hostRect);
-    const layout = computeIconPickerPopoverLayout(
-      {
-        left: triggerRect.left - hostRect.left,
-        right: triggerRect.right - hostRect.left,
-        top: triggerRect.top - hostRect.top,
-        bottom: triggerRect.bottom - hostRect.top,
-        width: triggerRect.width,
-        height: triggerRect.height,
-      },
-      { width: hostRect.width || window.innerWidth, height: hostRect.height || window.innerHeight },
-      {
-        horizontalAlign: 'left',
-        minLeft: horizontalBounds.minLeft,
-        maxRight: horizontalBounds.maxRight,
-        minWidth: 220,
-        maxWidth: 220,
-      }
-    );
-
-    if (!layout) {
-      biomeColorPopoverStyle = '';
-      return;
-    }
-
-    const verticalPosition =
-      layout.placement === 'top'
-        ? `top: auto; bottom: ${layout.bottom}px;`
-        : `top: ${layout.top}px; bottom: auto;`;
-
-    biomeColorPopoverStyle = [
-      `left: ${layout.left}px;`,
-      'right: auto;',
-      `width: ${layout.width}px;`,
-      `max-height: ${layout.maxHeight}px;`,
-      verticalPosition,
-    ].join(' ');
-  }
-
   function registerBiomeColorPopoverNode(node) {
     biomeColorPopoverRoot = node;
   }
 
+  // `anchoredPopover` is driven from HERE rather than with `use:` on the panel, for the reason
+  // `ManagerColorPicker` records against its own copy of this shape: the panel is
+  // `ManagerColorPopover`, a shared component this view does not own the markup of and whose
+  // other call sites render it inline. An action is a plain function, so this view applies it to
+  // the node the popover registers — same contract, same teardown, no new prop on that component.
+  //
+  // The options reproduce the measure/flip/clamp pass this view used to hand-write: the picker
+  // layout in host-relative coordinates, left-aligned at a fixed 220px, clipped inside the
+  // manager's main column. The effect tracks the popover ROOT alone; the trigger is re-read
+  // through the `trigger` function on every measure, and closing unmounts the popover, which
+  // unregisters the node and tears the handle down.
   $effect(() => {
-    if (
-      !openBiomeColorPickerId ||
-      typeof window === 'undefined' ||
-      typeof document === 'undefined'
-    ) {
-      biomeColorPopoverStyle = '';
-      biomeColorPopoverRoot = null;
-      return;
-    }
+    if (!biomeColorPopoverRoot) return;
 
-    updateBiomeColorPopoverPosition();
+    const handle = anchoredPopover(biomeColorPopoverRoot, {
+      component: 'EnvironmentsBrowserView biome colour picker',
+      trigger: () => biomeColorTriggerButton,
+      layout: biomeColorPopoverLayout,
+      layoutOptions: () => ({ horizontalAlign: 'left', minWidth: 220, maxWidth: 220 }),
+      bounds: MANAGER_MAIN_SELECTOR,
+    });
 
-    const handleViewportChange = () => updateBiomeColorPopoverPosition();
-    window.addEventListener('resize', handleViewportChange);
-    document.addEventListener('scroll', handleViewportChange, true);
-
-    return () => {
-      window.removeEventListener('resize', handleViewportChange);
-      document.removeEventListener('scroll', handleViewportChange, true);
-    };
+    return () => handle.destroy();
   });
 
   function updateCurrentCondition(kind, value) {
@@ -664,48 +648,12 @@
   function conditionValues(setting) {
     return Array.isArray(setting?.values) ? setting.values : [];
   }
-
-  function gatheringHeaderTitle() {
-    if (activeGatheringTab === 'travel' && worldParties) {
-      return text('FABRICATE.Admin.Manager.World.PartiesTitle', 'World Parties');
-    }
-    const titleKey = activeGatheringTabConfig?.titleKey;
-    if (titleKey) return text(titleKey, activeGatheringTabConfig.titleFallback);
-    return text('FABRICATE.Admin.Manager.Environment.Library', 'Gathering environments');
-  }
-
-  function gatheringHeaderHint() {
-    if (activeGatheringTab === 'travel' && worldParties) {
-      return text(
-        'FABRICATE.Admin.Manager.World.PartiesHint',
-        'Create and manage parties shared across every crafting system.'
-      );
-    }
-    const hintKey = activeGatheringTabConfig?.hintKey;
-    if (hintKey) return text(hintKey, activeGatheringTabConfig.hintFallback);
-    return text(
-      'FABRICATE.Admin.Manager.Environment.LibraryHint',
-      'Browse scene-linked gathering environments and open the existing editor for task authoring.'
-    );
-  }
 </script>
 
 <main
   class="manager-main"
   aria-label={text('FABRICATE.Admin.Manager.Nav.Environments', 'Gathering')}
 >
-  <section class="manager-section-header">
-    <div class="manager-heading">
-      <p class="manager-kicker">
-        {worldParties
-          ? text('FABRICATE.Admin.Manager.World.PartiesKicker', 'WORLD / every system')
-          : selectedSystemName || text('FABRICATE.Admin.Manager.SelectSystem', 'Select a system')}
-      </p>
-      <h2 class="manager-title">{gatheringHeaderTitle()}</h2>
-      <p class="manager-subtitle">{gatheringHeaderHint()}</p>
-    </div>
-  </section>
-
   {#if activeGatheringTab === 'environments'}
     <div
       class="manager-gathering-panel manager-gathering-panel-environments"
@@ -713,30 +661,24 @@
       role="tabpanel"
       aria-labelledby="manager-gathering-nav-environments"
     >
-      <section
-        class="manager-toolbar manager-environments-toolbar"
-        aria-label={text('FABRICATE.Admin.Manager.Environment.Filters', 'Environment filters')}
+      <ManagerToolbar
+        class="manager-environments-toolbar"
+        ariaLabel={text('FABRICATE.Admin.Manager.Environment.Filters', 'Environment filters')}
       >
-        <label class="manager-search">
-          <i class="fas fa-search" aria-hidden="true"></i>
-          <input
-            type="search"
-            bind:value={searchTerm}
-            placeholder={text(
-              'FABRICATE.Admin.Manager.Environment.SearchPlaceholder',
-              'Search environments...'
-            )}
-            aria-label={text(
-              'FABRICATE.Admin.Manager.Environment.SearchLabel',
-              'Search environments'
-            )}
-          />
-        </label>
+        <ManagerSearchField
+          value={searchTerm}
+          onInput={(next) => (ui.searchTerm = next)}
+          placeholder={text(
+            'FABRICATE.Admin.Manager.Environment.SearchPlaceholder',
+            'Search environments...'
+          )}
+          ariaLabel={text('FABRICATE.Admin.Manager.Environment.SearchLabel', 'Search environments')}
+        />
         <label class="manager-filter">
           <span>{text('FABRICATE.Admin.Manager.StatusFilter', 'Status')}</span>
           <select
             value={statusFilter}
-            onchange={(event) => (statusFilter = event.currentTarget.value)}
+            onchange={(event) => (ui.statusFilter = event.currentTarget.value)}
             aria-label={text(
               'FABRICATE.Admin.Manager.Environment.StatusFilterLabel',
               'Filter environments by status'
@@ -761,7 +703,7 @@
           <span>{text('FABRICATE.Admin.Environments.SelectionMode', 'Selection mode')}</span>
           <select
             value={selectionFilter}
-            onchange={(event) => (selectionFilter = event.currentTarget.value)}
+            onchange={(event) => (ui.selectionFilter = event.currentTarget.value)}
             aria-label={text(
               'FABRICATE.Admin.Manager.Environment.SelectionFilterLabel',
               'Filter environments by selection mode'
@@ -782,7 +724,7 @@
           <span>{text('FABRICATE.Admin.Manager.Environment.Risk', 'Risk')}</span>
           <select
             value={riskFilter}
-            onchange={(event) => (riskFilter = event.currentTarget.value)}
+            onchange={(event) => (ui.riskFilter = event.currentTarget.value)}
             aria-label={text(
               'FABRICATE.Admin.Manager.Environment.RiskFilterLabel',
               'Filter environments by risk'
@@ -809,7 +751,7 @@
           <span>{text('FABRICATE.Admin.Manager.Environment.Biome', 'Biome')}</span>
           <select
             value={biomeFilter}
-            onchange={(event) => (biomeFilter = event.currentTarget.value)}
+            onchange={(event) => (ui.biomeFilter = event.currentTarget.value)}
             aria-label={text(
               'FABRICATE.Admin.Manager.Environment.BiomeFilterLabel',
               'Filter environments by biome'
@@ -829,17 +771,16 @@
             .replace('{total}', environmentList.length)}</Chip
         >
         {#if filtersActive}
-          <button
-            type="button"
-            class="manager-button manager-clear-filters"
+          <ManagerButton
+            class="manager-clear-filters"
             data-clear-filters="environments"
             onclick={clearFilters}
           >
             <i class="fas fa-times" aria-hidden="true"></i>
             <span>{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</span>
-          </button>
+          </ManagerButton>
         {/if}
-      </section>
+      </ManagerToolbar>
 
       <section
         class="manager-table-scroll"
@@ -869,17 +810,13 @@
             )}
           >
             <div class="manager-action-group">
-              <button type="button" class="manager-button is-primary" onclick={onCreateEnvironment}>
+              <ManagerButton role="primary" onclick={onCreateEnvironment}>
                 <i class="fas fa-plus" aria-hidden="true"></i>
                 <span
                   >{text('FABRICATE.Admin.Manager.Environment.Create', 'Create environment')}</span
                 >
-              </button>
-              <button
-                type="button"
-                class="manager-button"
-                onclick={() => selectGatheringTab('tasks')}
-              >
+              </ManagerButton>
+              <ManagerButton onclick={() => selectGatheringTab('tasks')}>
                 <i class="fas fa-list-check" aria-hidden="true"></i>
                 <span
                   >{text(
@@ -887,12 +824,8 @@
                     'Review tasks'
                   )}</span
                 >
-              </button>
-              <button
-                type="button"
-                class="manager-button"
-                onclick={() => selectGatheringTab('encounters')}
-              >
+              </ManagerButton>
+              <ManagerButton onclick={() => selectGatheringTab('encounters')}>
                 <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
                 <span
                   >{text(
@@ -900,7 +833,7 @@
                     'Review events'
                   )}</span
                 >
-              </button>
+              </ManagerButton>
             </div>
           </EmptyState>
         {:else if filteredEnvironments.length === 0}
@@ -915,47 +848,43 @@
               'Clear search and filters to show all environments in this system.'
             )}
           >
-            <button type="button" class="manager-button" onclick={clearFilters}
-              >{text('FABRICATE.Admin.Manager.ClearSearch', 'Clear search')}</button
+            <ManagerButton onclick={clearFilters}
+              >{text('FABRICATE.Admin.Manager.ClearSearch', 'Clear search')}</ManagerButton
             >
           </EmptyState>
         {:else}
+          <!-- A LIST, NOT A TABLE (issue 1515): see `SystemsBrowserView` for the whole
+               reasoning. The column strip stays as the VISUAL header over the shared grid and is
+               `aria-hidden`, because a `columnheader` outside a `table` names nothing. -->
           <div
             class="manager-environments-table"
-            role="table"
+            role="list"
             aria-label={text('FABRICATE.Admin.Manager.Environment.TableShort', 'Environments')}
           >
-            <div class="manager-table-head manager-environment-table-head" role="row">
-              <span role="columnheader"
+            <div class="manager-table-head manager-environment-table-head" aria-hidden="true">
+              <span
                 >{text(
                   'FABRICATE.Admin.Manager.Environment.Column.Environment',
                   'Environment'
                 )}</span
               >
-              <span role="columnheader"
-                >{text('FABRICATE.Admin.Environments.SelectionMode', 'Selection mode')}</span
-              >
-              <span role="columnheader">{text('FABRICATE.Admin.Environments.Tasks', 'Tasks')}</span>
-              <span role="columnheader"
-                >{text('FABRICATE.Admin.Manager.StatusFilter', 'Status')}</span
-              >
-              <span role="columnheader"
-                >{text('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}</span
-              >
+              <span>{text('FABRICATE.Admin.Environments.SelectionMode', 'Selection mode')}</span>
+              <span>{text('FABRICATE.Admin.Environments.Tasks', 'Tasks')}</span>
+              <span>{text('FABRICATE.Admin.Manager.StatusFilter', 'Status')}</span>
+              <span>{text('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}</span>
             </div>
             {#each paginatedEnvironments as environment (environment.id)}
               {@const displayEnvironment = environmentDisplay(environment)}
               <div
                 class={`manager-environment-row ${selectedEnvironmentId === environment.id ? 'is-selected' : ''}`}
-                role="row"
-                aria-selected={selectedEnvironmentId === environment.id}
+                role="listitem"
+                aria-current={selectedEnvironmentId === environment.id ? 'true' : undefined}
                 data-environment-id={environment.id}
               >
                 <button
                   type="button"
                   class="manager-environment-identity"
                   onclick={() => onSelectEnvironment(environment.id)}
-                  role="cell"
                 >
                   <img
                     class={`manager-environment-thumb ${hasEnvironmentImage(displayEnvironment) ? '' : 'is-fallback'}`}
@@ -992,7 +921,6 @@
                   </span>
                 </button>
                 <span
-                  role="cell"
                   class="manager-labeled-cell"
                   data-label={stackedLabel(
                     'FABRICATE.Admin.Environments.SelectionMode',
@@ -1002,7 +930,6 @@
                   <Chip>{environmentSelectionModeLabel(displayEnvironment)}</Chip>
                 </span>
                 <span
-                  role="cell"
                   class="manager-labeled-cell"
                   data-label={stackedLabel('FABRICATE.Admin.Environments.Tasks', 'Tasks')}
                 >
@@ -1011,15 +938,15 @@
                   >
                 </span>
                 <span
-                  role="cell"
                   class="manager-labeled-cell manager-status-cell"
                   data-label={stackedLabel('FABRICATE.Admin.Manager.StatusFilter', 'Status')}
                 >
-                  <button
-                    type="button"
-                    class={`manager-status-toggle ${displayEnvironment.enabled === false ? 'is-off' : 'is-on'}`}
-                    aria-pressed={displayEnvironment.enabled !== false}
-                    aria-label={text(
+                  <StatusToggle
+                    on={displayEnvironment.enabled !== false}
+                    label={displayEnvironment.enabled === false
+                      ? text('FABRICATE.Admin.Manager.StatusOff', 'Off')
+                      : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
+                    ariaLabel={text(
                       'FABRICATE.Admin.Manager.Environment.ToggleNamed',
                       'Toggle {name}'
                     ).replace('{name}', environmentName(displayEnvironment))}
@@ -1031,27 +958,15 @@
                       );
                     }}
                     onkeydown={(event) => event.stopPropagation()}
-                  >
-                    <span class="manager-status-toggle-track" aria-hidden="true">
-                      <span class="manager-status-toggle-knob"></span>
-                    </span>
-                    <span class="manager-status-toggle-label">
-                      {displayEnvironment.enabled === false
-                        ? text('FABRICATE.Admin.Manager.StatusOff', 'Off')
-                        : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
-                    </span>
-                  </button>
+                  />
                 </span>
                 <span
-                  role="cell"
                   class="manager-action-group manager-environment-actions manager-labeled-cell"
                   data-label={stackedLabel('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}
                 >
                   <span class="manager-environment-action-grid">
-                    <button
-                      type="button"
-                      class="manager-icon-button"
-                      aria-label={text(
+                    <IconButton
+                      ariaLabel={text(
                         'FABRICATE.Admin.Manager.Environment.EditNamed',
                         'Edit {name}'
                       ).replace('{name}', environmentName(displayEnvironment))}
@@ -1059,37 +974,22 @@
                       onclick={() => onEditEnvironment(environment.id)}
                     >
                       <i class="fas fa-edit" aria-hidden="true"></i>
-                    </button>
-                    <button
-                      type="button"
-                      class="manager-icon-button"
-                      aria-label={text(
-                        'FABRICATE.Admin.Manager.Environment.DuplicateNamed',
-                        'Duplicate {name}'
+                    </IconButton>
+                    <ActionMenu
+                      items={rowMenuItems()}
+                      triggerLabel={text(
+                        'FABRICATE.Admin.Manager.Environment.ActionsFor',
+                        'Environment actions for {name}'
                       ).replace('{name}', environmentName(displayEnvironment))}
-                      title={text(
-                        'FABRICATE.Admin.Manager.Environment.Duplicate',
-                        'Duplicate environment'
+                      triggerTitle={text(
+                        'FABRICATE.Admin.Manager.Environment.Actions',
+                        'Environment actions'
                       )}
-                      onclick={() => onDuplicateEnvironment(environment.id)}
-                    >
-                      <i class="fas fa-copy" aria-hidden="true"></i>
-                    </button>
-                    <button
-                      type="button"
-                      class="manager-icon-button is-danger"
-                      aria-label={text(
-                        'FABRICATE.Admin.Manager.Environment.DeleteNamed',
-                        'Delete {name}'
-                      ).replace('{name}', environmentName(displayEnvironment))}
-                      title={text(
-                        'FABRICATE.Admin.Manager.Environment.Delete',
-                        'Delete environment'
-                      )}
-                      onclick={() => onDeleteEnvironment(environment.id)}
-                    >
-                      <i class="fas fa-trash" aria-hidden="true"></i>
-                    </button>
+                      onSelect={(action) => {
+                        if (action === 'duplicate') onDuplicateEnvironment(environment.id);
+                        else if (action === 'delete') onDeleteEnvironment(environment.id);
+                      }}
+                    />
                   </span>
                 </span>
               </div>
@@ -1102,10 +1002,10 @@
         totalCount={filteredEnvironments.length}
         {pageSize}
         {pageIndex}
-        onPageChange={(next) => (pageIndex = next)}
+        onPageChange={(next) => (ui.pageIndex = next)}
         onPageSizeChange={(next) => {
-          pageSize = next;
-          pageIndex = 0;
+          ui.pageSize = next;
+          ui.pageIndex = 0;
         }}
       />
     </div>
@@ -1123,6 +1023,7 @@
       onDuplicateTask={onDuplicateGatheringTask}
       onDeleteTask={onDeleteGatheringTask}
       onToggleTaskEnabled={onToggleGatheringTaskEnabled}
+      bind:browserState={gatheringTasksBrowserState}
     />
   {:else if activeGatheringTab === 'encounters'}
     <div class="manager-gathering-encounters-shell" data-gathering-encounters-shell>
@@ -1138,6 +1039,7 @@
         onDuplicateEvent={onDuplicateGatheringEvent}
         onDeleteEvent={onDeleteGatheringEvent}
         onToggleEventEnabled={onToggleGatheringEventEnabled}
+        bind:browserState={gatheringEventsBrowserState}
       />
     </div>
   {:else if activeGatheringTab === 'travel'}
@@ -1191,11 +1093,12 @@
               <i class={condition.icon} aria-hidden="true"></i>
               <span>{conditionTitle(condition.kind)}</span>
             </span>
-            <button
-              type="button"
-              class={`manager-status-toggle ${condition.setting.enabled === false ? 'is-off' : 'is-on'}`}
-              aria-pressed={condition.setting.enabled !== false}
-              aria-label={condition.setting.enabled === false
+            <StatusToggle
+              on={condition.setting.enabled !== false}
+              label={condition.setting.enabled === false
+                ? text('FABRICATE.Admin.Manager.StatusOff', 'Off')
+                : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
+              ariaLabel={condition.setting.enabled === false
                 ? text(
                     'FABRICATE.Admin.Manager.Environment.Conditions.EnableMatching',
                     'Enable matching'
@@ -1210,20 +1113,11 @@
                   condition.setting.enabled === false,
                   selectedSystemId
                 )}
-            >
-              <span class="manager-status-toggle-track" aria-hidden="true">
-                <span class="manager-status-toggle-knob"></span>
-              </span>
-              <span class="manager-status-toggle-label">
-                {condition.setting.enabled === false
-                  ? text('FABRICATE.Admin.Manager.StatusOff', 'Off')
-                  : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
-              </span>
-            </button>
+            />
           </header>
           <p class="manager-condition-panel-hint">{conditionHint(condition.kind)}</p>
 
-          <label class="manager-field manager-condition-current">
+          <Field as="label" class="manager-condition-current">
             <span>{conditionCurrentLabel(condition.kind)}</span>
             <select
               value={condition.setting.current}
@@ -1234,7 +1128,7 @@
                 <option value={conditionId(option)}>{conditionLabel(option)}</option>
               {/each}
             </select>
-          </label>
+          </Field>
 
           <form
             class="manager-condition-add"
@@ -1249,22 +1143,25 @@
               )}
               onChange={(icon) => setConditionAddIcon(condition.kind, icon)}
             />
-            <label class="manager-field">
+            <Field as="label">
               <input
                 value={conditionInputValue(condition.kind)}
                 aria-label={conditionAddLabel(condition.kind)}
                 placeholder={conditionInputPlaceholder(condition.kind)}
                 oninput={(event) => setConditionInput(condition.kind, event.currentTarget.value)}
               />
-            </label>
-            <button
+            </Field>
+            <ManagerButton
+              role="primary"
               type="submit"
-              class="manager-button manager-add-button"
+              class="manager-add-button"
+              data-gathering-condition-add={condition.kind}
               aria-label={conditionAddLabel(condition.kind)}
               title={conditionAddLabel(condition.kind)}
             >
+              <i class="fas fa-plus" aria-hidden="true"></i>
               <span>{text('FABRICATE.Admin.Manager.Environment.SettingsAdd', 'Add')}</span>
-            </button>
+            </ManagerButton>
           </form>
 
           <div
@@ -1385,22 +1282,25 @@
                 }}
               />
             {/if}
-            <label class="manager-field">
+            <Field as="label">
               <input
                 value={vocabularyInputValue()}
                 aria-label={vocabularyAddLabel()}
                 placeholder={vocabularyPlaceholder()}
                 oninput={(event) => setVocabularyInput(event.currentTarget.value)}
               />
-            </label>
-            <button
+            </Field>
+            <ManagerButton
+              role="primary"
               type="submit"
-              class="manager-button manager-add-button"
+              class="manager-add-button"
+              data-gathering-vocabulary-add={vocabulary.kind}
               aria-label={vocabularyAddLabel()}
               title={vocabularyAddLabel()}
             >
+              <i class="fas fa-plus" aria-hidden="true"></i>
               <span>{text('FABRICATE.Admin.Manager.Environment.SettingsAdd', 'Add')}</span>
-            </button>
+            </ManagerButton>
           </form>
 
           <div
@@ -1464,8 +1364,6 @@
                             selectedSystemId
                           )}
                         onDismiss={closeBiomeColorPicker}
-                        popoverStyle={biomeColorPopoverStyle}
-                        portalTarget={() => getBiomeColorPopoverHost()}
                         registerPopoverNode={registerBiomeColorPopoverNode}
                         manageDismiss={false}
                       />

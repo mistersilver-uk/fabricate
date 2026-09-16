@@ -83,10 +83,14 @@ export function createLabRoll({ random, replaceFormulaData, validate }) {
     /**
      * @param {string} formula The roll expression.
      * @param {object} [data] Roll data for `@path` substitution.
+     * @param {object} [options] Roll metadata preserved across the evaluated handoff.
      */
-    constructor(formula, data = {}) {
+    constructor(formula, data = {}, options = {}) {
       this.data = data;
-      this.formula = String(formula ?? '');
+      this.options = options;
+      // Core substitutes data while constructing terms; serialized rolls carry the resolved
+      // formula, not the actor's data. Resolve here so restoration needs no live actor lookup.
+      this.formula = replaceFormulaData(String(formula ?? ''), data, { missing: '0' });
       this.dice = [];
       this.terms = [];
       this.total = undefined;
@@ -175,6 +179,57 @@ export function createLabRoll({ random, replaceFormulaData, validate }) {
     }
 
     /**
+     * Snapshot the lab's evaluated roll for the authoritative check handoff.
+     *
+     * Envelope names follow Roll#toJSON in Foundry V14.365 client/dice/roll.mjs:
+     * it returns an OBJECT, and the wire flag is `evaluated`, not `_evaluated`.
+     * The lab retains its reduced dice/terms snapshots; this is not a decoder for arbitrary
+     * core RollTerm classes or an expansion of the evaluator's supported operators.
+     * Local and CI captures use this same adapter and seeded stream.
+     *
+     * @returns {object} Detached, JSON-serializable roll data.
+     */
+    toJSON() {
+      return structuredClone({
+        class: this.constructor.name,
+        options: this.options,
+        dice: this.dice,
+        formula: this.formula,
+        terms: this.terms,
+        total: this.total,
+        evaluated: this._evaluated,
+      });
+    }
+
+    /**
+     * Restore a lab snapshot without evaluating, looking up actor data, or drawing entropy.
+     * Core also defaults a missing `evaluated` flag to true for historical roll data.
+     *
+     * @param {object} data The object returned by toJSON, optionally JSON-transported.
+     * @returns {LabRoll} The reconstructed roll.
+     */
+    static fromData(data) {
+      if (data.class && data.class !== this.name) {
+        throw new Error(`View Lab Roll cannot reconstruct ${data.class}`);
+      }
+      const snapshot = structuredClone(data);
+      const roll = new this(snapshot.formula, snapshot.data, snapshot.options);
+      roll.terms = snapshot.terms;
+      if (snapshot.evaluated ?? true) {
+        roll.total = snapshot.total;
+        roll.dice = snapshot.dice ?? [];
+        roll._evaluated = true;
+        // Rebuild only the lab's diagnostic expression, using saved group totals. Never
+        // reduce the expression or evaluate the dice again: the stored total is authoritative.
+        let dieIndex = 0;
+        roll.result = roll.formula
+          .replaceAll(FLAVOUR_SPAN, '')
+          .replaceAll(DIE_TERM, () => String(roll.dice[dieIndex++].total));
+      }
+      return roll;
+    }
+
+    /**
      * Post the roll to chat.
      *
      * Real rather than a no-op because `checkRoll.js` wraps this call in a try/catch that
@@ -184,11 +239,12 @@ export function createLabRoll({ random, replaceFormulaData, validate }) {
      * @param {object} [messageData] Chat message data.
      * @param {object} [options] Options.
      * @param {string} [options.rollMode] Roll mode passthrough.
+     * @param {string} [options.messageMode] V14 message mode passthrough.
      * @param {boolean} [options.create] When false, return the data instead of creating.
      * @returns {Promise<object|null>} The created message, or the data when `create` is false.
      */
-    async toMessage(messageData = {}, { rollMode, create = true } = {}) {
-      const data = { ...messageData, rolls: [this], rollMode };
+    async toMessage(messageData = {}, { rollMode, messageMode, create = true } = {}) {
+      const data = { ...messageData, rolls: [this], rollMode, messageMode };
       if (create === false) return data;
       return (await globalThis.ChatMessage?.create?.(data)) ?? null;
     }

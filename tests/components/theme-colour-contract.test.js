@@ -12,6 +12,27 @@ const productRoots = [
   resolve(repoRoot, 'styles')
 ];
 const allowedExtensions = new Set(['.js', '.svelte', '.css']);
+// The READ corpus is deliberately wider than `productRoots` above (issue 1499). Tokens are read
+// from outside `src/ui` — `src/config/playerCharacterTypesMenu.js` and
+// `src/systems/BulkSalvageChatCard.js` both do — and from `.mjs`, which `allowedExtensions` omits.
+// A narrower corpus would report a live token as unread and delete a token the product paints
+// with, so the unread gate walks `src/` in full with its own extension list. The colour-literal
+// assertions keep `productRoots`: their subject is authored product UI, not every reader.
+const readCorpusRoots = [resolve(repoRoot, 'src'), resolve(repoRoot, 'styles')];
+const readCorpusExtensions = new Set(['.js', '.mjs', '.svelte', '.css']);
+// `--fab-tag-*` is read as `var(--fab-tag-${token})`, which no static scan can see, so the unread
+// gate exempts the family. An exemption is only sound while the dynamic reads it stands for still
+// exist, so the gate asserts each site first — otherwise deleting the last dynamic reader would
+// silently leave nine tokens permanently exempt and permanently dead.
+const dynamicTagReadSites = Object.freeze([
+  { path: 'src/ui/svelte/components/ManagerColorPicker.svelte', marker: 'var(--fab-tag-${' },
+  { path: 'src/ui/svelte/components/Medallion.svelte', marker: 'var(--fab-tag-${' },
+  {
+    path: 'src/ui/svelte/apps/manager/scoped/essenceScoped.js',
+    marker: 'getPropertyValue(`--fab-tag-${'
+  }
+]);
+const dynamicallyReadTokenPattern = /^--fab-tag-/;
 const colourLiteralPattern = /(#[0-9a-fA-F]{3,8}\b|rgba?\([^)]*\)|hsla?\([^)]*\)|(?<![-\w])(?:white|black)(?![-\w]))/g;
 const themeSelectors = Object.freeze({
   fabricate: ':root,\n:root[data-fabricate-theme="fabricate"],\n.fabricate[data-fabricate-theme="fabricate"]',
@@ -36,18 +57,18 @@ const themePaletteAnchors = Object.freeze({
   'foundry-native': ['#0C0A14', '#111018', '#30282F', '#2E2833', '#F3F3F5', '#BC8963', '#D9B06D', '#706B70', '#617054', '#A16C60']
 });
 
-function collectProductFiles(rootPath) {
+function collectProductFiles(rootPath, extensions = allowedExtensions) {
   const files = [];
 
   for (const entry of readdirSync(rootPath, { withFileTypes: true })) {
     const fullPath = resolve(rootPath, entry.name);
 
     if (entry.isDirectory()) {
-      files.push(...collectProductFiles(fullPath));
+      files.push(...collectProductFiles(fullPath, extensions));
       continue;
     }
 
-    if (allowedExtensions.has(extname(entry.name))) {
+    if (extensions.has(extname(entry.name))) {
       files.push(fullPath);
     }
   }
@@ -97,10 +118,42 @@ function fallbackBackedTokens(source) {
   return new Set([...source.matchAll(/var\((--fab-[A-Za-z0-9-]+)\s*,/g)].map(match => match[1]));
 }
 
+/**
+ * Source with `/* … *\/` runs removed, so prose cannot be mistaken for code.
+ *
+ * Both halves of the unread gate need this and for the same reason: the `:root` block documents a
+ * DELETED alias block by quoting one of its declarations (`--fab-cs-radius-row: 8px`), which the
+ * declaration scan reads as a live token and then reports as unread. The read scan is stripped for
+ * the mirror image of that: a commented-out `var()` is not a reader, and counting one would keep a
+ * dead token alive. `/* … *\/` is a block comment in CSS, JavaScript and a Svelte `<style>` alike.
+ */
+function stripCommentedSource(source) {
+  return source.replaceAll(/\/\*[\s\S]*?\*\//g, '');
+}
+
+/**
+ * Every `--fab-*` token the product reads through `var()`, across `styles/` and all of `src/`.
+ */
+function tokensReadByProduct() {
+  const read = new Set();
+
+  for (const filePath of readCorpusRoots.flatMap(root =>
+    collectProductFiles(root, readCorpusExtensions)
+  )) {
+    for (const token of tokenReferences(stripCommentedSource(readFileSync(filePath, 'utf8')))) {
+      read.add(token);
+    }
+  }
+
+  return read;
+}
+
 function findColourLiteralOffenders() {
   const offenders = [];
 
-  for (const filePath of productRoots.flatMap(collectProductFiles)) {
+  // Not `flatMap(collectProductFiles)`: `flatMap` passes the INDEX as the second argument, which
+  // would arrive as the extension set and throw on the first file.
+  for (const filePath of productRoots.flatMap(root => collectProductFiles(root))) {
     const source = readFileSync(filePath, 'utf8');
     let match;
 
@@ -132,7 +185,10 @@ describe('Theme colour contract', () => {
     const allReferencedFabTokens = tokenReferences(css);
     const tokensWithFallbacks = fallbackBackedTokens(css);
 
-    assert.ok(referenceThemeTokens.length > 100, 'theme blocks should define the full Fabricate theme token surface');
+    // A floor, not a count: it catches a theme block gutted to a stub, or a `blockFor` selector
+    // that stopped matching and returned something small. Issue 1499 deleted 24 unread tokens from
+    // every block (123 → 99), so the old floor of 100 would have failed on a correct sheet.
+    assert.ok(referenceThemeTokens.length > 90, 'theme blocks should define the full Fabricate theme token surface');
 
     for (const [themeId, block] of Object.entries(themeBlocks)) {
       assert.deepEqual(
@@ -156,6 +212,37 @@ describe('Theme colour contract', () => {
       unresolvedReferencedTokens,
       [],
       `all shared Fabricate token references should resolve from either the root token layer or every theme block:\n${unresolvedReferencedTokens.join('\n')}`
+    );
+  });
+
+  it('declares no root-layer token the product never reads', () => {
+    const css = readFileSync(cssPath, 'utf8');
+    const declared = new Set([
+      ...tokenNames(stripCommentedSource(blockFor(css, ':root'))),
+      ...tokenNames(stripCommentedSource(blockFor(css, themeSelectors.fabricate)))
+    ]);
+
+    for (const site of dynamicTagReadSites) {
+      const source = readFileSync(resolve(repoRoot, site.path), 'utf8');
+      assert.ok(
+        source.includes(site.marker),
+        `${site.path} should still read a tag token dynamically via \`${site.marker}\` — the `
+          + `--fab-tag-* exemption below is sound only while these reads exist, and without them `
+          + `the exemption would keep nine dead tokens permanently invisible to this gate`
+      );
+    }
+
+    const read = tokensReadByProduct();
+    const unread = [...declared]
+      .filter(token => !read.has(token) && !dynamicallyReadTokenPattern.test(token))
+      .sort();
+
+    assert.deepEqual(
+      unread,
+      [],
+      `every token declared in the root layer must be read by at least one var() in styles/ or `
+        + `src/ — a declared token nothing reads is dead weight in seven theme blocks and in every `
+        + `world's stylesheet download:\n${unread.join('\n')}`
     );
   });
 

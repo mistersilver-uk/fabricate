@@ -1,53 +1,65 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  The flat identity tile used by recipe rows and inspectors. It renders the real
-  linked image when the caller resolves one, and falls back to a Font Awesome
-  glyph when `src` is falsy — a recipe HAS an `img`, so a glyph-only medallion
-  would have quietly deleted the image affordance.
-
-  Flat by contract: the surface is `--fab-bg-3`, never a gradient
-  (`tests/components/flat-ui-style-contract.test.js` bans linear/radial/conic
-  gradients anywhere under `src/ui/**` and `styles/**`).
-
-  Import-free leaf (design-system §7): props only. The CALLER resolves the image
-  (`resolveRecipeImage(recipe)`) and passes a plain string — importing
-  `craftingImageDefaults.js` here would propagate a required raw-module entry into
-  every mount-harness allowlist compiling anything that renders a Medallion.
+  The flat identity tile used by recipe rows and inspectors: the real linked image when the caller
+  resolves one, and a Font Awesome glyph when it does not — a recipe HAS an `img`, so a glyph-only
+  medallion would have quietly deleted the image affordance. An IMPORT-FREE LEAF: the CALLER
+  resolves the image and passes a plain string, because importing the image-defaults module here
+  would propagate a required raw-module entry into every mount-harness allowlist.
 
   Props:
-   - src: resolved image path; falsy → the glyph fallback.
-   - icon: Font Awesome class used when `src` is falsy.
-   - size: edge length in px (default 40).
-   - alt: image alt text (decorative by default).
-   - tint: a BARE `--fab-tag-*` palette key (`sage`, `mauve`, …), or '' for the accent
-     default. Issue 1036: the tile pinned `color: var(--fab-accent)` and forwards no rest
-     spread, so as shipped it renders every essence medallion accent-coloured and the
-     per-essence colour vocabulary could never appear on it. The tint recolours the GLYPH
-     and washes the SURFACE, because the prototype tile carries both and recolouring the
-     glyph alone does not reproduce it. Unset is byte-identical to the shipped render:
-     the glyph reads the token through a `var()` FALLBACK, and the wash is a separate
-     class-gated rule rather than a `color-mix` against `transparent`, which would leave
-     an untinted tile 14% translucent instead of unchanged.
-   - glyph: the glyph's font-size in px, for a tile large enough that the 0.9rem default
-     reads as a speck inside it. Unset resolves to `0.9rem` through a `var()` FALLBACK, so
-     no existing medallion moves. It is a prop rather than a `size`-derived calc precisely
-     because deriving it would re-type all ~40 medallions across the manager at once, which
-     is a change with its own frames rather than a side effect of this one.
+  | prop | values | default | contract |
+  | --- | --- | --- | --- |
+  | `art` | resolved image path | `''` | Falsy renders the glyph fallback. Named for the tile the design system publishes, whose prop is `art` because it carries a record's ARTWORK rather than an element's `src`. |
+  | `src` | DEPRECATED alias for `art` | `''` | Kept for ONE release so an out-of-tree caller is not broken by the rename. `art` wins where both are passed and no shipped site uses it; delete it, and this row, in the release after the one that introduced `art`. |
+  | `icon` | Font Awesome classes | see source | Used when `art` is falsy. |
+  | `size` | px | `40` | Edge length. |
+  | `alt` | string | `''` | Image alt text, passed EXPLICITLY wherever `art` is set. `alt=""` is the correct value at every shipped site, because each renders the record's name as adjacent text; the contract is that the decision was TAKEN. Worded as "required" it would push an author into writing redundant alt text beside a visible name on every browse row. `medallion-art-contract.test.js` reds on an art-bearing call site that names no `alt`, and on one reaching for the deprecated alias to escape it. |
+  | `tint` | bare `--fab-tag-*` key | `''` | Recolours the GLYPH and NOTHING ELSE. Unset is byte-identical to the shipped render, because the glyph reads the token through a `var()` FALLBACK that resolves to the accent it always painted. |
+  | `glyph` | px | `''` | The glyph's font size, for a tile large enough that the default reads as a speck. A prop rather than a `size`-derived calc precisely because deriving it would re-type all ~40 medallions at once, which is a change with its own frames. |
+  | `variant` | `''` \| `'glyph-chip'` | `''` | The tile as an UNBORDERED slate chip carrying a tinted glyph. Anything else resolves to `''`, so a medallion that does not ask for it is byte-identical to what shipped. |
+
+  Invariants:
+  - FLAT BY CONTRACT: the surface is `--fab-bg-3`, never a gradient
+    (`tests/components/flat-ui-style-contract.test.js`). The reference paints the chip variant with
+    a gradient between two slate greys, so a `backgroundColor` compare line against it stays open
+    as a recorded deviation rather than a defect this variant can close.
+  - THE TINT RECOLOURS THE GLYPH ALONE: every tinted example on the published specimen sets
+    `color:` only, and the reference's row chips share ONE surface and differ in the glyph's
+    colour. Dropping the surface wash also RAISES glyph-to-ground contrast.
+  - THE `glyph-chip` VARIANT OWNS ONE THING: THE ABSENT BORDER, which is what a caller cannot
+    otherwise express. Its size and colour are the existing props — making either implicit would
+    put a second copy of a row's geometry inside a primitive that already takes it as an argument.
+    It owned a second statement, cancelling the tint's surface wash, until that became true of
+    every medallion; the cancellation went with the thing it cancelled.
 -->
 <script>
-  let { src = '', icon = 'fas fa-scroll', size = 40, alt = '', tint = '', glyph = 0 } = $props();
+  let {
+    art = '',
+    src = '',
+    icon = 'fas fa-scroll',
+    size = 40,
+    alt = '',
+    tint = '',
+    glyph = 0,
+    variant = '',
+  } = $props();
 
-  // Both numeric props are coerced and floored at zero before interpolation: they land in a
-  // `style` attribute, and a caller that passes a string is a caller that could otherwise
-  // compose a declaration.
+  /**
+   * The variant set is CLOSED and compared against a literal, so an unrecognised value renders the
+   * shipped tile rather than an `is-*` class the style block does not paint. It resolves to a
+   * BOOLEAN feeding a `class:` directive rather than a joined class string, which keeps the class
+   * attribute a static literal and the class name a literal in the source for the tooling that
+   * reads one.
+   */
+  const isGlyphChip = $derived(String(variant ?? '') === 'glyph-chip');
+
+  const artPath = $derived(art || src);
+
   const boxHeight = $derived(Math.max(0, Number(size) || 0));
   const glyphPx = $derived(Math.max(0, Number(glyph) || 0));
 
-  // The token arrives as a bare palette key and is interpolated into a `style` attribute,
-  // so it is constrained to the shape a key can have. Anything else is DROPPED to '' — an
-  // unrecognised value renders the accent default rather than emitting a declaration the
-  // caller composed. The leading `--fab-tag-` is tolerated because `ManagerColorPicker`
-  // already accepts both spellings and a primitive should not be the one place that does not.
+  // A bare palette key, interpolated into a `style` attribute, so anything else is DROPPED to ''
+  // and renders the accent default. The leading `--fab-tag-` is tolerated because
+  // `ManagerColorPicker` already accepts both spellings.
   const safeTint = $derived(
     /^[a-z0-9-]+$/.test(String(tint || '').replace(/^--fab-tag-/, ''))
       ? String(tint).replace(/^--fab-tag-/, '')
@@ -62,20 +74,19 @@
 
 <span
   class="fab-medallion"
-  class:has-tint={Boolean(safeTint)}
-  data-medallion={src ? 'image' : 'glyph'}
+  class:is-glyph-chip={isGlyphChip}
+  data-medallion={artPath ? 'image' : 'glyph'}
   data-medallion-tint={safeTint || undefined}
   style={boxStyle}
 >
-  {#if src}
-    <img class="fab-medallion-img" {src} {alt} />
+  {#if artPath}
+    <img class="fab-medallion-img" src={artPath} {alt} />
   {:else}
     <i class={icon} aria-hidden="true"></i>
   {/if}
 </span>
 
 <style>
-  /* Flat surface — no gradient (flat-ui-style-contract). */
   .fab-medallion {
     display: inline-flex;
     flex: 0 0 auto;
@@ -94,14 +105,8 @@
     font-size: var(--fab-medallion-glyph, 0.9rem);
   }
 
-  /* The surface wash, CLASS-GATED rather than folded into the base rule. Writing it as
-     `color-mix(in srgb, var(--fab-medallion-tint, transparent) 14%, var(--fab-bg-3))`
-     would look equivalent but is not: with the property unset that mixes 14% of
-     `transparent` into the surface, leaving every untinted medallion in the repo slightly
-     see-through. A separate rule is the only form that is genuinely a no-op when unset. */
-  .fab-medallion.has-tint {
-    border-color: color-mix(in srgb, var(--fab-medallion-tint) 45%, var(--fab-border));
-    background: color-mix(in srgb, var(--fab-medallion-tint) 14%, var(--fab-bg-3));
+  .fab-medallion.is-glyph-chip {
+    border: 0;
   }
 
   .fab-medallion-img {

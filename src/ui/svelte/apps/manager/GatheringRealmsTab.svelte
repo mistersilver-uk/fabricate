@@ -9,11 +9,14 @@
   intentionally blank.
 -->
 <script>
-  import Chip from './Chip.svelte';
+  import Chip from '../../components/Chip.svelte';
   import EmptyState from './EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
   import RealmEnvironmentsEditor from './RealmEnvironmentsEditor.svelte';
+  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
+  import ManagerToolbar from '../../components/ManagerToolbar.svelte';
+  import { createTravelRealmsBrowserState } from '../../../../utils/managerBrowserViewState.js';
 
   let {
     realms = [],
@@ -23,14 +26,26 @@
     onSelectRealm = () => {},
     onAddEnvironment = () => {},
     onRemoveEnvironment = () => {},
+    // ── THE VIEW-STATE IS LIFTED (issue 1438) ────────────────────────────────────────────
+    // Realms has no editor route — a realm is authored in the inspector — so the trip that
+    // destroyed this state is the World > Travel sub-tab switch to Map region links and any
+    // navigation off the Travel route. Both unmount this component. The page-to-the-selection
+    // sentinel is lifted with the rest: left local it re-initialises on the remount and pages
+    // away from the restored page, which reads as the page not surviving at all.
+    browserState = $bindable(null),
+    // The expanded row's environment pickers, owned by the root and threaded through, because
+    // collapsing the row unmounts them and this tab unmounts underneath them.
+    realmEnvironmentsBrowserState = $bindable(null),
   } = $props();
 
   const PAGE_SIZE = 6;
   const REALM_ICON = 'fas fa-map-location-dot';
 
-  let searchTerm = $state('');
-  let pageIndex = $state(0);
-  let lastNavigatedSelection = $state('');
+  let ownBrowserState = $state(createTravelRealmsBrowserState());
+  const ui = $derived(browserState ?? ownBrowserState);
+
+  const searchTerm = $derived(String(ui.searchTerm || ''));
+  const pageIndex = $derived(ui.pageIndex || 0);
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -51,19 +66,19 @@
   // Keep the page index in range as the filtered set shrinks.
   $effect(() => {
     if (pageIndex > 0 && pageIndex * PAGE_SIZE >= filteredRealms.length) {
-      pageIndex = 0;
+      ui.pageIndex = 0;
     }
   });
 
   // When the selection changes (e.g. a freshly created realm is auto-selected),
   // page to it so it's visible. Guarded so manual pagination/search isn't fought.
   $effect(() => {
-    if (!selectedRealmId || selectedRealmId === lastNavigatedSelection) return;
-    lastNavigatedSelection = selectedRealmId;
+    if (!selectedRealmId || selectedRealmId === ui.navigatedSelectionId) return;
+    ui.navigatedSelectionId = selectedRealmId;
     const index = filteredRealms.findIndex((realm) => realm.id === selectedRealmId);
     if (index < 0) return;
     const targetPage = Math.floor(index / PAGE_SIZE);
-    if (targetPage !== pageIndex) pageIndex = targetPage;
+    if (targetPage !== pageIndex) ui.pageIndex = targetPage;
   });
 
   const pagedRealms = $derived(
@@ -113,23 +128,20 @@
   aria-labelledby="manager-travel-nav-realms"
   data-travel-panel="realms"
 >
-  <section
-    class="manager-toolbar manager-travel-realms-toolbar"
-    aria-label={text('FABRICATE.Admin.Manager.Travel.Realms.Filters', 'Realm filters')}
+  <ManagerToolbar
+    class="manager-travel-realms-toolbar"
+    ariaLabel={text('FABRICATE.Admin.Manager.Travel.Realms.Filters', 'Realm filters')}
   >
-    <label class="manager-search">
-      <i class="fas fa-search" aria-hidden="true"></i>
-      <input
-        type="search"
-        bind:value={searchTerm}
-        placeholder={text(
-          'FABRICATE.Admin.Manager.Travel.Realms.SearchPlaceholder',
-          'Search realms...'
-        )}
-        aria-label={text('FABRICATE.Admin.Manager.Travel.Realms.SearchLabel', 'Search realms')}
-      />
-    </label>
-  </section>
+    <ManagerSearchField
+      value={searchTerm}
+      onInput={(next) => (ui.searchTerm = next)}
+      placeholder={text(
+        'FABRICATE.Admin.Manager.Travel.Realms.SearchPlaceholder',
+        'Search realms...'
+      )}
+      ariaLabel={text('FABRICATE.Admin.Manager.Travel.Realms.SearchLabel', 'Search realms')}
+    />
+  </ManagerToolbar>
 
   {#if filteredRealms.length === 0}
     <EmptyState
@@ -191,6 +203,7 @@
                 {saving}
                 onAdd={onAddEnvironment}
                 onRemove={onRemoveEnvironment}
+                bind:browserState={realmEnvironmentsBrowserState}
               />
             </div>
           {/if}
@@ -203,7 +216,7 @@
       pageSize={PAGE_SIZE}
       {pageIndex}
       pageSizeOptions={[PAGE_SIZE]}
-      onPageChange={(next) => (pageIndex = next)}
+      onPageChange={(next) => (ui.pageIndex = next)}
     />
   {/if}
 </div>

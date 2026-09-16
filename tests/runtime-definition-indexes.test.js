@@ -201,7 +201,8 @@ describe('issue 1076 bound — identity resolution is independent of library siz
     // Non-vacuity for the guard above: the same probe must still register a real scan.
     const counters = createOperationCounters();
     const components = countingCandidates(library(16), counters, 'componentCandidates');
-    components.find((entry) => entry.id === 'c-15');
+    // The RESULT is deliberately unused — the scan is what moves the counter asserted below.
+    const _scanned = components.find((entry) => entry.id === 'c-15');
     assert.equal(counters.get('componentCandidates'), 16);
   });
 
@@ -360,11 +361,15 @@ function ownedStack(componentId, index) {
     system: { quantity: STACK_QUANTITY },
     effects: [],
     deleted: false,
+    // Foundry resolves the DOCUMENT from both writes, which is what the
+    // acknowledged-receipt contract reads before recording an actual consumption.
     async delete() {
       this.deleted = true;
+      return this;
     },
     async update(payload) {
       if (payload['system.quantity'] !== undefined) this.system.quantity = payload['system.quantity'];
+      return this;
     },
     toObject() {
       return { name: this.name, type: this.type, system: { quantity: this.system.quantity } };
@@ -449,6 +454,9 @@ function bulkWorld({ componentCount = LIBRARY, itemCount = HELD_ITEMS } = {}) {
     system: {},
     flags: {},
     items: [...makeActor({ itemCount }).items, ...targets.map((c, index) => ownedStack(c.id, index))],
+    // A created embedded document is PARENTED to this actor and carries its own stored
+    // source, and both writes resolve the document: the acknowledged-award contract
+    // reads all three before it records a receipt for the award.
     async createEmbeddedDocuments(_type, payloads) {
       return payloads.map((payload) => {
         const item = {
@@ -459,11 +467,20 @@ function bulkWorld({ componentCount = LIBRARY, itemCount = HELD_ITEMS } = {}) {
           type: payload?.type || 'loot',
           flags: payload?.flags || {},
           system: { quantity: payload?.system?.quantity ?? 1 },
+          parent: this,
           effects: [],
           getFlag: () => null,
-          async update() {},
-          async delete() {},
+          async update(changes = {}) {
+            if (changes['system.quantity'] !== undefined) {
+              this.system.quantity = changes['system.quantity'];
+            }
+            return this;
+          },
+          async delete() {
+            return this;
+          },
         };
+        item._source = { name: item.name, type: item.type, system: { ...item.system } };
         created.push(item);
         this.items.push(item);
         return item;

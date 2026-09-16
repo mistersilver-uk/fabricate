@@ -1,77 +1,51 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  A clamped numeric stepper whose PRIMARY control is a real, typeable
-  `<input type="number">` styled mono; the −/+ buttons are adjuncts, not the
-  only path. A click-only stepper is a keyboard regression, so the input always
-  stays editable and the buttons never become the sole affordance.
-
-  Import-free leaf (design-system §7): props only — no foundryBridge, no model or
-  util imports. Callers pass an already-localized `ariaLabel`. One util import
-  inside a leaf would propagate a required raw-module entry into every mount
-  harness that compiles anything rendering it (a missing entry HANGS the suite as
-  `# cancelled` rather than failing).
+  A clamped numeric stepper whose PRIMARY control is a real, typeable `<input type="number">`
+  styled mono; the −/+ buttons are adjuncts, not the only path. A click-only stepper is a keyboard
+  regression, so the input always stays editable and the buttons never become the sole affordance.
 
   Props:
-   - value: the current number, or `null` / `undefined` / `''` for an UNSET field
-     (see `allowUnset`). The default is `null` rather than `0` deliberately: Svelte
-     5's `$props()` fallback fires on `undefined`, so a `0` default would resolve
-     before `allowUnset` was ever consulted and render `0` for a field its caller
-     left unset. `Number(null) === 0`, which is exactly what `numericValue` already
-     produced, so `allowUnset={false}` is unaffected by the change.
-   - min / max: inclusive clamp bounds (`null` disables that bound).
-   - step: increment applied by the −/+ buttons (default 1).
-   - ariaLabel: accessible name for the input (already localized).
-   - decrementLabel / incrementLabel: accessible names for the adjunct buttons.
-     Localize `FABRICATE.Common.Stepper.Decrease` / `FABRICATE.Common.Stepper.Increase`
-     against the field's own label; this leaf localizes nothing itself.
-   - disabled: disables the whole control.
-   - allowUnset: the field's domain admits absence (an inherited DC override, an
-     unbounded modifier bound). See the block comment on the prop.
-   - placeholder: shown while the input is empty. Wins over `inputProps.placeholder`.
-   - fill: sets `width: 100%`, so it only stretches correctly inside a slot that already
-     has an intrinsic width (a sized grid track or flex basis, a fixed-width column) —
-     an unsized slot has nothing for `100%` to resolve against. Simply dropping `fill`
-     does NOT fix an unsized slot either: an unfilled `.fab-stepper` is still a flex
-     item, and `align-items: stretch` widens it to the same box regardless (measured in
-     Chromium, not assumed). Where a call site's slot has no intrinsic width, the fix is
-     a width cap in that layout context instead — four call sites do this at 160px. See
-     the CSS.
-   - inputProps: extra ATTRIBUTES spread onto the underlying `<input>`.
-   - onChange(value): called with the clamped number on every accepted edit, and with
-     `null` when an `allowUnset` field is cleared.
+  | prop | values | default | contract |
+  | --- | --- | --- | --- |
+  | `value` | number \| `null` \| `undefined` \| `''` | `null` | `null` rather than `0` deliberately: `$props()` fallbacks fire on `undefined`, so a `0` default would resolve before `allowUnset` was consulted and render `0` for a field its caller left unset. |
+  | `min` / `max` | number \| `null` | `null` | Inclusive clamp bounds; `null` disables that bound. |
+  | `step` | number | `1` | The increment the −/+ buttons apply. |
+  | `ariaLabel` | localized string | `''` | The input's accessible name. See the invariants: never a wrapping `<label>`. |
+  | `decrementLabel` / `incrementLabel` | localized string | `''` | Accessible names for the adjuncts. This leaf localizes nothing itself. |
+  | `disabled` | boolean | `false` | Disables the whole control. |
+  | `allowUnset` | boolean | `false` | The field's domain admits absence. Use it only where `null` genuinely persists — a field that merely LOOKS blank for zero must keep the default and show `0`. |
+  | `placeholder` | string | `''` | Shown while the input is empty. WINS over `inputProps.placeholder`. |
+  | `fill` | boolean | `false` | Sets `width: 100%`, so it only stretches correctly inside a slot that already has an intrinsic width. Mutually exclusive with `orientation="vertical"`. |
+  | `orientation` | `'horizontal'` \| `'vertical'` | `'horizontal'` | An ORDER, not a second control: the two branches render the same three snippets in a different sequence, and draw a different pair of icons. |
+  | `density` | `'default'` \| `'comfortable'` | `'default'` | `comfortable` raises EVERY target — the typeable input included — to at least 24x24 for WCAG 2.2 §2.5.8. |
+  | `inputProps` | plain object | `{}` | Extra ATTRIBUTES spread onto the underlying `<input>`. See the invariants. |
 
-  ORIENTATION is an ORDER, not a second control. The input and the two adjuncts are
-  declared once each as `{#snippet}`s and the two branches differ only in the sequence
-  they `{@render}` them in (and in which icon each adjunct draws). They used to be
-  written out twice, which meant every change to the field — the `allowUnset` display
-  value, the `inputProps` spread, a `data-*` hook — had to be made in two places and was
-  a live clone the moment one of them was.
+  Callbacks:
+  - `onChange(value)` — the clamped number on every accepted edit, and `null` when an
+    `allowUnset` field is cleared.
 
-  `inputProps` CONTRACT — attributes and `data-*` only, NEVER event handlers. The
-  spread sits after `oninput={onInput} onblur={onBlur}` on the input (it has to, so an
-  explicit attribute a caller passes wins over the primitive's default), which means an
-  `oninput` or `onblur` routed through `inputProps` silently REPLACES this component's
-  commit path: the control keeps rendering and stepping and simply stops reporting
-  edits, with nothing failing loudly. Pass hooks and attributes through `inputProps`;
-  put behaviour in `onChange`.
-
-  `disabled` is the TOP-LEVEL prop, never an `inputProps` key. The adjuncts read the
-  top-level prop (`disabled || atMin` / `disabled || atMax`), so `inputProps={{
-  disabled: … }}` would disable only the input and leave −/+ live on a control the
-  caller believes is off — and every DOM assertion that checks `input.disabled` would
-  still pass, so the defect ships green.
-
-  NAMING is `ariaLabel`, never a wrapping `<label>`. This is a property of the primitive, so
-  it is stated here once rather than at each call site. A `<label>` with no `for` binds to
-  its FIRST labelable descendant, and this component's is the `−` button: a caption and a
-  Stepper inside one `<label>` therefore makes clicking the caption DECREMENT the value
-  instead of focusing the field. Call sites spell it as a `<div>` with a sibling `<span>`
-  caption and pass the name through `ariaLabel`, so nothing is lost by dropping the implicit
-  association. `tests/components/stepper-call-site-contract.test.js` fails any `<label>` in
-  `src/ui/svelte` that wraps a Stepper this way, so the rule is enforced mechanically and a
-  call site needs only to point back here. A `<label for>` naming the input's own id is a
-  DIFFERENT and correct binding — HTML consults descendants only when `for` is absent — and
-  focuses the typeable field, so the guard allows it.
+  Invariants:
+  - `inputProps` CONTRACT — attributes and `data-*` only, NEVER event handlers. The spread sits
+    after `oninput={onInput} onblur={onBlur}` on the input (it has to, so an explicit attribute a
+    caller passes wins over the primitive's default), which means an `oninput` or `onblur` routed
+    through `inputProps` silently REPLACES this component's commit path: the control keeps
+    rendering and stepping and simply stops reporting edits, with nothing failing loudly. Pass
+    hooks and attributes through `inputProps`; put behaviour in `onChange`.
+  - `disabled` is the TOP-LEVEL prop, never an `inputProps` key. The adjuncts read the top-level
+    prop (`disabled || atMin` / `disabled || atMax`), so `inputProps={{ disabled: … }}` would
+    disable only the input and leave −/+ live on a control the caller believes is off — and every
+    DOM assertion that checks `input.disabled` would still pass, so the defect ships green.
+  - NAMING IS `ariaLabel`, NEVER A WRAPPING `<label>`. A `<label>` with no `for` binds to its
+    FIRST labelable descendant, and this component's is the − button: a caption and a Stepper
+    inside one `<label>` therefore makes clicking the caption DECREMENT the value instead of
+    focusing the field. Call sites spell it as a `<div>` with a sibling `<span>` caption and pass
+    the name through `ariaLabel`.
+    `tests/components/stepper-call-site-contract.test.js` fails any `<label>` in `src/ui/svelte`
+    that wraps a Stepper this way. A `<label for>` naming the input's own id is a DIFFERENT and
+    correct binding — HTML consults descendants only when `for` is absent — so the guard allows
+    it.
+  - IMPORT-FREE LEAF: props only, no `foundryBridge`, no util imports. One util import inside a
+    leaf propagates a required raw-module entry into every mount harness that compiles anything
+    rendering it, and a missing entry HANGS that suite as `# cancelled` rather than failing it.
 -->
 <script>
   let {
@@ -83,42 +57,14 @@
     decrementLabel = '',
     incrementLabel = '',
     disabled = false,
-    // `false` (default): today's behaviour unchanged — a blank entry is coerced back
-    // to the model value on blur and never committed, and `0` renders as `0`.
-    // `true`: absence is a real value in this field's domain, so blank renders blank,
-    // clearing commits `null`, blur leaves a blank field blank, and the adjuncts step
-    // from `min ?? 0` and stay enabled while there is nothing to be at the bound of.
-    // Use it only where `null` genuinely persists — a field that merely LOOKS blank
-    // for zero must keep the default and show `0`.
+    // `true`: blank renders blank, clearing commits `null`, blur leaves a blank field blank,
+    // and the adjuncts step from `min ?? 0` and stay enabled while there is nothing to be at
+    // the bound of. `false`: a blank entry is coerced back to the model value on blur.
     allowUnset = false,
-    // Placeholder text for the input. The explicit prop WINS over
-    // `inputProps.placeholder`; either route reaches the rendered input.
     placeholder = '',
-    // `true`: sets `width: 100%` to fill the layout slot rather than sizing to content.
-    // Only correct when the slot has an intrinsic width to fill; an unsized slot leaves
-    // `100%` nothing to resolve against, and omitting `fill` does not fix that either —
-    // `align-items: stretch` widens an unfilled `.fab-stepper` to the same box anyway
-    // (measured in Chromium). Cap the width in the layout context instead when the slot
-    // is unsized; four call sites do this at 160px. Mutually exclusive with
-    // `orientation="vertical"`, which is already full-width. See the CSS.
     fill = false,
-    // 'horizontal' (default): [−] [input] [+], for inline quantities.
-    // 'vertical': up-chevron / big mono input / down-chevron, for the Overview
-    // duration unit columns — the increment sits on TOP so the visual stacks the
-    // way a spinner reads.
     orientation = 'horizontal',
-    // 'default': the compact 22px control the manager's dense editors use.
-    // 'comfortable': every target — the typeable input INCLUDED, not just the −/+
-    // adjuncts — raised to at least 24x24 for WCAG 2.2 §2.5.8. The input is the
-    // primary control, so raising only the adjuncts would leave the real target
-    // undersized. Used by the crafting essence pool, whose steppers are the main
-    // interaction of that panel rather than an inline field tweak.
     density = 'default',
-    // Extra ATTRIBUTES spread onto the underlying `<input>` (e.g. a test/marker
-    // `data-*` hook a caller relies on). Attributes and `data-*` only — never event
-    // handlers; see the `inputProps` CONTRACT note in the header. Import-free: a
-    // plain object, so this leaf still carries no module dependency into the mount
-    // harnesses.
     inputProps = {},
     onChange = () => {},
   } = $props();
@@ -140,9 +86,8 @@
   // reason absence has to be decided from the raw prop instead.
   const isUnset = $derived(allowUnset && (value === null || value === undefined || value === ''));
 
-  // What the input renders. A NAMED derived rather than an inline ternary, because both
-  // orientation branches need it and inlining would nest one ternary inside the markup's
-  // existing expressions (Sonar S3358).
+  // A NAMED derived rather than an inline ternary: both orientation branches need it, and
+  // inlining would nest one ternary inside the markup's existing expressions (Sonar S3358).
   const displayValue = $derived(isUnset ? '' : numericValue);
 
   // An unset field's adjuncts step from its lower bound, not from the `0` that
@@ -159,8 +104,6 @@
   const resolvedPlaceholder = $derived(placeholder || inputProps.placeholder || undefined);
 
   // The ONLY thing that differs between the two orientations besides render order.
-  // Vertical stacks the pair as a spinner, so it draws chevrons and reads top-to-bottom;
-  // horizontal sits inline around the field, so it draws − and +.
   const decrementIcon = $derived(isVertical ? 'fa-chevron-down' : 'fa-minus');
   const incrementIcon = $derived(isVertical ? 'fa-chevron-up' : 'fa-plus');
 
@@ -198,10 +141,10 @@
   }
 </script>
 
-<!-- The typeable control. `type="number"` is load-bearing: this component owns no keydown
-     handler, so Up/Down are native number-input behaviour that fires `input` and lands in
-     `onInput` → `commit`. `tests/components/stepper-spinner.test.js` pins that, and pins
-     that BOTH branches below render this one snippet rather than growing a second field. -->
+<!-- `type="number"` is load-bearing: this component owns no keydown handler, so Up/Down are
+     native number-input behaviour that fires `input` and lands in `onInput` → `commit`.
+     `tests/components/stepper-spinner.test.js` pins that, and pins that BOTH branches render
+     this one snippet rather than growing a second field. -->
 {#snippet numericField()}
   <input
     type="number"
@@ -280,8 +223,6 @@
     opacity: 0.55;
   }
 
-  /* Vertical spinner (Overview duration columns): up-chevron / big mono value /
-     down-chevron stacked, filling the column width. */
   .fab-stepper.is-vertical {
     flex-direction: column;
     width: 100%;
@@ -305,49 +246,26 @@
     font-weight: 600;
   }
 
-  /* WCAG 2.2 §2.5.8 minimum target: 24x24 CSS px on EVERY target, the typeable input
-     included. The compact default stays 22px because it sits inside dense manager
-     editor rows where it is one field among many; this variant is for a control that
-     IS the interaction.
-
-     `:not(.is-vertical)` is a GUARD, not decoration. The vertical rules above have the
-     same specificity as these, so a caller combining `orientation="vertical"` with
-     `density="comfortable"` would resolve on source order alone and SHRINK the spinner
-     to 24px — narrower than the full-width column it exists to fill, and shorter than
-     the 26/30px the vertical variant asks for. Excluding the combination here means
-     vertical keeps its own (already >= 24px) geometry instead. */
+  /* `:not(.is-vertical)` is a GUARD, not decoration. The vertical rules above have the same
+     specificity as these, so a caller combining `orientation="vertical"` with
+     `density="comfortable"` would resolve on source order alone and SHRINK the spinner to
+     24px — narrower than the full-width column it exists to fill. */
   .fab-stepper.is-comfortable:not(.is-vertical) .fab-stepper-adjunct {
     width: 24px;
     height: 24px;
   }
 
-  /* `fill`: stretch to the layout slot instead of sizing to content.
-
-     This exists because the primitive is NARROWER than the bare fields it replaces on
-     the pinned manager slots. A 102x28 borderless inline-flex island beside a 160x36
-     `<select>` and a 160x36 disabled placeholder would change the control's width,
-     height, border and fill on a mode swap — exactly what the UI spec's no-movement
-     rule forbids. So the slot's pin stays and the primitive learns to fill it.
-
-     `--fab-stepper-fill-height` defaults to 36px, the height `.manager-field
-     input`/`select` and `.manager-checks-outcome-row input` both resolve to. It is a
-     custom property rather than a constant because the candidate layout contexts do
-     NOT agree: 30px on the economy actor cells, 34px on the tool inline fields, 28px
-     on the environment composition weight field. Taking a SIZE from the layout context
-     is permitted — what a layout-context rule must not restyle is the primitive's
-     `font-*`, `border`, `border-radius` and `background`.
+  /* `--fab-stepper-fill-height` is a custom property rather than a constant because the
+     candidate layout contexts do NOT agree: 30px on the economy actor cells, 34px on the tool
+     inline fields, 28px on the environment composition weight field. Taking a SIZE from the
+     layout context is permitted — what a layout-context rule must not restyle is the
+     primitive's `font-*`, `border`, `border-radius` and `background`.
 
      `box-sizing` is declared HERE rather than inherited. The only universal reset in the
-     global sheet is `.fabricate-manager * { box-sizing: border-box }`, which is area-scoped
-     — `.fabricate-interactable-config` and `.fabricate-component-editor` get none — and this
-     is an import-free leaf that cannot see which area it was dropped into. Without it the
-     declared height becomes a CONTENT height and the control stands `36 + 4 padding + 2
-     border` = 42px outside the manager, 6px taller than the siblings it exists to match.
-     It is also what makes `height: 100%` on the input below resolve consistently in both.
-
-     `:not(.is-vertical)` is the same GUARD the comfortable rules above carry. The
-     vertical variant is already `width: 100%` with its own stacked 26/30px geometry,
-     so `fill` is mutually exclusive with `orientation="vertical"`. */
+     global sheet is area-scoped, and this is an import-free leaf that cannot see which area
+     it was dropped into. Without it the declared height becomes a CONTENT height and the
+     control stands 42px outside the manager, 6px taller than the siblings it exists to
+     match. It is also what makes `height: 100%` on the input below resolve in both. */
   .fab-stepper.is-fill:not(.is-vertical) {
     display: flex;
     box-sizing: border-box;
@@ -355,14 +273,11 @@
     height: var(--fab-stepper-fill-height, 36px);
   }
 
-  /* `min-width: 0` is LOAD-BEARING, not tidiness. `.fab-stepper-input`'s `width: 48px`
-     below is the only thing keeping this flex item from overflowing: per Flexbox §4.5
-     an item's automatic minimum size is min(specified size suggestion, content size
-     suggestion), and the 48px width is what supplies the specified suggestion.
-     `width: auto` removes it, leaving the UA min-content width of an `<input>`
-     (default `size=20`, ~140-180px even at 0.74rem mono). Without `min-width: 0` a
-     filled stepper's own minimum would be ~194px and it would OVERFLOW the 160px slot
-     this variant exists to fill. */
+  /* `min-width: 0` is LOAD-BEARING. Per Flexbox §4.5 an item's automatic minimum size is
+     min(specified size suggestion, content size suggestion), and `width: auto` here removes
+     the specified suggestion, leaving the UA min-content width of an `<input>` (~140-180px).
+     Without `min-width: 0` a filled stepper would OVERFLOW the 160px slot it exists to
+     fill. */
   .fab-stepper.is-fill:not(.is-vertical) .fab-stepper-input {
     flex: 1 1 0;
     width: auto;
@@ -370,13 +285,12 @@
     height: 100%;
   }
 
-  /* `fill` + `comfortable` is declared EXPLICITLY, at (0,5,0), because the rule above
-     and `.fab-stepper.is-comfortable:not(.is-vertical) .fab-stepper-input` both resolve
-     at (0,4,0) — so the combination would otherwise be settled by source order alone
-     and could pin the input to 24px inside a 36px wrapper. The input is borderless and
-     transparent, so the visible box is the WRAPPER: the typeable target would be 12px
-     shorter than it looks. The two variants are REQUIRED together on the economy actor
-     cells, so this is a real combination, not a defensive one. */
+  /* `fill` + `comfortable` is declared EXPLICITLY, at (0,5,0), because the rule above and
+     `.fab-stepper.is-comfortable:not(.is-vertical) .fab-stepper-input` both resolve at
+     (0,4,0) — so the combination would otherwise be settled by source order alone and could
+     pin the input to 24px inside a 36px wrapper. The input is borderless, so the visible box
+     is the WRAPPER and the typeable target would be 12px shorter than it looks. The two are
+     REQUIRED together on the economy actor cells. */
   .fab-stepper.is-fill.is-comfortable:not(.is-vertical) .fab-stepper-input {
     height: 100%;
     min-height: 24px;
@@ -429,17 +343,10 @@
     appearance: textfield;
   }
 
-  /* NO native spinner. This control already offers both ways to step — the −/+ adjuncts for
-     the pointer, and the browser's own Up/Down handling for the keyboard — so the arrows are
-     a third affordance that duplicates both. They also cost real room: the field is 48px and
-     the spinner takes ~13-17px of it, shunting the centred mono value off-centre.
-
-     The element STAYS `type="number"`. This component has no keydown handler of its own:
-     Up/Down work purely as native number-input behaviour, which fires `input` and lands in
-     `onInput` → `commit`. Suppressing the pseudo-elements removes only the drawn buttons and
-     leaves that intact, whereas switching to `type="text"` would silently delete the keyboard
-     stepping this component's header says it exists to protect.
-     `tests/components/stepper-spinner.test.js` pins both halves of that. */
+  /* NO native spinner, and the element STAYS `type="number"`. Suppressing the
+     pseudo-elements removes only the drawn buttons, whereas switching to `type="text"` would
+     silently delete the keyboard stepping this component exists to protect.
+     `tests/components/stepper-spinner.test.js` pins both halves. */
   .fab-stepper-input::-webkit-outer-spin-button,
   .fab-stepper-input::-webkit-inner-spin-button {
     appearance: none;

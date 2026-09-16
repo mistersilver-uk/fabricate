@@ -33,4 +33,22 @@ describe('portal action', () => {
     assert.equal(node.parentNode, target);
     action.destroy();
   });
+
+  it('refuses a selector string, leaving the node where it is (issue 1500)', () => {
+    // The string branch was the document-wide `querySelector` form in a second spelling: the one
+    // target shape that is not guaranteed to be an ancestor of the node being moved, and so the
+    // one that could portal a panel into a DIFFERENT window. Removing it has to be visible here,
+    // or a caller could reintroduce it and be silently served.
+    const source = document.createElement('div');
+    const target = document.createElement('div');
+    target.className = 'portal-target';
+    const node = document.createElement('div');
+    source.appendChild(node);
+    document.body.append(source, target);
+
+    const action = portal(node, '.portal-target');
+
+    assert.equal(node.parentNode, source);
+    action.destroy();
+  });
 });

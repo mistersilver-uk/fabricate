@@ -8,6 +8,16 @@ import { compile } from 'svelte/compiler';
 import { flushSync, mount, tick, unmount } from '../../node_modules/svelte/src/index-client.js';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
 import { rewriteClientImports } from '../helpers/rewriteClientImports.js';
+import { chooseSelectOption, selectOptionValues } from '../helpers/select-control.js';
+import { assertViewErrorTreatment } from '../helpers/playerViewStateAssertions.js';
+// The raw `.js` closure of `SearchablePopover`, which the shared `<Select>` composes
+// (issue 1504). Spread from the harness's own roster rather than copied, so a module added
+// there cannot go missing here.
+import {
+  PLAYER_APP_COMPILED_MODULES,
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  SELECT_COMPILED_MODULES,
+} from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -62,6 +72,13 @@ function makeServices(result, { reject = false } = {}) {
 
 async function mountView(services) {
   target = document.createElement('div');
+  // THE MOUNT TARGET IS THE PLAYER APPLICATION ROOT (issue 1504, decision YY). `GatheringView`
+  // renders a `Pagination`, whose page-size control is a shared `<Select>`; a picker resolves
+  // its portal host by walking up to the nearest Fabricate application root, and the only root
+  // this view has in production is `fabricate-app`. Mounted into a bare `<div>` the panel lands
+  // on `<body>`, out of reach of every `target.querySelector` in this file — which is a fixture
+  // asserting against a portal that FAILED, not a product regression.
+  target.className = 'fabricate-app';
   document.body.appendChild(target);
   mounted = mount(GatheringView, { target, props: { services } });
   flushSync();
@@ -84,6 +101,12 @@ describe('GatheringView mounted behavior', () => {
     };
     tempRoot = mkdtempSync(join(tmpdir(), 'fabricate-gathering-'));
     symlinkSync(resolve(repoRoot, 'node_modules'), join(tempRoot, 'node_modules'), 'junction');
+
+    // Issue 1648: the authority-refusal wording GatheringView reads. A module the
+    // compiled tree imports but the temp tree lacks CANCELS this suite.
+    const reasonsDestination = join(tempRoot, 'src/ui/svelte/util/journalRunReasons.js');
+    mkdirSync(dirname(reasonsDestination), { recursive: true });
+    writeFileSync(reasonsDestination, readFileSync(resolve(repoRoot, 'src/ui/svelte/util/journalRunReasons.js'), 'utf8'));
 
     const utilDestination = join(tempRoot, 'src/ui/svelte/util/foundryBridge.js');
     mkdirSync(dirname(utilDestination), { recursive: true });
@@ -145,6 +168,17 @@ describe('GatheringView mounted behavior', () => {
     writeFileSync(blockedReasonsDestination, readFileSync(resolve(repoRoot, 'src/ui/svelte/apps/gathering/gatheringBlockedReasons.js'), 'utf8'));
 
     writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
+    // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
+    for (const rawModule of SEARCHABLE_POPOVER_RAW_MODULES) {
+      const rawDestination = join(tempRoot, rawModule);
+      mkdirSync(dirname(rawDestination), { recursive: true });
+      writeFileSync(rawDestination, readFileSync(resolve(repoRoot, rawModule), 'utf8'));
+    }
+    // Issue 1504: the shared `<Select>`'s whole compiled closure, spread rather than copied.
+    for (const selectModule of SELECT_COMPILED_MODULES) {
+      writeCompiledSvelte(selectModule);
+    }
+    writeCompiledSvelte('src/ui/svelte/components/IconButton.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/EnvironmentCard.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte');
     // GatheringView now renders the center-column detail tree; compile it too so
@@ -166,6 +200,7 @@ describe('GatheringView mounted behavior', () => {
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringDropModifiers.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskDrops.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskDetail.svelte');
+    for (const primitive of PLAYER_APP_COMPILED_MODULES) writeCompiledSvelte(primitive);
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringView.svelte');
 
     GatheringView = (await import(pathToFileURL(join(
@@ -199,6 +234,32 @@ describe('GatheringView mounted behavior', () => {
     assert.equal(target.querySelectorAll('[data-environment-id]').length, 1, 'one environment card');
   });
 
+  it('announces the loading root as busy, and does not once the view is ready', async () => {
+    // Asserted on the RENDERED DOM (issue 1514): a composition that declares `aria-busy` and
+    // stops rendering it passes every source-text reader. The loading branch is reached with a
+    // listing promise that never settles, which is the only state in which this view is busy.
+    await mountView({ listGatheringForActor: () => new Promise(() => {}) });
+
+    const loadingRoot = target.querySelector('[data-gathering-state="loading"]');
+    assert.ok(Boolean(loadingRoot), 'loading state shown while the listing is in flight');
+    assert.equal(loadingRoot.getAttribute('aria-busy'), 'true', 'the loading root is busy');
+    assert.ok(
+      loadingRoot.textContent.includes('FABRICATE.App.Gathering.Loading'),
+      'and a VISIBLE label states what is loading'
+    );
+
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+    await mountView(makeServices(listing([environment()])));
+
+    assert.ok(
+      target.querySelector('[data-gathering-state="populated"]'),
+      'the ready view is populated'
+    );
+    assert.ok(!target.querySelector('[aria-busy]'), 'nothing in the ready view claims to be busy');
+  });
+
   it('shows the empty state when no actor is selected', async () => {
     await mountView(makeServices({ visible: true, selectedActorId: null, environments: [] }));
 
@@ -210,6 +271,10 @@ describe('GatheringView mounted behavior', () => {
     await mountView(makeServices(null, { reject: true }));
 
     assert.ok(target.querySelector('[data-gathering-state="error"]'), 'rejection renders error state');
+    assertViewErrorTreatment(target.querySelector('[data-gathering-state="error"]'), {
+      view: 'gathering view',
+      message: 'FABRICATE.App.Gathering.Error'
+    });
   });
 
   it('selects an available card on click and marks it selected', async () => {
@@ -796,15 +861,15 @@ describe('GatheringView mounted behavior', () => {
     flushSync();
     assert.ok(target.querySelector('[data-pagination-page]').textContent.includes('2'), 'on page 2 before resizing');
 
-    const sizeSelect = target.querySelector('[data-pagination-size]');
-    // 9 must be a real selectable option from [6, 9, 12].
+    // 9 must be a real offered option from [6, 9, 12] — read off the OPEN panel now that the
+    // control draws its own list (issue 1504), and `chooseSelectOption` refuses a value the
+    // control does not offer rather than staging an empty string the way a native `<select>`
+    // silently did.
     assert.ok(
-      Array.from(sizeSelect.options).some(option => option.value === '9'),
+      selectOptionValues(target, '[data-pagination-size]').includes('9'),
       '9 is a selectable per-page option'
     );
-    sizeSelect.value = '9';
-    sizeSelect.dispatchEvent(new window.Event('change', { bubbles: true }));
-    flushSync();
+    chooseSelectOption(target, '[data-pagination-size]', 9);
 
     assert.equal(
       target.querySelectorAll('[data-environment-id]').length,

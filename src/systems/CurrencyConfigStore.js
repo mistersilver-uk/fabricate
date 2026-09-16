@@ -3,6 +3,7 @@ import {
   setSetting as defaultSetSetting,
   SETTING_KEYS,
 } from '../config/settings.js';
+import { cloneJson } from '../utils/scalars.js';
 
 import { normalizeWorldCurrencyConfig } from './currencyProfile.js';
 
@@ -92,8 +93,4 @@ export class CurrencyConfigStore {
   async save(config) {
     return this._persist(config);
   }
-}
-
-function cloneJson(value) {
-  return value === undefined ? value : JSON.parse(JSON.stringify(value));
 }

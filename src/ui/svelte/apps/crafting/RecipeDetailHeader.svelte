@@ -6,13 +6,16 @@
   identity + a discovery hint — never any ingredient/result detail.
 -->
 <script>
+  import Medallion from '../../components/Medallion.svelte';
+  import { resolveCraftingArt } from '../../util/craftingArtResolution.js';
   import { localize } from '../../util/foundryBridge.js';
-  import CraftingThumb from './CraftingThumb.svelte';
-  import CraftingStatusBadge from './CraftingStatusBadge.svelte';
+  import { statusChipTone } from '../../util/statusChipTone.js';
+  import Chip from '../../components/Chip.svelte';
+  import Notice from '../../components/Notice.svelte';
   import { craftingRecipeStatus } from '../../util/craftingRecipeStatus.js';
   import { TIME_UNITS, formatTimeRequirementCompact } from '../../util/recipeDuration.js';
 
-  let { recipe = null } = $props();
+  let { recipe = null, authorityRefusal = '' } = $props();
 
   const name = $derived(String(recipe?.name ?? ''));
   const modeLabel = $derived(String(recipe?.modeLabel ?? ''));
@@ -50,13 +53,37 @@
   const blockingReasons = $derived(
     Array.isArray(recipe?.blockingReasons) ? recipe.blockingReasons : []
   );
+  // EVERY player-app craft is routed through the versioned-run authority
+  // (`CraftingEngine._routeVersionedCraft`, reached because `main.js` always sends
+  // `lifecycleVersion: 1`), so an authority refusal blocks this recipe whatever its own browse
+  // status says. It therefore drops the status chip — "Ready to craft" is a lie while the craft
+  // would be refused. The already-localized sentence arrives as a prop:
+  // `journalRunReasonMessage` is the ONE reason vocabulary and this header is not a second one.
+  //
+  // IT DOES NOT LEAD. It used to, and a transient authority state then outranked the recipe's
+  // own blocker: a player saw a claim-held sentence as the headline with "You're missing some
+  // required materials" demoted to the sub-line. The recipe's blocker is the one the player can
+  // ACT on, so it is the title and the authority's note is the detail; with no blocking reason
+  // of its own the refusal is the only cause there is and becomes the title itself.
+  //
+  // The refusal also STATES ITS CONSEQUENCE. The craft button below stays enabled on a craftable
+  // recipe on purpose — availability is a cache, and a stale `false` disabling the only CTA
+  // would leave a player with no way back — so the callout has to say what the click will do
+  // instead of leaving an accent-filled button contradicting it.
+  const refusal = $derived(String(authorityRefusal ?? '').trim());
+  const refusalLine = $derived(
+    refusal ? `${refusal} ${localize('FABRICATE.App.Crafting.Blocking.AuthorityRefused')}` : ''
+  );
+  const calloutReasons = $derived(
+    refusalLine ? [...blockingReasons, refusalLine] : blockingReasons
+  );
 </script>
 
 <header class="crafting-detail-header" data-recipe-header>
   <div class="crafting-detail-header-top">
     <span class="crafting-detail-thumb" class:is-uncraftable={uncraftable}>
       <span class="crafting-detail-thumb-media">
-        <CraftingThumb src={recipe?.img} alt="" size={56} />
+        <Medallion {...resolveCraftingArt(recipe?.img)} alt="" size={56} />
       </span>
       {#if uncraftable}
         <span class="crafting-detail-thumb-scrim" aria-hidden="true"></span>
@@ -99,8 +126,14 @@
         <!-- Uncraftable moves the status onto the thumbnail pip, so the labelled
              badge is dropped here to avoid a duplicate icon; the blocking-reasons
              callout below still spells out the reason. -->
-        {#if !uncraftable}
-          <CraftingStatusBadge {status} />
+        {#if !uncraftable && !refusal}
+          <Chip
+            density="list"
+            tone={statusChipTone(descriptor.tone)}
+            icon={descriptor.icon}
+            data-crafting-status={status}
+            title={statusLabel}>{statusLabel}</Chip
+          >
         {/if}
       </div>
     </div>
@@ -116,20 +149,34 @@
       <p class="crafting-detail-flavor">{flavor}</p>
     {/if}
 
-    {#if blockingReasons.length > 0}
-      <div
-        class="crafting-detail-blocking"
-        class:is-uncraftable={uncraftable}
-        data-recipe-blocking
-        role="status"
-      >
-        <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
-        <ul class="crafting-detail-blocking-list">
-          {#each blockingReasons as reason, index (index)}
-            <li>{reason}</li>
-          {/each}
-        </ul>
-      </div>
+    {#if calloutReasons.length > 0}
+      <!-- THE SHARED `Notice`, NON-BLOCKING (issue 1514). This well already carried
+           `role="status"`, and `Notice` is the only primitive that can keep it: `Callout` emits
+           `role="note"` or nothing (`Callout.svelte:131`) and cannot express a live status
+           region. Non-blocking is what KEEPS the role — and with it the polite live region the
+           role already implied, since `role="status"` carries an implicit `aria-live="polite"`
+           and `aria-atomic="true"`. The explicit attribute the primitive writes changes nothing
+           here; it is the role, present before and after, that announces. The tone is the one
+           this well already painted — the same
+           `--fab-warning-*` and `--fab-danger-*` triples, switched on the same `uncraftable`
+           reading — so the conversion moves the frame, not the meaning.
+
+           THE `<ul>` GOES, AND THE PRODUCER IS WHY. `Notice` takes `title` and `detail` as
+           STRINGS and has no children slot, so a bulleted list of N reasons has nowhere to go.
+           `CraftingListingBuilder._blockingReasons` returns `key ? [this.localize(key)] : []` —
+           AT MOST ONE reason, for every browse status there is — so the list this markup drew
+           has always been a one-item list wearing a `list-style: disc`. The first reason is the
+           title and any further one lands in `detail` rather than being dropped, which keeps a
+           future second reason visible instead of silent. -->
+      <Notice
+        tone={uncraftable ? 'danger' : 'warning'}
+        icon="fas fa-triangle-exclamation"
+        title={calloutReasons[0]}
+        detail={calloutReasons.slice(1).join(' ')}
+        dataAttr="data-recipe-blocking"
+        stateDataAttr={refusal ? 'data-recipe-authority-blocked' : ''}
+        stateDataValue="true"
+      />
     {/if}
   {/if}
 </header>
@@ -166,11 +213,12 @@
     opacity: 0.4;
   }
 
-  /* Flat error wash over the dimmed thumbnail (matches CraftingThumb's radius). */
+  /* Flat error wash over the dimmed thumbnail (matches the shared tile's radius, which
+     issue 1506 moved from the retired thumb's 6px to the medallion's 9px). */
   .crafting-detail-thumb-scrim {
     position: absolute;
     inset: 0;
-    border-radius: 6px;
+    border-radius: 9px;
     background: var(--fab-danger-soft);
     pointer-events: none;
   }
@@ -275,31 +323,5 @@
     font-size: 13px;
     font-style: italic;
     color: var(--fab-text-muted);
-  }
-
-  .crafting-detail-blocking {
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    padding: var(--fab-space-3);
-    border: 1px solid var(--fab-warning-border);
-    border-radius: 8px;
-    background: var(--fab-warning-soft);
-    color: var(--fab-warning-text);
-  }
-
-  /* Missing materials is an error, not a warning: align the callout with the row
-     tint + thumbnail pip. Other blockers (locked/unknown/exhausted) keep the amber
-     warning treatment. */
-  .crafting-detail-blocking.is-uncraftable {
-    border-color: var(--fab-danger-border);
-    background: var(--fab-danger-soft);
-    color: var(--fab-danger-text);
-  }
-
-  .crafting-detail-blocking-list {
-    margin: 0;
-    padding-left: 16px;
-    font-size: 13px;
   }
 </style>

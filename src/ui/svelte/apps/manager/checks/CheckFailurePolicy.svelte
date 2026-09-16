@@ -33,7 +33,8 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import Callout from '../Callout.svelte';
-  import RadioCardGroup from '../RadioCardGroup.svelte';
+  import RadioCardGroup from '../../../components/RadioCardGroup.svelte';
+  import InspectorCard from '../../../components/InspectorCard.svelte';
 
   let {
     // The persisted value: 'never' | 'perRecord' | 'always'.
@@ -109,7 +110,7 @@
   ]);
 </script>
 
-<section class="manager-inspector-card" data-failure-result-policy={activity}>
+<InspectorCard data-failure-result-policy={activity}>
   <h3 class="manager-checks-card-title">
     {text(
       'FABRICATE.Admin.Manager.Checks.FailureResults.Heading',
@@ -123,6 +124,9 @@
     )}
   </p>
   {#if inertNote}
+    <!-- INFO stands (issue 1505): this sentence exists only because the CURRENT configuration
+         makes the policy inert, which is exactly the live state the specimen reserves the tint
+         for. -->
     <Callout tone="info" text={inertNote} dataAttr="data-failure-result-policy-inert" />
   {/if}
   <RadioCardGroup
@@ -136,4 +140,4 @@
     optionDataAttr="data-failure-result-policy-option"
     onChange={(next) => onChange(next)}
   />
-</section>
+</InspectorCard>

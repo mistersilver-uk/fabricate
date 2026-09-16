@@ -5,9 +5,11 @@
   and its optional standing sub-hint (issue 772, extracted for issue 1010).
 
   It lives under `apps/manager/` rather than `apps/manager/components/` for the reason
-  `BulkSelectionToolbar` records: `components/` holds area-agnostic leaves, this scale is
-  manager-scoped, and staying here keeps `--fab-mv2-*` in scope so the extraction is a pure
-  move rather than a re-tokenisation.
+  `BulkSelectionToolbar` records: `components/` holds area-agnostic leaves and this scale
+  is manager-scoped. The token half of that reason — that the placement keeps an
+  area-scoped `--fab-manager-*` property in scope — has LAPSED, since a scoped `<style>`
+  may not reach one from any directory. The extraction was a pure move regardless: the
+  block below reads theme-root tokens only.
 
   IT WRAPS NOTHING. The heading, the hint and the sub-hint are emitted as SIBLINGS, not
   inside a section element, because `BulkEditPanelShell`'s uniform flex `gap` is what
@@ -58,9 +60,13 @@
 {/if}
 
 <style>
-  /* Manager-scoped by PLACEMENT — this component lives under `apps/manager/`, so
-     `--fab-mv2-*` (declared on `.fabricate-manager`) is in scope. Its appearance lives
-     HERE rather than in `styles/fabricate.css` so `VIEW_RECIPES` in
+  /* THEME-ROOT tokens only. The reason once recorded here — that living under
+     `apps/manager/` puts an area-scoped `--fab-manager-*` property in scope — has LAPSED:
+     a scoped `<style>` may not reach one from ANY directory, because a component is placed
+     in a directory and not in a DOM subtree (design-system spec, *The token namespace is
+     one generation and names its purpose*), and `tests/token-generation-gate.test.js` fails
+     any scoped block that tries. The placement's surviving consequence is the screenshot
+     map: this appearance lives HERE rather than in `styles/fabricate.css` so `VIEW_RECIPES` in
      `scripts/ui-pr-screenshot-evidence.mjs` routes a change to the views that actually
      render it. Because it sits OUTSIDE both `apps/manager/components/` and
      `apps/manager/recipes/`, it is enumerated BY NAME in that map's browser match lists. */
@@ -77,7 +83,7 @@
      inner spacing, and this extra `space-2` is what turns the flat run back into groups. */
   .fab-bulk-edit-label {
     margin: var(--fab-space-2) 0 0;
-    color: var(--fab-mv2-text-muted);
+    color: var(--fab-text-muted);
     font-size: 0.58rem;
     font-weight: 700;
     letter-spacing: 0.1em;
@@ -122,7 +128,7 @@
      copy is 0.62rem. */
   .fab-bulk-edit-hint {
     margin: 0;
-    color: var(--fab-mv2-text-muted);
+    color: var(--fab-text-muted);
     font-size: 0.58rem;
     font-weight: 400;
     line-height: 1.4;
@@ -130,7 +136,7 @@
 
   .fab-bulk-edit-subhint {
     margin: 0;
-    color: var(--fab-mv2-text-muted);
+    color: var(--fab-text-muted);
     font-size: 0.62rem;
     font-weight: 400;
     line-height: 1.4;

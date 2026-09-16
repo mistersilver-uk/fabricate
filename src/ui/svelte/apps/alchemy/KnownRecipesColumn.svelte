@@ -13,6 +13,9 @@
   exists. Prop-driven.
 -->
 <script>
+  import Callout from '../manager/Callout.svelte';
+  import EmptyState from '../manager/EmptyState.svelte';
+  import Medallion from '../../components/Medallion.svelte';
   import { localize } from '../../util/foundryBridge.js';
 
   let {
@@ -92,20 +95,34 @@
   </label>
 
   {#if recipes.length === 0 && knownCount > 0}
-    <div class="alchemy-known-empty" data-alchemy-known-no-matches>
-      <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
-      <p class="alchemy-known-empty-title">
-        {localize('FABRICATE.App.Alchemy.NoRecipeMatchesTitle')}
-      </p>
-      <p class="alchemy-known-empty-hint">
-        {localize('FABRICATE.App.Alchemy.NoRecipeMatchesHint')}
-      </p>
+    <!--
+      The wrapper carries the grow, the panel carries everything else — the same split
+      `.alchemy-inventory-empty` and `.gathering-env-empty` take, and for the same reason:
+      `EmptyState` is padding-driven and its only documented fill escape puts the module
+      stylesheet on this change's path (`EmptyState.svelte:53-55`).
+    -->
+    <div class="alchemy-known-empty">
+      <!--
+        `filtered` with the HINT alone, matching every shipped caller of the variant. The
+        dropped "No matches" title is redundant against the sentence that stays, and its
+        `lang/en.json` key goes with it so the orphan gate stays green.
+      -->
+      <EmptyState
+        filtered
+        hint={localize('FABRICATE.App.Alchemy.NoRecipeMatchesHint')}
+        dataAttr="data-alchemy-known-no-matches"
+        dataValue=""
+      />
     </div>
   {:else if recipes.length === 0}
-    <div class="alchemy-known-empty" data-alchemy-zero-known>
-      <i class="fas fa-flask-vial" aria-hidden="true"></i>
-      <p class="alchemy-known-empty-title">{localize('FABRICATE.App.Alchemy.ZeroKnownTitle')}</p>
-      <p class="alchemy-known-empty-hint">{localize('FABRICATE.App.Alchemy.ZeroKnownHint')}</p>
+    <div class="alchemy-known-empty">
+      <EmptyState
+        icon="fas fa-flask-vial"
+        title={localize('FABRICATE.App.Alchemy.ZeroKnownTitle')}
+        hint={localize('FABRICATE.App.Alchemy.ZeroKnownHint')}
+        dataAttr="data-alchemy-zero-known"
+        dataValue=""
+      />
     </div>
   {:else}
     <ul class="alchemy-known-list">
@@ -120,13 +137,14 @@
             onclick={() => onSelect?.(recipe.id)}
           >
             <span class="alchemy-recipe-top">
-              <span class="alchemy-recipe-icon">
-                {#if recipe.img}
-                  <img src={recipe.img} alt="" />
-                {:else}
-                  <i class="fas fa-flask" aria-hidden="true"></i>
-                {/if}
-              </span>
+              <Medallion
+                art={recipe.img}
+                alt=""
+                size={36}
+                glyph={14}
+                tint="peach"
+                icon="fas fa-flask"
+              />
               <span class="alchemy-recipe-meta">
                 <span class="alchemy-recipe-name">{recipe.name}</span>
                 <span class="alchemy-recipe-sig">{sigSummary(recipe)}</span>
@@ -149,12 +167,28 @@
     </ul>
   {/if}
 
-  <div class="alchemy-known-footer" data-alchemy-undiscovered>
-    <i class="fas fa-flask-vial" aria-hidden="true"></i>
-    <span>
-      <b>{localize('FABRICATE.App.Alchemy.Undiscovered', { count: undiscoveredCount })}</b>
-      {localize('FABRICATE.App.Alchemy.UndiscoveredHint')}
-    </span>
+  <!--
+    THE WELL IS THE PRIMITIVE'S, THE PLACEMENT IS THE CALLER'S (issue 1514). `Callout`
+    declares `margin: 0` and forwards no class, and this well's own rule carried two
+    properties that are the COLUMN's layout rather than the strip's geometry: `margin-top:
+    12px` separating it from the list above, and `flex: 0 0 auto` stopping the column's
+    flex from shrinking it. Both move to a wrapper; everything else the rule declared is
+    what the primitive now draws.
+
+    The count sentence becomes the `title` and the guidance the `text`, which is the split
+    `Callout` already models (`.manager-callout-title` over `.manager-callout-text`). It
+    used to be a `<b>` running inline into the sentence beside it, so the two sit on their
+    own lines now — recorded as an accepted frame move, not discovered later.
+  -->
+  <div class="alchemy-known-footer-slot">
+    <Callout
+      tone="neutral"
+      icon="fas fa-flask-vial"
+      title={localize('FABRICATE.App.Alchemy.Undiscovered', { count: undiscoveredCount })}
+      text={localize('FABRICATE.App.Alchemy.UndiscoveredHint')}
+      dataAttr="data-alchemy-undiscovered"
+      dataValue=""
+    />
   </div>
 </div>
 
@@ -311,25 +345,6 @@
     gap: 10px;
   }
 
-  .alchemy-recipe-icon {
-    width: 36px;
-    height: 36px;
-    flex: 0 0 auto;
-    border-radius: 8px;
-    background: var(--fab-surface-soft);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--fab-tag-peach);
-    overflow: hidden;
-  }
-
-  .alchemy-recipe-icon img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-
   .alchemy-recipe-meta {
     flex: 1 1 auto;
     min-width: 0;
@@ -385,55 +400,18 @@
     font-size: 9px;
   }
 
+  /* THE WRAPPER ONLY: the grow and the centring the column needs. */
   .alchemy-known-empty {
+    flex: 1 1 auto;
     display: flex;
     flex-direction: column;
-    align-items: center;
     justify-content: center;
-    gap: 8px;
-    text-align: center;
-    padding: 28px 16px;
-    color: var(--fab-text-muted);
-    flex: 1 1 auto;
   }
 
-  .alchemy-known-empty i {
-    font-size: 24px;
-  }
-
-  .alchemy-known-empty-title {
-    margin: 0;
-    font-weight: 600;
-    color: var(--fab-text-secondary);
-  }
-
-  .alchemy-known-empty-hint {
-    margin: 0;
-    font-size: 11px;
-  }
-
-  .alchemy-known-footer {
-    margin-top: 12px;
-    padding: 11px 12px;
-    border-radius: 9px;
-    background: var(--fab-surface);
-    border: 1px dashed var(--fab-border-strong);
-    display: flex;
-    gap: 9px;
-    font-size: 10.5px;
-    line-height: 1.5;
-    color: var(--fab-text-muted);
+  /* The two properties the deleted `.alchemy-known-footer` rule declared that were the
+     COLUMN's layout rather than the strip's own geometry. See the markup comment. */
+  .alchemy-known-footer-slot {
     flex: 0 0 auto;
-  }
-
-  .alchemy-known-footer i {
-    color: var(--fab-accent);
-    font-size: 12px;
-    margin-top: 1px;
-  }
-
-  .alchemy-known-footer b {
-    color: var(--fab-text-secondary);
-    font-weight: 600;
+    margin-top: 12px;
   }
 </style>

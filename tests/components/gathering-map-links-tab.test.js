@@ -23,11 +23,12 @@ const harness = createMountedComponentHarness({
   compiledModules: [
     // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
     // harness omits HANGS the suite (# cancelled) rather than failing it.
-    'src/ui/svelte/apps/manager/Chip.svelte',
+    'src/ui/svelte/components/Chip.svelte',
     // The shared no-state primitive (issue 785). A `.svelte` the tree renders but the
     // harness omits HANGS the suite (# cancelled) rather than failing it.
     'src/ui/svelte/apps/manager/EmptyState.svelte',
-    'src/ui/svelte/apps/manager/SearchablePopover.svelte',
+    'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/apps/manager/MapRegionLinkPicker.svelte',
     'src/ui/svelte/apps/manager/GatheringMapLinksTab.svelte'
   ],
@@ -91,7 +92,10 @@ describe('GatheringMapLinksTab mounted behavior', () => {
     flushSync();
     await tick();
     flushSync();
-    const option = Array.from(rows()[1].querySelectorAll('.manager-travel-option'))
+    // The options live in the PORTALED panel, which hangs off the application root rather than
+    // off the row that opened it (issue 1466). Only one picker is open, so scoping to the mount
+    // is exact.
+    const option = Array.from(harness.target.querySelectorAll('.manager-travel-option'))
       .find(node => /Verdant/.test(node.textContent));
     assert.ok(option, 'the Verdant option should be present');
     option.click();

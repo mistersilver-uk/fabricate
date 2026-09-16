@@ -27,12 +27,13 @@
   it is unit tested without a DOM and is written once for both lists.
 -->
 <script>
-  import Chip from '../Chip.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import EmptyState from '../EmptyState.svelte';
+  import ManagerButton from '../../../components/ManagerButton.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import Medallion from '../../../components/Medallion.svelte';
-  import StatusPill from '../../../components/StatusPill.svelte';
   import { resolveRecipeImage } from '../../../util/craftingImageDefaults.js';
+  import { statusChipTone } from '../../../util/statusChipTone.js';
   import { getRecipeCategoryLabel } from '../../../../../utils/recipeCategories.js';
   import {
     buildRecipeProduceRows,
@@ -41,6 +42,7 @@
     buildRecipeStepModel,
     groupProduceRowsByResultGroup,
   } from '../../../../../utils/recipeBrowserModel.js';
+  import IconButton from '../../../components/IconButton.svelte';
 
   let {
     selectedRecipe = null,
@@ -399,8 +401,8 @@
     </p>
 
     <div class="manager-recipe-browser-inspector-hero">
-      <Medallion src={resolveRecipeImage(selectedRecipe)} icon="fas fa-scroll" size={52} />
-      <div class="manager-recipe-browser-inspector-identity">
+      <Medallion art={resolveRecipeImage(selectedRecipe)} alt="" icon="fas fa-scroll" size={52} />
+      <div class="fab-stack" data-gap="1">
         <h2 class="manager-inspector-name" title={selectedRecipe.name}>{selectedRecipe.name}</h2>
         <!--
           TWO chips on one line: what it is, and whether it is on. The third chip used to be
@@ -417,19 +419,17 @@
               {getRecipeCategoryLabel(selectedRecipe.category, localize)}
             </Chip>
           {/if}
-          <StatusPill
-            tone={selectedRecipe.enabled === false ? 'subtle' : 'success'}
+          <Chip
+            tone={statusChipTone(selectedRecipe.enabled === false ? 'subtle' : 'success')}
             icon="fas fa-circle"
-            label={selectedRecipe.enabled === false
+            >{selectedRecipe.enabled === false
               ? text('FABRICATE.Admin.Manager.StatusOff', 'Off')
-              : text('FABRICATE.Admin.Manager.StatusOn', 'On')}
-          />
+              : text('FABRICATE.Admin.Manager.StatusOn', 'On')}</Chip
+          >
           {#if selectedRecipe.locked}
-            <StatusPill
-              tone="accent"
-              icon="fas fa-lock"
-              label={text('FABRICATE.Admin.Manager.Recipe.LockedLabel', 'Locked')}
-            />
+            <Chip tone="accent" icon="fas fa-lock"
+              >{text('FABRICATE.Admin.Manager.Recipe.LockedLabel', 'Locked')}</Chip
+            >
           {/if}
           <!--
             ONE predicate, three surfaces (issue 1010). This pill reads `enableBlocked` —
@@ -442,15 +442,18 @@
             activation gate fires only on a transition into the enabled state.
           -->
           {#if selectedRecipe.enableBlocked}
-            <StatusPill
-              tone={selectedRecipe.enabled === false ? 'danger' : 'warning'}
+            {@const blockedLabel =
+              selectedRecipe.enabled === false
+                ? text('FABRICATE.Admin.Manager.Recipe.CantEnable', "Can't enable")
+                : text('FABRICATE.Admin.Manager.Recipe.Incomplete', 'Incomplete')}
+            <Chip
+              tone={statusChipTone(selectedRecipe.enabled === false ? 'danger' : 'warning')}
               icon={selectedRecipe.enabled === false
                 ? 'fas fa-circle-exclamation'
                 : 'fas fa-pen-ruler'}
-              label={selectedRecipe.enabled === false
-                ? text('FABRICATE.Admin.Manager.Recipe.CantEnable', "Can't enable")
-                : text('FABRICATE.Admin.Manager.Recipe.Incomplete', 'Incomplete')}
-            />
+              truncate
+              title={blockedLabel}>{blockedLabel}</Chip
+            >
           {/if}
         </div>
       </div>
@@ -490,15 +493,14 @@
       <!-- Multi-step: paginate one step at a time — the step's own Requires / Produces —
            with prev/next, the step name, and an (x / y) position hint (issue 643). -->
       <div class="manager-recipe-step-pager" data-recipe-step-pager>
-        <button
-          type="button"
-          class="manager-icon-button manager-recipe-step-nav"
-          data-recipe-step-prev
-          aria-label={text('FABRICATE.Admin.Manager.Recipe.PrevStep', 'Previous step')}
+        <IconButton
+          class="manager-recipe-step-nav"
+          data-recipe-step-prev=""
+          ariaLabel={text('FABRICATE.Admin.Manager.Recipe.PrevStep', 'Previous step')}
           title={text('FABRICATE.Admin.Manager.Recipe.PrevStep', 'Previous step')}
           disabled={currentStepIndex === 0}
           onclick={() => goToStep(-1)}
-          ><i class="fas fa-chevron-left" aria-hidden="true"></i></button
+          ><i class="fas fa-chevron-left" aria-hidden="true"></i></IconButton
         >
         <div class="manager-recipe-step-pager-copy">
           <span class="manager-recipe-step-pager-name" data-recipe-step-name>{currentStepName}</span
@@ -507,15 +509,14 @@
             >{currentStepIndex + 1} / {stepModel.length}</span
           >
         </div>
-        <button
-          type="button"
-          class="manager-icon-button manager-recipe-step-nav"
-          data-recipe-step-next
-          aria-label={text('FABRICATE.Admin.Manager.Recipe.NextStep', 'Next step')}
+        <IconButton
+          class="manager-recipe-step-nav"
+          data-recipe-step-next=""
+          ariaLabel={text('FABRICATE.Admin.Manager.Recipe.NextStep', 'Next step')}
           title={text('FABRICATE.Admin.Manager.Recipe.NextStep', 'Next step')}
           disabled={currentStepIndex === stepModel.length - 1}
           onclick={() => goToStep(1)}
-          ><i class="fas fa-chevron-right" aria-hidden="true"></i></button
+          ><i class="fas fa-chevron-right" aria-hidden="true"></i></IconButton
         >
       </div>
     {/if}
@@ -712,33 +713,31 @@
       still clearly a real, full-width action rather than a demoted afterthought.
     -->
     <div class="manager-recipe-browser-inspector-actions">
-      <button
-        type="button"
-        class="manager-button manager-recipe-browser-inspector-duplicate"
+      <ManagerButton
+        class="manager-recipe-browser-inspector-duplicate"
         data-recipe-action="duplicate"
         onclick={() => onDuplicate()}
       >
         <i class="fas fa-copy" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.Duplicate', 'Duplicate recipe')}</span>
-      </button>
-      <button
-        type="button"
-        class="manager-button manager-recipe-browser-inspector-edit"
+      </ManagerButton>
+      <ManagerButton
+        class="manager-recipe-browser-inspector-edit"
         data-recipe-action="edit"
         onclick={() => onEdit()}
       >
         <i class="fas fa-pen" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.Edit', 'Edit recipe')}</span>
-      </button>
-      <button
-        type="button"
-        class="manager-button manager-recipe-browser-inspector-delete"
+      </ManagerButton>
+      <ManagerButton
+        role="danger"
+        class="manager-recipe-browser-inspector-delete"
         data-recipe-action="delete"
         onclick={() => onDelete()}
       >
         <i class="fas fa-trash" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.Delete', 'Delete recipe')}</span>
-      </button>
+      </ManagerButton>
     </div>
   </section>
 {:else if recipeCount === 0}
@@ -815,7 +814,7 @@
       aria-label={text('FABRICATE.Admin.Manager.Recipe.EmptySetup.Resources', 'Recipe resources')}
     >
       {#if componentCount <= 0}
-        <button type="button" class="manager-button is-primary" onclick={() => onAddComponents()}>
+        <ManagerButton role="primary" onclick={() => onAddComponents()}>
           <i class="fas fa-boxes" aria-hidden="true"></i>
           <span
             >{text(
@@ -823,26 +822,24 @@
               'Add components'
             )}</span
           >
-        </button>
+        </ManagerButton>
       {/if}
-      <a
-        class="manager-button"
-        href="https://mistersilver-uk.github.io/fabricate/recipes"
+      <ManagerButton
+        tag="a"
+        href="https://mistersilver-uk.github.io/fabricate/crafting/recipes/"
         target="_blank"
-        rel="noreferrer"
       >
         <i class="fas fa-book-open" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.EmptySetup.RecipeDocs', 'Recipe docs')}</span>
-      </a>
-      <a
-        class="manager-button"
-        href="https://mistersilver-uk.github.io/fabricate/quickstart"
+      </ManagerButton>
+      <ManagerButton
+        tag="a"
+        href="https://mistersilver-uk.github.io/fabricate/help/quickstart"
         target="_blank"
-        rel="noreferrer"
       >
         <i class="fas fa-circle-question" aria-hidden="true"></i>
         <span>{text('FABRICATE.Admin.Manager.Recipe.EmptySetup.Quickstart', 'Quickstart')}</span>
-      </a>
+      </ManagerButton>
     </div>
   </section>
 {:else}

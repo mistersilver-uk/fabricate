@@ -6,7 +6,7 @@ Define the requirements for Fabricate integrations with third-party Foundry modu
 Integrations must be automated, transparent, and require zero user-authored macros or scripts.
 
 This specification governs **inbound** integrations only — Fabricate consuming another module's data or services.
-The **outbound** companion-extension contract, by which another module contributes navigation and content into Fabricate's own windows, lives in `ui-integration/spec.md` §Downtime Preview and Premium Extension and §Player Navigation Extension.
+Fabricate's **outbound** contracts are specified elsewhere, and there are two of them: outbound **UI contribution**, by which another module contributes navigation and content into Fabricate's own windows, lives in `ui-integration/spec.md` §Downtime Preview and Premium Extension and §Player Navigation Extension; outbound **behavioural consumption**, by which another module calls Fabricate to settle work against an actor, lives in `companion-api/spec.md`.
 
 ## Principles
 

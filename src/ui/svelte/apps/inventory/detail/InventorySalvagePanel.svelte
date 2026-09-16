@@ -24,6 +24,8 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
+  import Callout from '../../manager/Callout.svelte';
+  import Kicker from '../../../components/Kicker.svelte';
   import SalvageMisconfiguredBody from './salvage/SalvageMisconfiguredBody.svelte';
   import SalvageProgressiveBody from './salvage/SalvageProgressiveBody.svelte';
   import SalvageRollSummary from './salvage/SalvageRollSummary.svelte';
@@ -174,20 +176,21 @@
 
 <div class="salvage-panel" data-inventory-salvage-panel={mode}>
   {#if actingSystemLabel}
-    <p class="salvage-acting-system" data-inventory-salvage-acting-system>{actingSystemLabel}</p>
+    <Kicker dataAttr="data-inventory-salvage-acting-system">{actingSystemLabel}</Kicker>
   {/if}
   <!-- SUPPRESSED when misconfigured (issue 764). The banner derives a mode/usability
        tone — for a Simple no-check config that is the green "you'll recover this" ramp —
        which contradicts the misconfigured body sitting directly beneath it. The
        misconfigured body IS the banner in that state. -->
   {#if !misconfigured}
-    <p class="salvage-banner is-{banner.tone}" data-inventory-salvage-banner={mode}>
-      <i class={banner.icon} aria-hidden="true"></i>
-      <span class="salvage-banner-text">
-        <span class="salvage-banner-title">{bannerTitle}</span>
-        <span class="salvage-banner-rule">{bannerRule}</span>
-      </span>
-    </p>
+    <Callout
+      tone={banner.tone}
+      icon={banner.icon}
+      title={bannerTitle}
+      text={bannerRule}
+      dataAttr="data-inventory-salvage-banner"
+      dataValue={mode}
+    />
   {/if}
 
   <!-- Required-tool disclosure (issue 777), positioned after the banner and before the
@@ -229,7 +232,23 @@
   {#if committed}
     <!-- ONE box. The reset is an inline text button INSIDE the ribbon, not a second
          full-width control stacked beneath it: "Salvage again" is a quiet way back, not
-         a second call to action competing with the result it sits under. -->
+         a second call to action competing with the result it sits under.
+
+         HAND-ROLLED, AND REFUSED RATHER THAN CONVERTED (issue 1514). This is a just-happened
+         success and `Notice tone="success"` paints exactly that, so the ROUTING is right and
+         the CONTENT MODEL is what refuses it. The ribbon's trailing slot holds two different
+         things in its two states, and the primitive can hold neither:
+
+           - `Salvage again` is an inline UNDERLINED text link in `--fab-success-text`, and
+             `Notice`'s `action` renders `.fab-notice-button` — a 28px bordered tile on
+             `--fab-surface-soft` in `--fab-text-secondary`. That is precisely the "second
+             call to action competing with the result" the paragraph above refuses by name;
+           - the depleted state's note is a `<span>`, not an action at all, and `Notice`
+             declares no `children` prop, so it has NO slot to render into.
+
+         Half the ribbon's states would therefore have nowhere to go. What would close it is a
+         children slot, or a `link`-shaped action variant — either belongs on the primitive, in
+         a change that builds one. -->
     <p class="salvage-ribbon" data-inventory-salvage-ribbon role="status">
       <i class="fas fa-circle-check" aria-hidden="true"></i>
       <span class="salvage-ribbon-text">{localize('FABRICATE.App.Inventory.Salvage.Ribbon')}</span>
@@ -293,78 +312,6 @@
        honoured, restoring ~24px below the last control (measured). Scoped here, not on
        the shared `.inventory-detail`, which also serves the Info and book panels. */
     padding-bottom: var(--fab-space-6);
-  }
-
-  /* A quiet eyebrow naming the acting participation on a multi-system card. */
-  .salvage-acting-system {
-    margin: 0;
-    font-size: 10px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--fab-text-muted);
-  }
-
-  .salvage-banner {
-    display: flex;
-    align-items: flex-start;
-    gap: var(--fab-space-2);
-    margin: 0;
-    padding: 10px;
-    border: 1px solid var(--fab-border);
-    border-radius: 9px;
-    background: var(--fab-surface-soft);
-  }
-
-  .salvage-banner.is-info {
-    border-color: var(--fab-info-border);
-    background: var(--fab-info-soft);
-    color: var(--fab-info);
-  }
-
-  .salvage-banner.is-accent {
-    border-color: var(--fab-accent-border);
-    background: var(--fab-accent-soft);
-    color: var(--fab-accent);
-  }
-
-  .salvage-banner.is-success {
-    border-color: var(--fab-success-border);
-    background: var(--fab-success-soft);
-    color: var(--fab-success-text);
-  }
-
-  .salvage-banner-text {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
-  }
-
-  /* The title takes its TONE's text colour, not a flat one: a tinted box whose headline
-     is the same grey in every state throws the ramp away. */
-  .salvage-banner-title {
-    font-size: 11.5px;
-    font-weight: 700;
-  }
-
-  .salvage-banner.is-info .salvage-banner-title {
-    color: var(--fab-info-text);
-  }
-
-  .salvage-banner.is-accent .salvage-banner-title {
-    color: var(--fab-accent);
-  }
-
-  .salvage-banner.is-success .salvage-banner-title {
-    color: var(--fab-success-text);
-  }
-
-  .salvage-banner-rule {
-    font-size: 11px;
-    font-weight: 400;
-    line-height: 1.5;
-    color: var(--fab-text-muted);
   }
 
   /* The prototype's ruled action row: a note left, the action right. */

@@ -60,19 +60,33 @@ export const GRACE_MS = 3 * 60_000;
 export const SLACK_MS = 5 * 60_000;
 
 /** The whole gate's wall-clock ceiling, whatever the producer's own deadline works out to. */
-export const MAX_WAIT_MS = 65 * 60_000;
+export const MAX_WAIT_MS = 100 * 60_000;
 
 /** The gap between polls of the runs list. */
 export const POLL_INTERVAL_MS = 20_000;
 
-/** The clock-independent iteration cap. A clock bug must fail fast, never hang a required check. */
-export const MAX_POLLS = 240;
+/**
+ * The clock-independent iteration cap: a bound on ITERATIONS, so a frozen or backwards clock cannot
+ * spin this loop forever. It is not a promise that the job outlives the cap — 360 polls of a 20 s
+ * sleep plus API time is roughly 126 minutes of real time, past the gate job's 110-minute
+ * `timeout-minutes`, so under a frozen clock GitHub cancels the job before the cap can emit its
+ * `capture-did-not-conclude`. Lowering it does not buy that promise back either (320 polls is still
+ * ~112 minutes), and raising `timeout-minutes` to cover it would spend runner budget on a
+ * pathological case to gain a tidier diagnostic.
+ *
+ * It moves with {@link MAX_WAIT_MS} rather than standing still, because the inequality above makes
+ * `maxPolls * pollIntervalMs` the ceiling's own ceiling: at 240 polls the product is 80 minutes,
+ * so a 100-minute `maxWaitMs` would be unreachable and every long wait would end at the cap with a
+ * `capture-did-not-conclude` the clock never justified. 360 puts the product at 120 minutes, above
+ * `maxWaitMs`, so on a working clock the deadline is always what ends a healthy wait.
+ */
+export const MAX_POLLS = 360;
 
 /**
  * The producer's own job timeout, as a default. `--capture-timeout-minutes` pins this to
  * `capture`'s real `timeout-minutes` in `pr-screenshots.yml`, and Task 6 asserts the two agree.
  */
-export const CAPTURE_TIMEOUT_MS = 40 * 60_000;
+export const CAPTURE_TIMEOUT_MS = 75 * 60_000;
 
 /** The default workflow file the gate waits on. */
 export const DEFAULT_CAPTURE_WORKFLOW = 'pr-screenshots.yml';
@@ -314,11 +328,13 @@ function withoutExtension(name) {
  * The View Lab case and head SHA a published frame's URL identifies, or `null` when the URL is not
  * one of this pull request's published frames.
  *
- * THE URL IS THE MACHINE-READABLE IDENTITY, NOT THE ALT TEXT. `labelForCaseId` is not wired into the
- * CLI publish path, so the alt text falls back to a `VIEW_RECIPES` lookup and only then to the bare
- * id — ambiguous by construction. `uploadScreenshotObjects` builds `${prefix}/${pr}[/${sha}]/${name}`,
- * so the last path segment minus its extension is the case id and the segment before it is the head
- * the frames were drawn for.
+ * THE URL IS THE MACHINE-READABLE IDENTITY, NOT THE ALT TEXT, and it stays that way now that
+ * `labelForCaseId` IS wired into the CLI publish path. The alt text is a human-facing sentence
+ * chosen for a reader — it is localizable in principle, it is `sanitizeLabel`d, and a maintainer
+ * pasting their own evidence writes whatever they like in it. None of that is true of the URL:
+ * `uploadScreenshotObjects` builds `${prefix}/${pr}[/${sha}]/${name}`, so the last path segment
+ * minus its extension is the case id and the segment before it is the head the frames were drawn
+ * for. Matching on the label would make this gate depend on wording.
  *
  * ANCHORED ON THE PR NUMBER, deliberately. "Looks like hex" is unsound as a discriminator, because
  * `normalizeHeadShaSegment` permits `[0-9a-zA-Z._-]+` — a legacy `<view>.png` segment can satisfy

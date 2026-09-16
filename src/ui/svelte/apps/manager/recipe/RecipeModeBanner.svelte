@@ -40,7 +40,7 @@
      resolution-mode hooks, so that call site keeps them without restating them.
 -->
 <script>
-  import Chip from '../Chip.svelte';
+  import Chip from '../../../components/Chip.svelte';
 
   let {
     icon = '',

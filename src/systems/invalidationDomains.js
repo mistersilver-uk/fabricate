@@ -264,7 +264,6 @@ export const SYSTEM_FIELD_DOMAINS = Object.freeze({
   // membership decides what a player may learn.
   recipeItemDefinitions: Object.freeze([LABELLING, NARRATIVE, ACCESS_AND_KNOWLEDGE]),
   membershipResolvesByRecipeIds: Object.freeze([ACCESS_AND_KNOWLEDGE]),
-  modifiers: Object.freeze([RESOLUTION_CONFIG]),
   craftingCheck: Object.freeze([RESOLUTION_CONFIG]),
   salvageCraftingCheck: Object.freeze([RESOLUTION_CONFIG]),
   gatheringCraftingCheck: Object.freeze([RESOLUTION_CONFIG]),
@@ -279,7 +278,12 @@ export const SYSTEM_FIELD_DOMAINS = Object.freeze({
   // moved, so a component rewrite carries all three of the classes a component can express.
   components: Object.freeze([LABELLING, NARRATIVE, COMPONENT_DEFINITIONS]),
   tools: Object.freeze([LABELLING, NARRATIVE, COMPONENT_DEFINITIONS, RESOLUTION_CONFIG]),
-  characterPrerequisites: Object.freeze([LABELLING, ACCESS_AND_KNOWLEDGE]),
+  // `modifiers` and `characterPrerequisites` are both GONE from the crafting system (issue 1308)
+  // — the two libraries are world settings now, so an edit to either no longer writes a system
+  // record and this map can no longer carry them. `settingChangeBridge`'s `characterLibraries`
+  // leg announces those edits instead. It announces the UNION of the three domains these two
+  // rows carried between them, because one setting cannot say which library moved; keeping the
+  // rows here would not help, since nothing writes the fields they classify.
   // Gathering geography and its behaviour settings. A realm carries authored PROSE
   // (`gatheringRealms.js` normalizes a `description`, rendered by `EnvironmentCard.svelte` and
   // `GatheringDetail.svelte`), and it is deliberately NOT filed under `narrative`: the

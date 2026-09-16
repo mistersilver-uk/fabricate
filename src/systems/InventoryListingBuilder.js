@@ -67,18 +67,30 @@ import {
 // item-bag literal (the "treat as no image" sentinel).
 import { GENERIC_ITEM_IMAGE } from '../ui/svelte/util/craftingImageDefaults.js';
 import { findMatchingComponent } from '../utils/essenceResolver.js';
+// The player-visible per-stage complication forecast, attached to the stage rows this
+// builder already publishes. Another deliberately import-free leaf (its one import is the
+// pure `complicationPlan.js`), so the audience filter reaches the panel without the
+// complication RUNTIME's import closure following it.
+import { attachStageComplications } from '../utils/progressiveStageComplications.js';
 // The cumulative "reached at >=N" thresholds a progressive salvage's stage list shows.
 // A deliberately import-free leaf.
 import { progressiveStageThresholds } from '../utils/progressiveStageThresholds.js';
 import { matchRecipeItemDefinition, resolveToolForItem } from '../utils/sourceUuid.js';
 
+import { resolveCharacterPrerequisiteLibrary } from './characterLibraries.js';
 import { evaluatePrerequisites } from './characterPrerequisites.js';
 import { readStackQuantity } from './itemStackQuantity.js';
 // The ONE salvage `(mode, checkUsable)` derivation, shared with `CraftingEngine` so the
 // player's panel and the engine that rolls for it cannot disagree. A pure, Foundry-free
 // leaf, so it adds no transitive edge.
 import { resolveSalvageCheck } from './salvageCheckUsability.js';
+import {
+  resolvedComponentsFor,
+  resolvedEssencesFor,
+  resolvedToolsFor,
+} from './scopedEntityReads.js';
 import { computeSystemVisibility } from './systemValidation.js';
+import { effectiveToolBreakageAuthority } from './toolBreakageAuthority.js';
 import { ingredientSetToolsAreActive } from './toolCheckBonus.js';
 
 // A shared empty set for the GM path, where no entity is visibility-hidden — avoids
@@ -343,8 +355,8 @@ export class InventoryListingBuilder {
    * @private
    */
   _buildSystemParticipations(system, sources, allowedRecipeIds = null, isGM = true, order = 0) {
-    const components = Array.isArray(system?.components) ? system.components : [];
-    const tools = Array.isArray(system?.tools) ? system.tools : [];
+    const components = resolvedComponentsFor(system);
+    const tools = resolvedToolsFor(system);
     // A system with tools and ZERO components must still project its owned tools (issue
     // 1119), so the cheap bail-out is the union of both libraries, not components alone.
     if (components.length === 0 && tools.length === 0) {
@@ -845,8 +857,7 @@ export class InventoryListingBuilder {
     const systemId = stringOrNull(system?.id);
     const systemName = stringOrEmpty(system?.name);
     const essencesEnabled = system?.enableEssences === true;
-    const essenceDefs =
-      essencesEnabled && Array.isArray(system?.essenceDefinitions) ? system.essenceDefinitions : [];
+    const essenceDefs = essencesEnabled ? resolvedEssencesFor(system) : [];
     const essenceDefById = new Map(essenceDefs.map((def) => [def.id, def]));
 
     // The system's recipes, fetched ONCE per owned system and shared by the used-by
@@ -876,7 +887,7 @@ export class InventoryListingBuilder {
     // it is additive and never wrong, and it still badges a component-linked tool whose
     // owned document resolves to the component but not to the tool.
     const toolComponentIds = new Set(
-      (Array.isArray(system?.tools) ? system.tools : [])
+      resolvedToolsFor(system)
         .filter((tool) => tool?.componentId)
         .map((tool) => tool.componentId)
     );
@@ -940,7 +951,7 @@ export class InventoryListingBuilder {
    * @private
    */
   _toolLookup(system, components) {
-    const tools = Array.isArray(system?.tools) ? system.tools : [];
+    const tools = resolvedToolsFor(system);
     const systemId = stringOrNull(system?.id);
     // A tool's OWN snapshot name first, then its linked component's, mirroring
     // `RecipeManager.toolMatchesItem`'s fallback ordering.
@@ -1307,9 +1318,7 @@ export class InventoryListingBuilder {
     // its recipes with a `learnBlocked` flag the Learn affordance disables on.
     const rollData = craftingActor?.getRollData?.() ?? {};
     const prerequisiteById = new Map(
-      (Array.isArray(system?.characterPrerequisites) ? system.characterPrerequisites : []).map(
-        (def) => [def.id, def]
-      )
+      resolveCharacterPrerequisiteLibrary(system).map((def) => [def.id, def])
     );
     const rows = [];
     for (const [defId, { def, sources: sourceMap, item }] of owned) {
@@ -1429,7 +1438,7 @@ export class InventoryListingBuilder {
     if (!system?.id) return NO_HIDDEN_ENTITIES;
     const { hiddenEntityIds } = computeSystemVisibility(system, {
       recipes,
-      components: system.components || [],
+      components: resolvedComponentsFor(system),
     });
     return hiddenEntityIds;
   }
@@ -1448,7 +1457,11 @@ export class InventoryListingBuilder {
    * mode.
    *
    * The panel is presentational: mode, usability, DC, thresholds and stage ordering
-   * are all decided here, against the same fields the engine dispatches on.
+   * are all decided here, against the same fields the engine dispatches on. Progressive
+   * component complications (issue 1286) join that list: which of a stage's complications
+   * a player may be told about is decided HERE, through the pure player projection, and a
+   * panel filtering an authored list in Svelte would reintroduce exactly the disclosure
+   * this builder-side filter exists to prevent.
    *
    * @param {object} args
    * @param {object} args.system  The owning crafting system.
@@ -1528,6 +1541,15 @@ export class InventoryListingBuilder {
     });
     const toolsAvailable = toolStates.every((tool) => tool.available === true);
 
+    // Progressive-only, because progressive is the only mode that HAS stages: the engine
+    // fires complications from an ordered stage list and returns null plan inputs for every
+    // other salvage mode, so a forecast on a `simple` or `routed` panel would promise a
+    // consequence nothing can deliver.
+    const stages =
+      mode === 'progressive' && !misconfigured
+        ? this._salvageStages({ system, salvage, componentById })
+        : [];
+
     return {
       enabled: true,
       mode,
@@ -1557,10 +1579,20 @@ export class InventoryListingBuilder {
         mode === 'routed' && !misconfigured
           ? this._salvageRoutedOutcomes({ salvage, config, routedType, component, componentById })
           : [],
-      stages:
-        mode === 'progressive' && !misconfigured
-          ? this._salvageStages({ system, salvage, componentById })
-          : [],
+      // Each row's player-visible complication FORECAST rides on the row itself (see
+      // `attachStageComplications`), so the store's reorder carries it and a panel never
+      // has to rejoin it. Identity-preserving: a component authoring none — which is every
+      // component predating issue 1286 — gets the array and the rows it got before.
+      stages: attachStageComplications(stages, {
+        componentById,
+        activity: 'salvage',
+        // Salvage's OWN active check block, never the recipe's. `config` is already
+        // `salvageCraftingCheck[mode]`, and `_resolveSalvageCheckBreakage` reads its
+        // `checkBreakage` off exactly this object, so the ids the forecast filters on are
+        // the ids the firing will match against. Unguarded by mode because `stages` is
+        // empty for every mode but progressive, and an empty list forecasts nothing.
+        checkBreakage: config?.checkBreakage ?? null,
+      }),
       // SALVAGE'S OWN award mode (`salvageCraftingCheck.progressive.awardMode`),
       // independently authored from the recipe's. Surfaced because a stage threshold is
       // a property of its POSITION, so reordering invalidates the baked values and the
@@ -1603,7 +1635,7 @@ export class InventoryListingBuilder {
   _salvageToolStates({ system, salvage, componentById, targetActor }) {
     const ids = Array.isArray(salvage?.toolIds) ? salvage.toolIds : [];
     if (ids.length === 0) return [];
-    const library = Array.isArray(system?.tools) ? system.tools : [];
+    const library = resolvedToolsFor(system);
     const seen = new Set();
     const tools = [];
     for (const rawId of ids) {
@@ -1850,7 +1882,10 @@ export class InventoryListingBuilder {
 
     // The projection. Never under checkDriven: usage still accrues there, but it
     // decides nothing.
-    if (system?.toolBreakage?.authority === 'checkDriven') return false;
+    // Routed through the world scope at issue 1363: with an absence-preserving crafting-system
+    // normalizer, re-defaulting locally would render the row "Broken" under an authored world
+    // `checkDriven` authority, which is the exact projection this gate exists to withhold.
+    if (effectiveToolBreakageAuthority(system) === 'checkDriven') return false;
     // The caller supplies the Tool. It used to be found here by `componentId`, which made
     // the exhaustion projection unreachable for an item-sourced Tool (issue 1119) — and
     // reachable for a component-linked one only by luck, since two tools may link one
@@ -1873,7 +1908,7 @@ export class InventoryListingBuilder {
    */
   _toolForComponentId(system, componentId) {
     if (!componentId) return null;
-    const tools = Array.isArray(system?.tools) ? system.tools : [];
+    const tools = resolvedToolsFor(system);
     return tools.find((entry) => entry?.componentId === componentId) ?? null;
   }
 
@@ -2191,7 +2226,7 @@ export class InventoryListingBuilder {
    */
   _toolComponentByIdMap(system) {
     const toolComponentById = new Map();
-    for (const tool of Array.isArray(system?.tools) ? system.tools : []) {
+    for (const tool of resolvedToolsFor(system)) {
       if (tool?.id && tool.componentId) toolComponentById.set(tool.id, tool.componentId);
     }
     return toolComponentById;
@@ -2303,7 +2338,7 @@ export class InventoryListingBuilder {
    * @private
    */
   _indexIngredientOptions(group, { componentUsedBy, recipeEntry, seen, system }) {
-    const systemComponents = Array.isArray(system?.components) ? system.components : [];
+    const systemComponents = resolvedComponentsFor(system);
     for (const option of Array.isArray(group?.options) ? group.options : []) {
       for (const componentId of this._optionConsumedComponentIds(option, systemComponents)) {
         pushUse(componentUsedBy, componentId, { ...recipeEntry, role: 'ingredient' }, seen);
@@ -2343,7 +2378,7 @@ export class InventoryListingBuilder {
    * @private
    */
   _indexSalvageProducers(system, addProduced) {
-    for (const source of Array.isArray(system?.components) ? system.components : []) {
+    for (const source of resolvedComponentsFor(system)) {
       if (source?.salvage?.enabled !== true) continue;
       const value = {
         kind: 'salvage',

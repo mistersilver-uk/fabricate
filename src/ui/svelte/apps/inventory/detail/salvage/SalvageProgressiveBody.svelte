@@ -25,6 +25,18 @@
   record. A stage still claiming to await a roll directly beneath a success ribbon is a
   contradiction the player would have to resolve for us.
 
+  Each stage may also carry a COMPLICATION BAND (issue 1286): what the GM has said can go
+  wrong when this result is produced, and — once the run has resolved — which of those
+  actually happened. The data rides on the stage row, published by
+  `InventoryListingBuilder._buildSalvage` and marked by `markFiredStageComplications`, so
+  this body passes only the TENSE. It never re-derives the list, and above all never
+  infers `fired` from a stage's missed state: `match` and the condition roll mean a short
+  stage need not have fired anything, so deriving one from the other asserts something
+  untrue about the roll that just happened.
+
+  The band offers no exclude toggle, no excluded-results list and no hidden-result note,
+  for the reason stated above: exclusion contradicts the reconciliation contract.
+
   The post-roll truth comes from the run record's `createdResults` — the engine's OWN
   list of what it awarded, keyed by componentId — not from matching the created Items
   by name, which is fragile. A salvage that ran without a run manager (the runless
@@ -33,8 +45,12 @@
 -->
 <script>
   import { localize } from '../../../../util/foundryBridge.js';
-  import StatusPill from '../../../../components/StatusPill.svelte';
+  import { statusChipTone } from '../../../../util/statusChipTone.js';
+  import Chip from '../../../../components/Chip.svelte';
   import ProgressiveStageList from '../../../crafting/detail/ProgressiveStageList.svelte';
+  import Callout from '../../../manager/Callout.svelte';
+  import EmptyState from '../../../manager/EmptyState.svelte';
+  import Kicker from '../../../../components/Kicker.svelte';
 
   let {
     stages = [],
@@ -115,13 +131,14 @@
   };
 </script>
 
-<!-- The house chip primitive, not a fourth hand-rolled one: StatusPill is what the
-     Journal (a player surface) and the manager already use. -->
+<!-- The house chip primitive, not a fourth hand-rolled one: `Chip` is what the Journal
+     (a player surface) and the manager already use, and since issue 1506 it is the only
+     one — the status pill this snippet used to render retired into it. -->
 {#snippet stateChip(stage)}
   {@const state = stateOf(stage)}
   {@const pill = STATES[state]}
   <span class="salvage-state-chip" data-progressive-stage-state={state}>
-    <StatusPill tone={pill.tone} icon={pill.icon} label={localize(pill.key)} />
+    <Chip tone={statusChipTone(pill.tone)} icon={pill.icon}>{localize(pill.key)}</Chip>
   </span>
 {/snippet}
 
@@ -138,17 +155,24 @@
     It sits here, below the roll summary, because after a roll it is the rule that
     explains the row states directly beneath it.
   -->
-  <p class="salvage-flow" data-inventory-salvage-flow>
-    <i class="fas fa-arrow-down-long" aria-hidden="true"></i>
-    <span>{localize('FABRICATE.App.Inventory.Salvage.ProgressiveFlow')}</span>
-  </p>
+  <!-- NEUTRAL, not info (issue 1505): the mode banner above derives `info` in progressive mode,
+       the only mode this body renders in, so tinting this strip too would spend the colour twice
+       and read the two boxes as a matched pair rather than a headline and its explanation. The
+       rule the conversion deleted refused that fill in terms, and the sentence below is an
+       invariant of the mode rather than a note about live state. -->
+  <Callout
+    tone="neutral"
+    icon="fas fa-arrow-down-long"
+    text={localize('FABRICATE.App.Inventory.Salvage.ProgressiveFlow')}
+    dataAttr="data-inventory-salvage-flow"
+  />
 
   <!-- The eyebrow's right slot tracks the list's state rather than emptying out: before
        a roll it says what will resolve the list, after one it says how far the roll got.
        Only with a RECORD, though — a runless salvage cannot count what it awarded, and a
        "0 of 4 recovered" derived from an absent record is a lie, not a default. -->
   <p class="salvage-body-title">
-    <span>{localize('FABRICATE.App.Inventory.Salvage.OrderedResultsTitle')}</span>
+    <Kicker as="span">{localize('FABRICATE.App.Inventory.Salvage.OrderedResultsTitle')}</Kicker>
     {#if !resolved}
       <span class="salvage-body-hint" data-inventory-salvage-roll-hint>
         {localize('FABRICATE.App.Inventory.Salvage.RollToResolve')}
@@ -164,7 +188,7 @@
   </p>
 
   {#if stages.length === 0}
-    <p class="salvage-empty">{localize('FABRICATE.App.Inventory.Salvage.NoResults')}</p>
+    <EmptyState note hint={localize('FABRICATE.App.Inventory.Salvage.NoResults')} />
   {:else}
     <ProgressiveStageList
       {stages}
@@ -176,6 +200,7 @@
       {stateChip}
       {fixedNoteKey}
       {fixedNoteFallback}
+      complications={resolved ? 'resolved' : 'forecast'}
     />
     <!-- The stage list explains itself only when the rows are FIXED. Silence in the
          other state leaves the affordance to be discovered: the grip is a small glyph,
@@ -188,21 +213,24 @@
          hidden — while the order is already the GM's, so the note's shape does not
          change under the player as they drag. -->
     {#if canReorder}
-      <p class="salvage-reorder-note" data-inventory-salvage-reorder-note>
-        <i class="fas fa-hand-pointer" aria-hidden="true"></i>
-        <span class="salvage-reorder-note-text">
-          {localize('FABRICATE.App.Inventory.Salvage.StageOrderYours')}
-        </span>
-        <button
-          type="button"
-          class="salvage-reorder-reset"
-          data-inventory-salvage-reorder-reset
-          disabled={!canResetOrder}
-          onclick={() => onResetOrder?.()}
-        >
-          {localize('FABRICATE.App.Inventory.Salvage.StageOrderReset')}
-        </button>
-      </p>
+      <Callout
+        tone="neutral"
+        icon="fas fa-hand-pointer"
+        text={localize('FABRICATE.App.Inventory.Salvage.StageOrderYours')}
+        dataAttr="data-inventory-salvage-reorder-note"
+      >
+        {#snippet actions()}
+          <button
+            type="button"
+            class="salvage-reorder-reset"
+            data-inventory-salvage-reorder-reset
+            disabled={!canResetOrder}
+            onclick={() => onResetOrder?.()}
+          >
+            {localize('FABRICATE.App.Inventory.Salvage.StageOrderReset')}
+          </button>
+        {/snippet}
+      </Callout>
     {/if}
   {/if}
 </div>
@@ -214,78 +242,41 @@
     gap: 8px;
   }
 
-  /* The section eyebrow, matching its two sibling bodies. */
+  /* The section eyebrow's ROW, matching its two sibling bodies — and the three copies of the
+     type it used to restate are one `Kicker` now, which is the drift that component exists to
+     end.
+THE ROW ONLY (issue 1514). The eyebrow itself is the shared `Kicker` now, which declares
+     every type property this rule used to — the size, the weight, the tracking, the transform
+     and the ink — so what is left here is what was genuinely the CALLER's: the flex row that
+     places the label beside its trailing figure, and the `line-height` that sets THAT figure's
+     leading. The kicker declares its own 1.3 and is unaffected by the inherited value. */
   .salvage-body-title {
     display: flex;
     align-items: center;
     gap: 6px;
     margin: 0;
-    font-size: 10px;
-    font-weight: 700;
     line-height: 1;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    color: var(--fab-text-muted);
   }
 
+  /* THE TRANSFORM AND THE TRACKING ARE DECLARED HERE NOW, and that is a repair rather than an
+     addition (issue 1514). This span never had either: it INHERITED them from the eyebrow rule
+     on `.salvage-body-title`, which the conversion moved onto `Kicker`. Measured in the View Lab
+     before it was noticed — the hint fell from 89.52px to 55.64px wide, because "Roll to
+     resolve" had silently stopped being "ROLL TO RESOLVE". Restated at the values it rendered. */
   .salvage-body-hint {
     margin-left: auto;
     font-size: 9px;
     font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
     color: var(--fab-text-subtle);
   }
 
-  .salvage-empty {
-    margin: 0;
-    font-size: 12px;
-    color: var(--fab-text-muted);
-  }
-
-  /* A positioning wrapper only — the pill inside is the shared StatusPill, which owns
-     every ramp, the radius, the padding and the type. */
+  /* A positioning wrapper only — the chip inside is the shared `Chip`, which owns every
+     ramp, the radius, the padding and the type. */
   .salvage-state-chip {
     display: inline-flex;
     flex: 0 0 auto;
-  }
-
-  /* The mechanic banner. It takes the panel banner's box but NOT its tone fill: two
-     saturated boxes stacked make neither one the headline. This is the quieter of the
-     pair — the mode banner names the mode, this explains it. */
-  .salvage-flow {
-    display: flex;
-    align-items: center;
-    gap: var(--fab-space-2);
-    margin: 0;
-    padding: 8px 10px;
-    border: 1px solid var(--fab-border);
-    border-radius: 9px;
-    background: var(--fab-surface);
-    color: var(--fab-info);
-    font-size: 11px;
-    line-height: 1.5;
-  }
-
-  .salvage-flow span {
-    color: var(--fab-text-muted);
-  }
-
-  .salvage-reorder-note {
-    display: flex;
-    align-items: center;
-    gap: var(--fab-space-2);
-    margin: 0;
-    padding: 8px 10px;
-    border: 1px solid var(--fab-border);
-    border-radius: 9px;
-    background: var(--fab-surface);
-    font-size: 11px;
-    line-height: 1.4;
-    color: var(--fab-text-muted);
-  }
-
-  .salvage-reorder-note-text {
-    flex: 1 1 auto;
-    min-width: 0;
   }
 
   /* An inline text button, matching the panel ribbon's "Salvage again": a quiet way

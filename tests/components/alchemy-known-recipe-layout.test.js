@@ -35,6 +35,12 @@ function styleOf(rel) {
 }
 const viewCss = styleOf('src/ui/svelte/apps/alchemy/AlchemyView.svelte');
 const cardCss = styleOf('src/ui/svelte/apps/alchemy/KnownRecipesColumn.svelte');
+// The leading tile's own block, because the tile is a SHARED PRIMITIVE now (issue 1514) and the
+// geometry this file measures depends on how much of the row it takes. `.alchemy-recipe-icon`
+// went with the raw `<img>` it styled, so a fixture still writing that class would give the name
+// column 36px more room than production does and the measurement would stop describing the
+// screen while still passing.
+const tileCss = styleOf('src/ui/svelte/components/Medallion.svelte');
 
 // The Bug-1 string (raw essence ids) vs the resolved string the fix produces.
 const LONG_SIG =
@@ -46,7 +52,9 @@ function card(name, sig) {
   <li>
     <button type="button" class="alchemy-recipe" data-alchemy-recipe="r">
       <span class="alchemy-recipe-top">
-        <span class="alchemy-recipe-icon"><i class="fas fa-flask"></i></span>
+        <span class="fab-medallion" data-medallion="glyph" style="width:36px;height:36px"
+          ><i class="fas fa-flask"></i
+        ></span>
         <span class="alchemy-recipe-meta">
           <span class="alchemy-recipe-name" data-probe-name>${name}</span>
           <span class="alchemy-recipe-sig" data-probe-sig>${sig}</span>
@@ -60,7 +68,7 @@ function card(name, sig) {
 function page(name, sig, winWidth) {
   return `<!doctype html><html><head><meta charset="utf-8">
     <style>${foundryCss}</style><style>${fabricateCss}</style>
-    <style>${viewCss}</style><style>${cardCss}</style>
+    <style>${viewCss}</style><style>${cardCss}</style><style>${tileCss}</style>
     <style>:root{--font-primary:Arial,sans-serif}.win{width:${winWidth}px;height:600px}</style></head>
     <body class="game"><div class="application theme-dark"><section class="window-content">
       <div class="fabricate" data-fabricate-theme="dark"><div class="win">

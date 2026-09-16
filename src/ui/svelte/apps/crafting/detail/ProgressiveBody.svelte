@@ -5,6 +5,14 @@
   progressive note; the craft button advances the next step (the run-summary panel
   on the right surfaces an in-flight run). Shared composition lives in
   RecipeBodyShell.
+
+  It opts the stage list into the per-stage COMPLICATION BAND (issue 1286) in the
+  `forecast` tense, and only that tense. Crafting is FORECAST-ONLY, and that is a property
+  of crafting rather than an omission: the fired record is defined on the salvage RUN
+  record and the immediate crafting path writes none, so there is nothing to mark and no
+  crafting stage ever claims a complication fired. `CraftingListingBuilder`'s own
+  `_buildProgressiveStages` says the same at the point it attaches the forecast. Inventing
+  a second carrier for a tense no prototype draws here is out of scope.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
@@ -55,6 +63,7 @@
           announcement={stageAnnouncement}
           onReorder={(index, target, announcement) => onReorderStage?.(index, target, announcement)}
           onReorderSettled={() => onReorderStageSettled?.()}
+          complications="forecast"
         />
       {:else}
         <IoTable {craftability} result={recipe?.result} {onChooseOption} {...rail} />

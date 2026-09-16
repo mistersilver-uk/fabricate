@@ -11,6 +11,11 @@
     2. every configured character is already a member of this party;
     3. the search matches none of the remaining candidates.
 
+  Reason 1 renders through `EmptyState`'s title AND body (issue 1035): naming the
+  setting is a second sentence of prose, not a continuation of the heading, so it lives
+  in the `hint` slot rather than being fused into the title. Reasons 2 and 3 are each
+  already complete in one short sentence and pass no `hint` at all.
+
   Membership comes from the projected `isPlayerCharacter` flag the manager app
   computes from the GM-configured actor types, tested STRICTLY (`=== true`): a
   `!== false` test would admit every NPC in a world whose projection ever regressed.
@@ -25,6 +30,7 @@
   may be associated with at most one enabled party.
 -->
 <script>
+  import EmptyState from './EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
 
   let {
@@ -72,7 +78,7 @@
     if (playerCharacters.length === 0)
       return text(
         'FABRICATE.Admin.Manager.World.Parties.Members.NoActorsConfigured',
-        'No player-character actors are available to add. Fabricate counts the actor types listed under Player Character Actor Types in its module settings — add yours there if a character is missing.'
+        'No player-character actors are available to add.'
       );
     if (available.length === 0)
       return text(
@@ -84,6 +90,19 @@
       'No characters match your search.'
     );
   });
+
+  // The explanation, rendered as `EmptyState`'s BODY beneath the title rather than fused
+  // into it (issue 1035): only the "no actors configured" reason names a setting to
+  // change, which is prose, not a heading. The other two reasons are already complete in
+  // one short sentence and must not gain a second.
+  const emptyDetail = $derived(
+    candidates.length === 0 && playerCharacters.length === 0
+      ? text(
+          'FABRICATE.Admin.Manager.World.Parties.Members.NoActorsConfiguredHint',
+          'Fabricate counts the actor types listed under Player Character Actor Types in its module settings — add yours there if a character is missing.'
+        )
+      : ''
+  );
 
   const emptyReasonKind = $derived.by(() => {
     if (candidates.length > 0) return '';
@@ -158,9 +177,13 @@
       </button>
     {/each}
     {#if emptyReason}
-      <p class="manager-party-add-empty" data-manager-party-add-empty={emptyReasonKind}>
-        {emptyReason}
-      </p>
+      <EmptyState
+        compact
+        title={emptyReason}
+        hint={emptyDetail || undefined}
+        dataAttr="data-manager-party-add-empty"
+        dataValue={emptyReasonKind}
+      />
     {/if}
   </div>
 </div>
@@ -304,14 +327,6 @@
     font-size: 9px;
   }
 
-  .manager-party-add-empty {
-    margin: 0;
-    padding: 12px;
-    color: var(--fab-text-subtle);
-    font-family: var(--font-primary);
-    font-size: 10.5px;
-    font-weight: 400;
-    line-height: 1.5;
-    text-align: center;
-  }
+  /* `EmptyState` renders its own chrome for the empty branch; this file no longer draws
+     one by hand (issue 1035). */
 </style>

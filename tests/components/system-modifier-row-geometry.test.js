@@ -105,7 +105,7 @@ function modifierRow(label, expression) {
        </span>`
     : '';
   return `
-    <li class="manager-modifier-item" data-system-modifier="${label}">
+    <li class="manager-modifier-item" data-world-modifier="${label}">
       <div class="manager-modifier-header">
         <button type="button" class="manager-modifier-summary" data-toggle-modifier>
           <i class="fa-solid fa-chevron-right manager-modifier-chevron" aria-hidden="true"></i>
@@ -113,7 +113,7 @@ function modifierRow(label, expression) {
           <span class="manager-modifier-label">${label}</span>
           ${path}
         </button>
-        <button type="button" class="manager-icon-button" aria-label="Delete modifier">
+        <button type="button" class="fabricate-icon-button manager-icon-button" aria-label="Delete modifier">
           <i class="fa-solid fa-trash" aria-hidden="true"></i>
         </button>
       </div>
@@ -124,7 +124,7 @@ const FIXTURE = `
 <div class="application theme-dark">
   <section class="window-content">
     <div class="fabricate fabricate-manager" data-fabricate-theme="dark" data-manager-view="systems">
-      <section class="manager-inspector-card" data-system-modifiers style="width: 720px">
+      <section class="fabricate-card manager-inspector-card" data-world-modifiers style="width: 720px">
         <ul class="manager-character-modifier-list">
           ${modifierRow('Survival', '@skills.sur.mod')}
           ${modifierRow('Modifier', '')}
@@ -205,13 +205,13 @@ const FIELD_FIXTURE = `
   <section class="window-content">
     <div class="fabricate fabricate-manager" data-fabricate-theme="dark" data-manager-view="systems">
       <div class="manager-modifier-body" style="width: 520px">
-        <label class="manager-field" data-case="label">
+        <label class="fabricate-field manager-field" data-case="label">
           <span>Label</span>
-          <input type="text" data-system-modifier-field="label" value="Medicine" />
+          <input type="text" data-world-modifier-field="label" value="Medicine" />
         </label>
-        <label class="manager-field" data-case="plain">
+        <label class="fabricate-field manager-field" data-case="plain">
           <span>Expression</span>
-          <input type="text" data-system-modifier-field="expression" value="@abilities.med.mod" />
+          <input type="text" data-world-modifier-field="expression" value="@abilities.med.mod" />
         </label>
         <label class="manager-tool-bonus-field" data-case="capped">
           <span>Bonus expression</span>
@@ -238,8 +238,16 @@ test('the un-capped expression field renders as an ordinary field, with no affix
   assert.ok(branch > -1, 'the component still branches on `sigil`');
   assert.ok(
     markup.slice(0, branch).includes('manager-prerequisite-path-input'),
-    'the SIGIL branch still renders the affix wrapper — the Tool Studio depends on it'
+    'the SIGIL branch still renders the affix wrapper, which is what the un-capped branch is ' +
+      'measured AGAINST below'
   );
+  // THE TOOL STUDIO NO LONGER DEPENDS ON IT, and this comment used to say it did. Issue 1373's
+  // maintainer round 3 replaced the Tool bonus text field with a pick from the world modifier
+  // library, which leaves `WorldModifiersTab` (`sigil={false}`) as this component's only caller
+  // and the sigil branch with none. The branch is retained rather than removed here because
+  // removing it is a change to a shared primitive with its own reviewers, and because this
+  // test's non-vacuity half below measures the capped shape as its control; it is reported as a
+  // dead branch for a follow-up rather than deleted in a Tool Studio change.
   // THE ANCHOR, stated as the fact and not as an ordering. A first draft asserted that the
   // wrapper appears BEFORE `{:else}`, which a component that wrapped BOTH branches satisfies —
   // and the mutation that did exactly that left this test green, because the rendered half

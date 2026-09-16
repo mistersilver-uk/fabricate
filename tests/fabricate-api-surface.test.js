@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { compileFunction } from 'node:vm';
 
 import { FABRICATE_HOOKS, MANAGER_HOOKS, PLAYER_HOOKS } from '../src/config/hooks.js';
 
@@ -274,7 +275,7 @@ test('Fabricate wires the crafting listing builder with a component resolver (is
   // owned-material tally silently reads as if the player owns nothing, and no existing
   // test goes red.
   assert.ok(
-    mainSource.includes("import { findMatchingComponent } from './utils/essenceResolver.js';"),
+    mainSource.includes("import { findMatchingComponent, resolveItemEssences } from './utils/essenceResolver.js';"),
     'main.js should import the same component resolver InventoryListingBuilder matches with'
   );
   assert.ok(
@@ -297,5 +298,135 @@ test('Fabricate hydrates the crafting recipe detail phase through the crafting l
   assert.ok(
     mainSource.includes('return this._getCraftingListingBuilder().buildRecipeDetail({'),
     "hydrateCraftingRecipe should route through the crafting listing builder's detail phase"
+  );
+});
+
+test('Fabricate exposes the versioned Journal command and per-user dismissal seams', () => {
+  for (const method of [
+    'executeJournalRunCommand(command, options)',
+    // Two arguments, load-bearing. This pin used to read the one-argument form, and sat twelve
+    // lines above another pin whose comment claimed the options were forwarded. Both passed while
+    // the facade dropped them (issue 1759); tests/facade-delegation-arity.test.js now gates the
+    // relationship rather than either line.
+    'dismissJournalRun(options)',
+    'getDismissedJournalRunKeys(options)',
+    'getJournalRunAuthorityAvailability()',
+    'setupJournalRunAuthority()',
+    'reconcileJournalRunAuthority(options)',
+  ]) {
+    assert.ok(mainSource.includes(method), `${method} should be exposed on game.fabricate`);
+  }
+  assert.ok(
+    mainSource.includes("Hooks.on('createJournalEntryPage', refreshJournalRunAuthorityAvailability)"),
+    'embedded authority-claim creation should refresh the synchronous availability cache'
+  );
+  assert.ok(
+    mainSource.includes("Hooks.on('deleteJournalEntryPage', refreshJournalRunAuthorityAvailability)"),
+    'embedded authority-claim release should refresh the synchronous availability cache'
+  );
+  assert.ok(
+    mainSource.includes("Hooks.on('updateUser', bootstrapJournalRunAuthority)"),
+    'a GM election update should trigger guarded recovery bootstrap in the newly active realm'
+  );
+  assert.ok(
+    mainSource.includes("Hooks.on('userConnected', bootstrapJournalRunAuthority)"),
+    'a GM connection transition should trigger guarded recovery bootstrap'
+  );
+  // `setupJournalRunAuthority()` survives as an idempotent ensure, not a one-shot provisioner:
+  // every world now provisions automatically, so refusing an existing ledger would make the
+  // documented API report a healthy world as broken.
+  assert.ok(
+    mainSource.includes(
+      'Ensure the private run-authority ledger exists, as the active GM. Idempotent: an existing'
+    ),
+    'setupJournalRunAuthority should be documented as an idempotent ensure'
+  );
+  assert.doesNotMatch(
+    mainSource,
+    /ledger-already-exists/,
+    'an existing ledger is no longer a refusal reason anywhere on the public surface'
+  );
+});
+
+test('the real Journal composition emitter survives socket serialization and preserves recipients', () => {
+  const start = mainSource.indexOf('function createJournalCommandsForFabricate(');
+  const end = mainSource.indexOf('\n// The GM notice', start);
+  assert.ok(start >= 0 && end > start);
+  let composed;
+  const received = [];
+  // Foundry V13.351/V14.365 handleCustomSocket destructures this argument: a
+  // default covers omission, but cannot cover undefined serialized as array null.
+  const handleCustomSocket = (event, message, { recipients } = {}) => {
+    received.push({ event, message, recipients });
+  };
+  const dependencies = {
+    createFoundryJournalRunAuthority: () => ({}),
+    createJournalExecutionReconstructor: () => ({}),
+    createCraftingJournalOperations: () => ({}),
+    createGatheringJournalRunOperations: () => ({}),
+    createJournalRunCommandService: (options) => { composed = options; return {}; },
+    installCraftingJournalRunAuthority: () => {},
+    EVENT_SCENE_SOCKET: 'module.fabricate',
+    game: { socket: { emit: (...args) => handleCustomSocket(...JSON.parse(JSON.stringify(args))) } },
+  };
+  compileFunction(
+    `${mainSource.slice(start, end)}\nreturn createJournalCommandsForFabricate({});`,
+    Object.keys(dependencies)
+  )(...Object.values(dependencies));
+  const request = { kind: 'journalRunCommand', requestId: 'request' };
+  const reply = { kind: 'journalRunReply', requestId: 'request' };
+  composed.emit(request);
+  composed.emit(reply, { recipients: ['initiating-player'] });
+  assert.deepEqual(received, [
+    { event: 'module.fabricate', message: request, recipients: undefined },
+    { event: 'module.fabricate', message: reply, recipients: ['initiating-player'] },
+  ]);
+});
+
+test('player-facing starts explicitly select the current journal lifecycle', () => {
+  assert.match(
+    mainSource,
+    /async craft\(actor, recipe, options = \{\}\)[\s\S]*?return executePublicCraft\(\{[\s\S]*?engine: this\.craftingEngine,[\s\S]*?runManager: this\.craftingRunManager,/,
+    'the general public craft facade should use the lifecycle-selecting boundary'
+  );
+  assert.match(
+    mainSource,
+    // The options are FORWARDED, not dropped: `executePublicCraft` asks for the
+    // non-interactive route, because the public API has no user to answer a roll dialog
+    // and `promptCheck` waits for one without a timeout (issue 1683).
+    /executeCommand: \(command, options\) => this\.executeJournalRunCommand\(command, options\),\s*resolveUuid: \(uuid\) => globalThis\.fromUuid\?\.\(uuid\),/,
+    'a ready public craft should execute through the command service and hydrate result UUIDs locally'
+  );
+  assert.match(
+    mainSource,
+    /async craftRecipe[\s\S]*?return await this\.craft\([\s\S]*?lifecycleVersion:\s*1,[\s\S]*?\n\s*}\);/,
+    'craftRecipe should start a versioned crafting run'
+  );
+  assert.match(
+    mainSource,
+    /async submitAlchemyAttempt[\s\S]*?this\.craftingEngine\.craftAlchemy\([\s\S]*?lifecycleVersion:\s*1,[\s\S]*?\n\s*}\);/,
+    'submitAlchemyAttempt should start a versioned alchemy run'
+  );
+  assert.match(
+    mainSource,
+    /startGatheringAttempt[\s\S]*?selectedActor[\s\S]*?actor:\s*selectedActor,\s*lifecycleVersion:\s*1[\s\S]*?'requestStart'/,
+    'startGatheringAttempt should start a versioned gathering run'
+  );
+  assert.ok(
+    mainSource.includes('installGatheringJournalRunAuthority({'),
+    'the constructed gathering engine should receive the journal authority adapter'
+  );
+  assert.ok(
+    mainSource.includes('fabricate.craft(actor, recipe).then(result => {'),
+    'the /craft chat command should delegate through the public craft facade'
+  );
+  assert.ok(
+    mainSource.includes('return await game.fabricate.craft(actor, recipeId, options);'),
+    'the global craft helper should delegate through the public craft facade'
+  );
+  assert.match(
+    mainSource,
+    /start: async \(\{ actor, payload, executionGrant, requestId, sender \}\)[\s\S]*?start\.call\(fabricate\.craftingEngine, \{\s*viewer: sender,/,
+    'the crafting start handler should pass the socket-attested sender as the viewer'
   );
 });

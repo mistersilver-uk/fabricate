@@ -98,3 +98,57 @@ The README states each as a trap; a reviewer should treat any of them as grounds
 
 Parity measurement is an addition to `visual-evidence-and-reuse.md`, never a substitute.
 The reference matrix, the reuse inventory and the embedded-screenshot requirement all still apply; a PR does not become exempt from screenshots because a parity run was green.
+
+## The parity review protocol
+
+This is the sequence a change with a prototype runs, from plan to approval, and the artifact each step leaves behind.
+It was assembled from the world catalogue programme (epic 1357), where every step below was learnt by shipping a screen that skipped it.
+The planner names each artifact in the delta; the driver produces the mechanical ones from the integrated branch; the reviewers approve only with all of them in hand.
+
+### 1. Authority, decided before anything is built
+
+The prototype is the authority for type, copy, structure, state, order, and which colour ROLE a surface takes.
+The design-system library — `openspec/specs/design-system/spec.md`, the vocabulary in `openspec/specs/design-system/library.html` and the shipped rows in `scripts/lib/designSystemPrimitives.json` — wins wherever the two conflict: control heights, corner radii, spacing rungs, the token a role resolves to, and which primitive draws a control.
+That is the Checks Studio split, and it is per control and per state, never per whole artifact.
+A conflict is escalated before implementation and recorded as a deviation with its reason where a reader meets it; a deviation discovered at review time is already too late.
+Two standing traps: the prototype's background ramp is shifted one rung from the shipped one, so a design `--bg1` paints the shipped `--fab-bg-0`; and a raw colour anywhere under `src/ui/**` or `styles/` fails the colour gate (`tests/components/theme-colour-contract.test.js`, which strips no comments and exempts only the theme-palette block of `styles/fabricate.css`), so a prototype hex with no token is an escalation rather than a literal.
+
+### 2. The reachable-state matrix, written at plan time
+
+For every changed screen, enumerate every state a GM can reach: empty, one, many, paged, selected, bulk-selected, hovered, inherited and overridden, warn and block, filtered to nothing, and both sides of every container query at a width a GM actually runs.
+Each row names four things: the prototype screen and state it corresponds to, the View Lab case that reaches it (with `expectView` and an `expectSelector` that only that state satisfies), the mounted test that ACTS on its controls, and the screen it maps to in the parity spec.
+A state with no case is a gap the plan closes by registering one, not a note for later.
+A fixture may not author a state the product cannot reach — the lab renders persisted shape and bypasses every editor guard, so a frame of an impossible combination is a defect wearing evidence's clothes.
+A widening filter is exercised at the cohort's zero point, because that is exactly where a zero-check on the wrong array makes the widened state unreachable.
+
+### 3. Extract the prototype, then measure the real app twice
+
+Drive the prototype with `extract.mjs`.
+The Design Canvas bundles under `tmp/` replace their `x-dc` element with `#dc-root` on boot, so that is the ready selector; screen roots are `display: contents` and have no box, so waits use `state: 'attached'`; navigation clicks by visible text, because the `sc-camel-on-click` directive is consumed at compile time and is absent from the live DOM.
+Then run `compare.mjs` AND `inventory.mjs` against the View Lab, never against a markup mirror of the app; the run that gates review is the driver's, from the integrated coordinator, and a lane's own run informs iteration but is not evidence.
+The lab must be opened with the same query parameters as the matrix's case — `openViewLab`'s `query` is what reaches a state, `case` is only a label — and its default world is the POPULATED one, so an empty, cleared or filtered state is asked for by that case's own flags (`clearSystem`, `noTools`) and never assumed; seed it in `subject.open`, not in `navigate`.
+It must also be a fresh lab: the harness attaches to anything already serving the lab page on its pinned port 5273, so a server left running from another worktree silently measures a different tree.
+Measure at a real window width, on pane content width rather than frame width, and on both sides of every container query.
+An extra LABEL or GLYPH never fails, because a product legitimately says more than a mockup; an extra CARD fails exactly as a missing one does, because a card is a claim about the shape of the screen.
+Every exemption, computed-style or structural, states a reason of forty characters or more.
+Paste both outputs into the lane report — the harness never runs in CI, so drift left open survives only as a written note.
+
+### 4. Frames that show the state, with a control run
+
+Capture every case in the matrix with the scoped View Lab command (`node scripts/view-lab-screenshots.mjs apps <case-ids>`), BEFORE the change, AFTER it, and a CONTROL — a second run of the same after commit.
+The lab is not pixel-deterministic, so a difference is real only when the control does not reproduce it.
+A frame counts only when it shows the changed state itself; a frame of an unchanged region satisfies nothing.
+Judge each frame against explicit criteria — first visible state, clipping, spacing, alignment, scroll containment, the visible control set — and where a lab frame and a smoke frame disagree, the smoke is right and the lab is defective.
+
+### 5. Mounted tests that act, and criteria that can fail
+
+A mounted test asserts the DOM the GM meets, not the spy behind it; a control is covered only when a test acts on it.
+Where a write refuses silently, assert the forwarded argument list, never a post-state.
+Every acceptance criterion names the mutation that reddens it, every negative assertion carries its positive control, and the cheap mutations are applied, run and pasted red before the lane hands off.
+A guard that has never been seen red has proved nothing.
+
+### 6. The gate
+
+The UX reviewer approves a screen with a prototype only with the matrix, both harness outputs and the frames in hand, and disbelieves a parity claim that arrives without the inventory pass.
+The quality reviewer approves only with the matrix's mounted column filled and the mutation proofs pasted.
+The driver runs the harness and the captures from the integrated coordinator before the review round, so reviewers measure the thing that will ship.

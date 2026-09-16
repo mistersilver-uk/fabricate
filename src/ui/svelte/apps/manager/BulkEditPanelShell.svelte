@@ -5,9 +5,11 @@
   for issue 1010).
 
   It lives under `apps/manager/` rather than `apps/manager/components/` for the reason
-  `BulkSelectionToolbar` records: `components/` holds area-agnostic leaves, this chrome is
-  manager-scoped, and staying here keeps `--fab-mv2-*` in scope so the extraction is a pure
-  move rather than a re-tokenisation.
+  `BulkSelectionToolbar` records: `components/` holds area-agnostic leaves and this chrome
+  is manager-scoped. The token half of that reason — that the placement keeps an
+  area-scoped `--fab-manager-*` property in scope — has LAPSED, since a scoped `<style>`
+  may not reach one from any directory. The extraction was a pure move regardless: the
+  block below reads theme-root tokens only.
 
   It renders in a browser's existing `.manager-inspector` column and REPLACES that
   browser's single-row inspector for as long as the selection is non-empty. The chrome is
@@ -34,8 +36,63 @@
    - children: the staged axes, rendered between the hero and Apply. They are FLEX ITEMS of
      this panel, so a caller emits its labels, controls and hints as siblings rather than
      wrapping them — the panel's uniform `gap` is the section rhythm.
+
+  ── FOUR PER-SITE PARAMETERS, ALL OFF BY DEFAULT (issue 1371, gap-list rows 38, 39, 47; r16-cat
+  ruling M24) ───
+
+  The world Component catalogue's bulk panel (`proto:622-696`) is this chrome with four
+  differences, and each is a PARAMETER here rather than a fork or an in-place restyle — the
+  standing rule for a shared primitive that must behave differently at a second site. All
+  four default to exactly what ships, so the Component, Recipe and Essence Studios render
+  byte-identically across this change.
+
+   - clearLabel: the header action's label, ALREADY LOCALIZED. `proto:626` reads `Clear`
+     where this panel reads `Clear selection`, and the shorter word is right there: the
+     action sits under a `BULK EDIT` eyebrow in a rail that is showing nothing but the
+     selection, so "selection" is the only thing it could be clearing. `''` — the default —
+     keeps the shipped phrase and its `BulkEdit.ClearSelection` key.
+
+     A CALLER'S STRING rather than a second key chosen here, following the `heading` and
+     `applyLabel` idiom directly above: a panel that wants the shorter word is a panel that
+     has decided its own rail says enough, which is a fact about that screen.
+   - hint: the hero's standing sentence, ALREADY LOCALIZED. `proto:628` writes a sentence
+     naming the staging that panel actually offers — `Pick the systems to add them to, stage
+     a category or tags, then commit below.` — where this shell's noun-free default says
+     `Stage changes below, then apply to all at once.` `''` keeps the default and its
+     `BulkEdit.SelectedHint` key.
+
+     Named `hint` because that is what this component already calls the element
+     (`.fab-bulk-edit-hero-hint`) and the key (`SelectedHint`), and what
+     `BulkSelectionToolbar` calls its own muted standing sentence. One meaning, one name.
+   - dockFoot: a snippet rendered INSIDE the dock, under Apply. `proto:791-796` puts the
+     destructive `🗑 Delete N components` and its consequence note in the same bordered,
+     pinned foot as the primary action, on the dock's own 8px column rhythm — not above it
+     and not in the scrolling body.
+
+     A SNIPPET AND NOT A PROP PAIR, because what goes there is a caller's CONTROL: the
+     catalogue stages an `ArmedDangerButton` with a note under it, and a label-plus-callback
+     prop would force this shell to grow an arm/confirm contract that belongs to that
+     component. `children` already takes the staged axes the same way, for the same reason.
+
+     IT DOES NOT MOVE THE DOCK. The dock's sticky construction and its three negative bleeds
+     are unchanged, and the comment on `.fab-bulk-edit-dock` below is still exact: what the
+     snippet adds is a second flex child inside the same box. A caller placing a TALL control
+     there makes the dock taller, which eats into the scrollport the panel above it scrolls
+     in — that is the same trade `bulk-edit-dock-pinning.test.js` already bounds for a
+     sibling delete card, and the two are alternatives rather than a stack.
+   - dockBleed: WHICH SPACING TOKEN THE DOCK BLEEDS BY (issue 1371 r16-cat, maintainer ruling
+     M24). The dock's three negative bleeds and its two compensating insets are written as the
+     SAME token as its container's padding so the two cannot drift — and that token is
+     `--fab-space-3`, the shared `.manager-inspector` rail's. `EntityListInspectorFrame`'s
+     inspector column pads `--fab-space-4`, so inside it the shipped dock stopped 4px short of
+     each edge and of the bottom, and the panel's scroller clipped it there: "a padding/
+     whitespace around the bulk edit panel that prevents the button panel from being
+     full-width". `'space-4'` restates all five declarations at that token; `''` — the
+     default — is the shipped rail's. Named for the token rather than for a consumer, because
+     what it states is a fact about the box the dock sits in, not about who put it there.
 -->
 <script>
+  import ManagerButton from '../../components/ManagerButton.svelte';
   import { localize } from '../../util/foundryBridge.js';
 
   let {
@@ -44,6 +101,19 @@
     canApply = false,
     onClearSelection = () => {},
     onApply = () => {},
+    // An ALREADY-LOCALIZED override for the header action's label. `''` keeps the shipped
+    // `Clear selection`; see the props block above for why this is the caller's string.
+    clearLabel = '',
+    // An ALREADY-LOCALIZED override for the hero's standing sentence. `''` keeps the shipped
+    // noun-free copy.
+    hint = '',
+    // A snippet rendered inside the dock, UNDER Apply — the reference's destructive action and
+    // its consequence note (`proto:791-796`). Absent by default.
+    dockFoot = undefined,
+    // The spacing token the dock bleeds by: `''` (the shipped `--fab-space-3`, the shared
+    // rail's inset) or `'space-4'` (the scoped list frame's inspector column). See the props
+    // block above.
+    dockBleed = '',
     panelAttr = 'data-component-bulk-panel',
     clearAttr = 'data-component-bulk-clear',
     countAttr = 'data-component-bulk-count',
@@ -78,7 +148,10 @@
       onclick={() => onClearSelection()}
     >
       <i class="fas fa-xmark" aria-hidden="true"></i>
-      <span>{text('FABRICATE.Admin.Manager.BulkEdit.ClearSelection', 'Clear selection')}</span>
+      <span
+        >{clearLabel ||
+          text('FABRICATE.Admin.Manager.BulkEdit.ClearSelection', 'Clear selection')}</span
+      >
     </button>
   </header>
 
@@ -89,34 +162,43 @@
     <div class="fab-bulk-edit-hero-copy">
       <strong class="fab-bulk-edit-hero-title" {...countHook}>{heading}</strong>
       <span class="fab-bulk-edit-hero-hint"
-        >{text(
-          'FABRICATE.Admin.Manager.BulkEdit.SelectedHint',
-          'Stage changes below, then apply to all at once.'
-        )}</span
+        >{hint ||
+          text(
+            'FABRICATE.Admin.Manager.BulkEdit.SelectedHint',
+            'Stage changes below, then apply to all at once.'
+          )}</span
       >
     </div>
   </div>
 
   {@render children?.()}
 
-  <div class="fab-bulk-edit-dock">
-    <button
-      type="button"
-      class="manager-button fab-bulk-edit-apply"
+  <div
+    class="fab-bulk-edit-dock"
+    class:has-foot={Boolean(dockFoot)}
+    class:is-bleed-space-4={dockBleed === 'space-4'}
+  >
+    <ManagerButton
+      class="fab-bulk-edit-apply"
       {...applyHook}
       disabled={!canApply}
       onclick={() => onApply()}
     >
       <i class="fas fa-check-double" aria-hidden="true"></i>
       <span>{applyLabel}</span>
-    </button>
+    </ManagerButton>
+    {@render dockFoot?.()}
   </div>
 </section>
 
 <style>
-  /* Manager-scoped by PLACEMENT — this component lives under `apps/manager/`, so
-     `--fab-mv2-*` (declared on `.fabricate-manager`) is in scope. Its appearance lives
-     HERE rather than in `styles/fabricate.css` so `VIEW_RECIPES` in
+  /* THEME-ROOT tokens only. The reason once recorded here — that living under
+     `apps/manager/` puts an area-scoped `--fab-manager-*` property in scope — has LAPSED:
+     a scoped `<style>` may not reach one from ANY directory, because a component is placed
+     in a directory and not in a DOM subtree (design-system spec, *The token namespace is
+     one generation and names its purpose*), and `tests/token-generation-gate.test.js` fails
+     any scoped block that tries. The placement's surviving consequence is the screenshot
+     map: this appearance lives HERE rather than in `styles/fabricate.css` so `VIEW_RECIPES` in
      `scripts/ui-pr-screenshot-evidence.mjs` routes a change to the views that actually
      render it instead of matching the broad `theme-or-global-ui` recipe. Because it sits
      OUTSIDE both `apps/manager/components/` and `apps/manager/recipes/`, it is enumerated
@@ -142,7 +224,7 @@
      it is for, and that is the first thing the GM must read. */
   .fab-bulk-edit-eyebrow {
     margin: 0;
-    color: var(--fab-mv2-accent);
+    color: var(--fab-accent);
     font-size: 0.58rem;
     font-weight: 700;
     letter-spacing: 0.1em;
@@ -165,7 +247,7 @@
     padding: 0;
     border: 0;
     background: transparent;
-    color: var(--fab-mv2-text-muted);
+    color: var(--fab-text-muted);
     font-family: inherit;
     font-size: 0.62rem;
     font-weight: 600;
@@ -174,12 +256,11 @@
   }
 
   .fab-bulk-edit-clear:hover {
-    color: var(--fab-mv2-text);
+    color: var(--fab-text);
   }
 
-  .fab-bulk-edit-clear:focus-visible,
-  .fab-bulk-edit-apply:focus-visible {
-    outline: 2px solid var(--fab-mv2-accent);
+  .fab-bulk-edit-clear:focus-visible {
+    outline: 2px solid var(--fab-accent);
     outline-offset: 2px;
   }
 
@@ -209,7 +290,7 @@
     height: 36px;
     border-radius: 9px;
     background: var(--fab-bg-0);
-    color: var(--fab-mv2-accent);
+    color: var(--fab-accent);
     font-size: 0.86rem;
   }
 
@@ -221,7 +302,7 @@
   }
 
   .fab-bulk-edit-hero-title {
-    color: var(--fab-mv2-text);
+    color: var(--fab-text);
     font-family: var(--fab-font-serif);
     font-size: 0.92rem;
     font-weight: 700;
@@ -229,7 +310,7 @@
   }
 
   .fab-bulk-edit-hero-hint {
-    color: var(--fab-mv2-text-muted);
+    color: var(--fab-text-muted);
     font-size: 0.62rem;
     line-height: 1.35;
   }
@@ -275,9 +356,9 @@
         scrolls once the three regions stack, which is that block's decision and not this
         rule's; do NOT reach into the `@container` block from here.
 
-     A SECOND sticky rule rather than reuse of `.manager-inspector-card.is-sticky`
-     (styles/fabricate.css): that class is a bordered, rounded, TOP-anchored card SHELL,
-     and Apply is not a card. This mirrors its idiom at the opposite edge — surface fill, a
+     A SECOND sticky rule rather than reuse of the inspector card's own sticky rule: that
+     one was a bordered, rounded, TOP-anchored card SHELL, and Apply is not a card. (It had
+     no call site under `src/` and was deleted from styles/fabricate.css in issue 1498.) This mirrors its idiom at the opposite edge — surface fill, a
      hairline against the content it covers, and a shadow thrown away from the edge it is
      pinned to — without inheriting a card's border box.
 
@@ -333,11 +414,59 @@
     bottom: calc(-1 * var(--fab-space-3));
     margin-inline: calc(-1 * var(--fab-space-3));
     margin-bottom: calc(-1 * var(--fab-space-3));
+    /* THE DOCK'S OWN TOP INSET (issue 1371 r16-cat, maintainer ruling M24): `proto:791` and
+       `proto:1270` pad the foot `13px 17px`, and the primary action sat 4px under the hairline
+       here — Apply's own `margin-top`, which the dock inherited from the rail's bottom slot. The
+       reference's 13 is `--fab-space-3` on the scale, stated on the dock so every consumer's foot
+       breathes the same, and Apply's margin goes with it. Whole-manager: the three studios' docks
+       gain the same 8px above Apply. */
+    padding-top: var(--fab-space-3);
     padding-inline: var(--fab-space-3);
     padding-bottom: var(--fab-space-3);
-    border-top: 1px solid var(--fab-mv2-border);
-    background: var(--fab-mv2-surface-1);
+    border-top: 1px solid var(--fab-border);
+    background: var(--fab-bg-2);
     box-shadow: 0 -2px 6px var(--fab-overlay-dark-25);
+  }
+
+  /* THE DOCK'S COLUMN RHYTHM, STATED ONLY WHEN IT HAS A SECOND CHILD (issue 1371, gap-list
+     row 47). `proto:791` draws the foot as a `flex-direction:column` with `gap:8px` between the
+     primary action and the destructive one below it.
+
+     GATED ON THE SNIPPET rather than declared unconditionally, because with one child the two
+     display modes are not obviously identical and this rule may not repaint the three studios
+     that ship today: `.fab-bulk-edit-apply` carries `margin-top: var(--fab-space-1)`, whose
+     behaviour is a block-flow question in one mode and not a question at all in the other. With
+     no `dockFoot` the class is not emitted and the dock is byte-identical to what ships.
+
+     `--fab-space-2` IS the reference's 8px, so the rhythm is a token statement rather than an
+     approximation, and the dock's own three negative bleeds above are untouched. */
+  .fab-bulk-edit-dock.has-foot {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-2);
+  }
+
+  /* THE FOOT'S CHILDREN MAY SHRINK TO THE RAIL (issue 1371 r16-cat, M24). A flex item's automatic
+     minimum is its min-content width, and a foot whose delete label is one `nowrap` line has a
+     min-content width of that whole line — so without this the column WIDENED past the rail to fit
+     it instead of letting the label ellipsise (measured: a 299px dock holding a 492px button). The
+     rule is on the dock's contract rather than on a consumer's wrapper because the snippet's root is
+     the consumer's markup, and every consumer needs the same answer. `:global`, since that root
+     carries the consumer's scope hash and never this one's. */
+  .fab-bulk-edit-dock.has-foot > :global(*) {
+    min-width: 0;
+  }
+
+  /* THE WIDER BLEED, FOR A CONTAINER THAT PADS `--fab-space-4` (issue 1371 r16-cat, M24). All
+     five container-bound declarations of the base rule, restated at the wider token and nothing
+     else: the sticky construction, the hairline, the fill and the shadow are the base rule's.
+     Gated on `dockBleed` so the three studios in the shared rail are byte-identical. */
+  .fab-bulk-edit-dock.is-bleed-space-4 {
+    bottom: calc(-1 * var(--fab-space-4));
+    margin-inline: calc(-1 * var(--fab-space-4));
+    margin-bottom: calc(-1 * var(--fab-space-4));
+    padding-inline: var(--fab-space-4);
+    padding-bottom: var(--fab-space-4);
   }
 
   /* Full-width and accent, the loudest thing on the panel — and genuinely inert until an
@@ -348,8 +477,33 @@
      moment a box is ticked: 38px and 0.78rem, so the swap does not resize or re-type the
      slot, and `--fab-on-accent` — the token that means "foreground ON an accent fill" —
      rather than `--fab-bg-1`, which is a surface colour and differs from it in all seven
-     themes. */
-  .fab-bulk-edit-apply {
+     themes.
+
+     `:global()` AND CHAINED (issue 1118), and both halves are load-bearing.
+
+     `:global()` first, because Apply is a `<ManagerButton>` now and a scoped selector could
+     not reach it at all. Svelte scopes a rule by appending its `svelte-<hash>` class to the
+     selector and stamping that class onto the elements THIS component writes — it does not
+     stamp a child component's internals, and a `class` prop passed to a child is forwarded
+     verbatim. So `.fab-bulk-edit-apply.svelte-<hash>` matched nothing the moment this button
+     became a component, and Svelte reported NO unused-selector warning for it, because the
+     class literal is right there in the markup. The failure is silent in the compiler, in
+     `lint:svelte:warnings` and in any fixture that stamps the hash by hand
+     (`tests/helpers/scoped-component-css.js` does exactly that) — only
+     `bulk-edit-dock-pinning.test.js`, which mounts the real component, could see it, and it
+     did: Apply lost `width: 100%` and stopped filling the rail.
+
+     Then chained, because `:global()` alone would be (0,2,0) and lose outright to
+     `.fabricate-button.manager-button.fab-manager-button` (0,3,0): this button would have
+     given up `min-height` 38px for 34px and `font-size` 0.78rem for 0.72rem — the two values
+     the dock comment above says must not change, because Apply swaps places with
+     `.manager-component-browser-inspector-edit` in the rail's bottom slot and a resized or
+     re-typed box desynchronises the swap. Naming the ancestor and both primitive classes
+     takes it to (0,4,0), which wins on specificity rather than on where the sheet happens to
+     be injected — see the header of `tests/helpers/scoped-component-css.js` for why
+     injection order is not a thing a rule may depend on. The `:hover`, `:disabled` and
+     `:focus-visible` companions below are written the same way for the same two reasons. */
+  :global(.fabricate-manager .manager-button.fab-manager-button.fab-bulk-edit-apply) {
     display: flex;
     gap: var(--fab-space-chip);
     align-items: center;
@@ -357,7 +511,8 @@
     width: 100%;
     height: auto;
     min-height: 38px;
-    margin-top: var(--fab-space-1);
+    /* The 4px it carried moved onto the dock as its `padding-top` (M24). */
+    margin-top: 0;
     padding: 0 var(--fab-space-3);
     border: 1px solid var(--fab-accent-border);
     border-radius: 9px;
@@ -371,15 +526,39 @@
 
   /* The same accent-strong hover its twin carries. Without it the rail's primary action
      is the only button on the panel with no pointer feedback. */
-  .fab-bulk-edit-apply:not(:disabled):hover {
+  :global(
+    .fabricate-manager .manager-button.fab-manager-button.fab-bulk-edit-apply:not(:disabled):hover
+  ) {
     border-color: var(--fab-accent);
     background: var(--fab-accent-strong);
   }
 
-  .fab-bulk-edit-apply:disabled {
-    border-color: var(--fab-mv2-border);
+  :global(.fabricate-manager .manager-button.fab-manager-button.fab-bulk-edit-apply:disabled) {
+    border-color: var(--fab-border);
     color: var(--fab-text-disabled);
     background: var(--fab-surface-soft);
     cursor: default;
+  }
+
+  /* Apply's half of what used to be one focus group with `.fab-bulk-edit-clear` above. It is
+     split out because the two controls are no longer the same KIND of element: Clear is
+     written here and carries this component's scoping class, Apply is a `<ManagerButton>` and
+     never will, so one selector cannot reach both.
+
+     ANCHORED AND CHAINED like the three companions above it, and MOVED down here beside them,
+     which is what the paragraph on the base rule already promised (issue 1118). It used to be
+     written as a bare `:global(.fab-bulk-edit-apply:focus-visible)` under a comment claiming
+     nothing else in the sheet states an `outline` for a manager button, so it needed no
+     chain. Both halves of that were wrong. `styles/fabricate.css` states
+     `.fabricate button:focus-visible` — (0,2,1), against this selector's (0,2,0) — with
+     byte-identical declarations, so the ring this rule claimed to be the only source of is
+     the module's own standing contract, and this rule was carrying no weight. (It was rooted
+     at `.fabricate-manager` until issue 1501 collapsed it onto the module root; the rank is
+     unchanged, so the argument is.) Chained, it
+     wins on specificity rather than on which sheet was injected last, and it is the only one
+     of Apply's four rules that does not restate the ancestor its siblings all name. */
+  :global(.fabricate-manager .manager-button.fab-manager-button.fab-bulk-edit-apply:focus-visible) {
+    outline: 2px solid var(--fab-accent);
+    outline-offset: 2px;
   }
 </style>

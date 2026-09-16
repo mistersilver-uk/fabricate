@@ -6,16 +6,14 @@
  * identical inline definition (product-code duplication is measured by SonarCloud CPD).
  */
 
+import { isPlainObject } from '../utils/scalars.js';
+
 /**
  * True when `value` is a non-null, non-array plain object.
  *
  * @param {*} value
  * @returns {boolean}
  */
-export function isPlainObject(value) {
-  return value != null && typeof value === 'object' && !Array.isArray(value);
-}
-
 /**
  * Structurally deep-clone a JSON-safe value so a migration never mutates its input.
  * `undefined` is returned unchanged.
@@ -43,3 +41,5 @@ export function renameKey(obj, oldKey, newKey) {
   obj[newKey] = obj[oldKey];
   delete obj[oldKey];
 }
+
+export { isPlainObject } from '../utils/scalars.js';

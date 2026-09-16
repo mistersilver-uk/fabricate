@@ -17,6 +17,7 @@ import {
   itemIsToolByDurableIdentity,
 } from '../utils/sourceUuid.js';
 
+import { resolveCharacterPrerequisiteLibrary } from './characterLibraries.js';
 import { evaluatePrerequisite } from './characterPrerequisites.js';
 import {
   craftingDataChange,
@@ -41,8 +42,14 @@ import {
   REVISION_SCOPES,
   RevisionRegistry,
 } from './revisionTokens.js';
+import {
+  resolvedComponentsFor,
+  resolvedEssencesFor,
+  resolvedToolsFor,
+} from './scopedEntityReads.js';
 import { SettingsCraftingDefinitionRepository } from './SettingsCraftingDefinitionRepository.js';
 import { SignatureValidator } from './SignatureValidator.js';
+import { selectedIngredientItems } from './stageReadiness.js';
 import { computeSystemVisibility } from './systemValidation.js';
 import { ingredientSetToolsAreActive, resolveToolPrerequisites } from './toolCheckBonus.js';
 
@@ -58,22 +65,6 @@ const FALLBACK_COMPONENT_IMG = 'icons/svg/item-bag.svg';
 const GENERIC_ITEM_IMG = 'icons/svg/item-bag.svg';
 // A currency match never resolves to an inventory item, so it always shows a coin icon.
 const FALLBACK_CURRENCY_IMG = 'icons/svg/coins.svg';
-
-/**
- * The concrete owned Item documents reserved by an ingredient selection.
- * A physical Item cannot simultaneously be consumed as an ingredient and
- * participate as a reusable Tool in the same attempt.
- *
- * @param {object|null} selection
- * @returns {Set<object>}
- */
-function selectedIngredientItems(selection) {
-  return new Set(
-    (Array.isArray(selection?.plan) ? selection.plan : [])
-      .map((entry) => entry?.item)
-      .filter(Boolean)
-  );
-}
 
 /**
  * Whether a retained alchemy signature report's guard still describes the world (issue
@@ -180,8 +171,13 @@ export class RecipeManager {
     // manager seam is: when absent the shared affordance resolver falls back to the
     // `game.fabricate` global, so no existing construction site changes.
     currencyConfigStore = null,
+    characterLibrariesStore = null,
   } = {}) {
     this.currencyConfigStore = currencyConfigStore;
+    // Issue 1308: the world character libraries. Optional — `resolveCharacterPrerequisiteLibrary`
+    // falls back to the module registry when nothing is injected, exactly as the currency
+    // resolver does, so only tests need to supply it.
+    this._characterLibrariesStore = characterLibrariesStore;
     this.recipes = new Map();
     this.initialized = false;
     // The revision-token registry this manager mints from (issue 1076). Per manager, never
@@ -278,7 +274,7 @@ export class RecipeManager {
       getComponentsForSystem: (id) =>
         typeof systemManager.getComponentsForSystem === 'function'
           ? systemManager.getComponentsForSystem(id)
-          : systemManager.getSystem(id)?.components || [],
+          : resolvedComponentsFor(systemManager.getSystem(id)),
     };
   }
 
@@ -1166,7 +1162,7 @@ export class RecipeManager {
     const components =
       typeof systemManager.getComponentsForSystem === 'function'
         ? systemManager.getComponentsForSystem(systemId)
-        : system?.components;
+        : resolvedComponentsFor(system);
     return {
       recipesToken: this._revisions.read(REVISION_SCOPES.recipesOfSystem(systemId)),
       systemToken:
@@ -1337,7 +1333,7 @@ export class RecipeManager {
 
     const { blocksSystem } = computeSystemVisibility(system, {
       recipes: this.getRecipes({ craftingSystemId: systemId }),
-      components: system.components || [],
+      components: resolvedComponentsFor(system),
     });
     cache.set(systemId, blocksSystem === true);
     return blocksSystem === true;
@@ -1897,7 +1893,7 @@ export class RecipeManager {
     const systemId = recipe?.craftingSystemId;
     if (!systemId || !this.getCraftingSystem) return [];
     const system = this.getCraftingSystem(systemId);
-    return Array.isArray(system?.characterPrerequisites) ? system.characterPrerequisites : [];
+    return resolveCharacterPrerequisiteLibrary(system, this._characterLibrariesStore);
   }
 
   _resolveCraftingSystem(systemId) {
@@ -2666,7 +2662,7 @@ export class RecipeManager {
   _resolveEssenceDefinition(recipe, type) {
     const systemId = recipe?.craftingSystemId;
     const system = systemId ? this._systemManager()?.getSystem(systemId) : null;
-    const definitions = Array.isArray(system?.essenceDefinitions) ? system.essenceDefinitions : [];
+    const definitions = resolvedEssencesFor(system);
     return definitions.find((def) => def?.id === type) ?? null;
   }
 
@@ -2815,7 +2811,7 @@ export class RecipeManager {
       const id = String(rawId ?? '').trim();
       if (!id || seen.has(id)) continue;
       seen.add(id);
-      const tool = (system.tools || []).find((entry) => entry?.id === id) || null;
+      const tool = resolvedToolsFor(system).find((entry) => entry?.id === id) || null;
       if (tool) tools.push(tool);
     }
     return tools;
@@ -2830,7 +2826,7 @@ export class RecipeManager {
     if (!systemId || !toolId) return null;
     const system = this._resolveCraftingSystem(systemId);
     if (!system) return null;
-    return (system.tools || []).find((tool) => tool?.id === toolId) || null;
+    return resolvedToolsFor(system).find((tool) => tool?.id === toolId) || null;
   }
 
   /**
@@ -3036,7 +3032,7 @@ export class RecipeManager {
     const systemManager = this._systemManager();
     const system = systemManager?.getSystem(systemId);
     if (!system) return null;
-    return findById(getDefinitionIndex(system.components), componentId);
+    return findById(getDefinitionIndex(resolvedComponentsFor(system)), componentId);
   }
 
   /**
@@ -3212,7 +3208,7 @@ export class RecipeManager {
     if (!systemId) return [];
     const systemManager = this._systemManager();
     const system = systemManager?.getSystem(systemId);
-    return Array.isArray(system?.components) ? system.components : [];
+    return resolvedComponentsFor(system);
   }
 
   /**
@@ -3226,7 +3222,7 @@ export class RecipeManager {
     if (!systemId) return [];
     const systemManager = this._systemManager();
     const system = systemManager?.getSystem(systemId);
-    return Array.isArray(system?.tools) ? system.tools : [];
+    return resolvedToolsFor(system);
   }
 
   /**
@@ -3669,7 +3665,7 @@ export class RecipeManager {
       return { valid: true, errors: [], issues: [] };
     }
 
-    const definitions = Array.isArray(system.essenceDefinitions) ? system.essenceDefinitions : [];
+    const definitions = resolvedEssencesFor(system);
     const validEssenceIds = new Set(definitions.map((def) => def.id));
     const essenceNames = this._essenceNameMap(definitions);
 
@@ -3737,7 +3733,7 @@ export class RecipeManager {
       return { valid: true, errors: [], issues: [] };
     }
 
-    const definitions = Array.isArray(system.essenceDefinitions) ? system.essenceDefinitions : [];
+    const definitions = resolvedEssencesFor(system);
     // Only a DEFINED essence can be disabled; an unknown id is `_validateEssenceReferences`'s
     // business and is already reported there, so it is not reported twice here.
     const disabled = new Map(

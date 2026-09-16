@@ -45,6 +45,34 @@ export const V14_CHAT_MODE_BY_LEGACY_ROLL_MODE = Object.freeze({
 });
 
 /**
+ * The chat option that carries a roll's visibility on the RUNNING Foundry, key and token
+ * chosen TOGETHER.
+ *
+ * V13 and V14 have disjoint vocabularies and crossing them fails two different ways: a legacy
+ * token handed to V14's `applyMode` THROWS, and a V14 token handed to V13 silently posts
+ * public. `Roll#toMessage` translates only the legacy `rollMode` key (it maps it internally),
+ * so a value passed as `messageMode` reaches `applyMode` UNTRANSLATED — which is why
+ * switching the key without switching the vocabulary is a new defect rather than a fix.
+ *
+ * The probe is `typeof ChatMessage.applyMode === 'function'`: a static, which a subclassed
+ * `CONFIG.ChatMessage.documentClass` inherits and therefore cannot fool. It is deliberately a
+ * `ChatMessage` static deciding a `Roll` option, because `toMessage({rollMode})` is deprecated
+ * on V14 in favour of `messageMode` and the translation table is core's own.
+ *
+ * @param {string} rollMode A legacy token (`publicroll`/`gmroll`/`blindroll`/`selfroll`). A
+ *   token with no entry in the table passes through unchanged, matching
+ *   {@link module:src/systems/bulkChatVisibility.applyBulkChatVisibility}.
+ * @returns {{rollMode: string}|{messageMode: string}} One option, spread into `toMessage`'s
+ *   options bag.
+ */
+export function chatModeOption(rollMode) {
+  if (typeof globalThis.ChatMessage?.applyMode === 'function') {
+    return { messageMode: V14_CHAT_MODE_BY_LEGACY_ROLL_MODE[rollMode] || rollMode };
+  }
+  return { rollMode };
+}
+
+/**
  * Apply `rollMode`'s visibility to `chatData`, translating the token when the running
  * Foundry expects V14's vocabulary.
  *
@@ -61,13 +89,24 @@ export const V14_CHAT_MODE_BY_LEGACY_ROLL_MODE = Object.freeze({
  *
  * Pass-through is right for `ic` and for any other real V14 mode key, but it also means
  * a token that is NEITHER a legacy key nor a V14 mode key reaches `applyMode`, which
- * THROWS on one. Nothing in this function catches that. Today the single call site —
+ * THROWS on one. Nothing in this function catches that. Today every call site sits inside
+ * a `try`/`catch` that logs and gives up on the message —
  * `Fabricate#_postBulkSalvageChatMessage`, reached through
- * `BulkSalvageService#_postAggregateCard` — sits inside a `try`/`catch` that logs and
- * returns `posted: false`, so a bad token costs the run its chat card and never the
- * awards it already made. That containment is the CALLER'S and a future caller must
- * bring its own; calling this on a naked path would let a chat-visibility token abort
- * whatever it is embedded in.
+ * `BulkSalvageService#_postAggregateCard`, and `Fabricate#postGmComplicationCard` — so a
+ * bad token costs the run its chat card and never the awards it already made. That
+ * containment is the CALLER'S and a future caller must bring its own; calling this on a
+ * naked path would let a chat-visibility token abort whatever it is embedded in.
+ *
+ * ## NEITHER applier present is a THROW, not a shrug
+ *
+ * `applyRollMode` is called unguarded on purpose. A build exposing neither applier is a
+ * build in which this function cannot establish visibility at all, and every caller wants
+ * the same answer to that: post nothing. An optional call would instead return `chatData`
+ * unchanged and the caller would create the message with core's own default, which is
+ * PUBLIC — so a rename or removal in a future Foundry would turn a whispered GM card and a
+ * blind bulk run's result table into table-wide chat, silently. Failing closed puts that
+ * into the caller's `catch`, which is where every other failure on these paths already
+ * lands.
  *
  * ## The caller must set `chatData.speaker` FIRST
  *
@@ -89,6 +128,6 @@ export function applyBulkChatVisibility(chatData, rollMode) {
     ChatMessage.applyMode(chatData, V14_CHAT_MODE_BY_LEGACY_ROLL_MODE[rollMode] || rollMode);
     return chatData;
   }
-  ChatMessage.applyRollMode?.(chatData, rollMode);
+  ChatMessage.applyRollMode(chatData, rollMode);
   return chatData;
 }

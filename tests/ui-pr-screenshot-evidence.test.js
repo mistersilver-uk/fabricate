@@ -14,6 +14,10 @@ import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { deflateSync } from 'node:zlib';
 
+// CODE POINT, not `localeCompare`: a recipe-id list compared by equality must order identically
+// on every machine, and `localeCompare` is locale-dependent.
+import { byCodePoint } from './helpers/ratchetBaseline.js';
+
 import {
   buildScreenshotMarkdown,
   cleanPrScreenshotEvidence,
@@ -105,7 +109,7 @@ function withScreenshotFixtures(fixtures, runAssert) {
 const TOOL_STUDIO_VIEWS = [
   ['01-library-1280x720', 'manager-tool-parity-01-library-1280x720', 1212, 682],
   ['zero-state-empty-library-1280x720', 'manager-tool-zero-state-empty-library-1280x720', 1212, 682],
-  ['02-overview-1280x720', 'manager-tool-parity-02-overview-1280x720', 1212, 682],
+  ['02-remove-1280x720', 'manager-tool-parity-02-remove-1280x720', 1212, 682],
   ['03-breakage-1280x720', 'manager-tool-parity-03-breakage-1280x720', 1212, 682],
   ['04-requirements-1280x720', 'manager-tool-parity-04-requirements-1280x720', 1212, 682],
   ['05-validation-1280x720', 'manager-tool-parity-05-validation-1280x720', 1212, 682],
@@ -264,7 +268,7 @@ describe('UI PR screenshot evidence', () => {
     // owned-copies frame would win forever and the armed state would never ship.
     for (const file of [
       'src/ui/svelte/apps/manager/KnowledgeView.svelte',
-      'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
+      'src/ui/svelte/components/ArmedDangerButton.svelte',
       'src/ui/svelte/apps/manager/knowledge/KnowledgeRoster.svelte',
       'src/ui/svelte/apps/manager/knowledge/KnowledgeOwnedCopyRow.svelte',
       'src/ui/svelte/apps/manager/knowledge/KnowledgeLearnedRow.svelte',
@@ -497,18 +501,20 @@ describe('UI PR screenshot evidence', () => {
       'the browser view must not also claim the bulk-edit label',
     );
 
-    // The browser view, any file in the browser's own directory, the four shared bulk
-    // primitives, the shared selection primitive and both pure models all republish the
-    // frame. The primitives are the sharp case (issue 1010): they live directly under
-    // `apps/manager/`, so they match NEITHER the `components/` glob nor the `recipes/` one
-    // and are only reachable because they are enumerated by name.
+    // The browser view, any file in the browser's own directory, the three shared bulk
+    // primitives, the staging inset, the shared selection primitive and both pure models all
+    // republish the frame. The primitives are the sharp case (issue 1010): they live directly
+    // under `apps/manager/`, so they match NEITHER the `components/` glob nor the `recipes/` one
+    // and are only reachable because they are enumerated by name. `BulkEditSelect` LEFT this
+    // list for issue 1371 r16-list (M23): the Component Studio draws its category as the inline
+    // `BulkStagingInset` now, so the select is the Recipe Studio's alone — asserted below.
     for (const file of [
       'src/ui/svelte/apps/manager/ComponentsBrowserView.svelte',
       'src/ui/svelte/apps/manager/components/ComponentBulkEditPanel.svelte',
       'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
       'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
       'src/ui/svelte/apps/manager/BulkEditSection.svelte',
-      'src/ui/svelte/apps/manager/BulkEditSelect.svelte',
+      'src/ui/svelte/apps/manager/BulkStagingInset.svelte',
       'src/ui/svelte/components/SelectionCheckbox.svelte',
       'src/utils/componentBulkEditModel.js',
       'src/utils/bulkSelectionModel.js',
@@ -518,6 +524,19 @@ describe('UI PR screenshot evidence', () => {
         `${file} must republish the bulk-edit frame`,
       );
     }
+
+    const selectViews = mapChangedFilesToViews(['src/ui/svelte/apps/manager/BulkEditSelect.svelte']).map(
+      view => view.id,
+    );
+    assert.ok(
+      selectViews.includes('manager-recipes-bulk-edit'),
+      'the Recipe Studio still renders the select, so a change to it republishes the recipe frame',
+    );
+    assert.equal(
+      selectViews.includes('manager-components-bulk-edit'),
+      false,
+      'and no longer the component one, which draws no select since issue 1371 r16-list',
+    );
 
     // The narrow model triggers must NOT drag in the whole components-browser set — and in
     // particular neither model is a Tool Studio or theme change. The per-studio staging model
@@ -768,21 +787,38 @@ describe('UI PR screenshot evidence', () => {
 
   it('maps all four player crafting essence icon states to dedicated evidence views', () => {
     const harness = readFileSync('scripts/foundry-test-run.mjs', 'utf8');
-    const views = mapChangedFilesToViews([
-      'src/ui/svelte/apps/crafting/CraftingEssenceThumb.svelte',
-    ]);
-    const ids = views.map((view) => view.id);
-    for (const id of [
-      'player-crafting-essence-legacy',
-      'player-crafting-essence-ingredient',
-      'player-crafting-essence-alternative',
-      'player-crafting-essence-shopping',
-    ]) {
-      assert.ok(ids.includes(id), `${id} is collected for the shared essence thumb`);
+
+    // RE-DRIVEN from the surviving co-located matchers (issue 1506). All four recipes used to
+    // name `CraftingEssenceThumb.svelte` as well, and this test drove all four from that one
+    // path; the change retired that component into the shared art tile, so the path can never
+    // match again. Each recipe is now driven from the surface it actually photographs, which is
+    // also the check that has teeth: a recipe left resting on a deleted matcher alone would
+    // collect nothing and this loop would say so.
+    const drivenBy = {
+      'player-crafting-essence-legacy': 'src/ui/svelte/apps/crafting/detail/IoTable.svelte',
+      'player-crafting-essence-ingredient': 'src/ui/svelte/apps/crafting/detail/IoTable.svelte',
+      'player-crafting-essence-alternative':
+        'src/ui/svelte/apps/crafting/detail/IngredientOptionSelector.svelte',
+      'player-crafting-essence-shopping': 'src/ui/svelte/apps/crafting/ShoppingList.svelte',
+    };
+    for (const [id, changedFile] of Object.entries(drivenBy)) {
+      const views = mapChangedFilesToViews([changedFile]);
       const view = views.find((candidate) => candidate.id === id);
+      assert.ok(Boolean(view), `${id} is collected for ${changedFile}`);
       assert.deepEqual(view.smokeLabels, [id]);
       assert.match(harness, new RegExp(`screenshot\\(page, '${id}'\\)`));
     }
+
+    // And none of the four DEDICATED recipes claims the retired path any more. It still selects
+    // the broad `apps/crafting/` frames, which is the glob's business and not this loop's; what
+    // must not survive is a single-label essence recipe resting on a matcher that can never fire.
+    assert.deepEqual(
+      mapChangedFilesToViews(['src/ui/svelte/apps/crafting/CraftingEssenceThumb.svelte'])
+        .map((view) => view.id)
+        .filter((id) => id in drivenBy),
+      [],
+      'no essence evidence view may be selected by a component that is not in the tree'
+    );
     assert.match(harness, /icon: 'fas fa-star-of-life'/);
     assert.match(harness, /name: 'Smoke Legacy Essence Seal'/);
     assert.match(harness, /name: 'Smoke First-Class Essence Draught'/);
@@ -909,24 +945,25 @@ describe('UI PR screenshot evidence', () => {
   it('re-points the pinned crafting selectors the requirement rail moved', () => {
     const harness = readFileSync('scripts/foundry-test-run.mjs', 'utf8');
 
-    // DEAD: a first-class essence requirement is no longer a CraftingEssenceThumb in the
-    // ingredient image grid, so this selector matches nothing and would time out.
+    // DEAD: a first-class essence requirement is no longer an essence thumb in the ingredient
+    // image grid, so this selector matches nothing and would time out. Issue 1506 retired that
+    // component outright, so the class it named cannot be rendered by anything.
     assert.equal(
-      harness.includes(`[data-io-group="ingredients"] .crafting-essence-thumb`),
+      harness.includes(`.crafting-essence-thumb`),
       false,
-      'the ingredient-grid essence-thumb selector must be re-pointed at the rail'
+      'the retired essence-thumb class must not be waited on anywhere in the walk'
     );
     assert.ok(
       harness.includes(
-        `[data-recipe-section="requirement-rail"] [data-slot-kind="essence"] .requirement-slot-glyph`
+        `[data-recipe-section="requirement-rail"] [data-slot-kind="essence"] [data-medallion]`
       ),
-      'the first-class essence wait must target the rail slot glyph'
+      'the first-class essence wait must target the rail slot tile'
     );
 
     // SURVIVES: legacy set-level essences keep their row presentation, and the Shopping
-    // List still renders the shared essence thumb.
+    // List still renders an essence tile — the shared one, in its glyph face, since 1506.
     assert.ok(harness.includes(`[data-io-group="essences"] .crafting-io-essence-icon`));
-    assert.ok(harness.includes(`[data-shopping-acquire-components] .crafting-essence-thumb`));
+    assert.ok(harness.includes(`[data-shopping-acquire-components] [data-medallion="glyph"]`));
 
     // The alternatives picker is now the chooser ONE slot opens, so the walk must open
     // that slot before waiting on the section.
@@ -1003,6 +1040,14 @@ describe('UI PR screenshot evidence', () => {
     assert.deepEqual(idsFor('src/systems/SalvageChatCard.js'), ['chat-craft-card']);
     // #735 row rendering — the shared VocabularyPanel renders the item-tags rows.
     assert.ok(idsFor('src/ui/svelte/apps/manager/VocabularyPanel.svelte').includes('manager-tags-categories-tags-tab'));
+    // #1429 — the vocabulary tab strip, extracted OUT of `TagsCategoriesView`. The recipes key on
+    // an exact `TagsCategoriesView.svelte` path, so an extraction silently leaves the new file
+    // matching no recipe at all and its changes publish an unrelated frame.
+    assert.deepEqual(
+      idsFor('src/ui/svelte/apps/manager/VocabularyTabs.svelte').sort(byCodePoint),
+      ['manager-tags-categories', 'manager-tags-categories-tags-tab'],
+      'the extracted strip renders on BOTH tags frames, so both must republish for it'
+    );
 
     // Each new frame carries exactly its own single smoke label.
     const byId = Object.fromEntries(VIEW_RECIPES.map(view => [view.id, view.smokeLabels]));

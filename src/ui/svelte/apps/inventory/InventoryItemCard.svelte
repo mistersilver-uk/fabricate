@@ -27,12 +27,17 @@
                  `max-width: calc(100% - 32px)` to keep a wide essence row clear of
                  this slot rather than running under it.
 
-  The card owns its thumbnail markup rather than reusing CraftingThumb: that
-  component takes a px `size` and hard-sets width/height from it, so it cannot
-  render this responsive `width:100%; aspect-ratio:1/1` square. It DOES reuse
-  CraftingThumb's fallback constant, so a component with no authored art shows the
-  same blueprint every other tab shows rather than a broken-image glyph. The glyph
-  path is for ESSENCES only, which have an authored icon and no artwork.
+  The card owns its thumbnail markup rather than reusing the shared art tile, and
+  the reason is RE-MEASURED against the tile that survives rather than left pointing
+  at the crafting thumbnail this adjudication was written against: `Medallion` writes
+  `width:${size}px;height:${size}px` into a `style` attribute from a px `size` prop
+  (`components/Medallion.svelte`, the `boxStyle` derivation), so it still cannot render
+  this responsive `width:100%; aspect-ratio:1/1` square, and it declares no `class` and
+  no rest spread through which a caller could override the box. The decision therefore
+  STANDS at the point where the two tiles became one (issue 1506). What this card DOES
+  reuse is the shared fallback constant `DEFAULT_CRAFTING_IMAGE`, so a component with no
+  authored art shows the same blueprint every other tab shows rather than a broken-image
+  glyph. The glyph path is for ESSENCES only, which have an authored icon and no artwork.
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
@@ -327,7 +332,23 @@
   }
 
   /* The thumbnail is the positioning context for every overlay: the pips sit INSIDE
-     its bounds, not hanging off the card. */
+     its bounds, not hanging off the card.
+
+     HAND-ROLLED, AND DEFERRED ON THREE COUNTS (issue 1514). Every other art tile in this tab
+     is `Medallion` now; this one cannot be, and none of the three reasons is about paint:
+
+       1. the box is FLUID — `width: 100%` at `aspect-ratio: 1 / 1`, sized by the grid's
+          `minmax(120px, 1fr)` track — while `Medallion` takes a px `size` and no ladder rung
+          has a fluid value at all;
+       2. this element is `position: relative` and is the positioning context for the quantity
+          pip, the broken badge, the essence pips and the selection tick, all of which are
+          absolutely positioned against it. `Medallion` declares no `position`, so the overlays
+          would resolve against the card instead and hang off its bounds;
+       3. the `<img>` inside carries `draggable="false"`, and `Medallion`'s own `<img>` has no
+          `draggable` and no rest spread — the same blocker that defers the two progressive
+          stage tiles.
+
+     All three go to the register with their measurements. */
   .inventory-card-thumb {
     position: relative;
     display: block;

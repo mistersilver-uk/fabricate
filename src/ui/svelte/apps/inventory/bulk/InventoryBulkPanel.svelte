@@ -30,6 +30,15 @@
   against `entries`, because that (click order) is the order the store snapshots for
   destroy, whereas salvage runs the name-sorted queue.
 
+  ## The forecast block is READ, never derived
+
+  Pre-commit, the panel draws a "What could go wrong" block above the queue: one group
+  card per queued entry carrying player-visible complications (issue 1286). Every field
+  it renders — the ordered rows, their positions, whose order those positions are
+  numbered against — is already published on the entry by the store. This panel calls no
+  forecast builder and reads no component's authored complications: the audience rule
+  that decides what a player may be shown has exactly one owner.
+
   ## Brokenness does not block
 
   A broken tool is still salvageable — `_isBrokenTool`'s own docblock and the spec
@@ -58,10 +67,13 @@
 -->
 <script>
   import { localize, formatList } from '../../../util/foundryBridge.js';
-  import StatusPill from '../../../components/StatusPill.svelte';
+  import { statusChipTone } from '../../../util/statusChipTone.js';
+  import Chip from '../../../components/Chip.svelte';
+  import EmptyState from '../../manager/EmptyState.svelte';
   import InventoryDetailHeader from '../detail/InventoryDetailHeader.svelte';
   import InventoryBulkSection from './InventoryBulkSection.svelte';
   import InventoryBulkRow from './InventoryBulkRow.svelte';
+  import InventoryBulkComplicationGroup from './InventoryBulkComplicationGroup.svelte';
   import InventoryBulkReport from './InventoryBulkReport.svelte';
 
   let {
@@ -121,6 +133,32 @@
   // whose component permits player reorder qualify; a GM who pinned the authored order
   // sets `allowPlayerResultReorder: false` and must not be told otherwise.
   const reorderedCount = $derived(salvageable.filter((entry) => entry.allowsReorder).length);
+
+  // ── The "What could go wrong" block (issue 1286) ──────────────────────────────────
+  //
+  // The QUEUED entries carrying a player-visible complication forecast, in queue order,
+  // and the count of the warnings they hold between them.
+  //
+  // Both READ the projection the store publishes on each entry. This panel never calls
+  // `forecastComplications` and never reads `component.complications`: the redaction
+  // rule that decides what a player may be shown has ONE owner, and a panel deriving any
+  // part of it a second time is how a `gmOnly` consequence eventually reaches a player.
+  //
+  // The count is a count of the rows the block actually draws, not a deduplicated tally.
+  // A number in a section eyebrow that disagrees with the rows beneath it is worse than
+  // no number at all, and each queued row is its own resolution — the same complication
+  // on two rows can genuinely fire twice.
+  const complicationGroups = $derived(
+    salvageable
+      .map((entry) => ({
+        entry,
+        complications: Array.isArray(entry.complications) ? entry.complications : [],
+      }))
+      .filter((group) => group.complications.length > 0)
+  );
+  const complicationCount = $derived(
+    complicationGroups.reduce((total, group) => total + group.complications.length, 0)
+  );
 
   const state = $derived.by(() => {
     if (hasReport) return 'report';
@@ -267,6 +305,12 @@
   </button>
 {/snippet}
 
+{#snippet complicationCountLabel()}
+  <span data-inventory-bulk-complication-count={complicationCount}>
+    {localize('FABRICATE.App.Complications.Count', { count: complicationCount })}
+  </span>
+{/snippet}
+
 {#snippet removeControl(entry)}
   <button
     type="button"
@@ -317,20 +361,47 @@
               attrs={{ 'data-inventory-bulk-run-row': entry.key }}
             >
               {#snippet trailing()}
-                <StatusPill
-                  tone={runState.tone}
-                  icon={runState.icon}
-                  label={localize(runState.labelKey)}
-                />
+                <Chip tone={statusChipTone(runState.tone)} icon={runState.icon}
+                  >{localize(runState.labelKey)}</Chip
+                >
               {/snippet}
             </InventoryBulkRow>
           {/each}
         </InventoryBulkSection>
       {:else if state === 'empty'}
-        <p class="inventory-detail-empty-note" data-inventory-bulk-empty>
-          {localize('FABRICATE.App.Inventory.Bulk.NothingToSalvage')}
-        </p>
+        <EmptyState
+          note
+          hint={localize('FABRICATE.App.Inventory.Bulk.NothingToSalvage')}
+          dataAttr="data-inventory-bulk-empty"
+          dataValue=""
+        />
       {:else}
+        <!-- ABOVE the queue, and PRE-COMMIT only. The forecast is what the player weighs
+             before spending the one gesture that rolls the whole batch, so it has to be
+             read before the commit control rather than found under it. It is absent in
+             the `running` and `report` states entirely: once the run commits, the fired
+             record is reported on the aggregate chat card, and a stale forecast standing
+             beside a committed outcome reads as a second, contradicting report. -->
+        {#if complicationGroups.length > 0}
+          <InventoryBulkSection
+            title={localize('FABRICATE.App.Complications.Title')}
+            titleTrailing={complicationCountLabel}
+            attrs={{ 'data-inventory-bulk-complications': '' }}
+          >
+            <!-- One card per QUEUED ENTRY, keyed on the entry, so the block reads against
+                 the queue directly below it. -->
+            {#each complicationGroups as group (group.entry.key)}
+              <InventoryBulkComplicationGroup
+                img={group.entry.img}
+                name={group.entry.name}
+                orderProvenance={group.entry.orderProvenance ?? null}
+                complications={group.complications}
+                attrs={{ 'data-inventory-bulk-complication-group': group.entry.key }}
+              />
+            {/each}
+          </InventoryBulkSection>
+        {/if}
+
         <InventoryBulkSection
           title={localize('FABRICATE.App.Inventory.Bulk.QueueTitle')}
           attrs={{ 'data-inventory-bulk-queue': 'preview' }}
@@ -344,26 +415,20 @@
             >
               {#snippet trailing()}
                 {#if isGuaranteed(entry)}
-                  <StatusPill
-                    tone="success"
-                    icon="fas fa-circle-check"
-                    label={localize('FABRICATE.App.Inventory.Salvage.Guaranteed')}
-                  />
+                  <Chip tone="positive" icon="fas fa-circle-check"
+                    >{localize('FABRICATE.App.Inventory.Salvage.Guaranteed')}</Chip
+                  >
                 {:else}
-                  <StatusPill
-                    tone="accent"
-                    icon="fas fa-dice-d20"
-                    label={localize('FABRICATE.App.Inventory.Bulk.Possible')}
-                  />
+                  <Chip tone="accent" icon="fas fa-dice-d20"
+                    >{localize('FABRICATE.App.Inventory.Bulk.Possible')}</Chip
+                  >
                 {/if}
                 {#if entry.broken}
                   <!-- Beside the certainty chip, never instead of the queue: brokenness
                        is about usability, and it does NOT gate salvageability. -->
-                  <StatusPill
-                    tone="danger"
-                    icon="fas fa-heart-crack"
-                    label={localize('FABRICATE.App.Inventory.Card.Broken')}
-                  />
+                  <Chip tone="danger" icon="fas fa-heart-crack"
+                    >{localize('FABRICATE.App.Inventory.Card.Broken')}</Chip
+                  >
                 {/if}
                 {@render removeControl(entry)}
               {/snippet}
@@ -394,17 +459,13 @@
                     </span>
                   {/if}
                   {#if shape.guaranteed}
-                    <StatusPill
-                      tone="success"
-                      icon="fas fa-circle-check"
-                      label={localize('FABRICATE.App.Inventory.Salvage.Guaranteed')}
-                    />
+                    <Chip tone="positive" icon="fas fa-circle-check"
+                      >{localize('FABRICATE.App.Inventory.Salvage.Guaranteed')}</Chip
+                    >
                   {:else}
-                    <StatusPill
-                      tone="accent"
-                      icon="fas fa-dice-d20"
-                      label={localize('FABRICATE.App.Inventory.Bulk.Possible')}
-                    />
+                    <Chip tone="accent" icon="fas fa-dice-d20"
+                      >{localize('FABRICATE.App.Inventory.Bulk.Possible')}</Chip
+                    >
                   {/if}
                 {/snippet}
               </InventoryBulkRow>
@@ -528,6 +589,10 @@
     color: var(--fab-text-secondary);
   }
 
+  /* HAND-ROLLED, AND DEFERRED (issue 1514). `FillBar` is the product's one horizontal fill
+     bar and this is one, but the bar publishes two rungs — `sm` at 6px and `md` at 8px — and
+     4px is neither. Converting would grow the running-batch track by half again, which is a
+     size move rather than a frame move, so it goes to the geometry sweep with the figure. */
   .bulk-progress-track {
     height: 4px;
     border-radius: 999px;

@@ -16,6 +16,10 @@
 *.ttf   binary
 *.otf   binary
 *.pdf   binary
+# Raw pixel data, and the fixture pairs under tests/fixtures/docs-screenshots/ contain 0d 0a byte
+# pairs inside their rasters that the heuristic above would rewrite. That corruption surfaces as a
+# frame comparison result nobody can explain, so this is load-bearing rather than tidiness.
+*.ppm   binary
 
 # LevelDB pack data
 *.db    binary

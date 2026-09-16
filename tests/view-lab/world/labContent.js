@@ -24,6 +24,8 @@
  * a placeholder would also collapse the intrinsic dimensions of anything sized by its image.
  */
 
+import { seedJournalPrototype } from './labJournalPrototype.js';
+
 /** Foundry serves `public/` at the web root; the lab mounts the harvested cache here. */
 export const ICON_BASE = '/@foundry-chrome/icons';
 
@@ -339,6 +341,136 @@ const SMITHING_COMPONENTS = [
   }),
 ];
 
+/**
+ * The PROGRESSIVE COMPONENT COMPLICATIONS the lab authors (issue 1286).
+ *
+ * ## Why herbalism, and why these three components
+ *
+ * `lab-herbalism` is the world's only system with a progressive mode anywhere, so it is the
+ * only system in which `ComponentComplicationsSection` renders at all — its own gate is
+ * "some activity in this system resolves progressively", and smithing, alchemy, jewelry and
+ * runework all fail it. Every complication frame is therefore a herbalism frame.
+ *
+ * The three carriers are chosen so that ONE authored set feeds all four GM surfaces:
+ *
+ *   - `hb-cracked-alembic` is the world's progressive-SALVAGE component, and its ordered
+ *     stages are Empty Vial → Ground Reagent → Frostcap Mushroom;
+ *   - `hb-r-grind` is the world's progressive-CRAFTING recipe, and its ordered results are
+ *     the SAME three components in the same order.
+ *
+ * So authoring on Ground Reagent and Frostcap Mushroom draws a strip under stages 2 and 3 of
+ * both the Component Studio's salvage list and the Recipe Studio's stage card, and Empty Vial
+ * — which authors NONE — leaves stage 1 bare in both. That adjacency is the placement ruling
+ * the prototype makes and is the reason one stage is deliberately left empty: a strip under
+ * every row would prove nothing about where the band hangs.
+ *
+ * ## The shape is the PERSISTED one, verbatim
+ *
+ * `_normalizeComponent` runs `authoredComplications` over this on every lab boot, and that is
+ * an allowlist rebuild. Authoring the full literal — every vocabulary token, both nested
+ * effect records, `checkTrigger` explicitly `null` — means the normalized value is byte-equal
+ * to what is written here, so a frame shows the fixture rather than a repair of it.
+ *
+ * ## `checkTrigger` is `null` on every one of them, and that is a WORLD constraint
+ *
+ * `complicationTriggerOptions` is built from `checkBreakage.triggers` on the three PROGRESSIVE
+ * check blocks, and this world authors triggers on exactly one block — runework's ROUTED
+ * crafting check — under a recorded decision that seeding the salvage and herbalism blocks
+ * would rewrite already-captured Checks frames for no extra evidence (see `ROUTED_CHECK`).
+ * That decision stands here: a trigger clause naming an id this system does not own is inert
+ * by contract, and authoring one would photograph the "Trigger no longer exists" degrade
+ * rather than the picker. The trigger row therefore renders in its off, empty-picker state,
+ * which is the honest state for a system with no authored progressive trigger.
+ *
+ * ## Visibility, deliberately mixed
+ *
+ * Two are `visible` and one is `gmOnly`, because the Player pill and its absence are the same
+ * row treatment read two ways — and because `gmOnly` is the DEFAULT, so a fixture where every
+ * complication were visible would photograph the exception and never the rule. The `gmOnly`
+ * one is also the only one enabled for gathering, which no lab system resolves progressively,
+ * so the "· not progressive" chip annotation and the dimmed activity glyph both appear.
+ */
+const GROUND_REAGENT_COMPLICATIONS = [
+  {
+    id: 'hb-comp-dust-cloud',
+    name: 'Choking dust',
+    description:
+      'The reagent goes up in a fine bitter cloud. Everyone at the bench coughs through the next exchange.',
+    // SEVERE, and the severity is chosen rather than picked: the parity spec measures this
+    // row's severity tile and pill against the prototype's first summary row, whose seed
+    // record is `severe`, and a severity token is what selects the whole colour family. Two
+    // rows carrying different severities would report every colour on both as drift, which is
+    // a fact about two fixtures rather than about the design.
+    severity: 'severe',
+    // VISIBLE, so the Player pill is on screen. It is the exception rather than the rule —
+    // see the header note on why the set is mixed. It also matches the prototype's first row,
+    // for the same reason the severity does: the pill's own treatment is measured.
+    visibility: 'visible',
+    activities: { crafting: true, salvage: true, gathering: false },
+    match: 'any',
+    when: { stageAwarded: true, stagePartial: false, stageMissed: true, checkTrigger: null },
+    // BOTH effect rows enabled, which is what makes the expanded authoring frame show the
+    // revealed input strips at all: `ComplicationEffectRow` renders its `children` only when
+    // the row is on, so a fixture with everything off photographs six collapsed heads.
+    rollCondition: { enabled: true, expr: '1d20', cmp: 'eq', value: '1' },
+    effectRoll: { enabled: true, expr: '1d4', label: 'Choking dust' },
+  },
+  {
+    id: 'hb-comp-dust-spoiled',
+    name: 'Spoiled batch',
+    description:
+      'What comes off the pestle is grey and inert. It measures as the real thing and behaves as chalk.',
+    severity: 'minor',
+    visibility: 'gmOnly',
+    // The gathering axis is on, and no lab system resolves gathering progressively, so this
+    // is the one row that draws the dimmed activity glyph and the "· not progressive" chip.
+    activities: { crafting: true, salvage: true, gathering: true },
+    match: 'all',
+    when: { stageAwarded: true, stagePartial: false, stageMissed: false, checkTrigger: null },
+    rollCondition: { enabled: false, expr: '1d20', cmp: 'eq', value: '1' },
+    effectRoll: { enabled: false, expr: '1d6', label: '' },
+  },
+];
+
+const FROSTCAP_COMPLICATIONS = [
+  {
+    id: 'hb-comp-frostcap-shatter',
+    name: 'The cap shatters',
+    description:
+      'The fungus is more ice than flesh by now. Handled short of its stage it bursts across the bench.',
+    // The THIRD severity token, so all three of `ComplicationSummaryRow`'s severity families —
+    // info, warning and danger — are on one screen: this band and Ground Reagent's two rows
+    // sit in the same salvage list, and a fixture that authored one token would leave two of
+    // the three tile treatments depicted nowhere.
+    severity: 'major',
+    // Visible, because it is the complication that fires on the HALTED stage of the resolved
+    // run `labRunStates.js` seeds, and `firedComplications` is written with
+    // `publicComplications` — a `gmOnly` one could not appear there at all.
+    visibility: 'visible',
+    activities: { crafting: true, salvage: true, gathering: false },
+    match: 'any',
+    when: { stageAwarded: false, stagePartial: false, stageMissed: true, checkTrigger: null },
+    rollCondition: { enabled: false, expr: '1d20', cmp: 'eq', value: '1' },
+    effectRoll: { enabled: true, expr: '2d6', label: 'Freezing shards' },
+  },
+];
+
+/**
+ * The ordered stages of `hb-cracked-alembic`'s progressive salvage, with EXPLICIT result ids.
+ *
+ * `_normalizeSalvageResult` mints `result.id || foundry.utils.randomID()`, so an unauthored
+ * result gets a fresh id on every lab boot. That was harmless while nothing referenced one;
+ * `labRunStates.js` now seeds a resolved run whose `resultOrder` and `firedComplications`
+ * name these stages by id, and a run pointing at ids the world minted this morning would
+ * reconcile against nothing — the strip would claim no stage fired while the record said two
+ * did. Naming them here is what makes that record stable across boots.
+ */
+export const CRACKED_ALEMBIC_STAGE_IDS = Object.freeze({
+  vial: 'hb-salv-alembic-r1',
+  reagent: 'hb-salv-alembic-r2',
+  frostcap: 'hb-salv-alembic-r3',
+});
+
 const HERBALISM_COMPONENTS = [
   component('hb-moonleaf', 'Moonleaf', 'commodities/flowers/blooms-purple.webp', {
     categories: ['Herbs'],
@@ -362,7 +494,15 @@ const HERBALISM_COMPONENTS = [
     'hb-frostcap',
     'Frostcap Mushroom',
     'consumables/mushrooms/campanulate-bell-shiny-blue.webp',
-    { categories: ['Herbs'], tags: ['fungus'], difficulty: 4, essences: { water: 2 } }
+    {
+      categories: ['Herbs'],
+      tags: ['fungus'],
+      difficulty: 4,
+      essences: { water: 2 },
+      // The LAST stage of both progressive lists, and the one a mid-range roll cannot
+      // afford — so it is the missed stage the seeded run in `labRunStates.js` halts on.
+      complications: FROSTCAP_COMPLICATIONS,
+    }
   ),
   component('hb-emberbloom', 'Emberbloom', 'commodities/flowers/blooms-pink.webp', {
     categories: ['Herbs'],
@@ -376,6 +516,11 @@ const HERBALISM_COMPONENTS = [
     'consumables/potions/bottle-round-corked-blue.webp',
     { categories: ['Bases'], tags: ['solvent'], difficulty: 1, essences: { water: 1 } }
   ),
+  // DELIBERATELY carries no `complications`, and that absence is load-bearing twice over. It
+  // is stage ONE of both progressive lists, so both GM strips draw a bare stage row above two
+  // annotated ones — the placement ruling the prototype makes, which a fixture that authored a
+  // complication on every stage could not depict. It is also the component the empty-state
+  // frame edits, so `EmptyState`'s new `inline` variant has a screen to be photographed on.
   component('hb-empty-vial', 'Empty Vial', 'consumables/potions/bottle-bulb-empty-glass.webp', {
     categories: ['Bases'],
     tags: ['vessel'],
@@ -385,6 +530,10 @@ const HERBALISM_COMPONENTS = [
     categories: ['Bases'],
     tags: ['prepared'],
     difficulty: 2,
+    // TWO complications on one component, because a strip with a single row cannot show the
+    // band's own stacking gap and because the collapsed authoring list needs a second row to
+    // be a list at all.
+    complications: GROUND_REAGENT_COMPLICATIONS,
   }),
   component(
     'hb-healing-potion',
@@ -445,10 +594,24 @@ const HERBALISM_COMPONENTS = [
           {
             id: 'hb-salv-alembic',
             name: 'Stripped glassware',
+            // IDs are AUTHORED rather than minted — see CRACKED_ALEMBIC_STAGE_IDS for why a
+            // run record that names a stage cannot survive a per-boot random id.
             results: [
-              { componentId: 'hb-empty-vial', quantity: 2 },
-              { componentId: 'hb-mortar-dust', quantity: 1 },
-              { componentId: 'hb-frostcap', quantity: 1 },
+              {
+                id: CRACKED_ALEMBIC_STAGE_IDS.vial,
+                componentId: 'hb-empty-vial',
+                quantity: 2,
+              },
+              {
+                id: CRACKED_ALEMBIC_STAGE_IDS.reagent,
+                componentId: 'hb-mortar-dust',
+                quantity: 1,
+              },
+              {
+                id: CRACKED_ALEMBIC_STAGE_IDS.frostcap,
+                componentId: 'hb-frostcap',
+                quantity: 1,
+              },
             ],
           },
         ],
@@ -1296,7 +1459,7 @@ const SMITHING_RECIPES = [
       description: 'Either burn the coal or spend the fire you are already carrying.',
       categories: ['Weaponsmithing'],
       // ONE group offering a COMPONENT or an ESSENCE, which is the only arrangement that draws an
-      // alternatives radiogroup carrying a `CraftingEssenceThumb`: `IngredientOptionSelector`
+      // alternatives radiogroup carrying an essence tile: `IngredientOptionSelector`
       // branches on the OPTION's `isEssence`, so an essence requirement in its own group renders a
       // rail tile instead and never reaches the chooser. Both options are affordable, so the
       // radiogroup shows two selectable rows rather than one flagged as short.
@@ -1822,10 +1985,128 @@ const ALCHEMY_RECIPES = [
   ),
 ];
 
+/**
+ * The world-default `prerequisites` / `bonus` sections, per world Tool record (issue 1373).
+ *
+ * Two records rather than one. `hb-tool-mortar` is the tool the INHERITING case adopts, so it is
+ * the one whose world value has to be resolvable from a system; `sm-tool-hammer` is the tool
+ * `world-tool-entry-requirements` opens, so it is the one whose value has to be VISIBLE on the
+ * world entry itself. Each expression names a real entry of the world modifier library the
+ * migration lifts out of the crafting systems, so both rows render as a library SELECTION rather
+ * than as the hand-typed fallback.
+ *
+ * `@prof` is carried by TWO of that library's entries — herbalism's `Herbalism kit` and
+ * runework's `Inscriber's chisel` — and that is left standing rather than tidied away. The
+ * design selects a row by EXPRESSION (`proto:4750`), so a world whose library says the same
+ * thing twice can only highlight the first of them, and a fixture that never contained a
+ * duplicate would leave that behaviour depicted nowhere.
+ *
+ * `gateMode: 'bonus'` rather than `usability`: a usability gate makes the Tool unusable for a
+ * character that fails it, which would reach the player gathering and crafting frames.
+ * Withholding the bonus states the same rule on every Tool screen and blocks nothing.
+ */
+const TOOL_WORLD_REQUIREMENT_DEFAULTS = Object.freeze({
+  'hb-tool-mortar': {
+    prerequisites: { enabled: true, ids: ['hb-prereq-nature'], gateMode: 'bonus' },
+    bonus: { enabled: true, expression: '@prof' },
+  },
+  'sm-tool-hammer': {
+    bonus: { enabled: true, expression: '@prof' },
+  },
+});
+
+/**
+ * The world Tool records that belong to NO crafting system, and the world defaults they carry.
+ *
+ * `lab-tool-unlinked` is the first of them and predates this block; these are the two states the
+ * corpus could not otherwise reach, both of them world-scope facts that no in-system tool
+ * definition can express.
+ *
+ * ── WHY THEY SORT LAST, AND WHY THAT IS LOAD-BEARING ────────────────────────────────────────
+ * The catalogue's default order is `name-asc` over `scopedEntryName`, its page window is ten,
+ * and six capture cases open `Smith's Hammer` from PAGE ONE. So a world-only record whose name
+ * sorts before `S` pushes the hammer onto page two and its row selector matches nothing — which
+ * fails the whole capture and publishes no frames at all rather than one wrong one. `Warped
+ * Crucible` sorts after `Unclaimed Bellows`, so page one is byte-for-byte the set it already
+ * was and page two grows from one row to two.
+ *
+ * `world-tool-catalogue-page-two` and `world-tool-entry-source-missing` both walk the pager to
+ * reach these records, and `world-tool-entry-unlinked` already did.
+ *
+ * ── WHAT EACH ONE IS FOR ────────────────────────────────────────────────────────────────────
+ * `lab-tool-warped-crucible` is the DANGLING SOURCE LINK: it names
+ * `Item.lab-tool-warped-crucible`, and `buildDocumentIndex` mints an Item only for the crafting
+ * systems' own component, tool and recipe-item definitions — so this uuid resolves to nothing.
+ * That is the one route to `ItemDropZone`'s `missing` face, which is the third of its three and
+ * had no frame at either scope: a record with no uuid at all draws the UNLINKED face instead,
+ * and `sourceMissing` deliberately requires a non-empty Item roster so that a roster which has
+ * simply not loaded cannot be mistaken for a broken link.
+ *
+ * ITS `0%` BREAK CHANCE IS A SECOND FACT AND IT IS PAIRED WITH A CASE. A break chance of zero is
+ * a mode with no usable value, which is what the world entry's Validation tab warns about — and
+ * `worldToolSorts` labels it `0% break`, which sorts FIRST of the twelve under the catalogue's
+ * one lane sort. `world-tool-catalogue-sort-lane-inert` asserts exactly that row on page one,
+ * because a lane sort composed with a direction falls back to name order silently and a frame
+ * showing a disabled toggle over an unreordered list would look identical to a working one.
+ */
+const WORLD_ONLY_TOOL_ENTITIES = [
+  {
+    id: 'lab-tool-warped-crucible',
+    name: 'Warped Crucible',
+    // A REAL FOUNDRY PATH, verified against the harvested `icons/` tree rather than inferred from
+    // the naming convention — see `lab-tool-unlinked`'s note for what an invented one costs.
+    img: `${ICON_BASE}/tools/smithing/crucible-steel.webp`,
+    description: 'Slumped out of true in a runaway heat, and the Item behind it is long deleted.',
+    // NAMED, AND UNRESOLVABLE. Both halves are the point: `entryHasSourceLink` reads this field,
+    // so the record reports itself LINKED, and nothing in the Item index answers the uuid.
+    registeredItemUuid: 'Item.lab-tool-warped-crucible',
+    originItemUuid: 'Item.lab-tool-warped-crucible',
+    aliasItemUuids: [],
+  },
+];
+
+/**
+ * The world defaults for the world-ONLY records, as `Object.fromEntries` pairs.
+ *
+ * `lab-tool-unlinked` gets one for the first time here, and `enabled: false` is the whole reason:
+ * no Tool in the corpus was disabled at world scope, so the master switch — the one control that
+ * reaches every crafting system at once — was photographed exclusively ON, on all three of the
+ * surfaces that draw it (the catalogue row's toggle, the catalogue inspector's pill and the
+ * entry's own switch card).
+ *
+ * IT IS THIS RECORD RATHER THAN A REAL TOOL, and that is the cheapest honest place for it. The
+ * world switch is a VETO — `resolveScopedDefinition` ANDs it with each system's own — so
+ * disabling any Tool a system actually has would switch it off in that system, and every recipe
+ * requiring it would stop being craftable, which reaches the player crafting and gathering frames.
+ * `lab-tool-unlinked` has no membership and no system, so the veto reaches the three world-scope
+ * surfaces it is evidence for and nothing else.
+ */
+const WORLD_ONLY_TOOL_DEFAULT_ENTRIES = [
+  [
+    'lab-tool-unlinked',
+    {
+      id: 'lab-tool-unlinked',
+      breakage: { mode: 'limitedUses', maxUses: null },
+      onBreak: { mode: 'destroy' },
+      enabled: false,
+    },
+  ],
+  [
+    'lab-tool-warped-crucible',
+    {
+      id: 'lab-tool-warped-crucible',
+      breakage: { mode: 'breakageChance', breakageChance: 0 },
+      onBreak: { mode: 'destroy' },
+    },
+  ],
+];
+
 const SMITHING_TOOLS = [
   {
     id: 'sm-tool-hammer',
     name: 'Smith’s Hammer',
+    description:
+      'A cross-pein sledge with a hickory haft, weighted for drawing hot iron out along the horn.',
     componentId: 'sm-iron-ingot',
     registeredItemUuid: 'Item.sm-tool-hammer',
     originItemUuid: 'Item.sm-tool-hammer',
@@ -1837,6 +2118,7 @@ const SMITHING_TOOLS = [
   {
     id: 'sm-tool-anvil',
     name: 'Anvil',
+    description: 'Two hundredweight of cast steel, set on an elm stump and rung true.',
     componentId: 'sm-steel-ingot',
     registeredItemUuid: 'Item.sm-tool-anvil',
     originItemUuid: 'Item.sm-tool-anvil',
@@ -1844,15 +2126,66 @@ const SMITHING_TOOLS = [
     aliasItemUuids: [],
     breakage: { mode: 'limitedUses', maxUses: null },
   },
+  // ── THE MARKED-BROKEN TOOL, AND THE ONE WITH A REPAIR ROUTE (issue 1373, round 2) ────────
+  // `Mark as broken` is the on-break action that takes an ARGUMENT — the ingredient groups that
+  // mend a broken copy — and no lab tool selected it, so the world entry's repair picker was a
+  // state no capture case could reach. That is precisely why two automated parity passes
+  // reported the screen complete while it rendered nothing there.
+  //
+  // TWO GROUPS, NOT ONE, and the second carries two OPTIONS. A single one-option group cannot
+  // show the AND-across-groups / OR-inside-a-group rule the card's own hint states, so a frame
+  // of it would be evidence for half the control. The ids are WORLD component ids: the `1.30.0`
+  // migration mints one world Component per system definition preserving its id, which is what
+  // makes a world-scope repair group addressable at all.
+  //
+  // A HIGHER BREAK CHANCE THAN THE HAMMER'S 5%, deliberately: 22% lands in the design's third
+  // band (`Breaks now and then`) where the hammer sits in its second (`Rarely breaks`), so the
+  // two frames of this control show two different bands rather than one twice.
   {
     id: 'sm-tool-tongs',
     name: 'Forge Tongs',
+    description: 'Wolf-jaw tongs, long enough in the rein to keep a hand clear of the fire.',
     componentId: 'sm-iron-ingot',
     registeredItemUuid: 'Item.sm-tool-tongs',
     originItemUuid: 'Item.sm-tool-tongs',
     img: `${ICON_BASE}/tools/smithing/tongs-steel-grey.webp`,
     aliasItemUuids: [],
-    breakage: { mode: 'breakageChance', breakageChance: 2 },
+    breakage: { mode: 'breakageChance', breakageChance: 22 },
+    onBreak: { mode: 'flagBroken' },
+    // THE OPTIONS CARRY A `match`, WHICH IS NOT THE RECIPE FIXTURES' SHORTHAND. `simpleSet`
+    // above writes `{componentId, quantity}` and gets away with it because a recipe passes
+    // through `Recipe` normalization on the way in; a world-defaults SECTION VALUE is stored
+    // OPAQUELY and reaches the editor exactly as written, so the shorthand renders as an unset
+    // `Pick component` row in every group. This is the normalized shape the editor reads.
+    repairRequirements: [
+      {
+        id: 'sm-tool-tongs-repair-g1',
+        options: [{ quantity: 1, match: { type: 'component', componentId: 'sm-iron-ingot' } }],
+      },
+      {
+        id: 'sm-tool-tongs-repair-g2',
+        options: [
+          { quantity: 2, match: { type: 'component', componentId: 'sm-coal' } },
+          { quantity: 1, match: { type: 'component', componentId: 'sm-whetstone' } },
+        ],
+      },
+      // A TAG ROW, BECAUSE NO REPAIR FRAME HELD ONE (issue 1373, maintainer round 6). Every
+      // repair seed in this file was components only, so the four kinds' plate tints rendered
+      // as one green four times over and the tag arm's one-line geometry - the thing the
+      // maintainer reported - was evidenced solely by `manager-recipe-edit-ingredients-cost`,
+      // on a different screen with a different container width. A tool inspector is the NARROW
+      // case of that row, so it is the one worth photographing.
+      //
+      // POPULATED rather than empty, and that is not only about showing more: an option with no
+      // tags fails `Ingredient.validate`, so an empty-tag seed would flip this Tool's Validation
+      // badge and change what every other frame of it is evidence for.
+      {
+        id: 'sm-tool-tongs-repair-g3',
+        options: [
+          { quantity: 2, match: { type: 'tags', tags: ['abrasive', 'hide'], tagMatch: 'any' } },
+        ],
+      },
+    ],
   },
 ];
 
@@ -1860,6 +2193,7 @@ const HERBALISM_TOOLS = [
   {
     id: 'hb-tool-mortar',
     name: 'Mortar & Pestle',
+    description: 'Unglazed porcelain, deliberately rough inside so a seed head gives up its oils.',
     componentId: 'hb-mortar-dust',
     registeredItemUuid: 'Item.hb-tool-mortar',
     originItemUuid: 'Item.hb-tool-mortar',
@@ -2294,6 +2628,18 @@ const GATHERING_TASKS = [
       { id: 'row-2', componentId: 'sm-copper-ore', quantity: 2, dropRate: 30, enabled: true },
       { id: 'row-3', componentId: 'sm-silver-ore', quantity: 1, dropRate: 15, enabled: true },
       { id: 'row-4', componentId: 'sm-ruby', quantity: 1, dropRate: 5, enabled: true },
+      // COAL, and it is here to close a fixture gap rather than to enrich the seam. `sm-coal` is
+      // the lab's only component carrying world tags, so it is the component the world catalogue
+      // entry's preview rail is photographed on — and nothing in the world produced it, so the
+      // rail's `Produced by` group had no row and could only ever photograph its empty sentence.
+      // A drop row is the cheapest producer: `producedBy` is derived from recipe results and
+      // gathering drop rows alike, and a seam that yields ore yields the coal beside it.
+      //
+      // The four rates above read like a distribution summing to 100, but a `dropRate` is an
+      // INDEPENDENT per-row probability (`GatheringDropReferenceValidator`: an integer 0-100 per
+      // row, with no cross-row constraint), and the task's yield chance is
+      // `1 - ∏(1 - rate/100)`. So this row is appended rather than funded out of the others.
+      { id: 'row-5', componentId: 'sm-coal', quantity: 2, dropRate: 35, enabled: true },
     ],
   },
 ];
@@ -2442,7 +2788,11 @@ const ENVIRONMENTS = [
     biomes: ['forest'],
     dangerTags: ['hazardous'],
     includedRealmIds: ['hb-realm-verdant'],
-    forcedTaskIds: ['hb-task-forage', 'hb-task-fungi'],
+    // Manual composition is exactly this list (issue 1315): these two lived in `forcedTaskIds`
+    // when manual mode still filtered by match and a force was the only way past it. The world
+    // migration folds forced into enabled for manual environments; this authored fixture is not
+    // migrated, so it carries the folded shape directly.
+    enabledTaskIds: ['hb-task-forage', 'hb-task-fungi'],
     enabledEventIds: ['hb-event-wolves', 'hb-event-storm'],
     blindSelection: { weights: { 'hb-task-forage': 3, 'hb-task-fungi': 2 } },
     conditions: { weather: 'rain', timeOfDay: 'night', visibility: '', notes: '' },
@@ -2520,7 +2870,8 @@ const ENVIRONMENTS = [
     // header alert and the travel guidance in its tooltip. That is the one environment card
     // state selection cannot reach, and it sorts last, exactly as its smoke counterpart does.
     includedRealmIds: ['sm-realm-deep'],
-    forcedTaskIds: ['sm-task-prospect'],
+    // Folded for the same reason as `hb-env-thicket` (issue 1315).
+    enabledTaskIds: ['sm-task-prospect'],
     enabledEventIds: ['sm-event-collapse'],
     conditions: { weather: 'clear', timeOfDay: 'day', visibility: '', notes: '' },
     nodeRuntime: {},
@@ -3325,7 +3676,7 @@ const HERBALISM_GATHERING_CHECK = Object.freeze({
   defaultModifierIds: ['hb-mod-nature', 'hb-mod-tools'],
 });
 
-export function buildLabContent() {
+export function buildLabContent({ journalCaseState = null } = {}) {
   const systems = [
     {
       id: LAB_SYSTEM_IDS.SMITHING,
@@ -3678,12 +4029,16 @@ export function buildLabContent() {
     },
   };
 
-  return {
+  const content = {
     systems,
     recipes: [
       ...SMITHING_RECIPES,
       ...HERBALISM_RECIPES,
-      ...ALCHEMY_RECIPES,
+      ...ALCHEMY_RECIPES.map((entry) =>
+        journalCaseState === 'alchemy' && entry.id === 'al-r-fire'
+          ? { ...entry, access: { playerIds: ['user-lab-player'], characterIds: [] } }
+          : entry
+      ),
       ...JEWELRY_RECIPES,
       ...RUNEWORK_RECIPES,
       ...TIDEWRACK_RECIPES,
@@ -3716,10 +4071,363 @@ export function buildLabContent() {
       ...TIDEWRACK_COMPONENTS,
     ],
     tools: [...SMITHING_TOOLS, ...HERBALISM_TOOLS, ...RUNEWORK_TOOLS],
+    // THE WORLD TOOL CORPUS (issue 1373, epic 1357), in the shape `toolScope` persists: an
+    // `entities` roster of identity records, `defaults` keyed by entity id, `membership` keyed
+    // by `<entityId>|<systemId>`, and the world break mode beside them.
+    //
+    // IT IS SEEDED SO THE WORLD SCREENS HAVE SOMETHING TO PHOTOGRAPH. A capture case cannot
+    // reach the world Tool ENTRY at all without a catalogue row to click, and an empty corpus
+    // renders the no-state hero - which would publish an empty frame as evidence of a
+    // catalogue.
+    //
+    // `lab-tool-unlinked` earns its place: `worldScopeEntityGrouping` records that a definition
+    // with no source references of its own becomes a world entity FLAGGED UNLINKED, and that
+    // state is drawn by a different badge in a different tone. One linked row cannot show it.
+    // ── THE DESCRIPTION IS NOT BLANKED ANY MORE, AND ONE RECORD STILL HAS NONE ──────────────
+    // Every world tool entity carried `description: ''`, so every row and the inspector read
+    // `No description` on the one screen whose premise is that the world record IS the Item —
+    // and the frames published that as the catalogue's normal state. A Tool registered through
+    // the shipped drop path captures the Item's description at link time, so a populated one is
+    // what a real corpus looks like.
+    //
+    // `hb-tool-alembic` deliberately keeps the empty one. The row and the inspector fall through
+    // to the linked ITEM's description when a record has none of its own, and a fixture where
+    // every record answers on the first rung would publish frames that could not tell the two
+    // apart. The lab has no `Item.hb-tool-alembic` document to inherit FROM, so what its row
+    // shows is the last rung — which is the honest picture of an unresolvable link and the state
+    // the catalogue exists to make findable.
+    // ── THE WORLD COMPONENT STATES THE MIGRATION CANNOT PRODUCE (issues 1371 and 1392) ────────
+    //
+    // The `1.30.0` pass already lifts every system's `components[]` into world records, so the
+    // world Component catalogue is populated with no seed at all. What it CANNOT produce is any of
+    // the states below, and each one is a screen one of these two lanes ships.
+    //
+    // Four of them are issue 1371's, enumerated (i) to (iv) here; the fifth is issue 1392's world
+    // Tags & Categories record, whose reasons are stated on the row itself rather than restated
+    // here because it is the only one of the five that is not about a component SCREEN.
+    //
+    // ── (i) AN INHERITING CATEGORY, WHICH NEEDS BOTH HALVES SEEDED ────────────────────────────
+    // The lab's ESSENCE seed is the membership record ALONE, because the migration's defaults half
+    // is gated per ENTITY and would still elect the world default. That option is not available
+    // here: `worldScopeDefaults` REFUSES an elected `category` whose donor value is the reserved
+    // bucket, and it declines the section outright whenever any member system left it unauthored —
+    // so most lab components end the migration with NO world `category` at all, and a bare
+    // `inherit: { category: true }` would render the note's THIRD branch ("no world category is
+    // set") rather than the inheriting one. A frame of a refused election looks exactly like a
+    // correct inheriting frame, which is why the pair is seeded together and stated here.
+    //
+    // Seeding `defaults['sm-iron-ingot']` suppresses that entity's whole election, which is the
+    // point: the value below IS the world default rather than one the migration happened to pick.
+    //
+    // ── (ii) WORLD TAGS AND A MUTE, ON A DIFFERENT COMPONENT ─────────────────────────────────
+    // The migration deliberately leaves world `tags` UNAUTHORED — an additive list is granted to
+    // every member system at once, so no donor rule can rescue it — so the world tag list, the
+    // entry's mute grid and the rules editor's read-only tag card are all unphotographable without
+    // this. `sm-coal` OVERRIDES its category, so the two components between them cover both
+    // branches of the note that has a world value.
+    //
+    // ── (iii) AND (iv) A COMPONENT NO SYSTEM HAS, AND ONE WITH NO SOURCE ITEM ────────────────
+    // Both are seeded through `entities`, which is safe: the migration seeds its id set FROM the
+    // existing payload and only PUSHES ids it does not already hold, never removing one. The first
+    // is the catalogue's `Unused` flag and the world entry's zero-member state — which is also the
+    // only state in which the entry's Delete actually proceeds. The second is the unlinked source
+    // pill and the entry validation tab's one blocking row.
+    componentScope: {
+      entities: [
+        {
+          id: 'lab-wildwood-resin',
+          name: 'Wildwood Resin',
+          // A HARVESTED PATH, and the reason it had to change: the harvest carries no
+          // `icons/commodities/tree` family at all, so this seed 404'd. It was invisible until
+          // C6 restored the ghost row's medallion — nothing requested the image before — and it
+          // then failed `manager-components-world-cohort`'s console-error gate. Amber IS tree
+          // resin, so the subject and the colour the old filename named both survive.
+          img: `${ICON_BASE}/commodities/gems/gem-amber-insect-orange.webp`,
+          description: 'Tapped from the reach’s oldest ironwoods. No system has rules for it yet.',
+          originItemUuid: 'Item.lab-wildwood-resin',
+          registeredItemUuid: 'Item.lab-wildwood-resin',
+          aliasItemUuids: [],
+        },
+        {
+          id: 'lab-unbound-salt',
+          name: 'Unbound Salt',
+          img: '',
+          description: 'Catalogued from a merchant’s ledger, with no game-world Item behind it.',
+        },
+        // ── THE ONE WORLD-ONLY RECORD THE MIGRATION CANNOT PRODUCE (issue 1392) ─────────────
+        //
+        // The lab seeds no `migrationVersion`, so `1.30.0`'s world-scope pass runs on every build
+        // and LIFTS a world component record out of each system's own `components[]`, electing
+        // each record's `category` from the donor system. The rows above extend that lifted half
+        // where the pass cannot reach; this row is the pair of states the world Tags & Categories
+        // screen exists to make readable, and both are authored on it:
+        //
+        //  - a world component default carrying a world CATEGORY that no system component
+        //    carries, so `Curios` publishes `0 references` and is STILL confirm-gated, because
+        //    deleting it rewrites this default. That row is the whole point of the one-click gate
+        //    being a conjunction rather than the reference count alone.
+        //  - a world component default carrying a world TAG, `moss`. The migration deliberately
+        //    leaves world `tags` unauthored (`data-models/spec.md:2349-2350`) because the tag
+        //    merge is additive, so a GM-authored world tag is a world-scope grant no membership
+        //    record mirrors — which is why the reference count INCLUDES the defaults' tags and
+        //    EXCLUDES their category. Without this record that asymmetry is invisible in every
+        //    frame.
+        //
+        // It carries its own `entities` row rather than hanging an orphan default off nothing, on
+        // the `lab-tool-unlinked` precedent above: a world record no system has adopted is a real
+        // state, and it reaches no system's read union because it has no membership record. Its
+        // image is REUSED from a component already in this fixture rather than guessed from the
+        // naming convention — `img` is unvalidated, so a wrong path 404s silently and the capture
+        // harness fails the whole case behind the layout assertion.
+        {
+          id: 'lab-world-component-curio',
+          name: 'Tidewrack Curio',
+          img: `${ICON_BASE}/commodities/stone/ore-chunk-blue.webp`,
+          description: 'A world component record no crafting system has adopted yet.',
+        },
+      ],
+      defaults: {
+        // ── (v) AN INHERITED ESSENCE MAP THAT DIFFERS FROM THE SYSTEM'S OWN ROW ────────────
+        // Issue 1371 r20-store3, reviewer round 6 finding 9. The world `essences` section is
+        // authored for almost every lab component and inherited by 66 pairs — but the `1.32.0`
+        // pass ELECTS each world map from the donor system's own row and only marks a system
+        // inheriting when the two are EQUAL, so in a freshly migrated world the resolved map and
+        // the persisted row are identical by construction and the r19 overlay changes no pixel.
+        // A frame of it therefore proved nothing: it was equally consistent with the list still
+        // drawing `getItems`.
+        //
+        // `air: 1` is the divergence, and it is the smallest one that reaches no arithmetic: the
+        // system's own row is `{earth: 2, fire: 1}`, so `manager-component-edit-inheriting` (which
+        // opens THIS component for exactly its inheriting state) and every rules-list row for it
+        // now draw a third essence the persisted row does not carry. No smithing recipe demands
+        // `air` — the system's essence demands are `fire`, `earth`, `water`, `aether` and `mote` —
+        // so no recipe's craftability moves. `water` would have moved `sm-r-tidebound`'s.
+        //
+        // The membership record below PRE-DECIDES `inherit.essences`, which is what makes the
+        // divergence survive: `markComponentEssenceInheritance` leaves a record that already
+        // carries a boolean alone, and would otherwise mark this pair OVERRIDING on the very
+        // inequality this seed exists to create.
+        'sm-iron-ingot': {
+          id: 'sm-iron-ingot',
+          category: 'Refined',
+          essences: { earth: 2, fire: 1, air: 1 },
+        },
+        // `moss` IS APPLIED HERE TOO (issue 1371 r17, UX F-N2). Under M18 the entry's tag run is
+        // the world VOCABULARY (`ingot` / `moss` / `ore`), and `fuel` / `bulk` sit outside it — so
+        // with those two alone no chip on the lab entry was LIT, and the parity region for a lit
+        // chip measured an unlit one against the prototype's lit `Reclaimed`. `moss` is the one
+        // tag the world both authors and applies, and applying it on `sm-coal` gives the entry
+        // frame its lit chip. `fuel` and `bulk` STAY, so the applied-but-unauthored state is
+        // still photographable and the note beneath the run still counts them (three now).
+        'sm-coal': { id: 'sm-coal', category: 'Raw Materials', tags: ['fuel', 'bulk', 'moss'] },
+        'lab-world-component-curio': {
+          id: 'lab-world-component-curio',
+          category: 'Curios',
+          tags: ['moss'],
+        },
+      },
+      membership: {
+        [`sm-iron-ingot|${LAB_SYSTEM_IDS.SMITHING}`]: {
+          entityId: 'sm-iron-ingot',
+          systemId: LAB_SYSTEM_IDS.SMITHING,
+          // `essences: true` is stated rather than left to the `1.32.0` pass — see the default
+          // above: the pass decides an undecided record by EQUALITY, and this pair is seeded
+          // unequal on purpose.
+          inherit: { category: true, essences: true },
+        },
+        [`sm-coal|${LAB_SYSTEM_IDS.SMITHING}`]: {
+          entityId: 'sm-coal',
+          systemId: LAB_SYSTEM_IDS.SMITHING,
+          inherit: { category: false },
+          category: 'Raw Materials',
+          mutedTags: ['bulk'],
+        },
+      },
+    },
+    toolScope: {
+      entities: [
+        ...[...SMITHING_TOOLS, ...HERBALISM_TOOLS].map((tool) => ({
+          id: tool.id,
+          name: tool.name,
+          img: tool.img,
+          description: tool.description ?? '',
+          originItemUuid: tool.originItemUuid,
+          registeredItemUuid: tool.registeredItemUuid,
+          aliasItemUuids: [],
+        })),
+        {
+          id: 'lab-tool-unlinked',
+          // A REAL FOUNDRY PATH, verified against the harvested `icons/` tree rather than
+          // guessed from the naming convention. The earlier `tools/smithing/bellows-tan.webp`
+          // reads like one and does not exist in 14.365: `img` is unvalidated, so the record
+          // rendered its fallback and the only symptom was a 404 the capture harness fails the
+          // whole case on — behind the layout assertion, so nothing reported it until that
+          // assertion passed.
+          name: 'Unclaimed Bellows',
+          img: `${ICON_BASE}/tools/smithing/furnace-boiler-steel.webp`,
+          description: 'A world record no game-world Item stands behind yet.',
+        },
+        ...WORLD_ONLY_TOOL_ENTITIES,
+      ],
+      defaults: Object.fromEntries([
+        ...[...SMITHING_TOOLS, ...HERBALISM_TOOLS].map((tool) => [
+          tool.id,
+          {
+            id: tool.id,
+            breakage: tool.breakage ?? { mode: 'limitedUses', maxUses: null },
+            onBreak: tool.onBreak ?? { mode: 'destroy' },
+            // THE SEEDED THIRD SECTION, READ OFF THE TOOL THAT DECLARES ONE (issue 1373,
+            // round 2). It used to be a hard-coded one-record special case whose value was
+            // `[{id, ingredients: []}]` — a shape no reader has: an ingredient GROUP carries
+            // `options`, not `ingredients`, so the world entry's repair editor rendered a group
+            // with nothing in it and the count beside it claimed one. Reading the tool's own
+            // declaration means the fixture states the seed in the shape the editor edits, and
+            // a second tool can carry a different one.
+            ...(Array.isArray(tool.repairRequirements)
+              ? { repairRequirements: tool.repairRequirements }
+              : {}),
+            // THE TWO SECTIONS THAT JOINED `TOOL_SECTIONS` AT `1.31.0`, AUTHORED ON ONE TOOL
+            // (issue 1373). Without a world value for either, the only frame that photographs
+            // the rules editor's inheriting face could not show them working at all: both cards
+            // and both effective-rules rows would read the canonical empty whether the editor
+            // resolved them from the world or from the in-system record, which is exactly how
+            // the defect stayed hidden. `hb-tool-mortar` is the tool the inheriting case adopts,
+            // so it is the one that has to carry them.
+            //
+            // `gateMode: 'bonus'` rather than `usability`: a usability gate makes the Tool
+            // unusable for a character that fails it, which would reach the player gathering and
+            // crafting frames. Withholding the bonus states the same rule on every Tool screen
+            // and blocks nothing.
+            //
+            // THE EXPRESSION IS STORED WITH ITS SIGIL, and it used to read `'prof'`. That is not
+            // a shape any writer produces: the Tool bonus is a roll-data path and every writer
+            // of one stores the leading `@` (`toStoredRollDataExpression`), which is also what
+            // the world modifier library persists. Since issue 1373's maintainer round 3 the
+            // bonus is a PICK from that library, matched by expression (`proto:4750`), so the
+            // un-sigilled value would have matched nothing and depicted the hand-typed state on
+            // the one frame that exists to show the library state.
+            //
+            // `sm-tool-hammer` CARRIES A BONUS TOO, and it is the reason the world Tool entry's
+            // Requirements frame can photograph the list at all: `world-tool-entry-requirements`
+            // opens the hammer, and with both sections at the canonical empty that frame proved
+            // only that two switches render. Nothing inherits either default (the frame's own
+            // reach line reads `0 crafting systems`), so this reaches exactly the one screen it
+            // is authored for and no roll anywhere.
+            ...(TOOL_WORLD_REQUIREMENT_DEFAULTS[tool.id] ?? {}),
+          },
+        ]),
+        // The two world-ONLY records' defaults, appended rather than merged over the top: they
+        // name no crafting system tool, so the map above cannot produce them and there is nothing
+        // for them to override.
+        ...WORLD_ONLY_TOOL_DEFAULT_ENTRIES,
+      ]),
+      membership: Object.fromEntries(
+        [
+          ...SMITHING_TOOLS.map((tool) => [tool.id, LAB_SYSTEM_IDS.SMITHING]),
+          ...HERBALISM_TOOLS.map((tool) => [tool.id, LAB_SYSTEM_IDS.HERBALISM]),
+        ].map(([entityId, systemId]) => [
+          `${entityId}|${systemId}`,
+          {
+            entityId,
+            systemId,
+            // ONE OVERRIDE among them, so the catalogue's per-section inherit counts are a
+            // real number rather than "every system, always".
+            //
+            // AND `prerequisites` AND `bonus` ARE DELIBERATELY NOT AUTHORED HERE (issue 1373),
+            // even though the world default above now authors both for `hb-tool-mortar`. The
+            // lab seeds no `migrationVersion`, so every registered migration runs on every lab
+            // build, and `1.31.0`'s `migrateToolRequirementSections` is what records both
+            // sections as overrides on EVERY membership record that has not authored a switch
+            // — writing the switch AND the canonical-empty value it reads off the in-system
+            // Tool. Authoring the switch here instead SUPPRESSES that pass by its own
+            // per-section guard and leaves the switch standing with NO stored value, which
+            // `resolveScopedDefinition` treats as no override at all: measured, herbalism's
+            // mortar then resolved to the WORLD prerequisite and check bonus — the exact
+            // leak into every herbalism frame that authoring it was meant to prevent.
+            inherit: entityId === 'sm-tool-anvil' ? { breakage: false } : {},
+            enabled: true,
+            ...(entityId === 'sm-tool-anvil'
+              ? { breakage: { mode: 'diceExpression', formula: '1d20', threshold: 3 } }
+              : {}),
+          },
+        ])
+      ),
+      // AUTHORED, so the World breakage default card draws a SELECTED segment rather than the
+      // unauthored state, and the system Tool Rules tri-state has a world token to name.
+      toolBreakage: { authority: 'toolSpecific' },
+    },
+    // ── THE WORLD VOCABULARY (issue 1392, epic 1357, PR 7a) ────────────────────────────────
+    //
+    // Authored so the `world-vocabulary` case photographs a POPULATED screen, and authored to
+    // put all THREE affordance states in one frame rather than three rows of the same one:
+    //
+    //  - REFERENCED: `Reagents` (14 components), `Weaponsmithing` (8 recipes), `ingot` (6
+    //    components). These render the `fas fa-link` reference chip and a neutral delete
+    //    control, and open the two-step confirm.
+    //  - ZERO REFERENCES BUT NOT SILENTLY DELETABLE: `Curios`. Nothing in any system carries it,
+    //    so it reads `0 references` — and it is still confirm-gated, because the world component
+    //    default above carries it. A row that read `Unused` here under a red one-click delete
+    //    would state one thing and do another.
+    //  - GENUINELY UNUSED: `Curiosities`. No recipe uses it and a recipe category rewrites
+    //    nothing on deletion — the world corpus holds no recipe record — so it renders the muted
+    //    `Unused` chip under the destructive delete and goes in one click.
+    //
+    // `moss` sits between the first two: its only references are world defaults' tags — the
+    // curio's and, since issue 1371 r17, `sm-coal`'s — so it reads `2 references` and is
+    // confirm-gated. If the count ever excluded the defaults' tags it would read `Unused` and
+    // offer a one-click delete that silently rewrites two world components.
+    //
+    // Entry ids are the trimmed lowercased names, which is what the store derives and what
+    // `buildVocabularyUsage` keys its maps on. Authoring them here rather than letting the
+    // normalizer derive them keeps the fixture in the shape the setting actually persists.
+    worldVocabulary: {
+      componentCategories: [
+        { id: 'raw materials', name: 'Raw Materials' },
+        { id: 'reagents', name: 'Reagents' },
+        { id: 'refined', name: 'Refined' },
+        { id: 'curios', name: 'Curios' },
+      ],
+      componentTags: [
+        { id: 'ore', name: 'ore' },
+        { id: 'ingot', name: 'ingot' },
+        { id: 'moss', name: 'moss' },
+      ],
+      recipeCategories: [
+        { id: 'weaponsmithing', name: 'Weaponsmithing' },
+        { id: 'refining', name: 'Refining' },
+        { id: 'curiosities', name: 'Curiosities' },
+      ],
+    },
     // Exposed so the uuid index can resolve an owned recipe-item copy back to the book it is a
     // copy OF. Without an index entry the copy still matches its definition (matching is by uuid,
     // not by document) but every surface that resolves the source through `fromUuid` renders it
     // unresolved — the same "looks unpopulated" failure the component index exists to prevent.
     recipeItems: [...HERBALISM_RECIPE_ITEMS],
+  };
+  return seedJournalPrototype(content, journalCaseState, { component, recipe });
+}
+
+/**
+ * Author the Journal's ready single-step fixture as a real optional no-check craft.
+ *
+ * Crafting check availability belongs to the system, not the recipe. The ordinary lab world
+ * keeps Karrun Forgecraft's authored check for its manager and crafting cases; this state-local
+ * variant turns that check off and clears its simple formula before the real managers normalize
+ * the persisted content. Bend Horseshoe already has no recipe-level check override, so the
+ * resulting run follows the same unconditional simple-mode path as a production no-check craft.
+ *
+ * @param {ReturnType<typeof buildLabContent>} content Fresh lab content, mutated in place.
+ * @returns {void}
+ */
+export function seedJournalNoCheckFixture(content) {
+  const system = content.systems?.find((entry) => entry?.id === LAB_SYSTEM_IDS.SMITHING);
+  const recipeEntry = content.recipes?.find((entry) => entry?.id === 'sm-r-horseshoe');
+  if (!system || !recipeEntry) {
+    throw new Error('view lab: ready-single no-check fixture requires smithing and Bend Horseshoe');
+  }
+  system.craftingCheck = {
+    ...system.craftingCheck,
+    enabled: false,
+    simple: { ...system.craftingCheck?.simple, rollFormula: '' },
   };
 }

@@ -21,12 +21,14 @@
   change does not implement, and that copy is dropped.
 -->
 <script>
+  import Field from '../../../components/Field.svelte';
   import IconPicker from '../../../components/IconPicker.svelte';
   import ManagerColorPopover from '../../../components/ManagerColorPopover.svelte';
   import Medallion from '../../../components/Medallion.svelte';
-  import ToggleCard from '../ToggleCard.svelte';
+  import ToggleCard from '../../../components/ToggleCard.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { DEFAULT_ESSENCE_ICON, normalizeEssenceIcon } from '../../../util/essenceIcons.js';
+  import IconButton from '../../../components/IconButton.svelte';
 
   let {
     name = '',
@@ -53,7 +55,19 @@
 <div class="manager-essence-tab-stack" data-essence-tab-panel="identity">
   <section class="manager-edit-card">
     <div class="manager-essence-edit-grid">
-      <div class="manager-essence-icon-panel">
+      <!-- THE CONTROL HALF of the validation row action (issue 1517). The `icon` blocker is
+           about the chosen GLYPH, and the two controls that change it — the tile's reset overlay
+           and the picker beneath it — are this panel's, so the panel is the destination and
+           `essenceStudio.js` addresses it as `essence-icon`. A panel is not natively focusable,
+           so it declares BOTH the tabindex that makes the focus real and the attribute that
+           tells Foundry the window is focused; without the second, Space pauses the game and
+           the arrows pan the canvas. -->
+      <div
+        class="manager-essence-icon-panel"
+        data-validation-target="essence-icon"
+        tabindex="-1"
+        data-keyboard-focus="true"
+      >
         <span class="manager-essence-field-label"
           >{text('FABRICATE.Admin.Manager.Essence.Icon', 'Icon')}</span
         >
@@ -64,7 +78,7 @@
              the column WIDTH and kept `size` only as its height, so a widened column
              stretched the tile into a rectangle. The maintainer's note is that the icon must
              read as a square: `size={124}` alone sets both dimensions, and the column below
-             is narrowed to that same 124px (`--fab-mv2-essence-icon-column`) so the picker
+             is narrowed to that same 124px so the picker
              row shrinks to fit beneath the tile rather than hanging past it. `glyph`
              stays: at the shared 0.9rem (~14px) default the flame was a speck in a 124px
              tile, and the prototype's flame fills roughly a third of the tile's edge.
@@ -77,17 +91,16 @@
              have made unreachable without a pointer. -->
         <div class="manager-essence-icon-tile">
           <Medallion icon={normalizedIcon} tint={colorToken || ''} size={124} glyph={44} />
-          <button
-            type="button"
-            class="manager-icon-button manager-essence-icon-reset"
-            data-essence-icon-reset
+          <IconButton
+            class="manager-essence-icon-reset"
+            data-essence-icon-reset=""
             disabled={saving || normalizedIcon === DEFAULT_ESSENCE_ICON}
-            aria-label={text('FABRICATE.Admin.Manager.Essence.ClearIcon', 'Clear icon')}
+            ariaLabel={text('FABRICATE.Admin.Manager.Essence.ClearIcon', 'Clear icon')}
             title={text('FABRICATE.Admin.Manager.Essence.ClearIcon', 'Clear icon')}
             onclick={() => onIconChange(DEFAULT_ESSENCE_ICON)}
           >
             <i class="fas fa-undo" aria-hidden="true"></i>
-          </button>
+          </IconButton>
         </div>
         <div class="manager-essence-icon-actions">
           <IconPicker
@@ -100,10 +113,14 @@
       </div>
 
       <div class="manager-essence-core-fields">
-        <label class="manager-field" for="manager-essence-edit-name">
+        <Field as="label" for="manager-essence-edit-name">
           <span>{text('FABRICATE.Admin.Manager.Essence.Name', 'Name')}</span>
+          <!-- `data-validation-target` is the CONTROL half of the validation row action
+               (issue 1517): the `name` blocker addresses this input by this exact value, and
+               `validationFocus.js` resolves, focuses and marks it. -->
           <input
             id="manager-essence-edit-name"
+            data-validation-target="essence-name"
             type="text"
             value={name}
             oninput={(event) => onNameChange(event.currentTarget.value)}
@@ -111,12 +128,13 @@
             disabled={saving}
             required
           />
-        </label>
+        </Field>
 
-        <label class="manager-field" for="manager-essence-edit-description">
+        <Field as="label" for="manager-essence-edit-description">
           <span>{text('FABRICATE.Admin.Manager.Essence.Description', 'Description')}</span>
           <textarea
             id="manager-essence-edit-description"
+            data-validation-target="essence-description"
             rows="5"
             value={description}
             oninput={(event) => onDescriptionChange(event.currentTarget.value)}
@@ -125,12 +143,21 @@
               'Description'
             )}
             disabled={saving}></textarea>
-        </label>
+        </Field>
       </div>
     </div>
   </section>
 
-  <section class="manager-edit-card" data-manager-essence-colour>
+  <!-- THE CONTROL HALF for the `colour` row (issue 1517). The palette is an inline grid of
+       swatches rather than one control, so the CARD is the destination — the same set-level rule
+       the icon panel above follows — and `essenceStudio.js` addresses it as `essence-colour`. -->
+  <section
+    class="manager-edit-card"
+    data-manager-essence-colour
+    data-validation-target="essence-colour"
+    tabindex="-1"
+    data-keyboard-focus="true"
+  >
     <div class="manager-edit-card-heading">
       <h3 class="manager-card-title">
         {text('FABRICATE.Admin.Manager.Essence.Colour.Label', 'Colour')}
@@ -236,8 +263,21 @@
      NOT `visibility: hidden`: `visibility: hidden` removes the button from the tab order, so
      a keyboard user could never focus it and the `:focus-visible` reveal below could never
      fire — the exact catch-22 this design exists to avoid. `opacity: 0` keeps it focusable;
-     `pointer-events: none` stops the invisible corner intercepting a click until revealed. */
-  .manager-essence-icon-tile .manager-essence-icon-reset {
+     `pointer-events: none` stops the invisible corner intercepting a click until revealed.
+
+     The reset control is an `<IconButton>` as of issue 1422, so the CHILD half of each
+     selector is `:global` while the tile keeps its scoping — the tile is still an element
+     this component writes, and globalising it too would let these rules escape into any
+     other component that happens to draw a tile. Specificity is unchanged by construction:
+     Svelte compiled the scoped descendant to
+     `.manager-essence-icon-tile.svelte-<hash> .manager-essence-icon-reset:where(.svelte-<hash>)`,
+     and `:where()` contributes nothing, so (0,3,0) then and (0,3,0) now.
+
+     Unlike `GatheringEconomyView.svelte`'s pair, this one failed LOUDLY: the class token
+     appears nowhere on an element this component still writes, so the compiler pruned all
+     three selectors and `lint:svelte:warnings` named them. A repair verified only against
+     that gate would have missed the other file entirely. */
+  .manager-essence-icon-tile :global(.manager-essence-icon-reset) {
     position: absolute;
     top: var(--fab-space-1);
     right: var(--fab-space-1);
@@ -246,8 +286,8 @@
     transition: opacity 120ms ease;
   }
 
-  .manager-essence-icon-tile:hover .manager-essence-icon-reset,
-  .manager-essence-icon-tile .manager-essence-icon-reset:focus-visible {
+  .manager-essence-icon-tile:hover :global(.manager-essence-icon-reset),
+  .manager-essence-icon-tile :global(.manager-essence-icon-reset:focus-visible) {
     opacity: 1;
     pointer-events: auto;
   }

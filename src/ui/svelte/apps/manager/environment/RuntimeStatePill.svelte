@@ -1,7 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
-  import Chip from '../Chip.svelte';
+  import Chip from '../../../components/Chip.svelte';
 
   let { state = 'unavailable' } = $props();
 

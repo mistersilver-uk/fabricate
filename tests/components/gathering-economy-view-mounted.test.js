@@ -6,8 +6,20 @@ import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { flushSync, mount, tick, unmount } from '../../node_modules/svelte/src/index-client.js';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
-import { createSvelteCompiler } from '../helpers/svelte-component-harness.js';
+import {
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  SELECT_COMPILED_MODULES,
+  createSvelteCompiler,
+} from '../helpers/svelte-component-harness.js';
 import { stepMigratedNumberField } from '../helpers/numericKeyboardStep.js';
+import {
+  assertSelectHasResolvedName,
+  chooseSelectOption,
+  closeSelectPanel,
+  selectOptionLabels,
+  selectOptionValues,
+  selectTriggerText,
+} from '../helpers/select-control.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -80,6 +92,13 @@ function makeServices(initialEconomy, actors = []) {
 
 async function mountView(props) {
   target = document.createElement('div');
+  // THE APPLICATION ROOT, and it is load-bearing since issue 1510 (issue 1504's rule, arriving
+  // at this suite). The regeneration controls are the shared `<Select>` now, and
+  // `SearchablePopover` PORTALS its panel to the nearest `.fabricate-manager` or
+  // `.fabricate-app` — falling back to `<body>` with a console error when it finds neither. This
+  // view's production host is the manager, so the mount target says so; without the class every
+  // panel lookup in this file would miss and the failure would read as "opened no panel".
+  target.className = 'fabricate-manager';
   document.body.appendChild(target);
   mounted = mount(GatheringEconomyView, { target, props });
   flushSync();
@@ -103,15 +122,24 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
     // (issue 1050); omitting it leaves the compiled component with an unresolvable import.
     for (const modulePath of [
       'src/ui/svelte/util/foundryBridge.js',
+      'src/ui/svelte/util/listReorderAnnouncement.js',
       'src/ui/svelte/components/stepperLabels.js',
     ]) {
       writeRawModule(modulePath);
     }
+    // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
+    for (const modulePath of SEARCHABLE_POPOVER_RAW_MODULES) writeRawModule(modulePath);
 
     writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
+    // Issue 1504: the shared `<Select>`'s whole compiled closure, spread rather than copied.
+    for (const selectModule of SELECT_COMPILED_MODULES) {
+      writeCompiledSvelte(selectModule);
+    }
     writeCompiledSvelte('src/ui/svelte/components/Stepper.svelte');
-    writeCompiledSvelte('src/ui/svelte/apps/manager/RadioCardGroup.svelte');
-    writeCompiledSvelte('src/ui/svelte/apps/manager/ResolutionModeCard.svelte');
+    writeCompiledSvelte('src/ui/svelte/components/RadioCardGroup.svelte');
+    // The manager's ONE labelled push-button (issue 1118): the actor list's bulk Save renders
+    // it. Already covered by the `SELECT_COMPILED_MODULES` loop above.
+    writeCompiledSvelte('src/ui/svelte/components/IconButton.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringEconomyView.svelte');
     const mod = await import(
       pathToFileURL(join(tempRoot, 'src/ui/svelte/apps/manager/GatheringEconomyView.svelte.js'))
@@ -148,67 +176,25 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
     target.remove();
   });
 
-  it('renders a gathering resolution-mode card above limitation mode (d100 live, others coming soon)', async () => {
+  it('keeps legacy resolution data inert while persisting unrelated economy edits', async () => {
     const { services, calls } = makeServices({
+      resolutionMode: 'progressive',
       stamina: { enabled: false, regen: { policy: 'none' } },
       nodes: { enabled: false },
     });
     await mountView({ services, systemId: 'sys-1' });
 
-    const resolutionCard = target.querySelector('[data-gathering-resolution-mode]');
-    assert.ok(resolutionCard, 'gathering resolution-mode card should render');
+    assert.equal(target.querySelector('[data-gathering-resolution-mode]'), null);
+    assert.ok(target.querySelector('[data-economy-mode-card]'));
 
-    // The resolution card renders BEFORE the limitation-mode card in document order.
-    const limitationCard = target.querySelector('[data-economy-mode-card]');
-    assert.ok(limitationCard, 'limitation mode card should render');
-    assert.equal(
-      resolutionCard.compareDocumentPosition(limitationCard) & Node.DOCUMENT_POSITION_FOLLOWING,
-      Node.DOCUMENT_POSITION_FOLLOWING,
-      'the resolution card precedes the limitation card'
-    );
-
-    const rows = [...resolutionCard.querySelectorAll('[data-gathering-resolution-mode-option]')];
-    assert.deepEqual(
-      rows.map((row) => row.getAttribute('data-gathering-resolution-mode-option')),
-      ['d100', 'progressive', 'routed'],
-      'gathering card lists d100, progressive, routed in order'
-    );
-
-    const radioFor = (value) =>
-      resolutionCard.querySelector(
-        `[data-gathering-resolution-mode-option="${value}"] input[type="radio"]`
-      );
-    assert.equal(radioFor('d100').disabled, false, 'd100 is selectable');
-    assert.equal(radioFor('progressive').disabled, true, 'progressive is disabled (coming soon)');
-    assert.equal(radioFor('routed').disabled, true, 'routed is disabled (coming soon)');
-    assert.deepEqual(
-      rows
-        .slice(1)
-        .map((row) => row.querySelector('.manager-resolution-option-badge')?.textContent.trim()),
-      ['Coming soon', 'Coming soon'],
-      'disabled shared radio cards retain their visible availability explanation'
-    );
-
-    // Clicking a disabled option persists nothing.
-    const before = calls.setEconomy.length;
-    radioFor('progressive').click();
-    flushSync();
-    assert.equal(
-      calls.setEconomy.length,
-      before,
-      'clicking a disabled option pushes no setEconomy call'
-    );
-
-    // Selecting d100 round-trips resolutionMode === 'd100'.
-    const d100 = radioFor('d100');
-    d100.checked = true;
-    d100.dispatchEvent(new window.Event('change', { bubbles: true }));
+    target.querySelector('[data-economy-mode-option="nodes"]').click();
     flushSync();
     assert.equal(
       calls.setEconomy.at(-1).economy.resolutionMode,
-      'd100',
-      'selecting d100 persists resolutionMode d100'
+      'progressive',
+      'an unrelated limitation edit retains the legacy compatibility value'
     );
+    assert.equal(calls.setEconomy.at(-1).economy.nodes.enabled, true);
     unmount(mounted);
     mounted = null;
     target.remove();
@@ -509,6 +495,85 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
       'and Current keeps the keyboard-stepped value rather than being nulled'
     );
     assert.notEqual(calls.setStamina[0].current, null, 'a cosmetic-zero field never persists null');
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+  });
+
+  it('offers the regeneration policy and unit as the app’s own lists, named by their captions', async () => {
+    // FIRST COVERAGE OF BOTH CONTROLS (issue 1510). `[data-economy-regen-policy]` and
+    // `[data-economy-regen-unit]` had no mounted assertion at all before this change: the regen
+    // card's amount field was covered and the two selects beside it were not, so a conversion
+    // could have reordered, relabelled or unnamed either of them and nothing would have said so.
+    const { services } = makeServices(
+      {
+        stamina: { enabled: true, regen: { policy: 'overTime', unit: 'hours', amount: '2' } },
+        nodes: { enabled: false },
+      },
+      []
+    );
+    await mountView({ services, systemId: 'sys-1' });
+
+    const policy = '[data-economy-regen-policy]';
+    const unit = '[data-economy-regen-unit]';
+    assert.deepEqual(selectOptionValues(target, policy), ['none', 'overTime']);
+    assert.deepEqual(selectOptionLabels(target, policy), ['Manual only', 'Over world time']);
+    // CLOSE IT BEFORE OPENING THE NEXT. Nothing dismisses a panel in a mounted suite: the
+    // dismisser listens on `mousedown` and `.click()` fires none, so both panels would sit in the
+    // portal host at once and the class-first lookup would return the policy list for the unit
+    // trigger. The helper reports that as a mismatched `aria-controls` rather than as an option
+    // this control does not offer, which is how this line came to exist.
+    closeSelectPanel(target, policy);
+    assert.deepEqual(selectOptionValues(target, unit), ['minutes', 'hours', 'days', 'weeks']);
+    // THE LABEL IS THE `<option>`'s OWN TEXT, resolved the same way. This harness stubs
+    // `localize` to return the key, so `text(key, fallback)` yields the fallback — which for the
+    // unit list is the unit id itself, exactly as it was before the conversion. The SHIPPED copy
+    // is `Economy.Unit.*`'s singular capitalised forms ("Minute", "Hour", "Day", "Week"), so the
+    // row still reads "Every [3] Minute"; that is measured against the real `lang/en.json` in
+    // `tests/components/manager-select-conversion-rendered.test.js`, which is the only harness
+    // here that loads it. `DurationUnitPlural` exists and is deliberately NOT adopted: a copy
+    // change is not this conversion's to make.
+    assert.deepEqual(selectOptionLabels(target, unit), ['minutes', 'hours', 'days', 'weeks']);
+
+    // Both wrappers were deleted rather than demoted: each existed only to caption its select, so
+    // the caption rides the primitive's own `label=` form. The announced name is unchanged.
+    closeSelectPanel(target, unit);
+    assert.equal(assertSelectHasResolvedName(target, policy), 'Regeneration');
+    assert.equal(assertSelectHasResolvedName(target, unit), 'Per');
+    assert.equal(selectTriggerText(target, unit), 'hours');
+
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+  });
+
+  it('routes a regeneration unit change through the caller’s own typed value', async () => {
+    const { services, calls } = makeServices(
+      {
+        stamina: { enabled: true, regen: { policy: 'overTime', unit: 'hours', amount: '2' } },
+        nodes: { enabled: false },
+      },
+      []
+    );
+    await mountView({ services, systemId: 'sys-1' });
+
+    chooseSelectOption(target, '[data-economy-regen-unit]', 'days');
+    flushSync();
+    assert.equal(
+      calls.setEconomy.at(-1).economy.stamina.regen.unit,
+      'days',
+      '`onChange` hands back the caller’s OWN value, so no call site coerces a string'
+    );
+
+    // And the policy control still gates the branch its sibling renders in.
+    chooseSelectOption(target, '[data-economy-regen-policy]', 'none');
+    flushSync();
+    assert.equal(calls.setEconomy.at(-1).economy.stamina.regen.policy, 'none');
+    assert.ok(
+      !target.querySelector('[data-economy-regen-unit]'),
+      'the unit control belongs to the over-time branch and leaves with it'
+    );
+
     unmount(mounted);
     mounted = null;
     target.remove();

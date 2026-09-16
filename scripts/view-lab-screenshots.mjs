@@ -49,7 +49,7 @@ import { chromium } from 'playwright';
 
 import { missingChromeMessage, resolveChromeCache } from './lib/foundryChromeCache.js';
 import { APP_CHROME, APP_CHROME_IDS, minimumViewportFor } from './lib/foundryChromeSpec.js';
-import { publishableCases } from './lib/viewLabCases.js';
+import { partitionConsoleErrors, publishableCases } from './lib/viewLabCases.js';
 import { groupFrames, renderIndexHtml, summarise } from './lib/viewLabIndex.js';
 import { assertViewLabLayout } from './lib/viewLabLayoutAssertion.js';
 
@@ -81,6 +81,43 @@ const TOLERATED_WARNINGS = [
   // It is a statement about the harness's own manifest, not about any rendered surface, and it
   // fires on every case regardless of fixture.
   /Item Piles integration: version .* does not meet minimum/,
+  // The `1.30.0` world-scope migration's own COMPLETION notice (`src/migration/worldScopeEntityNotice.js`),
+  // reporting what it created and merged. It is not a fault report, and the lab is EXPECTED to run
+  // the migration: `labWorld.js` seeds no `migrationVersion`, so `lastRunVersion` is `'0.0.0'` and
+  // every registered migration runs over these fixtures on every build. That is deliberate rather
+  // than an oversight — authoring the post-migration shape instead would leave the newest migration
+  // unexercised, which `tests/view-lab-world-migration.test.js` argues for at length.
+  //
+  // ITS SEVERITY IS DERIVED, NOT FIXED, and the distinction matters to whoever edits the fixture
+  // next. `buildWorldScopeEntityNotice` returns `warn` only when the pass produced a rename, a
+  // refusal or a flagged reference, and `info` otherwise. This world lands on `warn` because it
+  // produces exactly one rename (`hb-air-shard` -> `sm-air-shard`). So this entry excuses a message
+  // THIS FIXTURE makes loud, not one the migration always shouts: remove that rename and the notice
+  // falls to `info`, the gate never sees it, and this pattern matches nothing rather than hiding
+  // something.
+  //
+  // Anchored on the invariant opening clause of `FABRICATE.Migration.WorldScopeEntities.Created`.
+  // Every clause after it — merged groups, the rename list, transitive groups — carries live counts
+  // and fixture ids, so anchoring on one of those would pin a fixture detail instead of a message.
+  /Fabricate gave this world one shared record per component, essence and tool/,
+  // The Valid Id Basis fail-safe DECLINING to prune. This is the safety behaviour working: the two
+  // component-keyed passes are withheld and, as the message says itself, nothing is removed.
+  //
+  // It fires on every lab build for an environment reason rather than a product one, which is the
+  // same shape as the Item Piles entry above. `1.30.0` leaves a re-key map that
+  // `remapWorldScopeIdentityFlags` consumes later, in `src/main.js`'s `ready` body, on the active GM
+  // alone. The lab's Foundry shim never reaches that body, so the lab sits permanently inside the
+  // window `hasPendingWorldScopeRekey` names and the composition withholds those passes every time.
+  //
+  // NARROW BY CONSTRUCTION as well as by wording, which matters because the message names its
+  // omitted passes but not the basis kind that decided them. At this composition site
+  // `componentIdentityRemap` is the only kind that can be false: the other three arrive from the
+  // frozen `WHOLE_CORPUS_ID_BASIS` literal, and each corpus read either returns whole or throws —
+  // and a throw fails the boot, so the case fails on `viewLabError` before this listener matters.
+  //
+  // Anchored mid-message. The text ends with an `Omitted:` label list and a structured detail object
+  // that Playwright renders as `{omitted: Array(2), basis: Object}`, so neither tail is invariant.
+  /Startup cleanup skipped: the ids it would prune against are not known to be complete/,
 ];
 
 const LAUNCH_ARGS = ['--use-gl=angle', '--use-angle=swiftshader', '--force-color-profile=srgb'];
@@ -100,7 +137,7 @@ const NAVIGATION_TIMEOUT_MS = 150_000;
  * specifier before any rule filtering, and it crashes outright on Vite's exports map ("node with
  * invalid interface loaded as resolver") — an `eslint-disable` comment does not help, because the
  * crash happens before rules run. Keeping the specifier opaque is what keeps this file inside the
- * `npm run lint` gate instead of parked in KNOWN_UNGATED_SCRIPTS. Vite is only needed when a
+ * `npm run lint` gate, which since issue #1660 it is. Vite is only needed when a
  * capture actually runs, so the lazy load is honest on its own terms too.
  */
 const VITE_SPECIFIER = 'vite';
@@ -347,6 +384,11 @@ async function renderPage(
     expectNoHorizontalOverflow = null,
     expectOverflowY = null,
     expectScrollable = null,
+    // The console errors this case DECLARES it produces, as patterns. Empty for all but the
+    // handful of cases whose subject IS a refusal - see `partitionConsoleErrors`, which owns
+    // both halves of the rule: an undeclared error is fatal, and a declared one that never
+    // arrives is fatal too.
+    allowedConsoleErrors = [],
   }
 ) {
   const context = await browser.newContext(BROWSER_CONTEXT);
@@ -581,8 +623,23 @@ async function renderPage(
     const frame = page.locator(`[data-view-lab-frame="${appId}"]`);
     const buffer = await frame.screenshot({ animations: 'disabled', caret: 'hide' });
     const box = await frame.boundingBox();
-    if (consoleErrors.length > 0) {
-      throw new Error(`${label}: console errors during render:\n  ${consoleErrors.join('\n  ')}`);
+    const { unmatched, unusedAllowances } = partitionConsoleErrors(
+      consoleErrors,
+      allowedConsoleErrors
+    );
+    if (unmatched.length > 0) {
+      throw new Error(`${label}: console errors during render:\n  ${unmatched.join('\n  ')}`);
+    }
+    // A DECLARED ERROR THAT NEVER ARRIVED FAILS THE CASE. The allowance is an assertion, not a
+    // permission: the cases that carry one are photographing a refusal, so a pattern that matches
+    // nothing says the refusal stopped happening and the frame about to be written is the resting
+    // screen under a case named for the alert.
+    if (unusedAllowances.length > 0) {
+      throw new Error(
+        `${label}: declared allowedConsoleErrors that never matched:\n  ` +
+          `${unusedAllowances.join('\n  ')}\n` +
+          'the case no longer reaches the refusal it is named for, or the message was reworded.'
+      );
     }
     return { buffer, box };
   } finally {
@@ -844,6 +901,7 @@ async function commandApps() {
           expectNoHorizontalOverflow: viewCase.expectNoHorizontalOverflow ?? null,
           expectOverflowY: viewCase.expectOverflowY ?? null,
           expectScrollable: viewCase.expectScrollable ?? null,
+          allowedConsoleErrors: viewCase.allowedConsoleErrors ?? [],
         });
         if (viewCase.distinctEvidenceGroup) {
           const prior = distinctEvidence.get(viewCase.distinctEvidenceGroup) ?? [];

@@ -18,11 +18,14 @@
   getGatheringStaminaState/setGatheringStamina).
 -->
 <script>
+  import Field from '../../components/Field.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
+  import ManagerButton from '../../components/ManagerButton.svelte';
   import Stepper from '../../components/Stepper.svelte';
   import { stepperLabels } from '../../components/stepperLabels.js';
-  import ResolutionModeCard from './ResolutionModeCard.svelte';
+  import IconButton from '../../components/IconButton.svelte';
+  import Select from '../../components/Select.svelte';
 
   let { services = null, systemId = '' } = $props();
 
@@ -32,6 +35,27 @@
   }
 
   const UNITS = ['minutes', 'hours', 'days', 'weeks'];
+
+  // THE TWO REGENERATION OPTION LISTS, in the shared `<Select>`'s shape (issue 1510). Both are
+  // the `<option>` sets they replaced: same order, same values, same rendered text. The unit
+  // labels stay `Economy.Unit.*`'s singular capitalised forms — "Minute", "Hour", "Day", "Week"
+  // — so the shipped row still reads "Every [3] Minute". `DurationUnitPlural` exists and is
+  // deliberately NOT adopted here: a copy change is not this conversion's to make.
+  const regenPolicyOptions = [
+    {
+      value: 'none',
+      label: text('FABRICATE.Admin.Manager.Economy.RegenPolicyNone', 'Manual only'),
+    },
+    {
+      value: 'overTime',
+      label: text('FABRICATE.Admin.Manager.Economy.RegenPolicyElapsed', 'Over world time'),
+    },
+  ];
+
+  const regenUnitOptions = UNITS.map((unit) => ({
+    value: unit,
+    label: text(`FABRICATE.Admin.Manager.Economy.Unit.${unit}`, unit),
+  }));
 
   let economy = $state(defaultEconomy());
   let staminaActors = $state([]);
@@ -52,46 +76,9 @@
     };
   }
 
-  // Gathering resolution mode is system config (default d100, the only currently
-  // implemented gathering resolution). progressive/routed are modelled but not yet
-  // implemented, so they render disabled with a "Coming soon" badge.
+  // Retain the former system-level value in the read/write shape for compatibility.
+  // Resolution is authored per task now, so this view deliberately exposes no control for it.
   const GATHERING_RESOLUTION_MODES = ['d100', 'progressive', 'routed'];
-
-  const gatheringResolutionModeOptions = [
-    {
-      value: 'd100',
-      labelKey: 'FABRICATE.Admin.Manager.Economy.Resolution.D100',
-      fallback: 'd100 roll',
-      descKey: 'FABRICATE.Admin.Manager.Economy.Resolution.D100Desc',
-      descFallback:
-        'Each attempt rolls a d100 against the task’s drop tables to determine what is gathered.',
-    },
-    {
-      value: 'progressive',
-      labelKey: 'FABRICATE.Admin.Manager.Economy.Resolution.Progressive',
-      fallback: 'Progressive',
-      descKey: 'FABRICATE.Admin.Manager.Economy.Resolution.ProgressiveDesc',
-      descFallback: 'A numeric check awards every drop whose difficulty threshold is met.',
-      disabled: true,
-      badgeKey: 'FABRICATE.Admin.SystemSettings.ResolutionComingSoon',
-      badgeFallback: 'Coming soon',
-    },
-    {
-      value: 'routed',
-      labelKey: 'FABRICATE.Admin.Manager.Economy.Resolution.Routed',
-      fallback: 'Routed by check',
-      descKey: 'FABRICATE.Admin.Manager.Economy.Resolution.RoutedDesc',
-      descFallback: 'The gathering check outcome selects which drop group is returned.',
-      disabled: true,
-      badgeKey: 'FABRICATE.Admin.SystemSettings.ResolutionComingSoon',
-      badgeFallback: 'Coming soon',
-    },
-  ];
-
-  function setResolutionMode(mode) {
-    economy.resolutionMode = GATHERING_RESOLUTION_MODES.includes(mode) ? mode : 'd100';
-    void persistEconomy();
-  }
 
   // Reload economy + actor stamina whenever the selected system changes.
   $effect(() => {
@@ -258,19 +245,6 @@
 </script>
 
 <div class="manager-gathering-economy" data-gathering-economy-view>
-  <section class="manager-economy-card" data-gathering-resolution-card>
-    <ResolutionModeCard
-      legendKey="FABRICATE.Admin.Manager.Economy.GatheringResolutionMode"
-      legendFallback="Gathering resolution mode"
-      options={gatheringResolutionModeOptions}
-      selectedValue={economy.resolutionMode}
-      groupName="manager-gathering-resolution-mode"
-      dataAttr="data-gathering-resolution-mode"
-      optionDataAttr="data-gathering-resolution-mode-option"
-      onChange={setResolutionMode}
-    />
-  </section>
-
   <section class="manager-economy-card" data-economy-mode-card>
     <header class="manager-economy-card-head">
       <h3 class="manager-economy-card-title">
@@ -336,7 +310,7 @@
         </p>
 
         <div class="manager-economy-regen-grid">
-          <label class="manager-field">
+          <Field as="label">
             <span>{text('FABRICATE.Admin.Manager.Economy.MaxStamina', 'Maximum stamina')}</span>
             <input
               type="text"
@@ -348,8 +322,8 @@
               oninput={(e) => updateStamina({ max: e.currentTarget.value })}
               data-economy-stamina-max
             />
-          </label>
-          <label class="manager-field">
+          </Field>
+          <Field as="label">
             <span>{text('FABRICATE.Admin.Manager.Economy.StartStamina', 'Starting stamina')}</span>
             <input
               type="text"
@@ -361,7 +335,7 @@
               oninput={(e) => updateStamina({ start: e.currentTarget.value })}
               data-economy-stamina-start
             />
-          </label>
+          </Field>
         </div>
         <p class="manager-economy-card-hint">
           {text(
@@ -374,44 +348,33 @@
           class="manager-economy-regen-grid"
           class:is-single={economy.stamina.regen.policy !== 'overTime'}
         >
-          <label class="manager-field">
-            <span>{text('FABRICATE.Admin.Manager.Economy.RegenPolicy', 'Regeneration')}</span>
-            <select
-              value={economy.stamina.regen.policy}
-              onchange={(e) => updateRegen({ policy: e.currentTarget.value })}
-              data-economy-regen-policy
-            >
-              <option value="none"
-                >{text('FABRICATE.Admin.Manager.Economy.RegenPolicyNone', 'Manual only')}</option
-              >
-              <option value="overTime"
-                >{text(
-                  'FABRICATE.Admin.Manager.Economy.RegenPolicyElapsed',
-                  'Over world time'
-                )}</option
-              >
-            </select>
-          </label>
+          <!-- THE TWO WRAPPERS ARE GONE, not demoted (issue 1510). Each existed only to caption
+               its select — no per-site class, no hook, no sibling — and the shared `<Select>`'s
+               own labelled form renders exactly that column, so the captions ride `label=`. The
+               option labels are carried verbatim, including `Economy.Unit.*`'s singular
+               capitalised forms, so the row still reads "Every [3] Minute". -->
+          <Select
+            value={economy.stamina.regen.policy}
+            options={regenPolicyOptions}
+            showTick={false}
+            label={text('FABRICATE.Admin.Manager.Economy.RegenPolicy', 'Regeneration')}
+            triggerData={{ 'data-economy-regen-policy': '' }}
+            onChange={(next) => updateRegen({ policy: next })}
+          />
           {#if economy.stamina.regen.policy === 'overTime'}
-            <label class="manager-field">
-              <span>{text('FABRICATE.Admin.Manager.Economy.RegenPer', 'Per')}</span>
-              <select
-                value={economy.stamina.regen.unit}
-                onchange={(e) => updateRegen({ unit: e.currentTarget.value })}
-                data-economy-regen-unit
-              >
-                {#each UNITS as unit (unit)}
-                  <option value={unit}
-                    >{text(`FABRICATE.Admin.Manager.Economy.Unit.${unit}`, unit)}</option
-                  >
-                {/each}
-              </select>
-            </label>
+            <Select
+              value={economy.stamina.regen.unit}
+              options={regenUnitOptions}
+              showTick={false}
+              label={text('FABRICATE.Admin.Manager.Economy.RegenPer', 'Per')}
+              triggerData={{ 'data-economy-regen-unit': '' }}
+              onChange={(next) => updateRegen({ unit: next })}
+            />
           {/if}
         </div>
 
         {#if economy.stamina.regen.policy === 'overTime'}
-          <label class="manager-field">
+          <Field as="label">
             <span>{text('FABRICATE.Admin.Manager.Economy.RegenAmount', 'Amount per interval')}</span
             >
             <input
@@ -424,7 +387,7 @@
               oninput={(e) => updateRegen({ amount: e.currentTarget.value })}
               data-economy-regen-amount
             />
-          </label>
+          </Field>
           <p class="manager-economy-card-hint">
             {text(
               'FABRICATE.Admin.Manager.Economy.RegenAmountHint',
@@ -467,12 +430,12 @@
               <span class="manager-economy-actor-col-label"
                 >{text('FABRICATE.Admin.Manager.Economy.Max', 'Max (override)')}</span
               >
-              <button
-                type="button"
-                class="manager-button is-primary manager-economy-bulk-save"
+              <ManagerButton
+                role="primary"
+                class="manager-economy-bulk-save"
                 onclick={saveAll}
                 data-economy-bulk-save
-                >{text('FABRICATE.Admin.Manager.Economy.Save', 'Save')}</button
+                >{text('FABRICATE.Admin.Manager.Economy.Save', 'Save')}</ManagerButton
               >
             </li>
             {#each pagedActors as actor (actor.actorId)}
@@ -526,30 +489,28 @@
                   onChange={(next) => (actor.draftMaxOverride = next)}
                 />
                 {#if actor.rolled}
-                  <button
-                    type="button"
-                    class="manager-icon-button manager-economy-actor-roll"
+                  <IconButton
+                    class="manager-economy-actor-roll"
                     title={text(
                       'FABRICATE.Admin.Manager.Economy.ResetHint',
                       'Re-roll this character’s pool from the max/start expressions'
                     )}
-                    aria-label={`${text('FABRICATE.Admin.Manager.Economy.Reset', 'Reset')} — ${actor.name}`}
+                    ariaLabel={`${text('FABRICATE.Admin.Manager.Economy.Reset', 'Reset')} — ${actor.name}`}
                     onclick={() => rollActor(actor)}
-                    data-economy-actor-roll
-                    ><i class="fas fa-arrows-rotate" aria-hidden="true"></i></button
+                    data-economy-actor-roll=""
+                    ><i class="fas fa-arrows-rotate" aria-hidden="true"></i></IconButton
                   >
                 {:else}
-                  <button
-                    type="button"
-                    class="manager-icon-button manager-economy-actor-roll is-roll-needed"
+                  <IconButton
+                    class="manager-economy-actor-roll is-roll-needed"
                     title={text(
                       'FABRICATE.Admin.Manager.Economy.RollHint',
                       'Roll this character’s pool from the max/start expressions'
                     )}
-                    aria-label={`${text('FABRICATE.Admin.Manager.Economy.Roll', 'Roll')} — ${actor.name}`}
+                    ariaLabel={`${text('FABRICATE.Admin.Manager.Economy.Roll', 'Roll')} — ${actor.name}`}
                     onclick={() => rollActor(actor)}
-                    data-economy-actor-roll
-                    ><i class="fas fa-dice-d20" aria-hidden="true"></i></button
+                    data-economy-actor-roll=""
+                    ><i class="fas fa-dice-d20" aria-hidden="true"></i></IconButton
                   >
                 {/if}
               </li>
@@ -589,6 +550,24 @@
 </div>
 
 <style>
+  /* THE WIDTH THE ELEMENT-TYPED SHEET RULE NO LONGER SUPPLIES (issue 1510).
+     `.fabricate-field.manager-field select { width: 100% }` painted the two regeneration
+     controls until they became `<button>`s, and `.fabricate-select-trigger` declares no width at
+     all — a trigger's box belongs to the row it sits in. Without this rule the policy control
+     measured 121.53px and the unit control 61.09px on "Hour" against 71.53px on "Minute", inside
+     236px grid tracks; the two cells of a two-column grid rendered at different widths and the
+     unit cell re-sized as the GM changed it. Measured in Chromium against the fixture's declared
+     Arial face.
+
+     Both are the primitive's own labelled form, whose `<Field>` emits `.fabricate-select-field`,
+     so the rule names `.manager-field` and reaches both. The `:global()` is anchored at
+     `.manager-economy-regen-grid`, which THIS component writes, so it keeps a scoping hash
+     rather than reaching every trigger in the document — the shape the three interactables
+     roots already ship for this same form. */
+  .manager-economy-regen-grid :global(.manager-field .fabricate-select-trigger) {
+    width: 100%;
+  }
+
   /* Span the full settings grid (2 columns) so the economy reads as one card
      above the Times-of-day / Weather / Regions panels. Stack the resolution-mode
      card and the limitation card vertically with the same gap the cards use
@@ -606,7 +585,7 @@
     flex-direction: column;
     gap: 14px;
     padding: 14px;
-    border: 1px solid var(--fab-mv2-border);
+    border: 1px solid var(--fab-border);
     border-radius: 8px;
     background: var(--fab-overlay-light-035);
   }
@@ -622,7 +601,7 @@
     align-items: center;
     gap: 8px;
     margin: 0;
-    color: var(--fab-mv2-text);
+    color: var(--fab-text);
     font-size: 0.95rem;
     font-weight: 700;
     line-height: 1.2;
@@ -630,12 +609,12 @@
 
   .manager-economy-card-title i,
   .manager-economy-subtitle i {
-    color: var(--fab-mv2-accent);
+    color: var(--fab-accent);
   }
 
   .manager-economy-card-hint {
     margin: -2px 0 0;
-    color: var(--fab-mv2-text-muted);
+    color: var(--fab-text-muted);
     font-size: 0.78rem;
     line-height: 1.35;
   }
@@ -652,17 +631,22 @@
     gap: 8px;
     padding: 8px 14px;
     border-radius: 8px;
-    border: 1px solid var(--fab-mv2-border);
+    border: 1px solid var(--fab-border);
     background: var(--fab-overlay-light-035);
-    color: var(--fab-mv2-text);
+    color: var(--fab-text);
     cursor: pointer;
     font-weight: 600;
   }
 
+  /* The fill is a NEUTRAL overlay, not an accent tint, and that is the shipped pixel rather
+     than an oversight: this rule asked for a soft accent with the overlay as its fallback,
+     the soft accent was never declared anywhere, and so the overlay is what every theme has
+     always painted. Issue 1399 wrote the surviving branch down. Tinting it is a visible
+     change and needs `--fab-accent-soft`, which does exist. */
   .manager-economy-mode-option.is-active {
-    border-color: var(--fab-mv2-accent);
-    background: var(--fab-mv2-accent-soft, var(--fab-overlay-light-035));
-    color: var(--fab-mv2-text);
+    border-color: var(--fab-accent);
+    background: var(--fab-overlay-light-035);
+    color: var(--fab-text);
   }
 
   .manager-economy-subsection {
@@ -690,7 +674,7 @@
     align-items: center;
     gap: 8px;
     margin: 0;
-    color: var(--fab-mv2-text);
+    color: var(--fab-text);
     font-size: 0.85rem;
     font-weight: 700;
   }
@@ -712,10 +696,10 @@
     box-sizing: border-box;
     height: 34px;
     padding: 0 10px;
-    border: 1px solid var(--fab-mv2-border);
+    border: 1px solid var(--fab-border);
     border-radius: 6px;
-    color: var(--fab-mv2-text);
-    background: var(--fab-mv2-bg);
+    color: var(--fab-text);
+    background: var(--fab-bg-1);
   }
 
   /* Scrollable character list (paginated above 6). Right padding insets the rows
@@ -757,7 +741,7 @@
     align-items: center;
     gap: 8px;
     padding: 6px 8px;
-    border: 1px solid var(--fab-mv2-border);
+    border: 1px solid var(--fab-border);
     border-radius: 8px;
     background: var(--fab-overlay-light-035);
   }
@@ -770,8 +754,8 @@
     padding: 4px 8px;
     border: 0;
     border-radius: 0;
-    background: var(--fab-mv2-surface-2);
-    color: var(--fab-mv2-text-muted);
+    background: var(--fab-bg-3);
+    color: var(--fab-text-muted);
     font-size: 0.7rem;
     text-transform: uppercase;
     font-weight: 700;
@@ -813,8 +797,28 @@
      from the primitive's own `.fab-stepper` / `.fab-stepper.is-disabled` rules. */
 
   /* The trailing action column (bulk Save in the header, roll/reset per row).
-     Slightly more compact than a default button, with slightly larger label. */
-  .manager-economy-bulk-save {
+     Slightly more compact than a default button, with slightly larger label.
+
+     `:global()` AND CHAINED (issue 1118). Both halves are load-bearing, and the first was
+     missed when this rule was chained: a SCOPED rule cannot reach this button at all any
+     more. Svelte scopes by appending `svelte-<hash>` to the selector and stamping that class
+     onto the elements THIS component writes; it does not stamp a child component's internals,
+     and the `class` prop handed to `<ManagerButton>` is forwarded verbatim. So
+     `….manager-economy-bulk-save.svelte-<hash>` matched nothing while the element carried
+     `manager-economy-bulk-save` — and nothing said so, because the compiler emits no
+     unused-selector warning for a class literal sitting on a component tag.
+     `tests/components/manager-button-scoped-class-reach.test.js` is the guard that now does.
+
+     Then chained, for the reason it always was: at (0,2,0) this rule did not beat
+     `.fabricate-button.manager-button.fab-manager-button` (0,3,0) at all — it lost `padding`
+     and `font-size` outright, and `is-primary`'s own padding at (0,4,0) too. Naming the
+     ancestor and the primitive's classes takes it to (0,5,0), which wins on specificity rather
+     than on where the sheet happens to be injected — see the header of
+     `tests/helpers/scoped-component-css.js` for why injection order is not a thing a rule may
+     depend on. */
+  :global(
+    .fabricate-manager .manager-button.fab-manager-button.is-primary.manager-economy-bulk-save
+  ) {
     width: auto;
     justify-self: center;
     padding: 3px 10px;
@@ -823,15 +827,35 @@
     line-height: 1.1;
   }
 
-  .manager-economy-actor-roll {
+  /* `:global`, and CHAINED with `.manager-icon-button`, because the roll button is an
+     `<IconButton>` (issue 1422). This rule reached a `<button>` this component wrote until
+     that conversion; afterwards Svelte stamps its `svelte-<hash>` onto the elements this
+     component writes and forwards a `class` prop to the child verbatim, so the scoped
+     spelling emits `.manager-economy-actor-roll.svelte-<hash>` and matches NOTHING.
+
+     It is the SILENT half of that failure, not the loud one, and the pair below is the
+     worked example of both. `essences/EssenceIdentityTab.svelte` states the same kind of
+     rule as a DESCENDANT of an element it still writes, so the compiler prunes it and
+     raises `css_unused_selector`; this one is a bare single-compound selector whose class
+     literal is still visible on the component tag, so the compiler judges it used and
+     EMITS it with the hash attached. Zero warnings, `lint:svelte:warnings` green, and the
+     dice button silently loses its centring and its unrolled emphasis.
+
+     The chain is what keeps the specificity identical rather than merely making the rule
+     reach: the dead scoped form was (0,2,0) and a bare `:global(.manager-economy-actor-roll)`
+     would be (0,1,0), which is a cascade change smuggled in as a repair. */
+  :global(.manager-icon-button.manager-economy-actor-roll) {
     justify-self: center;
   }
 
-  /* Emphasise the dice button on characters that have not been rolled yet. */
-  .manager-economy-actor-roll.is-roll-needed {
-    color: var(--fab-mv2-accent);
-    border-color: var(--fab-mv2-accent);
-    background: var(--fab-mv2-accent-soft, var(--fab-overlay-light-035));
+  /* Emphasise the dice button on characters that have not been rolled yet. The fill is a
+     NEUTRAL overlay for the reason `.manager-economy-mode-option.is-active` records above:
+     the soft accent this rule once deferred to was never declared, so the fallback is the
+     shipped pixel and issue 1399 wrote it down in place of the dead branch. */
+  :global(.manager-icon-button.manager-economy-actor-roll.is-roll-needed) {
+    color: var(--fab-accent);
+    border-color: var(--fab-accent);
+    background: var(--fab-overlay-light-035);
   }
 
   /* Keep the actor-list pagination compact and on a single line. */

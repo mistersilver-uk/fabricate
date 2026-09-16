@@ -8,7 +8,7 @@
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
-  import SearchablePopover from './SearchablePopover.svelte';
+  import SearchablePopover from '../../components/SearchablePopover.svelte';
 
   let { value = '', regions = [], disabled = false, onChoose = () => {} } = $props();
 
@@ -45,7 +45,7 @@
   {options}
   {disabled}
   pickerClass="manager-map-link-picker"
-  triggerClass="manager-button manager-travel-picker-trigger manager-map-link-trigger"
+  triggerClass="fabricate-button manager-button manager-travel-picker-trigger manager-map-link-trigger"
   triggerIcon="fas fa-link"
   triggerLabel={selectedName}
   valueClass="manager-map-link-value"

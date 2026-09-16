@@ -35,6 +35,8 @@
  * Foundry edges (`game.socket.emit`, `game.users.activeGM`, the apply body).
  */
 
+import { trimString } from '../utils/scalars.js';
+
 export const GATHERING_NODE_DEPLETE = 'gatheringNodeDeplete';
 
 /** Depletions one sender may apply per window before the GM starts refusing. */
@@ -42,10 +44,6 @@ export const DEPLETION_RATE_LIMIT = 30;
 
 /** Rolling window for {@link DEPLETION_RATE_LIMIT}, in milliseconds. */
 export const DEPLETION_RATE_WINDOW_MS = 60_000;
-
-function trimString(value) {
-  return typeof value === 'string' ? value.trim() : '';
-}
 
 /**
  * Validate a node-depletion payload. A well-formed payload names the environment

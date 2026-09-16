@@ -24,7 +24,8 @@ The driver honours it only from a lane with zero commits, an empty `git status -
 - the work's GitHub issue and its `openspec-delta` block, via `gh issue view`
 - relevant `openspec/specs/`, `src/`, and `tests/` files
 - `.agents/skills/javascript-structural-design/SKILL.md` when the task changes JavaScript module boundaries, collaborator wiring, API shape, or test seams
-- `.agents/skills/fabricate-ux-designer/references/design-system.md` for the `--fab-*` token, component, and pattern reference when the task changes `src/ui/**`, `styles/**`, or any `*.svelte`
+- `openspec/specs/design-system/spec.md` BEFORE writing any UI code when the task changes `src/ui/**`, `styles/**`, or any `*.svelte` — reuse the primitive that owns the meaning, extend it with a prop when it lacks the behaviour, and add a new primitive only with two or more independent callers, adding its specimen to `openspec/specs/design-system/library.html` and, once it ships, its row to `scripts/lib/designSystemPrimitives.json`, in the same change
+- `.agents/skills/fabricate-ux-designer/references/design-system.md` for the `--fab-*` token, theming-architecture and shipped-inventory reference; where it and the `design-system` capability disagree, the capability wins
 - current git diff when continuing existing work
 - the canonical [isolated worktree lifecycle](../fabricate-orchestrator/references/worktree-lifecycle.md)
 
@@ -59,6 +60,9 @@ The workflow driver runs those authoritative gates from the fully integrated coo
 - When the brief carries `file:line` references from an audit or an earlier capture, the tree has usually moved since.
 Re-verify every cited ref against the current tree before editing, skip any finding that no longer holds, and record each skip with its reason in the handoff so the driver and reviewers can see what was dropped and why.
 - Follow existing patterns before inventing new ones.
+- **Concision is part of the output.** New code carries only the comments `AGENTS.md` admits under "Observed failure mode: bloat", and a docblock states purpose and contract in at most six lines.
+- Extract before the lane returns instead of adding to a giant: a function over 100 lines, a `.js` module over 800 lines, or a `.svelte` component over 500 is oversized by `tests/file-size-ledger.txt`, and that ledger only goes down.
+- Add no new `Source.includes(` pin (`tests/source-pin-ledger.txt`) and no local copy of a shared helper (`tests/scalar-helper-duplicates.test.js`); import the one implementation instead.
 - Prefer JavaScript ES modules and Svelte 5 patterns already used in this repo.
 - Use `javascript-structural-design` as the default reference for dependency seams, cohesion, constructors, and behavior-first APIs.
 - Prefer explicit collaborators over `context`, `container`, or `manager` grab bags.
@@ -103,6 +107,9 @@ These mirrors rot silently otherwise.
 - For PR screenshot evidence, the View Lab is the producer and usually needs no recommendation at all: the `capture` CI job maps your changed files to cases and publishes the affected frames on every push.
 Render locally when you want to see a state before pushing — `node scripts/view-lab-screenshots.mjs apps <case-ids>`, seconds per frame, no Docker.
 If your change reaches a state no case covers, say so in the handoff and add the case: an uncovered state publishes an unrelated frame, which is the failure this registry exists to prevent.
+- For a screen with a design prototype, read `.agents/skills/fabricate-ux-designer/references/prototype-parity-measurement.md` before writing UI code.
+Work the delta's reachable-state matrix: register a View Lab case for any state it names without one, write the mounted test that ACTS on each state's controls, and paste the mutation proof for every acceptance criterion.
+Where the prototype and the design-system library conflict, escalate to the driver BEFORE implementing rather than shipping the divergence and recording it in the handoff.
 - Recommend `npm run test:foundry` only when the task depends on Foundry runtime integration, the user asks for live Foundry evidence, or the affected view is outside the case registry; then the producer is the scoped `npm run test:foundry:screenshots`, which captures the changed-file-affected views (from `mapChangedFilesToViews`) as full real-Foundry app windows.
 Do not recommend it to re-photograph a view the registry already covers — it costs ~31s per frame against the lab's ~5s and cannot run in CI.
 The workflow driver owns that run and separates harness infrastructure failures from product regressions.

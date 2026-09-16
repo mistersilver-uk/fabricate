@@ -822,7 +822,12 @@ describe('empty-state copy', () => {
   // Issue 1182 rehomed this string with the World > Parties pane rebuild: the pane is
   // world-scoped, so its copy moved out of the selected-system `Travel.*` namespace and
   // the whole `Travel.Members.*` subtree was retired.
-  const partyEmpty = lang.FABRICATE.Admin.Manager.World.Parties.Members.NoActorsConfigured;
+  // Issue 1035 split it across a short title and a body, mirroring `travelActorEmpty`
+  // below, so tone is judged on both joined.
+  const partyEmpty = [
+    lang.FABRICATE.Admin.Manager.World.Parties.Members.NoActorsConfigured,
+    lang.FABRICATE.Admin.Manager.World.Parties.Members.NoActorsConfiguredHint,
+  ].join(' ');
   // The TRAVEL-ACTOR picker's equivalent (issue 1182), gated alongside the member one so
   // the two cannot drift: they answer the same GM question about the same setting on the
   // same card, and only one of them being honest is the failure this loop exists to stop.

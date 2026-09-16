@@ -45,12 +45,17 @@
  */
 
 import { resolveRecipeImage } from '../ui/svelte/util/craftingImageDefaults.js';
+// The player-visible per-stage complication forecast (issue 1286), attached to the stage
+// rows this builder already publishes. An import-free leaf, on the same grounds as
+// `progressiveStageThresholds` beneath it.
+import { attachStageComplications } from '../utils/progressiveStageComplications.js';
 import { progressiveStageThresholds } from '../utils/progressiveStageThresholds.js';
 import { normalizeRecipeCategory, getRecipeCategoryLabel } from '../utils/recipeCategories.js';
 
 import { buildCheckModifierContext } from './checkModifierResolver.js';
 import { CRAFTING_BROWSE_STATUS, deriveBrowseStatus } from './craftingBrowseStatus.js';
 import { buildPassInventorySnapshot } from './passInventorySnapshot.js';
+import { resolvedComponentsFor } from './scopedEntityReads.js';
 import { activeRunStepState, buildStepRecipeView } from './stepRecipeView.js';
 import { SUMMARY_AUDIENCE, projectRecipeSummary } from './summaryProjection.js';
 
@@ -1203,7 +1208,7 @@ export class CraftingListingBuilder {
     const results = Array.isArray(group?.results) ? group.results : [];
     if (results.length === 0) return [];
 
-    const components = Array.isArray(system?.components) ? system.components : [];
+    const components = resolvedComponentsFor(system);
     const byId = new Map(components.map((component) => [component.id, component]));
     // The ENGINE'S difficulty lookup, not a local re-implementation — see
     // `ResolutionModeService.getDifficulty`. Parity here is what keeps the displayed
@@ -1223,7 +1228,7 @@ export class CraftingListingBuilder {
       awardMode: this._progressiveAwardMode(system, mode),
     });
 
-    return results.map((result, index) => {
+    const stages = results.map((result, index) => {
       const componentId = result?.componentId || result?.systemItemId;
       const component = componentId ? byId.get(componentId) : null;
       const difficulty = costFor(result);
@@ -1240,6 +1245,24 @@ export class CraftingListingBuilder {
         threshold: thresholds[index] ?? null,
       };
     });
+
+    // FORECAST-ONLY, and that is a property of crafting rather than an omission: the fired
+    // record is defined on the salvage RUN record, and the immediate crafting path writes
+    // no run, so there is nothing for `markFiredStageComplications` to read here. Nothing
+    // is marked fired, which is also the un-rolled state — no crafting stage ever claims a
+    // complication fired.
+    //
+    // Identity-preserving, so a recipe whose result components author no player-visible
+    // complication publishes the stage rows it published before issue 1286.
+    return attachStageComplications(stages, {
+      componentById: byId,
+      activity: 'crafting',
+      // The RECIPE's progressive check block, read the same way
+      // `CraftingEngine._resolveCraftingCheckBreakage` reads it for this mode. Reaching for
+      // `salvageCraftingCheck` here would filter the forecast against another activity's
+      // trigger id space.
+      checkBreakage: system?.craftingCheck?.progressive?.checkBreakage ?? null,
+    });
   }
 
   /**
@@ -1249,7 +1272,7 @@ export class CraftingListingBuilder {
    */
   _resultItemsFromGroups(groups, system) {
     if (!Array.isArray(groups) || groups.length === 0) return [];
-    const components = Array.isArray(system?.components) ? system.components : [];
+    const components = resolvedComponentsFor(system);
     const byId = new Map(components.map((component) => [component.id, component]));
     const items = [];
     for (const group of groups) {

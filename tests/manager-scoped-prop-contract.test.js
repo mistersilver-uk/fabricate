@@ -1,0 +1,631 @@
+/**
+ * Source contract: the world-scope DATA seam the shell hands its scoped screens (issue 1374).
+ *
+ * ── WHY THIS FILE EXISTS AT ALL, STATED PLAINLY ─────────────────────────────────────────
+ *
+ * Twelve of the thirteen call sites this change touches produce NO OBSERVABLE BEHAVIOUR. The
+ * seven world pages are placeholders that declare no props, and the six system-scope views
+ * declare none of the four names in the bundle, so a spread that reaches them is inert. There
+ * is no DOM to assert and no mounted test that can red on any of it.
+ *
+ * That is not a reason to ship the wiring untested; it is a reason to say WHAT carries the
+ * falsifiability instead of dressing a source scan as a behavioural gate. This file is that
+ * carrier, and its four clauses are the whole of it.
+ *
+ * ── THE COUNT IS TWELVE ACROSS THIRTEEN, AND THAT ASYMMETRY IS THE POINT ────────────────
+ *
+ * `WorldVocabularyPage` is the thirteenth site and takes NO bundle: the World Vocabulary is
+ * not a scoped entity — `### GM World Vocabulary Route` says so in its own requirement — and
+ * naming its state `scope` would be the first place in this UI to lose that boundary. A
+ * criterion demanding thirteen spreads would therefore red on correct code.
+ *
+ * ── AND THE ABSENCE HALF OF CLAUSE (b) IS LOAD-BEARING ──────────────────────────────────
+ *
+ * Asserting only that the RIGHT bundle is spread at each site is satisfied by a mutation that
+ * ADDS a wrong bundle rather than replacing one. Svelte spreads are LAST-WINS over identical
+ * keys, and all three bundles carry the same four, so `{...toolScopeProps}` written after
+ * `{...essenceScopeProps}` on an essence page does not merge the two families — it REPLACES
+ * the essence family outright, and the screen silently edits tools. A presence-only check sees
+ * its own bundle still spread and passes. So each site asserts the other two are ABSENT.
+ *
+ * ── CLAUSE (d) IS A DESIGN CONSTRAINT, NOT A HANG DETECTOR ──────────────────────────────
+ *
+ * `tests/components/manager-mounted.test.js` copies plain `.js` dependencies verbatim from a
+ * hand-written array with no validator, and its `.svelte` closure walk follows `.svelte`
+ * specifiers only. A missing raw module there is LOUD rather than silent — the suite dies in
+ * its `before` hook with `ERR_MODULE_NOT_FOUND` naming the module — so this clause is not
+ * there to convert a hang into a failure. It is there because "the root gains no import" is
+ * the design constraint that keeps this change a wiring change: the seam is three `$derived`
+ * bundles over state the shell already holds, and the moment it needs a new module it has
+ * become something else.
+ *
+ * The set is PINNED as a literal rather than read back from `origin/main` with `git show`,
+ * because a test that shells to a remote-tracking ref is a test that fails in a shallow CI
+ * checkout for a reason that has nothing to do with the property. The literal below was
+ * generated from `origin/main` at `7304be93` and verified identical to the post-change root.
+ *
+ * ── NON-VACUITY RUNS FIRST ──────────────────────────────────────────────────────────────
+ *
+ * Every clause here is a parse over hand-written markup, and the cheapest green available to
+ * a broken parser is an empty set comparing equal to an empty set. So the counts are asserted
+ * BEFORE the equalities: thirteen call sites found, twelve of them spreading a bundle, three
+ * bundle declarations of four keys each. Break the parse and this file reds on the counts.
+ */
+import assert from 'node:assert/strict';
+import { readFileSync, readdirSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import test from 'node:test';
+import { fileURLToPath } from 'node:url';
+
+import { VIEW_LAB_CASES } from '../scripts/lib/viewLabCases.js';
+
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const ROOT_PATH = 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte';
+const ADMIN_STORE_PATH = 'src/ui/svelte/stores/adminStore.js';
+
+const rootLines = readFileSync(resolve(repoRoot, ROOT_PATH), 'utf8').split('\n');
+
+/** The four names every bundle carries, and the whole of what a scoped screen is handed. */
+const BUNDLE_KEYS = Object.freeze(['actions', 'scope', 'systemId', 'systems']);
+
+/** The three bundle declarations, by the entity type each serves. */
+const BUNDLES = Object.freeze({
+  component: 'componentScopeProps',
+  essence: 'essenceScopeProps',
+  tool: 'toolScopeProps',
+});
+
+/**
+ * Every call site the seam reaches, and the bundle each one takes.
+ *
+ * `null` means "takes no bundle", which is a positive claim about `WorldVocabularyPage` rather
+ * than an omission: clause (c) asserts what it takes instead.
+ */
+const CALL_SITES = Object.freeze([
+  Object.freeze({ component: 'WorldComponentCataloguePage', bundle: 'component' }),
+  Object.freeze({ component: 'WorldComponentEntryPage', bundle: 'component' }),
+  Object.freeze({ component: 'WorldEssenceCataloguePage', bundle: 'essence' }),
+  Object.freeze({ component: 'WorldEssenceEntryPage', bundle: 'essence' }),
+  Object.freeze({ component: 'WorldToolCataloguePage', bundle: 'tool' }),
+  Object.freeze({ component: 'WorldToolEntryPage', bundle: 'tool' }),
+  Object.freeze({ component: 'WorldVocabularyPage', bundle: null }),
+  Object.freeze({ component: 'ToolsBrowserView', bundle: 'tool' }),
+  Object.freeze({ component: 'ToolEditView', bundle: 'tool' }),
+  Object.freeze({ component: 'EssenceBrowserView', bundle: 'essence' }),
+  Object.freeze({ component: 'EssenceEditView', bundle: 'essence' }),
+  Object.freeze({ component: 'ComponentEditView', bundle: 'component' }),
+  Object.freeze({ component: 'ComponentsBrowserView', bundle: 'component' }),
+]);
+
+/** The props `WorldVocabularyPage` takes, exactly — no bundle, and its state under its own name. */
+const VOCABULARY_PROPS = Object.freeze(['actions', 'systems', 'vocabulary']);
+
+/**
+ * The root's `<script>` module specifiers, pinned from `origin/main` at `7304be93`.
+ *
+ * Sorted, deduplicated, and asserted as a SET rather than a count: a count is passed by a
+ * swap, and a swap is a new dependency wearing an old one's budget.
+ */
+const ROOT_IMPORT_SPECIFIERS = Object.freeze([
+  '../../../../config/currencyProviders.js',
+  // ADDED BY ISSUE 1373, and deliberately: the world Tool entry's `Preview as` region resolves
+  // its Tool's world-default prerequisites against ONE actor, and the roster it offers is the
+  // shared, GM-configurable player-character predicate rather than a second `type === 'character'`
+  // test. The projection to `{id, name, img}` happens in the shell because the page is a leaf
+  // with no Foundry in its closure; the predicate is what makes that roster the same one the
+  // Checks Studio's picker already offers.
+  '../../../../gatheringImageDefaults.js',
+  '../../../../systems/characterModifierPrerequisiteCopy.js',
+  '../../../../systems/checkModifierResolver.js',
+  '../../../../systems/gatheringComposition.js',
+  '../../../../systems/progressiveCheckSandbox.js',
+  '../../../../utils/categoryIcons.js',
+  '../../../../utils/componentBrowserModel.js',
+  '../../../../utils/componentBulkEditModel.js',
+  '../../../../utils/componentCategories.js',
+  '../../../../utils/craftingCheckExpression.js',
+  '../../../../utils/essenceBrowserModel.js',
+  '../../../../utils/essenceBulkEditModel.js',
+  '../../../../utils/failureResultPolicy.js',
+  // Issue 1438 lifted the remaining browse surfaces' filter/search state onto one
+  // root-owned record, which the root mints from this factory. It is a legitimate addition
+  // under the message below, not a drift.
+  '../../../../utils/managerBrowserViewState.js',
+  '../../../../utils/recipeBrowserModel.js',
+  '../../../../utils/recipeBulkEditModel.js',
+  '../../../../utils/recipeCategories.js',
+  '../../../../utils/routedOutcomeKeywords.js',
+  // ADDED BY ISSUE 1373, and legitimately under the message below. One game-world Item is one
+  // world Tool, so the catalogue's drop zone RESOLVES before it creates - and the walk over a
+  // record's `registeredItemUuid` / `originItemUuid` / `aliasItemUuids` is the shared one the
+  // definition index and the read union already answer that question with. A fourth comparison
+  // written in the shell would drift from the index the migration grouped by, which is exactly
+  // the failure `sourceReferenceUnion` was extracted to prevent.
+  '../../../../utils/sourceReferenceUnion.js',
+  '../../../../utils/vocabularyUsage.js',
+  '../../../managerExtensions.js',
+  '../../../navTabBadgeStore.js',
+  // THE SHIPPED TWO-STEP DESTRUCTIVE CONTROL, for the world Tool entry's HEADER `Delete`
+  // (issue 1373's parity round). The design draws `Back to tools · Delete · Save tool` on
+  // the title line, and `.manager-header` is a sibling of `.manager-main`, so the page
+  // structurally cannot render into that band - it reports an action descriptor and the shell
+  // draws the control. The verb, the reach and the write are all still the page's.
+  //
+  // MOVED BY ISSUE 1509, not added, and for the same reason recorded on the chip below: the
+  // control writes `fabricate-button manager-button is-danger`, a family another primitive
+  // already owns and roots, so it could go to `components/` at the cost of a specifier and
+  // nothing else. The dependency did not change; this list is spelled in specifiers, so the
+  // entry re-sorts as well as re-spells.
+  '../../components/ArmedDangerButton.svelte',
+  '../../components/ChanceSlider.svelte',
+  // MOVED BY ISSUE 1506, not added. The shell imports the same one chip it always did; the
+  // primitive left `apps/manager/` for `components/` because two shipped components under
+  // that directory already render it, so a player window that mounts either draws it too.
+  // The specifier changed, the dependency did not, and this list is spelled in specifiers.
+  '../../components/Chip.svelte',
+  // ADDED BY ISSUE 1515 (decision D12), under the message below and not as drift. That change
+  // deleted the six per-route `manager-section-header` sections and gave the SHELL one page
+  // header per route, so the kicker line those sections used to draw is now the shell's to
+  // render — and it renders it through the shipped primitive rather than a second hand-rolled
+  // copy of its markup. The shell gained a dependency it genuinely did not have; this is that
+  // addition, declared.
+  '../../components/Kicker.svelte',
+  '../../components/ManagerButton.svelte',
+  '../../components/Medallion.svelte',
+  '../../util/announceAfterFocus.js',
+  '../../util/componentEditor.js',
+  '../../util/craftingImageDefaults.js',
+  '../../util/dropUtils.js',
+  '../../util/foundryBridge.js',
+  './AccessTabView.svelte',
+  './BooksScrollsView.svelte',
+  './ComponentEditView.svelte',
+  './ComponentsBrowserView.svelte',
+  './CraftingSettingsView.svelte',
+  './EmptyState.svelte',
+  './EnvironmentEditView.svelte',
+  './EnvironmentsBrowserView.svelte',
+  './EssenceBrowserView.svelte',
+  './EssenceEditView.svelte',
+  './ExplainerCard.svelte',
+  './GatheringEventEditView.svelte',
+  './GatheringMapLinksTab.svelte',
+  './GatheringRealmsTab.svelte',
+  './GatheringTaskEditView.svelte',
+  './GrantAccessInspector.svelte',
+  './ImportFolderMappingModal.svelte',
+  './ImportReportModal.svelte',
+  './ItemPageInspector.svelte',
+  './KnowledgeView.svelte',
+  './RealmNameField.svelte',
+  './RecipeEditView.svelte',
+  './RecipeItemEditor.svelte',
+  './RecipesBrowserView.svelte',
+  './SystemEditView.svelte',
+  './SystemsBrowserView.svelte',
+  './TagsCategoriesView.svelte',
+  './ToolEditView.svelte',
+  './ToolsBrowserView.svelte',
+  './checks/ChecksView.svelte',
+  './checks/checkTriggerSummary.js',
+  './checks/checksCopy.js',
+  './checks/checksNav.js',
+  './checks/checksReadiness.js',
+  './component/ComponentEditorHeader.svelte',
+  './components/ComponentBrowserInspector.svelte',
+  './components/ComponentBulkEditPanel.svelte',
+  './crafting/craftingNav.js',
+  './crafting/craftingVisibility.js',
+  './downtime/WorldDowntimeExtensionHost.svelte',
+  './downtime/routeChromeChannel.js',
+  './downtime/worldDowntimePreviewProvider.js',
+  './environment/CharacterModifierBoundsRow.svelte',
+  './environment/GatheringRuleLimitStepper.svelte',
+  './essences/EssenceBehaviorPreview.svelte',
+  './essences/EssenceBrowserInspector.svelte',
+  './essences/EssenceBulkEditPanel.svelte',
+  './recipes/RecipeBrowserInspector.svelte',
+  './recipes/RecipeBulkEditPanel.svelte',
+  // ADDED BY ISSUE 1371's D6 HEADER SUBTITLE. The system Component rules header states the
+  // system's salvage resolution mode, and `.manager-header` is a sibling of `.manager-main`, so
+  // only the shell can render that band. The module is a frozen option list — a data leaf with no
+  // component and no store — and importing it beat restating the same labels a second time here.
+  './resolutionModeOptions.js',
+  // ADDED BY ISSUE 1372's HEADER-SAVE SEAM (maintainer parity round 4); sorted here rather than
+  // beside its sibling below because this list is asserted SORTED. See the note on
+  // `scopedEntryDraft.js` for what the seam is and why both halves are only renderable here.
+  // ADDED BY ISSUE 1371's M9 RULING. The system Component Rules list's `Add from catalogue` is
+  // the reference's in-place PICKER, not a route change, and `ManagerModal` portals its panel to
+  // the application root — so, like the folder-mapping and import-report dialogs already pinned
+  // above, it has to be mounted from the shell or it dies with the view that opened it. It mints
+  // no route and renders no `data-scoped-page`; see `component-world-scope-screens.test.js` for
+  // the requirement-7 evidence.
+  './scoped/ComponentAddFromCatalogueDialog.svelte',
+  './scoped/ScopedEntryHeaderActions.svelte',
+  './scoped/WorldComponentCataloguePage.svelte',
+  './scoped/WorldComponentEntryPage.svelte',
+  './scoped/WorldEssenceCataloguePage.svelte',
+  './scoped/WorldEssenceEntryPage.svelte',
+  './scoped/WorldToolCataloguePage.svelte',
+  './scoped/WorldToolEntryPage.svelte',
+  './scoped/WorldVocabularyPage.svelte',
+  // ADDED BY ISSUE 1371's C1/D1 HEADER SUBTITLES. `componentListSubtitle` and
+  // `componentRulesSubtitle` are the same kind of import-free presentation leaf as
+  // `essenceScoped.js` below, and for the same reason: the subtitle belongs to the header band,
+  // which only this file renders, so the page it describes cannot compose its own copy.
+  './scoped/componentScoped.js',
+  // ADDED BY ISSUE 1372's HEADER-CREATE SEAM. The prototype puts `+ New essence` in the page
+  // header band, which only this file renders; `mintEssenceId` is the epic's own import-free
+  // presentation leaf and slugs the new record's id with suffix collision resolution, so the
+  // alternative to importing it was a second copy of that logic in the gateway.
+  './scoped/essenceScoped.js',
+  // ADDED BY ISSUE 1372's HEADER-SAVE SEAM (maintainer parity round 4). The world entry editors
+  // buffer their edits and are saved explicitly, and BOTH things that act on a buffered edit are
+  // renderable only here: the header action pair, because `.manager-header` is a sibling of
+  // `.manager-main`, and the route-exit prompt, because leaving via the rail or the breadcrumb
+  // never reaches the page. `scopedEntryDraft.js` is the epic's own import-free draft leaf and
+  // `confirmScopedEntryExit` is the guard shape both entry editors take, so the alternative to
+  // importing it was a second copy of that shape in the gateway.
+  './scoped/scopedEntryDraft.js',
+  './scoped/scopedEntryRoutes.js',
+  './tools/ToolBrowserInspector.svelte',
+  './world/WorldCurrencyTab.svelte',
+  './world/WorldModifiersTab.svelte',
+  './world/WorldPrerequisitesTab.svelte',
+  'svelte',
+]);
+
+/**
+ * The lines of one element's attribute block, from its opening tag to its closing `/>`.
+ *
+ * Terminated on a line that is EXACTLY the opening tag's indentation plus `/>`, never on the
+ * first `>` character: several of these call sites carry inline arrow functions whose `=>`
+ * would end the scan a dozen attributes early.
+ *
+ * @param {string} componentName
+ * @returns {string[]}
+ */
+function attributeLines(componentName) {
+  const openTag = `<${componentName}`;
+  const openings = rootLines
+    .map((line, index) => ({ line, index }))
+    .filter((entry) => entry.line.trim() === openTag);
+  assert.equal(
+    openings.length,
+    1,
+    `${componentName} opens at ${openings.length} sites; this parser resolves exactly one`
+  );
+  const { line, index } = openings[0];
+  const indent = line.slice(0, line.length - line.trimStart().length);
+  const end = rootLines.findIndex((candidate, at) => at > index && candidate === `${indent}/>`);
+  assert.ok(end > index, `${componentName} never closes on its own indentation`);
+  return rootLines.slice(index + 1, end);
+}
+
+/**
+ * The prop names one call site declares: every `name={...}`, every `{name}` shorthand, every
+ * `bind:name={...}` and every `{...bundle}` spread, the last under the bundle's identifier.
+ *
+ * @param {string} componentName
+ * @returns {{names: string[], spreads: string[]}}
+ */
+function siteProps(componentName) {
+  const names = [];
+  const spreads = [];
+  for (const line of attributeLines(componentName)) {
+    const trimmed = line.trim();
+    const spread = /^\{\.\.\.([A-Za-z0-9_$]+)\}$/.exec(trimmed);
+    if (spread) {
+      spreads.push(spread[1]);
+      continue;
+    }
+    const bound = /^bind:([A-Za-z][A-Za-z0-9_$]*)=/.exec(trimmed);
+    if (bound) {
+      names.push(`bind:${bound[1]}`);
+      continue;
+    }
+    const named = /^([A-Za-z][A-Za-z0-9_:-]*)=/.exec(trimmed);
+    if (named) {
+      names.push(named[1]);
+      continue;
+    }
+    const shorthand = /^\{([A-Za-z][A-Za-z0-9_$]*)\}$/.exec(trimmed);
+    if (shorthand) names.push(shorthand[1]);
+  }
+  return { names, spreads };
+}
+
+/**
+ * The TOP-LEVEL keys of one `const <name> = $derived({ ... });` declaration.
+ *
+ * Depth-tracked rather than line-matched, so a nested object or a fallback literal inside a
+ * value cannot contribute a key.
+ *
+ * @param {string} declarationName
+ * @returns {string[]}
+ */
+function derivedObjectKeys(declarationName) {
+  const start = rootLines.findIndex(
+    (line) => line.trim() === `const ${declarationName} = $derived({`
+  );
+  assert.ok(start >= 0, `${declarationName} is not declared as a $derived object literal`);
+  const keys = [];
+  let depth = 1;
+  for (let index = start + 1; index < rootLines.length; index += 1) {
+    const trimmed = rootLines[index].trim();
+    if (trimmed === '});') break;
+    if (depth === 1) {
+      const key = /^([A-Za-z][A-Za-z0-9_$]*):/.exec(trimmed);
+      if (key) keys.push(key[1]);
+    }
+    depth += (trimmed.match(/[{[(]/g) || []).length - (trimmed.match(/[}\])]/g) || []).length;
+  }
+  return keys;
+}
+
+const bundleNames = () => Object.values(BUNDLES);
+
+test('NON-VACUITY: thirteen call sites, twelve bundle spreads, three bundles of four keys', () => {
+  // Asserted before every equality below, because the cheapest green available to a broken
+  // parser is an empty set comparing equal to an empty set.
+  assert.equal(CALL_SITES.length, 13, 'the seam reaches thirteen call sites');
+  assert.equal(
+    CALL_SITES.filter((site) => site.bundle !== null).length,
+    12,
+    'twelve of them take a bundle'
+  );
+  let foundSpreads = 0;
+  for (const site of CALL_SITES) {
+    const { names, spreads } = siteProps(site.component);
+    assert.ok(
+      names.length > 0 || spreads.length > 0,
+      `${site.component} parsed an empty attribute block, which no call site here has`
+    );
+    foundSpreads += spreads.filter((name) => bundleNames().includes(name)).length;
+  }
+  assert.equal(foundSpreads, 12, 'exactly twelve bundle spreads are rendered in the shell');
+  for (const declaration of bundleNames()) {
+    assert.equal(derivedObjectKeys(declaration).length, 4, `${declaration} declares four keys`);
+  }
+});
+
+test('(a) each bundle declares exactly scope, actions, systems and systemId', () => {
+  // The key set IS the contract. A screen reads `scope` for the published corpus, `actions`
+  // for its own entity type's write path, `systems` for the copy-from and add-to-system
+  // pickers, and `systemId` for the system a membership row is authored against.
+  for (const declaration of bundleNames()) {
+    assert.deepEqual(
+      derivedObjectKeys(declaration).slice().sort(),
+      BUNDLE_KEYS.slice(),
+      `${declaration} carries exactly the four bundle keys`
+    );
+  }
+});
+
+test('(b) each site spreads its own bundle AND NEITHER of the other two', () => {
+  // The absence half is what a presence-only check cannot see: an ADDITIVE wrong-bundle
+  // mutation leaves the right one in place and hands the screen a second entity type's action
+  // family, whose key set is the thing the per-type split protects.
+  for (const site of CALL_SITES.filter((candidate) => candidate.bundle !== null)) {
+    const expected = BUNDLES[site.bundle];
+    const { spreads } = siteProps(site.component);
+    assert.deepEqual(
+      spreads.filter((name) => bundleNames().includes(name)),
+      [expected],
+      `${site.component} takes ${expected} and no other bundle`
+    );
+    for (const other of bundleNames().filter((name) => name !== expected)) {
+      assert.ok(
+        !spreads.includes(other),
+        `${site.component} must not be handed ${other}: a screen addresses only the entity type it edits`
+      );
+    }
+  }
+});
+
+test('(c) WorldVocabularyPage takes vocabulary, actions and systems, and no bundle', () => {
+  // The World Vocabulary is NOT a scoped entity, so it takes its published state under its own
+  // name rather than as a `scope`. Its `actions` leg is wired ahead of the family that fills
+  // it, for the same one-way-door reason the read leg was: the shell is closed to the lane
+  // that draws this screen.
+  const { names, spreads } = siteProps('WorldVocabularyPage');
+  assert.deepEqual(
+    names.slice().sort(),
+    VOCABULARY_PROPS.slice(),
+    'the vocabulary page receives exactly its three props'
+  );
+  assert.deepEqual(spreads, [], 'and no bundle spread at all');
+});
+
+test('(d) the root gains no import: its script specifier set is unchanged', () => {
+  const open = rootLines.findIndex((line) => line.trim() === '<script>');
+  const close = rootLines.findIndex((line) => line.trim() === '</script>');
+  assert.ok(open >= 0 && close > open, 'the root has a parseable script block');
+  const script = rootLines.slice(open + 1, close).join('\n');
+  const specifiers = [
+    ...new Set([...script.matchAll(/\bfrom\s+'([^']+)'/g)].map((match) => match[1])),
+  ];
+  assert.ok(specifiers.length > 50, `only ${specifiers.length} specifiers parsed; the scan broke`);
+  assert.deepEqual(
+    specifiers.sort(),
+    ROOT_IMPORT_SPECIFIERS.slice(),
+    'this is a wiring change: the shell reads state it already holds and imports nothing new. ' +
+      'If YOUR change legitimately adds one, this pin is not a verdict on it — add the ' +
+      'specifier to ROOT_IMPORT_SPECIFIERS above and say so in your commit'
+  );
+});
+
+test('every case whose PAGE renders the shared placeholder body also claims it, and only those', () => {
+  // Criterion 4, as a biconditional over what the PAGE SOURCE actually renders.
+  //
+  // NEITHER VIEW-LAB COVERAGE TEST CAN SEE THIS. `ScopedPlaceholderPage` is inside the lab
+  // closure through seven routes and is claimed by SOME case whatever happens, so a claim on a
+  // route whose body a later lane has replaced goes stale in SILENCE — and then publishes that
+  // route's real screen as evidence of a placeholder-body change. That is the failure this
+  // assertion exists for, and it is why it needs a home at all.
+  //
+  // AND WHY IT IS NOT "the claim lives on the longest-lived route". Nominating one case only
+  // holds if the four lanes land in a predicted order, and nothing enforces one: PR 7 can ship
+  // before 6c. Requiring the claim to track RENDERING removes the ordering assumption — a lane
+  // that replaces a body deletes that route's claim in the same change, and this reds if it
+  // forgets, in either direction.
+  //
+  // ── AND WHY "RENDERS" IS READ OFF THE PAGE AND NOT OFF `expectSelector` ────────────────
+  //
+  // The first version of this asked whether a case's `expectSelector` names `data-scoped-page`.
+  // That is the predicate "is a world scoped route", which is not the same question and never
+  // becomes it: `ScopedPlaceholderPage` documents that hook as "what a later lane replaces
+  // rather than RENAMES", and `### GM World Scoped Entity Routes` requirement 3 obliges every
+  // one of these routes to carry it. So the proxy stays true forever while its subject goes
+  // away — and the inversion is total. A lane that replaced a body and correctly deleted the
+  // stale claim would have been RED, told to put the claim back; a lane that left the stale
+  // claim would have been GREEN. Worse than no guard, because it instructs four later lanes to
+  // restore exactly the state this exists to prevent.
+  //
+  // Reading the page source has none of that: a body that no longer calls the shared component
+  // no longer imports it, and the question is answered by the thing it is about.
+  const PLACEHOLDER = 'src/ui/svelte/apps/manager/scoped/ScopedPlaceholderPage.svelte';
+  const SCOPED_DIR = 'src/ui/svelte/apps/manager/scoped';
+
+  // Route token → the page that owns it. Both spellings are accepted deliberately: a page that
+  // delegates its body declares `pageId="<token>"` on the shared component, and a page with its
+  // own body carries `data-scoped-page="<token>"` on its own `<main>`. The map therefore keeps
+  // resolving across exactly the transition this guard has to survive.
+  const pageByRoute = new Map();
+  for (const file of readdirSync(resolve(repoRoot, SCOPED_DIR)).filter((n) => n.endsWith('.svelte'))) {
+    const source = readFileSync(resolve(repoRoot, SCOPED_DIR, file), 'utf8');
+    for (const [, token] of source.matchAll(/(?:pageId|data-scoped-page)="([a-z][a-z-]*)"/g)) {
+      assert.ok(!pageByRoute.has(token), `route ${token} is owned by two pages; the map is ambiguous`);
+      // `delegates` is derived from the SHAPE of the page — a page that hands its body to the
+      // shared component passes `pageId="<token>"` to it — and never from the component's NAME.
+      // The pairing below is what that buys.
+      pageByRoute.set(token, { file, source, delegates: /pageId="/.test(source) });
+    }
+  }
+  assert.equal(pageByRoute.size, 7, 'the seven world scoped routes each resolve to exactly one page');
+
+  // ── THE IMPORT LITERAL IS PINNED TO THE SHAPE, SO A RENAME CANNOT SILENCE THIS ─────────
+  //
+  // Two hand-maintained spellings of one component name drive the biconditional below: the
+  // `PLACEHOLDER` path and the `import ScopedPlaceholderPage` probe. They encode the SAME name,
+  // so an ordinary complete rename — component, its importers, and the capture claims, all
+  // updated correctly — goes stale in BOTH at once, and the biconditional collapses to
+  // `[] === []` and passes. Measured: seven routes still delegating, `rendering` empty,
+  // `claiming` empty, green. The three view-lab suites are green on that tree too, so nothing
+  // else catches it either.
+  //
+  // Pairing "delegates its body" against "imports the shared one" removes the coupling,
+  // because only ONE side of it carries the name. It degrades correctly rather than needing
+  // maintenance: as each lane replaces a body both sets lose that route together, and when the
+  // epic finishes both are empty because nothing delegates any more.
+  assert.deepEqual(
+    [...pageByRoute.entries()].filter(([, page]) => page.delegates).map(([token]) => token).sort(),
+    [...pageByRoute.entries()]
+      .filter(([, page]) => /import ScopedPlaceholderPage/.test(page.source))
+      .map(([token]) => token)
+      .sort(),
+    'a page delegates its body if and only if it imports the shared one. If these disagree the ' +
+      'import literal above has gone stale — most likely the component was renamed — and the ' +
+      'biconditional below is comparing an empty set to an empty set'
+  );
+
+  const routeOf = (viewCase) => /data-scoped-page="([a-z][a-z-]*)"/.exec(viewCase.expectSelector || '')?.[1];
+  const rendersPlaceholder = (viewCase) => {
+    const route = routeOf(viewCase);
+    if (!route) return false;
+    const page = pageByRoute.get(route);
+    assert.ok(page, `case ${viewCase.id} asserts route ${route}, which no page under ${SCOPED_DIR} owns`);
+    return /import ScopedPlaceholderPage/.test(page.source);
+  };
+  const claimsPlaceholder = (viewCase) =>
+    (viewCase.sourceMatches || []).some((pattern) => pattern.test(PLACEHOLDER));
+
+  const rendering = VIEW_LAB_CASES.filter(rendersPlaceholder).map((entry) => entry.id);
+  const claiming = VIEW_LAB_CASES.filter(claimsPlaceholder).map((entry) => entry.id);
+
+  // NON-VACUITY IS ASSERTED ON THE SCAN, NOT ON THE ANSWER. A floor on how many cases still
+  // RENDER the shared body would be a floor that legitimately falls as the four screen lanes
+  // land — and it would red on a lane that did everything right, which is the same shape of
+  // inversion this test was just fixed for. What must not silently become empty is the input:
+  // the seven-route map above, and the set of cases that resolve one.
+  const scopedCases = VIEW_LAB_CASES.filter((entry) => routeOf(entry));
+  assert.ok(
+    scopedCases.length >= 4,
+    `only ${scopedCases.length} cases assert a world scoped route; the scan is broken`
+  );
+  assert.deepEqual(
+    claiming.slice().sort(),
+    rendering.slice().sort(),
+    'the set of cases claiming the shared placeholder body is exactly the set whose PAGE still ' +
+      'imports it. A body replaced without dropping its claim publishes that route\u2019s real ' +
+      'screen as evidence of a placeholder change; a claim dropped while the body still ' +
+      'delegates leaves the component unclaimed by that route'
+  );
+});
+
+test('the world-scope write path is supplied FOUR store legs', () => {
+  // Criterion 5's source half. The vocabulary leg mints no family today — `WRITE_DESCRIPTORS`
+  // declares no `vocabulary` — so it has no behavioural mutation until the vocabulary lane
+  // declares one. Its falsifiability is here: delete the leg and this reds, and the lane that
+  // needs it would otherwise have to reopen a file requirement 7 closes to it.
+  const adminStore = readFileSync(resolve(repoRoot, ADMIN_STORE_PATH), 'utf8');
+  //
+  // THE BINDING IS `worldScopeFamilies`, NOT `worldScope` (issue 1372, maintainer parity round 8).
+  // The store now COMPOSES the generic families into its published `worldScope`, overriding
+  // exactly one verb: the essence family's `addToSystem`, whose second half — the in-system
+  // `essenceDefinitions` row — lives in a store `worldScopeActions.js` cannot reach. So the
+  // factory call is read by the name it is assigned to, and the composition is asserted below it.
+  const call =
+    /const worldScopeFamilies = createWorldScopeActions\(\{\s*getStores: \{([\s\S]*?)\},\s*\}\);/.exec(
+      adminStore
+    );
+  assert.ok(call, 'createWorldScopeActions is called with an inline getStores map');
+  const legs = [...call[1].matchAll(/^\s*([A-Za-z][A-Za-z0-9_$]*):/gm)].map((match) => match[1]);
+  assert.deepEqual(
+    legs.slice().sort(),
+    ['component', 'essence', 'tool', 'vocabulary'],
+    'the write path reads the same four store legs the read path does'
+  );
+  // TWO verbs are overridden PER COMPOSED FAMILY: a spread of the generic families with an
+  // override on each. A composition that replaced a whole family would be a second write path
+  // rather than two seams on two verbs.
+  //
+  // The pair is `addToSystem` and `removeFromSystem` (issue 1372), because BOTH have a second
+  // half in a store `worldScopeActions.js` cannot reach: joining writes the in-system
+  // `essenceDefinitions` row and removing deletes it, and a membership-only verb on either side
+  // leaves the screen and the runtime disagreeing about whether the system has the essence.
+  assert.match(
+    adminStore,
+    /essence: \{\s*\.\.\.worldScopeFamilies\.essence,\s*addToSystem: joinEssenceToSystem,\s*removeFromSystem: partEssenceFromSystem,\s*\},/,
+    'the published write path composes the two essence verbs that have an in-system half'
+  );
+  // THE ESSENCE FAMILY IS NO LONGER THE ONLY COMPOSED ONE (issue 1371). The prose above said it
+  // was, and that sentence was the thing this assertion's twin had to be added beside rather
+  // than under: a component ADOPTION is the same two writes for the same reason, and the read
+  // union's row set is the in-system array's, so a membership record written alone names a
+  // component no reader can see.
+  //
+  // IT IS PINNED HERE BECAUSE NOTHING ELSE CAN SEE IT. The composed verb keeps the GENERIC KEY,
+  // so no call site and no mounted test can distinguish it from the verb it replaces - a mounted
+  // test supplies the `actions` bag itself. Delete the `component:` entry and every button in the
+  // product reaches the membership-only verb; this assertion is the only thing that reds.
+  assert.match(
+    adminStore,
+    // `bulkEditRules` joined the two membership verbs in issue 1371 r16-cat (maintainer ruling M25):
+    // the world bulk panel's essence axis writes per-system RULES — the same kind of verb, whose
+    // second half lives in `CraftingSystemManager`.
+    /component: \{\s*\.\.\.worldScopeFamilies\.component,\s*addToSystem: joinComponentToSystem,\s*removeFromSystem: partComponentFromSystem,\s*(?:\/\/[^\n]*\n\s*)*bulkEditRules: bulkEditComponentRules,\s*\},/,
+    'the published write path composes the two component verbs that have an in-system half, plus the rules write'
+  );
+  // AND EVERY FAMILY IS WRAPPED so a write that lands re-publishes (issue 1372).
+  // `buildWorldScopeState()` is read once per publish, so before the wrapper a generic verb
+  // persisted through its own store and left the screen rendering the state before the click.
+  // Pinned as SOURCE TEXT beside the legs because the failure is a silent no-op on a verb that
+  // does not exist yet: a family minted later in `worldScopeActions.js` inherits the wrapper only
+  // if the composition keeps mapping over ALL of them.
+  assert.match(
+    adminStore,
+    /const worldScope = Object\.fromEntries\(\s*Object\.entries\(\{[\s\S]*?\}\)\.map\(\(\[entityType, family\]\) => \[entityType, _republishingFamily\(family\)\]\)\s*\);/,
+    'every world-scope family is published through the republishing wrapper'
+  );
+});

@@ -20,7 +20,9 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import { resolveDropUuid } from '../../../util/dropUtils.js';
-  import ItemDropZone from '../ItemDropZone.svelte';
+  import ItemDropZone from '../../../components/ItemDropZone.svelte';
+  import StatusToggle from '../../../components/StatusToggle.svelte';
+  import Kicker from '../../../components/Kicker.svelte';
 
   let {
     recipeItem = null,
@@ -37,6 +39,31 @@
   }
 
   const hasLink = $derived(Boolean(linkedItem?.uuid));
+  /**
+   * This site's drop-zone hooks, and the ONE bag in the repository that is not caller-constant.
+   *
+   * `data-recipe-item-link` and `data-recipe-item-dropzone` are two faces of ONE state — the
+   * filled chip and the empty prompt — and were conditioned on the zone's `item` rather than on
+   * its `kind` while they lived inside the primitive. A STATIC object here would render both or
+   * neither, which is exactly the state `recipe-item-overview-tab-mounted.test.js` asserts
+   * against in both directions.
+   */
+  const linkHooks = $derived({
+    root: {
+      ...(hasLink ? { 'data-recipe-item-link': true } : { 'data-recipe-item-dropzone': true }),
+      // THE CONTROL HALF of the validation row action (issue 1517). The `itemLinked` blocker is
+      // about THIS zone — the drop target and its unlink action are both inside it, and the zone
+      // itself is what a GM drops onto — so `RecipeItemValidationTab` addresses it as
+      // `recipe-item-source`. The zone's root is a `<div>`, so it declares BOTH the tabindex
+      // that makes the focus real and the attribute that tells Foundry the window is focused;
+      // without the second, Space pauses the game and the arrows pan the canvas.
+      'data-validation-target': 'recipe-item-source',
+      tabindex: '-1',
+      'data-keyboard-focus': 'true',
+    },
+    copy: { 'data-recipe-item-copy-uuid': true },
+    unlink: { 'data-recipe-item-unlink': true },
+  });
   const uuid = $derived(String(linkedItem?.uuid || recipeItem?.originItemUuid || ''));
   const itemName = $derived(String(linkedItem?.name || ''));
   const itemImg = $derived(String(linkedItem?.img || recipeItem?.img || ''));
@@ -60,8 +87,8 @@
   aria-label={text('FABRICATE.Admin.Manager.RecipeItem.Overview.Title', 'Overview')}
 >
   <div class="manager-recipe-item-field">
-    <span class="manager-recipe-item-label"
-      >{text('FABRICATE.Admin.Manager.RecipeItem.Overview.LinkLabel', 'Recipe item')}</span
+    <Kicker as="span"
+      >{text('FABRICATE.Admin.Manager.RecipeItem.Overview.LinkLabel', 'Recipe item')}</Kicker
     >
     <ItemDropZone
       item={hasLink ? { name: itemName || uuid, img: itemImg } : null}
@@ -79,6 +106,7 @@
             'The Item sets this recipe item’s name and description.'
           )}
       kind="recipe-item"
+      hookAttrs={linkHooks}
       copyLabel={text('FABRICATE.Admin.Manager.RecipeItem.Overview.CopyUuid', 'Copy UUID')}
       unlinkLabel={text('FABRICATE.Admin.Manager.RecipeItem.Overview.Unlink', 'Unlink item')}
       onDrop={handleItemDrop}
@@ -88,7 +116,7 @@
   </div>
 
   <div class="manager-recipe-item-field">
-    <span class="manager-recipe-item-label">
+    <Kicker as="span">
       {text('FABRICATE.Admin.Manager.RecipeItem.Overview.Name', 'Name')}
       <span class="manager-recipe-item-label-note"
         >{text(
@@ -96,7 +124,7 @@
           '· from linked item'
         )}</span
       >
-    </span>
+    </Kicker>
     <div
       class={`manager-recipe-item-readonly is-name ${itemName ? '' : 'is-placeholder'}`}
       data-recipe-item-name
@@ -107,7 +135,7 @@
   </div>
 
   <div class="manager-recipe-item-field">
-    <span class="manager-recipe-item-label">
+    <Kicker as="span">
       {text('FABRICATE.Admin.Manager.RecipeItem.Overview.Description', 'Description')}
       <span class="manager-recipe-item-label-note"
         >{text(
@@ -115,7 +143,7 @@
           '· from linked item'
         )}</span
       >
-    </span>
+    </Kicker>
     <div class="manager-recipe-item-readonly is-description" data-recipe-item-description>
       {description ||
         text(
@@ -142,26 +170,18 @@
             )}</span
       >
     </div>
-    <button
-      type="button"
-      class={`manager-status-toggle ${enabled ? 'is-on' : 'is-off'}`}
-      data-recipe-item-enabled
-      aria-pressed={enabled}
-      aria-label={text(
+    <StatusToggle
+      on={enabled}
+      label={enabled
+        ? text('FABRICATE.Admin.Manager.StatusOn', 'On')
+        : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}
+      ariaLabel={text(
         'FABRICATE.Admin.Manager.RecipeItem.Overview.ToggleEnabled',
         'Toggle enabled'
       )}
+      data-recipe-item-enabled=""
       onclick={toggleEnabled}
-    >
-      <span class="manager-status-toggle-track" aria-hidden="true"
-        ><span class="manager-status-toggle-knob"></span></span
-      >
-      <span class="manager-status-toggle-label"
-        >{enabled
-          ? text('FABRICATE.Admin.Manager.StatusOn', 'On')
-          : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}</span
-      >
-    </button>
+    />
   </div>
 </section>
 
@@ -178,19 +198,22 @@
     gap: var(--fab-space-2);
   }
 
-  .manager-recipe-item-label {
-    font-size: 0.66rem;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--fab-text-subtle);
-  }
+  /* The tail nested INSIDE two of this tab's three kickers, which is why it overrides three of
+     the four things the mark declares and must not override the fourth. Weight, tracking and
+     case are deliberately released so "· from linked item" reads as an aside rather than as a
+     second label.
 
+     THE INK IS INHERITED, NOT RESTATED (issue 1514). This rule used to paint the subtle tone,
+     which was the same ink the kicker around it painted, so label and tail were one colour at
+     two weights. When the mark took the contrast correction to the muted tone, that stopped
+     being true and this declaration became the half left behind — a visible two-tone split
+     inside a single 8.5px line, with the FAILING half the one still showing. Deleting the
+     declaration is the fix rather than narrowing the primitive: the correction is right for all
+     37 of its render sites, and re-breaking them to spare these two would invert the trade. */
   .manager-recipe-item-label-note {
     font-weight: 500;
     letter-spacing: 0;
     text-transform: none;
-    color: var(--fab-text-subtle);
   }
 
   .manager-recipe-item-readonly {

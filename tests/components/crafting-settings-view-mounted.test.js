@@ -11,11 +11,12 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-crafting-settings-',
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/apps/manager/resolutionModeOptions.js'
   ],
   compiledModules: [
-    'src/ui/svelte/apps/manager/RadioCardGroup.svelte',
-    'src/ui/svelte/apps/manager/ResolutionModeCard.svelte',
+    'src/ui/svelte/components/Field.svelte',
+    'src/ui/svelte/components/RadioCardGroup.svelte',
     'src/ui/svelte/apps/manager/CraftingEffectPanel.svelte',
     'src/ui/svelte/apps/manager/CraftingSettingsView.svelte'
   ],

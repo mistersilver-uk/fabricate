@@ -8,6 +8,7 @@
   The parent gates this on the row being expanded.
 -->
 <script>
+  import Kicker from '../../components/Kicker.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import { toPercent as pct } from '../../util/gatheringFormat.js';
 
@@ -72,9 +73,7 @@
 </script>
 
 <div class="gathering-task-drop-modifiers" data-gathering-drop-modifiers>
-  <p class="gathering-task-drop-modifiers-heading">
-    {localize('FABRICATE.App.Gathering.Detail.Modifiers')}
-  </p>
+  <Kicker as="p">{localize('FABRICATE.App.Gathering.Detail.Modifiers')}</Kicker>
   <ul class="gathering-task-drop-modifier-list">
     <li class="gathering-task-drop-modifier is-base">
       <span class="gathering-task-drop-modifier-label"
@@ -108,14 +107,6 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
-  }
-
-  .gathering-task-drop-modifiers-heading {
-    margin: 0;
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--fab-text-muted);
   }
 
   .gathering-task-drop-modifier-list {

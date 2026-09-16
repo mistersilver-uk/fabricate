@@ -79,8 +79,37 @@ jobs:
           echo "::error::playwright install failed twice; see issue 1264"
           exit 1
 
+      # TEE'd to RUNNER_TEMP rather than the workspace: several suites scan the repository tree, and
+      # a stray file appearing there mid-run is a test input. `pipefail` keeps the step's status the
+      # runner's rather than `tee`'s, which always succeeds.
       - name: Run unit tests
-        run: npm test
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee "$RUNNER_TEMP/unit-tests.tap"
+
+      # THE FAILING TEST NAMES, RE-PRINTED LAST. The TAP reporter writes each failure where it
+      # happens and emits ~119,000 lines in total, so on a red run every `not ok` line sits in the
+      # first ~96% of the log — past the reach of the log APIs, which serve a bounded tail. At issue
+      # 1654 that made a one-test failure cost two CI cycles to place. Re-printing the failures at
+      # the END of the job is what makes a red run readable without downloading the artifact.
+      - name: Report failing tests
+        if: failure()
+        run: |
+          echo "::group::Failing tests"
+          grep -E '^[[:space:]]*not ok ' "$RUNNER_TEMP/unit-tests.tap" || echo 'no "not ok" line: the suite failed before reporting, or died outside a test'
+          echo "::endgroup::"
+          echo "::group::Failure detail"
+          grep -E -A 25 '^[[:space:]]*not ok ' "$RUNNER_TEMP/unit-tests.tap" | head -500 || true
+          echo "::endgroup::"
+
+      # The full TAP, for a failure the re-print above truncates.
+      - name: Upload unit test output
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: unit-tests-tap
+          path: ${{ runner.temp }}/unit-tests.tap
+          retention-days: 7
 
       - name: Build module
         run: npm run build
@@ -90,7 +119,21 @@ jobs:
     # title/body doesn't change the head commit, so the existing result stands.
     if: github.event_name != 'pull_request' || github.event.action != 'edited'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    # 15, not 10, and not 5. `npm ci` on a slow hosted runner can outlast a 5-minute ceiling on
+    # its own: on 2026-09-04 this job hit that repeatedly — run 33865876591 (PR 1537) ran
+    # 11:00:22Z to 11:05:37Z and was annotated "The job has exceeded the maximum execution time
+    # of 5m0s", which reports as `cancelled` without being a concurrency cancel (run 33869986088
+    # on main did the same). 10 was then sized against a 1m43s healthy run.
+    #
+    # Issue #1660 made `npm run lint` a glob over the whole repository: 360 files became 1,892,
+    # and the step went from 32s to 168s locally. A healthy run is nearer 4 minutes now, and a
+    # hosted runner is commonly 1.5-2x slower than a dev machine on CPU-bound Node work, so 10
+    # no longer leaves room for a slow install on top. 15 does, and still bounds a genuine hang.
+    #
+    # `npm run lint:debt` is deliberately NOT a step here — it lints the repository a second
+    # time with the debt baseline lifted, which would serialise two full ESLint passes into one
+    # job's budget. It has its own job below so the two run in parallel.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
 
@@ -125,6 +168,36 @@ jobs:
       - name: Lint markdown (markdownlint)
         run: npm run lint:md
 
+  lint-debt:
+    # The ratchet half of the glob gate (issue #1660). `npm run lint` passes on the baselined
+    # files by construction — their failing rules are switched off per file in `eslint-debt.txt` —
+    # so this runs the same config with the baseline LIFTED and fails on an entry that reports
+    # nothing any more. Without it the baseline never shrinks, and "only shrinks" is a property
+    # nothing enforces. It is not hypothetical: the `tests/**` list shipped its first stale entry
+    # within an hour of being generated.
+    #
+    # Its own job rather than a step of `lint`, because it is a second full ESLint pass (~272s
+    # locally) and running the two in sequence would put both inside one budget. Not a unit test
+    # either: `npm test` shares its runner with browser-backed suites that starve beside a
+    # CPU-bound job. The cheap half of the ratchet is `tests/lint-coverage.test.js`.
+    if: github.event_name != 'pull_request' || github.event.action != 'edited'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Check the lint debt baseline is not stale
+        run: npm run lint:debt
+
   validate-bindings:
     # Pure-Node consistency check for the agent role bindings (skills <-> Codex
     # <-> Claude <-> AGENTS.md table). No install needed — the script has no deps.
@@ -145,7 +218,10 @@ jobs:
   lint-commits:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    # Same 10, same cause: in run 33865872604 (PR 1536) this job ran 11:00:19Z to 11:05:36Z and
+    # died on the 5-minute ceiling, though the whole job takes ~41s when healthy. Even the
+    # lightest install-bearing job is install-bound, so this bound is a hang guard, not a budget.
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
         with:
@@ -185,13 +261,15 @@ jobs:
   check-screenshots:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    # 75, raised from 5 (issue 1133). This job now AWAITS the `capture` job in
-    # `pr-screenshots.yml` for the same head SHA before deciding, and that job's own ceiling is 40
-    # minutes. The script's `maxWaitMs` (65 minutes) fires first by construction — the bounds
-    # inequality in `tests/ci-workflow-semantics.test.js` pins that ordering against this number —
-    # so a wait that runs long reports `capture-did-not-conclude` with a diagnosis rather than
-    # being killed here with none.
-    timeout-minutes: 75
+    # 110, raised from 75 (issue 1594; 75 was itself raised from 5 under issue 1133). This job
+    # AWAITS the `capture` job in `pr-screenshots.yml` for the same head SHA before deciding, and
+    # that job's own ceiling is 75 minutes. The script's `maxWaitMs` (100 minutes) fires first by
+    # construction — the bounds inequality in `tests/ci-workflow-semantics.test.js` pins that
+    # ordering against this number — so a wait that runs long reports `capture-did-not-conclude`
+    # with a diagnosis rather than being killed here with none. Every one of those numbers moves
+    # WITH the producer's ceiling: raising that alone would leave this gate abandoning a capture
+    # that was still rendering, which is the same uncoded red under a different name.
+    timeout-minutes: 110
     # Declared at JOB level as well as workflow level (SonarCloud S8264). Job-level permissions
     # REPLACE the workflow-level block rather than merging with it, so all three are restated;
     # `actions: read` is the new one, needed to list the producer's workflow runs.
@@ -292,4 +370,4 @@ jobs:
             --await-capture \
             --capture-eligible "$CAPTURE_ELIGIBLE" \
             --capture-workflow pr-screenshots.yml \
-            --capture-timeout-minutes 40
+            --capture-timeout-minutes 75

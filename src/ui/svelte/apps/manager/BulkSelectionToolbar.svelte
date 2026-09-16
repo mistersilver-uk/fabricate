@@ -6,11 +6,13 @@
 
   It lives under `apps/manager/` — beside `Chip`, `Callout` and `SegmentedControl` — and
   NOT under `apps/manager/components/`, which holds the area-agnostic leaves. That is
-  deliberate and load-bearing: this component's root class is `manager-*`, both of its
-  consumers are manager views, and staying inside `apps/manager/` keeps `--fab-mv2-*`
-  (declared on `.fabricate-manager`) in scope, so the extraction needed no token swap. A
-  `components/` leaf can be rendered outside `.fabricate-manager`, where those properties
-  are undefined and the colours silently fall back to inheritance.
+  deliberate and load-bearing, but NOT for the reason first recorded here. "Staying inside
+  `apps/manager/` keeps `--fab-manager-*` in scope" has LAPSED: a scoped `<style>` may not
+  reach an area-scoped property from ANY directory, because a component is placed in a
+  directory and not in a DOM subtree (design-system spec, *The token namespace is one
+  generation and names its purpose*). What survives is what the placement really decides:
+  this component's root class is `manager-*`, both of its consumers are manager views, and
+  `components/` is the area-agnostic leaf set, which this is not.
 
   Its root JOINS the host browser's own filter-row class so it inherits that toolbar's row
   metrics (flex, wrap, gap, full width) rather than declaring a bespoke bar; `is-selection`
@@ -30,6 +32,38 @@
   the rendered set, collapsing a category makes it appear even on a single-page library —
   where the prototype would not show it. That is correct; a collapsed group's rows are
   exactly the rows the page control cannot reach.
+
+  ── `selectAllScope`: ONE ACTION OVER THE SHOWN ROWS (issue 1371, gap-list row 37) ─────────
+
+  The world Component catalogue's band draws NEITHER of those two controls. `proto:592-596`
+  is a count, a standing sentence, one clickable `Select all {n} shown`, and Clear — no
+  master box anywhere, and the one action selects the rows on screen (`proto:5235`:
+  `rows.forEach(c => s2[c.id] = 1)`).
+
+  So this is ONE prop and not two, because the reference is one ruling: the box's job MOVES
+  INTO the link. Suppressing the box while leaving the link naming `results` would offer the
+  filtered set and no way to take the page; renaming the link while leaving the box would
+  offer the same population twice, one click apart. `bareActions` below argues the identical
+  case for the pair it governs — splitting a single ruling lets a caller take half of it.
+
+   - `'results'` — the default, and today's band exactly: the tri-state box over the
+     rendered rows, and `Select all {N} results` over the whole filtered set when the caller
+     says one is reachable. The Component, Recipe and Essence Studios are byte-identical
+     across this change.
+   - `'shown'` — no box, and the link reads `Select all {n} shown`. `pageSelectionState`,
+     `onTogglePage`, `selectAllLabel` and `pageBoxAttr` are inert under it, because the
+     control they parameterise is not rendered.
+
+  WHAT THE CALLER MUST WIRE, because this component names a population and does not choose
+  one: under `'shown'` the caller passes the count of the rows it is RENDERING as
+  `selectAllResultsCount` and points `onSelectAllResults` at those same rows. It should also
+  pass `showSelectAllResults` on whenever there is a selection, since the band otherwise has
+  no select-all affordance at all — the box that used to be one is gone.
+
+  AND THE BAND STOPS RENDERING WHEN IT WOULD BE EMPTY. Everything except the box lives
+  behind `count > 0`, so under `'shown'` a zero selection would leave a bordered row with
+  nothing in it. `proto:591` gates the whole band on `selActive` for exactly that reason.
+  Under the default the box is always there, so the root always renders and nothing moves.
 
   The model returns DATA (`describeBulkSelection`) and this component localizes it — the
   pure model carries no strings. Its four labels are NOUN-FREE, so they live in the neutral
@@ -62,6 +96,86 @@
     onTogglePage = () => {},
     onSelectAllResults = () => {},
     onClear = () => {},
+    // WHICH POPULATION THIS BAND'S SELECT-ALL NAMES, and therefore whether the tri-state master
+    // box is drawn at all. `'results'` is today's band exactly; `'shown'` is the reference's
+    // catalogue band. See the block above — it is one prop because the reference is one ruling.
+    selectAllScope = 'results',
+    // The VISIBLE caption on the select-all box, when a caller wants one shorter than the shared
+    // phrase. `''` — the default — keeps the shipped words, so the three studios are untouched.
+    // See `selectAllCaption` below for why the accessible name does not follow it.
+    selectAllLabel: selectAllLabelOverride = '',
+    // ── WHERE THE ACTIONS THIS COUNT FEEDS ACTUALLY ARE ─────────────────────────────────────
+    // An ALREADY-LOCALIZED standing sentence, rendered beside the count and only while there is
+    // a count to stand beside. `proto:594` draws it — `Bulk actions are in the inspector →` — and
+    // it is what keeps this register from competing with the panel it points at: the band states
+    // the fact, the panel owns the verbs.
+    //
+    // A PARAMETER rather than a shipped default, for the reason the five hook names are: `''`
+    // renders nothing, so the Component, Recipe and Essence Studios are byte-identical across
+    // this. It is the CALLER's string because only the caller knows whether its bulk body lands
+    // in an inspector rail at all — `EntityRulesListShell` renders one directly under this row.
+    hint = '',
+    // ── THE TWO TEXT ACTIONS AT THE TRAILING EDGE, TOGETHER ─────────────────────────────────
+    // `proto:595`-`596` puts the auto margin on the SELECT-ALL action and lets `Clear` follow it
+    // directly; this component's shipped rule puts it on `Clear` alone, so a register carrying a
+    // `hint` strands `Select all N results` against that sentence with no space between two
+    // differently-coloured runs of text. `false` keeps the shipped arrangement, so the Component,
+    // Recipe and Essence Studios render byte-identically.
+    //
+    // A PROP RATHER THAN A RULE IN `styles/fabricate.css`, and that is mechanical rather than a
+    // preference: that sheet is imported at `layer(modules)` and this scoped block is injected
+    // unlayered, so a rule there loses to the one below WHATEVER its specificity — silently, with
+    // the selector matching and the declaration unused. The sheet records the measurement.
+    trailingActions = false,
+    // ── THE PAIR AS BARE TYPE, WHICH IS WHAT THE REFERENCE DRAWS ────────────────────────────
+    // `proto:595` is a bare clickable span — `font:600 11px var(--sans); color:var(--info);
+    // cursor:pointer` — with NO border and no underline, and `proto:596` is the same shape in
+    // `--subtle` with NO glyph. This component draws the link with a `--fab-info-border`
+    // underline and puts a `fa-xmark` before `Clear`, and neither is in that reference.
+    //
+    // The xmark is not invented, and where it belongs is the point: `proto:626` is the INSPECTOR
+    // PANEL's Clear and it DOES carry one, at `600 10px` with a `gap:5px`. `BulkEditPanelShell`
+    // draws that correctly. What happened here is that the panel's treatment was borrowed for the
+    // band, where the design states the plainer one.
+    //
+    // ONE PROP FOR BOTH, because `proto:595` and `proto:596` are one statement about one pair:
+    // the band's two actions are type, not chrome. Splitting it would let a caller take half of a
+    // ruling. `false` is today's rendering exactly, so the Component, Recipe and Essence Studios
+    // are byte-identical — including the hand-copied markup in their two font-size fixtures,
+    // which spell the `fa-xmark` out.
+    //
+    // A PROP RATHER THAN A ROUTE-SCOPED RULE IN `styles/fabricate.css`, for the reason
+    // `trailingActions` records: this block declares `border-bottom` on the element, that sheet
+    // ships at `layer(modules)`, and a layered declaration loses to an unlayered one whatever its
+    // specificity. The glyph is not a cascade question at all — no stylesheet can remove an
+    // element the template renders.
+    bareActions = false,
+    // ── WHICH GLYPH THE COUNT DRAWS, WHICH IS A THIRD OBJECT AND NOT A THIRD ACTION ─────────
+    // `proto:593` is the band's count — `font:700 11px var(--sans); color:var(--accent)` behind a
+    // `fa-solid fa-check-double` at `font-size:10px; margin-right:6px`. Measured in Chromium at
+    // the production layering, everything but the glyph already matches: the count renders
+    // 10.88px at weight 700 in the accent token itself, and the glyph sits 6px from the label,
+    // because `--fab-space-chip` IS 6px. The sub-pixel gaps — 10.88px against 11px, and 9.92px
+    // against 10px — are the shipped rem scale this block is written in and are left alone; buying
+    // 0.12px would cost the three studios their identical rendering.
+    //
+    // NOT A THIRD CLAUSE ON `bareActions`, deliberately. That prop is one ruling about the band's
+    // two ACTIONS — `proto:595`-`596` — and it is a REMOVAL: no underline, no glyph. The count is
+    // the fact those actions operate on, not an action, and its ruling is a SUBSTITUTION. Folding
+    // it in would make one prop mean two unrelated things and hand a caller that asked about the
+    // actions a change to something else, which is the failure `bareActions`'s own note names when
+    // it argues against splitting a single ruling.
+    //
+    // A STRING, following the shipped idiom rather than inventing one: `Chip`, `Callout`,
+    // `ModifierLibraryRow`, `ComplicationEffectRow` and `ArmedDangerButton` all take "which Font
+    // Awesome classes does this leading glyph draw" as a string prop. The default is today's
+    // markup EXACTLY, so the Component, Recipe and Essence Studios are byte-identical — including
+    // the hand-copied `<i class="fas fa-layer-group">` in their two font-size fixtures.
+    //
+    // AND IT CANNOT BE A RULE. `bareActions` records why the sheet cannot win a cascade against
+    // this block; the glyph does not even get that far, because no stylesheet can swap the element
+    // a template renders. It is markup or it is nothing.
+    countIcon = 'fas fa-layer-group',
     rowClass = 'manager-component-filter-row',
     toolbarAttr = 'data-component-selection-toolbar',
     pageBoxAttr = 'data-component-select-all-page',
@@ -97,7 +211,14 @@
   const resultsHook = $derived({ [resultsAttr]: '' });
   const clearHook = $derived({ [clearAttr]: '' });
 
+  // THE ACCESSIBLE NAME, always the full phrase.
   const selectAllLabel = $derived(text('FABRICATE.Admin.Manager.BulkEdit.SelectAll', 'Select all'));
+  // THE VISIBLE CAPTION, which a caller may shorten. The prototype's catalogue toolbar reads
+  // `[☐ All]` where three shipped studios read `[☐ Select all]`, and the two are not the same
+  // string for the same reason the `title` on an icon-only segment is not: `All` beside a box is
+  // legible because the box is right there, and `All` announced on its own is not a verb a
+  // screen-reader user can act on. So only the caption moves and `ariaLabel` stays whole.
+  const selectAllCaption = $derived(String(selectAllLabelOverride || '').trim() || selectAllLabel);
   const countLabel = $derived(
     format('FABRICATE.Admin.Manager.BulkEdit.SelectedCount', '{count} selected', {
       count,
@@ -109,57 +230,95 @@
     })
   );
   const clearLabel = $derived(text('FABRICATE.Admin.Manager.BulkEdit.Clear', 'Clear'));
+
+  // A CLOSED SET WITH A FALLBACK, as `Chip`'s tone and `ManagerButton`'s role are: an
+  // unrecognised value renders the shipped band rather than silently deleting its master box.
+  const showsShown = $derived(selectAllScope === 'shown');
+
+  // The label the ONE action carries under `'shown'`. Built from its own key rather than from
+  // `SelectAllResults` with a swapped word, because `{count} results` and `{count} shown` are
+  // different sentences about different populations and a translator needs both.
+  const shownLabel = $derived(
+    format('FABRICATE.Admin.Manager.BulkEdit.SelectAllShown', 'Select all {count} shown', {
+      count: selectAllResultsCount,
+    })
+  );
+
+  // The band's whole content is the master box plus everything behind `count > 0`. With the box
+  // suppressed and nothing selected there is no content, and an empty bordered row is not a
+  // thing this component may render — the reference gates the band on the selection for the
+  // same reason. Under the default this is always true, so the root always renders.
+  const renders = $derived(!showsShown || count > 0);
 </script>
 
-<div class="{rowClass} is-selection" {...toolbarHook}>
-  <!--
-    `wrapper="contents"` because THIS element is the label: the box and its caption are one
-    click target, and nesting the primitive's own `<label>` inside another would be invalid
-    HTML with an ambiguous target. The focus ring therefore belongs to this host — the
-    primitive scopes its own ring to the wrapper IT renders — so the focus-ring rule below
-    is load-bearing, not decoration. Read its comment before touching its shape: this rule
-    reaches into another component's markup, and the obvious authoring of it compiles to
-    nothing at all.
-  -->
-  <label class="fab-bulk-selection-all">
-    <SelectionCheckbox
-      wrapper="contents"
-      size="md"
-      checked={pageSelectionState === 'all'}
-      indeterminate={pageSelectionState === 'some'}
-      ariaLabel={selectAllLabel}
-      {...pageBoxHook}
-      onChange={(on) => onTogglePage(on === true)}
-    />
-    <span class="fab-bulk-selection-all-label">{selectAllLabel}</span>
-  </label>
+{#if renders}
+  <div class="{rowClass} is-selection" {...toolbarHook}>
+    {#if !showsShown}
+      <!--
+        `wrapper="contents"` because THIS element is the label: the box and its caption are one
+        click target, and nesting the primitive's own `<label>` inside another would be invalid
+        HTML with an ambiguous target. The focus ring therefore belongs to this host — the
+        primitive scopes its own ring to the wrapper IT renders — so the focus-ring rule below
+        is load-bearing, not decoration. Read its comment before touching its shape: this rule
+        reaches into another component's markup, and the obvious authoring of it compiles to
+        nothing at all.
 
-  {#if count > 0}
-    <span class="fab-bulk-selection-divider" aria-hidden="true"></span>
-    <span class="fab-bulk-selection-count" {...countHook}>
-      <i class="fas fa-layer-group" aria-hidden="true"></i>
-      <span>{countLabel}</span>
-    </span>
-    {#if showSelectAllResults}
+        SUPPRESSED UNDER `selectAllScope="shown"`, where the reference draws no master box at
+        all and the select-all link takes over the population it acted on.
+      -->
+      <label class="fab-bulk-selection-all">
+        <SelectionCheckbox
+          wrapper="contents"
+          size="md"
+          checked={pageSelectionState === 'all'}
+          indeterminate={pageSelectionState === 'some'}
+          ariaLabel={selectAllLabel}
+          {...pageBoxHook}
+          onChange={(on) => onTogglePage(on === true)}
+        />
+        <span class="fab-bulk-selection-all-label">{selectAllCaption}</span>
+      </label>
+    {/if}
+
+    {#if count > 0}
+      <span class="fab-bulk-selection-divider" aria-hidden="true"></span>
+      <span class="fab-bulk-selection-count" {...countHook}>
+        <i class={countIcon} aria-hidden="true"></i>
+        <span>{countLabel}</span>
+      </span>
+      {#if hint}
+        <span class="fab-bulk-selection-hint">{hint}</span>
+      {/if}
+      {#if showSelectAllResults}
+        <button
+          type="button"
+          class="fab-bulk-selection-link"
+          class:is-trailing={trailingActions}
+          class:is-bare={bareActions}
+          {...resultsHook}
+          onclick={() => onSelectAllResults()}>{showsShown ? shownLabel : resultsLabel}</button
+        >
+      {/if}
       <button
         type="button"
-        class="fab-bulk-selection-link"
-        {...resultsHook}
-        onclick={() => onSelectAllResults()}>{resultsLabel}</button
+        class="fab-bulk-selection-clear"
+        {...clearHook}
+        onclick={() => onClear()}
       >
+        {#if !bareActions}<i class="fas fa-xmark" aria-hidden="true"></i>{/if}
+        <span>{clearLabel}</span>
+      </button>
     {/if}
-    <button type="button" class="fab-bulk-selection-clear" {...clearHook} onclick={() => onClear()}>
-      <i class="fas fa-xmark" aria-hidden="true"></i>
-      <span>{clearLabel}</span>
-    </button>
-  {/if}
-</div>
+  </div>
+{/if}
 
 <style>
-  /* Manager-scoped by PLACEMENT — this component lives under `apps/manager/`, so
-     `--fab-mv2-*` (declared on `.fabricate-manager`) is always in scope here. That is the
-     opposite of `SelectionCheckbox`, which is area-agnostic and reaches theme root only;
-     do not carry this over to a shared `components/` primitive.
+  /* THEME-ROOT tokens only, like every scoped `<style>` in the product. The reason once
+     recorded here — that living under `apps/manager/` puts an area-scoped
+     `--fab-manager-*` property in scope — has LAPSED: a scoped block may not reach one from
+     ANY directory (design-system spec, *The token namespace is one generation and names its
+     purpose*). `SelectionCheckbox` records the same rule for the same reason; it is no
+     longer the opposite case.
 
      The row itself is NOT styled here. `.<rowClass>.is-selection` in the global sheet owns
      the row metrics and the hairline that separates this register from the filter rows
@@ -170,7 +329,7 @@
     gap: var(--fab-space-2);
     align-items: center;
     flex: 0 0 auto;
-    color: var(--fab-mv2-text-muted);
+    color: var(--fab-text-muted);
     font-size: 0.68rem;
     font-weight: 600;
     cursor: pointer;
@@ -206,7 +365,7 @@
      same markup sits in the Playwright fixture in
      `tests/components/component-studio-font-size.test.js`. */
   .fab-bulk-selection-all :global(.fab-selection-input:focus-visible + .fab-selection-check) {
-    outline: 2px solid var(--fab-mv2-accent);
+    outline: 2px solid var(--fab-accent);
     outline-offset: 2px;
   }
 
@@ -214,7 +373,7 @@
     flex: 0 0 auto;
     width: 1px;
     height: 16px;
-    background: var(--fab-mv2-border);
+    background: var(--fab-border);
   }
 
   /* The selection count is the one ACCENT thing in the row: it is the fact the rest of the
@@ -224,13 +383,29 @@
     gap: var(--fab-space-chip);
     align-items: center;
     flex: 0 0 auto;
-    color: var(--fab-mv2-accent);
+    color: var(--fab-accent);
     font-size: 0.68rem;
     font-weight: 700;
   }
 
   .fab-bulk-selection-count > i {
     font-size: 0.62rem;
+  }
+
+  /* The standing sentence beside the count, MUTED and one rung lighter than it: it is context
+     for the accent fact rather than a second fact. `proto:594` sets `500 10.5px var(--sans)` in
+     `--muted`, and 10.5px is 0.66rem against the 16px root this product uses.
+
+     `flex: 0 1 auto` with `min-width: 0`, not `0 0 auto`: it is the one item in this register
+     that is a sentence rather than a control, so it is also the only one that can honestly give
+     width back before the row wraps. */
+  .fab-bulk-selection-hint {
+    flex: 0 1 auto;
+    min-width: 0;
+    color: var(--fab-text-muted);
+    font-size: 0.66rem;
+    font-weight: 500;
+    line-height: 1.2;
   }
 
   /* A real `<button>` wearing link chrome, not an `<a>` with no href: it performs an
@@ -259,9 +434,22 @@
   }
 
   .fab-bulk-selection-link {
-    color: var(--fab-mv2-info);
+    color: var(--fab-info);
     border-bottom: 1px solid var(--fab-info-border);
     border-radius: 0;
+  }
+
+  /* ── `bareActions`: THE LINK LOSES ITS UNDERLINE (issue 1373, round 4) ─────────────────────
+     `proto:595` gives the select-all action colour and weight and nothing else. The rule above
+     is the shipped treatment and stays the default; this removes only the border, since the
+     colour was already right. `Clear`'s half of the same ruling is a MARKUP change — the
+     `fa-xmark` simply is not rendered — because no stylesheet can delete an element.
+
+     `border-bottom: 0` rather than dropping the declaration from a variant, so the override is
+     one property against one property and a future change to the default's colour or width does
+     not have to be mirrored here. */
+  .fab-bulk-selection-link.is-bare {
+    border-bottom: 0;
   }
 
   /* Clear is the quiet escape from the whole mode, so it recedes and sits at the far end
@@ -271,14 +459,32 @@
     color: var(--fab-text-subtle);
   }
 
+  /* ── `trailingActions`: THE PAIR MOVES TO THE END TOGETHER (issue 1373, round 4) ───────────
+     `proto:595` puts the auto margin here rather than on `Clear`, so `Select all N results` and
+     `Clear` sit together at the trailing edge with the count and the standing hint at the
+     leading one. BOTH declarations are required and the second is the non-obvious half: two flex
+     items each carrying `margin-left: auto` SPLIT the free space between them rather than both
+     moving right, so `Clear` has to give its own back. It keeps it whenever the link is absent,
+     which is the single-page case.
+
+     Scoped, not `:global()`, and deliberately so: both elements are written by THIS template, so
+     Svelte can see the selector and would warn if either class stopped being emitted. */
+  .fab-bulk-selection-link.is-trailing {
+    margin-left: auto;
+  }
+
+  .fab-bulk-selection-link.is-trailing + .fab-bulk-selection-clear {
+    margin-left: 0;
+  }
+
   .fab-bulk-selection-clear:hover,
   .fab-bulk-selection-link:hover {
-    color: var(--fab-mv2-text);
+    color: var(--fab-text);
   }
 
   .fab-bulk-selection-link:focus-visible,
   .fab-bulk-selection-clear:focus-visible {
-    outline: 2px solid var(--fab-mv2-accent);
+    outline: 2px solid var(--fab-accent);
     outline-offset: 2px;
   }
 

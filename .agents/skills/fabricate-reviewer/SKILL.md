@@ -24,6 +24,7 @@ The driver honours it only from a lane with zero commits, an empty `git status -
 - the current diff or changed-file list provided by the driver
 - the implementer's full immutable diff artifact stored in the driver-owned sibling artifacts directory
 - relevant canonical spec files for the changed area
+- `openspec/specs/design-system/spec.md` whenever the diff touches `src/ui/**`, `styles/**`, or any `*.svelte` — a control the primitive set already owns, a geometry off its ladders, a raw colour literal, or a new component missing either half of its entry (its specimen in `openspec/specs/design-system/library.html`, and once it ships its row in `scripts/lib/designSystemPrimitives.json`, which sits outside `openspec/specs/` and is therefore easy to miss) is a finding
 - `.agents/skills/javascript-structural-design/SKILL.md` when reviewing JavaScript structure, dependency seams, or testability
 - prior test and build results if available
 - the canonical [isolated worktree lifecycle](../fabricate-orchestrator/references/worktree-lifecycle.md)
@@ -62,6 +63,10 @@ The only other admissible first line is the non-verdict `ESCALATE_TIER: <reason>
 Return findings, the verdict, and any recommended issue or PR text to the workflow driver.
 Do not commit, push, merge, mutate GitHub, or inspect an ambient branch from this role.
 
+**Confirmation round (revision 2 or later, brief marked disposition-only).**
+Keep to your own prior findings: mark each `RESOLVED`, `RESOLVED-WITH-NIT` (give the exact text the driver applies) or `UNRESOLVED` (say what is still wrong), then add ONE section, "New, introduced by the revision", for defects the revision itself created; raise nothing else.
+The driver runs these rounds at model tier `medium`, because the scope is fixed by your own earlier verdict rather than by the change's path set.
+
 ## Review checklist
 
 - The change achieves its stated goal, and any artifact it produces is faithful to the real system.
@@ -89,6 +94,9 @@ Flag a test that pins a pure predicate while the path consuming it (an event han
 - UI-only changes use Vite-first verification when available, with container-based validation reserved for runtime-sensitive or reproducibility-focused checks.
 - UI screenshot claims identify what the artifact proves: first view, clipping, spacing, alignment, image fidelity, scroll containment, visible controls, and relevant responsive sizes.
 - Automated screenshot claims bind every affected view to one successful, non-degraded run with matching run/manifest identity, exact requested head, target label, capture record, and declared/decoded PNG dimensions; stricter view-specific parity rules remain additive.
+- A screen with a design prototype ships with the parity protocol's artifacts in the handoff — the reachable-state matrix, both `scripts/visual-parity/` outputs from the integrated branch, and before, after and control frames — per `.agents/skills/fabricate-ux-designer/references/prototype-parity-measurement.md`.
+Approve without them only when the delta records why a step could not run; a parity claim resting on the computed-style pass alone is a finding, because that pass cannot see absence.
+The prototype decides type, copy, structure, state, order and colour role; the design-system library decides geometry, the token a role resolves to, and primitives; a divergence recorded after implementation rather than escalated before it is a finding.
 - Normal UI PR screenshot evidence is an embedded screenshot image in the PR description with `pr-<number>` in its alt text, produced by `npm run screenshots:ui:publish` (uploaded to S3 under `pr-screenshots/<number>/`).
 Uploaded artifacts, `test-results/` paths, and `user-attachments` embeds are accepted fallbacks, not the normal handoff.
 There is no `SCREENSHOTS_NEEDED:` bypass; the only exemption is a maintainer-applied `screenshots-exempt` label, which an agent must never apply.
@@ -100,6 +108,8 @@ PR-scoped screenshots should not be committed as repository assets.
 - Foundry UI CSS avoids unscoped generic state classes such as `.disabled`, `.active`, and `.selected` where global styles could interfere.
 - Image UI tests or smoke screenshots prove linked-image priority, or the remaining screenshot gap is explicitly called out.
 - Smoke screenshot data uses Foundry VTT core or dnd5e non-SVG raster paths when previews need imagery; invented SVG preview art should be treated as a finding.
+- **Bloat is a finding, not a style note.** Return `NEEDS_CHANGES` for a comment that narrates history or argues a rejected alternative, for ALL-CAPS emphasis, for a header longer than its template, for a unit past the size gate, for a new `Source.includes(` pin, and for a helper redeclared beside a shared one.
+"Observed failure mode: bloat" in `AGENTS.md` names each shape with the ledger that measures it, and a diff that raises `tests/comment-share-ledger.txt`, `tests/file-size-ledger.txt`, or `tests/source-pin-ledger.txt` is going the wrong way even while its gate stays green.
 
 ## Foundry API checks
 
@@ -117,4 +127,5 @@ When reviewing Foundry-facing code, verify:
 
 - first line: status token only, or the non-verdict `ESCALATE_TIER: <reason>` when the assignment exceeds the assigned model tier
 - then severity-ordered findings with `file:line` references
+- one line `concision: pass` when the bloat checklist found nothing, or `concision: <shapes found>` naming them, so the driver can see it was checked
 - if no findings, say so explicitly and list residual risks or testing gaps

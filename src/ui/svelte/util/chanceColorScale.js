@@ -17,7 +17,7 @@ const TOOL_BREAKAGE_CHANCE_STOPS = [
 export function interpolateCssColorScale(value, stops) {
   const chance = normalizeRateForTier(value);
   const scale = [...stops].sort((left, right) => left.at - right.at);
-  if (scale.length === 0) return 'var(--fab-mv2-accent)';
+  if (scale.length === 0) return 'var(--fab-accent)';
   if (chance <= scale[0].at) return scale[0].color;
 
   for (let index = 1; index < scale.length; index += 1) {

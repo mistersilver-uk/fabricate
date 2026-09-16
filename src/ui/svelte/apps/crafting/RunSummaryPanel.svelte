@@ -8,8 +8,9 @@
   is NO Journal cross-link in this PR.
 -->
 <script>
+  import Medallion from '../../components/Medallion.svelte';
+  import { resolveCraftingArt } from '../../util/craftingArtResolution.js';
   import { localize } from '../../util/foundryBridge.js';
-  import CraftingThumb from './CraftingThumb.svelte';
   import CraftButton from './CraftButton.svelte';
   import RollResultBox from './detail/RollResultBox.svelte';
 
@@ -56,7 +57,7 @@
   </header>
 
   <div class="crafting-run-recipe">
-    <CraftingThumb src={recipe?.img} alt="" size={36} />
+    <Medallion {...resolveCraftingArt(recipe?.img)} alt="" size={36} />
     <span class="crafting-run-recipe-name" title={name}>{name}</span>
   </div>
 

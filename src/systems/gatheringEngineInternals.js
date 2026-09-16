@@ -7,6 +7,8 @@
  * duplication gate forbids a second copy in the builder).
  */
 
+import { cloneJson } from '../utils/scalars.js';
+
 /**
  * Sentinel `taskId` prefix persisted on an opaque-blind WAITING run in place of
  * the drawn task's real id (issue 901).
@@ -152,10 +154,6 @@ export function plainObjectOrNull(value) {
  * @param {*} value
  * @returns {*}
  */
-export function cloneJson(value) {
-  return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
-}
-
 /**
  * Normalize a value into a de-duplicated array of trimmed non-empty strings.
  * A non-array scalar is treated as a single-element list.
@@ -346,3 +344,5 @@ export function stripRuntimeSnapshotFromRun(run) {
   }
   return publicRun;
 }
+
+export { cloneJson } from '../utils/scalars.js';

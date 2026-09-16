@@ -20,13 +20,23 @@
   (`lockedRow`), the live hint machine is injected (`describeInput`), icons are opt-in
   (`showIcon`), and the row `data-` attribute name is caller-chosen (`rowAttr`) so
   each tab keeps its own distinct test hook rather than three tabs colliding on one.
+
+  Two of those knobs are per-ROW rather than per-panel (issue 1392), because they vary row by
+  row on one surface: `row.confirmTokens` is the second number a kind's confirm sentence states,
+  and `row.silentlyDeletable` is the predicate ALL THREE renderings of the one-click delete read.
+  Both default to today's rendering, so the two shipped call sites are byte-identical. See
+  `confirmSentence` and `isSilentlyDeletable` below.
 -->
 <script>
-  import Chip from './Chip.svelte';
+  import Chip from '../../components/Chip.svelte';
   import EmptyState from './EmptyState.svelte';
   import IconPicker from '../../components/IconPicker.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import InlineVocabularyAdd from './InlineVocabularyAdd.svelte';
+  import ManagerButton from '../../components/ManagerButton.svelte';
+  import IconButton from '../../components/IconButton.svelte';
+  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
+  import { createVocabularyBrowserState } from '../../../../utils/managerBrowserViewState.js';
 
   let {
     label = '',
@@ -69,9 +79,22 @@
     confirmRemoveLabel = '',
     cancelRemoveLabel = '',
     onSetIcon = () => {},
+    // ── THE SEARCH IS LIFTED (issue 1438) ────────────────────────────────────────────────
+    // Tags, recipe categories and component categories are three MUTUALLY EXCLUSIVE branches
+    // of one tabbed surface, so switching vocabulary tab unmounts this panel outright, and so
+    // does leaving the Tags & Categories route. Each caller therefore binds its OWN slot:
+    // "herb" names a tag and nothing in the category vocabulary next door.
+    //
+    // `pendingRemovalId` below is deliberately NOT lifted. It is an ARMED destructive
+    // confirmation against one row in one sitting, and an arm that outlives its surface is a
+    // delete the GM did not re-confirm.
+    browserState = $bindable(null),
   } = $props();
 
-  let searchTerm = $state('');
+  let ownBrowserState = $state(createVocabularyBrowserState());
+  const ui = $derived(browserState ?? ownBrowserState);
+
+  const searchTerm = $derived(String(ui.searchTerm || ''));
   let pendingRemovalId = $state('');
 
   function text(key, fallback) {
@@ -140,16 +163,57 @@
     );
   }
 
+  // ── TWO PER-ROW FACTS, EACH DEFAULTING TO TODAY'S RENDERING (issue 1392) ───────────────
+  //
+  // This primitive is shared by every vocabulary surface at either scope, and the world-scope
+  // screen needs a confirm that states a SECOND number and a one-click predicate that is
+  // strictly NARROWER than the reference count alone. Both are per-ROW data rather than
+  // per-panel copy, because both vary row by row on one surface; both are optional and default
+  // to exactly what the two shipped call sites render today.
+
+  /**
+   * The confirm sentence, with `{name}` and `{count}` plus whatever second number the row
+   * carries.
+   *
+   * `row.confirmTokens` is merged OVER the two defaults rather than replacing them, so a caller
+   * supplying one extra token still gets the shipped pair. Substituted by split/join rather than
+   * `String#replace`, because a replacement value containing `$&` would otherwise be interpreted
+   * as a back-reference.
+   */
   function confirmSentence(row) {
-    return removeConfirmHint.replace('{name}', row.name).replace('{count}', row.totalUsage || 0);
+    const tokens = { name: row.name, count: row.totalUsage || 0, ...(row.confirmTokens || {}) };
+    let sentence = removeConfirmHint;
+    for (const [token, value] of Object.entries(tokens)) {
+      sentence = sentence.split(`{${token}}`).join(String(value));
+    }
+    return sentence;
+  }
+
+  /**
+   * Whether this row deletes in ONE CLICK, and it is derived ONCE.
+   *
+   * All THREE renderings of that affordance read this: the gate in `requestRemove`, the usage
+   * chip (whose else-branch is the muted `Unused` chip) and the delete control's destructive
+   * tone. Leaving any of them keyed on `row.totalUsage` while the gate reads this would let a
+   * surface state one thing and do another — a row labelled `Unused` under a red one-click
+   * delete that then opens a confirm strip naming four crafting systems.
+   *
+   * The default is `(row.totalUsage || 0) === 0`, which makes the predicate exactly
+   * `!(row.totalUsage > 0)` for a caller that passes neither: the two shipped call sites pass
+   * `totalUsage` and never this field, and render byte-identically.
+   */
+  function isSilentlyDeletable(row) {
+    return typeof row?.silentlyDeletable === 'boolean'
+      ? row.silentlyDeletable
+      : (row?.totalUsage || 0) === 0;
   }
 
   function requestRemove(row) {
     if (!row || row.locked) return;
-    // Unused entries delete in one click, matching the prototype's affordance. Only
-    // referenced entries open the confirm strip — its copy reassigns the references,
-    // which is meaningless for a 0-reference row.
-    if ((row.totalUsage || 0) > 0) {
+    // Entries nothing references AND whose deletion rewrites nothing delete in one click,
+    // matching the prototype's affordance. Everything else opens the confirm strip, which
+    // states what the deletion changes.
+    if (!isSilentlyDeletable(row)) {
       pendingRemovalId = row.id;
     } else {
       onRemove(row);
@@ -166,7 +230,12 @@
   }
 </script>
 
-<section class="manager-vocabulary-panel" aria-label={label}>
+<!-- `label || undefined` rather than `label`, the guarded spelling `IconButton` and
+     `SelectionCheckbox` ship. `label` defaults to the empty string, and an EMPTY `aria-label` is
+     not the same as no `aria-label`: it REPLACES the accessible name with nothing rather than
+     leaving the element to take one from anything else. Omitting the attribute leaves the element
+     with no name, which is the honest state for a caller that passed none. -->
+<section class="manager-vocabulary-panel" aria-label={label || undefined}>
   <p class="manager-vocabulary-desc manager-muted">{hint}</p>
 
   <InlineVocabularyAdd
@@ -186,15 +255,13 @@
   />
 
   <div class="manager-vocabulary-search-row">
-    <label class="manager-search manager-vocabulary-search">
-      <i class="fas fa-search" aria-hidden="true"></i>
-      <input
-        type="search"
-        bind:value={searchTerm}
-        placeholder={searchPlaceholder}
-        aria-label={searchLabel}
-      />
-    </label>
+    <ManagerSearchField
+      class="manager-vocabulary-search"
+      value={searchTerm}
+      onInput={(next) => (ui.searchTerm = next)}
+      placeholder={searchPlaceholder}
+      ariaLabel={searchLabel}
+    />
     <Chip icon="fas fa-hashtag" class="manager-vocabulary-count" data-vocabulary-shown-count>
       <span>{entriesLabel}</span>
     </Chip>
@@ -250,22 +317,21 @@
           <div class="manager-vocabulary-main">
             <strong>{row.displayName || row.name}</strong>
           </div>
-          {#if row.totalUsage > 0}
+          {#if !isSilentlyDeletable(row)}
             <Chip tone="warning" icon="fas fa-link">{refText(row)}</Chip>
           {:else}
-            <Chip icon="fa-regular fa-circle" class="manager-vocabulary-chip-unused"
+            <Chip icon="fas fa-circle" class="manager-vocabulary-chip-unused"
               >{text('FABRICATE.Admin.Manager.TagsCategories.Unused', 'Unused')}</Chip
             >
           {/if}
-          <button
-            type="button"
-            class={`manager-icon-button ${row.totalUsage > 0 ? '' : 'is-danger'}`}
-            aria-label={removeNamedLabel.replace('{name}', row.name)}
+          <IconButton
+            class={isSilentlyDeletable(row) ? 'is-danger' : ''}
+            ariaLabel={removeNamedLabel.replace('{name}', row.name)}
             title={removeLabel}
             onclick={() => requestRemove(row)}
           >
             <i class="fas fa-trash" aria-hidden="true"></i>
-          </button>
+          </IconButton>
         </div>
         {#if pendingRemovalId === row.id}
           <div
@@ -275,13 +341,13 @@
           >
             <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
             <span class="manager-vocabulary-confirm-copy">{confirmSentence(row)}</span>
-            <button type="button" class="manager-button" onclick={cancelRemove}
-              >{cancelRemoveLabel}</button
+            <ManagerButton data-vocabulary-cancel-remove onclick={cancelRemove}
+              >{cancelRemoveLabel}</ManagerButton
             >
-            <button
-              type="button"
-              class="manager-button is-danger"
-              onclick={() => confirmRemove(row)}>{confirmRemoveLabel}</button
+            <ManagerButton
+              role="danger"
+              data-vocabulary-confirm-remove
+              onclick={() => confirmRemove(row)}>{confirmRemoveLabel}</ManagerButton
             >
           </div>
         {/if}

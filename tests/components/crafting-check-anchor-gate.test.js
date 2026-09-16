@@ -30,6 +30,7 @@ const harness = createMountedComponentHarness({
   rawModules: [
     ...CHECKS_TREE_RAW_MODULES,
     'src/utils/rollExpressionAverage.js',
+    'src/utils/rollFormulaRollability.js',
     // The DC-macro card joined the routed tree with issue 1096's dcMode work.
     'src/ui/svelte/actions/dragDrop.js',
     'src/ui/svelte/util/dropUtils.js',
@@ -38,8 +39,9 @@ const harness = createMountedComponentHarness({
   compiledModules: [
     ...CHECKS_TREE_COMPILED_MODULES,
     'src/ui/svelte/apps/manager/SegmentedControl.svelte',
-    'src/ui/svelte/apps/manager/ItemDropZone.svelte',
+    'src/ui/svelte/components/ItemDropZone.svelte',
     'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/apps/manager/checks/CheckDcMacroCard.svelte',
     'src/ui/svelte/apps/manager/checks/CheckDifficultyCard.svelte',
     'src/ui/svelte/apps/manager/checks/CheckFormulaFields.svelte',

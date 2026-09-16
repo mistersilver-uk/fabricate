@@ -23,14 +23,19 @@
     subscribeInventoryChange,
     subscribeCraftingDataChange,
     subscribeActorRunFlagChange,
+    subscribeJournalAuthorityRestored,
+    subscribeJournalDismissalsChange,
   } from '../util/foundryBridge.js';
   import GatheringView from './gathering/GatheringView.svelte';
   import CraftingView from './crafting/CraftingView.svelte';
   import AlchemyView from './alchemy/AlchemyView.svelte';
   import JournalView from './journal/JournalView.svelte';
   import InventoryView from './inventory/InventoryView.svelte';
-  import ActorSelectTopBar from '../components/ActorSelectTopBar.svelte';
+  import ActorSelectTopBar from './ActorSelectTopBar.svelte';
   import PlayerExtensionHost from './PlayerExtensionHost.svelte';
+  import Notice from '../components/Notice.svelte';
+  import WorldClockChip from '../components/WorldClockChip.svelte';
+  import { worldTimeLabel } from '../util/worldTimeLabel.js';
   import { buildPlayerNavTabs, parseRouteKey } from '../../playerNavModel.js';
   import {
     DOMAIN_CONSUMERS,
@@ -87,6 +92,12 @@
   // The Journal nav entry carries a live active-run count badge fed by the shared
   // journal store's reactive `navCount` rune getter.
   const journalNavCount = $derived(Number(services?.journal?.navCount ?? 0));
+  const journalWorldClock = $derived(
+    worldTimeLabel(
+      services?.getWorldTimeComponents?.(Number(services?.journal?.worldTime ?? 0)) ?? null,
+      { localize }
+    )
+  );
   // ONE derivation, three callers: this rail, the application host that owns the active tab,
   // and the View Lab's mount harness all read `playerNavModel.js` rather than each computing
   // its own answer. Its projection is an explicit allowlist, never a spread, so a field Core
@@ -356,6 +367,26 @@
   });
   $effect(() => subscribeWorldTime(() => services?.journal?.load?.(true)));
   $effect(() => subscribeSceneChange(() => services?.journal?.load?.(true)));
+  // The listing captures the run authority's availability as it builds, so a refusal captured
+  // while a command held the execution claim outlives that claim in the rendered view. The
+  // authority announces the LIFT and this re-derives on it (issue 1648, M25).
+  //
+  // The hook is LOCAL — `Hooks.callAll` never crosses the socket. A remote client re-derives
+  // because the core `deleteJournalEntryPage` hook fires its own refresh, which is correct only
+  // because the collection delete precedes the `callAll`. The player side of that depends on the
+  // ledger being in `game.journal` at all; see `.agents/docs/foundry-and-architecture.md`.
+  $effect(() => subscribeJournalAuthorityRestored(() => services?.journal?.load?.(true)));
+  // Dismissals live in a user setting, not actor run flags. The shell owns this
+  // subscription across tabs; payload-free replicated changes refresh the viewer's
+  // own listing, while local actor-scoped changes use the selection at fire time.
+  $effect(() =>
+    subscribeJournalDismissalsChange(() => services?.journal?.load?.(true), {
+      isRelevantActor: (actorUuid) => {
+        const selected = services?.getSelectedActorId?.() || null;
+        return Boolean(selected) && actorUuid === `Actor.${selected}`;
+      },
+    })
+  );
   // Cross-client run refresh (issues 733 + 739): a run created/advanced/archived by
   // another client (or the primary-GM world-time resume) writes the selected actor's
   // run flags. main.js drops the stale run-manager cache on the same updateActor hook,
@@ -492,6 +523,7 @@
         aria-label={tab.accessibleName}
         aria-describedby={tab.tooltip ? `player-nav-tooltip-${tab.routeKey}` : undefined}
         tabindex={tab.routeKey === focusableTab?.routeKey ? 0 : -1}
+        data-keyboard-focus="true"
         onclick={() => onSelectTab?.(tab.routeKey)}
         onkeydown={(event) => onNavKeydown(event, index)}
       >
@@ -525,7 +557,23 @@
          context cluster (next to the gathering weather/time/region info). It is
          passed down so ActorSelectTopBar can render it adjacent to those
          conditions; see ActorSelectTopBar for the chip markup + aria-live. -->
-    <ActorSelectTopBar store={services?.actorBar} {services} {activeTab} {activeCanvasTool} />
+    <div class="fabricate-app-topbar" class:has-journal-clock={activeTab === 'journal'}>
+      <ActorSelectTopBar
+        store={services?.actorBar}
+        {services}
+        {activeTab}
+        {activeCanvasTool}
+        sharedSurface={activeTab === 'journal'}
+      />
+      {#if activeTab === 'journal' && journalWorldClock}
+        <div class="fabricate-app-journal-clock">
+          <WorldClockChip
+            label={localize('FABRICATE.App.Journal.WorldClock.Label')}
+            value={journalWorldClock}
+          />
+        </div>
+      {/if}
+    </div>
 
     <!-- A `div`, not the `section` this used to be. Naming the panel is what makes it a
          labelled `region` landmark by implication, and a landmark cannot also be a tabpanel:
@@ -544,20 +592,22 @@
              which is what lets it report `surfaceTabChanged` at all — and is recreated when
              the user moves to a different companion's surface. -->
         {#if activeSurface && activeProviderFaulted}
-          <div
-            class="fabricate-app-extension-fault"
-            data-player-extension-fault={activeSurface.surfaceId}
-            role="alert"
-          >
-            <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
-            <div>
-              <strong>{localize('FABRICATE.App.Extension.FaultTitle')}</strong>
-              <p>
-                {localize('FABRICATE.App.Extension.FaultDescription', {
-                  providerId: activeSurface.provider.id,
-                })}
-              </p>
-            </div>
+          <!-- THE SHARED `Notice`, BLOCKING (issue 1514). `blocking` is what keeps the
+               `role="alert"` this state has always carried; a non-blocking notice would demote
+               it to `status`. The wrapper below owns the `max-width` and the `margin` the
+               deleted rule declared, because the primitive forwards no class and no style. -->
+          <div class="fabricate-app-extension-fault">
+            <Notice
+              blocking
+              tone="danger"
+              icon="fas fa-triangle-exclamation"
+              title={localize('FABRICATE.App.Extension.FaultTitle')}
+              detail={localize('FABRICATE.App.Extension.FaultDescription', {
+                providerId: activeSurface.provider.id,
+              })}
+              dataAttr="data-player-extension-fault"
+              dataValue={activeSurface.surfaceId}
+            />
           </div>
         {:else if activeSurface}
           {#key activeSurfaceId}
@@ -726,6 +776,28 @@
     flex: 0 0 auto;
   }
 
+  .fabricate-app-topbar {
+    position: relative;
+    flex: 0 0 auto;
+    min-width: 0;
+  }
+
+  .fabricate-app-topbar.has-journal-clock {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    background: var(--fab-surface-soft);
+    border-bottom: 1px solid var(--fab-border);
+  }
+
+  .fabricate-app-topbar.has-journal-clock :global(.fabricate-app-actor-bar) {
+    border-bottom: 0;
+  }
+
+  .fabricate-app-journal-clock {
+    margin-right: var(--fab-space-4);
+  }
+
   .fabricate-app-content {
     flex: 1 1 auto;
     min-width: 0;
@@ -737,42 +809,26 @@
      promotional: it names the provider that failed and says nothing about products,
      offers or subscriptions.
 
-     WHY THIS IS NOT `manager/Callout.svelte`. That component owns this meaning — a leading
-     semantic glyph plus prose in a bordered, rounded strip — it declares itself area-agnostic
-     and names `.fabricate-app` among its supported hosts, and it even defaults to the same
-     `fas fa-triangle-exclamation` glyph, so the mismatch has to be written down rather than
-     left for the next author to rediscover. Three things make it unusable here. Its root is a
-     `<p>`, which cannot legally contain the `<strong>` title plus `<p>` description this state
-     needs. Its tones are `info` and `warning` only, so a failure could not be coloured as one.
-     And it is a standing-statement strip, whereas this is a `role="alert"` error state
-     announced when it replaces the companion's panel. Extend one of these two rather than
-     writing a third.
+     THE STRIP IS `components/Notice.svelte` NOW, AND ONE OF THE THREE REASONS IT WAS NOT
+     SURVIVED (issue 1514). This block used to refuse `manager/Callout.svelte` on three
+     grounds, and the refusal has to be restated rather than deleted, because two of the three
+     were about the tree at the time they were written and are false at HEAD. Its root being a
+     `<p>` that cannot contain a `<strong>` and a `<p>`: FALSE — `Callout.svelte:122,129-131`
+     renders a `<div role="note">` when it is given a title. Its tones being `info` and
+     `warning` only: FALSE — `Callout.svelte:105` lists six. The third reason is STILL TRUE and
+     is what decided this: a callout is a standing statement that stays put, whereas this is a
+     `role="alert"` error state announced when it replaces the companion's panel, and
+     `Callout.svelte:131` emits `role="note"` or nothing. `Notice` is the primitive that owns
+     that meaning, and `blocking` is the prop that keeps the role.
 
-     `max-width` because the copy is ~650px of text: full-bleed across the ~1140px panel at the
-     default window size it reads as a sparse band with a long empty tail. */
+     WHAT IS LEFT HERE IS LAYOUT. `max-width` because the copy is ~650px of text: full-bleed
+     across the ~1140px panel at the default window size it reads as a sparse band with a long
+     empty tail. The margin separates it from the panel edge. The primitive forwards no class
+     and no style, so both stay on this caller-owned wrapper; everything else the deleted rule
+     declared — the edge, the fill, the corner, the glyph and both type scales — is the
+     notice's own. */
   .fabricate-app-extension-fault {
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
     max-width: 560px;
     margin: 20px;
-    padding: 14px 16px;
-    border: 1px solid var(--fab-border-strong);
-    border-radius: 10px;
-    background: var(--fab-surface-raised);
-    color: var(--fab-text);
-  }
-
-  .fabricate-app-extension-fault i {
-    color: var(--fab-danger-text);
-    font-size: 18px;
-    line-height: 1.2;
-  }
-
-  .fabricate-app-extension-fault p {
-    margin: 4px 0 0;
-    color: var(--fab-text-muted);
-    font-size: 12px;
-    line-height: 1.4;
   }
 </style>

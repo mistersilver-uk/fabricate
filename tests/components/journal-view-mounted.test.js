@@ -1,33 +1,61 @@
-// Mounted coverage for JournalView: loading / error / no-actor states, the
-// populated 3-column layout, per-column empty states, the world-time footer, and
-// run selection wiring through the shared store. JournalView consumes a
-// services.journal store; the test passes a plain mock store implementing the
-// getter/action surface (the production store is a runes factory, exercised
-// separately in tests/stores/journal-store.test.js). Uses the shared harness with
-// the FULL JournalView subtree registered so the suite cannot hang as
-// `# cancelled`.
-import { describe, it, before, after, afterEach } from 'node:test';
+import { after, afterEach, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  PLAYER_APP_COMPILED_MODULES,
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  SELECT_COMPILED_MODULES,
+  STATUS_TONE_RAW_MODULES,
+  createMountedComponentHarness,
+} from '../helpers/svelte-component-harness.js';
 import { makeCraftingRun, makeGatheringRun, makeSucceededRun } from '../helpers/journal-fixtures.js';
+import { RunJournalBuilder } from '../../src/systems/RunJournalBuilder.js';
+import { chooseSelectOption } from '../helpers/select-control.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
-
+const english = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8'));
+const component = (name) => `src/ui/svelte/components/${name}.svelte`;
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-journal-view-',
   rawModules: [
-    'src/ui/svelte/util/foundryBridge.js',
+    ...SEARCHABLE_POPOVER_RAW_MODULES,
+    ...STATUS_TONE_RAW_MODULES,
+    'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/formatDuration.js',
     'src/ui/svelte/util/worldTimeLabel.js',
+    // Issue 1648: the shared authority-refusal wording the Journal panels and stores read.
+    'src/ui/svelte/util/journalRunReasons.js',
     'src/systems/foundryCalendar.js',
-    'src/ui/svelte/apps/journal/journalRunStatus.js'
+    'src/ui/svelte/apps/journal/journalRunStatus.js',
+    'src/ui/svelte/apps/journal/historyPresentation.js',
+    'src/ui/svelte/apps/journal/runStateNotice.js',
+    'src/ui/svelte/apps/journal/runDetailPresentation.js',
+    'src/ui/svelte/apps/journal/stageHeading.js',
+    'src/ui/svelte/apps/journal/runRecovery.js',
   ],
   compiledModules: [
-    'src/ui/svelte/components/Pagination.svelte',
-    'src/ui/svelte/apps/journal/RunStatusPill.svelte',
+    ...SELECT_COMPILED_MODULES,
+    ...PLAYER_APP_COMPILED_MODULES,
+    'src/ui/svelte/components/ManagerSearchField.svelte',
+    component('Pagination'),
+    'src/ui/svelte/components/IconButton.svelte',
+    component('ManagerButton'),
+    component('RunActionBar'),
+    component('SlotTile'),
+    component('ChoiceOptionList'),
+    component('SlotRow'),
+    'src/ui/svelte/components/Stepper.svelte',
+    component('EssencePool'),
+    component('RunProgress'),
+    component('StageNav'),
+    component('StageCard'),
+    component('ListRow'),
+    component('YieldScale'),
+    component('OutcomeLadder'),
+    'src/ui/svelte/components/InspectorCard.svelte',
     'src/ui/svelte/apps/journal/JournalCard.svelte',
     'src/ui/svelte/apps/journal/JournalListShell.svelte',
     'src/ui/svelte/apps/journal/JournalFactRow.svelte',
@@ -35,237 +63,878 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/journal/ActiveRunsList.svelte',
     'src/ui/svelte/apps/journal/HistoryRow.svelte',
     'src/ui/svelte/apps/journal/HistoryList.svelte',
-    'src/ui/svelte/apps/journal/StepTimeline.svelte',
     'src/ui/svelte/apps/journal/StepDetails.svelte',
+    'src/ui/svelte/components/RadioCardGroup.svelte',
     'src/ui/svelte/apps/journal/TimeRemainingBox.svelte',
     'src/ui/svelte/apps/journal/ActionsPanel.svelte',
-    'src/ui/svelte/apps/journal/RecentResults.svelte',
-    'src/ui/svelte/apps/journal/AboutThisRun.svelte',
-    'src/ui/svelte/apps/journal/WhatToExpect.svelte',
-    'src/ui/svelte/apps/journal/JournalTips.svelte',
     'src/ui/svelte/apps/journal/RunDetail.svelte',
-    'src/ui/svelte/apps/journal/JournalView.svelte'
+    'src/ui/svelte/apps/journal/HistoricalRunDetail.svelte', 'src/ui/svelte/apps/journal/ThisRun.svelte',
+    'src/ui/svelte/apps/journal/JournalView.svelte',
   ],
-  componentPath: 'src/ui/svelte/apps/journal/JournalView.svelte'
+  rootClass: 'fabricate-app',
+  componentPath: 'src/ui/svelte/apps/journal/JournalView.svelte',
 });
 
 function makeJournal(overrides = {}) {
-  const calls = { select: [], cancel: [] };
+  const calls = Object.fromEntries(
+    ['load', 'select', 'search', 'kind', 'status', 'activeSort', 'historySort', 'activePage',
+      'activeSize', 'historyPage', 'historySize', 'execute', 'pause', 'resume',
+      'completion', 'selection', 'cancel', 'dismiss', 'viewStage'].map((key) => [key, []])
+  );
   const store = {
     loading: false,
     error: false,
-    listing: { selectedActorId: 'Actor.1' },
+    listing: { selectedActorId: 'Actor.actor-1' },
     worldTime: 0,
+    activePageItems: [],
     activeRuns: [],
+    activeCount: 0,
+    activeCounts: { all: 0, ready: 0, inProgress: 0, paused: 0 },
+    activePage: 0,
+    activePageSize: 4,
+    pageSizes: [4, 6, 12, 25],
     historyPageItems: [],
-    recentTerminalRuns: [],
-    selectedRun: null,
-    selectedRunId: '',
     historyCount: 0,
     historyPage: 0,
-    historyPageSize: 6,
-    historyPageSizes: [6, 12, 25],
+    historyPageSize: 4,
+    historyPageSizes: [4, 6, 12, 25],
+    selectedRun: null,
+    selectedRunKey: '',
+    selectedRunId: '',
+    viewedStageIndex: 0,
+    search: '',
+    kindFilter: 'all',
+    activeStatusFilter: 'all',
     activeSort: 'soonestReady',
     historySort: 'newest',
-    navCount: 0,
     loadedOnce: true,
-    busyRunId: '',
-    load() {},
-    select(id) { calls.select.push(id); },
-    setActiveSort() {},
-    setHistorySort() {},
-    setHistoryPage() {},
-    setHistoryPageSize() {},
-    advance() {},
-    cancel(run) { calls.cancel.push(run?.id ?? run); },
+    busyRunKey: '',
+    load: (...args) => calls.load.push(args),
     tickWorldTime() {},
-    ...overrides
+    select: (value) => calls.select.push(value),
+    setSearch: (value) => calls.search.push(value),
+    setKindFilter: (value) => calls.kind.push(value),
+    setActiveStatusFilter: (value) => calls.status.push(value),
+    setActiveSort: (value) => calls.activeSort.push(value),
+    setHistorySort: (value) => calls.historySort.push(value),
+    setActivePage: (value) => calls.activePage.push(value),
+    setActivePageSize: (value) => calls.activeSize.push(value),
+    setHistoryPage: (value) => calls.historyPage.push(value),
+    setHistoryPageSize: (value) => calls.historySize.push(value),
+    execute: (run) => calls.execute.push(run),
+    pause: (run) => calls.pause.push(run),
+    resume: (run) => calls.resume.push(run),
+    setCompletionMode: (run, value) => calls.completion.push([run, value]),
+    setSelection: (run, value) => calls.selection.push([run, value]),
+    cancel: (run) => calls.cancel.push(run),
+    dismiss: (run) => calls.dismiss.push(run),
+    viewStage: (run, value) => calls.viewStage.push([run, value]),
+    ...overrides,
   };
   return { store, calls };
 }
 
 function makeServices(journal) {
-  return { journal, actorBar: { selectedActorId: 'Actor.1' }, getWorldTimeComponents: () => null };
+  return {
+    journal,
+    actorBar: { selectedActorId: 'Actor.actor-1' },
+    getWorldTimeComponents: () => ({ day: 13, hour: 8, minute: 0, secondsPerDay: 86400 }),
+  };
+}
+
+const HISTORY = 'FABRICATE.App.Journal.History.';
+
+/** A terminal legacy gathering record as the builder projects it, never a hand-written yield. */
+function historicalGatheringRun(id, rows, awards) {
+  const record = {
+    id,
+    taskId: 'mining',
+    status: 'succeeded',
+    craftingSystemId: 'mining',
+    checkResult: { provider: 'd100', items: rows },
+    createdResults: awards,
+  };
+  const components = rows.map((row) => ({
+    id: row.componentId,
+    registeredItemUuid: `Compendium.ex.mat.Item.${row.componentId}`,
+  }));
+  return new RunJournalBuilder({
+    gatheringRunSource: { getRunHistory: () => [record] },
+    getSystem: () => ({ id: record.craftingSystemId, components }),
+  }).buildListing({ actor: { id: 'a', uuid: 'Actor.a' }, viewer: { isGM: true } }).history[0];
+}
+
+const award = (componentId, quantity, name) => ({
+  itemUuid: `Compendium.ex.mat.Item.${componentId}`,
+  quantity,
+  name,
+});
+
+/** The ` · `-joined evidence line, split back into the independent fields that built it. */
+const fieldsOf = (row) => row.querySelector('.fabricate-list-row-detail').textContent.split(' · ');
+
+function oddsChipOf(row) {
+  const chips = row.querySelectorAll('.manager-chip');
+  assert.equal(chips.length, 1, 'a yield row carries exactly one odds chip');
+  return chips[0];
+}
+
+async function mountHistory(run) {
+  const { store } = makeJournal({
+    historyPageItems: [run],
+    historyCount: 1,
+    selectedRun: run,
+    selectedRunKey: run.key,
+    selectedRunId: run.id,
+  });
+  return harness.mount({ services: makeServices(store) });
+}
+
+async function settle() {
+  await new Promise((resolvePromise) => setImmediate(resolvePromise));
+  flushSync();
 }
 
 describe('JournalView mounted behavior', () => {
-  before(() => harness.setup());
+  before(async () => {
+    await harness.setup();
+    const localize = globalThis.game.i18n.localize;
+    globalThis.game.i18n.localize = (key) => {
+      const prefix = 'FABRICATE.App.Journal.WhatToExpect.';
+      return key.startsWith(prefix)
+        ? english.FABRICATE.App.Journal.WhatToExpect[key.slice(prefix.length)] ?? key
+        : localize(key);
+    };
+  });
   afterEach(() => harness.remount());
   after(() => harness.teardown());
 
-  it('renders the loading state', async () => {
-    const { store } = makeJournal({ loading: true });
-    const target = await harness.mount({ services: makeServices(store) });
-    assert.ok(target.querySelector('[data-journal-state="loading"]'), 'loading state shown');
+  it('keeps loading, error, and no-actor branches explicit', async () => {
+    for (const [overrides, state] of [
+      [{ loading: true }, 'loading'],
+      [{ error: true }, 'error'],
+      [{ listing: { selectedActorId: null } }, 'empty'],
+    ]) {
+      const { store } = makeJournal(overrides);
+      const target = await harness.mount({ services: makeServices(store) });
+      assert.ok(target.querySelector(`[data-journal-state="${state}"]`));
+      harness.remount();
+    }
   });
 
-  it('renders the error state', async () => {
-    const { store } = makeJournal({ error: true });
+  it('offers a working retry action after a load error', async () => {
+    const { store, calls } = makeJournal({ error: true });
     const target = await harness.mount({ services: makeServices(store) });
-    assert.ok(target.querySelector('[data-journal-state="error"]'), 'error state shown');
+    const beforeRetry = calls.load.length;
+    target.querySelector('[data-notice-action]').click();
+    assert.equal(calls.load.length, beforeRetry + 1);
   });
 
-  it('renders the no-actor empty state', async () => {
-    const { store } = makeJournal({ listing: { selectedActorId: null } });
+  it('renders four Finished entries with truthful outcome glyphs and compact independent pagers', async () => {
+    const statuses = ['succeeded', 'failed', 'cancelled', undefined];
+    const runs = statuses.map((status, index) => makeSucceededRun({
+      id: `outcome-${index}`, key: `outcome-${index}`, status, derivedStatus: status,
+      createdResults: [{ name: 'Award does not establish success', quantity: 42 }],
+    }));
+    const { store, calls } = makeJournal({ historyPageItems: runs, historyCount: 12, activeCount: 11 });
     const target = await harness.mount({ services: makeServices(store) });
-    assert.ok(target.querySelector('[data-journal-state="empty"]'), 'no-actor empty state shown');
+    await settle();
+    const rows = [...target.querySelectorAll('[data-history-run-id]')];
+    assert.equal(rows.length, 4);
+    assert.equal(target.querySelectorAll('[data-pagination-compact]').length, 2);
+    assert.ok(!target.querySelector('[data-history-quantity], .journal-history-meta .manager-chip'));
+    assert.deepEqual(rows.map((row) => row.querySelector('[data-history-outcome]')?.getAttribute('data-history-outcome')),
+      ['succeeded', 'failed', 'cancelled', 'unknown']);
+    assert.ok(rows.every((row) => row.querySelector('[data-history-outcome]')?.getAttribute('aria-label')));
+    rows[3].dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    assert.equal(calls.select[0].id, 'outcome-3');
+    target.querySelector('[data-journal-dismiss="outcome-3"]').click();
+    assert.ok(target.querySelector('[data-journal-dismiss="outcome-3"]').classList.contains('is-size-24'), 'dismiss uses the owning 24px variant');
+    assert.equal(calls.dismiss[0].id, 'outcome-3');
+    assert.equal(calls.select.length, 1, 'dismissal does not select the entry');
   });
 
-  it('renders the populated 3-column layout with the footer', async () => {
-    const run = makeCraftingRun();
+  it('renders Browse and Detail as two zones with independently paged Active and Finished lists', async () => {
+    const active = makeCraftingRun();
+    const finished = makeSucceededRun();
     const { store } = makeJournal({
-      activeRuns: [run],
-      selectedRun: run,
-      selectedRunId: run.id,
-      historyPageItems: [makeSucceededRun()],
-      historyCount: 1,
-      recentTerminalRuns: [makeSucceededRun()],
-      navCount: 1
+      activePageItems: [active], activeRuns: [active], activeCount: 1,
+      activeCounts: { all: 1, ready: 0, inProgress: 1, paused: 0 },
+      historyPageItems: [finished], historyCount: 1,
+      selectedRun: active, selectedRunKey: active.key, selectedRunId: active.id,
     });
     const target = await harness.mount({ services: makeServices(store) });
-    assert.ok(target.querySelector('[data-journal-state="populated"]'), 'populated grid shown');
-    assert.ok(target.querySelector('.journal-view-column-left'), 'left column present');
-    assert.ok(target.querySelector('.journal-view-column-center'), 'center column present');
-    assert.ok(target.querySelector('.journal-view-column-right'), 'right column present');
-    assert.ok(target.querySelector('[data-run-id="run-craft-1"]'), 'the active run card renders');
-    assert.ok(target.querySelector('[data-journal-detail]'), 'the run detail renders in the centre');
-    assert.ok(target.querySelector('[data-journal-card="recent"]'), 'recent results render on the right');
-    assert.ok(target.querySelector('[data-journal-card="about"]'), 'about-this-run renders when a run is selected');
-    // Right-column order (mockup): about → recent (about now precedes recent).
-    const about = target.querySelector('[data-journal-card="about"]');
-    const recent = target.querySelector('[data-journal-card="recent"]');
-    assert.ok(
-      about.compareDocumentPosition(recent) & Node.DOCUMENT_POSITION_FOLLOWING,
-      'about-this-run is ordered before recent results in the right column'
-    );
-    // A multi-step crafting run uses the standard crafting explainer, not the single-step variant.
-    const expect = target.querySelector('.journal-view-column-right [data-journal-card="expect"]');
-    assert.match(expect.textContent, /WhatToExpect\.Crafting\b/, 'multi-step run uses the standard crafting copy');
-    assert.doesNotMatch(expect.textContent, /CraftingSingleStep/, 'not the single-step variant');
+
+    assert.equal(target.querySelectorAll('.journal-browse, .journal-detail-pane').length, 2);
+    assert.ok(target.querySelector('[data-run-id="run-craft-1"]'));
+    assert.ok(target.querySelector('[data-history-run-id="run-done-1"]'));
+    const activeList = target.querySelector('[data-journal-list="active"]');
+    const finishedList = target.querySelector('[data-journal-list="finished"]');
+    assert.ok(activeList.querySelector('[data-journal-list-scroll]'));
+    assert.ok(finishedList.querySelector('[data-journal-list-scroll]'));
+    assert.ok(!activeList.querySelector('[data-journal-list-scroll]').contains(activeList.querySelector('.manager-pagination')));
+    assert.ok(!finishedList.querySelector('[data-journal-list-scroll]').contains(finishedList.querySelector('.manager-pagination')));
+    assert.equal(target.querySelectorAll('.journal-list-footer .manager-pagination').length, 2);
+    assert.ok(target.querySelector('[data-journal-list="active"] [data-pagination-page]'));
+    assert.ok(target.querySelector('[data-journal-list="finished"] [data-pagination-page]'));
+    assert.ok(target.querySelector('[data-journal-detail]'));
+    assert.ok(target.querySelector('[data-journal-time-remaining]'));
+    assert.equal(target.querySelectorAll('[data-journal-summary-card]').length, 2);
+    assert.ok(!target.querySelector('.journal-view-column-right'));
+    assert.ok(!target.querySelector('[data-journal-card="recent"]'));
   });
 
-  it('suppresses the step timeline and uses finish copy for a single-step run', async () => {
-    const base = makeCraftingRun();
-    const run = makeCraftingRun({
-      id: 'run-single-1',
-      multiStep: false,
-      isFinalStep: true,
-      stepLabel: '',
-      structureLabel: 'Single-Step Recipe',
-      steps: [base.steps[0]]
-    });
-    const { store } = makeJournal({ activeRuns: [run], selectedRun: run, selectedRunId: run.id });
+  it('gives unknown, recovery and unsettled Finished outcomes localized non-success labels', async () => {
+    const runs = [
+      { derivedStatus: 'unrecognized', status: 'unrecognized' },
+      { recoveryEvidence: { required: true } },
+      { recoveryEvidence: { status: 'planned' } },
+    ].map((fields, index) => makeSucceededRun({ ...fields, id: `uncertain-${index}`, key: `uncertain-${index}` }));
+    const { store } = makeJournal({ historyPageItems: runs, historyCount: runs.length });
     const target = await harness.mount({ services: makeServices(store) });
-
-    const center = target.querySelector('.journal-view-column-center');
-    assert.ok(!center.querySelector('[data-journal-timeline]'), 'no step timeline for a single-step run');
-    // Only the structure chip renders — the blanked step-label chip is gone from the DOM.
-    assert.equal(center.querySelectorAll('.journal-detail-tag').length, 1, 'only the structure chip remains');
-
-    const trigger = target.querySelector('[data-journal-trigger]');
-    assert.ok(trigger, 'the primary action button renders');
-    assert.match(trigger.textContent, /FinishCrafting/, 'button uses the finish-crafting label');
-    // Gated (worldTime 0 < availableAt): the time-gate card shows the finish hint.
-    const gate = target.querySelector('[data-journal-time-remaining]');
-    assert.ok(gate, 'the time-gate card renders while gated');
-    assert.match(gate.textContent, /WhenPassedFinal/, 'gate hint uses the finish variant');
-    // The right-column explainer switches to the single-step crafting copy.
-    const expect = target.querySelector('.journal-view-column-right [data-journal-card="expect"]');
-    assert.match(expect.textContent, /CraftingSingleStep/, 'what-to-expect uses the single-step copy');
+    await settle();
+    const outcomes = [...target.querySelectorAll('[data-history-outcome]')];
+    assert.deepEqual(outcomes.map((node) => node.dataset.historyOutcome), ['unknown', 'recovery', 'inProgress']);
+    assert.ok(outcomes.every((node) => !node.classList.contains('is-success')));
+    assert.match(outcomes[0].getAttribute('aria-label'), /unknown/i);
+    assert.match(outcomes[1].getAttribute('aria-label'), /Recovery/i);
+    assert.match(outcomes[2].getAttribute('aria-label'), /progress/i);
   });
 
-  it('uses finish copy on the last step of a multi-step run while keeping the timeline', async () => {
-    // multiStep stays true (timeline shown) but the run is on its final step
-    // (isFinalStep true) — proving the finish copy keys off isFinalStep, not !multiStep.
-    const run = makeCraftingRun({ id: 'run-last-step', stepIndex: 1, isFinalStep: true });
-    const { store } = makeJournal({ activeRuns: [run], selectedRun: run, selectedRunId: run.id });
-    const target = await harness.mount({ services: makeServices(store) });
-
-    const center = target.querySelector('.journal-view-column-center');
-    assert.ok(center.querySelector('[data-journal-timeline]'), 'the multi-step timeline is still shown');
-    assert.match(
-      target.querySelector('[data-journal-trigger]').textContent,
-      /FinishCrafting/,
-      'the last step uses the finish-crafting label'
-    );
-    assert.match(
-      target.querySelector('[data-journal-time-remaining]').textContent,
-      /WhenPassedFinal/,
-      'the last step gate uses the finish variant'
-    );
-  });
-
-  it('keeps the gathering explainer for a gathering run (not the single-step crafting copy)', async () => {
+  it('operates search, kind, status, and both independent sort controls', async () => {
     const run = makeGatheringRun();
-    const { store } = makeJournal({ activeRuns: [run], selectedRun: run, selectedRunId: run.id });
-    const target = await harness.mount({ services: makeServices(store) });
-    const expect = target.querySelector('.journal-view-column-right [data-journal-card="expect"]');
-    assert.match(expect.textContent, /WhatToExpect\.Gathering/, 'gathering run keeps the gathering copy');
-    assert.doesNotMatch(expect.textContent, /CraftingSingleStep/, 'gathering never mis-routes to the single-step copy');
-  });
-
-  it('shows per-column empty states when there are no active or history runs', async () => {
-    const { store } = makeJournal({ activeRuns: [], historyPageItems: [], historyCount: 0 });
-    const target = await harness.mount({ services: makeServices(store) });
-    assert.ok(target.querySelector('[data-journal-empty="active"]'), 'no-active-runs empty state shown');
-    assert.ok(target.querySelector('[data-journal-empty="history"]'), 'no-history empty state shown');
-    assert.ok(target.querySelector('[data-journal-empty="detail"]'), 'no-run-selected empty state shown');
-  });
-
-  it('shows an owner-only cancel affordance that confirms then routes to store.cancel', async () => {
-    // A discovered, owned, in-progress crafting run offers the player cancel (issue 848).
-    const run = makeCraftingRun({ canCancel: true, refundOnCancel: true });
-    const { store, calls } = makeJournal({ activeRuns: [run], selectedRun: run, selectedRunId: run.id });
+    const finished = makeSucceededRun();
+    const { store, calls } = makeJournal({
+      activePageItems: [run], activeRuns: [run], activeCount: 9,
+      activeCounts: { all: 4, ready: 1, inProgress: 2, paused: 1 },
+      historyPageItems: [finished], historyCount: 9,
+    });
     const target = await harness.mount({ services: makeServices(store) });
 
-    const startBtn = target.querySelector('[data-journal-cancel-start]');
-    assert.ok(startBtn, 'the cancel-craft button renders for an owned in-progress run');
-    // No cancel is issued until the player confirms.
-    startBtn.click();
-    flushSync();
-    assert.equal(calls.cancel.length, 0, 'the first click only reveals the confirm step');
-    const prompt = target.querySelector('[data-journal-cancel-prompt]');
-    assert.ok(prompt, 'the confirm prompt appears');
-    assert.match(prompt.textContent, /CancelConfirmRefund/, 'refund-on run explains inputs return');
+    const search = target.querySelector('[data-journal-search] input');
+    search.value = 'herb';
+    search.dispatchEvent(new Event('input', { bubbles: true }));
+    chooseSelectOption(target, '[data-journal-kind-filter]', 'gathering');
+    target.querySelector('[data-journal-status-filter] input[value="ready"]').click();
+    chooseSelectOption(target, '[data-journal-sort="active"]', 'newest');
+    chooseSelectOption(target, '[data-journal-sort="history"]', 'oldest');
+    target.querySelector('[data-journal-list="active"] [data-pagination-next]').click();
+    target.querySelector('[data-journal-list="finished"] [data-pagination-next]').click();
+    chooseSelectOption(target, '[data-journal-list="active"] [data-pagination-size]', 6);
+    chooseSelectOption(target, '[data-journal-list="finished"] [data-pagination-size]', 6);
 
-    target.querySelector('[data-journal-cancel-confirm]').click();
-    flushSync();
-    assert.deepEqual(calls.cancel, [run.id], 'confirming routes to store.cancel with the run');
+    assert.deepEqual(calls.search, ['herb']);
+    assert.deepEqual(calls.kind, ['gathering']);
+    assert.deepEqual(calls.status, ['ready']);
+    assert.deepEqual(calls.activeSort, ['newest']);
+    assert.deepEqual(calls.historySort, ['oldest']);
+    assert.deepEqual(calls.activePage, [1]);
+    assert.deepEqual(calls.historyPage, [1]);
+    assert.deepEqual(calls.activeSize, [6]);
+    assert.deepEqual(calls.historySize, [6]);
+    assert.equal(target.querySelector('[data-segment-badge="4"]').textContent, '4');
   });
 
-  it('lets the player back out of a cancel with "keep crafting" (no cancel issued)', async () => {
-    const run = makeCraftingRun({ canCancel: true, refundOnCancel: false });
-    const { store, calls } = makeJournal({ activeRuns: [run], selectedRun: run, selectedRunId: run.id });
-    const target = await harness.mount({ services: makeServices(store) });
-
-    target.querySelector('[data-journal-cancel-start]').click();
-    flushSync();
-    // A forfeit system warns that inputs will NOT return.
-    assert.match(
-      target.querySelector('[data-journal-cancel-prompt]').textContent,
-      /CancelConfirmForfeit/,
-      'refund-off run warns inputs are forfeit'
-    );
-    target.querySelector('[data-journal-cancel-keep]').click();
-    flushSync();
-    assert.equal(calls.cancel.length, 0, 'backing out issues no cancel');
-    assert.ok(!target.querySelector('[data-journal-cancel-prompt]'), 'the confirm step is dismissed');
-  });
-
-  it('hides the cancel affordance for a run the player does not own', async () => {
-    const run = makeCraftingRun({ canCancel: false });
-    const { store } = makeJournal({ activeRuns: [run], selectedRun: run, selectedRunId: run.id });
-    const target = await harness.mount({ services: makeServices(store) });
-    assert.ok(!target.querySelector('[data-journal-cancel]'), 'no cancel affordance for a not-owned run');
-    // The advance button still renders — only the cancel affordance is gated.
-    assert.ok(target.querySelector('[data-journal-trigger]'), 'the advance button is unaffected');
-  });
-
-  it('routes a run-card click to the store select action', async () => {
+  // Issue 1648, D-029/M19. The filter vocabulary must not diverge from the badge vocabulary, and
+  // `Waiting` was the ONLY tab whose word the badge no longer uses. It carries the merged count,
+  // which is what makes a run between stages reachable by a tab at all.
+  it('offers All / Ready / In progress / Paused, with the merged count on the merged tab', async () => {
     const run = makeCraftingRun();
-    const { store, calls } = makeJournal({ activeRuns: [run] });
+    const { store, calls } = makeJournal({
+      activePageItems: [run], activeRuns: [run], activeCount: 6,
+      activeCounts: { all: 6, ready: 1, inProgress: 4, paused: 1 },
+    });
     const target = await harness.mount({ services: makeServices(store) });
-    target.querySelector('[data-run-id="run-craft-1"]').click();
-    assert.deepEqual(calls.select, ['run-craft-1'], 'clicking the card calls store.select with the run id');
+
+    const inputs = [...target.querySelectorAll('[data-journal-status-filter] input')];
+    assert.deepEqual(
+      inputs.map((input) => input.value),
+      ['all', 'ready', 'inProgress', 'paused'],
+      'no tab names a badge the player is never shown'
+    );
+    const merged = target.querySelector('[data-journal-status-filter] label:has(input[value="inProgress"])');
+    // The harness localizes to the key, so the WORD parity between this tab and the badge is
+    // asserted against `lang/en.json` in `tests/journal-run-reasons.test.js`.
+    assert.match(merged.textContent, /Filters\.Status\.InProgress/, 'the tab is the merged one');
+    assert.match(merged.textContent, /4/, 'and carries the merged count');
+
+    merged.querySelector('input').click();
+    assert.deepEqual(calls.status, ['inProgress']);
+  });
+
+  it('selects by the full run model so equal ids in different run types stay distinct', async () => {
+    const crafting = makeCraftingRun({ id: 'same' });
+    const gathering = makeGatheringRun({ id: 'same' });
+    const { store, calls } = makeJournal({
+      activePageItems: [crafting, gathering], activeRuns: [crafting, gathering], activeCount: 2,
+      selectedRunKey: gathering.key,
+    });
+    const target = await harness.mount({ services: makeServices(store) });
+    const rows = target.querySelectorAll('[data-run-id="same"]');
+    assert.equal(rows.length, 2);
+    assert.equal(rows[1].getAttribute('data-selected'), 'true');
+    rows[0].click();
+    assert.equal(calls.select[0], crafting);
+  });
+
+  it('dismisses a Finished row without selecting it', async () => {
+    const run = makeSucceededRun();
+    const { store, calls } = makeJournal({ historyPageItems: [run], historyCount: 1 });
+    const target = await harness.mount({ services: makeServices(store) });
+    target.querySelector('[data-journal-dismiss]').click();
+    assert.deepEqual(calls.dismiss, [run]);
+    assert.deepEqual(calls.select, []);
+  });
+
+  it('uses the shared action bar for primary, pause, completion preference, and armed cancellation', async () => {
+    const run = makeCraftingRun({
+      lifecycleContract: 'current', lifecycleVersion: 1, derivedStatus: 'ready', timeGate: null,
+      actions: { execute: true, pause: true, resume: false, setCompletionMode: true, setSelection: false, cancel: true, dismiss: false, disabledReason: null },
+    });
+    const { store, calls } = makeJournal({
+      activePageItems: [run], activeRuns: [run], activeCount: 1,
+      selectedRun: run, selectedRunKey: run.key, selectedRunId: run.id,
+    });
+    const target = await harness.mount({ services: makeServices(store) });
+    target.querySelector('[data-run-action="primary"]').click();
+    target.querySelector('[data-run-action="pause"]').click();
+    target.querySelector('[data-run-completion-switch] input[value="worldTime"]').click();
+    target.querySelector('[data-run-action="cancel-arm"]').click();
+    flushSync();
+    assert.ok(target.querySelector('[data-run-cancel-decision]'));
+    assert.ok(!target.querySelector('[data-run-action="primary"]'));
+    target.querySelector('[data-run-action="cancel-confirm"]').click();
+    assert.deepEqual(calls.execute, [run]);
+    assert.deepEqual(calls.pause, [run]);
+    assert.deepEqual(calls.completion, [[run, 'worldTime']]);
+    assert.deepEqual(calls.cancel, [run]);
+  });
+
+  it('keeps stage browsing separate from the current stage and uses no navigation for one stage', async () => {
+    const run = makeCraftingRun({ lifecycleContract: 'current', lifecycleVersion: 1 });
+    const { store, calls } = makeJournal({
+      activePageItems: [run], activeRuns: [run], activeCount: 1,
+      selectedRun: run, selectedRunKey: run.key, selectedRunId: run.id, viewedStageIndex: 0,
+    });
+    const target = await harness.mount({ services: makeServices(store) });
+    target.querySelector('[data-stage-nav-index="1"]').click();
+    assert.deepEqual(calls.viewStage, [[run, 1]]);
+    assert.equal(target.querySelector('[data-stage-card]').getAttribute('data-stage-state'), 'current');
+
+    harness.remount();
+    const single = makeCraftingRun({ steps: [run.steps[0]], stepCount: 1, multiStep: false });
+    const { store: singleStore } = makeJournal({ selectedRun: single, selectedRunKey: single.key });
+    const singleTarget = await harness.mount({ services: makeServices(singleStore) });
+    assert.ok(!singleTarget.querySelector('[data-stage-nav]'));
+    assert.ok(!singleTarget.querySelector('.fab-stage-card-number'));
+    assert.ok(singleTarget.querySelector('.fab-stage-card-body'), 'the single stage body remains rendered');
+
+    harness.remount();
+    const futureStep = {
+      ...run.steps[1],
+      inputPreview: { source: 'preview', stageIndex: 1, routes: [{ id: 'future-set', name: '',
+        groups: [{ id: 'fuel', options: [{ id: 'coal', name: 'Coal', kind: 'component', need: 2 }] }] }] },
+      detail: { ...run.steps[1].detail, failureText: 'The metal cracked.' },
+      lastCheckResult: { formula: '1d20 + 2', total: 16, value: 14, dc: 10, success: false },
+      requirementSnapshot: {
+        id: 'future-set',
+        ingredientGroups: [{
+          id: 'fuel', name: 'Fuel', quantity: 2,
+          options: [{ componentId: 'coal', name: 'Coal', quantity: 2 }],
+        }],
+      },
+      selectionPlan: { selectedIngredientSetId: 'future-set' },
+    };
+    const futureRun = makeCraftingRun({ steps: [run.steps[0], futureStep] });
+    const { store: futureStore } = makeJournal({
+      selectedRun: futureRun, selectedRunKey: futureRun.key, viewedStageIndex: 1,
+    });
+    const futureTarget = await harness.mount({ services: makeServices(futureStore) });
+    const futureCard = futureTarget.querySelector('[data-stage-card]');
+    assert.equal(futureCard.getAttribute('data-stage-state'), 'future');
+    assert.ok(futureCard.classList.contains('is-inactive'));
+    assert.match(futureCard.textContent, /Coal/);
+    assert.doesNotMatch(futureCard.textContent, /RollResultWithDc|The metal cracked/);
+    assert.ok(!futureCard.querySelector('button, input'));
+  });
+
+  it('persists an exact held-item choice and a stage-scoped essence allocation', async () => {
+    const base = makeCraftingRun();
+    const option = (index, id, name, candidate) => ({
+      index, id, kind: 'component', name, img: '', icon: 'fas fa-cube', colorToken: 'sage',
+      need: 1, available: true, candidates: [candidate],
+    });
+    const iron = option(0, 'iron', 'Iron', {
+      itemId: 'Item.iron', name: 'Iron ingot', img: '', held: 3, available: true,
+    });
+    const copper = option(1, 'copper', 'Copper', {
+      itemId: 'Item.copper', name: 'Copper ingot', img: '', held: 2, available: true,
+    });
+    const firstStep = {
+      ...base.steps[0],
+      selectionPlan: { selectedIngredientSetId: 'set-1', ingredientOptionOverrides: {} },
+      requirementSnapshot: { id: 'set-1', ingredientGroups: [] },
+      selectionAvailability: {
+        requirements: [{
+          groupId: 'metal', name: 'Metal', selectedOptionIndex: 0,
+          selectedItemId: 'Item.iron', option: iron,
+        }],
+        choices: [{ groupId: 'metal', selectedOptionIndex: 0, options: [iron, copper] }],
+        essencePool: {
+          requirements: [{
+            groupId: 'spark', essenceId: 'fire', name: 'Fire', icon: 'fas fa-fire',
+            colorToken: 'ember', need: 4, delivered: 0, owned: 4, satisfied: false,
+          }],
+          carriers: [{
+            itemKey: 'Item.crystal', componentId: 'crystal', name: 'Ember crystal', img: '',
+            perUnit: { fire: 2 }, ownedUnits: 2, allocatedUnits: 0,
+          }],
+          allocation: {}, suggested: {}, totals: {},
+        },
+      },
+    };
+    const run = makeCraftingRun({
+      lifecycleContract: 'current', lifecycleVersion: 1,
+      steps: [firstStep, base.steps[1]], currentStep: firstStep,
+      actions: { ...base.actions, setSelection: true },
+    });
+    const { store, calls } = makeJournal({ selectedRun: run, selectedRunKey: run.key });
+    const target = await harness.mount({ services: makeServices(store) });
+    target.querySelector('[data-slot-id="metal"] button').click();
+    flushSync();
+    const copperChoice = [...target.querySelectorAll('[data-choice-id]')]
+      .find((node) => node.textContent.includes('Copper ingot'));
+    copperChoice.click();
+    const essenceIncrement = target.querySelector(
+      '[data-essence-source="Item.crystal"] [data-stepper-increment]'
+    );
+    essenceIncrement.click();
+    flushSync();
+    essenceIncrement.click();
+
+    assert.equal(calls.selection[0][1].ingredientOptionOverrides.metal.optionIndex, 1);
+    assert.equal(calls.selection[0][1].ingredientOptionOverrides.metal.heldItemId, 'Item.copper');
+    assert.equal(
+      calls.selection[2][1].ingredientEssenceAllocation.allocation['Item.crystal'],
+      2
+    );
+    assert.equal(calls.selection[2][1].ingredientEssenceAllocation.stepId, 's1');
+    assert.equal(calls.selection[2][1].ingredientEssenceAllocation.ingredientSetId, 'set-1');
+  });
+
+  it('renders terminal awards through YieldScale and moves facts and guidance into Detail', async () => {
+    const run = makeSucceededRun();
+    const { store } = makeJournal({
+      historyPageItems: [run], historyCount: 1,
+      selectedRun: run, selectedRunKey: run.key, selectedRunId: run.id,
+    });
+    const target = await harness.mount({ services: makeServices(store) });
+    assert.match(target.querySelector('[data-history-items="produced"]').textContent, /Healing Potion/);
+    assert.ok(!target.querySelector('[data-journal-record]'));
+    assert.match(target.querySelector('[data-journal-this-run]').textContent, /DayWithClock/u);
+    assert.ok(target.querySelector('[data-journal-guidance]'));
+    assert.ok(!target.querySelector('[data-journal-verdict="succeeded"]'), 'ordinary reselected history has no transient success banner');
+  });
+
+  it('keeps every unrecorded historical check field unknown and borrows nothing from a neighbour', async () => {
+    const run = historicalGatheringRun(
+      'unknown-legacy',
+      [
+        { id: 'moss', componentId: 'moss' },
+        { id: 'fern', componentId: 'fern' },
+      ],
+      [award('moss', 3, 'Moss')]
+    );
+    assert.equal(run.gatheringYield.rollModel, 'unknown');
+    const target = await mountHistory(run);
+    const rows = [...target.querySelectorAll('[data-yield-entry]')];
+    assert.deepEqual(
+      rows.map((row) => row.getAttribute('data-yield-entry')),
+      ['moss', 'fern']
+    );
+    for (const row of rows) {
+      assert.deepEqual(fieldsOf(row), [
+        `${HISTORY}RollNotRecorded`,
+        `${HISTORY}ThresholdNotRecorded`,
+        `${HISTORY}OutcomeNotRecorded`,
+      ]);
+      assert.equal(row.className.includes('is-cleared'), false, 'an unknown outcome is not a hit');
+      assert.equal(row.className.includes('is-missed'), false, 'nor a miss');
+      assert.equal(oddsChipOf(row).textContent, `${HISTORY}NotRecorded`);
+    }
+    assert.deepEqual(
+      rows.map((row) => row.querySelector('.fabricate-list-row-quantity').textContent),
+      ['FABRICATE.App.Journal.Quantity:{"n":3}', `${HISTORY}NotRecorded`],
+      'the row with no receipt says so rather than inheriting the 3 or settling at zero'
+    );
+    assert.equal(
+      target.querySelectorAll('[data-yield-cut], [data-yield-shared-roll]').length,
+      0,
+      'no recorded roll, so nothing cuts the scale and no shared roll is shown'
+    );
+    assert.equal(
+      target.querySelector('[data-yield-scale] .fab-yield-kicker').textContent,
+      `${HISTORY}ScalePerRow`,
+      'and the heading does not assert "where THE roll landed" over a record with no roll at all'
+    );
+  });
+
+  it('states a legacy row roll once and never paints a recorded row with the no-roll odds tone', async () => {
+    const run = historicalGatheringRun(
+      'legacy-mining',
+      [
+        { id: 'ore', componentId: 'ore', roll: 12, effectiveRoll: 12,
+          threshold: 11, finalDropRate: 90, dropped: true },
+        { id: 'grit', componentId: 'grit', roll: 5, effectiveRoll: 5,
+          threshold: 1, finalDropRate: 100, dropped: true },
+      ],
+      [award('ore', 2, 'Ore'), award('grit', 1, 'Grit')]
+    );
+    assert.equal(run.gatheringYield.rollModel, 'perRow');
+    assert.equal(run.gatheringYield.roll, null, 'the record has no root roll to share');
+    const target = await mountHistory(run);
+    // #1648 A8: two INDEPENDENT rolls, so the scale heading may not re-assert in words the
+    // single shared cut the per-row ruling already removed from the pixels.
+    assert.equal(
+      target.querySelector('[data-yield-scale] .fab-yield-kicker').textContent,
+      `${HISTORY}ScalePerRow`
+    );
+    const rows = [...target.querySelectorAll('[data-yield-entry]')];
+    assert.deepEqual(
+      rows.map((row) => row.getAttribute('data-yield-entry')),
+      ['grit', 'ore'],
+      'rows read down from the highest recorded chance'
+    );
+    const evidence = 'exactly three fields: an effective roll equal to the raw roll adds nothing';
+    assert.deepEqual(
+      fieldsOf(rows[1]),
+      [
+        `${HISTORY}RolledValue:{"roll":12}`,
+        `${HISTORY}RecordedThreshold:{"threshold":11}`,
+        `${HISTORY}CheckCleared`,
+      ],
+      evidence
+    );
+    assert.deepEqual(
+      fieldsOf(rows[0]),
+      [
+        `${HISTORY}RolledValue:{"roll":5}`,
+        `${HISTORY}RecordedThreshold:{"threshold":1}`,
+        `${HISTORY}CheckCleared`,
+      ],
+      evidence
+    );
+    const guaranteed = oddsChipOf(rows[0]);
+    assert.equal(guaranteed.textContent, '100%');
+    assert.ok(guaranteed.className.includes('is-neutral'), guaranteed.className);
+    assert.equal(
+      guaranteed.className.includes('is-positive'),
+      false,
+      'the guaranteed-odds tone belongs to a preview with no roll, not to a row with its own outcome'
+    );
+    assert.equal(target.querySelectorAll('[data-yield-cut], [data-yield-shared-roll]').length, 0);
+    assert.ok(
+      !target.querySelector('[data-history-unattributed]'),
+      'every receipt is attributed, so nothing is listed a second time'
+    );
+  });
+
+  it('anchors a terminal detail with no browse index at its final stage', async () => {
+    const steps = Array.from({ length: 3 }, (_unused, index) => ({
+      stepId: `finished-${index}`, stepName: `Finished ${index + 1}`, status: 'succeeded',
+    }));
+    const run = makeSucceededRun({ steps, stepIndex: null, currentStep: null });
+    const { store, calls } = makeJournal({ selectedRun: run, viewedStageIndex: null });
+    const target = await harness.mount({ services: makeServices(store) });
+    assert.ok(!target.querySelector('[data-stage-nav]'));
+    assert.ok(!target.querySelector('[data-stage-nav-return]'));
+    assert.equal(target.querySelector('[data-stage-card]').dataset.stageState, 'past');
+    assert.equal(target.querySelectorAll('[data-stage-card]').length, 3);
+    assert.deepEqual(calls.viewStage, []);
+  });
+
+  it('renders the authoritative gathering preview separately from actual awards', async () => {
+    const run = makeGatheringRun({
+      gatheringYield: {
+        mode: 'd100',
+        entries: [
+          { id: 'herb', name: 'Moon herb', qty: 2, chance: 70 },
+          { id: 'seed', name: 'Moon seed', qty: 1, chance: 20 },
+        ],
+        roll: 41,
+        tiers: [],
+      },
+      createdResults: [{ componentId: 'herb', name: 'Moon herb', quantity: 2 }],
+    });
+    const { store } = makeJournal({ selectedRun: run, selectedRunKey: run.key });
+    const target = await harness.mount({ services: makeServices(store) });
+    assert.equal(target.querySelectorAll('[data-yield-scale]').length, 1, 'active scale has no duplicate received aggregate');
+    assert.ok(target.querySelector('[data-yield-cut]'));
+    assert.match(target.querySelector('.journal-detail-meta').textContent, /d100/u);
+
+    harness.remount();
+    const routed = makeGatheringRun({
+      gatheringYield: {
+        mode: 'routed', entries: [], roll: null,
+        tiers: [
+          { id: 'rich', name: 'Rich seam', band: '20+', fail: false,
+            yields: [{ id: 'ore', name: 'Moon ore', quantity: '×3' }] },
+          { id: 'barren', name: 'Barren', band: '<10', fail: true, yields: [] },
+        ],
+      },
+    });
+    const { store: routedStore } = makeJournal({
+      selectedRun: routed, selectedRunKey: routed.key,
+    });
+    const routedTarget = await harness.mount({ services: makeServices(routedStore) });
+    assert.equal(routedTarget.querySelectorAll('[data-outcome-tier]').length, 2);
+    assert.match(routedTarget.querySelector('.journal-detail-meta').textContent, /Mode\.routed/u);
+    assert.doesNotMatch(routedTarget.querySelector('.journal-detail-meta').textContent, /null/u);
+
+    harness.remount();
+    const straight = makeGatheringRun({
+      gatheringYield: {
+        mode: 'straight',
+        entries: [{ id: 'ore', name: 'Moon ore', qty: 3, chance: 100 }],
+        roll: null,
+        tiers: [],
+      },
+    });
+    const { store: straightStore } = makeJournal({
+      selectedRun: straight, selectedRunKey: straight.key,
+    });
+    const straightTarget = await harness.mount({ services: makeServices(straightStore) });
+    assert.ok(straightTarget.querySelector('[data-yield-entry="ore"]'));
+    assert.equal(straightTarget.querySelector('[data-yield-cut]'), null);
+    assert.match(straightTarget.querySelector('.journal-detail-meta').textContent, /Mode\.straight/u);
+  });
+
+  it('personalizes active d100 chances without replacing terminal evidence', async () => {
+    const active = makeGatheringRun({
+      environmentId: 'env-1',
+      gatheringYield: {
+        mode: 'd100',
+        entries: [{ id: 'herb', name: 'Moon herb', qty: 2, chance: 30 }],
+        roll: null,
+        tiers: [],
+      },
+    });
+    const { store } = makeJournal({ selectedRun: active, selectedRunKey: active.key });
+    const calls = [];
+    let resolveBreakdown;
+    const services = {
+      ...makeServices(store),
+      getGatheringDropBreakdown: (options) => {
+        calls.push(options);
+        return new Promise((resolvePromise) => {
+          resolveBreakdown = resolvePromise;
+        });
+      },
+    };
+    const target = await harness.mount({ services });
+    await settle();
+    assert.ok(target.querySelector('[data-journal-yield-loading]'));
+    resolveBreakdown({ drops: [{ id: 'herb', finalChance: 0.72 }] });
+    await settle();
+    assert.deepEqual(calls, [{ environmentId: 'env-1', taskId: 'task-1', rememberedActorId: 'Actor.actor-1' }]);
+    assert.match(target.querySelector('[data-yield-entry="herb"]').textContent, /72%/);
+
+    harness.remount();
+    const terminal = makeGatheringRun({
+      derivedStatus: 'succeeded',
+      status: 'succeeded',
+      finishedAt: 100,
+      environmentId: 'env-1',
+      createdResults: [{ componentId: 'herb', name: 'Moon herb', quantity: 2 }],
+      gatheringYield: {
+        mode: 'd100',
+        entries: [{ id: 'herb', name: 'Moon herb', qty: 2, chance: 41, cleared: true }],
+        roll: 80,
+        tiers: [],
+      },
+    });
+    const { store: terminalStore } = makeJournal({ selectedRun: terminal, selectedRunKey: terminal.key });
+    const terminalTarget = await harness.mount({ services: { ...services, journal: terminalStore } });
+    await settle();
+    assert.equal(calls.length, 1, 'terminal evidence does not request a live preview');
+    assert.match(terminalTarget.querySelector('[data-yield-entry="herb"]').textContent, /41%/);
+
+    harness.remount();
+    const redacted = makeGatheringRun({
+      redacted: true,
+      environmentId: 'env-1',
+      gatheringYield: active.gatheringYield,
+    });
+    const { store: redactedStore } = makeJournal({ selectedRun: redacted, selectedRunKey: redacted.key });
+    const redactedTarget = await harness.mount({ services: { ...services, journal: redactedStore } });
+    await settle();
+    assert.equal(calls.length, 1, 'redacted runs never request personalized evidence');
+    assert.ok(!redactedTarget.querySelector('[data-journal-yield-loading]'));
+  });
+
+  it('reports a personalized gathering preview failure and keeps the authored scale visible', async () => {
+    const run = makeGatheringRun({
+      environmentId: 'env-1',
+      gatheringYield: {
+        mode: 'd100',
+        entries: [{ id: 'herb', name: 'Moon herb', qty: 2, chance: 30 }],
+        roll: null,
+        tiers: [],
+      },
+    });
+    const { store } = makeJournal({ selectedRun: run, selectedRunKey: run.key });
+    const target = await harness.mount({
+      services: {
+        ...makeServices(store),
+        getGatheringDropBreakdown: () => Promise.reject(new Error('unavailable')),
+      },
+    });
+    await settle();
+    assert.ok(target.querySelector('[data-journal-yield-error]'));
+    assert.match(target.querySelector('[data-yield-entry="herb"]').textContent, /30%/);
+  });
+
+  it('hides a matured time callout while retaining time and no-check facts', async () => {
+    const base = makeCraftingRun();
+    const step = {
+      ...base.steps[0],
+      detail: { ...base.steps[0].detail, checkLabel: null, checkKind: 'none' },
+      timeGate: { availableAt: 100, initiatedAt: 0, requiredSeconds: 100 },
+    };
+    const run = makeCraftingRun({
+      lifecycleContract: 'current',
+      lifecycleVersion: 1,
+      derivedStatus: 'ready',
+      steps: [step],
+      currentStep: step,
+      stepCount: 1,
+      multiStep: false,
+      timeGate: step.timeGate,
+    });
+    const { store } = makeJournal({ worldTime: 200, selectedRun: run, selectedRunKey: run.key });
+    const target = await harness.mount({ services: makeServices(store) });
+    assert.ok(!target.querySelector('[data-journal-time-remaining]'));
+    assert.equal(target.querySelectorAll('[data-journal-summary-card]').length, 2);
+    assert.match(target.querySelector('[data-journal-summary-card="check"]').textContent, /NoCheck|No check/u);
+    const guidance = target.querySelector('[data-journal-guidance]').textContent;
+    assert.match(guidance, /no check.*finish crafting to complete/iu);
+    assert.doesNotMatch(guidance, /roll/iu);
+  });
+
+  it('describes current gathering as manually resolved while preserving legacy guidance', async () => {
+    const current = makeGatheringRun({ lifecycleContract: 'current', lifecycleVersion: 1 });
+    const { store } = makeJournal({ selectedRun: current, selectedRunKey: current.key });
+    const currentTarget = await harness.mount({ services: makeServices(store) });
+    const currentGuidance = currentTarget.querySelector('[data-journal-guidance]').textContent;
+    assert.match(currentGuidance, /available action to resolve/iu);
+    assert.doesNotMatch(currentGuidance, /resolves automatically/iu);
+
+    harness.remount();
+    const legacy = makeGatheringRun();
+    const { store: legacyStore } = makeJournal({ selectedRun: legacy, selectedRunKey: legacy.key });
+    const legacyTarget = await harness.mount({ services: makeServices(legacyStore) });
+    assert.match(
+      legacyTarget.querySelector('[data-journal-guidance]').textContent,
+      /resolves automatically/iu
+    );
+  });
+
+  it('freezes paused time and reads summary facts from the stage being viewed', async () => {
+    const base = makeCraftingRun();
+    const current = {
+      ...base.steps[0],
+      detail: { ...base.steps[0].detail, checkLabel: 'CURRENT CHECK' },
+      timeGate: { availableAt: 1000, initiatedAt: 0, requiredSeconds: 1000 },
+    };
+    const future = {
+      ...base.steps[1],
+      detail: { ...base.steps[1].detail, requiredSeconds: 7200, checkLabel: 'FUTURE CHECK' },
+      timeGate: null,
+    };
+    const paused = makeCraftingRun({
+      derivedStatus: 'paused',
+      pauseState: { pausedAt: 250, remainingSeconds: 750 },
+      steps: [current, future],
+      currentStep: current,
+      timeGate: current.timeGate,
+    });
+    const { store } = makeJournal({ worldTime: 500, selectedRun: paused, selectedRunKey: paused.key });
+    const currentTarget = await harness.mount({ services: makeServices(store) });
+    assert.match(currentTarget.querySelector('[data-journal-summary-card="time"]').textContent, /12m 30s/u);
+    assert.ok(!currentTarget.querySelector('[data-journal-time-remaining]'));
+
+    harness.remount();
+    store.viewedStageIndex = 1;
+    const futureTarget = await harness.mount({ services: makeServices(store) });
+    assert.ok(!futureTarget.querySelector('[data-journal-summary]'));
+    // D-025: a future stage states the time it NEEDS in words; only a live countdown is H:M:S.
+    assert.match(
+      futureTarget.querySelector('[data-stage-card]').textContent,
+      /Duration\.HourMany:\{"count":2\}/u
+    );
+    assert.doesNotMatch(futureTarget.querySelector('[data-stage-card]').textContent, /2h 0m 0s/u);
+    const check = futureTarget.querySelector('[data-stage-card]').textContent;
+    assert.match(check, /FUTURE CHECK/u);
+    assert.doesNotMatch(check, /CURRENT CHECK/u);
+  });
+
+  it('shows a run-scoped command failure and operates its retry action', async () => {
+    const run = makeCraftingRun({ lifecycleContract: 'current', lifecycleVersion: 1 });
+    const { store, calls } = makeJournal({
+      selectedRun: run,
+      selectedRunKey: run.key,
+      commandError: { runKey: run.key, actorUuid: run.actorUuid, message: 'The run changed.' },
+    });
+    store.retryCommandError = () => {
+      calls.execute.push('retry');
+      store.commandError = null;
+    };
+    const services = makeServices(store);
+    const target = await harness.mount({ services });
+    const notice = target.querySelector('[data-journal-command-error]');
+    assert.ok(notice, 'the command failure notice is visible for the selected run');
+    assert.match(notice.textContent, /The run changed\./u);
+    notice.querySelector('[data-notice-action]').click();
+    assert.deepEqual(calls.execute, ['retry']);
+
+    harness.remount();
+    const cleared = await harness.mount({ services });
+    assert.ok(!cleared.querySelector('[data-journal-command-error]'));
+  });
+
+  it('offers the GM the release on the very run whose own evidence is uncertain', async () => {
+    // M27: the run holding the uncertain effect reports `recoveryRequired` from its OWN
+    // evidence, so the notice that describes it used to answer `claim: null` and withhold the
+    // one control that can clear the claim blocking the world. It is the run a GM opens first.
+    const run = makeCraftingRun({
+      lifecycleContract: 'current', lifecycleVersion: 1,
+      recoveryEvidence: { required: true, appliedEffectCount: 1, effects: [] },
+      actions: {
+        execute: false, pause: false, resume: false, setCompletionMode: false,
+        setSelection: false, cancel: false, dismiss: false, disabledReason: 'recoveryRequired',
+        recoveryClaim: { claimId: 'claim-9', requestKind: 'command', claimedAt: 2000 },
+      },
+    });
+    const { store } = makeJournal({ selectedRun: run, selectedRunKey: run.key });
+    const target = await harness.mount({ services: makeServices(store) });
+    const notice = target.querySelector('[data-journal-recovery]');
+    assert.ok(notice, 'the uncertain-effect notice still leads');
+    const action = notice.querySelector('[data-notice-action]');
+    assert.ok(Boolean(action), 'and it carries the release the GM needs');
+    assert.match(action.textContent, /Recovery\.Action/u);
+  });
+
+  it('shows recovery evidence without disclosing selection internals on a redacted owner run', async () => {
+    const run = makeCraftingRun({
+      redacted: true, names: { title: 'Hidden recipe', subtitle: '' }, steps: [], currentStep: null,
+      lifecycleContract: 'current', lifecycleVersion: 1,
+      recoveryEvidence: { required: true, appliedEffectCount: 2, effects: [] },
+      actions: { execute: false, pause: false, resume: false, setCompletionMode: false, setSelection: false, cancel: false, dismiss: false, disabledReason: 'recoveryRequired' },
+    });
+    const { store } = makeJournal({ selectedRun: run, selectedRunKey: run.key });
+    const target = await harness.mount({ services: makeServices(store) });
+    assert.ok(target.querySelector('[data-journal-recovery]'));
+    assert.match(target.textContent, /Hidden recipe/);
+    assert.doesNotMatch(target.textContent, /selectedIngredientSetId/);
   });
 });

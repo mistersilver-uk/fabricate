@@ -150,6 +150,15 @@
     background: var(--fab-surface-soft);
   }
 
+  /* NOT a kicker, and deliberately OUT OF SCOPE for the conversion. This label is the only
+     one of the candidates whose content is authored GM data rather than a fixed localized
+     category word, and it is the step's HEADLINE: converting it to the 8.5px
+     `--fab-text-subtle` rung collapsed it onto the same level as the "Requirements" label
+     BENEATH it, and left it smaller and fainter than both the 11px accent ordinal to its left
+     and the 10px duration chip to its right — so a duration chip became the most prominent
+     text in the row. A shape that ranks below the things it introduces is not the shape the
+     kicker names, so the type half stays here until the hierarchy is designed rather than
+     inherited. */
   .crafting-step-label {
     display: flex;
     align-items: center;

@@ -41,11 +41,11 @@
       >{mode === 'manual'
         ? text(
             'FABRICATE.Admin.Manager.EnvironmentEditor.Events.ManualIntro',
-            'Only events you explicitly include apply here. You can add matching events or force add non-matching events.'
+            'Only events you add apply here, whether or not they match this environment.'
           )
         : text(
             'FABRICATE.Admin.Manager.EnvironmentEditor.Events.AutomaticIntro',
-            'All matching enabled library events apply unless you exclude them here.'
+            'All matching enabled library events apply here. Exclude any of them here, or force add a non-matching event.'
           )}</span
     >
   </p>

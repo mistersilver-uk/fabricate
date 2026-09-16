@@ -20,15 +20,23 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-import-report-',
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     'src/ui/svelte/actions/portal.js',
+    // The shared portal-host resolver (issue 1466): `ManagerModal` imports it to find the
+    // application root it portals its dialog into.
+    'src/ui/svelte/util/overlayHost.js',
   ],
   compiledModules: [
     // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
     // harness omits HANGS the suite (# cancelled) rather than failing it.
-    'src/ui/svelte/apps/manager/Chip.svelte',
+    'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/apps/manager/ManagerModal.svelte',
+    // THE manager's labelled push-button (issue 1118). The footer Close renders it.
+    // Omitting a rendered `.svelte` HANGS the suite (# cancelled) rather than failing it.
+    'src/ui/svelte/components/ManagerButton.svelte',
+    'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/apps/manager/ImportReportModal.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/ImportReportModal.svelte',

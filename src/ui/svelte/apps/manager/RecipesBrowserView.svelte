@@ -17,17 +17,19 @@
   live in the pure `recipeBrowserModel.js`; this component only renders.
 -->
 <script>
-  import Chip from './Chip.svelte';
+  import Chip from '../../components/Chip.svelte';
   import EmptyState from './EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
+  import ManagerButton from '../../components/ManagerButton.svelte';
   import Medallion from '../../components/Medallion.svelte';
-  import StatusPill from '../../components/StatusPill.svelte';
+  import StatusToggle from '../../components/StatusToggle.svelte';
   import CollapsibleGroupHeader from '../../components/CollapsibleGroupHeader.svelte';
   import SelectionCheckbox from '../../components/SelectionCheckbox.svelte';
   import SegmentedControl from './SegmentedControl.svelte';
   import BulkSelectionToolbar from './BulkSelectionToolbar.svelte';
   import { resolveRecipeImage } from '../../util/craftingImageDefaults.js';
+  import { statusChipTone } from '../../util/statusChipTone.js';
   import { getRecipeCategoryLabel } from '../../../../utils/recipeCategories.js';
   import {
     describeRecipeSelection,
@@ -42,6 +44,10 @@
     deriveRecipeIo,
     deriveRecipeStatuses,
   } from '../../../../utils/recipeBrowserModel.js';
+  import IconButton from '../../components/IconButton.svelte';
+  import Notice from '../../components/Notice.svelte';
+  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
+  import ManagerToolbar from '../../components/ManagerToolbar.svelte';
 
   let {
     recipes = [],
@@ -114,13 +120,35 @@
   // The error is never surfaced from inside this component — it has no Foundry
   // notification path at all — which is what makes the seam stubbable in a mounted
   // test and keeps the suppression invariant enforceable.
-  let flashMessage = $state('');
+  //
+  // TWO PARTS SINCE ISSUE 1515, because the vehicle is a `<Notice>` and its specimen draws a
+  // `title` naming what happened over a quieter `detail` saying why. The store hands the sink
+  // both — `localizeRecipeActivationParts` builds each half from its own material rather than
+  // cutting the one-line message at a colon a translation is free to move — and the one-line
+  // string stays the fallback for any refusal that is not an activation error (a persistence
+  // failure, or a raw `error.message`), which carries no name/reasons split to make.
+  let flashTitle = $state('');
+  let flashDetail = $state('');
+
+  // A REFUSAL COUNTER, WHICH THE SHARED NOTICE MAKES NECESSARY (issue 1515). `Notice` owns its
+  // own dismissal — `library.html:1079` declares `dismissable` as a boolean with no caller to
+  // tell, so the component simply leaves the DOM — and this view's message is not always new.
+  // Clearing the term and setting it again inside ONE toggle is a single batched update, so the
+  // `{#if}` never goes false and the same component instance survives with `dismissed` still
+  // true: refuse, dismiss, refuse the same recipe again, and the second refusal would be
+  // silent. Keying the block on a counter that rises on every refusal is what makes each one a
+  // new notice, which is the behaviour the bespoke strip had for free by clearing the caller's
+  // own state on dismissal.
+  let flashToken = $state(0);
 
   function handleToggleEnabled(recipe) {
-    flashMessage = '';
+    flashTitle = '';
+    flashDetail = '';
     onToggleEnabled(recipe.id, recipe.enabled === false, {
-      onBlocked: (message) => {
-        flashMessage = message;
+      onBlocked: (message, parts) => {
+        flashTitle = parts?.title || message;
+        flashDetail = parts?.title ? parts.detail : '';
+        flashToken += 1;
       },
     });
   }
@@ -442,30 +470,67 @@
   what the breadcrumb and the titlebar's gold system badge already said.
 -->
 <main class="manager-main" aria-label={text('FABRICATE.Admin.Manager.Nav.Recipes', 'Recipes')}>
+  <!--
+    THE BLOCKED-ENABLE NOTICE, WHICH IS THE SHARED PRIMITIVE NOW (issue 1515).
+
+    It still REPLACES the Foundry notification — the store suppresses its own toast while this
+    view owns the message through the `onBlocked` sink — so it is the only place a GM is told
+    why the switch did not move, and it still does not auto-hide.
+
+    TWO THINGS CHANGED, and both are the design system's rulings rather than preferences.
+    `openspec/specs/design-system/spec.md` routes a strip carrying `role="alert"` to a BLOCKING
+    notice, which is the one form that keeps the role, and it fixes a browse screen's element
+    order: a blocking notice sits between the page header and the filter bar. This route has no
+    per-view page header, so that position is the first child of the content region. The bespoke
+    toast that floated bottom-centre over the list is therefore retired, along with the four
+    `.manager-recipe-flash*` rules that painted it: a notice is a bar in the page's own flow, and
+    a second geometry for the same meaning is exactly what the primitive exists to remove.
+
+    THE SLOT IS UNCONDITIONAL AND THE NOTICE INSIDE IT IS NOT. `.manager-main` is a grid whose
+    tracks this route names explicitly, so a CONDITIONAL direct child would move the collapsing
+    `minmax(0, 1fr)` onto a different child in each state — the defect
+    `assertOneTrackPerGridChild` names on three other routes. An empty slot is a zero-height
+    `auto` row, and the sheet gives it its inset only when it holds a notice.
+  -->
+  <div class="manager-recipe-notice">
+    {#key flashToken}
+      {#if flashTitle}
+        <!-- NO `icon`, DELIBERATELY (issue 1515). `Notice` ships a per-tone default glyph and the
+             danger tone's default IS the specimen's danger mark; passing one here re-stated the
+             primitive's own choice from a call site, which is the drift the default exists to
+             prevent. The prop stays for the two accent callers whose glyph the specimen does not
+             declare. -->
+        <Notice
+          blocking
+          tone="danger"
+          title={flashTitle}
+          detail={flashDetail}
+          dismissable
+          dismissLabel={text('FABRICATE.Admin.Manager.Recipe.DismissFlash', 'Dismiss')}
+          dataAttr="data-recipe-flash"
+        />
+      {/if}
+    {/key}
+  </div>
+
   <!-- `tabindex="-1"` makes this landmark a FOCUS TARGET without making it a tab stop
        (issue 1157) — see the twin note in `EssenceBrowserView`. The manager root lands the
        keyboard here when an action empties the bulk selection and unmounts the panel that
        was acted on, addressing it through `data-recipe-toolbar`. -->
-  <section
-    class="manager-toolbar manager-recipe-toolbar"
+  <ManagerToolbar
+    class="manager-recipe-toolbar"
     tabindex="-1"
-    data-recipe-toolbar
-    aria-label={text('FABRICATE.Admin.Manager.Recipe.Filters', 'Recipe filters')}
+    data-keyboard-focus="true"
+    data-recipe-toolbar=""
+    ariaLabel={text('FABRICATE.Admin.Manager.Recipe.Filters', 'Recipe filters')}
   >
     <div class="manager-recipe-filter-row">
-      <label class="manager-search">
-        <i class="fas fa-search" aria-hidden="true"></i>
-        <input
-          type="search"
-          value={recipeSearchTerm || ''}
-          oninput={(event) => onSearchChange(event.currentTarget.value)}
-          placeholder={text(
-            'FABRICATE.Admin.Manager.Recipe.SearchPlaceholder',
-            'Search recipes...'
-          )}
-          aria-label={text('FABRICATE.Admin.Manager.Recipe.SearchLabel', 'Search recipes')}
-        />
-      </label>
+      <ManagerSearchField
+        value={recipeSearchTerm || ''}
+        onInput={(next) => onSearchChange(next)}
+        placeholder={text('FABRICATE.Admin.Manager.Recipe.SearchPlaceholder', 'Search recipes...')}
+        ariaLabel={text('FABRICATE.Admin.Manager.Recipe.SearchLabel', 'Search recipes')}
+      />
       <SegmentedControl
         options={statusOptions}
         value={ui.statusFilter}
@@ -535,18 +600,12 @@
           <span class="manager-recipe-filter-label" id="manager-recipe-group-label"
             >{text('FABRICATE.Admin.Manager.Recipe.GroupByCategory', 'Group by category')}</span
           >
-          <button
-            type="button"
-            class={`manager-status-toggle ${ui.groupByCategory ? 'is-on' : 'is-off'}`}
-            data-recipe-group-toggle
-            aria-pressed={ui.groupByCategory}
+          <StatusToggle
+            on={ui.groupByCategory}
+            data-recipe-group-toggle=""
             aria-labelledby="manager-recipe-group-label"
             onclick={() => (ui.groupByCategory = !ui.groupByCategory)}
-          >
-            <span class="manager-status-toggle-track" aria-hidden="true"
-              ><span class="manager-status-toggle-knob"></span></span
-            >
-          </button>
+          />
         </div>
         <span class="manager-recipe-filter-divider" aria-hidden="true"></span>
       {/if}
@@ -564,9 +623,8 @@
             <option value={key}>{sortLabel(key)}</option>
           {/each}
         </select>
-        <button
-          type="button"
-          class="manager-button manager-recipe-sort-direction"
+        <ManagerButton
+          class="manager-recipe-sort-direction"
           data-recipe-sort-direction={ui.sortDirection}
           aria-label={text(
             'FABRICATE.Admin.Manager.Recipe.ToggleSortDirection',
@@ -585,7 +643,7 @@
               ? text('FABRICATE.Admin.Manager.Recipe.SortAscending', 'Asc')
               : text('FABRICATE.Admin.Manager.Recipe.SortDescending', 'Desc')}</span
           >
-        </button>
+        </ManagerButton>
       </div>
     </div>
 
@@ -648,31 +706,7 @@
       onSelectAllResults={selectAllResults}
       onClear={clearBulkSelection}
     />
-  </section>
-
-  {#if flashMessage}
-    <!-- The blocked-enable flash. It REPLACES the Foundry notification (the store
-         suppresses it when this owns the message) so the GM is never told the same
-         thing twice; it is an error, so it is a dismissible role="alert" that does
-         not auto-hide.
-
-         It FLOATS over the list (absolutely positioned against the recipes
-         `.manager-main`), rather than sitting in flow between the toolbar and the
-         first row, where its appearance shoved every row down the page. -->
-    <div class="manager-recipe-flash" role="alert" data-recipe-flash>
-      <i class="fas fa-circle-exclamation" aria-hidden="true"></i>
-      <span class="manager-recipe-flash-message">{flashMessage}</span>
-      <button
-        type="button"
-        class="manager-icon-button manager-recipe-flash-dismiss"
-        data-recipe-flash-dismiss
-        aria-label={text('FABRICATE.Admin.Manager.Recipe.DismissFlash', 'Dismiss')}
-        onclick={() => (flashMessage = '')}
-      >
-        <i class="fas fa-times" aria-hidden="true"></i>
-      </button>
-    </div>
-  {/if}
+  </ManagerToolbar>
 
   <section
     class="manager-table-scroll"
@@ -698,12 +732,8 @@
           'No recipes match your filters.'
         )}
       >
-        <button
-          type="button"
-          class="manager-button"
-          data-clear-filters="recipes"
-          onclick={clearFilters}
-          >{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</button
+        <ManagerButton data-clear-filters="recipes" onclick={clearFilters}
+          >{text('FABRICATE.Admin.Manager.ClearFilters', 'Clear filters')}</ManagerButton
         >
       </EmptyState>
     {:else}
@@ -723,18 +753,18 @@
             >{text('FABRICATE.Admin.Manager.Recipe.Column.Recipe', 'Recipe')}</span
           >
           <div class="manager-recipe-head-cluster">
-            <span class="manager-recipe-head-cell is-io"
+            <span class="manager-recipe-head-cell fab-truncate is-io"
               >{text('FABRICATE.Admin.Manager.Recipe.Column.Requirements', 'Requirements')}</span
             >
-            <span class="manager-recipe-head-cell is-check"
+            <span class="manager-recipe-head-cell fab-truncate is-check"
               >{text('FABRICATE.Admin.Manager.Recipe.Column.Check', 'Check')}</span
             >
             <!-- STATUS spans both the lock and the enable-toggle columns: lock and
                  enable are both status controls, so the header sits over the pair. -->
-            <span class="manager-recipe-head-cell is-status"
+            <span class="manager-recipe-head-cell fab-truncate is-status"
               >{text('FABRICATE.Admin.Manager.Recipe.Column.Status', 'Status')}</span
             >
-            <span class="manager-recipe-head-cell is-edit"></span>
+            <span class="manager-recipe-head-cell fab-truncate is-edit"></span>
           </div>
         </div>
         {#each model.groups as group (group.category || '__ungrouped')}
@@ -772,12 +802,22 @@
                       class="manager-recipe-identity"
                       onclick={() => onSelectRecipe(recipe.id)}
                     >
-                      <Medallion src={resolveRecipeImage(recipe)} icon="fas fa-scroll" size={40} />
+                      <Medallion
+                        art={resolveRecipeImage(recipe)}
+                        alt=""
+                        icon="fas fa-scroll"
+                        size={40}
+                      />
                       <span class="manager-system-copy">
                         <span class="manager-recipe-name-row">
                           <span class="manager-system-name" title={recipe.name}>{recipe.name}</span>
                           {#each statusPills(recipe) as pill (pill.id)}
-                            <StatusPill tone={pill.tone} icon={pill.icon} label={pill.label} />
+                            <Chip
+                              tone={statusChipTone(pill.tone)}
+                              icon={pill.icon}
+                              truncate
+                              title={pill.label}>{pill.label}</Chip
+                            >
                           {/each}
                         </span>
                         <span
@@ -827,12 +867,11 @@
                         <span>{check.label}</span>
                       </Chip>
 
-                      <button
-                        type="button"
-                        class={`manager-icon-button manager-recipe-lock ${recipe.locked ? 'is-locked' : ''}`}
+                      <IconButton
+                        class={`manager-recipe-lock ${recipe.locked ? 'is-locked' : ''}`}
                         data-recipe-lock={recipe.locked === true}
                         aria-pressed={recipe.locked === true}
-                        aria-label={format(
+                        ariaLabel={format(
                           recipe.locked
                             ? 'FABRICATE.Admin.Manager.Recipe.UnlockNamed'
                             : 'FABRICATE.Admin.Manager.Recipe.LockNamed',
@@ -849,7 +888,7 @@
                           class={recipe.locked ? 'fas fa-lock' : 'fas fa-lock-open'}
                           aria-hidden="true"
                         ></i>
-                      </button>
+                      </IconButton>
 
                       <!--
                         No "On"/"Off" text IN THE ROW. The track colour already carries
@@ -859,11 +898,9 @@
                         in the manager, where a switch has no pill beside it.)
                       -->
                       <span class="manager-recipe-status">
-                        <button
-                          type="button"
-                          class={`manager-status-toggle ${recipe.enabled === false ? 'is-off' : 'is-on'}`}
-                          aria-pressed={recipe.enabled !== false}
-                          aria-label={format(
+                        <StatusToggle
+                          on={recipe.enabled !== false}
+                          ariaLabel={format(
                             recipe.enabled === false
                               ? 'FABRICATE.Admin.Manager.Recipe.EnableNamed'
                               : 'FABRICATE.Admin.Manager.Recipe.DisableNamed',
@@ -871,11 +908,7 @@
                             { name: recipe.name }
                           )}
                           onclick={() => handleToggleEnabled(recipe)}
-                        >
-                          <span class="manager-status-toggle-track" aria-hidden="true">
-                            <span class="manager-status-toggle-knob"></span>
-                          </span>
-                        </button>
+                        />
                       </span>
 
                       <!--
@@ -885,11 +918,10 @@
                         toolbar and truncated the description; a single edit pencil next to
                         the enable switch is the row's primary action and does not.
                       -->
-                      <button
-                        type="button"
-                        class="manager-icon-button manager-recipe-edit"
+                      <IconButton
+                        class="manager-recipe-edit"
                         data-recipe-edit={recipe.id}
-                        aria-label={format(
+                        ariaLabel={format(
                           'FABRICATE.Admin.Manager.Recipe.EditNamed',
                           'Edit {name}',
                           { name: recipe.name }
@@ -898,7 +930,7 @@
                         onclick={() => onEditRecipe(recipe.id)}
                       >
                         <i class="fas fa-pen" aria-hidden="true"></i>
-                      </button>
+                      </IconButton>
 
                       <!--
                         The bulk selection box (issue 1010), AFTER the Edit pencil and

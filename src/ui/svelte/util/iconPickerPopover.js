@@ -27,16 +27,24 @@ function clamp(value, min, max) {
  * behaviour rather than a guessed height.
  *
  * @param {number} maxHeight The popover's own max height.
- * @param {object} options `rowPitch` (row height + the gap between rows) and `chromeHeight`
- *   (everything in the popover that is not the list: its padding, the search field, the gap).
+ * @param {object} options `rowPitch` (row height + the gap between rows), `chromeHeight`
+ *   (everything in the popover that is not the list: its padding, the search field, the gap) and
+ *   `listExtra` (height rendered INSIDE the list that no pitch can see).
  * @returns {number|null} The list's max height, or `null` when it cannot be derived.
  */
 function floorListToWholeRows(maxHeight, options) {
   const rowPitch = Number(options?.rowPitch) || 0;
   const chromeHeight = Number(options?.chromeHeight) || 0;
+  // HEIGHT RENDERED INSIDE THE LIST THAT NO PITCH CAN SEE. `rowPitch` is a row's border box plus
+  // the list's `row-gap`, and an outer margin on a row sits outside that box — the extra gap the
+  // sheet puts under a pinned row is the case. It is subtracted BEFORE the floor, because it
+  // competes with the rows for the same space, and added back AFTER it, because the list's own
+  // box is what has to contain it. Counting it as popover chrome does only the first half, which
+  // changes the row COUNT and leaves the list exactly one margin too short for what it renders.
+  const listExtra = Number(options?.listExtra) || 0;
   if (rowPitch <= 0) return null;
 
-  const available = maxHeight - chromeHeight;
+  const available = maxHeight - chromeHeight - listExtra;
   // A popover too short for even one row still shows one, clipped: refusing to render the list
   // at all would be a worse answer than a cramped one, and the caller cannot open a picker with
   // no options in it.
@@ -44,7 +52,7 @@ function floorListToWholeRows(maxHeight, options) {
   // `rows` pitches minus the trailing gap: N rows carry only N-1 gaps between them, so keeping
   // the last gap would reintroduce exactly the sliver this exists to remove.
   const trailingGap = Number(options?.rowGap) || 0;
-  return Math.max(0, rows * rowPitch - trailingGap);
+  return Math.max(0, rows * rowPitch - trailingGap + listExtra);
 }
 
 export function computeIconPickerPopoverLayout(triggerRect, viewport, options = {}) {

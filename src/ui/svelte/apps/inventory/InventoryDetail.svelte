@@ -21,6 +21,7 @@
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import EmptyState from '../manager/EmptyState.svelte';
   import InventoryBookDetail from './detail/InventoryBookDetail.svelte';
   import InventoryComponentDetail from './detail/InventoryComponentDetail.svelte';
 
@@ -52,9 +53,25 @@
 </script>
 
 {#if !item}
+  <!--
+    THE PANE'S FILL IS THE CALLER'S, THE PANEL IS THE PRIMITIVE'S (issue 1514). This state
+    stands in for the whole inspector column, so it must fill the height the selected item's
+    detail would have filled. `EmptyState` is padding-driven and declares no height, and its
+    documented fill escape is `contextClass`, "whose rules live in the global sheet"
+    (`EmptyState.svelte:53-55`) — which would put `styles/fabricate.css` on this change's path.
+    So `.inventory-detail-empty` survives as a caller-owned WRAPPER declaring the fill and the
+    centring and nothing else, which is the answer `PlayerViewState` and
+    `GatheringEnvironmentList` both take for the same reason.
+
+    The hook stays ON THE WRAPPER, which is the box it has always sat on, so it keeps rendering
+    `data-inventory-detail-empty=""` rather than the `="true"` `EmptyState` coerces a bare hook
+    to (`EmptyState.svelte:84`, `dataValue || true`).
+  -->
   <div class="inventory-detail-empty" data-inventory-detail-empty>
-    <i class="fas fa-boxes-stacked" aria-hidden="true"></i>
-    <p>{localize('FABRICATE.App.Inventory.Detail.SelectHint')}</p>
+    <EmptyState
+      icon="fas fa-boxes-stacked"
+      title={localize('FABRICATE.App.Inventory.Detail.SelectHint')}
+    />
   </div>
 {:else if isRecipeItem}
   <InventoryBookDetail {item} {onOpenRecipe} {onLearn} {onLearnAll} {learningRecipeId} />
@@ -78,25 +95,13 @@
 {/if}
 
 <style>
+  /* THE WRAPPER ONLY: the fill and the centring the pane needs, and nothing about the tile,
+     the type or the ink — those belong to the panel nested inside it now. */
   .inventory-detail-empty {
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 12px;
     height: 100%;
     padding: var(--fab-space-4);
-    text-align: center;
-    color: var(--fab-text-muted);
-  }
-
-  .inventory-detail-empty i {
-    font-size: 28px;
-    opacity: 0.7;
-  }
-
-  .inventory-detail-empty p {
-    margin: 0;
-    font-size: 13px;
   }
 </style>

@@ -342,6 +342,40 @@ const LAB_ROLL_STATICS = {
   },
 };
 
+/**
+ * THE PLAYER ROSTER A CROWDED WORLD HAS, seeded on request rather than by default (issue 1515).
+ *
+ * `game.users.players` holds ONE non-GM user in the resting lab world, which is truthful for a
+ * two-seat table and leaves two states of the Access route's Players roster unreachable: it pages
+ * at seven and its per-roster search only has something to miss once there is something to find.
+ * Two frames photograph those states, and nothing else in the corpus asks for them — so this
+ * table is OPT-IN, reached only through `mount.js`'s `manyPlayers` query flag, and every other
+ * frame keeps the roster it had.
+ *
+ * SEVEN, and the number is derived rather than chosen: the roster pages at
+ * `GrantAccessInspector.svelte`'s `ROSTER_PAGE_SIZE` of six, so seven added to the resting one is
+ * the smallest roster that fills a page AND has a second one. `tests/view-lab-cases.test.js`
+ * re-derives that arithmetic from this table and from the component's own constant rather than
+ * restating either, because a fixture that quietly fell to six would publish a full page with no
+ * bar under a case named for the bar.
+ *
+ * NAMES AND ROLES ARE BOTH LOAD-BEARING. The manager sorts this roster by name
+ * (`SvelteCraftingSystemManagerApp.svelte.js`'s `getWorldUsers`), so the names decide which six
+ * land on page one and an alphabet is the only way to make that stable and readable. The roles
+ * decide the subtitle each row draws, and the two a grantable user can actually hold — Player and
+ * Trusted Player — are both represented, because a roster drawing one subtitle eight times
+ * photographs a field that could be a constant.
+ */
+const LAB_EXTRA_PLAYER_USERS = Object.freeze([
+  { id: 'user-lab-player-bram', name: 'Bram Holt', role: 1, css: '#a3c9a8' },
+  { id: 'user-lab-player-cass', name: 'Cass Vane', role: 2, css: '#e0b1cb' },
+  { id: 'user-lab-player-doryn', name: 'Doryn Vale', role: 1, css: '#ffb703' },
+  { id: 'user-lab-player-elspeth', name: 'Elspeth Rue', role: 1, css: '#bde0fe' },
+  { id: 'user-lab-player-ferrin', name: 'Ferrin Ashe', role: 2, css: '#c77dff' },
+  { id: 'user-lab-player-goss', name: 'Goss Merrow', role: 1, css: '#90be6d' },
+  { id: 'user-lab-player-hallis', name: 'Hallis Tarn', role: 1, css: '#f4a261' },
+]);
+
 export function installFoundryShim(world) {
   const random = installLabRandom({ seed: world.seed });
   const utils = createUtils(random.randomID);
@@ -364,16 +398,29 @@ export function installFoundryShim(world) {
     id: 'user-lab-player',
     name: 'Lab Player',
     isGM: false,
+    // DECLARED, and it was not before (issue 1515). `Users#players` is
+    // `!u.isGM && u.hasRole('PLAYER')`, so a roster entry with no role at all is not a player
+    // Foundry would put in that array — and the manager reads the field to draw each row's
+    // subtitle, which rendered `None` for the one user the lab had. A role-NONE user cannot be
+    // granted a recipe, so the frame was drawing an ungrantable target in a grant roster.
+    role: 1,
     color: { css: '#8ecae6' },
   };
+
+  // Rebuilt rather than mutated when the crowded roster is asked for: `createCollection` closes
+  // over the array it was handed AND over an id map built once, so pushing into `contents` would
+  // leave `game.users.get()` unable to find anything added.
+  function usersCollection(players) {
+    return Object.assign(createCollection([gmUser, ...players]), {
+      activeGM: gmUser,
+      players,
+    });
+  }
 
   const game = {
     ready: true,
     user: gmUser,
-    users: Object.assign(createCollection([gmUser, playerUser]), {
-      activeGM: gmUser,
-      players: [playerUser],
-    }),
+    users: usersCollection([playerUser]),
     actors: Object.assign(createCollection(world.actorList), {
       // The smoke imports its crafter and travel member from the hero pack rather than creating
       // them, so this is the call that decides who owns the inventory every craftability frame reads.
@@ -386,9 +433,48 @@ export function installFoundryShim(world) {
         return actor;
       },
     }),
-    items: createCollection([]),
+    // THE WORLD ITEM ROSTER, SEEDED FROM THE DOCUMENT INDEX RATHER THAN LEFT EMPTY.
+    //
+    // This started as `createCollection([])`, so `game.items.contents` held only the Items a
+    // frame created at runtime through `Item.createDocuments`. Every screen that resolves a
+    // linked game-world Item reads this collection — `getWorldItemOptions` in
+    // `SvelteCraftingSystemManagerApp.svelte.js` maps it directly — so the world Tool and
+    // Component screens were photographed against a roster no GM has: an EMPTY one.
+    //
+    // Two consequences, and both were invisible. `toolSourceSnapshot` falls back
+    // `worldItem || managedItem || tool`, so a linked tile drew the TOOL's own name and art and
+    // looked entirely correct while never once exercising the resolved-Item path it exists for.
+    // And `sourceMissing` requires a non-empty roster on purpose — a roster that has not loaded
+    // must not be mistaken for a broken link — so `ItemDropZone`'s `missing` face was
+    // unreachable in the lab by construction, which is what made a case for it fail the whole
+    // capture rather than one frame.
+    //
+    // The index already mints an Item per component, tool and recipe item (`buildDocumentIndex`);
+    // it was simply never wired to the collection the product reads. Actors and scenes share the
+    // index and are filtered out by uuid prefix.
+    items: createCollection(
+      Array.from(world.documents?.values?.() ?? []).filter((document) =>
+        String(document?.uuid ?? '').startsWith('Item.')
+      )
+    ),
+    // `current` is what the Manager's Travel → Map Region Links tab reads; `active` is what the
+    // three canvas windows fall back to (issue 1520). `InteractablesManagerApp._scene()` is
+    // `globalThis.canvas?.scene ?? globalThis.game?.scenes?.active ?? null`, and it is the only
+    // reader of `scenes.active` in the product — so this one key is the whole of what those
+    // windows need. Both name the same scene here, which is the ordinary Foundry state.
+    //
+    // NOT a synthetic `globalThis.canvas`, and the difference is not cosmetic. `canvas` appears
+    // nowhere in this shim today and `canvas?.` is read 33 times across 5 product files, so a
+    // partial canvas would flip every EXISTING lab frame from the absent branch to a
+    // present-but-incomplete one. THE CAVEAT THAT LEAVES: `_gridSize()` reads `canvas`
+    // exclusively and therefore takes its 100 fallback in every lab frame, so any grid-derived
+    // geometry in a captured frame is the fallback's rather than a scene's. Nothing rendered by
+    // the three windows is grid-derived today — the fallback reaches only the Drawing-marker
+    // create seam, which no case drives — but a case that ever photographs a created marker's
+    // size is photographing 100, not the lab scene's grid.
     scenes: Object.assign(createCollection(world.scenes ?? []), {
       current: world.scenes?.[0] ?? null,
+      active: world.scenes?.[0] ?? null,
     }),
     journal: createCollection([]),
     folders: createCollection([]),
@@ -566,6 +652,45 @@ export function installFoundryShim(world) {
     getSpeaker(options = {}) {
       return { alias: options.actor?.name ?? 'Fabricate', actor: options.actor?.id ?? null };
     },
+
+    // Visibility, and why BOTH statics are modelled rather than the one this lab's version needs.
+    //
+    // Production asks for `applyMode` first and falls back to `applyRollMode`, because V14 renamed
+    // the static and deprecated the old name (`client/documents/chat-message.mjs`: `applyMode` at
+    // :151, `applyRollMode` at :654 carrying a `logCompatibilityWarning` until v16). Fabricate
+    // supports both, so the shim has to answer for both or the lab silently exercises one branch.
+    //
+    // These were absent while the production call was OPTIONAL (`applyRollMode?.(...)`), which made
+    // a missing static a silent no-op: the lab rendered a bulk salvage card that had never had any
+    // visibility applied and looked correct doing it. Issue 1286 made the call unconditional so a
+    // future rename cannot quietly turn a whispered GM card into table-wide chat, and that turned
+    // the same gap into a thrown TypeError that failed `player-inventory-bulk-report`. Both
+    // outcomes came from the shim, not from production — the fail-closed call is right, and a lab
+    // that cannot answer a documented static is what was wrong.
+    applyMode(chatData, mode) {
+      const data = chatData ?? {};
+      let whisper = data.whisper ?? [];
+      if (mode === 'public') whisper = [];
+      else if (mode === 'self') whisper = [globalThis.game?.user?.id].filter(Boolean);
+      else if (whisper.length === 0 && (mode === 'gm' || mode === 'blind')) {
+        whisper = (globalThis.game?.users?.filter((user) => user.isGM) ?? []).map((user) => user.id);
+      }
+      data.whisper = whisper;
+      data.blind = mode === 'blind';
+      return data;
+    },
+    applyRollMode(chatData, mode) {
+      // The deprecated spelling maps the legacy token and delegates, exactly as V14 does. Kept
+      // deliberately: production reaches it only when `applyMode` is absent, and a lab that
+      // omitted it could never exercise that fallback at all.
+      const V14_MODE_BY_LEGACY = {
+        publicroll: 'public',
+        gmroll: 'gm',
+        blindroll: 'blind',
+        selfroll: 'self',
+      };
+      return globalThis.ChatMessage.applyMode(chatData, V14_MODE_BY_LEGACY[mode] ?? mode);
+    },
   };
 
   // The smoke's world-document block opens by deleting stale data from a previous run. In a lab
@@ -678,6 +803,29 @@ export function installFoundryShim(world) {
      */
     setViewer(role) {
       game.user = role === 'player' ? playerUser : gmUser;
+    },
+    /**
+     * Grow the world's non-GM roster to the crowded shape two Access frames need (issue 1515).
+     *
+     * Called from `mount.js` after the world is built and before the manager's services are, for
+     * `setViewer`'s reason: `getWorldUsers()` reads `game.users.players` when the projection is
+     * built, so the roster has to be in place by then and nothing re-reads it afterwards.
+     *
+     * @returns {number} How many non-GM users the roster now holds, so a caller can assert it.
+     */
+    seedPlayerRoster() {
+      const players = [
+        playerUser,
+        ...LAB_EXTRA_PLAYER_USERS.map(({ id, name, role, css }) => ({
+          id,
+          name,
+          isGM: false,
+          role,
+          color: { css },
+        })),
+      ];
+      game.users = usersCollection(players);
+      return players.length;
     },
     /**
      * Choose how the lab answers a dialog Foundry would wait on a human for: `open` to leave it

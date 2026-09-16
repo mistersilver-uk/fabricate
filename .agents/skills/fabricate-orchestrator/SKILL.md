@@ -15,6 +15,7 @@ Make behavior changes here, not in the bindings.
 - `openspec/README.md` for the issue-based change-delta format and managed-block rules
 - the work's GitHub issue context supplied by the workflow driver, including any existing `openspec-delta` block
 - relevant canonical specs under `openspec/specs/`
+- `openspec/specs/design-system/spec.md` when planning any UI-touching change, so the plan names the primitives it reuses and states explicitly which, if any, it extends or adds
 - the **Agent Roles & Bindings** table in `AGENTS.md` to resolve routing tokens to the provider agents that bind to these skills, together with its `Family` table for a model-tiered family
 - the **Model tier routing** section of `AGENTS.md` for the per-spawn selection ladder, its stage thresholds, the model-tier floors, the `HIGH_RISK_PATHS` list, and the `ESCALATE_TIER` protocol
 - `.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md` for isolated lane assignment, integration, artifacts, feedback, and cleanup
@@ -28,7 +29,7 @@ The **workflow driver** is the top-level loop — Codex's depth-0 prompt agent o
 A spawned `fabricate_orchestrator` is a read-only planning helper.
 It inspects the supplied repository and issue context, resolves the roster, and returns a complete draft or replacement `openspec-delta` managed block for the driver to apply.
 It never edits files, commits, pushes, manages worktrees, mutates GitHub state, or spawns another agent.
-Each loop iterates until acceptance or hits a 3-revision cap; at the cap, halt and surface findings to the user.
+Each loop runs one full round by default; the driver applies mechanical findings itself and spawns only disposition-only confirmation rounds at model tier `medium` after that, per `AGENTS.md`'s **Iteration cycles**; the 3-revision cap is the stop condition — at the cap, halt and surface findings to the user.
 Every spawned role uses the isolated lane lifecycle in `.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md` by default.
 The driver retains exclusive authority over the coordinator checkout, integration, GitHub and remote mutations, authoritative gates, and lane cleanup.
 The numbered state-machine procedure belongs to the driver; a spawned helper performs only its read-only planning analysis and handoff portions from the context in its brief.
@@ -40,7 +41,10 @@ It prioritizes the earliest honestly reviewable PR while preserving mandatory sa
 
 - Front-load cheap checks before expensive or delegated work: branch and base freshness, affected paths and resolved roster, PR title and commitlint compliance, existing CI and external-check state, and screenshot scope.
 - Treat one mechanically valid evidence run as satisfying every gate it directly covers, and record or retain that evidence instead of repeating equivalent checks ceremonially.
-- Repeat a reviewer only when the commit or artifact it reviews materially changes within its owned concern, or when one of its findings remains unresolved.
+- Repeat a reviewer only when the commit or artifact it reviews materially changes within its owned concern, or when one of its findings remains unresolved — and then as a disposition-only confirmation round at model tier `medium`, scoped to its own prior findings, never as a second full reading.
+- Apply mechanical findings yourself: a finding that names exact replacement text, an anchor, a count or a roster entry goes straight into the next delta revision or the fix brief, and does not cost a reviewer spawn to confirm.
+- Prune a path-signal role at the post-implementation and docs stages when its row fired on prose alone (comments, docblocks, cites, counts; no executable line, selector, assertion or requirement sentence; at or below the stage's `SMALL_MAX`), per step 5 of `AGENTS.md`'s **Auto-spawn routing**; record the pruned role in the handoff.
+- Plan issues that share an exact-count ledger as one delta and one PR chain, and run changes as parallel lanes only when their path sets are disjoint from each other's pinned ledgers, sheet regions and registry prose; otherwise sequence them on one rail.
 - Do not invalidate an approval merely because issue or PR metadata changed or a rebase is patch-equivalent for the reviewed concern.
 - When repeat review is required, use a fresh detached lane pinned to the exact target and supply an immutable base-relative artifact.
 - Monitor each delegated lane for observable progress, such as tool output, a status report, a diff, or a commit.
@@ -79,23 +83,23 @@ Keep the delta concrete, using the block's sections (`### Proposal`, `### Design
 7. **Plan review loop.** From a clean committed coordinator baseline, the driver may create detached planning and plan-review lanes using the preliminary roster derived from the current affected-file proposal; approval is not a prerequisite for these read-only lanes.
 The driver runs the plan-review agents in parallel against the issue delta.
 Each emits `APPROVED / NEEDS_CHANGES / BLOCKED` to the driver — reviewers do not post verdicts as issue or PR comments.
-The driver rewrites the delta block in response to `NEEDS_CHANGES` and re-runs the affected reviewers.
+The driver applies the mechanical findings to the delta block itself and re-spawns a reviewer only as a disposition-only confirmation round at model tier `medium`, per `AGENTS.md`'s **Iteration cycles**.
 Treat any `BLOCKED` verdict as a stop condition.
 Hard cap: 3 plan revisions before escalating.
-8. Update the visible plan with `update_plan` once all plan reviewers approve.
+8. Update the visible plan with `update_plan` once every plan-review finding is applied or dispositioned.
 9. Before mutable implementation fan-out, require an approved delta, the final roster, a clean committed coordinator baseline, disjoint path ownership, and integrated dependencies, then create each assigned lane according to `.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md`.
 For every spawn of a model-tiered family, resolve exactly one model tier first, keyed on the `(family token, stage, revision)` triple, by applying the ladder in `AGENTS.md` to the facts already held at that point, then record the resolved model tier and those facts in the lane brief.
 10. **Implementation review loop.** The driver hands off to the implementer with explicit file ownership; the implementer makes the canonical spec changes under `openspec/specs/` that the delta's `### Spec Deltas` require.
 When the implementer reports done, the driver runs `fabricate_reviewer` plus any post-implementation reviewers from the resolved roster, supplying them the issue delta alongside the diff.
 Reviewers compare the actual `openspec/specs/` diff against the proposed delta and confirm a faithful realization (or flag a justified deviation for reconciliation).
-Loop on `NEEDS_CHANGES` until every reviewer emits `APPROVED`.
+Loop on `NEEDS_CHANGES` until every finding is applied, dispositioned by a confirmation round, or recorded as a Deviation, per `AGENTS.md`'s **Iteration cycles**.
 Hard cap: 3 implementation revisions.
 11. **Documentation iteration loop.** If the change touches behaviour, public API, hooks, settings, or any JSDoc/Jekyll-documented surface, the driver runs the paired `fabricate_domain_expert` + `fabricate_docs_writer` loop:
 
 - domain-expert updates `DOMAIN.md` and canonical specs against the diff, and reconciles the issue delta — updating the `openspec-delta` block (and its `### Deviations` note) when the shipped canonical spec justifiably differs from the proposed delta;
 - docs-writer updates JSDoc and the Jekyll site under `docs/` to match the shipped canonical spec;
 - each then reviews the other's output and emits `DOCS APPROVED / DOCS NEEDS_CHANGES` against the diff;
-- loop until both emit `DOCS APPROVED`.
+- loop until both emit `DOCS APPROVED` — one full round, then disposition-only confirmation.
 Hard cap: 3 docs revisions.
 
 1. Ensure the driver has integrated the completed lane commits into the coordinator branch and represented them with a draft PR targeting `main`; feedback updates go through retained or fresh revision lanes and then the same integration branch and PR unless the user explicitly asks for a replacement.
@@ -132,10 +136,12 @@ Before rebasing any branch at all, check whether its own PR already merged (`gh 
 Parallel (not stacked) PRs need the same care for a different reason: when two independent branches off `main` touch the SAME file or reference each other's paths, GitHub's `mergeable` flag only checks for a TEXTUAL conflict — a clean auto-merge can still leave a semantic duplicate (two copies of a rewritten section) or a dangling reference (one PR deletes a file a doc in the other still cites by path, which then fails `validate:agents`).
 Plan the merge order, and rebase whichever merges second to reconcile the shared file rather than trusting `mergeable`.
 - Use GitHub issue numbers such as `#42`, not legacy task IDs, when the issue exists.
-- For quick-start docs work, route changes only to `docs/quickstart.md`.
+- For quick-start docs work, route changes only to `docs/help/quickstart.md`.
 - For tasks centered on `src/ui/`, `styles/`, or UX behavior, make the plan prefer the local Vite dev server first, then the View Lab for reproducible full-window frames, and reserve `npm run test:foundry` for runtime-sensitive validation or a view the case registry does not cover.
 - For UI work, do not let “screenshot captured” stand as acceptance.
 Define what screenshots must prove: first visible state, image/content fidelity, clipping, spacing, alignment, scroll containment, visible controls, and relevant window sizes.
+- For a screen with a design prototype, the delta carries the reachable-state matrix of `.agents/skills/fabricate-ux-designer/references/prototype-parity-measurement.md` — every reachable state paired with the View Lab case that reaches it, the mounted test that acts on it, and its parity-spec screen — and names the harness run and the before, after and control captures as post-implementation steps the driver performs from the integrated coordinator before the review round.
+A state with no case is closed in the plan by registering one; a divergence from the prototype that the design-system library does not require is escalated before implementation, never recorded after it.
 - Require the UX reference comparison and reuse inventory before approving a non-trivial UI plan; authority is per control and state, not per whole artifact.
 - Keep screen-specific UI behavior in canonical specs (or, while still being planned, the issue's `openspec-delta` block).
 Skills and agents should point to those documents instead of carrying detailed product contracts.
@@ -143,7 +149,7 @@ Skills and agents should point to those documents instead of carrying detailed p
 **The default producer is the View Lab, and for a registry-covered view you usually plan NO capture work at all**: the `capture` CI job maps the PR's changed files to cases and publishes the affected frames into the PR body on every push, so evidence exists before anyone asks.
 Plan a local run only when you need frames before pushing or want to inspect a state directly: `node scripts/view-lab-screenshots.mjs apps <comma-separated-case-ids>` writes into `ui-screenshot-artifact/apps/` in seconds, and `ui-screenshot-artifact/apps/index.html` browses them by screen with a multi-tag filter.
 Targeting is per changed file: a typical UI file selects a handful of cases, the widest selects 35 (~3 min).
-A change to the lab's own fixture world, mount page, capture driver or registry selects **surface coverage** by design — one frame of every route and tab the lab renders, 36 of 248 cases — not every publishable case, because the detailed states of a screen are captured by the files that draw them, not by a shared input.
+A change to the lab's own fixture world, mount page, capture driver or registry selects **surface coverage** by design — one frame of every route and tab the lab renders, 48 of 485 cases — not every publishable case, because the detailed states of a screen are captured by the files that draw them, not by a shared input.
 Do NOT plan the smoke as the routine producer.
 Its `screenshots` profile costs ~31s per frame against the lab's ~5s, needs Docker and a licensed container, and cannot run on a GitHub Actions runner at all — so it produces nothing per-PR and serialises the lane on one machine.
 Reserve it for a view the registry does not cover, or for a question about real Foundry runtime behaviour: `npm run test:foundry:screenshots` captures the changed-file-affected views (from `mapChangedFilesToViews`, via `npm run screenshots:ui:targets`) as full real-Foundry app windows; `full` stays the occasional outer-loop suite.
@@ -165,6 +171,10 @@ The script uses exact manifest keys and does not require `s3:ListBucket`.
 A converged cap-hit can be closed with a single maintainer-authorized finisher round; a dispute needs a maintainer decision first, so naming which kind it is tells the user what to resolve.
 - When a maintainer decision supersedes an issue's delta, quote that decision VERBATIM as binding in every lane brief and append it to the issue body, so implementers and reviewers never relitigate it.
 - In Default collaboration mode, do not stop for extra user input unless the task is genuinely blocked.
+- Cap what the workflow writes about itself, because only the driver can stop this prose being written.
+An `openspec-delta` block states the decisions and the acceptance they are judged against, not the history that produced them, and each entry under `### Deviations` is one line.
+A lane brief carries the assignment, owned paths, allowed checks and the facts the model tier was resolved from; a handover reports what shipped, what was skipped and why, and nothing else.
+Anything past that is the shape `AGENTS.md` names under "Observed failure mode: bloat".
 
 ## PR description template
 

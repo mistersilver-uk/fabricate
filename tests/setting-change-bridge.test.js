@@ -142,6 +142,71 @@ describe('handleFabricateSettingChange', () => {
     ]);
   });
 
+  // The WORLD character libraries leg (issue 1308). It departs from the currency leg above in two
+  // ways, and both are silent when got wrong — which is why they are pinned here rather than left
+  // to the fact that the leg "looks like" its siblings.
+  it('reloads the character-libraries store and announces the UNION of all three domains', () => {
+    const emitted = [];
+    const order = [];
+    const handled = handleFabricateSettingChange('fabricate.characterLibraries', {
+      characterLibrariesStore: {
+        load: () => order.push('load'),
+      },
+      craftingSystemManager: {
+        getSystems: () => [{ id: 'alpha' }, { id: 'beta' }],
+      },
+      callAll: (hook, payload) => {
+        order.push(hook);
+        emitted.push([hook, payload]);
+      },
+    });
+
+    assert.equal(handled, true);
+    // ORDERING IS A MUST, not an accident. Every consumer of the announcements reads the
+    // libraries back through this store, so announcing first hands them the pre-edit libraries
+    // and caches that as the new truth.
+    assert.equal(order[0], 'load', 'the store is re-read BEFORE anything is announced');
+
+    const [republish, change] = emitted;
+    assert.equal(republish[0], 'fabricate.craftingSystemsChanged');
+    assert.equal(change[0], 'fabricate.craftingDataChanged');
+    assert.deepEqual(
+      change[1].scopes,
+      [
+        // EVERY system, not just participants: there is no participation flag here by design, so
+        // any system may reference any entry by id.
+        //
+        // And all THREE domains. Before the move the two libraries lived on the crafting system
+        // and were classified separately — `modifiers: [resolution-config]` and
+        // `characterPrerequisites: [labelling, access-and-knowledge]` — so an edit to either
+        // announced its own domains through the `craftingSystems` write. One setting cannot say
+        // WHICH library moved, so narrowing this to `resolution-config` alone (which is exactly
+        // what copying the currency leg produces) silently stops announcing the other two.
+        { systemId: 'alpha', domains: ['labelling', 'resolution-config', 'access-and-knowledge'] },
+        { systemId: 'beta', domains: ['labelling', 'resolution-config', 'access-and-knowledge'] },
+      ],
+      'every system, carrying the union of the three domains the two libraries used to carry'
+    );
+  });
+
+  it('character libraries: emits NOTHING in a world with no crafting systems', () => {
+    // Same reasoning as the currency leg's zero-participant case: an empty scope list poisons
+    // `craftingDataChange` into a broad invalidation of every shell in the world.
+    const emitted = [];
+    const handled = handleFabricateSettingChange('fabricate.characterLibraries', {
+      characterLibrariesStore: { load: () => {} },
+      craftingSystemManager: { getSystems: () => [] },
+      callAll: (hook, payload) => emitted.push([hook, payload]),
+    });
+
+    assert.equal(handled, true);
+    assert.deepEqual(
+      emitted.map(([hook]) => hook),
+      ['fabricate.craftingSystemsChanged'],
+      'the manager republish still fires; the scoped change does not'
+    );
+  });
+
   it('emits NOTHING when no system participates, rather than an unattributable payload', () => {
     // `craftingDataChange` treats an empty domain set as poisoning the whole payload into a
     // broad invalidation, so emitting an empty-scope change here would invalidate every shell
@@ -239,6 +304,159 @@ describe('main.js settings hook wiring', () => {
       mainSource,
       /handleFabricateSettingChange\(key, fabricateSettingChangeTargets\(\)\);/,
       'the shared listener must call the factory, not close over a snapshot'
+    );
+  });
+});
+
+// --- World scope stores (issue 1359, epic 1357) ---------------------------------------------
+// A client that booted before the migrating GM wrote keeps `isSeeded() === false` for the whole
+// session. That is harmless while this change is additive — but once the epic's migration strips
+// the in-system arrays, that client has an unseeded world corpus AND an empty legacy corpus, so
+// its union read answers NOTHING and it sees no components, essences or tools at all until reload.
+describe('the world scope legs', () => {
+  // FOUR LEGS SINCE ISSUE 1392, and the fourth is not a scoped-entity store. Each row carries
+  // its own factory, its own replicated payload and its own probe, because the World Vocabulary
+  // has no `entities` sub-key and no entity roster to read back — parameterising those three is
+  // what lets one loop state one claim about all four rather than a fourth hand-written copy.
+  const SCOPES = [
+    {
+      name: 'componentScope',
+      key: 'fabricate.componentScope',
+      target: 'componentScopeStore',
+      module: '../src/systems/worldScopeStores.js',
+      factory: 'createComponentScopeStore',
+      subKey: 'entities',
+      payload: { entities: [{ id: 'w1', name: 'Replicated' }] },
+      ids: (store) => store.listEntities().map((entity) => entity.id),
+    },
+    {
+      name: 'essenceScope',
+      key: 'fabricate.essenceScope',
+      target: 'essenceScopeStore',
+      module: '../src/systems/worldScopeStores.js',
+      factory: 'createEssenceScopeStore',
+      subKey: 'entities',
+      payload: { entities: [{ id: 'w1', name: 'Replicated' }] },
+      ids: (store) => store.listEntities().map((entity) => entity.id),
+    },
+    {
+      name: 'toolScope',
+      key: 'fabricate.toolScope',
+      target: 'toolScopeStore',
+      module: '../src/systems/worldScopeStores.js',
+      factory: 'createToolScopeStore',
+      subKey: 'entities',
+      payload: { entities: [{ id: 'w1', name: 'Replicated' }] },
+      ids: (store) => store.listEntities().map((entity) => entity.id),
+    },
+    {
+      name: 'worldVocabulary',
+      key: 'fabricate.worldVocabulary',
+      target: 'worldVocabularyStore',
+      module: '../src/systems/WorldVocabularyStore.js',
+      factory: 'createWorldVocabularyStore',
+      subKey: 'componentTags',
+      payload: { componentTags: [{ id: 'w1', name: 'w1' }] },
+      ids: (store) => store.list('componentTags').map((entry) => entry.id),
+    },
+  ];
+
+  for (const scope of SCOPES) {
+    it(`reloads the ${scope.name} store BEFORE announcing, so a consumer reads the post-edit corpus`, async () => {
+      // THE ORDER IS THE WHOLE POINT. Every consumer that reacts reads the corpus back through the
+      // store, so announcing first hands it the pre-edit value and caches that as the new truth.
+      // Proven by a consumer that reads from INSIDE the announcement, rather than by asserting a
+      // call order — a `['load','emit']` order assertion passes against a `load()` that read the
+      // wrong key.
+      const module = await import(scope.module);
+      const values = new Map();
+      const store = module[scope.factory]({
+        getSetting: (key) => values.get(key),
+        setSetting: async (key, value) => values.set(key, value),
+      });
+      store.load();
+      assert.equal(store.isSeeded(scope.subKey), false, 'unwritten before the replicated write');
+
+      // The replicated write lands in the settings store first; the hook fires afterwards.
+      values.set(scope.name, scope.payload);
+
+      const observed = [];
+      const handled = handleFabricateSettingChange(scope.key, {
+        [scope.target]: store,
+        craftingSystemManager: { getSystems: () => [{ id: 's1' }] },
+        callAll: () => {
+          observed.push({ seeded: store.isSeeded(scope.subKey), ids: scope.ids(store) });
+        },
+      });
+
+      assert.equal(handled, true);
+      assert.ok(observed.length > 0, 'the leg announced at least once');
+      for (const seen of observed) {
+        assert.equal(seen.seeded, true, 'isSeeded() is RE-DERIVED before any consumer is told');
+        assert.deepEqual(seen.ids, ['w1'], 'and the corpus is the post-edit one');
+      }
+    });
+
+    it(`tolerates a missing ${scope.name} store`, () => {
+      assert.equal(handleFabricateSettingChange(scope.key, { callAll: () => {} }), true);
+    });
+  }
+
+  it('drives EVERY store `src/main.js` hands the bridge, with the exemptions stated inline', () => {
+    // ── THE MIRROR THIS CLOSES ────────────────────────────────────────────────────────────
+    // `WORLD_STORE_LEGS` is an unexported frozen array, and the `SCOPES` table above is a
+    // hand-maintained copy of part of it. Before this, a store registered, constructed, loaded
+    // and handed to the bridge with NO leg was invisible: the key is not handled, nothing
+    // reports the miss, and the client's corpus stays at whatever it read at boot for the whole
+    // session. That is the exact failure the three issue-1359 legs exist to prevent, and it was
+    // reachable again for every later store.
+    //
+    // KEYED ON `fabricateSettingChangeTargets()` AND NOT ON `WORLD_SCOPED_SETTING_KEYS`. The
+    // targets factory is the actual enumeration of stores the bridge can drive; the key set has
+    // 27 members against 6 legs and carries no store information at all, so keying on it would
+    // need a ~21-entry hand-maintained exemption list — a second unguarded mirror in place of
+    // the first.
+    const mainSource = readFileSync(resolve(import.meta.dirname, '..', 'src/main.js'), 'utf8');
+    const bridgeSource = readFileSync(
+      resolve(import.meta.dirname, '..', 'src/config/settingChangeBridge.js'),
+      'utf8'
+    );
+    const targetsStart = mainSource.indexOf('const fabricateSettingChangeTargets = () => ({');
+    assert.notEqual(targetsStart, -1, 'the targets factory is still present');
+    const targetsBody = mainSource.slice(
+      targetsStart,
+      mainSource.indexOf('\n  });', targetsStart) + 6
+    );
+    const targets = [...targetsBody.matchAll(/\n {4}(\w+): /g)].map((match) => match[1]);
+    const legsSource = bridgeSource.slice(
+      bridgeSource.indexOf('const WORLD_STORE_LEGS = Object.freeze(['),
+      bridgeSource.indexOf(']);', bridgeSource.indexOf('const WORLD_STORE_LEGS = Object.freeze(['))
+    );
+    const legs = [...legsSource.matchAll(/store: '(\w+)'/g)].map((match) => match[1]);
+
+    // POSITIVE CONTROLS, because both slices are `indexOf` reads that answer an empty string on
+    // a miss and would make the subtraction below compare two empty sets.
+    assert.ok(targets.length > 5, 'the targets slice found the factory body');
+    assert.ok(targets.includes('componentScopeStore'), 'and it reaches the world-store block');
+    for (const known of ['componentScopeStore', 'essenceScopeStore', 'toolScopeStore']) {
+      assert.ok(legs.includes(known), `the legs slice found ${known}`);
+    }
+
+    const EXEMPT = new Set([
+      // Not stores. The manager and the recipe manager have their own branches above the leg
+      // lookup, and `callAll` is the bound hook emitter every leg is handed.
+      'craftingSystemManager',
+      'recipeManager',
+      'callAll',
+      // Driven by its own listener branch rather than by a leg, because its announcement is a
+      // single dedicated hook rather than the systems-scoped invalidation the legs emit.
+      'gatheringEnvironmentStore',
+    ]);
+    assert.deepEqual(
+      targets.filter((name) => !EXEMPT.has(name)).sort(),
+      legs.slice().sort(),
+      'every store `src/main.js` hands the bridge must have a leg that reloads it, or be ' +
+        'exempted above with its reason. A store with no leg NO-OPS silently.'
     );
   });
 });

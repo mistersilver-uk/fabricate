@@ -1,0 +1,1655 @@
+# Contributing to Fabricate
+
+## Development Workflow
+
+### Mandatory Process for ALL Code Changes
+
+**All non-trivial code changes must follow this OpenSpec workflow:**
+
+1. **Read the Canonical Spec** – Start with the relevant file(s) in `openspec/specs/*/spec.md`
+2. **Capture the Change Delta in the Issue** – Author the OpenSpec delta in the work's GitHub issue, inside the managed `openspec-delta` block (append it to an existing issue and preserve the reporter's text, or create one from the `OpenSpec Change Delta` issue template for prompt-driven work).
+It is not versioned under `openspec/changes/`.
+3. **Fill the Delta Sections** – Proposal, Design, Tasks, optional Spec Deltas, Resolved Roster, and Verification & Acceptance before implementation
+4. **Await Approval** – Plan-review agents (and any maintainer) accept the delta via plan-review verdicts on the issue before implementation begins
+5. **Implement** – Write code and make the canonical spec changes the delta requires under `openspec/specs/`
+6. **Reconcile** – Post-implementation and docs review compare the actual `openspec/specs/` diff against the issue delta, confirming a faithful realization or updating the delta (with a `Deviations` note) when implementation justifiably diverged
+
+### OpenSpec Layout
+
+Canonical technical specifications live under `openspec/specs/` — the only versioned spec source of truth.
+Per-change deltas are **not** versioned in git; they live in the work's GitHub issue (managed `openspec-delta` block).
+The legacy `spec/` directory is retained only as compatibility links and should not be edited directly.
+
+See `openspec/README.md` and `openspec/specs/README.md` for:
+
+- OpenSpec structure
+- The canonical spec index
+- The issue-based change-delta format and its rules
+
+### Specification-Driven Development
+
+We follow a **spec-driven approach** for development with agents:
+
+- **Specifications define behaviour** – Features are specified before implementation
+- **Code implements specs** – Implementation follows the specification
+- **Per-change deltas capture intent** – Each change's issue delta records scope, design, and execution steps
+- **Specs are living documents** - Updated as features evolve
+- **Specs guide testing** – Test scenarios are derived from specifications
+
+This ensures consistency, maintainability, and clear documentation of system behaviour.
+
+## How releases work
+
+This section explains; it does not specify.
+It MUST NOT restate a MUST from the spec; where a rule matters it states the consequence in plain language and links to the requirement by name.
+If the two disagree, the spec wins.
+
+The canonical rules live in `openspec/specs/release-and-distribution/spec.md`, cited below by requirement name.
+The mechanism — the semantic-release plugin wiring, the workflow names, the git operations, the version comparison — lives in the detailed sections further down (Release pipeline, Beta workflow, S3 publish workflow); this section deliberately keeps none of it.
+
+### The three channels
+
+Fabricate publishes to three audiences through three channels, promoted in a fixed order.
+
+- **beta** — the closed-tester channel, served through an unguessable tester URL.
+It is private: it has no publicly downloadable artefact of any kind.
+- **early-access** — the patron channel, promoted from beta and served the same way.
+It is private too: patrons pay for access, not for a different build, because there is no login gate and nothing anonymous can reach it.
+- **public** — everyone, listed on the Foundry package registry, promoted from early access.
+
+A client stays on the channel it installed from and never crosses to another in place — see the **Channel isolation** requirement.
+The tester feeds are what make the private channels private: a cohort is only ever given a tester URL, never a channel's own sources URL, and that is what keeps the bucket policy safe (see the S3 publish workflow section).
+
+### Promotions come in two kinds
+
+Two different operations are both called "promotion", and conflating them is a mistake the spec calls out under **Channel topology and promotion order**.
+
+- A **prerelease promotion** takes a tested commit from beta, moves it onto the release line, and MINTS a new stable version there.
+This is the only operation that creates a version number.
+- A **release promotion** takes an already-minted stable version and MOVES it to the next stage (early access, then public).
+It mints nothing and creates no tag; it changes only what each channel advertises and, as its final act, makes the release public.
+
+The **forward-port** — merging the release line back into the prerelease line — belongs to the *prerelease* promotion, not the release promotion.
+It runs as soon as the stable version that promotion minted has been **published** to its channel, so the prerelease line's next version always numbers above the one just released (the **Version authority and promotion mechanics** requirement).
+Deferring it to the release promotion is not a delay but a deadlock: while the prerelease line is numbered below a published stable version, every version that line mints is numbered below it too, so its channel head can never overtake the released version and the registry-lead guard refuses the very promotion whose forward-port would have fixed it (the **Prerelease line precedence** requirement).
+The release promotion still **confirms** the forward-port has happened and performs it if it has not, which is normally a no-op.
+
+### Hotfixes
+
+A hotfix reaches the current public version without shipping any unreleased feature work (the **Hotfix isolation** requirement).
+Which route you take depends on what is currently soaking in early access.
+
+- If a version **carrying features** is soaking, promoting it early would ship those features, so the hotfix is cut on its own line from the public tag, carries only the fix, and goes straight to public through its own channel — the soaking version and any unreleased `main` work stay behind.
+- If a **patch** is soaking, it carries only fixes by construction, so you promote it first and cut a further hotfix on top only if one is still needed.
+
+A hotfix line accepts fixes only, is never offered to the private cohorts (its own channel keeps no cohort), and is brought back into the release line and then `main` so neither loses the fix.
+That bring-back into `release` must itself be a reviewed pull request based on `release`, because the forward-port that carries it onward has no other evidence of its provenance and will otherwise refuse it.
+Nothing becomes publicly obtainable until the promotion completes — the **Promotion-gated public availability** requirement.
+
+### The three-channel flow
+
+The prerelease line (`main`) feeds beta on every releasing push; a prerelease promotion mints the stable version on the release line and publishes early access; a release promotion moves that same version to public.
+The forward-port carries the release line back into `main` as soon as early access carries the new stable version — not later, at the public promotion.
+
+```mermaid
+flowchart LR
+  main["main (prerelease line)"] -->|"every releasing push"| beta["beta channel (private testers)"]
+  main -->|"prerelease promotion: merge tested commit, mint stable"| release["release (release line)"]
+  release -->|"publish stable"| ea["early-access channel (private patrons)"]
+  ea -->|"release promotion: move the SAME version"| public["public channel + Foundry registry"]
+  release -. "forward-port merge, once early access carries the version" .-> main
+```
+
+### The hotfix path
+
+A hotfix is cut from the public tag onto its own line, carries only the fix, and is promoted straight to public through its own cohort-less channel.
+Neither the soaking early-access version nor unreleased `main` work is dragged in; the fix returns to the release line through a reviewed pull request based on `release`, and to `main` by the automation's forward-port.
+
+```mermaid
+flowchart TD
+  pub["public v1.4.0"] -->|"git branch 1.4.x from the public tag"| hl["hotfix line 1.4.x"]
+  hl -->|"fix only, mints v1.4.1"| hc["hotfix channel (no cohort)"]
+  hc -->|"release promotion (source is the hotfix line)"| pubnew["public v1.4.1 + registry"]
+  soak["early-access 1.5.0-beta.N soaking (private)"] -. "NOT dragged in" .-> hl
+  work["unreleased main feature work"] -. "NOT dragged in" .-> hl
+  hl -->|"reviewed PR based on release"| release2["release"]
+  release2 -->|"forward-port"| main2["main"]
+```
+
+### The promotion job graph
+
+A public promotion is a four-job graph.
+The guard verifies the source channel and the private heads; the forward-port backstop calls the shared `forward-port.yml` and normally takes its already-forward-ported no-op; the publish re-stages the public targets; the final job reads everything back and only then performs the two irreversible steps — un-drafting the release and posting to the registry — LAST, so anything that can fail has already failed.
+
+```mermaid
+flowchart TD
+  guard["guard: verify source channel + private heads"] --> fp["forward-port BACKSTOP: call forward-port.yml (normally a no-op)"]
+  guard --> publish["publish: re-stage public targets"]
+  fp --> final["read back, download assets, aggregate notes, build + validate registry payload"]
+  publish --> final
+  final --> undraft["un-draft the release (irreversible)"]
+  undraft --> registry["registry POST (irreversible, LAST)"]
+```
+
+### Recovering from a failed publish
+
+This section explains; it does not specify.
+It MUST NOT restate a MUST from the spec; where a rule matters it states the consequence in plain language and links to the requirement by name.
+If the two ever disagree, the spec wins.
+
+A channel publish (`scripts/release-s3.js`, run by the reusable `release-s3.yml`) stages one build and, per target, writes a versioned zip and a manifest.
+It is guarded so a failed or repeated publish can never corrupt an already-distributed version — see the **Published artefact immutability** and **Publish completeness** requirements.
+
+#### What the guard decides
+
+The guard keys "same build" on recorded **build provenance** — the `(version, source sha, build profile)` triple stamped onto every versioned zip as S3 object metadata (`fabricate-version`, `fabricate-source-sha`, `fabricate-build-profile`).
+It never compares zip bytes, because the archive is not byte-reproducible across builds of one source tree, so byte-identity would read every re-run as a different build.
+
+| Situation at a target | Guard verdict |
+|---|---|
+| No manifest head and no zip yet | publish the target — it is new |
+| Head not newer, zip provenance matches this build | skip the zip upload and continue — the resume path |
+| Head not newer, zip provenance differs or is absent/`unknown` | fail closed as a same-version content swap unless `--overwrite` is given |
+| Head is Foundry-newer than the incoming version | fail closed as a downgrade unless `--allow-downgrade` is given |
+
+An absent or `unknown` provenance counts as an unidentified build and never satisfies the match — see the **Published artefact immutability** requirement.
+
+#### A publish failed — what now?
+
+Re-run it from the SAME commit.
+A target already written from this build is recognised by its provenance and skipped, and only the unwritten targets are completed — the resume path in the **Publish completeness** requirement.
+For a push-triggered stable release, re-dispatch `release.yml` via `workflow_dispatch` with `--ref` set to the branch that produced the tag and the already-minted `tag` supplied; for any channel, `release-s3.yml` can be dispatched directly with the same `tag` and `channel`.
+
+Do NOT reach for `--overwrite` to get past a failed publish.
+`--overwrite` replaces the bytes of a version a target already advertises, and a version's published artefacts are immutable — clients already on it never re-fetch, and any CDN holding the immutable zip pins the old bytes — so overwriting splits one version string across two different builds.
+`--overwrite` is legitimate ONLY for a version no client could yet have installed, such as re-staging a target that failed before any cohort read it, and is NEVER legitimate for a version already distributed to any channel or tester feed.
+The routine remedy for a failed publish is the resume above, not an override — the **Published artefact immutability** requirement forbids the override as the routine path.
+
+#### Provenance metadata and `--source-sha`
+
+Every versioned zip is uploaded with its provenance triple as S3 metadata, and the guard reads it back on the next publish.
+`release-s3.js` takes the commit explicitly via `--source-sha`, because `release-s3.yml` checks out the release tag before invoking the script, which leaves `GITHUB_SHA` naming the ref that triggered the run rather than the built commit — the workflow passes `--source-sha "$(git rev-parse HEAD)"`.
+A build profile defaults to `community`, and every target of one publish must share it, so a mixed-profile publish fails before writing anything (keyed to issue 345) — see the **One build per publish** requirement.
+
+#### Backfilling provenance onto older zips
+
+A zip published before provenance existed carries no metadata, so the guard reads its provenance as absent and fails closed, which would strand a version mid-promotion.
+Stamp the triple onto every existing versioned zip in a channel and its tester feeds with the one-shot backfill:
+
+```bash
+node scripts/release-s3.js --backfill-provenance --channel <channel> --dry-run   # preview first
+node scripts/release-s3.js --backfill-provenance --channel <channel>             # then stamp
+```
+
+Or dispatch the `backfill-provenance.yml` workflow for that channel, starting with `dry_run: true` to preview exactly which zips would be stamped and with which source sha.
+The backfill re-supplies `ContentType: application/zip` and the immutable `CacheControl` alongside the metadata — a metadata `REPLACE` drops system metadata too, so omitting them would downgrade an immutable-cached zip — and it never touches a manifest.
+Where a version's `v<version>` tag cannot be resolved it stamps `unknown`, which the guard still treats as absent.
+
+#### The zip name differs between GitHub and S3 — do not "fix" it
+
+The GitHub release attaches `fabricate-v<version>.zip` (with the `v`), matching the release tag, while the S3 versioned zip is `fabricate-<version>.zip` (no `v`).
+The divergence is deliberate, because the S3 manifest's `download` URL is baked from the S3 name, so renaming either to "match" the other breaks the other artefact's install URL — see the **Self-contained distribution targets** requirement.
+
+## Release Workflow
+
+Fabricate uses a local release build script to assemble the final module distribution before publishing.
+
+### npm Scripts
+
+There is no `npm run release` script; the release is minted by the pipeline, not by a hand-run command (the **Version authority and promotion mechanics** requirement in `openspec/specs/release-and-distribution/spec.md`).
+The local build scripts are:
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+| Script | Command | What it does |
+|:-------|:--------|:-------------|
+| `release:build` | `npm run release:build` | Full build: run Vite, copy assets, write `dist/module.json`, and zip — this is `node scripts/release.js` with no flags |
+| `release:validate` | `npm run release:validate` | Validate an existing `dist/` without rebuilding (`--validate-only`) |
+| `release:s3` | `npm run release:s3` | Publish a built `dist/` to a channel's S3 targets (`scripts/release-s3.js`) |
+| `release:s3:dry-run` | `npm run release:s3:dry-run` | The same publish, printing every planned key and URL and writing nothing (`--dry-run`) |
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+`scripts/release.js` exports three utility functions used by both the script and its tests:
+
+- **`rewriteModuleJson(manifest)`** — produces a `dist/`-ready manifest: strips the `dist/` prefix from `esmodules` paths and strips the `.db` suffix from pack paths.
+- **`getRequiredFiles(manifest)`** — returns the list of files that must be present in `dist/` based on the rewritten manifest.
+- **`validateDist(distDir, srcManifest)`** — checks that all required files exist and that `dist/module.json` is valid JSON.
+
+### Building a Release
+
+```bash
+# Standard build + zip
+npm run release:build
+
+# Build only, no zip (e.g. for CI artifact upload)
+node scripts/release.js --no-zip
+
+# Validate dist/ without rebuilding
+npm run release:validate
+```
+
+The script exits with code 1 if validation fails and prints a list of missing files or parse errors.
+
+### Local Development (dev server with HMR)
+
+Link the **project root** into Foundry's module directory:
+
+```bash
+npm run setup:dev
+```
+
+The script is idempotent — re-run it any time (for example after a Foundry update).
+It creates a directory junction on Windows (no admin or Developer Mode needed) and a symlink on Linux and macOS.
+Default Foundry Data paths:
+
+- Windows: `%LOCALAPPDATA%\FoundryVTT\Data`
+- macOS: `~/Library/Application Support/FoundryVTT/Data`
+- Linux: `~/.local/share/FoundryVTT/Data`
+
+If your Foundry install uses a custom Data location, set `FOUNDRY_DATA_PATH` before running the script.
+If an existing link points at the wrong place, re-run with `--force` to repoint it (the script refuses to clobber a real directory or file at the target path under any flag).
+
+**Troubleshooting:** If the Fabricate module is missing from Foundry's Setup screen after a Foundry major-version update, the symlink is probably fine — check `compatibility.verified` and `compatibility.maximum` in `module.json`.
+Foundry hides modules whose `maximum` is below the running major version.
+
+Start Foundry at `http://localhost:30000` with a world that has the module enabled, then:
+
+```bash
+npm run dev
+```
+
+Open `http://localhost:5173` instead of `:30000`.
+Foundry loads normally, but Fabricate's source files are served by Vite with HMR transforms.
+Svelte component edits appear instantly without a page reload; other JS changes trigger a full reload.
+
+**How it works:**
+
+- A custom Vite plugin (`scripts/vite-foundry-proxy.js`) proxies all requests to Foundry at `:30000`
+- Foundry requests `/modules/fabricate/main.js`, which Vite serves from the repo root
+- The repo-root `main.js` shim loads `src/main.js` on the Vite dev server and `dist/main.js` for direct Foundry or release-like loads
+- `/@vite/client` is injected into Foundry's HTML to bootstrap the HMR WebSocket
+- Foundry's `socket.io` is proxied with WebSocket upgrade support
+- HMR uses a separate port (5174) to avoid collision with Foundry's socket.io
+
+### Release Script CI Usage
+
+The `--no-zip` flag (`node scripts/release.js --no-zip`) is designed for use in GitHub Actions, where the zip is created separately or the raw `dist/` is uploaded as an artifact:
+
+```yaml
+- uses: actions/setup-node@v4
+  with:
+    node-version: '20'
+- run: npm ci
+- run: node scripts/release.js --no-zip
+- uses: actions/upload-artifact@v4
+  with:
+    name: fabricate-dist
+    path: dist/
+```
+
+## UI Architecture (Svelte)
+
+Fabricate's UI is built with **Svelte 5** (runes mode).
+All components use `$props()`, `$state`, `$derived`, `$effect`, and `onclick`/`onchange` event attributes.
+
+### File Layout
+
+```text
+src/ui/svelte/
+├── apps/                        # Root components (one per Foundry window)
+│   ├── CraftingAppRoot.svelte   # Player crafting interface
+│   ├── RecipeManagerRoot.svelte # GM admin interface
+│   └── editor/
+│       └── RecipeEditorRoot.svelte  # GM recipe editor
+├── components/                  # Shared/reusable components
+│   └── DropZone.svelte
+├── stores/                      # Reactive state (one per app surface)
+│   ├── craftingStore.js
+│   ├── adminStore.js
+│   └── editorStore.js
+├── actions/                     # Svelte use:action directives
+│   └── dragDrop.js              # Foundry drag-and-drop integration
+├── util/
+│   └── foundryBridge.js         # Thin wrappers for Foundry APIs
+├── SvelteApplicationMixin.svelte.js  # Mounts Svelte into ApplicationV2
+└── SvelteApplicationMixinCore.js     # Core mixin logic (testable without Svelte)
+```
+
+### Foundry Integration
+
+Each Foundry window is an `ApplicationV2` subclass using `SvelteApplicationMixin`.
+The mixin mounts a root Svelte component in `_renderHTML()` and unmounts it in `close()`.
+App classes are registered via factory functions in `src/ui/appFactory.js` to avoid importing `.svelte.js` files in the Node test environment.
+
+### Store Pattern
+
+Stores use a **factory pattern** — `createCraftingStore(services)`, `createEditorStore(services, options)`, `createAdminStore(services)`.
+Each app instance creates its own store to prevent state leaking between multiple open windows.
+Services (RecipeManager, CraftingEngine, etc.) are injected for testability.
+
+### Foundry Bridge
+
+`src/ui/svelte/util/foundryBridge.js` wraps Foundry APIs (`game.i18n.localize`, `Dialog.confirm`, notifications).
+Components import from this module rather than accessing `game.*` directly, making them testable outside Foundry.
+
+### Drag-and-Drop
+
+The `use:dragDrop` action (`src/ui/svelte/actions/dragDrop.js`) integrates with Foundry's drag-and-drop system.
+Apply it to any element that should accept drops from Foundry sidebars or other modules.
+
+### Testing
+
+- **Store tests** (pure JS, no DOM): `tests/stores/*.test.js` — exercise state transitions and service interactions using `node --test` with Foundry global mocks.
+- **App/UI tests**: existing test files in `tests/` test store and app-class behaviour with mocked services.
+- **Test runner**: Node's built-in `node --test`.
+No Jest, Vitest, or Playwright.
+
+### CSS
+
+- Component-scoped `<style>` blocks handle per-component styles.
+- `styles/fabricate.css` contains shared/global rules (layout, admin panel, design tokens).
+- Foundry core CSS classes (`flexrow`, `flexcol`) are used where appropriate.
+
+### Foundry vs Fabricate CSS overrides
+
+Foundry core ships global styles for `button`, `input`, `select`, `textarea`, and `[tabindex]` controls.
+These frequently win over — or fight with — Fabricate's own styling.
+The override almost always belongs in **global CSS in `styles/fabricate.css`**, not in a scoped Svelte component `<style>`.
+
+**Why global, not scoped:**
+
+- `styles/fabricate.css` is served directly by Foundry, so edits take effect on reload with no Svelte rebuild.
+  A scoped component `<style>` only ships after the Vite bundle is rebuilt — a stale bundle silently keeps the old behavior.
+- Scoped component rules race the global stylesheet on specificity in ways that are easy to get wrong (see the specificity ladder below).
+  Centralizing the override in one root-level block keeps the cascade predictable.
+- The areas are keyed by root classes — `.fabricate`, the shared module root every Fabricate application emits, carries the focus pair for the player app and the manager, while the three interactables windows and the roll-prompt dialog issue 1520 owns still key on their own.
+
+**Instance 1 — button layout.**
+Foundry's global `button` styles center content (`justify-content: center`) and pin a fixed height.
+A Svelte component rendering a `<button>` with custom content (icon+label triggers, portrait+name option rows) must set `justify-content: flex-start`, `height: auto`, and an explicit `min-height`, or content centers and taller children (e.g. actor portraits) clip.
+Verify in real Foundry, not just compiled source.
+
+**Instance 2 — the orange focus ring.**
+Foundry paints an orange focus ring on focusable controls.
+The module root `.fabricate` carries one **paired block** for the player app and the manager in `styles/fabricate.css`; the three interactables windows and the roll-prompt dialog issue 1520 owns still carry their own:
+
+```css
+/* strip Foundry's orange ring (mouse focus) */
+.fabricate a:focus,
+.fabricate button:focus,
+.fabricate input:focus,
+.fabricate select:focus,
+.fabricate textarea:focus,
+.fabricate [tabindex]:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+/* repaint an intentional accent ring (keyboard focus) */
+.fabricate a:focus-visible,
+.fabricate button:focus-visible,
+.fabricate input:focus-visible,
+.fabricate select:focus-visible,
+.fabricate textarea:focus-visible,
+.fabricate [tabindex]:focus-visible {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: 2px;
+}
+```
+
+Write the element list **flat**, not as `.fabricate :is(a, button, …):focus`.
+`:is()` takes the specificity of its most specific argument — `[tabindex]` here — so the `:is()` form is 0,3,0 and would newly beat every per-component ring in the sheet, which is exactly what the ladder below keeps it from doing.
+
+`:focus` vs `:focus-visible` is load-bearing.
+Handle `:focus-visible` **explicitly**.
+A button lands in the `:focus-visible` state after a sibling/panel re-render — for example the player nav's tab panel swapping content on click.
+A `:focus:not(:focus-visible)` rule alone strips the ring on a plain mouse click but leaves it in exactly that "clicked-away, panel re-rendered" state, which is the symptom that originally got reported.
+
+**Specificity ladder.**
+Keep the block at **single root-class** specificity so per-component focus rings still win:
+
+| Selector | Specificity | Role |
+| --- | --- | --- |
+| `.fabricate button:focus-visible` | 0,2,1 | module default — strips/repaints Foundry's ring |
+| `.fabricate-button:focus-visible` | 0,2,0 | shared-primitive family ring — global sheet, below the module default |
+| `.some-widget:focus-visible` (scoped Svelte, `+ .svelte-hash`) | 0,3,0 | per-component ring (custom offset, inset, color) |
+| `.fabricate.fabricate-app button:focus-visible` | 0,3,1 | ❌ clobbers the per-component ring |
+
+Using the doubled root class (`.fabricate.fabricate-app …`) raises the module default to 0,3,1, which overrides component-scoped rings (e.g. gathering rows that intentionally use `outline-offset: -2px`).
+Use the single class (`.fabricate …`) — matching how `.fabricate-interactables-manager` and the other three blocks issue 1520 owns are written — so component rings at 0,3,0 stay authoritative.
+
+**Checklist when adding/auditing a control or surface:**
+
+- New top-level app surface? It inherits the `.fabricate` paired block automatically — add a per-area block only where a surface deliberately needs a different treatment, and say why.
+- Shared primitive under `components/`? Its family declares its own paired focus block in the global sheet, at family-root specificity (0,2,0) so the module default still wins where it applies.
+A primitive rooted at the class it emits cannot assume it is inside an area, and a repaint without the strip lays the accent ring over Foundry's orange outline in any host carrying no Fabricate root at all.
+- Don't add scoped `:focus`/`:focus-visible` CSS in a component to fight Foundry — the module block already handles it.
+Reserve scoped focus CSS for genuinely per-widget rings, and keep them at component specificity (0,3,0) so the module default doesn't fight them.
+- Custom-content button clipping? Apply the layout fix in Instance 1.
+- Verify both in real Foundry (`npm run test:foundry`) — Foundry's global cascade is not reproduced by compiled-source inspection or unit tests.
+
+## Commit conventions
+
+All commits to Fabricate must follow the [Conventional Commits](https://www.conventionalcommits.org/) format.
+A GitHub Actions workflow validates every commit on a pull request and the PR title itself using `commitlint`.
+
+The accepted commit types are:
+
+| Type | When to use |
+|------|-------------|
+| `feat` | A new feature visible to users or module consumers |
+| `fix` | A bug fix |
+| `docs` | Documentation changes only |
+| `style` | Formatting changes with no logic change |
+| `refactor` | Code restructuring that is neither a fix nor a feature |
+| `perf` | A performance improvement |
+| `test` | Adding or updating tests |
+| `build` | Build system or dependency changes |
+| `ci` | CI/CD workflow changes |
+| `chore` | Anything else that does not modify `src/` or tests |
+| `revert` | Reverting a previous commit |
+
+For `feat` and `fix` commits, include the related GitHub issue number as the scope:
+
+```text
+feat(#42): add shopping list panel to crafting UI
+fix(#99): correct ingredient deduplication in alchemy mode
+```
+
+The scope is optional for all other types.
+Header lines must be 100 characters or fewer.
+
+## Linting & formatting
+
+Fabricate uses [ESLint](https://eslint.org/) (flat config in `eslint.config.js`) for JavaScript and Svelte static analysis, [Stylelint](https://stylelint.io/) (config in `stylelint.config.js`) for CSS, [Prettier](https://prettier.io/) for formatting, and [markdownlint-cli2](https://github.com/DavidAnson/markdownlint-cli2) (config in `.markdownlint-cli2.jsonc`) for Markdown.
+All of these run as a **required CI check** (`lint` job in `.github/workflows/ci.yml`).
+
+```bash
+npm run lint           # ESLint over the whole repository (fails on any warning)
+npm run lint:fix       # …and auto-fix what can be fixed
+npm run lint:debt      # what is still wrong in the files eslint.debt.js carries (what CI runs)
+npm run lint:svelte    # ESLint over every src/**/*.svelte (what CI runs)
+npm run lint:svelte:warnings  # Svelte COMPILER warnings, every component (what CI runs)
+npm run lint:css       # Stylelint over styles/**/*.{css,scss} (what CI runs)
+npm run lint:css:fix   # …and auto-fix what can be fixed
+npm run format         # Prettier-format the whole repository
+npm run format:check   # verify formatting (what CI runs)
+npm run lint:md        # markdownlint over all Markdown (what CI runs)
+npm run lint:md:fix    # …and auto-fix (splits prose to one sentence per line)
+```
+
+### Markdown linting (markdownlint)
+
+`npm run lint:md` runs [`markdownlint-cli2`](https://github.com/DavidAnson/markdownlint-cli2) over every authored Markdown file, using the rules in `.markdownlint-cli2.jsonc`.
+The headline rule is **one sentence per line**: every sentence sits on its own physical line, and no sentence is hard-wrapped across multiple lines.
+Run `npm run lint:md:fix` to auto-split prose, then re-run it until the count stops dropping, because a long paragraph splits one boundary per pass.
+A multi-sentence **table cell** cannot be split across lines, so wrap that table in a `<!-- markdownlint-disable markdownlint-sentences-per-line -->` / `<!-- markdownlint-enable markdownlint-sentences-per-line -->` region.
+Run this before finalising any change that touches Markdown.
+
+### CSS linting (Stylelint)
+
+`npm run lint:css` gates `styles/**/*.{css,scss}` (today: the global `styles/fabricate.css`).
+The config extends `stylelint-config-standard` and is tuned to enforce the dimensions a linter can actually check — each is mapped to its rule(s) in the header comment of `stylelint.config.js`:
+
+- **Quality** — invalid/unknown syntax, modern value notation, malformed selectors.
+- **Reliability** — duplicate/contradictory declarations, shorthand-property overrides, deprecated properties/values.
+- **Duplication** — duplicate selectors, duplicate properties / custom properties, duplicate `@import`s and font-family names.
+- **Reuse / DRY** — collapses redundant longhands into shorthands (`declaration-block-no-redundant-longhand-properties`) and strips redundant shorthand values.
+- **Cross-browser** — `stylelint-no-unsupported-browser-features` checks every property/value against the `browserslist` matrix in `package.json` (Foundry's supported browsers).
+
+Stylelint has **no** robust rule for detecting two near-identical rule blocks that *could be merged* (structural similarity); the duplicate/shorthand rules above are the closest proxy, and SonarCloud also scores CSS duplication on a PR's new code.
+A handful of standard rules are deliberately turned off with justification in `stylelint.config.js` (e.g. `no-descending-specificity` — reordering the single large global sheet is regression-prone and unreviewable; the cosmetic `selector-not-notation` / `media-feature-range-notation` modernizers — pure churn for no enforcement value).
+The Svelte components' scoped `<style>` blocks are not linted here (they compile to hashed classes and are owned by the Svelte toolchain).
+
+### The gate is a glob, and the debt is a list
+
+`npm run lint` is `eslint .` and `npm run format:check` is `prettier --check .`, over the whole repository, as of issue #1660.
+
+They used to enumerate about eighty paths each.
+Linting had been introduced path by path so each step landed green, and the cost of that was a gate that could only be widened by hand: a file left off the list was linted by nothing, and the miss surfaced at SonarCloud after push rather than at any local gate (issue #933).
+The glob inverts it — a new file is gated the moment it lands — and the not-yet-clean files are carried explicitly instead.
+
+`eslint.debt.js` records, **per file**, the rules that file fails today, and `eslint.config.js` switches off exactly those.
+Every other rule stays armed on it.
+That is deliberately not an `ignores` entry: ignoring a file takes it out of ESLint's reach entirely, `no-undef` included, while the linted-file *count* goes up — which reads as progress in a diff and is a regression in fact.
+`src/main.js` is the file that settles the point; `tests/main-undefined-identifiers.test.js` exists because a `ReferenceError` shipped in it past lint, tests and build.
+
+So the debt shrinks along two axes: a rule leaves a file when that rule is fixed, and a file leaves when its last rule does.
+
+- `npm run lint:debt` shows what is left in a baselined file, and **fails** when an entry reports nothing any more — an entry paid off and left in place is how "the baseline only shrinks" quietly stops being true.
+  It is a step of the `lint` CI job rather than a unit test because answering it means linting the largest files in the tree, and twenty-three CPU-bound seconds do not belong in the unit-test job.
+- `tests/lint-coverage.test.js` pins each group's size **exactly** (not as a ceiling — a ceiling banks a free slot on every debt payment), asserts the glob still covers everything the old enumeration reached, and asserts `no-undef` is never baselined.
+- Formatting debt is the marked section of `.prettierignore`, pinned and staleness-checked the same way.
+
+When you bring a file to green, delete its entry and lower the pinned count in the same commit.
+
+A **second** gated script, `npm run lint:svelte`, covers every `*.svelte` file under `src/` and runs as its own step of the same required `lint` job.
+It is separate because components need the Svelte parser and their own rule set, not because they are optional.
+Note what this means for `src/ui/**`: that directory holds both halves and `npm run lint` now covers both, so the 394 plain `.js` files there that are clean are gated outright; only the 60 listed in `eslint-debt.txt` carry any exclusion, and only for the rules they fail.
+
+`lint:svelte` runs with `--max-warnings=0`, so the two WARN-level rules in `svelte.configs.recommended` (`svelte/no-at-debug-tags`, `svelte/no-inspect`) fail the build rather than printing and exiting 0 — a `{@debug}` tag or an `$inspect()` call left in a component is a CI failure.
+A finding has three legitimate dispositions: fix the code, tune the rule in `eslint.config.js`, or suppress it.
+Suppressions use `eslint-disable-next-line` only — never a file-level disable — and carry a one-line rationale naming the contract they protect; a markup site needs the HTML-comment form `<!-- eslint-disable-next-line <rule> -->`, because a `//` in markup renders as literal on-screen text.
+The gate polices suppressions in **both** directions: with `svelte/no-unused-svelte-ignore` active, a stale `svelte-ignore` comment is itself a lint failure, so remove a suppression when it stops being needed rather than leaving it to mask a future warning.
+That is the narrow case of a stronger property that covers every `eslint-disable` directive too: the `.svelte` block in `eslint.config.js` pins `linterOptions: { reportUnusedDisableDirectives: 'error' }`, so a directive that suppresses nothing exits 1 — which is what stops a suppression from outliving the finding it was written for.
+It is pinned explicitly rather than left to ESLint's default because it is load-bearing.
+`eslint-disable-next-line` is anchored to a line, and Prettier — which now formats components — moves lines.
+A directive that slips off its violation resurfaces the violation as an unsuppressed error; one that lands suppressing nothing is caught by this option.
+Both failure shapes fail the gate, which is what makes a mechanical reformat of a component safe.
+Where a suppression must sit on a particular line, fence the element with `<!-- prettier-ignore -->` — it has to be the LAST comment before the element to take effect.
+The `{' '}` separators in `ExplainerCard.svelte` and `CraftingSystemManagerRoot.svelte` need this: Prettier splits a `<span>` containing an `{#if}` across several lines whatever the print width, which moves the mustache off the directive's line.
+The fence there protects the directive's line anchor and nothing else — `{' '}` is an expression, so both the fenced and the split form compile to the same template and render identically.
+
+ESLint and the Svelte compiler are the static analysis a `.svelte` file gets.
+Prettier now formats components as well — `prettier-plugin-svelte` is registered in `.prettierrc.json`, and `format:check` covers `src/**/*.svelte`.
+Prettier 3 does not auto-load plugins, so the devDependency alone leaves `.svelte` with no parser.
+That used to fail loudly: the script named `src/**/*.svelte` explicitly, so `format:check` exited 2 with "No parser could be inferred".
+It does not any more, and the change is worth knowing — measured on this branch, removing `plugins` from `.prettierrc.json` leaves `prettier --check .` exiting **0**, because directory expansion simply skips a file it can infer no parser for.
+So both ways back are silent now, and `tests/prettier-svelte-scope.test.js` is the only thing that catches either: re-ignoring `*.svelte`, and dropping the plugin.
+Its `resolves a Svelte parser for a real component` and `registers prettier-plugin-svelte in the resolved config` assertions are what stand in for the exit code the glob used to give you.
+
+Svelte compiler warnings fail the build as of issue 924, which found seven of them passing unnoticed.
+Five were real accessibility defects; one was a `css_unused_selector` that was not dead code at all but a focus ring the compiler was emitting COMMENTED OUT, so the ring had never applied in a shipped build; the seventh was a `state_referenced_locally` in `GatheringEnvironmentList.svelte`, a deliberate one-time seed now said so with `untrack()` rather than suppressed.
+The gate has two halves.
+`onwarn` in `svelte.config.js` throws, so `npm run build` fails; that is the fast local signal, but a Vite build compiles only the entry graph and cannot see a component nothing imports (`RowDisclosure.svelte` is one today; issue 927 is where the gap was found).
+`npm run lint:svelte:warnings` (`scripts/check-svelte-warnings.mjs`) sweeps every `src/**/*.svelte` regardless of reachability and is the step CI runs, so it is the authoritative half.
+Both take their compiler options from `svelte.config.js` through `scripts/lib/svelteCompilerWarnings.js`, which is what makes a disagreement between them diagnostic: it can only be graph reachability, never drift in `compilerOptions`.
+Read that qualifier literally.
+`emitCss` is a `vite-plugin-svelte` option, not a compiler option, so it is outside the shared read — and `emitCss: false` makes the plugin drop every `css_unused_selector` before `onwarn` is called, which would silence the build on the exact class that motivated the issue while the sweep kept reporting it.
+A disagreement in which the sweep is the clean one is a bug in the sweep, not grounds to override `onwarn`.
+`tests/svelte-warning-scope.test.js` keeps the whole thing honest — it drives the real sweep against a fixture tree to prove it still detects a warning and still attributes an uncompilable component to that file, asserts the CI wiring, and pins the two config keys that could go quiet: `emitCss` at its default, and no `warningFilter` in `compilerOptions`.
+A warning worth keeping is suppressed at its site with `<!-- svelte-ignore <code> -->` and a stated reason, which `svelte/no-unused-svelte-ignore` then polices in the other direction; there is deliberately no allowlist.
+
+SonarCloud still indexes no `.svelte` at all (SonarJS ships no Svelte parser), so components contribute nothing to the quality gate's duplication or issue counts, and Stylelint still excludes their scoped `<style>` blocks.
+Both are tracked as their own follow-ups.
+
+Carried as debt rather than gated away (see `eslint.debt.js`, and `npm run lint:debt` to see what is left):
+
+- the `tests/` suite — one rule list across the tree rather than a per-file table, because 887 of its 1,040 files report something.
+  Every rule *not* on that list is now enforced there for the first time, `no-undef` among them.
+- 60 of the 454 plain `.js` files under `src/ui/**`; the other 394 are gated outright, as are the `.svelte` components beside them
+- `src/main.js` and three root `src/gathering*.js` modules
+- 15 of the 33 files under `scripts/**`
+- the `examples/macros/*.js` documentation macros, and two root config files
+
+`scripts/**` is worth understanding before you add a script, because the reason its fifteen are still listed is a measurement rather than an oversight.
+The Foundry smoke harness alone accounts for 844 of the roughly one thousand ESLint findings across that directory, and it pins its Phase D0 selectors by class, index and button text with no unit coverage over any of them.
+Adding a script now lints it — that is the whole point of the glob — so the only thing left to remember is that a new `.sh` file joins `SHELL_SCRIPTS` in `tests/scripts-lint-gate-coverage.test.js` by hand.
+Shell is parsed by no linter and formatted by no formatter here, and that list plus its `bash -n` parse is the only gate a shell script gets.
+
+## The View Lab (Foundry-free window captures)
+
+The View Lab renders whole Fabricate application windows in Chromium — the real app roots, the real
+stores, production `styles/fabricate.css` at its production cascade layer — with no Foundry, no
+Docker, and no world.
+It exists because PR screenshot evidence should not cost a container boot and a twenty-minute walk.
+
+```sh
+npm run viewlab:chrome:harvest              # one-off; see below
+node scripts/view-lab-screenshots.mjs apps  # every registry case -> ui-screenshot-artifact/apps/
+npm run viewlab:index                       # regenerate the evidence index on its own
+```
+
+The window chrome is Foundry's own, harvested from the release archive `npm run test:foundry:up`
+already caches under `.foundry-e2e/cache/`.
+That material is proprietary: it lands in the gitignored `.foundry-chrome/`, is never committed, and
+is never downloaded for you.
+Without it the lab fails closed rather than approximating — a frame drawn without the real cascade is
+worse than no frame, because it looks authoritative.
+
+A capture accumulates in `ui-screenshot-artifact/apps/` rather than replacing it.
+Each frame's manifest entry records the head sha it was drawn at, so a rerun can tell an older frame
+from a fresh one.
+Pass `--clean` to force a full reset.
+The same directory also carries a self-contained `index.html`, grouped by application and area with
+a multi-tag filter, written automatically at the end of every capture.
+It shows the lab's own frames only, never a smoke label, because it is not a comparison.
+
+Cases live in `scripts/lib/viewLabCases.js`.
+A case names a window, the state to drive it to, and the `sourceMatches` patterns that select it from
+a changed-file set.
+Every manager case declares `expectView`, which the capture asserts against the app's actual route
+before taking the frame — without it a mis-click silently screenshots the wrong screen.
+
+A case also declares `reaches`: `exact` when the frame lands on its smoke counterpart's own
+condition, `window` when it reaches the right application window but not that condition (known
+remaining work), and `beyond` for a condition the live smoke never walks at all — the routed recipe
+resolution modes, the visibility modes it does not visit, Foundry's light application theme.
+A `beyond` case carries an empty `smokeLabels`, because there is nothing to compare it against.
+A `window` case's shortfall is accounted for by a class-level entry in the known-gaps register in
+`scripts/README.md`, not by a per-case comment.
+As of this writing the registry holds 379 cases: 148 `exact`, 8 `window`, 223 `beyond`.
+
+A change to the lab's own inputs is attributed rather than treated like an ordinary render-file change.
+By default a PR touching the case registry, `labActors.js`, `labRunStates.js`, or any other file the lab depends on selects **surface coverage**: one frame of every route and tab the lab renders — every manager route, every player tab, one per single-screen canvas window, plus the light-theme pair — which is 48 of the 379 publishable cases.
+A shared input can alter any frame at once, so the selection has to be wide; what it has to PROVE is that the lab still boots, still mounts both windows and still reaches and photographs every route and tab, and that is what coverage answers.
+It deliberately does not re-photograph every state of every screen: a state is evidence about the files that draw it, those files select it themselves, and 247 frames on every lab-infrastructure PR was a twenty-five minute job producing a wall nobody read.
+A route's own internal tabs — the Recipe editor's Results tab, the Tool editor's Requirements tab — fold into their route's single frame, so they are deferred alongside detailed states rather than covered.
+Coverage is derived (`LAB_SURFACE_CASES`), never listed, so a route added tomorrow is covered without anyone remembering; each surface is represented by a default-geometry, dialog-free, least-driven frame of it, which in practice is that screen's own `*-normal` case.
+Where a lab input ships alongside render files, the two selections are unioned — coverage does not contain the detailed frames those files select.
+Five inputs narrow below coverage.
+A patch to `scripts/lib/viewLabCases.js` selects only the case literals its hunks fall inside.
+A patch to `tests/view-lab/mount.js` selects only the cases the marked regions it falls inside can render — the four player-only blocks are marked in the file rather than found by column, because two of them sit inside functions the manager window runs too.
+A change to `scripts/lib/viewLabLayoutAssertion.js` selects only the cases declaring `expectLayout`, whole-file, since every path through that helper validates those and no others.
+A patch to `tests/view-lab/world/labActors.js` selects only the cases that can render what the touched fixture table feeds: player cases alone for `INVENTORIES` and `BROKEN_STACKS`, and player cases plus the manager cases whose own `sourceMatches` claim a Knowledge or Books & Scrolls render file for `RECIPE_ITEM_COPIES` and `LEARNED_RECIPES`.
+A patch to `tests/view-lab/world/labRunStates.js` selects player cases alone, and it needs no content-anchoring, since its whole output is player-only.
+The three patch-narrowed inputs — the case registry, the actor fixture and the mount page — locate a hunk by searching the rendered file for its own content instead of trusting the hunk header's line numbers; where that content recurs, the hunk is attributed at every location it could be and the answer is their union, which contains wherever the edit really landed.
+A patch to anything else in `labActors.js`, such as `ACTOR_DEFINITIONS` or a shared builder function, keeps the coverage default.
+So does a patch to any lab input the registry does not attribute, or a hunk whose content cannot be anchored at all.
+Widening is always a UNION with whatever the change did attribute, never a replacement of it: a PR that edits one case literal and also touches shared code gets coverage AND that case's own frame.
+
+Steps are ordered and take five verbs: `{selector}` clicks, `{selector, select}` chooses a
+`<select>` option, `{selector, fill}` types (the only route to a dirty form), `{selector, scroll:
+true}` scrolls an element into view inside its own overflow container, and `{selector, upload}`
+chooses a file on a native file input.
+The scroll verb matters more than it sounds: `frame.screenshot()` on the outer `.application` does
+not scroll nested containers, so a card that never scrolled into view is absent from the frame while
+every assertion still passes.
+
+A real `DialogV2` confirmation or prompt, transcribed from the harvested
+`client/applications/api/dialog.mjs`, can be left open for the screenshot, answered with its default
+button, or answered with a named button action, so a state that used to be blocked behind a native
+Foundry dialog is often reachable now.
+`input` and `query` are not wired, and a native drag-and-drop payload is outside the runner's step
+vocabulary, so a handful of cases still cannot reach their state.
+The known-gaps register in `scripts/README.md` names them.
+
+**The live smoke is still the fidelity authority.**
+Where a View Lab frame and a smoke frame of the same view disagree, the smoke frame is correct and
+the lab is defective.
+`scripts/README.md` carries the standing fidelity register (no canvas, no sidebar, a real `DialogV2`
+confirmation but otherwise no live Foundry JS, fixture world rather than the smoke world).
+
+## Foundry integration (smoke) tests
+
+The smoke harness boots a real Foundry VTT instance in Docker, loads the built module, and walks the Crafting System Manager UI and the unified Fabricate shell end-to-end with Playwright.
+It catches regressions the JS-level unit suite can't — actual layout, DOM events, real Foundry APIs.
+
+### Prerequisites
+
+- Docker and Docker Compose installed and running.
+- A Foundry VTT account (needed to pull the `felddy/foundryvtt` image, which activates via username and password).
+- Node.js 20 or later.
+
+### First-time setup
+
+Copy the credentials template and fill in your Foundry account details:
+
+```bash
+cp .env.foundry.example .env.foundry
+# Edit .env.foundry and set FOUNDRY_USERNAME and FOUNDRY_PASSWORD
+```
+
+Never commit `.env.foundry`.
+It is listed in `.gitignore`, but double-check before pushing.
+
+Install the Playwright browser used by the smoke test:
+
+```bash
+npm run test:foundry:install
+```
+
+Build the module so the Docker container has a `dist/` directory to mount:
+
+```bash
+npm run build
+```
+
+### Entrypoints
+
+- `npm run test:foundry` — full pipeline: `up` → `run` → `down`. ~7–8 minutes including docker boot.
+- `npm run test:foundry:up` — start the Foundry container and wait for it to be healthy; leave it running (useful when iterating on the harness itself).
+- `npm run test:foundry:run` — run the Playwright smoke test against an already-running container.
+- `npm run test:foundry:down` — stop and remove the container (preserve the image).
+- `npm run test:foundry:rc` — release-candidate profile.
+- `npm run test:foundry:screenshots` — scoped PR screenshot evidence (issue 826): full real-Foundry frames for only the views a PR affects (pass `-- --target-labels=<csv>` from `npm run screenshots:ui:targets` to scope it; empty captures the full catalogue).
+- `npm run test:foundry:v13` — the narrow **V13 boot-and-assert arm** (issue 1088), about a minute on a warm container; see "The narrow V13 arm" below.
+- `npm run test:foundry:v14` — the same narrow arm against the default (14.365) build.
+
+To run the release-candidate CI profile locally:
+
+```bash
+npm run test:foundry:rc
+# or
+FOUNDRY_SMOKE_PROFILE=rc npm run test:foundry      # POSIX
+$env:FOUNDRY_SMOKE_PROFILE='rc'; npm run test:foundry  # PowerShell
+```
+
+To do a full clean reset including volumes:
+
+```bash
+node scripts/foundry-test-down.mjs --clean
+```
+
+Scripts live in `scripts/foundry-test-*.mjs`.
+The main harness is `scripts/foundry-test-run.mjs` (~3700 lines).
+
+### Smoke arms: which Foundry generation boots
+
+`module.json` declares `minimum: "13"` and `verified: "14"`, and the harness can boot either.
+Which one is an **arm**, selected with `--arm=<v14|v13>` (or the `FOUNDRY_SMOKE_ARM` environment variable) and defined once in `scripts/lib/foundrySmokeArms.js`.
+An arm bundles the three things that must agree: the Docker image, the dnd5e release, and the world manifest's `coreVersion`.
+
+| Arm | Foundry | dnd5e | Selected by |
+|-----|---------|-------|-------------|
+| `v14` (default) | the pin in `docker-compose.foundry.yml` (14.365) | 5.3.3 (`verified: "14"`) | nothing — it is the default |
+| `v13` | 13.351 | 5.2.5 (`verified: "13"`) | `--arm=v13` / `FOUNDRY_SMOKE_ARM=v13` |
+
+Three properties of that design are load-bearing, and `tests/foundry-smoke-arms.test.js` pins each of them.
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+- **The non-default arm is env-only.** It reaches Docker through `FOUNDRY_IMAGE`, and nothing writes it into `docker-compose.foundry.yml`. Editing that pin to boot 13 would red `tests/view-lab-chrome-version-lock.test.js` (which holds the View Lab's harvested window chrome to the build the smoke boots), rotate the CI `foundry-binary-*` cache key, and leave the lab attesting a build nothing runs.
+- **There is one committed world fixture.** `.foundry-e2e/worlds/fabricate-smoke-ci/world.json` targets the default arm; `scripts/foundry-setup-data.mjs` stamps `coreVersion`, `systemVersion` and `compatibility` onto the *runtime copy* for whichever arm is booting. A second committed fixture would drift, and the drift presents as a world-launch timeout that names nothing.
+- **Every arm shares one container identity.** The felddy licence binds to the container **hostname**, so a per-arm hostname would burn a second Foundry activation per worktree. Both arms therefore use the same container name, hostname, host port and data directory — which means **two arms can never run at the same time in one worktree**. Switching arms recreates the container (the felddy image extracts Foundry into the container filesystem, so a reused container would keep booting the previous generation); `foundry-test-up.mjs` detects the image mismatch and does this for you.
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+Downloaded game systems are kept per version under the gitignored `.foundry-e2e/systems-cache/`, so switching arms is a local copy rather than a repeat ~50 MB download.
+
+An arm switch installs a different dnd5e release, so Foundry migrates package data on the world's first launch afterwards.
+That is a one-off that can run past the compose healthcheck's grace period, and Docker then reports the container `unhealthy` — a state it clears again on the very next passing probe.
+`foundry-test-up.mjs` therefore treats `unhealthy` as "not answering yet" and waits for its own deadline rather than aborting, which is what it used to do; a run that hits this says so and carries on.
+
+### The narrow V13 arm (`npm run test:foundry:v13`)
+
+`scripts/foundry-version-assert.mjs` boots the arm's Foundry, launches the smoke world, joins as Gamemaster, confirms Fabricate loads, asserts a handful of version-sensitive API shapes, and exits.
+It is deliberately **not** the ~32-minute walk: it answers "is Fabricate broken on V13?" in about a minute, which is the question that otherwise goes unanswered between releases because V13 is unexercised everywhere else.
+
+It writes `test-results/version-arm-<arm>.json` (`{ arm, expectedFoundryVersion, image, passed, failure, assertions[], pageErrors[], consoleErrors[] }`) and `test-results/version-arm-<arm>-console.log`.
+A run fails on any failing assertion, any `pageerror`, or any non-waived console error; the waiver list is one entry (`/favicon/i`) on purpose.
+
+The assertions, and why each is there, are documented at the top of that script.
+In summary: `core-build` (the container really is running the arm's Foundry — without it a mis-set image tests 14 twice and reports a V13 pass), `fabricate-ready`, `compendium-directory`, `compendium-context` (the modern `{label, icon, visible, onClick}` entry shape, exercised against a really-rendered Item pack row **and** a non-Item control row), `settings-round-trip`, `region-subtype`, `region-sheet`, `scene-control`, `app-renders`.
+
+Two properties of that list are deliberate and worth preserving.
+
+<!-- markdownlint-disable markdownlint-sentences-per-line -->
+
+- **Every entry is a check some build could fail.** An observation no verdict rests on goes in the summary's `reportedOnly` instead — which is where the `CompendiumCollection` namespace probe lives, because both supported builds expose the namespaced path *and* the bare global, so any assertion over it would pass by construction. A check that cannot fail is worse than no check: it buys confidence it has not earned and inflates the pass count a reader uses to judge coverage.
+- **`compendium-directory` is a named precondition, not padding.** `compendium-context` exercises Fabricate's `visible()` against a really-rendered sidebar row, so it needs one row of each kind to exist; the arm waits for them explicitly and reports the wait under its own name. Without that, a slow or unrendered Compendium Directory reported `compendium-context: FAIL` — that is, "Fabricate is broken on V13" — and the arm's whole value is that a red result is believable.
+
+<!-- markdownlint-enable markdownlint-sentences-per-line -->
+
+The `compendium-directory` wait was verified by mutating its predicate to demand an impossible document type: the run went red on `compendium-directory` with a message naming the sidebar, and `compendium-context` reported `blockedBy: compendium-directory` rather than sending anyone to debug `visible()`.
+
+The arm never touches the canvas and adds no console-error waiver keyed on a render-flag queue name.
+`Canvas##activateTicker` builds `pendingRenderFlags` with two queues on 13.351 and three on 14.365, so a placeable created before the first scene draw throws `reading 'OBJECTS'` on V13 and `reading 'INTERFACE'` on V14 — the same defect under two names.
+Issue 1010 retired that waiver from the full smoke after it hid a real defect for a year; anything needing a drawn canvas belongs in the full walk, which waits properly via `scripts/lib/foundryCanvasReadiness.js`.
+
+The setup → license → auth → launch → join path is shared with the full smoke through `scripts/lib/foundryBrowserBoot.js`, so both harnesses log in the same way and the join-control select-vs-tile fallback exists once.
+That module takes a Playwright `page` but never imports Playwright, and reporting (step records, screenshots, progress output) is injected by the caller.
+
+### Phases
+
+The run walks several phases in order; if an earlier phase fails, later phases are skipped:
+
+- **boot-and-join** — health-poll the container, log in as Gamemaster.
+- **Phase B** — create test actors and items, screenshot sheets.
+- **Phase C** — create a crafting system + sample recipes.
+- **Phase D0** — open the Crafting System Manager, exercise its surfaces, screenshot (the `screenshot-manager` step).
+  **This is where most drift shows up** when manager markup changes.
+  After the default-selection capture it can also re-theme the real manager via the `data-fabricate-theme` attribute (exactly as the theme setting's `applyFabricateTheme` onChange does) and capture `manager-theme-<themeId>` for every Fabricate theme, then restore the default.
+  These are real, Foundry-rendered themed captures — theme fidelity is not validated via hand-authored mocks.
+  The theme sweep (and the matching player-alchemy `player-alchemy-theme-<themeId>` sweep in Phase E) is OFF by default because those 14 frames are unasserted and are not mapped to any PR view; set `FOUNDRY_SMOKE_THEMES=1` (or pass `--themes` to `node scripts/foundry-test-run.mjs`) to regenerate them when auditing theme fidelity.
+- **Phase E** — API-driven crafting flow, then open the unified Fabricate shell (`#fabricate-app`) from the Craft Item and Gathering sidebar buttons and assert the four-tab left nav (`fabricate-app-shell` screenshot).
+  The shared actor-selection top bar mounts with the shell; the phase waits for it to flip `[data-actor-bar-state]` from `loading` to `ready` before capturing.
+  The full profile also walks staged player gathering screenshots: environment list, event inspection, ready attempt detail, post-attempt refresh, missing-tool block, timed-run ready and active states, blind gathering, realm-locked listing, and stacked narrow-window layout.
+- **Phase F** — cleanup.
+
+The former standalone player-facing Crafting and Gathering app phases (D2/D3/E2) and standalone Recipe Editor were removed when those surfaces were retired; both sidebar buttons now open the unified Fabricate window.
+
+The `full` profile also captures seven demonstration frames whose purpose is to show an in-flight PR's fix once it rebases, not to satisfy the screenshot gate (issue 752).
+Each is full-profile only, leaves the world as it found it, and rides an existing manager or player session.
+
+- `manager-experimental-off` — the selected-system rail with `fabricate.experimentalFeatures` disabled (the world-scoped flag is restored afterward).
+- `manager-checks-crafting-consumption` — the Checks → Crafting tab scrolled to the failure-consumption controls.
+- `manager-alchemy-settings` — the Crafting → Settings surface of the minimal "Smoke Alchemy Bench" alchemy-mode system seeded in Phase C.
+- `fabricate-journal-craft-detail` — the Journal with a crafting history run selected so the run-detail requirements card is visible.
+- `player-crafting-roll-result` — the crafting run summary's roll-result box (awarded pills and outcome) after a UI craft.
+- `chat-craft-card` — the chat sidebar clipped to the crafting result card posted by the Phase E craft.
+- `manager-tags-categories-tags-tab` — the Tags & Categories screen's Item tags rows (the three seeded tags).
+
+### Test artifacts
+
+After any run (success or failure), results are written to `test-results/`:
+
+| File | Description |
+|------|-------------|
+| `summary.json` | Machine-readable `{ passed, steps[], errors[], consoleErrors[], stepFailures, consoleErrorCount, degraded, rendererCrashed, phaseTimings[], viewTimings[] }` — pass/fail result, the split `stepFailures`/`consoleErrorCount` signals, the `degraded`/`rendererCrashed` flags, smoke profile, timings, and list of errors |
+| `console.log` | Full browser console output captured during the test |
+| `screenshot-*.png` | Per-step screenshots captured by the selected profile |
+| `screenshot-failure.png` | Captured only when a step throws (last DOM state) |
+
+When debugging a smoke failure, read `summary.json` first: the failing step's `error` field plus the surrounding successful steps usually point straight at the broken selector.
+
+At the end of every run the harness prints a phase-timings table followed by a "Slowest views" table.
+The per-view timings record the wall-clock spent reaching each captured frame (elapsed time between the previous captured frame, or the current phase start, and this frame) and are also persisted to `summary.json` as `viewTimings[]`.
+Use the slowest-views list to target future harness speedups at the views that actually cost time.
+
+### What the smoke test checks
+
+Every profile boots a real Foundry instance, joins the `fabricate-smoke-ci` world, and verifies the load-bearing crafting and gathering paths:
+
+1. Navigates to the Foundry setup page and authenticates as admin.
+2. Launches the `fabricate-smoke-ci` world (auto-wiped from the fixture under `.foundry-e2e/worlds/fabricate-smoke-ci/` on every `test:foundry:up`).
+3. Waits for `game.ready` and `game.fabricate.ready`.
+4. Verifies the Fabricate module is active (`game.modules.get('fabricate')?.active === true`).
+5. Opens the unified Fabricate shell from the sidebar actions, verifies the shared navigation/actor bar, and completes one successful **Gather Meadow Herbs** task on Alara the Alchemist.
+6. Crafts one **Healing Potion** through the runtime API, verifying it lands in Alara's inventory.
+7. Executes and asserts craft coverage across every resolution mode through the runtime API: a `simple` craft, a `routedByCheck` craft on a recipe with two result groups on different outcome tiers (the selected tier's item is produced and the sibling's is not), a `routedByIngredients` craft across two ingredient sets mapped to different groups (the chosen set's item is produced and the other's is not), and a `progressive` craft completed in a single deterministic advance.
+8. Executes and asserts a `breakageChance` and a `limitedUses` tool breakage (the backing tool item ends flagged broken with the localized " (broken)" name suffix), one salvage run (the result components land in inventory), a negative tool-gating craft (returns `success: false` when the required tool is absent), and one guaranteed-success gather (the actor's inventory increases).
+9. Fails if any non-ignored browser console errors were captured during the session.
+
+The `full` profile additionally captures Crafting System Manager v2 screenshots, exercises the blocked / failure / timed gathering states, the non-GM redaction path, the no-selectable-actors state, asserts the seeded 0%-drop and scene-blocked gathers plus the hazardous "Bramble Snare" event firing, and runs document cleanup.
+
+### Smoke profiles (`rc`, `full`, `screenshots`)
+
+A single orchestrator (`scripts/foundry-test.mjs`) and run script (`scripts/foundry-test-run.mjs`) handle every profile.
+The profile is selected by `FOUNDRY_SMOKE_PROFILE` (or `--profile=<value>` on `node scripts/foundry-test.mjs`).
+
+| Profile | When | Phases | Target |
+|---------|------|--------|--------|
+| `rc` | Release-candidate CI | Phase B → C → E (unified shell, one Gathering success, Healing Potion craft) → console-error check | < 25 min including cold setup |
+| `ci` | Deprecated alias for `rc` (removed after one release) | same as `rc` | same |
+| `full` (default) | Local and visual-regression runs | + Phase D0 (manager screenshots), extended Gathering states, non-GM redaction, no-selectable actors, Phase F (cleanup) | ~10–15 min locally |
+| `screenshots` | Scoped PR screenshot evidence (issue 826) | Same rendering path and budget as `full`, but captures ONLY the labels a PR's changed files affect and skips a view-bearing phase whose labels are all off-target; the full-only behavioral assert phases do NOT run | Modestly faster for a manager-only PR (phase E skipped, ~25% off) but ≈no win yet for player PRs since phase D0 still fully navigates — the per-view within-D0 scoping that yields the larger win is a follow-on |
+
+The `rc` profile captures a pinned screenshot budget (`world-loaded`, `fabricate-app-shell`, `post-craft`, `alara-post-craft-inventory`, plus `screenshot-failure.png` on failure) — every other `screenshot(page, label)` call is a no-op under `rc`, but the surrounding behavioral assertions still run.
+
+The `screenshots` profile is the PR-evidence producer: it renders the same real-Foundry app windows as `full` but scopes the captured set to the views a PR touches.
+Its target label set comes from `mapChangedFilesToViews` — derive it with `npm run screenshots:ui:targets -- --base origin/main` (or `--changed-files <file>`) and pass it via `--target-labels=<csv>` / `FOUNDRY_SCREENSHOT_TARGET_LABELS`; an empty set (no UI change) means capture the full catalogue.
+Phase E (the player/craft/journal frames) is skipped when no target label maps to it, so a manager-only PR drops that whole phase.
+The label → phase registration lives in `scripts/lib/screenshotCaptureMap.js` (a pure, playwright-free module the harness and the unit tests share).
+
+The orchestrator gives the in-browser run its own wall-clock budget (`FOUNDRY_RUN_TIMEOUT_MS`).
+When unset, the default is **profile-derived**: the expected walk duration for the resolved profile plus a fixed finalization grace (`scripts/lib/foundryRunBudget.js`), so the budget always clears a legitimately-passing walk *plus* its post-verdict `summary.json` write rather than SIGTERM-killing finalization on a green run.
+`rc`/`ci` keep today's 18-minute budget (headroom over the observed ~870-930s rc walk), while `full`/`screenshots` derive ~26 minutes — so the `full` walk no longer needs a manual `FOUNDRY_RUN_TIMEOUT_MS` override to finish teardown and write `summary.json`.
+On overrun, the run process is sent `SIGTERM` and the orchestrator proceeds to Docker teardown + artifact upload, so the 25-minute Actions budget can never preempt cleanup.
+An explicit `FOUNDRY_RUN_TIMEOUT_MS` (for example CI's pinned value) always wins; override locally if you need a longer or shorter cap:
+
+```bash
+FOUNDRY_RUN_TIMEOUT_MS=600000 npm run test:foundry:rc          # POSIX (10 minutes)
+$env:FOUNDRY_RUN_TIMEOUT_MS='600000'; npm run test:foundry:rc  # PowerShell
+```
+
+Every run prints a phase-timing table to stdout at the end and writes timings into `summary.json` under `phaseTimings` and `bootTimings`, so slow phases jump out in CI logs.
+Use `full` whenever you need fresh visual references for design review.
+
+### Interpreting `passed: false`
+
+`summary.json.passed` is false if **either** a phase step fails **or** `consoleErrors[]` is non-empty.
+These are very different signals:
+
+- A failed **step** (an entry in `steps[]` with an `error`) is a real regression — a broken selector, a thrown assertion, a surface that didn't render.
+- A non-empty **`consoleErrors[]`** can be benign.
+  The fixture world routinely emits browser `404 (Not Found)` loads for missing tiles, portraits, or sounds, and any such console error flips `passed` to false even when every step passed.
+
+So before treating a run as broken — or discarding its captured screenshots — confirm whether `steps[]` contains an actual failing step.
+A `passed: false` driven purely by `404` console noise with zero failed steps means the walk succeeded and the `screenshot-*.png` artifacts are valid evidence.
+(Example seen in practice: all phases B–F passed and `fabricate-app-shell` captured correctly, but `passed: false` came solely from 12 generic `404` console errors.)
+
+### Tolerated transient renderer teardown (`degraded` / `rendererCrashed`)
+
+A long `full` run can hit a transient Chromium renderer/page teardown at the tail — the message class `Target page, context or browser has been closed` (or `disconnected`/`crashed`).
+This is the same infra flake the Phase E Journal step and the process-level `unhandledRejection` guard already absorb.
+The Phase D0 manager walk now absorbs it too, but only after its last load-bearing capture (the `manager-experimental-off` milestone).
+
+`d0RequiredCapturesComplete` flips true immediately after the `manager-experimental-off` screenshot — the last genuine D0 capture.
+A teardown after that milestone records the `screenshot-manager` step skipped (not failed) and the run continues.
+A teardown before it still records `screenshot-manager: false` and fails the run, because the later frames were genuinely never captured and a PR relying on them must not go green.
+The tolerated window is deliberately minimal, so any earlier teardown fails loudly.
+
+`degraded: true` means a transient teardown was tolerated (a `screenshot-manager` or `player-journal` step is `skipped: true` with a `transient page teardown (skipped): …` error), so the run still exits 0 but is distinguishable from a clean pass.
+`rendererCrashed: true` means Playwright fired a page `crash` event (canonically an OOM) — the causation-bearing renderer-crash signal that `page.isClosed()` cannot distinguish from an intentional close — so a crash-flagged tolerated run stays exit 0 but warrants a confirming re-run.
+A real Fabricate JS error surfaces as a `pageerror`/`console.error` in the independent `consoleErrors[]` gate, not through the teardown path, so a tolerated teardown coincident with any non-waived console error still fails the run.
+The tolerance can therefore only ever mask a post-captures renderer process crash, never a JS regression.
+A persistent `rendererCrashed`/`degraded` pattern across runs is actionable (a systematic tail OOM), not cosmetic.
+When `npm run screenshots:ui` refuses a run on any of these, it prints which of the five evidence conditions tripped, the value each one measured, an excerpt of the failing steps and un-waived console errors behind them, and how to check whether the same fault is already present at your PR's base — read that refusal rather than re-deriving it from `summary.json` by hand.
+
+### Known drift pattern: Phase D0 selectors
+
+`exerciseManagerEnvironmentPointerTargets` in `scripts/foundry-test-run.mjs` and the env-edit checks in the same file pin many selectors by class, child index (`.nth(N)`), and visible button text.
+When the manager UI evolves, these go stale silently — the harness only fails when the next smoke run hits the broken locator.
+
+Hit list seen historically:
+
+- `.manager-environment-row .manager-icon-button .nth(3)` / `.nth(4)` — expected move-up / move-down buttons that were dropped when reordering moved to drag-and-drop.
+- `.manager-environment-edit-view.is-placeholder` and `.manager-environment-placeholder-card` — gone since the real composition editor replaced the placeholder.
+- "Return to environments" button text — renamed to "Back to environments" and rewired through `confirmRouteExit`.
+- `.manager-environment-details-band` — CSS rule survived in `styles/fabricate.css`, but the Svelte usage was removed; the harness kept waiting on it.
+- `.manager-travel-party-row` / `.manager-travel-member-row` — the **singular** classes from a retired combined Travel view.
+World > Parties renders `GatheringPartiesTab` (`.manager-travel-parties-row`, **plural**) and `PartyExpandedBody` (`.manager-party-member-row`); the harness `waitFor` timed out until the selectors were repointed.
+
+**Workflow rule:** Whenever editing manager UI markup (env browser row, env-edit view, CompositionList, header actions, Travel tabs, etc.), grep `scripts/foundry-test-run.mjs` for the changed classes / text BEFORE declaring the change done.
+Prefer running `npm run test:foundry` locally at least once on UI-touching PRs.
+If the harness asserts on something the new markup no longer has, update the harness in the same PR.
+
+**CI blind spot:** PR CI runs a reduced profile that skips full-only steps (e.g. the Travel screenshot).
+A selector that only the **full** profile exercises rots invisibly until someone runs `npm run test:foundry` locally.
+Don't assume green PR CI means the full smoke walk passes.
+
+### Running it locally (gotchas)
+
+- Needs Docker Desktop running and `.env.foundry` with `FOUNDRY_USERNAME` / `FOUNDRY_PASSWORD` (the `up` script loads it; CI sets the vars directly).
+The container is cached between runs, so re-runs boot in ~5s.
+- Running smoke from a disposable worktree needs a few extras the main checkout has already.
+Copy `.env.foundry` from the main checkout (a fresh worktree does not carry it).
+The container identity (name, hostname, compose project, host port) is now derived deterministically from the worktree root by `scripts/lib/foundryRunIdentity.js`, so it is unique per worktree and no longer collides — the old pre-run/post-run `docker rm -f fabricate-foundry-test` dance is superseded and unnecessary.
+Tear a disposed worktree down with `npm run test:foundry:down -- --clean` so its per-worktree container and compose network are removed; that is a cleaner reclaim than the periodic `docker network prune -f` guard (which stays safe, since it only frees networks with no attached container — preserved stopped containers keep theirs in use).
+The default run budget is now profile-derived, so a local `full` walk (`npm run test:foundry`, no `FOUNDRY_RUN_TIMEOUT_MS`) already gets ~26 minutes and no longer needs a manual headroom override to finish teardown and write `summary.json`.
+On a branch that predates this profile-derived default, still give the run `FOUNDRY_RUN_TIMEOUT_MS` headroom so the older flat 18-minute default does not trip the watchdog on an otherwise-passing full walk.
+- The `run` phase **wipes `test-results/`** at startup.
+Do **not** redirect run logs into `test-results/` (e.g. `... | Tee-Object test-results/x.log`) — on Windows the open log file can't be unlinked and the run dies with `EBUSY`.
+Tee to a path outside `test-results/` if you need a copy.
+
+### Documentation screenshot source
+
+A new or replaced screenshot on the documentation site is generated from a named View Lab case.
+Nothing on the site is hand-captured from a browser any more, because a curated frame has no producer and goes stale with nothing to say so.
+
+A page declares an image slot by naming a case id.
+The generator fills the slot, and both halves are gated, so neither can move without the other.
+
+```sh
+node scripts/docs-screenshots.mjs plan   # what a run would rewrite, without starting a browser
+npm run docs:screenshots                 # render, encode what changed, update the map
+npm run docs:screenshots:check           # re-render, and compare every committed frame against it
+```
+
+Three files make up the mechanism.
+
+- `docs/_data/screenshots.json` is the committed map.
+  It carries a provenance header and one entry per case, each with the alternative text the site publishes and the SHA-256 of the source frame the committed image was encoded from.
+  That digest is provenance and only provenance: it records WHICH render produced the committed asset, and it moves only when a frame is actually rewritten.
+  Nothing re-derives it, and nothing can.
+  The renderer is not byte-deterministic, so a fresh render of the same case yields a different source PNG and therefore a different digest while showing the identical view.
+  `docs:screenshots:check` compares pixels, not digests.
+  `tests/docs-screenshot-map.test.js` checks the digest's shape and uniqueness, which is all that can be checked without rendering.
+  The asset path is derived from the case id and never stored, so there is only ever one name for a frame.
+- `docs/_includes/screenshot.html` is the slot.
+  Write `{% raw %}{% include screenshot.html case="manager-recipe-edit-normal" %}{% endraw %}` on a page, optionally with `alt` to override the map's text or `caption` to add a visible one.
+- `docs/img/screenshots/lab/` holds the generated images, one per mapped case.
+
+The generated set has a directory of its own, and that is load-bearing rather than tidiness.
+`docs/img/screenshots/` still holds a hand-curated frame that predates the generator, five case ids share the `fabricate-` prefix with it, and mixed together the only available test for "did the generator produce this" would be "is it in the map".
+That reduces the reverse gate to the map restating itself.
+`tests/docs-screenshots.test.js` owns the flat directory and `tests/docs-screenshot-map.test.js` owns `lab/`, and each says in its own comments which facts keep them apart.
+
+What is left of that pre-existing population stays exactly as it is.
+It remains valid documentation evidence and is not migrated, because retiring evidence that is still accurate buys nothing.
+The rule applies to a new or replaced screenshot.
+The population is also closed and may only shrink, and `tests/docs-screenshots.test.js` now enumerates what is in it and why no view case can reach it, so adding to it is a visible act rather than a silent one.
+
+`npm run docs:screenshots` rewrites only the frames whose view actually moved, and reports which ones it left alone.
+Run it after any change that alters one of the mapped views, and read what it reports before committing.
+Then run `npm run docs:screenshots:check` to confirm every committed frame still matches a fresh render.
+Both verbs decide with the same comparison, so a `check` failure means the same thing a `generate` rewrite would have.
+
+That comparison is perceptual rather than byte-equal, and the reason is measured rather than assumed.
+This renderer is not byte-deterministic: two clean renders of the identical set of mapped cases differ in a handful of frames, and the differing set moves between runs rather than settling, so it is per-run timing and not a property of any case.
+Byte equality would therefore report roughly a tenth of the set as changed on every run forever, which is the churn the selective rewrite exists to prevent.
+
+So a frame is compared like this.
+The fresh render is encoded with the same `cwebp` settings the committed asset uses, and the two WebP files are compared byte for byte.
+Identical means unchanged, and that is the fast path.
+Only on a mismatch are both decoded with `dwebp -ppm` and compared pixel by pixel.
+Comparing WebP against WebP keeps both sides under identical encoder treatment, so nothing but a genuine render difference survives.
+Comparing a fresh PNG against the committed WebP would fold the encoder's own preprocessing into every measurement.
+
+The tolerance has two rules, because a difference can be loud or it can be broad, and this renderer's noise is neither.
+
+The first rule is amplitude, and it was derived from the measurement rather than chosen.
+Four full renders of the forty-six mapped cases give six pairings, which is 276 frame comparisons.
+Nineteen of those frame pairs differed at all.
+The worst carried 2116 differing pixels, and the largest per-channel difference any pair reached anywhere was sixteen levels, on three pixels.
+Not one noise pixel reached twenty-four, so the budget is zero: one pixel differing by twenty-four levels or more is a changed view.
+The other side was measured the same way.
+Changing one character of one recipe name in the View Lab world fixture, between two letters of equal advance width so nothing reflowed, put forty-seven pixels past twenty-four levels in the smallest of the three places that name appears on screen, reaching sixty levels.
+So the threshold sits eight levels above a noise population that never reaches it and well below the weakest real signal, and every scrap of margin the rule has is in amplitude rather than in a pixel budget.
+
+The second rule is area: more than five percent of a frame differing at all, at any amplitude, is a changed view.
+Amplitude alone cannot see a shallow change that covers a lot of frame, and that is not a hypothetical shape.
+Lightening every pixel of a real committed frame by twenty-three levels puts no pixel past twenty-four, and was reported unchanged.
+That is a Fabricate colour token changing across a panel, which is the sort of change documentation exists to show.
+The worst noise measured touched 2116 pixels of a 1280x860 frame, which is 0.19% of it, so five percent sits about twenty-six times above the measurement.
+
+What still passes is a difference under twenty-four levels on every pixel AND under five percent of the frame: a subtle recolour of something small.
+That is the residual cost of a tolerance wide enough to absorb this renderer's jitter at all.
+The cost runs the other way too.
+A libwebp release that changes `-near_lossless` preprocessing would move many pixels a little, trip the area rule, and rewrite the set once with no visual change to review.
+
+`tests/docs-screenshot-frames.test.js` holds every one of these numbers against committed fixtures, and its header records where they came from and which of them are synthesized.
+Do not widen any of them without repeating that measurement.
+A tolerance that cannot separate renderer jitter from a changed character is not a tolerance, it is a blindfold.
+
+Generation fails closed.
+Without the harvested Foundry chrome it aborts naming the harvest command, and without `cwebp` and `dwebp` on `PATH` it aborts naming libwebp.
+The decoder is required even by a run that encodes nothing, because without it the only available comparison is byte equality.
+This renderer's own jitter fails byte equality.
+A case the renderer failed on this run is refused even when an earlier run left a frame for it on disk, because the renderer accumulates output and republishing that frame would ship an older commit's picture as current documentation.
+A run whose renderer died before it produced anything is refused whole, on the modification time of the manifest rather than on its contents: the renderer writes that file last, so a throw before its render loop leaves an earlier run's manifest in place, and every frame in it agrees with its own recorded head by construction.
+Without that, a `check` could report that every committed frame matches a fresh render having rendered nothing.
+A run that refused any case leaves the provenance header alone, because stamping it would certify frames that run never rendered.
+
+There is no CI job that regenerates any of this.
+Generation needs the harvested chrome, which never leaves your machine, so CI builds and deploys what is committed.
+
+A Foundry chrome rotation or a Playwright resolution change rewrites the whole set with no visual change to review.
+The map's provenance header makes that identifiable, and such a rewrite lands as its own commit, separate from any content change.
+
+## UI PR screenshot evidence
+
+UI changes must include screenshot evidence in the PR body.
+The CI `check-screenshots` job enforces this with `scripts/ui-pr-screenshot-evidence.mjs`: the body must contain a **Screenshots** heading (any ATX level, normally `##`) with at least one image beneath it.
+A frame the View Lab capture job published automatically must additionally match this PR's own head commit and one of the changed views, and the check now waits for that job to conclude before deciding — see "CI behavior" below.
+The smoke-harness/S3 workflow below is the recommended way to produce real screenshots, but any image under a Screenshots heading that a person put there directly — including a drag-and-dropped GitHub attachment — still satisfies the check outright, with no matching applied.
+
+### When it applies
+
+The rule applies when a PR changes any file under `src/ui/`, `styles/`, any `*.svelte` file, or any `*.css` file.
+A `lang/` change (visible UI text) requires screenshots only when the same PR also changes one of those render files.
+
+### Prerequisites
+
+- A `gh` CLI authenticated (used only to read and patch the PR body).
+- AWS credentials for the release S3 bucket.
+  **Locally**, the AWS default provider chain (env vars or an `aws` CLI profile).
+  **In CI**, OIDC role assumption only — never static keys.
+  `publish` uploads PNGs to `s3://<bucket>/pr-screenshots/<number>/` (bucket/baseUrl from `release.s3.config.json`, overridable via `S3_RELEASE_BUCKET`/`RELEASE_BASE_URL`/`AWS_REGION`).
+
+### Local workflow
+
+1. Plan the required screenshot views:
+
+   ```sh
+   npm run screenshots:ui:plan -- --base origin/main
+   ```
+
+2. Run the Foundry smoke harness to generate real UI screenshots (local default is the `full` profile, which captures every per-view screen):
+
+   ```sh
+   npm run test:foundry
+   ```
+
+   The harness writes real Foundry-mounted screenshots under `test-results/`.
+
+3. Collect only the mapped smoke screenshots for the PR:
+
+   ```sh
+   npm run screenshots:ui -- --base origin/main --pr <number>
+   ```
+
+   This copies the relevant smoke artifacts from `test-results/` into `tmp/pr-screenshots/<number>/`.
+PR-scoped screenshots are temporary handoff files only.
+
+4. Upload and embed automatically:
+
+   ```sh
+   npm run screenshots:ui:publish -- --pr <number>
+   ```
+
+   This uploads each collected PNG to `s3://<bucket>/pr-screenshots/<number>/<view>.png`, then patches the PR body via `gh pr edit --body-file`, inserting (or replacing, on re-run) a managed block:
+
+   ```md
+   <!-- fabricate:screenshots:start -->
+   ![pr-123 Manager gathering environments](https://<bucket>.s3.<region>.amazonaws.com/pr-screenshots/123/manager-environments.png)
+   <!-- fabricate:screenshots:end -->
+   ```
+
+   The S3 key is PR-scoped, so the object URL itself identifies the PR and the block alt text also includes `pr-<number>`.
+   The block is idempotent — re-running `publish` replaces it in place rather than appending duplicates.
+
+5. Clean up:
+
+   ```sh
+   npm run screenshots:ui:clean -- --pr <number>
+   ```
+
+   This removes the local `tmp/pr-screenshots/<number>/` only.
+   The uploaded S3 objects stay live so the embedded image URLs keep working while the PR is open.
+   Do not commit files from `tmp/pr-screenshots/<number>/` or move them into `docs/`, `assets/`, or any other repository asset directory.
+
+   **Removing the S3 objects** (e.g. when the PR closes): `npm run screenshots:ui:clean -- --pr <number> --s3` deletes them best-effort (a missing-credentials/permission failure only warns).
+
+   **Orphan prevention:** the S3 bucket has a lifecycle rule expiring the `pr-screenshots/` prefix after N days as a backstop, so PR screenshots never accumulate even if `--s3` cleanup is skipped.
+
+### Evidence and CI recovery runbook
+
+A few sharp edges recur when collecting, publishing, and reading back CI:
+
+- `screenshots:ui` and `screenshots:ui:plan` need `--base origin/main`.
+Without it, zero views are planned **silently** — the command exits 0 as if there were nothing to capture, and a later `publish` then reports nothing to upload.
+Pass `--base origin/main` every time rather than trusting an empty plan.
+- Publishing patches the PR body, which fires an `edited` workflow run whose payload SHAs are frozen at that moment.
+That `edited` run's `lint-commits` can fail with "Invalid revision range", and its skipped jobs pollute the status contexts.
+Never rerun the `edited` run: let it settle, then fully rerun the original PUSH run so a fresh green result lands **last** in every context.
+- Judge PR state by the newest result per context (`gh pr view --json statusCheckRollup`), not the flat `gh pr checks` listing, which mixes the stale `edited`-run rows in with the fresh push-run rows.
+
+### Screenshot source
+
+Screenshot evidence must come from real smoke-harness artifacts in `test-results/`.
+The script does not render hand-authored HTML fixtures, does not use copied mock asset manifests, and does not generate synthetic previews.
+Smoke fixture data should use Foundry core or dnd5e non-SVG raster icon paths directly when a preview image is needed.
+
+### CI behavior
+
+CI runs only the lightweight `check` (no smoke run on the runner).
+For a same-repository PR, it first awaits the `capture` job in `pr-screenshots.yml` for this PR's own head SHA, because that job is the automatic producer of screenshot evidence and used to publish its frames only after this check had already decided, reddening a PR's first push through no fault of the change.
+A fork PR has no such producer to wait for — `pr-screenshots.yml` never runs on untrusted head code — so the check decides immediately on whatever the body already carries, which is also the only path open to a fork's author.
+It likewise decides immediately, without waiting, whenever the body already carries evidence sufficient to satisfy the gate for this head.
+Once it has waited (or decided it need not), it re-reads the live PR body, the changed files, and the labels, then passes when the body has a **Screenshots** heading whose section contains at least one image that satisfies the rules below.
+
+- The heading match is case-insensitive, accepts any ATX level (`#`–`######`) and the singular form (`## Screenshot`).
+- The section runs from the heading to the next heading of the same or higher level, so an image under a *different* later heading does not count.
+- Images may be markdown (`![alt](url)`) or HTML (`<img src=...>`).
+GitHub drag-and-drop attachment URLs have no file extension, so the image syntax — not the URL shape — is what matters.
+- An image with no Screenshots heading, or a Screenshots heading with no image, does not pass.
+There is **no `SCREENSHOTS_NEEDED:` text bypass**.
+
+An image the View Lab capture job published automatically only counts when it sits inside that job's own managed block in the PR body (`<!-- fabricate:screenshots:start -->` … `<!-- fabricate:screenshots:end -->`).
+Its case id and head SHA, read back from its published S3 URL (`<prefix>/<pr>/<head-sha>/<caseId>.png`), must match this PR's current head and one of the changed views.
+An image in a Screenshots section that is NOT inside that managed block satisfies the check outright, with no matching applied — that is what keeps the maintainer-pasted path and the fork path working, since a drag-and-dropped GitHub attachment carries no case id and no head SHA.
+
+A failing check names which problem it is, via a distinct `::error::<code>` prefix: `no-screenshots-section`, `capture-run-not-found`, `capture-run-failed`, `capture-published-nothing`, `no-frames-for-this-head`, `no-frames-for-changed-views`, `capture-cancelled`, `capture-did-not-conclude`, or `pull-request-read-failed`.
+The last of these fires when the check cannot re-read the live PR body after the producer concludes, for example on a rate limit or a transient error from the API.
+It is deliberately distinct from `capture-published-nothing`, because an unread body is not evidence that the producer published nothing.
+Reporting it under that code would send the reader to debug the producer, when the actual problem is the check's own re-read failing.
+
+The only way to skip the check is the **`screenshots-exempt` label**, which only a maintainer can apply.
+An agent must never apply it.
+Use it only when screenshot capture is genuinely impossible (e.g. the smoke harness cannot boot for an unrelated reason).
+
+## CI workflows
+
+### Conventional Commits gate
+
+Job: `lint-commits` in `.github/workflows/ci.yml`
+
+Runs on every pull request.
+Validates all commits in the PR using `commitlint` and checks that the PR title itself also follows the Conventional Commits format.
+
+### Foundry integration workflow
+
+File: `.github/workflows/foundry-integration.yml`
+
+Runs:
+
+- As a reusable workflow (`workflow_call`) invoked by the release pipeline — `beta.yml` and `release.yml` — with `require_credentials: true`.
+- On manual trigger via `workflow_dispatch`.
+
+It has no `push` or `schedule` trigger; the release workflows call it, and that is the only automatic path.
+The `require_credentials` input is load-bearing: with it unset the job SKIPS green when `FOUNDRY_USERNAME` / `FOUNDRY_PASSWORD` are absent, so a release publish must pass `require_credentials: true` or it could ship on a build whose smoke test silently never ran.
+If the smoke test fails, the workflow opens (or comments on an existing) GitHub Issue labelled `foundry-smoke-failure`.
+Requires two repository secrets: `FOUNDRY_USERNAME` and `FOUNDRY_PASSWORD`.
+
+### Beta workflow
+
+File: `.github/workflows/beta.yml`
+
+Trigger: push to `main`.
+
+`main` is the prerelease line, so `semantic-release` computes a `-beta.N` version for the pushed commit.
+The `-beta.N` suffix is a **privacy mechanism, not a `!` breaking-change scheme**: because a stable version does not compare as newer than its own prereleases under Foundry's version check, publishing the eventual public `v1.5.0` never offers an update to a client sitting on `1.5.0-beta.N` — the **Version scheme** requirement.
+Do not "clean up" the preid into anything Foundry orders above its GA, or the whole private cohort is offered the public build on its next update check.
+
+Steps:
+
+1. Run unit tests (`npm test`) and build.
+2. Run the Foundry integration smoke test (via the reusable workflow, with `require_credentials: true` so the job fails rather than skipping green when Foundry credentials are unset).
+3. Run `semantic-release` to determine the version bump and inject a `-beta.N` version into the built `dist/module.json`.
+On `main` the config OMITS `@semantic-release/github` (see the allowlist in the Release pipeline section), so NO GitHub release object is created — that omission is what keeps the private beta channel private — and the config's `successCmd` writes `next_version`/`next_tag` to `$GITHUB_OUTPUT` as the version signal instead.
+4. When `next_version` is non-empty, call `.github/workflows/release-s3.yml` with `channel: beta`, `tag: <next_tag>`, `dry_run: false`, and `overwrite: false`.
+When `next_version` is empty (a push with no releasing commits), skip S3 publishing without failing the run.
+
+### Release workflow (early-access producer)
+
+File: `.github/workflows/release.yml`
+
+Trigger: push to `release` or to a hotfix line (`[0-9]+.[0-9]+.x`).
+
+This is the **sole producer of the private early-access channel**.
+`semantic-release` mints the STABLE version for the pushed commit and — because the github plugin IS loaded here with `draftRelease: true` — drafts its GitHub release with the zip and `module.json` as assets.
+Nothing is made public: the release is a DRAFT and only a private channel receives the artefact.
+
+- On `release` the channel is `early-access`.
+- On a hotfix line the channel is that line's own name (`${{ github.ref_name }}`), NEVER `early-access` — a hotfix must not be offered to patrons.
+A hotfix line is semantic-release's `'maintenance'` branch *type*; in our vocabulary it is always a **hotfix line**, and its channel keeps **no cohort** (it exists only so a hotfix can be published, guarded, and promoted, with CI and smoke but no soak).
+
+A `workflow_dispatch(tag)` re-entry point exists because a push run can mint the tag and draft but then fail the S3 publish; without re-entry the channel would never carry the version and the promotion's guard would refuse it forever.
+
+**It also schedules the forward-port.**
+A final `forward-port` job calls the shared `.github/workflows/forward-port.yml`, gated on `if: always() && github.ref_name == 'release' && needs.verify-publish.result == 'success'`.
+Every conjunct is load-bearing.
+`always()` is required because `semantic-release` is *skipped* on the `workflow_dispatch(tag)` re-entry path and a skipped `need` fails the implicit `success()`; because `always()` disables that wrapping entirely, the `verify-publish` conjunct is the only thing preventing a forward-port after a **failed** publish.
+`github.ref_name == 'release'` is the hotfix exclusion — a hotfix leaves its line by cherry-pick, never a release-into-`main` merge.
+A job-level `if:` is safe here (unlike in `promote-to-public.yml`) because nothing in this workflow depends on this job's result.
+
+The job passes an `expected_tag`, and it is not decoration.
+This run's gate is on *its own* publish, but the merge acts on `origin/release`'s **current tip**, and on the re-entry path those differ: republishing an older tag successfully satisfies the gate while a newer commit on `release` still has a failing publish, and merging that tip would number `main` above a version no channel advertises.
+When `expected_tag` does not point at `origin/release`'s tip the callee **skips and reports success**, printing both the expected tag and the tags actually found.
+Nothing is stranded by that skip: the merge takes `origin/release`'s whole tip rather than one tag, and the re-run no-op compares branches rather than tags, so the next successful release-line publish carries everything the skipped run would have.
+
+### The forward-port workflow
+
+File: `.github/workflows/forward-port.yml`
+
+One implementation, three entry points (`workflow_call` and `workflow_dispatch` in one file, with **job-level** `concurrency` so it survives being called):
+
+1. `release.yml` calls it after `verify-publish`, on the `release` line only — the scheduling point that keeps the prerelease line numbered above what is published.
+2. `promote-to-public.yml` job 2 calls it as a **confirming backstop**; `release` is normally already an ancestor of `main` by then, so it takes the ancestry no-op.
+3. A manual `workflow_dispatch` is the standing recovery lever, and the only thing that can unjam a prerelease line that has already fallen below a published stable version — **without promoting anything to `public`**.
+
+It merges `origin/release` into `main` with `--no-ff` (never a squash: `release` carries semantic-release's tags and notes) under a `chore:` subject (which must not be a releasing Conventional Commit type), and pushes as the ruleset-bypass App installation token — never `GITHUB_TOKEN`, which is neither the bypass actor nor able to trigger the downstream `beta.yml` run.
+Two guards short-circuit it, both through step **outputs** and neither ever failing the job: `git merge-base --is-ancestor origin/release origin/main` (already forward-ported) and `git tag --points-at origin/release` (the `expected_tag` check above).
+A guard that failed the job would turn a legitimate no-op into a red release run, which is exactly what the `enabled` no-op design exists to avoid.
+
+The `enabled` input, not a job-level `if:`, is how a caller no-ops it.
+`promote-to-public.yml` job 4's `if:` requires `needs.forward-port.result == 'success'`, and a *skipped* job reports `skipped` — so job 2 carries no job-level `if:` and passes `enabled: ${{ inputs.source_channel == 'early-access' }}` instead.
+Every step after the skip notice is gated so it evaluates false when `enabled` is false, under either value of `dry_run`; `tests/forward-port-workflow.test.js` *evaluates* those conditions rather than string-matching them, because a hotfix promotion that silently merged `release` into `main` would be the repository's worst automated write.
+
+A dispatched forward-port defaults to `dry_run: true` (it is a hand-run lever pointed at `main`); a called one defaults to `false` (its caller states its intent).
+
+#### The content gate — a verification, not a question
+
+The gate used to print the diff and ask a human to "confirm that every file listed above was authored through a reviewed pull request", then re-run with `allow_content: true`.
+That was an unverified human assertion, and it was the exception to this repository's own standard — `scripts/lib/promoteGuards.js` insists enforcement "MUST be a verification performed by the promotion, never an assumption".
+It also rested on a premise a hotfix falsifies by definition: `release` is **not** content-empty by construction once a fix has landed on it, and shipping v1.9.1 and v1.9.2 produced both of that premise's failure modes on the same day.
+
+The gate now establishes the answer itself.
+`scripts/forward-port-content-gate.sh` owns it, and both call sites invoke that one script: the first-pass gate step, and the push retry, which re-performs the merge against a freshly fetched `main` and is therefore a second merge no gate has otherwise seen.
+It runs four checks, in this order.
+
+**First, git must be able to answer the question.**
+The predicate below needs `git merge-tree --write-tree`, which arrived in git 2.38, so the gate asserts that version and refuses if it is not met.
+There is deliberately no fallback: the obvious one is the predicate described immediately below, which answers a different question.
+
+**Second, the forward-port's own merge must introduce nothing.**
+Its two parents are re-merged with `git merge-tree --write-tree`, and the resulting tree must be *identical* to the tree the merge recorded.
+Equal means the merge is precisely what an unattended three-way merge of its parents produces, so it invented nothing; unequal means it carries something neither parent has, and the refusal prints exactly that difference.
+A re-merge that *conflicts* is also a refusal — the recorded merge necessarily embeds a human resolution — and so is a parent count other than two, because there is then no two-parent re-merge to compare against.
+A HEAD that is not a merge at all is **not** a refusal: on the retry path `git merge --no-ff` reports "Already up to date." and creates no commit, and failing a run for having had nothing to do would be a non-overridable jam.
+This is the only check that looks at the merge the ruleset-bypassing push actually lands, and `allow_content` does **not** override it: an operator can only vouch for content that exists somewhere to be reviewed, and content invented by a conflict resolution exists nowhere else.
+
+**Why not the combined diff.**
+This check was originally `git diff-tree --cc -r --no-commit-id --name-only HEAD` being empty, and that command cannot express the question.
+`--name-only` follows the `-c` *file* selection — "files modified from all parents" — and `--cc`'s hunk compression only ever affects *patch* output, so it never reaches the name list.
+A clean auto-merge in which one file took hunks from both sides, and a genuine evil merge of the same two parents, print exactly the same thing.
+Of the last 38 merges reachable from `origin/main`, five have a non-empty combined diff and every one of them invented nothing — two on `CHANGELOG.md`, which is the release path itself.
+Since "both lines touched a common file" is the ordinary reason a forward-port exists at all, that predicate refused the routine case, non-overridably, on a branch that forbids landing the merge by pull request.
+
+**Third, the fast path.**
+`git diff --stat origin/main` empty means the merge carries no file content onto `main`, so no unreviewed content can reach it and no API call is made.
+The routine forward-port is unchanged and free.
+
+**Fourth, change provenance.**
+Otherwise the script collects the range `origin/main..origin/release` (never `origin/main..HEAD` — by then `HEAD` is the bot's own merge commit, which comes from no pull request, so including it would guarantee a refusal), the per-commit merge-content verdicts, and each commit's associated pull requests, and hands them to `scripts/forward-port-provenance.mjs`.
+The evidence loop is driven by the same commit listing the verifier is given, so the set of commits decided and the set collected cannot diverge.
+The API read authenticates as the App installation token, never `GITHUB_TOKEN`; the job holds only `contents: read`.
+A commit is accounted for when either rule holds:
+
+- **pull-request authored** — associated with a **merged** pull request whose base is `release`.
+Merged-ness is read from `merged_at`, because the REST payload carries no `merged` boolean and reports `state: "closed"` for a merged pull request and an abandoned one alike.
+Being reviewed against a *different* line does not count: that review was never a review for landing on this one.
+- **content-free merge** — two parents whose re-merge reproduces the merge's own tree exactly, so it introduces nothing beyond what its parents already carry.
+This rule is a requirement rather than a loophole: `promote-to-early-access.yml` merges each beta tag into `release` with `--no-ff` under the App token, and that merge is associated with no pull request at all, so a gate demanding one would red every routine release.
+A merge that fails this rule is not refused outright — a merge commit closing a reviewed pull request based on `release` *was* reviewed, its resolution included — so it falls to the rule above, and a refusal then names both halves of why it was not accounted for.
+
+Anything else is refused by sha, with its subject, its author, and which rule it failed.
+
+Every unverifiable state — an unreadable evidence file, an API error, a rate limit, a page that may be truncated, an association naming another repository, a range above 200 commits, a `per_page` above the 100 GitHub honours, a git too old for the predicate — exits 2 and refuses, because an absence of evidence is not an absence of unreviewed content.
+`allow_content` does **not** apply to any of them, and the override hint is not printed under them either: there is no established refusal to vouch for, and telling a reader to override a state that established nothing is how an absence of evidence gets accepted as an absence of unreviewed content.
+The first-run failure most likely to reach this branch is the release-bot App installation missing **Pull requests: Read**, which is a 403 and a configuration fault no retry fixes.
+
+**Known limitation.**
+The rule catches content introduced by a *resolution*.
+It does not catch an additive semantic duplicate: two sides independently adding the same test in different places merge cleanly, the re-merge reproduces the tree exactly, and every hunk is attributable to one parent.
+That is the v1.9.1 shape, and it is handled by the process rule below rather than by the gate.
+
+**Land on `release` first; never squash onto `main` first.**
+When a release-line fix reaches `main` first as a squash, identical content carries a different SHA, the forward-port's `git merge origin/release` conflicts, and the auto-resolution can silently duplicate whole hunks — which is exactly what happened in v1.9.1 and needed a hand-resolved repair PR.
+Land the fix on `release` through its own reviewed pull request and let the forward-port carry it to `main`.
+
+**When the gate refuses.**
+Read the named commits.
+The ordinary remedy is to give them the provenance they lack — open a pull request **based on `release`** carrying that content and merge it with a merge commit — and then re-run the forward-port, which will pass without any override.
+`allow_content: true` survives as a last-resort override on `forward-port.yml`'s own dispatch, and it still prints the refusal it overrode; it is not the ordinary path, and it applies only to a refusal — never to a run that could not complete its verification.
+From a promotion, that means dispatching `.github/workflows/forward-port.yml` manually (with `dry_run: false`) and then re-running the promotion, which then takes the already-forward-ported no-op.
+
+`allow_content` is settable only on `forward-port.yml`'s own dispatch, and deliberately so: `promote-to-public.yml`'s inputs are `version` / `source_channel` / `dry_run` only, and it will not grow a content override.
+That is the same composition the `override_hint` inputs carry into the failure message, so the message and this manual never disagree.
+
+#### Recovering a conflicted forward-port
+
+`git merge --no-ff origin/release` can conflict, and until this existed the only recovery was a human resolving it by hand and pushing the merge to `main` — the one manual push `main`'s ruleset still has to allow.
+The workflow now completes the merge itself from a resolution you supply.
+
+**Is it a conflict, or a failure?**
+`scripts/forward-port-complete-merge.sh` runs only when the merge fails, and says which it was.
+A conflict prints `the forward-port's merge of origin/release into main CONFLICTED` followed by one `::error::` line per path that could not be combined.
+Anything else prints `left no conflicting paths behind` and stops: an unreachable ref or an unreadable repository is not something a resolution fixes, so the resolution inputs are never consulted on that path.
+
+**Produce the resolution.**
+In a local clone, `git fetch origin main release`, `git checkout -B resolve origin/main`, `git merge --no-ff origin/release`, resolve the paths the job named, and `git commit`.
+Do **not** push it to `main`.
+Push the branch and **open a pull request against `main`** — this is required, not optional.
+Its tree is exactly what `main` will look like afterwards, so `main`'s own CI runs on the resolved result and the pull request shows the whole forward-port diff.
+It is also the only place a human sees the two things the gate cannot: a resolution that silently dropped what the release line was bringing back, and a duplication of content both lines already carry.
+Do not merge that pull request; it exists to be read.
+Then dispatch `.github/workflows/forward-port.yml` with `resolution_ref` set to the resolution's sha and `resolution_effect` set to its outcome.
+Both inputs are required together, and both are dispatch-only — no caller can supply them.
+
+**Choosing `resolution_effect`.**
+It states the outcome the completed forward-port must produce, and the gate then establishes it rather than believing it.
+Use `no-content-onto-main` when `main` already carries everything `release` has and the conflict is a squash collision — the completed merge must leave `main`'s content byte-identical.
+Use `content-onto-main` when the forward-port genuinely brings content back, as a hotfix bring-back does.
+The wrong one is refused with the difference printed, because a tree that differs from `main`'s falsifies the first claim and a tree identical to it falsifies the second.
+A value that is neither is refused too: an unrecognised statement is one nothing checks.
+
+**Rehearse it.**
+`workflow_dispatch` defaults to `dry_run: true`, and a dry run performs the merge, completes it from your resolution, and runs the entire content gate including every check of the resolution — stopping only before the push.
+It reports the exact commit it would push.
+So the first use of this path on a real conflict is itself a full rehearsal whose blast radius is a red job.
+
+**A moved `main` invalidates the resolution.**
+The resolution is pinned to the exact `origin/main` and `origin/release` it was produced against, and is refused rather than reapplied if either has moved.
+Without that pin, a run whose push was rejected would re-merge against the newer `main` and take the stale tree verbatim, silently deleting whatever `main` gained in the meantime.
+The remedy is always to recompute the resolution against the current `origin/main` and dispatch again.
+For the same reason a conflicted forward-port has no retry: the retry exists because `main` moved, which is exactly what invalidates the resolution.
+
+**A resolution is not an override.**
+`scripts/forward-port-content-gate.sh` still applies in full: the completed merge reaches the same provenance verification as any other, and `allow_content` overrides none of the resolution's own refusals — they live in the own-merge guard, upstream of it.
+What the checks do establish is that the resolution reached no further than the conflict, invented no line neither side contains, left no unresolved difference behind, and produced the outcome you declared.
+What they do not establish is that it kept everything `release` was bringing back, or that it did not duplicate content both sides already had — the latter only where the declaration is `no-content-onto-main`.
+That is what the pull request above is for.
+
+#### The `release` branch ruleset
+
+The gate above establishes that content reaching `main` was reviewed.
+The ruleset is what makes that establishable at all: `release` carried **zero** rules until this was added, so a fix could be — and was — pushed straight to it, and nothing recorded that it had ever been reviewed.
+
+The ruleset targets `refs/heads/release` with `enforcement: active` and the rules `pull_request`, `required_status_checks`, `non_fast_forward` and `deletion`.
+It deliberately does **not** use `required_linear_history`: that forbids the merge-commit shape a hotfix bring-back needs.
+Merge-method availability is a repository-wide setting rather than a per-branch rule, so "merge commit, never squash" is a process rule here, not an enforced one.
+
+**The App bypass is mandatory.**
+`promote-to-early-access.yml` pushes to `release` directly with the release-bot App token, and its own comment anticipates this: "It is the ruleset bypass actor, so a future ruleset on `release` still lets it push."
+Without a `bypass_actors` entry naming that App installation with `bypass_mode: always`, the next prerelease promotion jams.
+The bypass opens no hole: that same workflow already refuses a beta tag whose commit is not an ancestor of `origin/main`, so everything it carries was reviewed on `main` first.
+
+**Preconditions, in order.**
+Confirm the App holds **Pull requests: Read** (the content gate's association read returns 403 without it, and the gate then fails closed), and confirm the `bypass_actors` entry is present, *before* setting `enforcement: active`.
+
+**Rollback.**
+`gh api --method DELETE repos/mistersilver-uk/fabricate/rulesets/<release-ruleset-id>`.
+
+#### What a change landing on the release line may reference
+
+A change landing on the release line must be self-contained ON THAT LINE.
+Being byte-identical to its counterpart on the prerelease line is not sufficient, because a file can be internally valid there and still depend on other content the release line does not carry.
+
+The gate that catches this is `scripts/validate-agent-bindings.mjs`, which resolves every backticked repository path in the agent skills and in the root documents, this file included, and fails when one does not exist.
+A paragraph copied verbatim from the prerelease line can therefore cite a path that arrived with later work and is absent from the release line, and the copy is refused even though its own text was reviewed and merged.
+
+Prefer prose that cites nothing, or cite only paths you have confirmed exist on the release line.
+
+### Prerelease promotion (promote to early access)
+
+File: `.github/workflows/promote-to-early-access.yml`
+
+Trigger: `workflow_dispatch(beta_tag)`.
+
+This is the **prerelease promotion**: it does the MERGE ONLY of a tested beta commit onto `release`, which then triggers `release.yml` to mint the stable version and publish early access.
+It is a `git merge --no-ff` (**never a squash** — squashing collapses the Conventional Commit types semantic-release reads and mis-computes the version, per the **Version authority and promotion mechanics** requirement).
+Before merging it verifies the tag's shape, that it exists, that its commit is an ancestor of `origin/main`, and that **every** private `beta` target — the channel manifest AND every tester manifest — already advertises that version.
+Ancestry alone is not enough: the tag is pushed before the beta publish job, so a tag whose publish failed is still an ancestor of `main` yet leaves a stale head, which later turns a hotfix into a cohort defection (the **Registry lead prohibition** requirement).
+
+**The forward-port deliberately does NOT live here.**
+This workflow merges onto `release` and returns; it mints nothing.
+The stable tag is created asynchronously afterwards, by the `release.yml` run this push triggers.
+A forward-port here would push `main` *before* that tag exists, so the `beta.yml` run that push triggers would compute another version on the **old** line and publish it — re-arming the exact defect on the next cycle.
+It would also forward-port even when the mint or the early-access publish subsequently failed, advancing `main` past a version no channel carries.
+The seam is `release.yml`, after `verify-publish`, because that is where "a stable version was minted **and** published" is an established fact.
+
+### Public promotion
+
+File: `.github/workflows/promote-to-public.yml` (task 3.5, replacing the retired `promote-release.yml`).
+
+Trigger: `workflow_dispatch` with `version`, `source_channel` (default `early-access`), and `dry_run`.
+
+This is the **release promotion**: it moves an already-minted stable version to `public` and the registry, minting nothing.
+The promotion is **TOLD** its `source_channel` (a hotfix promotes with `source_channel: <its line>`); it never infers "EA head != version, therefore hotfix", because that guess fails open.
+It is a four-job `needs:` chain, and the ordering is the whole point of the **Promotion-gated public availability** requirement — everything that can fail runs before the one step that cannot be undone:
+
+1. **guard** — verifies the `source_channel`, asserts the source channel advertises `version` across every private target, and performs the registry-lead read against every private target of `beta` and `early-access`.
+A lagging private head hard-fails the promotion **before** the registry POST, naming the remedy: advance that channel first.
+For a lagging `beta` head the remedy leads with the **forward-port** — bring the release line back into the prerelease line whenever the prerelease line is itself numbered below the version being promoted, which is the case whenever that head is a prerelease of a version at or below the released one.
+No amount of new work on `main` can raise it in that state, because every version `main` mints stays on the same line; only after the forward-port does the next prerelease number above the released version.
+Otherwise (the prerelease line is already numbered above it) push the feature work to `main` so `beta.yml` mints a newer beta.
+There is no bare-stable catch-up in either case, which would defect the cohort.
+2. **forward-port** — a **confirming backstop**, not the forward-port's scheduling point.
+It calls the shared `.github/workflows/forward-port.yml`, and because the forward-port is now performed at the *prerelease* promotion, `release` is normally already an ancestor of `main` by the time a release promotion runs, so this job takes the callee's ancestry no-op.
+It still performs the merge if it has not happened, which is what the **Version authority and promotion mechanics** requirement obliges a release promotion to do.
+It carries **no job-level `if:`** (a skipped job would report `skipped` and fail job 4's strict `if:`); the hotfix no-op runs through the callee's `enabled` input instead, and its `dry_run` is forwarded from the promotion's own input.
+3. **publish** — re-stages the `public` targets from the built `dist` (promotion is a **re-publish, never an S3 copy** — copying a private artefact would bake the secret cohort URL into the public build and sidegrade public installers onto the private feed).
+4. **readback-preflight-undraft-register** — reads back every written manifest, downloads the release assets to confirm both exist, **aggregates the notes of any superseded stable draft** strictly between the current public version and this one on the same line (without this the public changelog silently loses a whole feature set; the consumed drafts are left drafted as the record), builds and validates the registry payload (its `manifest` is CONSTRUCTED as the version-pinned `releases/download/v<version>/module.json`, never copied from the artefact), then performs the two irreversible steps LAST: `gh release edit --draft=false --latest` and the registry POST.
+
+Under `dry_run: true` all four jobs RUN and every mutating step no-ops and prints its plan — the un-draft and the POST included — so a dry run never publishes anything.
+
+One thing a reader will file as a bug but must not "fix": the early-access draft's zip bakes the **public latest-release** manifest URL, not the early-access one.
+That is deliberate and harmless — a private draft is excluded from GitHub's "latest", and baking the public URL is exactly what makes the un-draft a clean flip to public with no manifest rewrite (the **Self-contained distribution targets** requirement).
+
+### S3 publish workflow
+
+File: `.github/workflows/release-s3.yml`
+
+Triggers:
+
+- Manual `workflow_dispatch`, with `tag`, `channel`, `check_heads`, `dry_run`, and `overwrite` inputs.
+- Reusable `workflow_call` from `beta.yml` and `release.yml` (and the promotion workflows), using the same inputs.
+
+The reusable publisher takes a release tag, derives its version, checks out that tagged commit, builds, and publishes to the requested channel's S3 targets from `release.s3.config.json`'s `channels` map (`beta` → the closed-tester group; `early-access` → the patron group; `public` → no tester group; a hotfix line is not declared, so its only target is its sources target).
+Before writing anything it runs the monotonic-head guard per target: a publish that would move a head to a version Foundry considers older fails closed and names the remedy — a higher version, not a downgrade override (the **Monotonic channel heads** requirement).
+The stall the guard catches is a **double-digit rollover in the part glued to the prerelease suffix** (`1.5.0-beta.10` vs `1.5.0-beta.9` compares fine, but `1.4.10-beta.1` vs `1.4.9-beta.1` string-compares `"10-beta"` below `"9-beta"`); its remedy is a version bump that **keeps** the prerelease identifier (`1.5.0-beta.1`), never a bare stable version, which would level the head with the registry and defect the cohort.
+A pure-stable channel like `public` can never stall this way.
+
+**Cohorts get tester URLs, never the sources URL.**
+The sources target is what the tooling reads; on a private channel nothing installs from it, and a cohort is only ever given an unguessable tester URL.
+That separation is what makes the bucket policy safe — denying the derivable sources path locks out anonymous readers without defecting any cohort, because no cohort is pinned to it (the **Channel isolation** requirement).
+
+**Tester path secret (rotation freezes a cohort, not a lockout).**
+The tester feed lives at an unguessable path: `testers/<group>/<segment>/<moduleId>/…`, where `<segment>` comes from a per-channel repository **secret** (`S3_TESTER_PATH_SECRET` for beta, a separate `S3_EARLY_ACCESS_PATH_SECRET` for early access, referred to abstractly here — never paste the value) — never the committed config.
+Generate each once and set it before publishing; the publish **refuses to run** when a channel declares tester groups but its secret is unset, so the feed can never fall back to a guessable URL.
+Treat rotation as a **cohort migration, not hygiene**: it starts a new segment for future publishes, and the superseded segment keeps serving its last pre-rotation manifest, because the publisher only ever writes the current segment and nothing in the release path deletes, prunes, or expires an old one.
+No update is ever offered to that superseded cohort and no error is surfaced — it silently stops receiving updates rather than failing.
+Rotation is not a lockout: every artefact already published to the superseded segment stays reachable to anyone holding its URL, including a lapsed patron.
+Deliberately deleting a superseded segment, by contrast, makes its manifest URL genuinely unreachable and returns a 404 to `checkPackage` — Foundry's own internal, server-side setup route, not documented client API — which suppresses that 404 and shows the client only an offer to switch to the public registry.
+This module never deletes a tester segment, for exactly that reason.
+After rotating a secret, uninstall and reinstall the affected cohort from the new manifest URL, because it will never be offered an update on its own.
+`release-s3.js` withholds all S3 keys and install URLs from CI logs (they print only on local/`--dry-run` runs); GitHub also masks the secret value.
+
+**`--overwrite`.**
+The one legitimate use is re-staging a zip whose manifest never advertised the version (a failed first publish), so no client can already be pinned to it.
+Automatic calls publish only a newly-minted tag and never overwrite an existing versioned zip.
+Note that `isNewerVersion('1.3.0', '1.3.0-rc.85') === false`, so the first public `v1.3.0` is not offered to any client still installed from a legacy `-rc.N` prerelease — that is expected, and those clients rejoin the public line through Foundry's manifest-rewrite offer.
+For the same reason, **do not delete the 179 existing `v*-rc.*` prereleases**: each one's assets bake `releases/download/v<ver>/module.json`, so deleting a prerelease 404s every client installed from it.
+
+### Screenshot publishing infrastructure
+
+`npm run screenshots:ui:publish` uploads UI-PR screenshots to S3 under `pr-screenshots/<pr-number>/` and embeds the public object URLs in the PR body.
+Publishing now runs only locally (via the AWS default provider chain) — the workflow that published from CI has been removed; `pr-screenshots-cleanup.yml` still deletes the objects afterwards and authenticates via GitHub OIDC.
+That cleanup uses a **dedicated, least-privilege IAM role** — deliberately separate from the module-release role, so a screenshot workflow can never write or overwrite real release artifacts.
+
+Repository variables (role ARNs and bucket names are not secrets):
+
+- `AWS_SCREENSHOTS_ROLE_TO_ASSUME` — ARN of the dedicated screenshot role (below).
+- `AWS_REGION`, `S3_RELEASE_BUCKET`, `RELEASE_BASE_URL` — shared with the release workflow.
+
+**IAM role trust policy** (`GitHubFabricatePrScreenshotsRole`) — only the PR-screenshots-cleanup workflow in this repo may assume it:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": { "Federated": "arn:aws:iam::088545273404:oidc-provider/token.actions.githubusercontent.com" },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
+          "token.actions.githubusercontent.com:repository": "mistersilver-uk/fabricate",
+          "token.actions.githubusercontent.com:ref": "refs/heads/main",
+          "token.actions.githubusercontent.com:workflow": ["PR screenshots cleanup"]
+        },
+        "StringLike": {
+          "token.actions.githubusercontent.com:sub": [
+            "repo:mistersilver-uk/fabricate:ref:refs/heads/main",
+            "repo:mistersilver-uk/fabricate:pull_request"
+          ]
+        }
+      }
+    }
+  ]
+}
+```
+
+Do not use `token.actions.githubusercontent.com:job_workflow_ref` for this job.
+GitHub emits that claim for reusable workflow jobs, while the screenshot cleanup workflow here is a normal repository workflow.
+The cleanup workflow uses `pull_request_target`, so its default `sub` is the pull-request subject (`repo:mistersilver-uk/fabricate:pull_request`) rather than the branch subject.
+
+**IAM role permission policy** (`PublishPrScreenshots`) — `pr-screenshots/*` only, including delete for cleanup:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ListPrScreenshots",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::fabricate-modules-088545273404-eu-west-2-an",
+      "Condition": { "StringLike": { "s3:prefix": "pr-screenshots/*" } }
+    },
+    {
+      "Sid": "WritePrScreenshots",
+      "Effect": "Allow",
+      "Action": ["s3:PutObject", "s3:DeleteObject"],
+      "Resource": "arn:aws:s3:::fabricate-modules-088545273404-eu-west-2-an/pr-screenshots/*"
+    }
+  ]
+}
+```
+
+**Bucket policy** — add public read for `pr-screenshots/*` so GitHub can render the images (alongside the existing `modules/*` / `testers/*` grant):
+
+```json
+{
+  "Sid": "PublicReadPrScreenshots",
+  "Effect": "Allow",
+  "Principal": "*",
+  "Action": "s3:GetObject",
+  "Resource": "arn:aws:s3:::fabricate-modules-088545273404-eu-west-2-an/pr-screenshots/*"
+}
+```
+
+**Cleanup** — `screenshots:ui:clean` removes only local temp files (the S3 objects must stay live while the PR is open).
+The `pr-screenshots-cleanup.yml` workflow runs `screenshots:ui:clean -- --pr <n> --s3` automatically when a PR closes (merged or not) to delete that PR's S3 objects.
+A bucket **lifecycle rule** expiring the `pr-screenshots/` prefix after N days is the backstop so nothing accumulates even if the cleanup workflow is skipped or fails.
+(Set N comfortably above how long PRs stay open, or the images break while a PR is still under review.)
+
+These objects are public-read by URL (the accepted tradeoff for inline GitHub rendering of a private repo's screenshots).
+The required `check-screenshots` gate fails closed until a maintainer publishes the screenshots manually or applies the `screenshots-exempt` label, and it now also fails closed when the automatically published frames belong to a stale head or match none of the PR's changed views.
+
+## Release pipeline
+
+Fabricate uses [semantic-release](https://semantic-release.gitbook.io/) to automate version management.
+The pipeline is configured in `release.config.js`.
+
+### How version bumps are determined
+
+| Commit type | Version bump |
+|-------------|-------------|
+| `feat` | Minor |
+| `fix`, `perf`, `revert` | Patch |
+| Any with `BREAKING CHANGE` footer | Major |
+| All other types | No release |
+
+### The branch allowlist and the github plugin
+
+`release.config.js`'s `branches` array has three entries: the hotfix glob `'+([0-9]).+([0-9]).x'`, `'release'`, and `{ name: 'main', prerelease: 'beta' }` (no `channel`).
+A pure, exported `classifyBranch(name)` maps a branch to `'main' | 'release' | 'maintenance'` and throws for anything else.
+`'maintenance'` is semantic-release's own branch *type* for a line cut from a released version — in our vocabulary that is always a **hotfix line**.
+
+`classifyBranch` drives an **allowlist** for `@semantic-release/github`:
+
+- on `main` the github plugin is **OMITTED**, so no GitHub release object is ever created — this omission is the beta channel's privacy mechanism;
+- on `release` and on a hotfix line the plugin is loaded with `draftRelease: true` as a literal constant.
+
+**No branch ever yields `draftRelease: false`.**
+A `false` here would publish a stable release the moment it is minted, defeating the entire promotion gate; the invariant is pinned by `tests/release-config.test.js`.
+
+### What semantic-release does on a release
+
+1. Reads all commits since the last tag using `@semantic-release/commit-analyzer`.
+2. Generates release notes with `@semantic-release/release-notes-generator`.
+3. Calls the release build via `@semantic-release/exec`, using `--dist-version <new-version>` so the build injects the version into the generated `dist/module.json` only and never mutates the tracked `module.json`.
+This runs `vite build`, copies static assets, and creates `dist/fabricate-v<version>.zip`.
+4. On `release` and a hotfix line, creates a **drafted** GitHub Release with the zip and the raw `module.json` as assets; on `main` no GitHub release object is created.
+5. The config's `successCmd` writes `next_version`/`next_tag` to `$GITHUB_OUTPUT`; `beta.yml` reads that (not a tag diff) and publishes the beta tag through the reusable S3 workflow.
+
+GitHub Releases are the canonical release history.
+There is no committed `CHANGELOG.md` in this repository; release notes are generated from Conventional Commits per version, and a superseded stable draft's notes are aggregated into the release that reaches `public` after it (the **Version authority and promotion mechanics** requirement).
+The CI release flow does not commit a repository changelog back to `main`; branch protection requires pull requests and status checks on `main`, so release automation publishes tags and GitHub Releases without a protected-branch writeback step.
+
+### The cutover (F4)
+
+Switching `main` from the old `next` channel to the `-beta` prerelease scheme is a one-time, order-sensitive cutover, because the change touches **both** the channel and the prerelease identifier (preid).
+Renaming the preid without promoting first lets a `feat:` compute a fresh `1.3.0-beta.1` and publish it with no `EINVALIDNEXTVERSION` error — a silent wrong version.
+The safe sequence: the config-change PR carries a **non-releasing** title (`main` is squash-merged, so the PR title is the commit semantic-release analyses); every PR merged during the cutover window keeps a non-releasing title (a `fix:` while `lastRelease` is `1.2.1` mints a permanent garbage `1.2.2-beta.1` tag); the first prerelease promotion is run manually with `GITHUB_REF_NAME=release` set (a bare local run would fall back to `main` and mint no draft); then the forward-port to `main`; then unfreeze.
+
+### The hotfix runbook
+
+The route depends on what is currently soaking in early access (the **Hotfix isolation** requirement).
+
+**Route decision.**
+A soaking **minor or major** carries features, so promoting it would ship them — cut a **hotfix line** from the public tag instead (route 1).
+A soaking **patch** carries only `fix`/`perf` commits by construction, so promoting it leaks no feature work — **promote the soak first** (route 2), then cut a hotfix on top only if one is still needed.
+The trade when you promote the soak is that you ship a patch that has **not completed its soak**: it leaks no *feature* work, but it forgoes *soak time* — choose it knowingly.
+
+**Pre-flight.**
+Before cutting a hotfix line, run `git ls-remote --tags origin | node scripts/hotfix-preflight.mjs v<base>` (for example `v1.4.0`).
+It computes the next patch tag and **refuses** when that tag already appears in the piped remote-tag listing — a signal that a patch is soaking, so route 2 applies.
+The tool never runs `git` itself; you pipe the tag listing in, and an empty or malformed listing is treated as unverifiable and refused.
+This is defense-in-depth: semantic-release also refuses the collision (`EINVALIDNEXTVERSION`), but the pre-flight refuses earlier, before the branch is cut, and more legibly.
+
+**Route 1 — cut a hotfix line.**
+
+1. Cut `N.N.x` from the **public tag**, never from `release` or `main`: `git branch 1.4.x v1.4.0`.
+2. Land **`fix:` commits only**; a `feat:` hard-fails with `EINVALIDNEXTVERSION`, the guard rail that keeps feature work off the line.
+3. `release.yml` mints the draft release and publishes the hotfix's own channel (`1.4.x`), never `early-access`.
+4. Promote it with `promote-to-public.yml`, passing `source_channel: 1.4.x`.
+5. Bring the fix back into `release` through a **reviewed pull request based on `release`**, merged with a **merge commit** (never a squash); the automation's forward-port then carries it on to `main`.
+6. Delete the hotfix branch once the fix has landed in `release`.
+
+**Never merge `release` or `main` into a hotfix line** — it fails with `EINVALIDMAINTENANCEMERGE`.
+A fix leaves a hotfix line by cherry-pick onto a branch that is then reviewed into `release`, never by merging a line back into it.
+
+### Running the release script locally
+
+You can invoke the build script directly without going through semantic-release:
+
+```bash
+# Build and zip
+node scripts/release.js
+
+# Build without creating a zip (useful in CI steps that zip separately)
+node scripts/release.js --no-zip
+
+# Validate an existing dist/ directory without rebuilding
+node scripts/release.js --validate-only
+
+# Inject a specific version into module.json, then build
+node scripts/release.js --version 1.2.3
+```

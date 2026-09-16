@@ -33,9 +33,12 @@ CraftingSystem = {
   // "checkDriven": the active check's checkBreakage triggers decide whether ALL
   // required tools break; each Tool's own mode is ignored and each Tool's
   // separate checkBreakable flag decides whether it participates.
-  // Normalized on read (no versioned migration): unknown/missing -> "toolSpecific".
+  // Normalized on read (no versioned migration) and ABSENCE-PRESERVING since 1.30.0: an
+  // unauthored or unrecognized authority persists NO key at all rather than a minted
+  // "toolSpecific", so the world value stays reachable. The read shape is unchanged - the
+  // resolver answers "toolSpecific" when neither scope authored a token.
   toolBreakage: {
-    authority: "toolSpecific" | "checkDriven", // default "toolSpecific"
+    authority: "toolSpecific" | "checkDriven", // whole block ABSENT when unauthored
   },
 
   features: {
@@ -54,26 +57,33 @@ CraftingSystem = {
     itemPiles: boolean, // default false; the Item Piles integration toggle referenced by integrations/spec.md
   },
 
+  // SHADOWED by a world scope setting and still authoritative — requirement 36.
   categories: string[], // custom recipe categories only; reserved "general" is implicit
+  // SHADOWED by a world scope setting and still authoritative — requirement 36.
   componentCategories?: string[], // default []; custom COMPONENT categories only; reserved "general" is implicit; independent of `categories`
+  // SHADOWED by a world scope setting and still authoritative — requirement 36.
   categoryIcons?: Record<string, string>, // default {}; optional per-recipe-category Font Awesome icon, keyed by lowercased category name (may include "general")
+  // SHADOWED by a world scope setting and still authoritative — requirement 36.
   componentCategoryIcons?: Record<string, string>, // default {}; the same, for component categories
+  // SHADOWED by a world scope setting and still authoritative — requirement 36.
   itemTags: string[],
 
   // Emitted unconditionally by normalization (empty array when features.essences is off).
+  // SHADOWED by a world scope setting; authoritative for every key EXCEPT an INHERITED
+  // section — requirement 36.
   essenceDefinitions: EssenceDefinition[],
 
+  // SHADOWED by a world scope setting; authoritative for every key EXCEPT an INHERITED
+  // section — requirement 36.
   components: Component[],
   recipeItemDefinitions: RecipeItemDefinition[],
   membershipResolvesByRecipeIds?: boolean, // default absent (falsy = legacy basis). Monotonic per-system marker (issue 1010/1011) recording that recipe↔book membership resolves through RecipeItemDefinition.recipeIds rather than the legacy recipe.recipeItemId scalar. Set by the first write to any definition's recipeIds, backfilled on load as a monotone OR over the persisted value, and NEVER cleared — see recipe-visibility/spec.md and ui-integration/spec.md.
 
-  // System-owned character-prerequisite library (issue 544). Reusable pass/fail
-  // conditions the GM authors in System Settings and attaches, by id, to a book/
-  // scroll's caps.learn to gate WHO may learn its recipes against the acting
-  // actor's roll data. Normalized wholesale (settings replace, not deep-merge) by
-  // normalizeCharacterPrerequisiteList, so a removed entry does not resurrect.
-  // Shape defined under ## CharacterPrerequisite below.
-  characterPrerequisites: CharacterPrerequisite[], // default []
+  // NO `characterPrerequisites` KEY, and no `modifiers` key (issue 1308). Both libraries
+  // moved to the `characterLibraries` WORLD setting, so `_normalizeSystem` emits neither
+  // and its allowlist rebuild sheds any surviving legacy copy on the next save. See
+  // ## CharacterLibraries, ## CharacterPrerequisite and ## ModifierLibrary below; unlike
+  // currency and travel, NO participation flag stays behind on the crafting system.
 
   // Present only when features.salvage is true.
   salvageResolutionMode: "simple" | "routed" | "progressive",
@@ -107,7 +117,7 @@ CraftingSystem = {
       checkBreakage: CheckBreakage,    // unified per-check trigger list (force award-all/none and/or break tools)
     },
 
-    // The SELECTION TRIPLE over `CraftingSystem.modifiers` (issues 1095, 1117), the SAME
+    // The SELECTION TRIPLE over the WORLD modifier library (issues 1095, 1117, 1308), the SAME
     // three keys `craftingCheck` carries below and emitted by the SAME shared derivation
     // (`CraftingSystemManager._normalizeCheckModifierSelection`). It is spelled out on
     // every activity rather than left implicit: the library is shared, the SELECTION is
@@ -132,7 +142,7 @@ CraftingSystem = {
     },
     routed: RoutedCheck,
 
-    // The SELECTION TRIPLE over `CraftingSystem.modifiers` (issues 1095, 1117), the SAME
+    // The SELECTION TRIPLE over the WORLD modifier library (issues 1095, 1117, 1308), the SAME
     // three keys `craftingCheck` carries below and emitted by the SAME shared derivation
     // (`CraftingSystemManager._normalizeCheckModifierSelection`). It is spelled out on
     // every activity rather than left implicit: the library is shared, the SELECTION is
@@ -143,53 +153,6 @@ CraftingSystem = {
     defaultModifierIds?: string[],  // default []
     maxModifierPicks?: number,      // positive integer; default: key absent = unlimited
   },
-
-  // THE ONE named modifier library for the WHOLE system (issue 1117). It has moved twice:
-  // out of `craftingCheck.checkModifiers` in `1.22.0`, because salvage and gathering select
-  // over the same entries so it can belong to no one activity; and then, in `1.23.0`, it
-  // ABSORBED the gathering character-modifier library
-  // (`gatheringConfig.systems[systemId].characterModifiers`), because a named actor-driven
-  // expression is ONE concept and authoring it twice let a GM define "Medicine" as two
-  // unrelated records that could disagree. Both migrations delete the old key.
-  //
-  // THE SHAPE IS A SUPERSET, and each field is honoured by whichever consumer needs it:
-  // `min`/`max` clamp a CHECK modifier's contribution — the resolved number for a flat
-  // entry, and the ROLLED result for a rolling one — while a gathering drop-row
-  // reference carries its OWN `min`/`max` that clamp its contribution independently.
-  // `isRollExpression` is DERIVED from the expression on every normalize and never read
-  // from the input, so a persisted or imported flag cannot contradict the expression
-  // beside it.
-  //
-  // Each `expression` is a roll-data fragment evaluated against the acting character
-  // (missing/failed → 0). `icon`, `min` and `max` are attached ONLY when authored, so
-  // absence round-trips as key-absent and means unbounded — a bound of `0` is a real
-  // bound, which is why the guard is `Number.isFinite` on an explicitly-guarded value
-  // rather than truthiness. An authored `min > max` is preserved VERBATIM and is a
-  // BLOCKING readiness issue (`modifierBoundsInverted`): that entry contributes 0 until
-  // it is repaired, matching gathering's `INVALID_CHARACTER_MODIFIER_BOUNDS` posture.
-  // A finite bound that no dice-grammar `Constant` can express (`1e21`, `1e-7`) is the
-  // SECOND blocking bounds fault, `modifierBoundsUnsafe`, also `critical`, and likewise
-  // contains the entry to 0. Two issue ids rather than one cause with two readings: the
-  // repairs differ and `1e21` is not an inversion.
-  // A ROLL-SHAPED expression is legal here and legal in a CHECK (issue 1118). A gathering
-  // drop row evaluates the expression and applies the result as a percentage-point delta;
-  // a check appends the DICE to its roll formula, so the authored variance survives to the
-  // roll and shows on the card. The bounds above clamp the ROLLED result for such an entry,
-  // in the formula. `isRollExpression` is therefore a DISPLAY classification and never a
-  // gate: the blocking `modifierRollExpression` readiness issue issue 1117 raised is
-  // RETIRED.
-  //
-  // An entry with an EMPTY expression is KEPT rather than dropped: the library has an "Add
-  // modifier" button, and an entry that vanished on save the moment it was created would
-  // make that button appear broken. It is still a runtime misconfiguration wherever it is
-  // referenced.
-  //
-  // Absent = empty library, so every activity's contribution is nothing and no term is
-  // appended.
-  modifiers?: {
-    id: string, label: string, expression: string, isRollExpression: boolean,
-    icon?: string, min?: number, max?: number
-  }[],  // default []
 
   craftingCheck: {
     // `enabled` is ONLY the on/off toggle for optional checks (simple/alchemy
@@ -235,10 +198,13 @@ CraftingSystem = {
       checkBreakage: CheckBreakage,
     },
 
-    // THE SELECTION TRIPLE, and only it (issues 1095, 1117). The LIBRARY moved UP to
-    // `CraftingSystem.modifiers` — see the system shape above — because salvage and
-    // gathering now select over the same entries; the `1.22.0` migration relocates it and
-    // DELETES this level's `checkModifiers` key. The identical triple appears on
+    // THE SELECTION TRIPLE, and only it (issues 1095, 1117, 1308). The LIBRARY moved UP to
+    // `CraftingSystem.modifiers` in `1.22.0` — because salvage and gathering select over the
+    // same entries, so it can belong to no one activity — and then OUT of the crafting system
+    // altogether in `1.28.0`, to the `characterLibraries` world setting (## ModifierLibrary).
+    // Each relocation DELETES the key it moved from, this level's `checkModifiers` included.
+    // The SELECTION stayed here through both moves: the library is shared, the selection is
+    // not. The identical triple appears on
     // `salvageCraftingCheck` and `gatheringCraftingCheck`, emitted by ONE shared
     // derivation so the three whitelist rebuilds cannot drift.
     //
@@ -481,6 +447,10 @@ CraftingSystem = {
    The per-system gathering economy block (`gatheringConfig.systems[systemId].economy`, defined in `gathering-and-harvesting`) carries a normalized `resolutionMode: "d100" | "progressive" | "routed"` (default `"d100"`).
    An absent, invalid, or wrong-shape value (including a stray `"simple"`) normalizes to `"d100"` on both the read and persist paths.
    It is GM configuration and is not part of the player gathering listing payload.
+   The economy mode is inert compatibility data and never overrides task-level `resolutionMode`.
+   Gathering task library normalization and composition preserve task-owned `resolutionMode` and canonical `resultGroups` across save, reload, export and import.
+   An absent task mode selects `d100`; straight and routed retain authored result groups, and progressive keeps its separate legacy budget contract.
+   This preservation introduces no lifecycle migration or run restamping.
 10. `recipeItemDefinitions` are distinct from `components`; a recipe item definition must not be treated as a crafting ingredient/result component unless it is also intentionally imported as a component.
 11. `RecipeItemDefinition.id` values must be unique within a crafting system.
 12. `RecipeItemDefinition.originItemUuid` values should be unique within a crafting system so one system recipe item can be reused across multiple recipes.
@@ -520,19 +490,62 @@ CraftingSystem = {
     Providers are registered in a pure, Foundry-free registry (`getCurrencyProvidersForFoundrySystem`, `getDefaultProviderId`, `resolveProvider`); the only registered provider is the pf2e inventory adapter (an internal `systemId → adapter` map, not a third-party plugin registry), which reads coins from the pf2e inventory aggregate (`actor.inventory.coins`) and spends through `actor.inventory.removeCoins(...)`, letting pf2e make its own change and report insufficient funds; Fabricate does not run its own change-making on this path. `providerId` is stored and selectable but the runtime still resolves the adapter by `game.system.id` (one provider per system today).
     Systems with no registered provider (e.g. dnd5e) surface an empty-provider callout steering the GM to the `"macro"` strategy.
     When no adapter is registered for the active system, the spend fails loudly with a clear message rather than silently succeeding. - `"macro"` drives currency through GM-supplied macros.
-    Because the macro receives the actor and does whatever it needs, macro spending is **not inventory-specific** and is a peer top-level strategy rather than a sub-mode of `"actorInventory"`. `MacroCoinSpender` runs the `canAfford` macro for the affordability check and the `decrement` macro for the deduction, passing each a context `{ actor, cost: [{ abbreviation, amount }], units: [{ id, abbreviation, label }], requirement, recipe, craftingSystem }`.
-    A macro return of `true`, or an object with a truthy `success`/`canAfford`, passes; `false`/`null`/a thrown error (or a falsy `success`/`canAfford`) fails and surfaces the macro's `message` to the player, aborting the craft before ingredient consumption.
-    The `increment` macro performs the player-cancel refund: when a player cancels an in-progress craft and the system's `features.refundOnPlayerCancel` policy is on, `MacroCoinSpender` runs the `increment` macro to return the spent currency (the inverse of `decrement`).
+    Because the macro receives the actor and does whatever it needs, macro spending is **not inventory-specific** and is a peer top-level strategy rather than a sub-mode of `"actorInventory"`. `MacroCoinSpender` runs the `canAfford` macro for the affordability check and the `decrement` macro for the deduction, passing each a context `{ actor, cost: [{ abbreviation, amount }], units: [{ id, abbreviation, label }], requirement, recipe, craftingSystem, caller }`.
+    `caller` is `"craft"`, `"award"` or `"consume"` and says WHO is asking: `"craft"` on every recipe-keyed check, spend and refund; `"award"` on the world-scoped affordability check AND on the world-scoped currency credit (see the _CurrencyConfig_ section); and `"consume"` on the pooled holdings pair (see `companion-api`).
+    On every non-`"craft"` occasion `recipe` and `craftingSystem` are `null`.
+    The token is positive on EVERY arm rather than inferred from those nulls, because a macro can test a token, while a null recipe is indistinguishable from an occasion the macro has never heard of.
+    ONE token covers the pooled READ and the pooled DEBIT rather than two, because they are the halves of a single companion act and a macro branching on `caller` wants one branch for both; what separates them is the macro KEY, so a macro can still tell "you are being asked" from "you are being told" without a fourth token.
+    It is named `"consume"` and not `"cost"` because `"craft"` and `"award"` name the ACT rather than the thing being paid.
+    The discriminator is therefore the PAIR `(macro key, caller)` rather than either half alone, and the occasions it separates are: `canAfford` with `"craft"`, the craft-time affordability gate; `canAfford` with `"award"`, the published affordability check; `decrement` with `"craft"`, the craft-time spend; `decrement` with `"consume"`, the pooled holdings debit; `balance` with `"consume"`, the pooled holdings read; `increment` with `"craft"`, the player-cancel refund; `increment` with `"consume"`, the pooled debit's own intra-call give-back; and `increment` with `"award"`, the published currency credit.
+    **That last cell is the one pair that is not unique**, and it is declared rather than left to be discovered: a pooled consume that has to unwind a currency cost it already settled gives it back THROUGH the published credit, so a GM's `increment` macro sees `"award"` for that unwind exactly as it does for a credit a companion asked for outright.
+    A macro that needs to tell them apart cannot do it from the context, and does not need to: both are Fabricate returning coin it is entitled to return, and the `increment` macro's job is the same in each.
+    Because `recipe` and `craftingSystem` are `null` on every `"award"` and `"consume"` occasion, a macro that dereferences `context.recipe` without first testing `caller` throws on every one of them.
+    A macro return of `true`, or an object with a truthy `success`/`canAfford`, passes; `false`/`null`/a thrown error (or a falsy `success`/`canAfford`) fails and surfaces the macro's `message` to the player.
+    Under `caller: "craft"` a failure aborts the craft before ingredient consumption.
+    Under `caller: "award"` a macro that THREW answers a refusal DISTINGUISHABLE from a genuine shortfall: `MacroCoinSpender` marks its catch branch `thrown: true`, and the affordability check reports that the question could not be answered rather than that the actor cannot pay.
+    A spender carries TWO markers rather than one, and `caller: "award"` now covers two occasions rather than one, so the write-truth rule below is about both: `thrown: true` says the mechanism delivered no answer, and `wroteNothing: true` says Fabricate can PROVE nothing was written.
+    Both markers are additive, and the craft paths — which read only `valid` and `message` — are unaffected by either.
+    A spender's `refund` reports what it OBSERVED.
+    An `actor.update` that Foundry DISCARDED — because the configured `actorPath` is not in the actor's data model — is reported as _nothing was written_, never as success; an `actorPath` holding a value that is not a number is reported the same way, and is detected before any write is attempted; an inventory adapter that threw part-way is reported as _unknown_, not as a decline; and a macro that could not be found or run is reported as _nothing was written_, distinctly from a macro that ran and threw.
+    The `wroteNothing` marker is what carries that last distinction, and a reader of both members tests it FIRST.
+    Three of the four unrunnable spellings additionally carry `thrown: true` — the two that throw today, plus a non-`script` macro, whose command is chat text compiled as JavaScript and so throws for any body that is not also valid JS — solely so that the shipped affordability answer for each of them does not move; the blank-command spelling carries `wroteNothing` alone, for the same reason in the other direction.
+    **This MOVES a shipped answer, and that is declared rather than discovered:** a player cancelling a craft in an `actorProperty` world whose `actorPath` is mis-typed now receives a PARTIAL refund rather than a reported full one, with a console error, because a discarded write was never a refund.
+    The `increment` macro performs THREE occasions, not one.
+    The first is the player-cancel refund: when a player cancels an in-progress craft and the system's `features.refundOnPlayerCancel` policy is on, `MacroCoinSpender` runs the `increment` macro to return the spent currency (the inverse of `decrement`).
+    The second is the world-scoped currency credit published to a companion module, which reaches this same macro with `caller: "award"`.
+    The third is a pooled holdings consume giving coin back — either the currency leg's own intra-call restore, at `caller: "consume"`, or the member's outer unwind, which routes through the published credit and therefore arrives at `caller: "award"`.
     It remains optional — a macro-mode system with no `increment` macro simply cannot refund a cancel, and the reversal reports that failure rather than aborting.
+    The published credit answers such a world with _the world cannot express this credit_, never with _the spender declined_, because `increment` is optional and a missing one is therefore a documented-normal world state rather than a broken one.
+    **A pooled holdings consume goes further and refuses to take currency from that world at all**, up front and before the pool is read, answering `creditNotConfigured` having written nothing: taking coin a world has published no way to return is the one failure a member that deletes may not risk, and the refusal reads world configuration alone so it never needs a reading to decide.
+    That argument is `increment`'s and `balance`'s alone among the four keys: profile validation REQUIRES `canAfford` and `decrement`, so a `macro` world missing either fails validation and answers `ladderInvalid` before a spender exists at all.
+    The `balance` key ASKS rather than acts, and is therefore interpreted differently from every other key: a returned NUMBER is the answer — `0` meaning provably none — and anything else means _cannot see_, where the shared spend interpretation would read a bare `250` as a refusal.
+    It is optional on `increment`'s precedent, and a world that never authors it loses the pooled read and keeps every craft-time behaviour unchanged.
+    Adding the key needed no migration: normalization iterates the declared key list and runs on every read, so `macros.balance: ""` backfills in every existing world for free.
+    Under the credit a THROWN `increment` macro answers that whether anything was credited is UNKNOWN, never a decline; an `increment` uuid that names nothing RUNNABLE answers _the world cannot credit_, exactly as a missing one does.
+    "Nothing runnable" is defined POSITIVELY and gated before anything is run, rather than discovered from a syntax error, because `Macro#command` is a string field on EVERY macro type: a uuid that resolves to nothing, a document with no string command, a macro whose type is not `script`, and a blank command are all the same fact.
     The macro strategy is GM-only config with no separate feature flag (matching the property macros). - The pf2e currency preset seeds units with `denomination` set, selects the `"actorInventory"` spend strategy, and sets the active Foundry system's default `providerId` on the world config; the legacy pf2e system-adapter config normalizes to the same strategy (and the legacy dnd5e adapter normalizes to `"actorProperty"`).
-20. `CurrencyConfig.providerId` is a trimmed string (default `""`) and `CurrencyConfig.macros` is an object of trimmed `canAfford`/`increment`/`decrement` UUID strings (each default `""`).
+20. `CurrencyConfig.providerId` is a trimmed string (default `""`) and `CurrencyConfig.macros` is an object of trimmed `canAfford`/`increment`/`decrement`/`balance` UUID strings (each default `""`).
     Both are always persisted and normalized, but `providerId` is only meaningful under `"actorInventory"` and `macros` only under `"macro"`; each remains inert (but preserved) under the other strategies so flipping the strategy never loses a configured provider or macro set.
     Absent fields back-compat default to `""`/empty macros with no migration.
     The retired `inventoryMode` field is never emitted.
-21. **Tool-breakage authority** (`toolBreakage.authority`) is a per-system switch, normalized on read (no versioned migration): unknown or missing normalizes to `"toolSpecific"`, mirroring the inline `resolutionMode`/`salvageResolutionMode` defaulters.
-    A system with no persisted `toolBreakage` reads as `{ authority: "toolSpecific" }`.
+21. **Tool-breakage authority** (`toolBreakage.authority`) is a per-system OVERRIDE of a world value, normalized on read (no versioned migration).
+    **Normalization is ABSENCE-PRESERVING as of `1.30.0`**: an unknown or missing authority emits NO `toolBreakage` key at all, where it previously minted `"toolSpecific"`.
+    A system with no persisted `toolBreakage` still READS AS `"toolSpecific"` whenever no world value is authored — the guarantee is unchanged — but it is now answered by the RESOLVER (requirement 21a), which is where the world value can be consulted, rather than by minting a token the corpus cannot tell apart from a GM's deliberate choice.
+    A RECOGNIZED authored token is never stripped: every value already on disk was minted by the pre-flip normalizer, so `## Scoped Entity Definitions` `### Tool scope` requirement 5 makes every EXISTING value AUTHORED.
     The governing rule is that authority decides WHETHER a Tool breaks, `checkBreakage` triggers decide WHEN under `checkDriven`, and the Tool's `onBreak` decides what happens.
     `checkBreakable: false` opts a Tool out of check-driven breakage without replacing or erasing its retained tool-specific mode.
+    21a.
+    **LIVE as of `1.30.0`** (issue 1358, made live by the epic 1357 world-scope migration): the switch has a WORLD half carrying the SAME two tokens, and the per-system value is an OVERRIDE of it rather than the only place it is authored.
+    Resolution is `system.toolBreakage.authority ?? worldToolBreakage.authority`, and it is ABSENT-PRESERVING on the system side: a system that authored nothing INHERITS the world value rather than re-defaulting to `toolSpecific`, and an unrecognized system token is treated as absent for the same reason.
+    Only when neither scope authors a recognized token does the answer fall to `toolSpecific`, so a world that has authored no world value reads exactly as this requirement already shipped.
+    This is a MODIFICATION of this requirement and not a new field: recording the world break mode as new is how a FOURTH breakage control gets built beside `toolBreakage.authority`, `checkBreakable` and the gathering realm's `toolBreakagePolicy`, with no precedence rule between them.
+    The governing rule above is unchanged and gains exactly one clause: SCOPE decides where authority is authored; AUTHORITY still decides WHETHER.
+    The per-tool control stays `checkBreakable`; the prototype's `tool` / `check` / `immune` spellings are not introduced.
+    The world half is PERSISTED on `fabricate.toolScope` (issue 1359) and became REACHABLE at `1.30.0`, when this requirement's own normalizer became absence-preserving.
+    A reader that re-defaults to `"toolSpecific"` locally re-creates the unreachability at its own call site, so the FOUR non-UI effective-authority readers — the shared breakage evaluator, both crafting-engine breakage decisions and the inventory listing builder's exhaustion projection — are routed through the resolver, via the one shared seam `effectiveToolBreakageAuthority` (`src/systems/toolBreakageAuthority.js`).
+    The UI readers are routed at ONE point rather than five: the manager's selected-system projection publishes the RESOLVED authority, and every manager surface that draws or gates on it reads that published value.
+    It publishes the AUTHORING SCOPE beside it — one value per branch of the resolver — because a screen that offers "inherit" as a third choice cannot recover that from the resolved token.
+    Routing them at the projection rather than at each reader is what keeps the count from growing with the screens, and it is why a screen that re-defaults locally is a defect rather than a duplicate.
 22. Authority is strictly either-or (issue 419 recombine): a check can break tools ONLY under `"checkDriven"`.
     Under `"toolSpecific"` authority, each Tool's own `breakage.mode` decides whether it breaks, and a check NEVER breaks tools — the shared `evaluateCheckBreakage` decision (including the routed per-tier `data.breakTools` legacy bridge) is not consulted.
     A trigger's forced `outcome` (success/failure/award) still applies under both authorities; only its `breakTools` effect is gated to `checkDriven`.
@@ -570,7 +583,7 @@ CraftingSystem = {
     The former `tiered` / `namedOutcomes` branch — which defaulted `outcomes` to `["low", "high"]` — was dead code and has been removed.
     This is distinct from `CraftingSystem.alchemy.checkMode` (`none` | `simple` | `tiered`, requirement 8), whose `tiered` value IS a live check-slot selector and is unaffected.
     `craftingCheck.outcomes` is a legacy free-text outcome-name list normalized to trimmed, lowercased, unique strings and defaulting to `["fail", "pass"]` when absent; it too has no runtime consumer (routed outcome tiers live on `routed.relativeOutcomes` / `routed.fixedOutcomes`).
-    **`craftingCheck.checkModifiers` no longer exists at this level either** (issues 1095, 1117): the library is `CraftingSystem.modifiers`, and `_normalizeCraftingCheck` — an allowlist rebuild — does not emit the old key at all, which is why the `1.22.0` and `1.23.0` migrations' before-any-load ordering is load-bearing rather than incidental.
+    **`craftingCheck.checkModifiers` no longer exists at this level either** (issues 1095, 1117, 1308): the library is the world `characterLibraries.modifiers`, and `_normalizeCraftingCheck` — an allowlist rebuild — does not emit the old key at all, which is why the before-any-load ordering of the `1.22.0`, `1.23.0` and `1.28.0` migrations is load-bearing rather than incidental.
 
 30. **Built-in check contract — the authored roll formula IS the built-in check.** Fabricate's supported "built-in" check lets a GM author a plain dice expression (`craftingCheck.simple` / `routed` / `progressive.rollFormula`) that the engine rolls and evaluates natively, with no macro and no game-system adapter — the low-complexity path for GMs who do not need dnd5e/pf2e-specific stat integration (the "built-in check source" desired in the domain audit).
     A check is **usable** IFF its resolution mode carries an authored `rollFormula` that SURVIVES the retired-placeholder shim (see the _Crafting Check Macro Contract_ section); `enabled` is only the optional-check on/off toggle and is never a proxy for "the check works".
@@ -602,11 +615,13 @@ CraftingSystem = {
     Separately, `data.blockedOutcomeId` (additive alongside `data.minTierFailed`, on a minimum-success-tier failure only) is the tier the recipe minimum BLOCKED — post-step and pre-gate.
     It is named for what the gate did to it rather than "rolled", because issue 975 mints **rolled tier** as a term of art for the PRE-step tier; the former `data.rolledOutcomeId` name would overload that word in the same change that defines it.
 
-33. **System-level modifier library.** `CraftingSystem.modifiers` is the ONE named modifier library for the whole system: an ordered array of `{ id, label, expression, isRollExpression, icon?, min?, max? }`, ids unique and trimmed, malformed entries dropped, a bad expression coerced to `''`, `icon` / `min` / `max` attached only when authored, and `isRollExpression` DERIVED from the expression on every normalize.
-    It is referenced by all three activity checks AND by every gathering drop row, event and stamina cost, and it is authored on exactly ONE surface (System settings › Modifiers).
-    It replaces `craftingCheck.checkModifiers` (moved up and deleted by `1.22.0`), `CraftingSystem.checkModifiers` and `gatheringConfig.systems[systemId].characterModifiers` (merged and deleted by `1.23.0`).
+33. **World modifier library.** The ONE named modifier library is a WORLD record since issue 1308 and is defined in full under ## ModifierLibrary; `CraftingSystem` carries no `modifiers` key at all, and this requirement states only what the crafting system's own checks do with it.
+    It is referenced by all three activity checks AND by every gathering drop row, event and stamina cost, and it is authored on exactly ONE surface (System settings › Modifiers, relocating to a World route in the follow-up change).
+    It replaces `craftingCheck.checkModifiers` (moved up and deleted by `1.22.0`), `CraftingSystem.checkModifiers` and `gatheringConfig.systems[systemId].characterModifiers` (merged and deleted by `1.23.0`), and `CraftingSystem.modifiers` itself (lifted to world scope and deleted by `1.28.0`).
     An entry with an empty expression is kept, not dropped, because the authoring surface can create one.
-    Each of `craftingCheck`, `salvageCraftingCheck` and `gatheringCraftingCheck` carries its own `{ defaultModifierPolicy, defaultModifierIds, maxModifierPicks? }` selection over it, normalized by ONE shared derivation (`CraftingSystemManager._normalizeCheckModifierSelection`) so the three cannot drift; a default id naming nothing in the catalogue is dropped, preserving order and de-duplication.
+    Each of `craftingCheck`, `salvageCraftingCheck` and `gatheringCraftingCheck` carries its own `{ defaultModifierPolicy, defaultModifierIds, maxModifierPicks? }` selection over it, normalized by ONE shared derivation (`CraftingSystemManager._normalizeCheckModifierSelection`) so the three cannot drift.
+    **A default id naming nothing in the library is dropped ONLY when the Valid Id Basis for the modifier library is known-complete**, preserving order and de-duplication; when it is not, every id passes through untouched.
+    That condition is not a caveat but the requirement's operative half since the library left the crafting system: the basis is now derived from a world setting a client may not have migrated, and a pass that read it as an empty library would prune every authored default on the next save (see ### Valid Id Basis and ## CharacterLibraries).
     `min` / `max` clamp that entry's CONTRIBUTION, so a bound means the same thing under every combination rule: the resolved value for a flat expression, and the ROLLED result for a rolling one, the latter expressed in the formula as `min(max((1d8), -1), 6)`.
     Both are absence-preserving in the same way `maxModifierPicks` is: only a FINITE number is attached, and `null` / `''` / `[]` are guarded explicitly before coercion because `Number()` reads all three as `0` and `0` is a real bound.
     An authored `min > max` is preserved verbatim rather than reordered, raises the BLOCKING `modifierBoundsInverted` readiness issue, and makes that entry contribute exactly 0 until it is repaired.
@@ -614,6 +629,8 @@ CraftingSystem = {
     The expressibility test is the same `isDecimalSafeTermValue` the term emit asks, so the clamp and the emit cannot disagree about which numbers a formula can carry.
 
 34. **Subject-level modifier picks.** Under the `bySubject` combination rule the pick lives on the record being resolved: `Recipe.craftingModifier.modifierIds`, `Component.salvage.checkModifierIds`, `GatheringTask.checkModifierIds`.
+    All three name entries in the WORLD modifier library (issue 1308), so the pick outlives any one crafting system's authoring and a system copied between worlds keeps resolving whatever ids the destination library carries.
+    None of the three is pruned against the library at all: `normalizeCheckModifierIds` filters SHAPE and not catalogue membership, so a subject pick is never a Valid Id Basis consumer and the move changed nothing about it.
     All three preserve an AUTHORED EMPTY array as a real pick of zero, distinct from absent, keyed on `Array.isArray` at entry so a malformed member cannot flip an authored empty set back to inherit.
     All three are truncated to `maxModifierPicks` at the resolver rather than only at the picker, so lowering the cap never leaves a record rolling more modifiers than the system permits and never destroys its stored picks.
     **The id COERCION is one rule for all three subjects** (`normalizeCheckModifierIds`, `src/utils/checkModifierPicks.js`): ids are TRIMMED, non-string members are dropped rather than coerced, duplicates are dropped and authored order is preserved.
@@ -629,6 +646,53 @@ CraftingSystem = {
     All three normalizers emit it through ONE shared derivation (`_normalizeFailureResultPolicy`); because each is a whitelist rebuild, omitting it from any one drops it from that activity on the next save.
     A newly-created system defaults to `perRecord`, and an absent or unrecognized value normalizes to `perRecord` on read (the `toolBreakage.authority` precedent, requirement 21).
     An UPGRADED world never reaches that default: the `1.25.0` migration seeds `never` onto every check block already on disk (`destructive-changes-and-migrations`), so no existing world changes behaviour.
+
+36. **EIGHT in-system keys are SHADOWED by a world scope setting and remain LIVE AND AUTHORITATIVE FOR EVERY KEY THEY DECIDE** (issue 1359, epic 1357; the blanket form RETIRED at issue 1372).
+    They are `components`, `essenceDefinitions`, `tools`, `componentCategories`, `itemTags`, `categories`, `componentCategoryIcons` and `categoryIcons`.
+    Each is marked `SHADOWED` in the shape above; `tools` is declared under `## Tool` requirement 2 rather than in that shape and carries the same note.
+    Since `1.30.0` the three ENTITY keys are shadowed by a corpus that is actually WRITTEN, and since issue 1392 THREE OF THE FIVE vocabulary keys are too — **the correction is per key, not blanket**.
+    `fabricate.worldVocabulary` exists and carries three lists, so `componentCategories`, `itemTags` and `categories` now have a destination; `componentCategoryIcons` and `categoryIcons` still have NONE, and for those two the original reason survives unchanged.
+    All eight stay LIVE AND AUTHORITATIVE either way: nothing reads the world half of the three lists until the consumer sweep, so what has changed for them is the REASON they are unshadowed — a destination now exists and no consumer resolves it — and not the fact.
+    This requirement's retirement remains bound to that sweep.
+
+    **WHAT THIS REQUIREMENT'S OWN RETIREMENT RETIRES IS THE LIFTED IDENTITY FIELDS, NOT THE ARRAYS — and for two of the three it is never the array.**
+    The shed binds to THIS requirement retiring, not to the read repointing that has already happened: readers now enter through the read union, and the arrays are unchanged.
+    An earlier form of this requirement attributed the shed of all eight keys to the migration; that was aspirational on both counts, and it is corrected here and in the `## Scoped Entity Definitions` banner together, because both carried the identical attribution.
+    `components` PERMANENTLY retains `essences`, `difficulty`, `complications`, `salvage` and `id`; `tools` permanently retains `componentId`, `label`, `requirement`, `prerequisites`, `bonus`, `checkBreakable` and `id`.
+    `id` is in both lists because it is the JOIN KEY the read union merges on, and a retained-field list omitting it describes an unjoinable record.
+    The ground is the SETTLED DECISION of `## Scoped Entity Definitions`'s own Purpose — essences, salvage and difficulty are exactly what two systems SHOULD disagree about — its requirement 1, and the EXHAUSTIVE section enumerations of `### Component scope` requirement 1 ("the component sections are `category` and `essences`", the second added by its own requirement 2a at `1.32.0`) and `### Tool scope` requirement 1, whose OPENING sentence ("There are FIVE tool world-default sections, FOUR of them inherited", amended at `1.31.0` by its own requirement 1a) is what makes the SECTION enumeration exhaustive - its closing "and nothing else" closes the INHERIT-MAP enumeration, which is a different list, which together with the per-SECTION unit of override make those fields unable to move to a membership record WITHOUT AN EXPLICIT, REVIEWED AMENDMENT to that requirement text.
+    That is the genuine distinction from `COMPONENT_SECTIONS`, which is a mutable constant a later PR can edit; it is not the membership allowlist either, since the entity roster preserves every authored field verbatim.
+
+    **`essenceDefinitions` IS retirable in full, and the SECTION COUNT is not why.**
+    `### Essence scope` requirement 1 is the two-section counterpart, and read as the component and tool enumerations are read it would argue the opposite.
+    What makes essences different is that the destinations EXHAUST the shipped record: `## EssenceDefinition` carries only identity, `enabled`, and the two fields `### Essence scope` requirement 1 maps onto `effectSource` and `macro` by name.
+    Nothing is left without a home, while `## Component` and `## Tool` each retain fields with no destination at all — and THAT RESIDUE is the asymmetry.
+
+    **WHAT THE IN-SYSTEM ARRAYS NO LONGER DECIDE, AND WHY THE BLANKET FORM WAS RETIRED** (issue 1372).
+    This requirement used to say the in-system record decides EVERY key it carries, without exception.
+    That made every world-scope screen a false statement: the system rules editor renders `Inheriting` beside a `World default: …` line and the rules list renders an `Inherits world defaults` pill, and under the blanket form a GM who edited a world default changed nothing in a system marked inheriting.
+    The claim was true at the instant the switch was flipped and false the moment the world default moved.
+    **The maintainer ruling is that an inheriting system FOLLOWS its world default**, so the blanket form is retired and replaced by a rule the switch decides:
+
+    - a section a membership record marks **OVERRIDING** is answered by the SYSTEM'S OWN value, which is the in-system record for as long as the lifted fields have not been shed;
+    - a section it marks **INHERITING** — including one its `inherit` map omits, which `isSectionInherited` reads as inheriting — is answered by the **WORLD DEFAULT**, applied onto the shipped field names that section is spelled over;
+    - every other key the in-system record carries, including all four lifted IDENTITY fields, is still answered by that record and nothing else.
+
+    **NO EXISTING WORLD MOVES**, and the reason is mechanical rather than a promise.
+    `buildMembershipRecord` writes every section `false` for every `(entity, system)` pair the `1.30.0` migration creates, so every section is OVERRIDING on a migrated world; a world that predates the membership record has no world half at all and its rows are answered BY REFERENCE.
+    The only rows whose resolution changes are the ones a GM has explicitly switched, which is the opt-in the screens describe.
+
+    **THE MEMBERSHIP RECORD'S STORED SECTION BLOCK DOES NOT WIN AN OVERRIDING SECTION**, and that asymmetry is deliberate.
+    It is the RETAINED dormant override `setSectionInheritance` keeps; no shipped editor writes it, and the migration froze it at `1.30.0`, so letting it beat the in-system record would revert every post-migration edit on the very next read — the same failure the identity clause below exists to prevent, transposed onto behaviour.
+    It becomes the answer only when the lifted fields are shed and a writer for it ships.
+
+    **`enabled`, component `tags` and tool `repairRequirements` ARE NOT SECTIONS** and are not switched by this rule; they are answered by the in-system record unchanged.
+    Naming them matters because all three are emitted by a resolver — `enabled` and `tags` unconditionally — so a reading of this requirement that simply dropped the in-system re-application would hand every one of them a frozen migration-time copy.
+
+    While this requirement holds the in-system arrays stay **LIVE AND AUTHORITATIVE** for everything above that they still decide, and the world copy is the **World Identity Snapshot**: equal to them at migration time by construction, and written by no identity writer thereafter.
+    That snapshot is now READ — every non-UI reader enters through `## Scoped Entity Definitions` requirement 15's read union — but it never WINS an ORDER or a ROW the in-system record decides, it never wins an IDENTITY field, and the union re-derives identity from the in-system record on every read.
+    Reading it is not authority, and neither is a shed: nothing is removed from any of the eight keys while this requirement holds.
+    The world corpus is nevertheless part of each key's VALID ID BASIS — see `## Scoped Entity Definitions` requirement 16 — so a reference is pruned only when BOTH halves can vouch for the id set, and a world setting that has never been written vouches for nothing.
 
 **Disambiguation:** `checkBreakage` (per-check, decides WHEN tools break under `checkDriven`) is distinct from the gathering realm rule `toolBreakagePolicy` (`failureOnBreak | successDespiteBreak`, defined in `gathering-and-harvesting`, which governs what a broken tool does to the gather outcome).
 The two are unrelated and independently applied.
@@ -714,7 +778,7 @@ It is persisted as the `fabricate.currencyConfig` world setting (`scope: "world"
 type CurrencyConfig = {
   spendStrategy: "actorProperty" | "actorInventory" | "macro"; // default "actorProperty"
   providerId: string; // default ""; meaningful only under actorInventory, always persisted
-  macros: { canAfford: string; increment: string; decrement: string }; // default all ""; meaningful only under macro
+  macros: { canAfford: string; increment: string; decrement: string; balance: string }; // default all ""; meaningful only under macro
   units: CurrencyUnit[]; // default []
 };
 ```
@@ -744,9 +808,43 @@ type CurrencyConfig = {
    Every reconciliation of two ladders is therefore keyed by `id` and is reference-preserving: the `1.26.0` migration UNIONS units by id across every crafting system (the first system wins an id collision), and import merges an incoming ladder by id with the DESTINATION definition winning (see `import-export`).
 8. Exactly one runtime chokepoint composes the two scopes.
    `getCurrencyRequirementConfig` takes `enabled` from the crafting system and `units` / `spendStrategy` / `providerId` / `macros` from this config, reaching each through a seam (`getCraftingSystemManager`, `getCurrencyConfig`) with a `game.fabricate` global fallback.
-   No affordance, spend, or refund path reads the configuration any other way, which is why relocating it changed no engine logic.
+   No RECIPE-KEYED affordance, spend, or refund path reads the configuration any other way, which is why relocating it changed no engine logic.
+   The paths that are not recipe-keyed are the two published world-scoped members of requirements 10 to 14, the affordability check and the currency credit — and one of those two WRITES.
+   Both read the world half alone through the same `getCurrencyConfig` seam and compose nothing.
 9. The config is world data and is therefore NOT part of the `CraftingSystem` record, but unlike `gatheringParties` it DOES ride along with crafting-system import/export, as its own envelope slice.
    The difference is that an exported recipe's currency cost names a unit id that is unusable unless the unit arrives with it, whereas no exported record references a party.
+10. The published affordability check (`game.fabricate.checkAffordability`) and the published currency credit (`game.fabricate.creditCurrency`), both members of the companion contract — see `companion-api` — answer against the WORLD configuration ALONE and consult no crafting system's `requirements.currency.enabled` toggle.
+    They are structurally unable to: neither resolves a crafting system and neither holds a system-manager seam.
+    That is the correct scope because the questions they answer have no recipe — a downtime activity settled by a companion belongs to no crafting system, so there is no toggle whose answer could apply to it.
+11. A caller supplies one `{ unitId, amount }` to either member and performs no aggregation of its own.
+    The CHECK is LADDER-AWARE in a sense the credit is not: it compares the actor's total base value across the whole connected branch, so 10 sp affords a 1 gp cost on a ten-silver-per-gold ladder.
+    The CREDIT writes ONE denomination — the requested unit's own `actorPath`, set to its current value plus the amount — and makes no change across the branch, so the branch-summing rule above is the check's alone.
+12. Both resolve the unit and validate the amount BEFORE invoking any spender, and through ONE shared resolution, so the check and the credit cannot disagree about what a unit is.
+    An unresolvable `unitId`, a non-positive or non-finite `amount`, an empty ladder and an invalid profile each answer `success: false` with a distinct outcome, and NEVER `affordable: true`.
+    The ordering is load-bearing rather than defensive: the only unknown-unit guard on the craft path lives inside the aggregation step a single-unit question skips, and skipping it prices the cost at a base value of zero, which every purse satisfies — so an unknown unit id, and an amount of zero, would each read as AFFORDABLE.
+    A refusal answers `affordable: null` rather than `false`, so "this actor is short" and "this question could not be answered" cannot collapse into the same confident no.
+    The credit additionally requires a positive SAFE-INTEGER amount, refusing anything else rather than truncating it, because a truncated amount is a different amount and because `current + amount` stops being exact beyond that range; the check is deliberately NOT narrowed to match, since narrowing what a published member accepts is a `schemaVersion` bump.
+13. The CHECK performs no write, and it is GM-gated at the facade, so it introduces no player-reachable trigger for GM-authored macro code with caller-chosen arguments.
+    That first conjunct is what licensed a world-scoped surface reaching GM-authored macro code with caller-chosen arguments at all, and it is NOT true of the credit.
+14. The CREDIT performs exactly one write per call, and it reaches a GM macro — `increment` — that has never before been reachable from a companion.
+    Its safety therefore rests on TWO gates rather than one: the GM gate at the facade, and the call-site and election gate that requires a caller declaring a `broadcast` call site to be this client's elected executor.
+15. A THIRD pair of world-scoped paths reads and spends against a SET of actors: the pooled balance read and the pooled debit behind the companion contract's pooled holdings members.
+    They answer against the WORLD configuration alone on requirement 10's reasoning, and neither consults a crafting system's `requirements.currency.enabled` toggle.
+    The pooled read is the only currency path that fires a GM's `balance` macro, and it fires it once per actor, SERIALLY: firing N of a world's own automation concurrently is a behaviour a GM cannot reason about, and the set is a party, so N is small.
+16. **A pooled balance COMPOSES BY ADDITION, and that is a property of the readers rather than an assumption.**
+    Every coin spender's balance read answers the actor's whole ladder branch expressed in ONE terminal base unit — 1 gp and 10 sp are the same 100 copper to all of them — so N actors' answers are N numbers in one denomination and their sum is the pool.
+    No pooled path re-derives a conversion rate.
+    **A pool containing ONE unreadable actor is UNREADABLE, not partial.**
+    The pooled `available` is `null` the moment any actor answers _cannot see_, because a sum over a subset is a number about a different group than the caller asked about — and it is always too SMALL, so a gate built on it would refuse parties that can pay while looking authoritative.
+    Per-actor readings are still reported individually so a caller can say which actor and why.
+    An EMPTY actor set reads `0` rather than `null`: nothing was unreadable, and the pool provably holds nothing; refusing an empty set belongs to the calling member, not to this path.
+17. **Every per-actor spend in a pooled debit is denominated in the TERMINAL BASE UNIT, and that is a correctness requirement rather than a style.**
+    The recipe-shaped aggregation expresses a requirement back in a representative unit by rounding UP, which exists so a SINGLE payer is never under-charged; applied per actor across N payers the same rounding over-charges the POOL by up to `baseValue - 1` for every payer, so on a `gp → sp → cp` ladder four characters splitting one cost could be charged nearly 4 gp more than it.
+    In the base unit that ceiling is the identity, so the pool pays exactly what was asked, and the spend path breaks higher denominations to satisfy a base-unit requirement, so paying in copper costs an actor holding only gold nothing extra.
+    A pooled debit's amount must be a positive SAFE-INTEGER count whose product with the unit's base value is also a safe integer, on the CREDIT's rule rather than the check's: admitting a fraction would let the debit take an amount the published credit cannot express, so a companion could remove money it could not put back through the API.
+    A pooled debit is all-or-nothing — the pool is tested against the total before anything is written — and a failure part-way gives back every payment that settled, in the SAME base-unit amount it was taken, which restores an actor's TOTAL exactly even though their coin MIX may differ.
+    A give-back that itself FAILED is recorded and does NOT become a zero-mutation claim, and that exclusion is the whole reason the debit refuses up front in a world that cannot give coin back.
+    The pooled READ, unlike the debit, converts its answer BACK into the caller's own unit and FLOORS it, because a pool holding three and a half gold pieces cannot pay four, and because deriving a sufficiency from two different denominations would err PERMISSIVE.
 
 ## TravelConfig
 
@@ -779,6 +877,7 @@ type TravelConfig = {
 3. Normalization is total and non-throwing, always emitting all three keys.
 4. **Realm `id`s are stable and are never rewritten**, because environments (`includedRealmIds` / `excludedRealmIds`), party overrides (`currentRealmOverride.realmIds`) and the actor discovery flag all store realm ids, so a dropped or re-keyed realm orphans every reference to it.
    Every reconciliation of two libraries is therefore keyed by `id` and is reference-preserving: the `1.27.0` migration UNIONS realms by id across every crafting system (the first system wins an id collision, and the discarded copy is REPORTED rather than re-keyed), and import merges an incoming library by id with the DESTINATION definition winning (see `import-export`).
+   Realm ids are `randomID()`, so reporting EVERY collision is informative here; the `1.28.0` character-library migration refines that to CONTENT-DIFFERING collisions only, because its preset ids are stable semantic slugs that collide by design (## CharacterLibraries requirement 8).
 5. The store publishes its cache BEFORE awaiting the write.
    Callers read-modify-write, so a second edit starting while the first write is in flight would otherwise read the pre-first-edit config and clobber it.
    The per-system store this replaced was safe by construction because the system manager writes its map before its own await, so publishing late here would be a regression rather than a new limitation.
@@ -787,6 +886,104 @@ type TravelConfig = {
    A read-modify-write loop over the realm list would lose every iteration but the last.
 7. The config is world data and is therefore NOT part of the `CraftingSystem` record, but unlike `gatheringParties` it DOES ride along with crafting-system import/export, as its own envelope slice.
    The difference is that an exported environment's realm gating names a realm id that is unusable unless the realm arrives with it, whereas no exported record references a party.
+
+## CharacterLibraries
+
+### Purpose
+
+Define the WORLD character libraries: the character-prerequisite library and the modifier library, which issue 1308 lifted off every crafting system.
+
+Both are world scope because both resolve against the acting CHARACTER rather than against any one crafting system.
+"Smith's Tools proficiency at least 1" is a fact about a character and `@abilities.med.mod` is a number read off a character sheet; neither becomes a different rule because the GM switched from the blacksmithing system to the alchemy system, yet the per-system model made a world running three systems maintain three copies of each and let the copies drift apart.
+
+**Unlike `CurrencyConfig` and `TravelConfig`, NOTHING stays on the crafting system.**
+There is no `enabled` key here and no participation flag there, because an unreferenced entry already costs nothing, so there is no meaningful "off" state to model.
+A reader looking for a per-system half of this concept is looking for something that does not exist.
+
+It is persisted as the `fabricate.characterLibraries` world setting (`scope: "world"`, `config: false`, `type: Object`, default `{}`); `CharacterLibrariesStore` is the persistence shell, `normalizeCharacterPrerequisiteList` and `normalizeModifierLibrary` are the two normalizers, and `src/systems/characterLibraries.js` is the shared read-side resolver.
+
+```ts
+type CharacterLibraries = {
+  characterPrerequisites: CharacterPrerequisite[]; // default []
+  modifiers: ModifierLibraryEntry[]; // default []
+};
+```
+
+### Requirements
+
+1. **This is ONE setting key carrying TWO independent libraries, and that is a persistence decision rather than a modelling one.**
+   The two share no key, no reference, no invariant and no reader: nothing in the corpus reads both.
+   The key is shared only so that a fourth near-identical persistence shell is not written beside `CurrencyConfigStore` and `GatheringRealmStore`.
+   Splitting it into two keys later would therefore be a pure persistence change with no domain consequence, and every rule below that says "per library" is what keeps that true.
+2. **Every operation over this setting is PER LIBRARY, never over the object as a whole.**
+   Normalization, the world migration's union, the export slice and the import merge each treat `characterPrerequisites` and `modifiers` separately.
+   A single object-level destination-wins merge on import would let a destination world that has prerequisites but no modifiers win the whole slice and silently discard every incoming modifier, which is the concrete harm requirement 1's independence exists to prevent.
+3. **The shared key WIDENS the lost-update window across both libraries, and the cost is accepted knowingly.**
+   A write to either library rewrites the whole setting, so two GMs editing DIFFERENT libraries can clobber each other where two keys would not.
+   The store therefore publishes its cache BEFORE awaiting the write, exactly as `CurrencyConfigStore` does and for the same read-modify-write reason, and with more at stake: a stale read taken during a modifier keystroke writes back a stale `characterPrerequisites` beside it, losing an edit in a list the GM was not even touching.
+4. **The store exposes RAW KEY PRESENCE as `isSeeded()`, captured from the raw read before normalizing, and that predicate is what makes a destructive prune decidable.**
+   `game.settings.get` on a world setting that has never been written returns the registered default, so an unmigrated world reads `{}`, normalizes to two empty arrays and reports itself loaded — byte-identical, at this store's API, to a GM who deliberately emptied both libraries.
+   `{}` means never written, so the Valid Id Basis is UNKNOWN and nothing may be pruned; `{ characterPrerequisites: [], modifiers: [] }` means the GM emptied it, so the basis is real, empty and prunable.
+   A write seeds the setting from that point on, so a GM's deliberate deletion starts pruning immediately rather than waiting for a reload.
+5. `load()` is GUARDED and never throws, unlike `CurrencyConfigStore.load()`.
+   A throw would propagate through `CraftingSystemManager._normalizeSystem` into `hydrate` and out of `initialize()`, which is the issue-970 failure mode where the manager never initializes at all.
+   An unreadable setting degrades to an UNKNOWN basis; it never takes the module down.
+6. **Persistence is NOT gated on validity**, exactly as `CurrencyConfig` requirement 4 states and for the same reason: a GM authors a library incrementally, so an entry is transiently incomplete between being added and being filled in, and refusing those writes would make the editor unusable.
+7. **Entry `id`s are stable and are never rewritten**, because books and scrolls (`caps.learn.characterPrerequisiteIds`), tool requirement gates (`Tool.prerequisites.ids`), the three activity checks' `defaultModifierIds`, every subject pick, and every gathering drop row, event and stamina cost all store ids.
+   Every reconciliation of two libraries is therefore keyed by `id` and reference-preserving, per library: the `1.28.0` migration UNIONS entries by id across every crafting system (the first system wins an id collision, and the discarded copy is REPORTED rather than re-keyed), and import merges an incoming library by id with the DESTINATION definition winning (see `import-export`).
+8. **Collision reporting is narrowed to CONTENT-DIFFERING collisions, which is a refinement on the `1.27.0` rule rather than a copy of it.**
+   Realm ids are `randomID()`, so a travel collision is already rare enough that reporting all of them is informative; preset ids on BOTH of these libraries are stable semantic slugs (`smithsTools`, `proficientArcana`, `expertCrafter`; `strength`, `perception`, `survival`) and presets are editable once seeded, so a GM who seeded presets into two systems collides on every seeded entry.
+   Sameness is judged on the NORMALIZED entry, so a difference in key order or in an absent-versus-undefined bound is not mistaken for a disagreement, and the one collision that changed a rule is not buried under dozens that changed nothing.
+9. **The runtime READ is the UNION of the world library and the crafting system's own surviving legacy copy, world first on an id collision** (`resolveModifierLibrary` / `resolveCharacterPrerequisiteLibrary`).
+   Before the `1.28.0` migration lifts them, the legacy in-system entries ARE the live corpus, and migrations run on the ACTIVE GM only, so every player and every assistant GM spends at least one session reading a world setting that has not been written yet; without the union their tools, books and checks would resolve nothing at all in that window.
+   This is deliberately NOT the silent read-alias the `1.22.0` and `1.23.0` relocations refused: an alias hides a relocation by making the old location keep working forever, whereas this is bounded by the migration, which strips the legacy copy the first time an active GM loads the world.
+10. The libraries are world data and are therefore NOT part of the `CraftingSystem` record, but they DO ride along with crafting-system import/export as their own envelope slice, on the terms `CurrencyConfig` requirement 9 and `TravelConfig` requirement 7 state.
+    An exported book's learning gate, an exported tool's requirement gate and an exported check's `defaultModifierIds` all name entries by `id` and are unusable in the destination world unless those entries arrive with them.
+11. **Both libraries are read DURING crafting-system normalization, which currency and travel are not, and that difference is load-bearing at three sites.**
+    `CraftingSystemManager` derives its Valid Id Basis from this store on every `_normalizeSystem` and on every `upsertTool`, so the store must be constructed and loaded BEFORE the manager at startup, a copy-mode import must merge this slice BEFORE the system is created, and that merge must go through (or invalidate) the store rather than writing the setting behind its cache.
+    Copying the currency and travel placements — both constructed or persisted late, because nothing reads them during normalization — would prune every incoming reference against a basis that cannot yet see it.
+
+## ModifierLibrary
+
+### Purpose
+
+Define the ONE named modifier library: the ordered list of reusable actor-driven expressions that every activity's check selects over and that every gathering drop row, event and stamina cost references.
+
+It lives in the `characterLibraries` world setting as `modifiers[]` (see ## CharacterLibraries).
+It has moved THREE times, and each move deleted the key it left: out of `craftingCheck.checkModifiers` in `1.22.0`, because salvage and gathering select over the same entries so it can belong to no one activity; into a merge with the gathering character-modifier library (`gatheringConfig.systems[systemId].characterModifiers`) in `1.23.0`, because a named actor-driven expression is ONE concept and authoring it twice let a GM define "Medicine" as two unrelated records that could disagree; and out of `CraftingSystem.modifiers` to world scope in `1.28.0`, because an expression evaluated against a character is not a fact about a crafting system.
+
+### Properties
+
+```js
+ModifierLibraryEntry = {
+  id: string,               // stable reference; trimmed, unique within the library
+  label: string,            // GM label; '' when unauthored
+  expression: string,       // roll-data fragment evaluated against the acting character
+  isRollExpression: boolean,// DERIVED from the expression, never read from input
+  icon?: string,            // attached only when authored
+  min?: number,             // attached only when authored; absence means unbounded
+  max?: number,             // attached only when authored; absence means unbounded
+}
+```
+
+### Requirements
+
+1. **ABSENT IS NOT AN EMPTY LIBRARY**, and this inverts the rule that stood while the library lived on the crafting system.
+   The pre-1308 shape read an absent `modifiers` key as an empty library, so every activity's contribution was nothing and no term was appended; that reading is exactly the Valid Id Basis anti-pattern, and once the library moved to a world setting whose unwritten form reads back as the registered default it would have made every unmigrated client prune every authored default id.
+   An unwritten setting is therefore UNKNOWN rather than empty (## CharacterLibraries requirement 4): reading still resolves the union with any surviving legacy in-system copy, and pruning is skipped entirely.
+   A library the GM has WRITTEN and emptied is a real empty library, and it does contribute nothing.
+2. `normalizeModifierLibrary` is total and non-throwing: ids are trimmed and de-duplicated, an entry with no assignable id or a non-object entry is dropped rather than repaired, a bad expression coerces to `''`, and `isRollExpression` is DERIVED on every normalize so a persisted or imported flag can never contradict the expression beside it.
+   It lives in `src/systems/modifierLibrary.js` rather than on `CraftingSystemManager` because since issue 1308 it has THREE callers that must agree byte for byte — the world store, the `1.28.0` migration and the export-payload upcast — and a second implementation of a normalizer is how a persisted shape and its migration drift apart.
+3. **THE SHAPE IS A SUPERSET**, and each field is honoured by whichever consumer needs it: `min` / `max` clamp the resolved value of a CHECK modifier, while a gathering drop-row reference carries its OWN `min` / `max` that clamp its contribution independently.
+4. `icon`, `min` and `max` are ABSENCE-PRESERVING: each is attached only when authored, so `null`, `undefined`, `''` and junk all normalize to the same shape with the key absent, and absence means unbounded.
+   `0` is a real bound and survives, which is why the guard is `Number.isFinite` on an explicitly-guarded value rather than truthiness.
+   The bounds are asked of the shared resolver rather than re-derived, so the persisted shape and the clamp the engine applies cannot disagree about what an unbounded form is.
+5. An authored `min > max` is PRESERVED VERBATIM rather than repaired: it is the blocking `modifierBoundsInverted` readiness issue that the GM must fix, and silently swapping the pair would roll a number nobody authored.
+   A finite bound no dice-grammar `Constant` can express (`1e21`, `1e-7`) is the second blocking bounds fault, `modifierBoundsUnsafe`, and contains the entry to 0 in the same way.
+6. **AN ENTRY WITH NO EXPRESSION IS KEPT.** The library has an "Add modifier" button, and an entry that vanished on save the moment it was created would make that button appear broken.
+   It is still a runtime misconfiguration wherever it is referenced.
+7. **A ROLL-SHAPED expression is legal for BOTH consumers** (issue 1118): a gathering drop row evaluates the expression and applies the result as a percentage-point delta, and a check appends the DICE to its roll formula so the authored variance survives to the roll and shows on the card.
+   `isRollExpression` is therefore a DISPLAY classification and never a gate; the blocking `modifierRollExpression` readiness issue is RETIRED.
 
 ## CurrencyUnit
 
@@ -826,7 +1023,8 @@ type CurrencyUnit = {
    - Under `"actorProperty"`, every unit must define an `actorPath`; `denomination` is ignored.
    - Under `"actorInventory"`, every unit must map to a pf2e denomination — `denomination` (defaulting to the unit `id`) must be one of `pp`, `gp`, `sp`, or `cp`; `actorPath` is not required.
    - Under `"macro"`, every unit must define a non-empty `abbreviation` (macros match a unit by abbreviation); `denomination`/`actorPath` are not required.
-     Additionally, the config-level `canAfford` and `decrement` macros must be set (the `increment` macro is optional).
+     Additionally, the config-level `canAfford` and `decrement` macros must be set; the `increment` and `balance` macros are both OPTIONAL, and a world missing either is a documented-normal state rather than a broken one.
+     What each absence costs is stated positively, because "optional" alone tells a GM nothing: with no `increment` macro the world cannot refund a cancelled craft, the published currency credit answers _the world cannot express this credit_, and the pooled holdings consume refuses a currency cost up front rather than taking coin it could not give back; with no `balance` macro the world can still spend coin but cannot report it, so every pooled currency reading answers _cannot see_ and nothing else in the request is affected.
      The `"macro"` requirement is unchanged by the abbreviation default: an empty `abbreviation` (the new default for an unauthored unit) still produces the missing-abbreviation validation error under `"macro"`.
 7. When a stored `abbreviation` strictly equals the unit `id` **and** the id has the generated-id shape (`/^[A-Za-z0-9]{10,}$/`, matching `foundry.utils.randomID()` or the crypto fallback), normalization treats the abbreviation as unauthored and resets it to the empty string (legacy self-heal).
    Short or non-alphanumeric semantic ids are **deliberately left un-healed** even when `abbreviation === id`: they fail the generated-id shape guard, so a hand-authored abbreviation that intentionally equals a semantic id (e.g. the seeded preset coin keys `cp`/`sp`/`ep`/`gp`/`pp`, the only such ids in practice) is preserved.
@@ -860,6 +1058,15 @@ type CurrencyUnit = {
 ### Purpose
 
 Define one essence type used by components and recipe requirements.
+
+**What this record still OWNS after `1.30.0`, and what a World Identity Snapshot is.**
+The `1.30.0` world-scope migration (epic 1357, PR 3) lifted this record's IDENTITY — `id`, `name`, `icon`, `colorToken`, `description` — to a WORLD ESSENCE, and its `effectSource`, `macro` and `enabled` onto a per-system membership record.
+Those fields nevertheless **REMAIN THE SOURCE OF TRUTH** here.
+The readers now enter through the read union, which answers from this record for every field it carries EXCEPT a section this system INHERITS; this record REMAINS the source of truth for the rest while `## CraftingSystem` requirement 36 holds.
+Every shipped writer writes this copy, and no identity writer writes the world one.
+The world copy is the **World Identity Snapshot**: taken from this record at migration time, equal to it by construction at that moment, and written by no identity writer thereafter.
+It is READ now, and it supplies only the keys this record does not carry; where the two disagree the answer is re-derived FROM this record at read time, and the divergence is reported to the GM.
+This record OWNS nothing the three destinations do not cover, which is what makes `essenceDefinitions` the one of the three in-system arrays that requirement 36's own retirement can retire IN FULL — see `## CraftingSystem` requirement 36, and note that the two-section count is NOT the reason.
 
 ### Properties
 
@@ -906,6 +1113,11 @@ EssenceDefinition = {
    That check is repeated at craft time as a backstop, because `command` is a required string on a `chat` macro too and `type` defaults to `chat`, so an imported system or a hand-edited world setting can carry a `propertyMacroUuid` that never passed through the drop handler at all.
    At craft time an unresolvable uuid, or one that resolves to a Macro whose own type is not `script`, is logged and skipped silently.
 10. Both new fields survive export, import and copy-import unchanged, and the import reference resolver collects `propertyMacroUuid` as a macro reference owned by the essence.
+11. This section describes the LIVE per-system shape and remains authoritative, for every key it still decides, while `## CraftingSystem` requirement 36 holds.
+    The readers now enter through the read union, which answers from this record for every field it carries EXCEPT a section this system INHERITS; this record REMAINS the source of truth for the rest while `## CraftingSystem` requirement 36 holds.
+    A reader's row is that shape PLUS the resolver's `member` and `inherited` keys, which no stored record carries.
+    `## Scoped Entity Definitions` is PARTLY LIVE per requirement — see its banner — and this section's own shape is SHADOWED by a world scope setting the `1.30.0` migration WRITES (identity, one fully-overriding membership record per system, and a world default per section elected from the oldest contributing system) (`## CraftingSystem` requirement 36).
+    Where the two disagree, this section is what the code does.
 
 ## RecipeItemDefinition
 
@@ -963,7 +1175,7 @@ RecipeItemDefinition = {
                                      // first (AND — "Required Knowledge"; prior-knowledge gate). Folds
                                      // a legacy single `prerequisite` string on normalize (issue 544).
                                      // Only enforced when limitLearning is true.
-      characterPrerequisiteIds: string[], // default []; ids into CraftingSystem.characterPrerequisites
+      characterPrerequisiteIds: string[], // default []; ids into the WORLD characterLibraries.characterPrerequisites
                                      // that a reader must ALL pass (AND) to learn this book's recipes,
                                      // evaluated against actor roll data (issue 544). A per-book
                                      // actor-stat gate, distinct from `prerequisiteIds` (prior knowledge).
@@ -996,7 +1208,7 @@ RecipeItemDefinition = {
 6. `caps.learn.learnScope` selects the learn-cap counter scope: `"perInstance"` (default) counts against each physical item document (`recipeItemLearning.learnedCount`), while `"total"` draws every actor's learns from one GM-authoritative shared world pool keyed `system::defId`.
    6a. `caps.learn.prerequisiteIds` and `caps.learn.characterPrerequisiteIds` (issue 544) are each a deduped, trimmed, non-empty string list (default `[]`), normalized with the same shape in `CraftingSystemManager._normalizeRecipeItemCaps`.
    `prerequisiteIds` (**Required Knowledge**) is a list of recipeIds the reader must ALL already have learned; it folds a legacy single `caps.learn.prerequisite` string on normalize (back-compat, no stored data to migrate) and the singular is no longer emitted.
-   `characterPrerequisiteIds` references into `CraftingSystem.characterPrerequisites[].id`: a per-book **character-prerequisite learning gate** where a reader must pass **ALL** referenced prerequisites (AND semantics) against the acting actor's roll data.
+   `characterPrerequisiteIds` references into the world `characterLibraries.characterPrerequisites[].id` (issue 1308): a per-book **character-prerequisite learning gate** where a reader must pass **ALL** referenced prerequisites (AND semantics) against the acting actor's roll data.
    The two gates are distinct — `prerequisiteIds` gates on prior recipe knowledge, `characterPrerequisiteIds` gates on actor stats/flags — but both are only enforced when `caps.learn.limitLearning` is `true` (Limited learning off ⇒ learn freely, neither gate applies).
    An id that no longer resolves is skipped at runtime (fail-open for character prerequisites), so deleting a prerequisite removes its gate rather than bricking the book.
 7. The `1.11.0` migration seeds `caps` on every existing recipe item from the system's former `recipeVisibility.knowledge.item` / `.learn` values, then strips those fields from the system config.
@@ -1006,8 +1218,10 @@ RecipeItemDefinition = {
 
 ### Purpose
 
-Define one system-owned, reusable pass/fail condition (issue 544) evaluated against the acting actor's prepared roll data.
-The GM authors a library of them on the System Settings page; a book/scroll references a subset by id from `RecipeItemDefinition.caps.learn.characterPrerequisiteIds` to gate who may learn its recipes (behaviour in `recipe-visibility`).
+Define one WORLD-scoped, reusable pass/fail condition (issue 544, moved to world scope by issue 1308) evaluated against the acting actor's prepared roll data.
+The library lives in the `characterLibraries` world setting as `characterPrerequisites[]` (see ## CharacterLibraries); a crafting system carries no copy of it and no participation flag over it.
+The GM authors it on the System Settings page THIS change, which is the one surface in the Manager where a world record is edited on a page framed as settings for the selected crafting system; the interim honesty package (a scope chip on the card header, hints reading "shared by every crafting system", and a delete confirmation naming the cross-system reach) is what makes that state honest, and the follow-up change relocates the editor to its own World route.
+A book/scroll references a subset by id from `RecipeItemDefinition.caps.learn.characterPrerequisiteIds` to gate who may learn its recipes (behaviour in `recipe-visibility`); a Tool references a subset from `Tool.prerequisites.ids` to gate who may wield it (behaviour under ## Tool).
 
 ### Properties
 
@@ -1016,7 +1230,8 @@ CharacterPrerequisite = {
   id: string,     // stable reference stored by caps.learn.characterPrerequisiteIds
   name: string,   // GM label; defaults to "Prerequisite"
   icon: string,   // Font Awesome glyph; defaults to "fa-solid fa-user-shield"
-  path: string,   // dotted key into actor.getRollData(), stored WITHOUT a leading @ (e.g. "skills.cra.rank")
+  path: string,   // dotted key into actor.getRollData(), stored WITHOUT a leading @
+                  // (dnd5e: "skills.arc.value"; pf2e: "actor.skills.crafting.rank")
   op: "eq" | "neq" | "gt" | "gte" | "lt" | "lte" | "isTrue" | "isFalse" | "exists", // default "gte"
   value: * | null, // comparand; forced to null for the valueless operators (isTrue/isFalse/exists)
 }
@@ -1026,21 +1241,46 @@ CharacterPrerequisite = {
 
 1. `characterPrerequisites` normalizes wholesale from the incoming array (`normalizeCharacterPrerequisiteList`); settings replace rather than deep-merge, so a removed entry does not resurrect.
    An entry with no assignable `id` is dropped.
+   Since issue 1308 the ONE array being normalized is the world library's, and the same normalizer is shared by the world store, the `1.28.0` migration and the export-payload upcast so the three cannot drift.
 2. `op` is one of the nine word tokens above; an unknown or missing token normalizes to `"gte"`.
    The three **valueless** operators — `isTrue`, `isFalse`, `exists` — force `value` to `null` and hide the editor's value field; the six numeric operators keep a comparand (an empty-string value normalizes to `null`).
 3. `path` is stored WITHOUT a leading `@` (the `@` is a display/authoring affordance only); a leading `@` on input is stripped on normalization.
-   It is resolved at runtime as a dotted traversal of `actor.getRollData()`, which Foundry has already flattened (`skills.cra.rank` in pf2e, `skills.arc.value` in dnd5e).
+   It is resolved at runtime as a dotted traversal of `actor.getRollData()`.
+   WHAT THAT OBJECT CARRIES IS THE GAME SYSTEM'S CHOICE, and the two systems Fabricate ships presets for do not agree: `dnd5e` spreads `system` onto its roll data, so a bare `skills.arc.value` resolves, while `pf2e` returns `{ actor }` alone, so every `pf2e` path MUST be rooted at `actor.`.
+   Foundry itself flattens nothing; an earlier revision of this requirement said it did, and three shipped `pf2e` presets written against that claim could never be satisfied.
+   A path that names PREPARED state rather than stored data (`actor.skills.<slug>.rank`) resolves only against a live document, so callers MUST pass `actor.getRollData()` and MUST NOT pass a cloned or serialized projection.
 4. Evaluation is pure and Foundry-free (`evaluatePrerequisite` / `evaluatePrerequisites`).
    An unknown or missing `path` degrades to `0` (numeric operators) or `false` (boolean/existence operators) and logs a single `console.warn`; it never throws.
    `evaluatePrerequisites` applies **AND** semantics and returns `{ passed, failures }`, where each failure carries a `prerequisitePreview` string (`@path op value`, or `@path op` for valueless) for player messaging.
-5. `op` is a deliberate **word-token** vocabulary that parallels the symbolic `CheckBreakageCondition` operators (`==` / `<=` / `>=` / `<` / `>`, defined under **CraftingSystem**).
+5. **AN UNRESOLVABLE ID HAS TWO OPPOSITE POLARITIES, one per gate, and neither is a bug.**
+   The LEARNING gate fails OPEN: a `caps.learn.characterPrerequisiteIds` entry that resolves to no definition is SKIPPED, so a book with one broken reference still gates on the rest and stays learnable.
+   The TOOL gate fails CLOSED: `toolCheckBonus` passes only when `resolved.length > 0 && unresolvedIds.length === 0`, so a single unresolvable id makes the tool fail its gate — and under `gateMode: "usability"` that makes the tool unusable, which blocks every craft, salvage and gathering attempt that requires it.
+   The asymmetry is deliberate in each direction — knowledge that cannot be checked is granted, a tool whose gate cannot be checked is withheld — but it is what makes an id-losing prune far more destructive on the tool side than on the learning side, and it is the reason ## Tool requirement 6's prune is now conditional on a known-complete Valid Id Basis.
+6. `op` is a deliberate **word-token** vocabulary that parallels the symbolic `CheckBreakageCondition` operators (`==` / `<=` / `>=` / `<` / `>`, defined under **CraftingSystem**).
    The two are the same comparison intent on different surfaces (a stat gate versus a dice-matching trigger) and are intentionally not unified.
+   The word-token table has a THIRD consumer since issue 1286: a component complication's `rollCondition` gate.
+   All three read ONE table through the exported `compareNumbersByOperatorId(actual, op, expected)`, so a retuned operator cannot mean two things on two surfaces.
+   A complication's gate offers the **six numeric operators only** (`eq`, `neq`, `gt`, `gte`, `lt`, `lte` — the entries whose `valueless` is `false`), filtered by the shared valueless predicate rather than hand-listed: a dice total is always a number with no boolean or existence reading, and an `exists` offered against a roll total would be a complication that always fires.
+   `compareNumbersByOperatorId` returns `false` for the three valueless ids and for any unknown id, so the gate fails closed on a comparator it does not know.
+   The symbolic `CheckBreakageCondition` set stays separate for the reason above and for one more: `evaluateCheckBreakageCondition` is a pure synchronous predicate the authoring-side odds preview consumes, and a complication's condition rolls a live formula, so admitting one as a condition type would make an odds histogram roll dice while charting it.
+   The symbolic set also has no not-equals, so `neq` would have no spelling there.
 
 ## Component
 
 ### Purpose
 
 Represent one curated item entry available to recipes and salvage operations.
+
+**What this record still OWNS after `1.30.0`, and what a World Identity Snapshot is.**
+The `1.30.0` world-scope migration (epic 1357, PR 3) lifted this record's IDENTITY — `name`, `img`, `description` and the source link — to a WORLD COMPONENT, and its `category` and `tags` onto a per-system membership record.
+Those fields nevertheless **REMAIN THE SOURCE OF TRUTH** here.
+The readers now enter through the read union, which answers from this record for every field it carries EXCEPT a section this system INHERITS; this record REMAINS the source of truth for the rest while `## CraftingSystem` requirement 36 holds.
+This record PERMANENTLY retains `id`, `difficulty`, `complications` and the whole `salvage` block: they have no destination in the scope model at all, and moving them would need an explicit amendment to `## Scoped Entity Definitions` `### Component scope` requirement 1.
+`essences` is the one field that gained a destination WITHOUT leaving: since `1.32.0` (issue 1371 r18-store, maintainer ruling M31) the WORLD default carries an `essences` section a system inherits unless it overrides, and this record's own map REMAINS the value an overriding system resolves — the read union answers an INHERITING system the world map and an OVERRIDING one this record, exactly as it does `category` (`### Component scope` requirement 2a).
+
+**"World Identity Snapshot" is NOT the `snapshot` this section already uses, and the two are easy to conflate over the very same three fields.**
+Requirement 9c below calls `name` and `img` "the one-hop snapshots", and requirement 9b REFRESHES the description copy from the linked source Item on two triggers — the exact opposite of "written by nothing", so a reader conflating them would conclude the world copy self-heals, which is the belief this clause exists to prevent.
+SCOPE and SUBJECT-COPIED-FROM separate them: requirement 9's snapshot is PER-SYSTEM and is copied FROM THE LINKED SOURCE ITEM; the World Identity Snapshot is WORLD-SCOPE, is copied FROM THIS IN-SYSTEM RECORD by the `1.30.0` migration, feeds no display precedence, and is written by nothing thereafter.
 
 ### Properties
 
@@ -1053,8 +1293,31 @@ Represent one curated item entry available to recipes and salvage operations.
     originItemUuid: string | null,
     category: string, // default "general"; single-valued grouping axis drawn from CraftingSystem.componentCategories
     tags: string[],
-  essences: { [essenceId: string]: number },
+  essences: { [essenceId: string]: number }, // this system's OWN map; a system whose membership record inherits the
+                                            // `essences` section resolves the WORLD default's map instead (### Component scope 2a)
   difficulty?: number, // only used in progressive mode
+
+  // GM-authored progressive complications (issue 1286). TOP-LEVEL, beside `difficulty`,
+  // because the concern spans all three activities; see requirement 19. The key is ABSENT
+  // on a component that authored none, and an authored empty list normalizes to absent.
+  complications?: Array<{
+    id: string,
+    name: string,
+    description: string,
+    severity: "minor" | "major" | "severe",   // default "minor"; narrative gravity
+    visibility: "gmOnly" | "visible",         // DEFAULT "gmOnly"
+    activities: { crafting: boolean, salvage: boolean, gathering: boolean },
+    match: "any" | "all",                     // default "any"
+    when: {
+      stageAwarded: boolean,
+      stagePartial: boolean,
+      stageMissed: boolean,
+      checkTrigger: string | null,            // a CheckBreakageTrigger id, never a boolean
+    },
+    rollCondition: { enabled: boolean, expr: string, cmp: string, value: string },
+    effectRoll: { enabled: boolean, expr: string, label: string },
+    macroUuid?: string,                       // absent when unauthored
+  }>,
 
   salvage?: {
     enabled: boolean,              // default false
@@ -1090,6 +1353,9 @@ Represent one curated item entry available to recipes and salvage operations.
    The `enabled` clamp — a Simple config with no success group cannot be enabled — is unchanged.
 6. Runtime essence matching, craftability checks, discovered-recipe craftability, crafting-check contexts, and effect-transfer contexts must count `Component.essences` for actor items that match the component by source reference or name.
    Explicit `fabricate.essences` item flags remain a compatibility override for that item.
+   `fabricate.essences` there is the `getFlag` KEY; the STORED path is the doubly-nested `flags.fabricate.fabricate.essences`.
+   The `1.34.0` essence merge REMAPS THAT MAP'S KEYS on OWNED ACTOR ITEMS under a whole-corpus unambiguity tie-break, leaves an AMBIGUOUS key alone, and never reaches a world Item or a compendium Item at all (`destructive-changes-and-migrations/spec.md` § Equivalent World Essence Merge requirement 9).
+   Leaving a key alone is safe only because of that section's requirement 17 TOMBSTONE, which never reissues a retired id — so a left-alone key can only ever contribute NOTHING, never the WRONG essence.
    The source-reference half of that match is governed by the shared **Component Item Matching** resolver defined below (its identity tier, then the raw-reference fall-through).
    The separate name fallback some callers apply after the resolver returns null is not part of this matcher and is unchanged here.
    That fallback is case-insensitive in `RecipeManager.ingredientMatchesItem`, `RecipeManager.toolMatchesItem`, and `essenceResolver.findMatchingComponent`, and case-sensitive in `CraftingEngine.findComponentItems` (the private `_findComponentItems` spelling survives only as a thin delegate for existing callers).
@@ -1156,6 +1422,46 @@ Represent one curated item entry available to recipes and salvage operations.
     Stack quantities are read through the configured stack-quantity accessor and captured **before** deleting, since a deleted document's name, image and stack size are unreadable afterwards.
 18. **Bulk salvage** consumes `salvage.ingredientQuantity` per selected row exactly as a single salvage does.
     There is no per-row quantity in the bulk gesture: each queued row is one `salvage()` call at the component's authored `ingredientQuantity`.
+19. **`complications` is TOP-LEVEL on the component and is not part of `salvage`.**
+    Two independent reasons hold it there, and the first is the deciding one.
+    A complication is scoped to a component's participation in ANY progressive activity — as a recipe result, as a salvage yield, or as a gathering drop — so a cross-activity concern parked inside `salvage`, the salvage-ACTIVITY sub-record, is an aggregate-boundary violation; the sibling that already spans all three activities is `difficulty`, the progressive DC a complication keys on, and it is correctly top-level.
+    The second reason is SPEC VALIDITY rather than data loss: requirement 4 makes `salvage` valid only when `CraftingSystem.features.salvage` is true, and a complication authored on a crafting OUTPUT component has to fire on a system with salvage switched off — precisely where a `salvage`-nested record would be spec-invalid.
+    A complication fires when the component is PRODUCED as a progressive stage, and never when the component is itself salvaged or spent; complications on the salvaged or crafted SOURCE component are a separate concern tracked as issue 1287.
+20. `complications` normalizes at the single component chokepoint and is **absence-preserving**.
+    The attach emits the key ONLY for a non-empty normalized list, so a component that authored none carries no key at all and its persisted bytes are unchanged.
+    There is **no authored-empty state**: unlike `salvage.checkModifierIds`, an empty complication list carries no meaning distinct from absence, so an authored `[]` normalizes to ABSENT.
+    No reader may distinguish an absent `complications` from an empty one, and that obligation is audited per reader rather than assumed (the omitted-when-default rule in § Canonical-Write and Legacy-Read Compatibility Policy: legitimate only where NO reader distinguishes the two, which is a property of the readers and is audited per field).
+    A member that is not a plain object is dropped; an entry with no authored `id` is minted one rather than discarded.
+21. Normalization CLAMPS the three closed vocabularies and PRESERVES every operand.
+    `severity`, `visibility` and `match` clamp to their declared token sets, because each drives a rendering treatment rather than a validated operand and no complication validator exists to report an unknown token, so an unclamped value would render as garbage indefinitely.
+    The operands — both dice expressions, the comparand, the effect label, the macro uuid and the trigger id — are preserved verbatim, never repaired and never dropped, on the same reasoning the gathering failure-outcome normalizer records: silently deleting a malformed operand makes the validator unreachable and turns an authoring mistake into silent data loss.
+    `rollCondition.value` stays a STRING because it may itself carry roll data.
+    The single alias is the comparator `ne`, which normalizes to the operator table's `neq`; that is an alias rather than a repair, and every other comparator survives verbatim for the gate to reject.
+22. `visibility` defaults to `gmOnly`.
+    Every other default on this record preserves pre-existing behaviour; there is no pre-existing behaviour here, so the default is the SAFE one, and an audience Fabricate cannot read must never resolve to "show the player".
+23. **`visibility: 'gmOnly'` is a DISCLOSURE guarantee across every Fabricate surface, and is NOT a confidentiality guarantee.**
+    A `gmOnly` complication must appear in no chat message, no view-model, no engine return read by a player and no actor-flag run record — including when a GM is the acting user.
+    It is nevertheless readable by a determined player, because `craftingSystems` is a world setting and world settings replicate UNFILTERED to every joining client.
+    This is the first Fabricate field whose VALUE is intended to be secret, and the limit is stated here and in the field documentation rather than in editor chrome; a GM authoring one must understand that the guarantee is about what Fabricate shows, not about what the client holds.
+    **The GM-only chat card does not narrow that limit, and must not be described as though it did.**
+    Foundry does not scope whispers server-side: a whispered `ChatMessage` is broadcast in full to every connected client, and `visible` / `isContentVisible` are purely presentational, so a player can read a GM whisper's `content` out of `game.messages` in the console.
+    That is core behaviour, identical for core's own Private GM Roll, and it is not a Fabricate defect — but it means the GM card is the same class of home for authored `description` and `severity` that the world setting already is, and neither surface may be offered as confidentiality.
+    Relatedly, a whispered message carrying `rolls` is visible to EVERY client, because `visible` short-circuits on `isRoll` before it tests the whisper list; a `gmOnly` complication's card therefore carries no roll, and a `gmOnly` complication's effect ROLL discloses its own existence by design (`AGENTS.md` § FoundryVTT Notes).
+24. **`when.checkTrigger` is a trigger id, never a boolean, and a trigger id is owned by exactly ONE activity's progressive check block.**
+    `craftingCheck.progressive`, `salvageCraftingCheck.progressive` and `gatheringCraftingCheck.progressive` each own their own `checkBreakage.triggers` id space.
+    A complication enabled for several activities therefore matches its trigger clause only in the activity that owns the named trigger, and the clause is INERT in the others.
+    An id that resolves to no trigger is likewise inert — fail-open, contributing nothing to `match` — and never a validation error.
+    The clause is an id rather than a flag because a `CheckBreakageTrigger` declares each of its three existing effects explicitly and defaulted-off: an "any trigger fires any complication" boolean would hand every already-authored trigger a fourth effect with no GM action at all.
+    A complication naming a trigger fires when that trigger's CONDITION matches the roll, regardless of that trigger's own `breakTools`, `outcome` or `tierStep` values, because a trigger's match is a fact about the roll and its three effects are independent of it.
+25. **`complications` requires no migration and is not `downgradeLosesData`.**
+    Component normalization is an allowlist rebuild, so a component's persisted shape after a save is exactly what that rebuild emits and the key is absent for a component that authored none.
+    This is the **omitted-when-default** doctrine of § Canonical-Write and Legacy-Read Compatibility Policy, whose in-file precedent is `salvage.checkModifierIds` and NOT `salvage.allowPlayerResultReorder` — the latter is stamped on both normalizer return paths and is therefore absent-reads-as-default but not byte-preserving.
+    No earlier build ever wrote this key, so the write-side alias-retirement rule does not apply; what carries over is the AUDIT obligation at requirement 20.
+26. This section describes the LIVE per-system shape and remains authoritative, for every key it still decides, while `## CraftingSystem` requirement 36 holds.
+    The readers now enter through the read union, which answers from this record for every field it carries EXCEPT a section this system INHERITS; this record REMAINS the source of truth for the rest while `## CraftingSystem` requirement 36 holds.
+    A reader's row is that shape PLUS the resolver's `member` and `inherited` keys, which no stored record carries.
+    `## Scoped Entity Definitions` is PARTLY LIVE per requirement — see its banner — and this section's own shape is SHADOWED by a world scope setting the `1.30.0` migration WRITES (identity, one fully-overriding membership record per system, and a world default per section elected from the oldest contributing system) (`## CraftingSystem` requirement 36).
+    Where the two disagree, this section is what the code does.
 
 ## Recipe
 
@@ -1321,7 +1627,7 @@ Recipe = {
     See resolution-modes/spec.md §Check Source.
     An unrecognized `defaultModifierPolicy` falls back to `addAll` at the activity-check level (`CraftingSystemManager._normalizeCheckModifierSelection`), which is the only level a rule exists at.
     Neither selecting rule needs new per-recipe fields: `playerPicks` changes only when the eligible set is chosen, and `bySubject` reuses this same `modifierIds` list.
-    Library membership of the ids is NOT enforced here — the resolver drops unknown ids against the live system-level `CraftingSystem.modifiers`.
+    Library membership of the ids is NOT enforced here — the resolver drops unknown ids against the live WORLD modifier library.
 14. `importSource` is durable settings-payload provenance stamped by the compendium importer (NOT a Foundry flag): `{ systemId, importedAt } | null`, identifying the source pack.
     The `Recipe` constructor normalizes it to object-or-`null` — a non-object, or an object missing a non-empty string `systemId`, normalizes to `null` — and `toJSON()` emits it.
     A recipe created through the GM authoring path is never stamped, so it round-trips as `null`; this structural absence is the never-prune guard (import never auto-removes an unprovenanced recipe).
@@ -1644,8 +1950,11 @@ When the crafting system has `requirements.currency.enabled === true`, a currenc
    With no crafting actor the currency option is treated as unaffordable (shown missing); it never throws.
 3. The engine computes the chosen item plan and currency spends **once** for a craft, then runs an all-affordable gate over the chosen spends — aggregated per terminal base unit — **before** any item or currency mutation.
    On a shortfall the craft aborts with an `Insufficient currency` message and zero mutation, and never falls back to an unselected item plan.
-4. Currency is deducted after item consumption on success (and on a failure path only when the failure policy consumes ingredients).
+4. On the CRAFT path, currency is deducted after item consumption on success (and on a failure path only when the failure policy consumes ingredients).
+   The scope matters because the companion contract's pooled holdings consume settles in the same order for a different reason, and the two agree rather than merely coinciding: an earlier draft of that member had them opposed.
+   Here the order follows from the craft's own sequencing; there it follows from which leg has a reliable inverse — a deleted component is restorable exactly, while a currency give-back may be absent or lossy — so the recoverable leg is taken first in both.
    Deduction makes change across the configured denomination ladder; a deduction failure is logged, not refunded — the settled deductions are NOT rolled back, and the craft still proceeds.
+   That last clause is the craft path's alone: the pooled consume gives back everything it took in the same call, which is the difference between a craft that has already produced its result and a companion request that has produced nothing yet.
    Deduction is aggregated per terminal base unit and stops at the first group that fails, so no further currency is taken for a craft already in an anomalous state; the deduction reports which groups settled.
    A time-gated step that consumes at START records on its run ONLY the spends that actually settled, never the intended plan.
    A group that did not settle is not recorded, so no later reversal can return currency the actor never paid.
@@ -1725,6 +2034,707 @@ Define the save/import invariant that guarantees deterministic ingredient-signat
     - one aggregated conflict report is returned at completion.
     A recipe rejected SOLELY for a signature collision is reported under its own reason, distinct from the malformed-recipe reason, because it is authored correctly and is refused only for the company it keeps; a recipe that is both malformed and colliding is reported as malformed, the fault to fix first.
 
+## Scoped Entity Definitions
+
+> **PARTLY LIVE — PER REQUIREMENT, not per section.**
+> A section-level "partly live" marker tells a reader nothing they can act on, so the split is stated exactly.
+>
+> **LIVE** as of issue 1359: the three persisted shapes and their settings keys (requirement 13), the store contract (requirement 14) and the Valid Id Basis requirement (requirement 16).
+> The requirement 1-12 NORMALIZERS are live with them, because every `load()` runs the world-defaults and membership normalizers over the raw payload.
+> The BASIS union of requirement 15 is live in the strongest sense — six passes derive it: the crafting-system normalizer, and five mutation-time paths that BYPASS that normalizer and would otherwise rebuild a basis of their own.
+>
+> **LIVE, AND NOW WITH PRODUCTION CONSUMERS** (epic 1357, PR 8a): the READ union of requirement 15, and with it the requirement 1-12 RESOLUTION contract — section inheritance, the per-entity resolvers and the world/system precedence rules — which nothing but that union reaches.
+> Every non-UI reader of a system's `components` / `essenceDefinitions` / `tools` enters through it, by way of one shared read seam and the crafting-system manager's read accessors.
+> **THREE CLOCKS RUN SEPARATELY HERE, and conflating any two turns a reader repoint into a migration.**
+> READ ENTRY has run.
+> AUTHORITY has moved ONE STEP and no further (issue 1372): requirement 15's clause 1a makes the union answer an INHERITED SECTION from the world default, while `## CraftingSystem` requirement 36 keeps the in-system arrays the source of truth for every other key, every ROW and the row ORDER, re-derived at read time, with the world layer supplying only the keys they do not carry.
+> The SHED has NOT: nothing is removed from any of the eight shadowed keys, and `destructive-changes-and-migrations` still measures zero references disappearing.
+> `src/ui/**` was deliberately outside the repoint, on the precedent this banner sets for the effective tool-breakage authority: with the ORDER and ROW SET rules adopted, an unwritten world corpus reads exactly as the previous release did.
+> TWO UI READERS HAVE SINCE JOINED IT (issue 1373), and both are the Tool Rules surface: the manager's selected-system `tools` projection, which the rules LIST reads, and the rules EDITOR's own draft seed.
+> The list joined because it is the surface a GM administers Tools from and reading the raw array there gave that one screen a SECOND answer to a question the read union already answers — one that could not see the world master switch of `### Tool scope` requirement 3a at all.
+> The editor joined for the same reason one route deeper: it stated the in-system value for a section the list beside it labelled `Inherits world defaults`, and `prerequisites` and `bonus` — which no adoption seed ever copied — disagreed with the world outright.
+> Each is threaded the corpus EXPLICITLY rather than probing a global, and `null` — no world half — makes the seam hand back the in-system array itself, so an unmigrated world still reads exactly as the previous release did.
+> **THE EDITOR'S READ CARRIES A WRITE OBLIGATION AND THE LIST'S DOES NOT**, because the editor is the only one of the two that saves: its save is section-aware, so a value it displays because the section INHERITS is never persisted back onto the in-system record (`ui-integration/spec.md` -> Tools Tab).
+> Without that, a display repoint would convert every inheriting section into an override on the next save — an AUTHORITY move made by accident, which is exactly the conflation of clocks this banner warns about.
+> The rest of `src/ui/**` is unchanged and stays outside.
+>
+> **DELIVERED AT `1.30.0`** (epic 1357, PR 3): the migration itself, the world entity corpus, the membership model, and the WORLD tool-breakage authority (`### Tool scope` requirement 5), which the crafting-system normalizer's absence-preserving flip makes reachable.
+> The migration ELECTS each world default from the OLDEST contributing system, the same donor that wins identity, across six sections at `1.30.0` and a seventh — the component `essences` map — since `1.32.0`; component `tags` and the world tool-breakage authority are excluded for two different reasons, and FIVE constraints can decline an individual section.
+> The first of the five is the every-live-member precondition on `category`, `breakage` and `onBreak` — the three sections a membership record cannot express an empty override for — and `### Component scope` and `### Tool scope` each state it for their own.
+> Every membership record is nevertheless created fully OVERRIDING — except the `essences` switch, which is decided by EQUALITY with the elected map and so changes nothing either — so NO section resolves to a value the system did not already have at migration time and resolved behaviour is unchanged; a world default matters only for a system added later, or an override a GM clears later.
+>
+> **ALSO DELIVERED AT `1.30.0`** (epic 1357, PR 4): IMPORT/EXPORT of all three scopes, as three envelope slices at schema `6`, membership-filtered to the exported system.
+> The in-system arrays remain what an import BUILDS A SYSTEM FROM, for every field — the three slices populate the destination's world corpus and no import path reads them to build the system — and an import NEVER SEEDS a scope the destination has not already seeded, so an unmigrated destination behaves exactly as the previous schema does.
+>
+> **STILL NOT LIVE**: the normalizer does NOT shed `components` / `essenceDefinitions` / `tools`, and it does not touch the five vocabulary keys at all.
+> **What `## CraftingSystem` REQUIREMENT 36's OWN RETIREMENT retires is the lifted identity FIELDS, plus the whole of `essenceDefinitions`; `components` and `tools` are NEVER shed** — they permanently retain fields the scope model has no destination for, and that requirement states which and why.
+> The shed is bound to that requirement rather than to the read repointing, which has already happened and removed nothing.
+> The three vocabulary LISTS have a destination since issue 1392 — `fabricate.worldVocabulary`, modelled by `## World Vocabulary` — and nothing reads it until the consumer sweep; the two vocabulary ICON MAPS still have no destination at all.
+> `## Component`, `## EssenceDefinition` and `## Tool` therefore still describe the LIVE per-system shape and, where those sections and this one disagree, they are what the code does — with the single addition that a reader's row also carries the resolver's `member` and `inherited` keys.
+>
+> **REACHABILITY, DERIVED RATHER THAN ASSERTED.** As of issue 1371 the set of scoped-entity types with no reachable world-scope screen is EMPTY: components, essences and tools each render a real world catalogue and a real world entry. `world-vocabulary` is accounted for separately rather than counted in that set, because it is not a scoped-entity corpus at all (see `### GM World Vocabulary Route`); it delegated to `ScopedPlaceholderPage` until issue 1392 gave it a real body, so no world route delegates now.
+> `src/ui/svelte/stores/worldScopeActions.js` implements the whole per-entity-type action family — create, update and delete a world entity, write a world-default section, add to and remove from a system, flip a section's inherit switch, write a membership override, copy a membership, and (component only) the additive tag and per-tag mute writes — and `adminStore` exposes it as `store.worldScope`.
+> **NOT EVERY LEG HAS A CALLER, and the two that do not are named rather than left to be re-derived.** `updateMembershipSection` has none — a system's own section values are written on its in-system record through the rules editor's draft, and the membership record carries the inherit SWITCH alone.
+> `setMutedTags` has none either: the prototype-parity rebuild removed every muting control, so the leg is published, tested and unauthored (`ui-integration/spec.md` `### GM World Component Screens` requirement 5).
+> A published leg with no caller is a REACHABLE WRITE PATH with no writer, which is a different state from an unreachable corpus and must not be counted as one.
+>
+> **THE PUBLISH READS THE WHOLE RECIPE LIBRARY EXACTLY ONCE, AND THAT IS A PINNED BUDGET RATHER THAN AN OBSERVATION** (issue 1371).
+> One world-scope snapshot answers a recipe question for three entity types, and each consumer that reaches for the library itself takes a WHOLE-LIBRARY COPY: two consumers were doing so for one publish — the snapshot's own `recipes` key and the essence usage leg — so the library was copied twice per republish and every world-scope write republishes.
+> The read is therefore taken once, bound to a name, and PASSED to the legs that need it, and a `node --test` budget counts both the copy and the per-system cohort reads.
+> The two quantities are counted SEPARATELY because they are not the same cost: a per-system cohort read is answered from the recipe manager's own index, while the unfiltered read is not, so a pin that counted only cohorts left the more expensive quantity unguarded — which is how the second copy arrived with no test moving.
+> The pin is a LITERAL over the three legs and their three arguments, because an argument silently dropped from any of them restores exactly that cost with no rendered symptom at all.
+>
+> **THE STALENESS OF THIS PARAGRAPH IS MECHANICAL RATHER THAN A MERGE CONVENTION.**
+> A `node --test` assertion DERIVES the unreachable set from which world scoped-entity pages under `scoped/` still import the shared placeholder body, and asserts this paragraph names exactly those types.
+> It reds in a lane that replaces a body without amending this text, and it reds the other way in a lane that amends this text while still delegating.
+> The paragraph was stale for TOOLS for a whole release before that assertion existed, because prose is not a gate.
+>
+> **A REACHABLE WRITER DOES NOT MAKE THE CORPUS CONSUMED, AND THE TWO MUST NOT BE READ AS ONE FACT.**
+> A component's world `category` IS consumed: requirement 15 clause 1a makes the read union answer an inheriting section from the world default, so every system whose switch is on resolves from the value the world catalogue authors.
+> A component's world IDENTITY and its world `tags` are NOT: the union re-derives identity from the in-system record unconditionally, and `tags` is not a section, carries no inherited-section writer, and is emitted by the in-system normalizer unconditionally — so the resolver's additive merge is discarded by the union's trailing in-system re-spread.
+> Both are authored, read back by their own screens, and consumed by nothing until the merge is routed through the union.
+> The screens that author them say so, and the disclosure names per-system tag MUTING explicitly, because a mute is a membership write the identity-and-tags sentence does not cover.
+
+### Purpose
+
+Components, essences and tools are world scope in their **identity** and per-system in their **behaviour**, and that split is why this section's shape differs from the three world-scope lifts above it.
+`## CurrencyConfig`, `## TravelConfig` and `## CharacterLibraries` each moved their SUBSTANCE wholly, because two crafting systems cannot meaningfully disagree about a coin ladder, a valley or a character stat, so at most a participation boolean stayed behind.
+Here the opposite is true: Ash Salt is one item in the world, but what it is worth in essences, what it salvages into and how hard it is to work are things a blacksmithing system and an alchemy system SHOULD disagree about.
+
+The per-`(entity, system)` membership record carries that disagreement, and it is a **generalization** of the participation flag rather than a fourth pattern: `requirements.currency.enabled` and `gatheringRealmSettings.enabled` are the degenerate case — one record per system instead of one per `(entity, system)`, with no overridable section.
+The prohibition those sections state still binds: no field is authored at BOTH scopes with independent values, which is what the inherit map exists to prevent.
+
+This is ONE cross-cutting section rather than three near-identical ones, on the `## Recipe Item Identity` precedent: the identity-and-resolution contract is stated once, and the three thin subsections below carry only what differs per entity.
+
+### Properties
+
+```js
+// Layer 1 - identity. One per entity, world scoped, never editable from a crafting system.
+// THE THREE RECORDS DIFFER IN THREE WAYS, and a screen that assumed one shape for all three
+// would draw the wrong thumbnail and the wrong badge on two of them.
+WorldComponent | WorldTool = {
+  id: string,
+  // name, description, `img`, and the three source item link fields
+  // (`originItemUuid`, `registeredItemUuid`, `aliasItemUuids`). NO colour.
+}
+WorldEssence = {
+  id: string,
+  // name, description, `icon` and `colorToken`. NO source item link at all.
+}
+
+// Layer 2 - the world defaults. The behaviour every system inherits until it overrides a section.
+WorldDefaults = {
+  id: string,                      // the world entity id
+  [section]: unknown,              // per entity; ABSENCE-PRESERVING, never a minted default.
+                                   // A component's are `category` and `essences` (a map essenceId -> quantity;
+                                   // `{}` is an authored "none", a non-object is absence).
+  enabled?: boolean,               // TOOLS ONLY - the world MASTER SWITCH; absent means enabled
+  // Per entity, BESIDE the sections and carrying no inherit switch: `tags` on a component,
+  // `repairRequirements` on a tool. Both are ABSENT when unauthored.
+}
+
+// Layer 3 - the system membership record. Its ABSENCE means the entity does not exist there.
+SystemMembershipRecord = {
+  entityId: string,
+  systemId: string,
+  inherit: { [section: string]: boolean },  // an omitted section reads as INHERITED
+  [section]: unknown,                       // the local override, RETAINED while dormant
+  enabled?: boolean,                        // essences and tools ONLY; default true. This is the
+                                            // SYSTEM half of a tool's resolved enablement; see
+                                            // requirement 7.
+  // Per entity, BESIDE the sections and carrying no inherit switch: `tags` and `mutedTags` on
+  // a component, `repairRequirements` on a tool. All are ABSENT when unauthored.
+}
+```
+
+### Requirements
+
+1. There are THREE layers, in strict precedence: the World Component / World Essence / World Tool (identity), the world defaults (inherited behaviour), and the system membership record (per-`(entity, system)` behaviour and the fact of membership).
+   A world entity is never editable from a crafting system, and a membership record never carries identity.
+2. **Resolution is per SECTION, never per FIELD.**
+   A section is the unit of the inherit decision AND the unit of the answer: an overriding section's stored value is the whole answer for that section, and no field inside it falls back to the world.
+   That is safe rather than lossy because turning a switch OFF SEEDS the local block from the current world value (requirement 5), so an override is complete the moment it exists.
+   An overriding switch over an ABSENT section is not an override and resolves to the world value, because absence is not a partial block and falling back to the whole world section is therefore still per-section: that record is reachable (`setSectionInheritance` produces it whenever the world default is itself unauthored, and normalization emits it for import, copy-mode and the `1.30.0` migration), and resolving it to nothing would stop a tool breaking or stop an essence's property macro running.
+   `inherited` still reports the switch AS AUTHORED in that state rather than repairing it to `true`, because a switch that is off while the world value shows is the seed state the editor renders.
+3. **An absent membership record means the entity does not exist in that system**: recipes there cannot reference it and players never see it.
+   **This is a REFUSAL, never a PRUNE.**
+   An unresolved reference is refused at use and left on disk; nothing derives a deletion from the absence of a membership record unless the membership corpus is a KNOWN-COMPLETE Valid Id Basis, which an unwritten or unreadable world setting is not.
+4. **Sections are populated even for a non-member**, falling to the world-defaults branch, and that is intentional rather than incidental: the world-scope preview resolves with no system at all and needs exactly those values.
+   `member` is therefore the gate a caller must check — a populated section says nothing about whether the entity exists in the system.
+5. **Re-inheriting RETAINS the dormant local override.**
+   Turning a section's inherit switch OFF seeds the override from the current world value so no field is blank on first override; turning it back ON flips the switch ONLY.
+   The local block stays on disk, dormant and ignored by resolution, and re-overriding RESTORES it rather than re-seeding from the world.
+   Nothing is lost, so no confirmation is required and the inherit row's copy stays "fall back".
+6. Resolution answers `inherited` PER SECTION: `true` when there is no membership record, and otherwise the record's switch for that section.
+   A record whose `inherit` map OMITS a section reads as inheriting it, because that is the state a record created by "add to system" is in.
+7. **A world-level `enabled` flag exists for a `worldEnableable` scope, and it is a MASTER SWITCH rather than a fourth layer.**
+   The TOOL is the only scope that declares one today; the component has no enabled flag at all and the essence's world defaults carry none.
+
+   **The resolved value is the AND of the two flags — `resolved = world.enabled && system.enabled` — and WORLD OFF WINS.**
+   A world-disabled tool is off in every crafting system that has it, whatever each system says.
+   The per-system flag keeps its own meaning exactly and simply cannot re-enable a world-disabled record, so re-enabling at world scope restores whatever each system had already chosen rather than turning anything on.
+
+   **The two scopes' `enabled` are DIFFERENT CONCEPTS and prose must not name them alike.**
+   A world record's flag is the WORLD MASTER SWITCH — whether the Tool exists as a usable thing in this world at all — and a rules record's flag is the SYSTEM ENABLEMENT — whether this crafting system currently uses the Tool it has adopted.
+   The resolution answers all three under three distinct names: `worldEnabled`, `systemEnabled` and the AND as `enabled`.
+   An authoring surface reads the layer it writes; a consumer reads `enabled`.
+   Nothing above the resolver re-derives the AND, because a screen that computed it locally is how one scope's answer and another's diverge.
+
+   **It is not a fourth layer, and this is the distinction.**
+   The switch carries no per-section inherit decision, is not seeded onto a membership record, and takes no override: it is one boolean at world scope that vetoes a boolean at system scope.
+   The three layers, their per-section resolution and requirement 2's per-SECTION unit are all unchanged.
+
+   **ABSENCE READS AS ENABLED, and that is a compatibility requirement rather than a convenience.**
+   The flag is ABSENCE-PRESERVING on disk — an unauthored or non-boolean value persists NO key rather than a minted `true` — so every world default written before the switch existed comes back without it, and only an explicit `false` disables.
+   A world SETTING preserves key absence (unlike `setFlag`, whose merge resurrects a removed key), so the absence survives the round trip rather than only the first read.
+   This is DELIBERATELY ASYMMETRIC with the membership record's `enabled`, which is minted `true` on every normalize: a membership record exists only because a GM added the entity to a system, so minting states a fact that write already established, whereas minting at world scope would rewrite every persisted world default in the corpus to say something nobody authored.
+
+   For an enableable entity, resolution still answers `enabled: false` for an absent membership record because it is NOT A MEMBER, never because it inherited an off.
+
+   7a.
+   **The READ UNION re-applies the world veto over its merged rows, and it is a VETO ONLY.**
+   Requirement 15's union re-spreads the in-system record last while `## CraftingSystem` requirement 36 holds, and a normalized in-system tool carries `enabled` unconditionally — so the resolver's AND is overwritten on every read-union row unless the veto is re-applied after the merge.
+   That precedence is correct for a value the system AUTHORED and wrong for a world-scope veto, because "world off wins" means the world's off cannot be outvoted by anything.
+   The re-application never turns a row ON, so a corpus with no world-disabled record answers the identical rows — and the identical ARRAY — that it answered before the switch existed.
+   7b.
+   **A world screen must state the membership count before a GM flips the switch off.**
+   A world-scope write persists on change and has no confirmation step, and switching a Tool off silently stops every recipe in every member system that requires it.
+   The count is the number of crafting systems holding a membership record for that entity, stated beside the control rather than after the write.
+8. **`enabled` is opt-in PER ENTITY and the opt-out is STRUCTURAL rather than conventional.**
+   The generic resolver does not compute the key for every entity and let one path override it: an entity that carries no enabled flag gets an answer on which `"enabled" in result` is FALSE — the key is ABSENT, not `false`.
+   A resolver that answered `false` would satisfy every statement about the record and still hand a screen the exact value it would read to draw a toggle the domain does not have.
+9. **Every world-defaults editor states the INHERIT COUNT before the change lands**, because editing one world value changes behaviour in every inheriting system at once.
+   The count is the number of membership records for that entity whose section is inherited; a system with NO membership record is not counted, because the entity does not exist there and the edit changes nothing for it.
+10. **Normalization is total, non-throwing and idempotent**, on the `normalizeModifierLibrary` contract (`## ModifierLibrary` requirement 2).
+    A non-array corpus answers an empty list; a non-object or id-less entry is DROPPED rather than repaired; ids are trimmed and de-duplicated first-wins, on the `(entityId, systemId)` PAIR for a membership record; an unknown section key is dropped; an unknown key or a non-boolean value in the `inherit` map is dropped; and every absence-preserving field is left ABSENT rather than becoming `null`.
+    Idempotence is required rather than incidental: the store, the migration and the export upcast each normalize possibly-already-normalized data.
+11. **A section VALUE is opaque to the shared primitive**, which never looks inside one, never walks one and never clones one.
+    That is what makes requirement 10 total on adversarial input: a self-referential section value cannot starve a normalizer that does not descend into it, and an unbounded synchronous walk would surface as a `# cancelled` test run rather than as a failure on the bad case.
+    It follows that **a normalized record ALIASES its input's section values** — normalization copies a section by reference, so a caller that keeps hold of what it handed in shares that object with the normalized corpus.
+    A store must therefore treat a corpus it normalizes as given away rather than as still its own to mutate; the only deep copy in this contract is the tool `repairRequirements` seed, which is a copy precisely because it is the one value that must NOT stay shared.
+    A per-entity module that needs a SHAPE rule over its own section (the component category's trim-or-absent rule, for instance) states it at the normalizer rather than in a resolver branch, so that the inheriting and overriding branches carry the same guarantee.
+    The scope descriptor's optional `coerceSection` hook is where that rule is declared; it runs on BOTH records, and answering `undefined` from it means the section is ABSENT rather than an override of nothing.
+12. **The World Vocabulary is a separate concern and is NOT a fourth layer.**
+    The component category fallback and the additive tag merge both resolve against a world list of component categories and component tags merged with each system's own `CraftingSystem.componentCategories` / `itemTags`; that vocabulary, its layering and its deletion semantics are modelled by `## World Vocabulary`.
+    ITS ICON MAPS ARE NOT PART OF IT: the World Vocabulary carries no icon map at all, so `componentCategoryIcons` and `categoryIcons` remain per-system with no world half, and where a world category's icon lives is the consumer sweep's decision (`## World Vocabulary` requirement 6).
+    The resolvers here take the world category and the world tag set as EXPLICIT ARGUMENTS and read no vocabulary from a store or a crafting system, which is what stops this contract quietly acquiring a fourth layer.
+    The reserved `general` component category is not part of that vocabulary and stays implicit.
+
+13. **The three layers are PERSISTED as three separate world settings** (issue 1359), each `scope: "world"`, `config: false`, `type: Object`, default `{}`:
+
+    | Setting key | Holds |
+    | --- | --- |
+    | `fabricate.componentScope` | `{ entities[], defaults{}, membership{} }` |
+    | `fabricate.essenceScope` | the same shape |
+    | `fabricate.toolScope` | the same shape, plus the WORLD tool-breakage authority alone |
+
+    `entities` is the world entity roster (layer 1), `defaults` a map of entity id to world defaults (layer 2), and `membership` a map of `"<entityId>|<systemId>"` to membership record (layer 3).
+
+    **THE PERSISTED SHAPE AND THE IN-MEMORY SHAPE DIFFER, AND BOTH ARE NORMATIVE.**
+    `defaults` and `membership` PERSIST AS MAPS, because that is how they are addressed, and NORMALIZE TO ARRAYS in the published corpus, because that is what every requirement 1-12 normalizer and resolver takes.
+    A consumer therefore reads `corpus.defaults` and `corpus.membership` as ARRAYS and MUST NOT key into them; the map is a storage projection alone.
+    A persisted map key is DISCARDED on read — normalization keeps the records and not the keys — and RE-DERIVED FROM ITS RECORD on write, never carried over, so a hand-edited or imported payload whose key and record disagree cannot survive a round trip in that state or produce a lookup that finds the wrong record.
+    Both sub-keys additionally accept an ARRAY on read, because an import or a hand edit may legitimately deliver either and the requirement 1-12 normalizers have always taken one.
+
+    **THERE IS A THIRD PROJECTION — THE EXPORT ONE — AND IT CARRIES THE ARRAY FORM** (issue 1364).
+    Each of the three settings additionally has an export projection, membership-filtered to one crafting system, which `import-export/spec.md` -> Export completeness owns.
+    It carries `defaults` and `membership` as ARRAYS, for three reasons: every other envelope slice is a list, every requirement 1-12 normalizer takes one, and the persisted map key EMBEDS THE SOURCE SYSTEM ID, which neither import mode's destination shares — so every carried key would be stale on arrival.
+    Dropping the key costs nothing on its own, precisely because it is re-derived from the record on write.
+
+    The reciprocal obligation binds the other direction and MUST be stated, because the failure is silent rather than loud: **a consumer that hands an envelope's `defaults` or `membership` to a transform expecting the PERSISTED shape MUST RE-KEY IT FIRST.**
+    The map form is what that shape means, and an array is NOT tolerated there — it is IGNORED, not rejected — so an unconverted array reaches such a transform as an absent layer.
+
+    **The `entities` roster enforces an IDENTITY FLOOR, and `1.30.0` states the SCHEMA the floor tolerates.**
+    The floor is unchanged and stays where it is: a non-object or id-less entry is DROPPED rather than repaired, ids are trimmed and de-duplicated first-wins, and EVERY OTHER AUTHORED FIELD IS PRESERVED VERBATIM — so a hand-edited or imported roster is still tolerated rather than rejected.
+    What the migration adds is the schema it WRITES, which a reader may now rely on for any entity the migration created:
+
+    - a WORLD COMPONENT and a WORLD TOOL carry `id`, `name`, `img`, `description` and the source link (`originItemUuid`, `registeredItemUuid`, `aliasItemUuids`);
+
+    **THE SOURCE LINK IS UNIONED ACROSS THE GROUP; the display fields are not.**
+    `name`, `img` and `description` are taken from the OLDEST contributing definition as a unit.
+    The three source-link fields are the exception: the donor's `originItemUuid` and `registeredItemUuid` are kept as the primaries and EVERY member's references are collected into `aliasItemUuids`.
+    Donor-wins is wrong for them because union-find guarantees only that a group is CONNECTED, not that every member shares a reference with the donor: in a chain A-B-C where C shares a uuid with B and nothing with A, taking A's links as a unit DELETES the uuids only C claimed, and an owned Item sourced from one of them stops resolving at the source-reference tier.
+    Unioning is safe in the direction the deletion is not — a source reference is a CLAIM, every member has already made its own, and the resolvers intersect reference SETS rather than compare them, so a longer list resolves strictly more.
+
+    **The migration WRITES THE UNION BACK onto every in-system record**, which is what keeps the two copies equal, and it has a consequence worth stating rather than discovering: after `1.30.0` a component or tool in a NON-DONOR system claims every other member system's source uuids, so `## Component`'s and `## Tool`'s own presence matching widens accordingly — AND SO DOES THE IMPORT-TIME WORLD-ENTITY MATCH, which binds an incoming entity to a destination one on an INTERSECTION of those unioned sets (`import-export/spec.md` -> Copy-mode identifier rebinding).
+    A widened destination entity can therefore be intersected by two incoming records that share NOTHING with each other, which is why that binding is required to be INJECTIVE and cannot be treated as a partition of the incoming records.
+    `## EssenceDefinition` is unaffected — a world essence carries no source link at all.
+    - a WORLD ESSENCE carries `id`, `name`, `icon`, `colorToken` and `description`, and no source link, because an essence has no source item.
+
+    ABSENCE IS PART OF THAT SCHEMA: a field the elected identity does not carry is not minted, and the migration DELETES it from the in-system record too, so the two copies agree on absence as well as on value.
+    NO BEHAVIOUR FIELD IS EVER ON AN ENTITY: behaviour lives on the membership record and, when a GM authors one, on the world defaults.
+
+    `fabricate.worldVocabulary` is not among the three keys, and since issue 1392 registered it that is a SETTLED BOUNDARY rather than a not-yet.
+    This table enumerates the three SCOPED-ENTITY layers and the World Vocabulary is not one of them (requirement 12, and `## World Vocabulary`); it is a fourth world setting of the same registration shape, modelled in its own section.
+14. **The three keys are SEPARATE ON PURPOSE, and the reason is seededness independence rather than write amplification.**
+    `isSeeded()` is the predicate that makes a destructive prune decidable (requirement 16), and on a SHARED key it cannot be honest per entity type: a store writes the whole object, so one entity type's first write persists the others as empty and converts an UNKNOWN basis into a real, empty, PRUNABLE one in a single keystroke.
+    `## CharacterLibraries` requirement 1 shares one key for two libraries only so that a fourth near-identical persistence shell is not written, and a parameterized store factory removes that reason; it survives that hazard only because its legacy in-system half still vouches for the ids, which three entity types whose references reach recipe ingredients, results, salvage, gathering drop rows, tool links and essence source components would not.
+
+    Three keys REDUCE but do not REMOVE the clobber window: separate keys are separate `Setting` documents and cannot lose each other's update, but the INTRA-key window is unchanged — a whole scope value is read-modify-written per edit, and Foundry offers no per-key merge and no compare-and-set — so it is mitigated only by publishing the cache BEFORE awaiting the write, within one client.
+    The accepted cost, as `## CharacterLibraries` requirement 3 states its own: three keys are three non-atomic writes, so a partially-migrated corpus becomes observable where one key made it impossible.
+    That is accepted because each entity type's union read and Valid Id Basis are independently valid in every interleaving.
+
+    Each store READS RAW, records key presence, THEN normalizes; answers `isSeeded(subKey)` over the NAMED RAW sub-keys `entities` / `defaults` / `membership`, because Foundry synthesizes a document for an unwritten key and offers no value-level presence answer; publishes its cache BEFORE awaiting the write; never THROWS from a load, degrading an unreadable or malformed setting to an unknown basis rather than taking the module down; and never gates persistence on validity, because a GM authors incrementally.
+    Each publishes exactly ONE normalized corpus and replaces it WHOLESALE, never mutating it in place.
+
+    **WHOLESALE REPLACEMENT IS A CONTRACT, NOT AN IMPLEMENTATION DETAIL, AND THE MEMO IS WHY.**
+    The resolved-union memo keys on the corpus OBJECT — not on `entities`, not on any other one of its arrays, and never on a system id, which would alias a deleted-and-recreated system, alias across manager instances, and alias two copy-imported systems that deliberately share ids.
+    Keying on one array would leave the memo warm whenever an edit replaced a DIFFERENT array, so the corpus object is the only invalidation signal there is and an in-place edit to it would serve a stale union forever.
+    That is what lets world scope mint NO revision counter of its own: a replicated write publishes a new corpus object and invalidates by identity.
+    The memo's second key is the system's own in-system array, guarded by the `(revision, length)` pair the definition-index invalidation rule already defines, so the existing in-place-mutation obligations cover the system half unchanged.
+    BOTH KEYS ARE REQUIRED: a world-only key serves a stale union after an in-place edit to the system's array, and a system-only key serves a stale union after a replicated world write.
+15. **THERE ARE TWO UNIONS AND THEY ARE NOT THE SAME UNION.**
+
+    The **READ** union answers what a system's entity list IS: the world entities whose membership record for that system is PRESENT, resolved through requirements 1-8, unioned with that system's surviving in-system array, WORLD WINNING on an id collision **FIELD BY FIELD**.
+    It is MEMBERSHIP-FILTERED and returns RESOLVED values, never raw world entities.
+
+    **FIELD BY FIELD, NOT RECORD BY RECORD, and the distinction is what makes the union correct for a migrated world.**
+    The collision branch merges the surviving in-system record UNDER the world entity and the resolved sections: the in-system record supplies every field no world layer owns — `essences`, `salvage`, `difficulty` and `complications` on a component; `componentId`, `label`, `requirement`, `prerequisites`, `bonus` and `checkBreakable` on a tool — and the world layer still wins every field it authors.
+    Replacing the record instead would drop those fields from EVERY component the union returns, because after `1.30.0` the in-system record and the world entity share an id BY CONSTRUCTION.
+    Two consequences of the merge are INTENDED as the TARGET contract and are stated so neither is later read as a defect: an AUTHORED EMPTY-STRING world `description` or `img` overwrites a populated in-system one, because the roster preserves an authored value verbatim and an authored empty string is a value; and the resolved `enabled` overwrites an in-system one on an essence or a tool, because the membership record is the intended source of it.
+    **BOTH CLAUSES REMAIN SUSPENDED**, and both re-arm when the lifted identity fields are shed.
+    Issue 1372's retirement of `## CraftingSystem` requirement 36's blanket form did NOT re-arm either, and the sub-heading below says which of the four clauses it did retire and which three it kept.
+    The kept ones include that ABSENCE IS PART OF THE ANSWER: a lifted identity field the in-system record does not carry is DELETED from the merged row rather than supplied by the world layer.
+    An unfiltered union would give every system every world entity and delete the membership model; a raw-entity union would hand back world defaults in place of a system's own overrides, bypassing the inherit map.
+
+    The **BASIS** union answers which ids a reference may name without being pruned, and is deliberately NOT membership-filtered, because requirement 3 makes an absent membership record a REFUSAL and never a PRUNE: a reference to a world entity a system is not a member of must survive normalization and be refused at use.
+    Filtering the basis by membership would convert that refusal into a silent, persisted deletion on the first normalize.
+
+    A world entity with no membership record for system S is therefore ABSENT from S's read union and PRESENT in S's basis, and one function serving both cannot satisfy that pair.
+
+    The READ union is BOUNDED by the migration and is not a permanent read-alias: migrations run on the ACTIVE GM alone, so every player and assistant GM spends at least one session reading settings that have not been written, and before the migration the in-system arrays ARE the corpus.
+
+    **WHILE THE LIFTED FIELDS HAVE NOT BEEN SHED.**
+    `## CraftingSystem` requirement 36 keeps each system's in-system `components` / `essenceDefinitions` / `tools` array LIVE AND AUTHORITATIVE for everything it still decides, and this requirement declares its world-wins precedence binding NOW.
+    Both are true: the world-wins precedence above is the TARGET contract, and it is SUSPENDED rather than consumed for the duration.
+    The two copies are known-EQUAL only at migration time, by construction — the migration writes the merged identity back onto every in-system record — and they diverge on the first post-migration identity edit on EITHER SIDE.
+    **A WORLD-SCOPE IDENTITY WRITER HAS SHIPPED, as of issue 1371**, so divergence is now reachable in both directions: an in-system edit the world snapshot has not seen, or a world catalogue edit no crafting system reads.
+    Clause 1a still resolves it in favour of the in-system record, so the writer's effect is confined to the catalogue's own screens and no craft changes.
+    Without the clauses below, repointing a reader at this union would make the STALE snapshot beat the FRESH record and silently revert every identity edit made since `1.30.0`.
+    **CLAUSE 1 WAS RETIRED AT ISSUE 1372 AND IS REPLACED BY CLAUSE 1a; CLAUSES 2, 3 AND 4 ARE KEPT** and retire with the shed, not with the read repointing that made them necessary.
+
+    1. ~~**KEYS.** The read union answers every key the in-system record CARRIES from the in-system record.~~ **RETIRED at issue 1372.**
+       Read as written it made the membership record's `inherit` map decide nothing at read time, which made every `Inheriting` pill and every `World default: …` line on the world-scope screens a false statement — see `## CraftingSystem` requirement 36.
+       The half of it that was load-bearing survives as clause 1a, and the half that was wrong is stated so a reader meeting the old form elsewhere can see what replaced it.
+    1a. **KEYS, BY SECTION.** The read union answers a section the membership record marks OVERRIDING from the in-system record, and a section it marks INHERITING from the WORLD DEFAULT, applied onto the shipped field names that section is spelled over.
+       Every other key the in-system record carries — its identity, and every key that is not a section — is answered from that record, and the world layer supplies only the keys it does not carry.
+       ABSENCE IS A VALUE: every lifted identity field the in-system record does not carry is DELETED from the merged row, so `'description' in row` is `false` for a record whose description the GM has cleared.
+       Re-applying only the identity fields is NOT sufficient and is the specific error to avoid: the identity projection re-applies none of the behaviour keys, and `tags` on a component and `enabled` on an essence or a tool are emitted by the resolver UNCONDITIONALLY — so without the whole-record re-application a GM-disabled tool reads back usable whether or not any scope authored anything.
+       The identity projection supplies the DELETE key-set only.
+       **A SECTION NAME AND ITS SHIPPED FIELD NAME ARE NOT ALWAYS THE SAME, AND THE PROJECTION IS PART OF THE CLAUSE.**
+       Component `category` and tool `breakage` / `onBreak` are spelled identically at both scopes.
+       An essence's two sections are not: `effectSource` is a block over `sourceComponentId`, `sourceItemUuid` and `associatedSystemItemId`, and `macro` is `propertyMacroUuid`.
+       Without the projection an inherited essence section would sit on the merged row under a key no consumer reads, and this clause would be true of the union's SHAPE and false of every craft.
+       **AN INHERITED SECTION IS ANSWERED WHOLE**, never per field, on requirement 2's own rule: an authored world `effectSource: {}` CLEARS all three source fields, and a world block authoring one of the three nulls the other two, because a system's own `sourceItemUuid` surviving beside a world `sourceComponentId` names two different Items.
+       An UNAUTHORED world section applies nothing and the in-system value stands, which is exactly what the screen's `The world default is unset` note says; `null` is AUTHORED and does apply, because `null` is the shipped spelling of "no macro".
+    2. **ORDER.** The union's row ORDER is the in-system array's order.
+       The world roster is ordered by the migration's grouping — oldest contributing system first — while three resolution tiers are FIRST-WINS over array order: the first record per id, the first per name and lower-cased name, and the EARLIEST position per source reference.
+       A roster-ordered union silently re-ranks all three.
+       This clause is NOT dated to requirement 36 and did not move with issue 1372: an inherit switch decides which LAYER answers a section, never which rows exist or in what order.
+    3. **ROW SET.** The union's ROW SET is the in-system array's row set, and a duplicate id is PRESERVED rather than collapsed, so first-wins resolution keeps answering the record it answered before.
+       The world layer contributes rows only after the shed; issue 1372 did not change this, for the same reason clause 2 gives.
+       A world entity whose membership record outlives the deletion of its in-system record must NOT be resurrected by a read: the same delete disables the referencing recipes, so a resurrected row would appear beside its own disabled recipes.
+       A keep-mode import can create the same membered-but-recordless pair with no deletion involved, and this rule covers it identically.
+    4. **READ-TIME RE-DERIVATION.** World identity is re-derived from the in-system copy AT READ TIME, INSIDE the union, on every read.
+       A one-shot boot-time pass does not hold: the component metadata refresh bound to the item-update hook rewrites `name`, `img` and `description` in place on the in-system record at any point in a session, so a pass that ran at boot leaves the world copy stale again minutes later — and dual-writing the world copy is unavailable, because the identity-writer set cannot be enumerated.
+       Read-time re-derivation is free (the in-system record is already in hand at the merge), total (it is correct on a player client, with no write and no replication), and needs no GM gate.
+
+    **THE DIVERGENCE IS ALSO REPORTED, AND THAT IS A DISCLOSURE OBLIGATION RATHER THAN A CORRECTNESS ONE.**
+    Clauses 1 to 3 resolve every divergence in the safe direction whether or not it is reported; the report tells the GM where their own two copies of one identity no longer agree.
+    It was written while every identity writer wrote the in-system copy, so it described one direction; since issue 1371 shipped the world catalogue's entry editor it covers BOTH, and the detector's behaviour is unchanged because it reports a divergence and never a direction.
+    It runs once per session on the ACTIVE GM alone — not on every assistant — after the three scope stores load and before any manager is constructed, and it NAMES the diverged `(entity, field)` pairs rather than counting them.
+    It is INFORMATIONAL: nothing is wrong, and nothing is changed by it.
+    **Its scope is narrow, and the notice says so.**
+    The detector covers the LIFTED IDENTITY fields alone and is blind to `tags`, `category`, `breakage`, `onBreak`, `repairRequirements` and `enabled`; widening it would change what the migration's own write-back deletes, in the same release as the migration.
+16. **The VALID ID BASIS is `null` — prune nothing — only when NEITHER half can vouch for an id**, per entity type.
+    The world half counts when `isSeeded("entities")`: the sub-key the id set is actually drawn from, never the aggregate no-argument form, which ORs across sub-keys and would report seeded on the strength of a sibling.
+    The legacy half counts when the system's in-system array is NON-EMPTY, because an empty array is a legacy KEY rather than a legacy corpus — it vouches for nothing while licensing a full prune.
+    The basis is the UNION of the two id sets, and `null` only when the store is unseeded AND the in-system array is empty.
+    Deriving it from `isSeeded()` alone returns `null` on every unmigrated client for every system and silently disables every reference prune in the corpus; deriving it from the in-system array alone is the failure this contract exists to prevent.
+
+    **THE FIRST GM-AUTHORED WORLD ENTITY FLIPS `isSeeded()`, AND THAT IS A BASIS INPUT.**
+    Issue 1362 ships the first writer that is not the migration, so `isSeeded("entities")` can now become true on a world that has never been migrated: `worldScope.<type>.createEntity` persists the setting, and the write replicates to every client.
+    The basis stays KNOWN-COMPLETE across that transition, and it is worth stating why rather than leaving a destructive-prune gate to be re-derived.
+    The basis is the UNION of the world set with the system's SURVIVING legacy array, so the moment the world half starts vouching the legacy half has not stopped: a world that authors one component still carries every in-system component it had, and both id sets are in the basis.
+    The predicate is PER SUB-KEY, so a component write cannot vouch for essences or tools — each entity type has its own setting and its own `isSeeded("entities")`.
+    What a GM cannot do is empty the basis by authoring into it.
+
+    **NO CONSUMER MAY DEFAULT THE BASIS TO AN EMPTY SET.**
+    That is the same defect as an omitted argument, and it re-arms exactly the failure the basis exists to prevent.
+    The rule binds every destructive pass, including the ones that BYPASS the crafting-system normalizer — a mutation-time path that rebuilds an in-system-only basis of its own is the shape this has already been got wrong in once.
+    The same rule governs each CATEGORY VOCABULARY: an icon map is pruned against its own vocabulary only when that vocabulary is a known-complete basis, because a normalizer that is a whitelist rebuild makes an ungated prune permanent on the next save.
+    Each icon map is gated by ITS OWN vocabulary — `componentCategoryIcons` against `componentCategories`, `categoryIcons` against `categories` — and never by the other's, on `## CraftingSystem` requirement 6b's prohibition against merging or aliasing the two.
+
+    **A BASIS MUST BE DERIVED FROM THE SAME RECORD THE PRUNE WILL RUN OVER**, and this clause is stated because the failure it names is invisible to a coverage census.
+    A census counts CALL SITES, so a defect that keeps the derivation call and degrades only its ARGUMENT — deriving the basis from a stale copy of the record, from a sibling entity type's array, or from a legacy alias the pass does not prune — passes every site-counting check while handing a real prune a basis that does not describe its own subject.
+    Today that is latent rather than live for the three entity id sets, because with a seeded store the answer is non-`null` whatever the legacy argument was and the sole consumer is a `null` test; it becomes REAL the moment a consumer reads the id set itself rather than only its known/unknown state.
+    The change that first does so OWNS the behavioural coverage for it: a test that pins the prune's OUTCOME under a degraded argument, not a test that the derivation was called.
+
+    **AN UNKNOWN WORLD HALF MUST ANSWER THE SURVIVING IN-SYSTEM ARRAY VERBATIM**, and VERBATIM is stronger than EQUAL.
+    A read whose world half is absent, unloaded, unreadable or EMPTY, or whose system record carries no id, MUST answer that array ITSELF — the same object — and MUST NOT rebuild, filter, de-duplicate, trim-collapse or REALLOCATE it.
+    Rebuilding is not equivalent, and the difference is measurable rather than stylistic: a union computed against a null corpus drops id-less entries, de-duplicates first-wins and collapses a whitespace-padded id against its trimmed twin, so a six-row in-system array comes back as two.
+    Object IDENTITY is load-bearing beyond content, because the definition index and the recipe manager's signature guard are both keyed on the array itself: a copy is a permanent cache miss, and a rebuild counts a memo build on the overwhelming majority of worlds, which have written no world corpus at all.
+    This is the basis rule applied to the READ: `null` means UNKNOWN, and UNKNOWN prunes nothing.
+
+### Component scope
+
+**What the `1.30.0` migration writes here, and what it deliberately leaves UNAUTHORED.**
+Each membership record carries its own system's `category` VERBATIM — that is an override, and `general` is a legitimate stored token there — and its own `tags`, with no `mutedTags`.
+
+**The WORLD default `category` IS written, elected from the OLDEST contributing system**, and requirement 2's `general` prohibition binds that election directly: a world `category` is never the reserved bucket, because an absence-preserving world category that minted it would reset every inheriting system on the first resolve.
+It is also declined outright whenever any member system left the section unauthored, because a membership record cannot express an empty `category` override — `coerceComponentSection` coerces `''` to absence, and an absent section under an `inherit: false` switch falls back to the world value by requirement 2 of `## Scoped Entity Definitions`.
+`### Tool scope` declines `breakage` and `onBreak` on the same rule, for a related but not identical reason: those two are inexpressible as an empty override because they collide by NAME with the surviving in-system record, where `category`'s coercion forecloses it first.
+
+**The WORLD `tags` are left UNAUTHORED, and for a DIFFERENT reason** that must not be conflated with the one above: requirement 3's tag merge is ADDITIVE with no inherit switch, so a world tag list is granted to EVERY member system at once whoever the donor is.
+That hazard is independent of which system authored the list, which is why no donor rule can rescue it; requirement 3 therefore binds the world catalogue EDITOR rather than the migration.
+
+**The WORLD `essences` map IS written too, since `1.32.0`** (issue 1371 r18-store, maintainer ruling M31), elected from the OLDEST system still holding rules for the component as that system's own normalized map; an EMPTY donor map elects nothing, on the same absence-preserving rule.
+Unlike `category`, whose membership switches the migration writes uniformly OFF, each membership record's `essences` switch is decided by EQUALITY: a system whose own map equals the elected one is marked inheriting, one that differs is marked overriding and carries its own map, and one with no in-system row left inherits — so resolution at migration time is unchanged by construction rather than by fixture.
+The `1.30.0` pass applies the same rule to the records it writes, so a fresh world and a long-migrated one converge; `destructive-changes-and-migrations/spec.md` -> Component Essence Sections states the pass.
+
+1. The component sections are `category` and `essences`, with **two independent inherit switches** — `category` since `1.30.0`, `essences` since `1.32.0` (issue 1371 r18-store, maintainer ruling M31).
+   The second section was added because the world catalogue's essence values were being written into per-system rules that no world screen reads, so a GM's world edit persisted nowhere visible; the world record now carries the values, and every system that has rules for the component follows them unless it overrides.
+   A membership record's `inherit` map therefore carries those two and nothing else.
+2. **`category` departs from the plain pattern on its INHERITING branch**: the world category wins IF AUTHORED, and otherwise the local value falls through.
+   "Authored" is ABSENCE, not truthiness, and specifically not the `general` default `## Component` requirement 13 gives `Component.category`.
+   The world default category is ABSENCE-PRESERVING and normalization MUST NOT emit `general` for an unauthored one: `general` is the reserved implicit component category that is always enabled, cannot be removed, and must never be persisted in `CraftingSystem.componentCategories` (`## CraftingSystem` requirement 6a).
+   The failure this rule prevents is a RESET to `general` in every inheriting system on the first resolve, not a blank — a blank is unreachable, because an absent world category falls through to the local value.
+   A world category the GM later deletes reaches the resolver as absence and takes that same path.
+   The WORLD-scope deletion case is governed by `## World Vocabulary` requirement 7, which CLEARS the world default's `category` rather than reassigning it to `general` — forbidden here — so the resolver reaches absence and the local value falls through, exactly as this requirement already describes; `## CraftingSystem` requirement 6d governs the system-scope case.
+   **The `general` prohibition binds an IMPORT-TIME write of a carried world default as well as the migration's election**, because since issue 1364 the migration is no longer the only writer: an import carries world defaults elected in another world, and every constraint on them is RE-DECIDED against the DESTINATION's merged corpus rather than the corpus the value was elected in (`import-export/spec.md` -> World-default constraint re-check on import).
+   An authored category is a token matched against `CraftingSystem.componentCategories`, so BOTH normalizers trim it and coerce a whitespace-only or non-string one to ABSENCE (requirement 11's shape-rule clause).
+   That belongs at the normalizer and not on the inheriting branch: the overriding branch answers the stored value verbatim, so a rule stated only on the fallback path would let one system's `"  ingot  "` resolve to an unmatchable token while another's resolved trimmed.
+   **The prohibition binds a THIRD writer as of issue 1371: the world catalogue's own category PICKER**, which is a GM-facing control and therefore the enforcement point — the store writes a section value opaquely and the normalizer coerces SHAPE rather than reserved-token membership, so no layer below the picker can refuse the bucket.
+   The picker refuses by the SHIPPED CASE-INSENSITIVE PREDICATE and never by string equality: `General` and ` GENERAL ` are the same category downstream, so a `!== 'general'` implementation lets both through, the resolver treats either as authored, and every inheriting system resets on the next read.
+   **Since issue 1372 that failure is REACHABLE AT READ TIME rather than latent.** Under the retired blanket form of `## Scoped Entity Definitions` requirement 15 clause 1 an inheriting section resolved from the in-system record anyway, so a world `general` was inert; clause 1a makes it apply.
+
+   2a.
+   **`essences` IS A PLAIN-PATTERN SECTION** (issue 1371 r18-store, maintainer ruling M31): a map `essenceId -> quantity` over the WORLD essence catalogue's ids, with no helper of its own on either branch.
+   Its SHAPE rule is stated once at the normalizer, on requirement 11's shape-rule clause, and binds both records: ids are trimmed, only POSITIVE finite quantities are kept, and a non-object normalizes to ABSENCE.
+   **AN EMPTY MAP IS A VALUE, NOT ABSENCE.** `{}` is an authored "this component carries no essences", which an inheriting system takes whole rather than keeping its own — the reading `### Essence scope` gives `effectSource: {}` — and only a non-object is the world saying nothing, under which an inheriting system keeps its own map.
+   The section is spelled over the shipped in-system `Component.essences` map, so the read union's writer for it is an assignment of a COPY of the world map onto the merged row, and an OVERRIDING system resolves its own in-system row — the membership record's stored block is the dormant copy `## Scoped Entity Definitions` requirement 15 describes, exactly as it is for `category`.
+   A world map is NOT narrowed to the ids a given system holds: which of the world catalogue's essences a system holds is that system's own concern at read time, and its readers already ignore an id it does not hold.
+   **THE WRITERS ARE THE GENERIC SECTION VERBS AND NO NEW ONE**: the world Component entry's essence editor and the world catalogue's bulk `Essence values` group write the world map through `updateWorldDefaultSection`, replacing it whole, and the system rules editor's inherit choice flips the switch through `setSectionInherited`, seeding the record's dormant block from the world map when it goes off.
+   The per-system rules write the world panel used before this section existed (`bulkEditRules`, maintainer ruling M25) is kept for system-scope surfaces and is SUPERSEDED as the world panel's route.
+   **A SYSTEM-SCOPE ESSENCE WRITE IS AN OVERRIDE** (issue 1371 r19-store2), and this replaces the earlier reading under which such a write was simply shadowed until a GM found the switch.
+   Every system-scope writer of the map — the Component Studio's bulk `Essence values` axis, `bulkEditRules`, and the single-component update — flips the pair's `inherit.essences` to `false` FIRST and writes the values second, on the same flag-before-values order the rules editor's own inherit choice uses, so what the GM staged is what the system resolves.
+   The flag write is per PAIR rather than per batch, so a refused one costs that pair its ESSENCE axis alone and leaves every other staged axis, and the rest of the cohort, to land; a refused world-setting write REJECTS rather than answering `false`, so the stop catches as well as testing the answer.
+   The count of refused pairs is reported to the caller alongside the updated count, because they answer different questions and neither is derivable from the other.
+   **A FLAG WRITE THAT LANDS AHEAD OF A VALUE WRITE THAT THEN FAILS IS ROLLED BACK TO THE RECORD'S PRE-STATE, NOT MERELY TO THE FIELD IT MOVED** (issue 1371 r21-store4).
+   The flip is a durable, replicated world-setting write made BEFORE the values, so leaving it standing over a failed write would opt those pairs out of every later world edit while the GM is told the write failed.
+   Moving the switch OFF has a SECOND effect — it seeds the membership record's own block from the world map when the record carried none — and moving it back ON does not undo that half, so a switch-only compensation leaves a retained dormant override the pre-state did not have.
+   The restored switch reads as inheriting again through an explicit `true` where the pre-state commonly had the key absent; every reader tests `!== false`, so the two are one state.
+   Nothing resolves that block, so the state reads as repaired; but a later genuine flip-off RESTORES a retained block rather than re-seeding, so the system would silently start from the map as it stood at the failed save rather than as the world has it now.
+   The compensation therefore also removes a block the flip itself seeded, and the writer records, per flipped pair, whether it seeded — a fact the corpus can no longer answer once the block exists.
+   **AND THE COMPENSATED REGION IS THE WRITE, NEVER THE REPUBLISH THAT FOLLOWS IT.**
+   A rollback is correct only while "the values did not land" is true, so a projection rebuild after a successful write must not reach it: doing so re-shadows a map the GM authored and is durably on disk, and reports the write as failed.
+   A cohort written in more than one pass orders them so that no pass a rollback would undo is persisted before a pass that may throw.
+   A pair with no membership record is written unchanged, because nothing shadows a component the world corpus does not hold for that system.
+   **AND THE FLIP FIRES ONLY WHERE THE WRITE WOULD IN FACT BE SHADOWED** (issue 1371 r20-store3): a pair that inherits a world section the world record never AUTHORED already resolves its own row, so nothing shadows the write and no switch moves.
+   Flipping there would opt the pair out of a world default it has not yet received, and the rules editor withholds the inherit offer in exactly that state, so the GM could neither see nor reverse it.
+   The test is the READ UNION'S OWN, in full: a row whose id is absent from the world entity ROSTER is passed through untouched by the union whatever its membership record and world default say, so nothing masks a write there either and no switch moves for it (issue 1371 r21-store4).
+   **A SAVE THAT MERELY RESTATES THE EDITOR'S OWN SEED WRITES NO MAP AT ALL**, and that exemption is what protects authored data: a component editor sends the section on every save whether or not the GM touched the card, so turning an untouched save into an override would flip a switch nobody touched and overwrite the system's dormant own map — which is exactly what an inheriting system falls back to if the world section is later cleared.
+   **THE COMPARISON IS AGAINST THE BASELINE THE EDITOR WAS SEEDED FROM, STATED BY THE CALLER, AND NOT AGAINST AN ASSUMPTION** (issue 1371 r20-store3).
+   Comparing against what the system resolves is sound only for an editor seeded from the read union; a caller seeded from anything else states its own baseline, and a caller that states none is taken to have been seeded from the read union.
+   **NO SHIPPED WRITER RELIES ON THAT FALLBACK ANY LONGER** (issue 1371 r22-store4): both component editors state their own baseline, and the fallback is kept for a caller that has none rather than as a standing claim about any of them.
+   It was the in-page rules editor the fallback was written for, and the claim was true of it only while the item card's essence run WAS the read union's answer — a premise a change to the PROJECTION falsified without touching the rule, which is the shape an assumption at a distance always fails in.
+   **THE BASELINE IS A FACT ABOUT THE RENDER, SO IT IS CAPTURED WHERE THE ROWS WERE DRAWN AND TRAVELS WITH THEM** (issue 1371 r21-store4).
+   Re-deriving it when the save runs reads the record as it is THEN, and an editor window registers no hooks: a replicated world-scope write landing while it is open moves the baseline out from under the rows the GM is looking at, so an untouched save differs from it and is read as an authored override.
+   A draft that carries its own baseline is believed over anything the caller re-derives, and the same holds for the carried entries below.
+   Both shipped editors state their baseline this way — the standalone editor from the rows its root drew, the in-page rules editor from the rows it rendered — so no shipped writer relies on the re-derived fallback; the in-page editor reads its rendered rows at save time rather than snapshotting them when the draft is seeded, so a world-scope QUANTITY change landing while it is open can still move that baseline under standing rows — a narrow, two-GM window recorded on the follow-up issue rather than closed here.
+   **AND AN EDITOR'S ROUND TRIP MUST NOT NARROW THE MAP.**
+   Since a world map is not narrowed to the ids a given system holds, an editor whose rows come from that system's essence roster carries every id outside it FORWARD in the write instead of dropping it; such an id is carried rather than offered, because the system has no name, icon or control for it.
+   **WHICH BINDS THE PROJECTION THE EDITOR IS SEEDED FROM, NOT ONLY THE EDITOR** (issue 1371 r22-store4).
+   The GM component card carries TWO essence runs and they answer different questions: the whole resolved map, which is what an editor opened on that card is seeded from, and the DRAWN run — the same map through the shared chip model, in the order of the roster the site states (the system's own definitions on a system-scope surface), with nothing for an id the system's roster cannot name.
+   Narrowing the seed makes the carried set EMPTY by construction, because the carried ids are exactly those the rendered rows do not cover; the editor then has no row, no carry and no way back into the write for them, and the next save drops them durably.
+   The row, the inspector and the browser's essence filter read the drawn run — `ui-integration`'s one-function rule for chips and filter — and nothing that SEEDS an editor may.
+   What an in-system row may finally HOLD is still `## CraftingSystem`'s own roster rule, enforced at the in-system normalizer.
+   The projection publishes, per entry, the world map as `defaults.essences` and `inheritCounts.essences`, and per system row `inherited.essences` and `resolvedEssences` — the map that system resolves, a read fact named so that no world editor writes it back.
+   **EVERY GM READ OF A COMPONENT'S ESSENCES DRAWS THE RESOLVED MAP, NOT THE PERSISTED ROW** (issue 1371 r19-store2, extended at r20-store3).
+   The authoring accessor answers the persisted in-system record by design — a merged row would be offered for editing that no writer can save back — so each reader overlays the read union's answer onto the essence map alone, exactly as the world essence COLOUR is overlaid onto the essence definitions.
+   That binds the system rules list and its inspector, the essence library's per-essence component usage count and roster, the world Essence Catalogue's own reference figure, and the essence delete confirmation's impact statement — a destructive path, where reading the persisted row let a GM delete an essence components still resolve.
+   **AND THE ESSENCE DELETE'S CASCADE IS AN OVERRIDE, ON THE SAME RULE AS EVERY OTHER SYSTEM-SCOPE ESSENCE WRITE** (issue 1371 r21-store4).
+   A delete is a write, and its component half strips the essence from the system's own rows — which an inheriting pair does not resolve, so the strip changed nothing the GM was told it would and the row went on drawing a chip for an id no editor could clear.
+   Each pair the delete AFFECTS — one whose RESOLVED map carries a deleted id — that inherits an authored world map is therefore flipped to override before the strip, and its row is first seeded from the map that pair resolved, so the essences the delete does not name survive it.
+   The WORLD map is untouched: the delete is scoped to one system, and every other system keeps the essence exactly as the GM left it.
+   A pair whose flag write is REFUSED still inherits and keeps the essence; that is reported rather than allowed to block the delete, because refusing the whole delete over one setting write would leave a definition the GM asked to remove in place.
+   It binds ONE accessor rather than a read per consumer: two surfaces over one conceptual value reading different fields is the defect this states away, and it has already been found twice.
+   Without it the list contradicts its own editor and every engine reader the moment a world map is edited, which after the `1.32.0` election is every component in a one-system world.
+3. **`tags` is ADDITIVE and is not a section**: the effective set is the world tags MINUS the record's muted list, PLUS the record's own tags.
+   There is no inherit switch on this path at all, because muting is per tag and one per-section switch cannot express it.
+   The record's muted list is `mutedTags`; both it and `tags` normalize to trimmed, de-duplicated, order-preserving labels, and an authored EMPTY list normalizes to ABSENT on the `complications` doctrine (`## Component` requirement 20), because it carries no meaning distinct from absence.
+   **Per-tag muting is written through `setMutedTags`, which the COMPONENT family alone publishes.** Its absence on the essence and tool families is `taggable: false` on their write descriptors — a per-type capability flag — and is NOT requirement 4's structural `enabled` reasoning; conflating the two would suggest a later lane could add muting to a tool by relaxing a structural rule, when what it would actually need is a tag model those types do not have.
+   **NO SCREEN CALLS IT.** The leg refuses silently for a non-member — it returns `false` with no membership record — and after issue 1371's prototype-parity rebuild nothing in `src/` invokes it at all, so a stored `mutedTags` list can be READ BACK and DISPLAYED but reaches the corpus only through the `1.30.0` migration, an import, or a hand edit.
+   The screens' side of that is `ui-integration/spec.md` `### GM World Component Screens` requirement 5.
+   **A world tag list is stated WITH ITS MEMBER COUNT before the write lands**, which is what binds the world catalogue EDITOR rather than the migration: the merge is granted to every member system at once, so the reach is the fact a GM is deciding on.
+   **THE ADDITIVE MERGE STAYS RESOLVER-ONLY.**
+   `## Scoped Entity Definitions` requirement 15 clause 1a switches SECTIONS, and `tags` is not one — it carries no inherited-section writer and the in-system normalizer emits it unconditionally — so the union's trailing in-system re-spread discards the resolver's answer.
+   Routing it through the union is deferred, and the reason is not effort: the resolver's system half is the MEMBERSHIP record's migration-time `tags` copy while the in-system record's own `tags` is edited live, so routing it today would revert every member system's live tag list to its migration-time state on the first read.
+   It becomes routable once the live in-system `tags` is the system half.
+4. **A component membership record carries NO `enabled` flag**, and the component path exposes no enable/disable API.
+   Component membership is binary — present or absent.
+   Essence enabling toggles effect transfer and macros and tool enabling evokes a drained leyline or a seasonal workshop; component enabling serves no purpose and is deliberately not implemented, and an `enabled` key in adversarial or hand-edited input is DROPPED by the component normalizer rather than carried.
+5. **REMOVING A COMPONENT FROM A SYSTEM IS TWO DELETIONS, AND THE IN-SYSTEM ONE IS A REFERENCE-REPAIRING CASCADE** (issue 1371).
+   The membership record's deletion is the fact of leaving; the in-system record's deletion is what the system is actually left with, and the two are composed under the family's one `removeFromSystem` key because deleting the membership record alone leaves an in-system record requirement 15's read union pushes through unchanged.
+   The in-system half runs the SANCTIONED DELETE the system's own component list runs — remove the components, repair every reference to them, persist once — so it rewrites every recipe in that system naming the id, disables the ones left without a usable ingredient set or result, clears essence source links pointing at it, cleans up its salvage runs and reconciles alchemy signatures.
+   **"REMOVE FROM THIS SYSTEM" AND "DELETE THIS SYSTEM'S COMPONENT" THEREFORE LEAVE THE SAME SYSTEM BEHIND**, and the WORLD entity is the whole of the difference: it survives one and not the other.
+   **THIS IS NOT IN TENSION WITH REQUIREMENT 3 OF `## Scoped Entity Definitions`, AND THE DISTINCTION IS WORTH STATING BECAUSE THE TWO READ ALIKE.**
+   That requirement's "absence is a REFUSAL at use, never a prune" governs NORMALIZATION — a reference surviving a load must not be silently deleted by it, which is why a **Valid Id Basis** is not membership-filtered.
+   This requirement governs a GM'S DELIBERATE, ARMED WRITE, where a rewrite is the point rather than a side effect; nothing here licenses a normalizer to prune.
+   **A SYSTEM MANAGER THAT CANNOT RUN THE CASCADE REFUSES THE WHOLE REMOVAL RATHER THAN HALF OF IT**, on the tool family's precedent for the mirror verb: the capability is checked BEFORE either half is touched, and neither half is written when it is absent.
+   The asymmetry is sharper here than on the add path — deleting the membership record and then failing the in-system one leaves the component RESOLVING in a system the GM has removed it from, with the world layer no longer consulted, which is the exact state the composition exists to prevent.
+   **THE ORDER IS THE COMPENSATION, AND THERE IS NO ROLLBACK** (issue 1371, revision 11).
+   The two partial states are not symmetric: the in-system row gone with the membership record left is INERT — the read union iterates the in-system array and draws nothing, the component is absent from the system, which is what the GM asked for, and the next add reuses the record — while the membership record gone with the row left is the ghost above.
+   So the in-system delete runs FIRST and the membership write SECOND: a throw from the first half has written no membership at all, a throw from the second can only leave the inert half, and neither window reaches the ghost.
+   A rollback was not written because it could not have been written correctly, for two measured reasons: the family publishes no verb that writes a removed membership record BACK with its per-section overrides intact — `removeFromSystem` deletes the record and its overrides, and `addToSystem` mints a fresh `inherit: {}` one, so restoring through it would answer a failed removal by discarding every override the GM authored — and the two failure windows cannot be told apart from the store, because the sanctioned delete mutates the live system object BEFORE it persists, so the row reads gone after a throw on either side of the persist.
+   **THE VERB ANSWERS "DID ANYTHING CHANGE", NOT "DID IT SUCCEED".** A failure is caught, reported through a notification and answered rather than thrown, so a bulk apply continues through its remaining pairs; the answer is `true` whenever the in-system row is gone, because the projection is republished on that answer and a failure that left the row gone must still move the screen, and `false` when nothing was written at all, which spends no re-projection.
+   The notification says the removal did not COMPLETE rather than that it failed, because a throw from the second half leaves the row really gone and a throw from the first leaves memory and the setting disagreeing, so "was not removed" would be a fresh false statement in two of the three outcomes — and the lang key carries the same wording for the same reason.
+   Still open, and still the tool family's follow-up: the tool family's `removeFromSystem` is the generic verb and has neither the cascade nor the ordering, and no verb here can report a compensation that itself fails.
+   **AND THE ADD PATH ROLLS BACK THE RECORD IT WROTE.** A seed refused for a duplicate source reference removes the membership record THIS CALL wrote and reports `false`; a record authored earlier is left alone, so an unrelated collision cannot delete a GM's own membership.
+   The refusal is reported rather than thrown, so a bulk apply continues through its remaining pairs.
+
+### Essence scope
+
+1. The essence sections are `effectSource` and `macro`, with **two independent inherit switches**.
+   They are two sections rather than one because a system may reasonably take the world's active-effect source and author its own property macro, or the reverse.
+   Neither name is new behaviour: `effectSource` is the essence's source reference — the shipped `sourceComponentId` and its `associatedSystemItemId` / `sourceItemUuid` aliases (`## EssenceDefinition` requirements 1-4), whose resolved item is the template whose active effects transfer — and `macro` is the shipped `propertyMacroUuid` (`## EssenceDefinition` requirement 9).
+   The section names are the TARGET names; mapping the shipped keys onto them is the migration's work (epic 1357, PR 3).
+2. `enabled` KEEPS its shipped meaning verbatim: it gates essence-carried **behaviour** and never essence **arithmetic** (`## EssenceDefinition` requirements 7-8).
+   A disabled essence still matches, accumulates and is consumed exactly as before, because a mid-session toggle must not change what an already-held item is worth; what it withholds is what the essence carries ONTO a result, so neither its property macro nor its active-effect transfer runs.
+3. `enabled` defaults to TRUE on a record that authored none, matching `## EssenceDefinition` requirement 6.
+4. **Disabled is not absent.**
+   A disabled essence is a MEMBER that is off and keeps its overrides; removing it from the system deletes the membership record and its overrides with it.
+5. **`effectSource` IS A LIVE PARENT, and `### Tool scope` requirement 2's seeding is not the precedent for it.**
+   This is settled here rather than deferred, because leaving it open would let the migration decide it by accident, and the two are close enough to be confused: both target names cover a shipped field that today names an IN-SYSTEM reference.
+   They differ on three counts, and each on its own is decisive.
+
+   **The unit of the answer.**
+   `repairRequirements` is an authored STRUCTURE a system is expected to edit after adoption, and there is no state in which a system says "I have edited the world's copy" — so it is copied once and diverges.
+   `effectSource` is a single reference under its own inherit switch: a system that wants its own source turns the switch off and authors one, which is the whole of requirement 1's `### Section Inheritance` contract and needs no seed.
+
+   **The failure mode of a dangling reference.**
+   An unresolvable essence source is ALREADY a first-class, non-destructive state — `## EssenceDefinition` requirement 4 retains the stored source evidence so the GM sees a stale-but-readable source — so a world value that resolves to nothing in one member system degrades exactly as an in-system one already does.
+   A dangling repair ingredient group has no such rule and would silently change what a repair costs.
+
+   **Addressability, which is where the constraint bites.**
+   `repairRequirements` cannot be a live parent because an ingredient group names a QUANTITY OF EACH REFERENT IN A PARTICULAR SYSTEM, and a world value that resolved live would change what a repair costs in a system that never authored it.
+   The referents themselves ARE world-addressable, and this is a correction of an earlier reading that said otherwise (issue 1373, maintainer round 2): THIS SECTION makes components a world entity, so a repair group naming world component ids is exactly as addressable as `effectSource`'s `sourceComponentId`.
+   What world scope cannot promise is MEMBERSHIP — that every system inheriting the Tool has also adopted each named Component — which is the same constraint `destructive-changes-and-migrations/spec.md` already applies when it lifts a seed only where every referenced component is a world component every member system holds.
+   `effectSource` escapes the live-parent objection for a different reason: it is a SINGLE reference rather than a costed set, so a system that resolves it to nothing degrades into the already-specified dangling-source state instead of quietly repricing a repair.
+
+   **The binding constraint on EVERY WRITER, not only the migration:**
+   a WORLD essence default's `effectSource` may name only a WORLD-ADDRESSABLE referent — a world component id or a document UUID — and MUST NOT carry a system-local component id.
+   The `1.30.0` migration WRITES a world `effectSource` default, elected from the OLDEST contributing system, and this constraint is what decides whether it may: the donor's value is lifted only when EVERY reference it carries is world-addressable — a document UUID, or a component id in the world roster — and is DECLINED outright otherwise.
+   Independently of that, `effectSource` is written onto EVERY membership record as an override with the switch OFF, world-addressable or not, and that write is UNCONDITIONAL: an absent section under an `inherit: false` switch falls back to the world value by requirement 2 of `## Scoped Entity Definitions`, so an absence-preserving write would silently hand a system that authored nothing the donor's source.
+   An empty `{}` is a real overriding value every reader treats as "no source", which is what makes the unconditional write expressible here and not for `category` or for `### Tool scope`'s `breakage` and `onBreak`.
+   `effectSource` and `macro` are NEW section names that collide with nothing on the in-system record, so writing them can never overwrite a live in-system block through requirement 15's read union — which is the property the other three lack, and why those take an every-member precondition on their world default instead of an unconditional membership write.
+   So a non-world-addressable referent still reaches the system side exactly as this requirement mandates; what changes is that a world-addressable one ALSO seeds the world default.
+   Essences group by trimmed `id` AT `1.30.0` and that pass re-keys none of them, so no essence reference is rewritten there and ITS re-key map carries no essence leg.
+   **`1.34.0` DOES RE-KEY AN ESSENCE ID.**
+   § Equivalent World Essence Merge merges world essences whose canonicalised `(name, macro, effectSource)` triples are equal, carries its OWN map in `fabricate.worldEssenceMergeMap` rather than a leg on the `1.30.0` one, and rewrites EVERY reference the re-key invalidates.
+   So A WORLD ESSENCE ID IS OPAQUE AND MAY BE RETIRED — and once retired is never reissued, on that section's requirement 17 tombstone — and NO READER MAY TREAT IT AS A STABLE SLUG or derive anything from its spelling.
+   A membership record that `1.34.0` RE-POINTS carries its previously-INHERITED sections as explicit OVERRIDES, because the re-key moves its world parent and an inherited section would otherwise resolve through a different one.
+   Issue 1362 ships the SECOND, `worldScope.essence.updateWorldDefaultSection`, and it writes OPAQUELY by design: requirement 11's section values are opaque to the store, and the normalizer coerces a section's SHAPE rather than its ADDRESSABILITY, so neither can enforce this.
+   **The enforcement point is therefore the PICKER.**
+   A world-defaults editor offers only world-addressable referents — it lists world components and document UUIDs, and it does not offer a system's own component list — because the layer below it accepts whatever it is handed.
+   An essence whose shipped `sourceComponentId` names a component that did not itself become a world component therefore migrates its source onto the SYSTEM side, as an override with the switch off, and never onto the world default.
+   Nothing further is needed for the membership case: a member system that is not a member of the referenced world component resolves the source, fails to resolve the component, and lands in `## EssenceDefinition` requirement 4's retained-evidence state — the REFUSAL requirement 15's basis union exists to preserve, never a prune.
+
+   **The constraint binds an IMPORT-TIME write of a carried world default too, and is RE-DECIDED at the destination** (issue 1364).
+   The migration is no longer the only writer of a world `effectSource`: an import carries one elected in ANOTHER world, whose component roster the destination does not share, so world-addressability is re-evaluated against the DESTINATION's MERGED roster rather than the corpus the value was elected in, and a section that fails is DECLINED and reported (`import-export/spec.md` -> World-default constraint re-check on import).
+
+### Tool scope
+
+**What the `1.30.0` migration writes here, and the precondition on the two inherited sections.**
+Each membership record carries its own system's `breakage`, `onBreak` and seeded `repairRequirements` verbatim, and all three ALSO take a WORLD default, elected from the OLDEST contributing system wherever the migration registry's constraints permit.
+Since `1.31.0` it carries its own `prerequisites` and `bonus` too, unconditionally and with no world default elected for either — see requirement 1a.
+**`breakage` and `onBreak` are DECLINED outright whenever any member system of the group left the section unauthored**, on the same rule `### Component scope` states for `category`, and the rule is stated here too rather than left to be inferred from there.
+A membership record cannot express an EMPTY `breakage` or `onBreak` override, so a member that authored neither carries an ABSENT section, and an absent section under an `inherit: false` switch resolves to the WORLD value by requirement 2 of `## Scoped Entity Definitions` — which would hand that member the donor's breakage mode or on-break action.
+
+**Why an empty override is inexpressible for these two, which is the fact the decline rests on.**
+`breakage` and `onBreak` are spelled IDENTICALLY at world scope and on the shipped in-system `Tool` record.
+An override of `{}` would therefore ERASE a live in-system block rather than mean "no breakage".
+**THAT HAZARD IS LIVE AS OF ISSUE 1372 FOR AN INHERITING MEMBER, AND STILL DORMANT FOR AN OVERRIDING ONE.**
+Requirement 15's clause 1a answers an INHERITING section from the world default and applies it onto the shipped field name, so a world `breakage: {}` DOES reach a live in-system block for a system whose switch is on — which is precisely what makes the every-live-member decline load-bearing rather than precautionary, and why it is kept rather than relaxed.
+An OVERRIDING section is still answered by the in-system record, and that block is still where a GM's post-migration edits land.
+The decline is what guarantees the transition is safe: the migration writes NO world default for a section any member left unauthored, so there is nothing for a later inherit switch to fall back INTO.
+`### Essence scope`'s `effectSource` and `macro` escape all of this because they are NEW section names that collide with nothing on the in-system record, which is why requirement 5 there can mandate an UNCONDITIONAL write instead; `repairRequirements` escapes it because requirement 2 below answers it from the membership record alone.
+
+1. There are FIVE tool world-default sections, FOUR of them inherited.
+   `breakage`, `onBreak`, `prerequisites` and `bonus` are ordinary sections with their own inherit switches, and they are the shipped `Tool.breakage`, `Tool.onBreak`, `Tool.prerequisites` and `Tool.bonus` unchanged; `repairRequirements` is the fifth and is SEEDED rather than inherited.
+   A tool membership record's `inherit` map therefore carries those four and nothing else, and a `repairRequirements` key in it is DROPPED by normalization because it is not a section the resolver reads through.
+
+   1a.
+   **`prerequisites` AND `bonus` JOINED AT `1.31.0`, AND THIS IS THE EXPLICIT AMENDMENT `## CraftingSystem` REQUIREMENT 36 DEMANDS** (issue 1373).
+   The design treats a Tool's character gate and its check bonus as WORLD defaults a crafting system inherits and may override, not as per-system-only fields; the shipped model held them per system only, which is what left the world Tool entry with three tabs where the design has four and two rows missing from two separate card stacks.
+   The maintainer ruled for the design.
+
+   **AN EMPTY OVERRIDE IS EXPRESSIBLE FOR BOTH, which is what separates them from `breakage` and `onBreak`.**
+   `{enabled: false, ids: [], gateMode: "usability"}` and `{enabled: false, expression: ""}` are real values every reader treats as "no prerequisites" and "no bonus", exactly as `### Essence scope`'s `effectSource: {}` means "no source".
+   A membership record can therefore SAY that its system requires nothing, so the every-live-member precondition the two older sections need does not apply to these two and the migration writes both UNCONDITIONALLY.
+
+   **NO WORLD DEFAULT IS ELECTED FOR EITHER, on the unknowable-PROVENANCE rule requirement 5 already states for the world tool-breakage authority.**
+   `Tool#toJSON` emits both keys on EVERY save, so a persisted `{enabled: false}` is the normalizer's mint and a GM's deliberate "nothing required" written identically, and the corpus cannot distinguish them.
+   Electing one would state a choice nobody made, on every tool at once.
+   The remedy is the one the migration registry already names for a declined section: author the world default directly, on the world Tool entry's Requirements tab.
+
+   **AN ABSENT WORLD DEFAULT RESOLVES TO THE SHIPPED BEHAVIOUR, BY CONSTRUCTION.**
+   The `1.31.0` migration records every existing `(tool, system)` pair's own in-system value as its override with the switch OFF, so the resolver answers that system's own data whether or not a world default is ever authored.
+   A world that has not yet reached `1.30.0` gets the same corpus from that pass directly — `buildMembershipRecord` writes both sections and the overriding inherit map names both — and `1.31.0` then finds nothing to do, so the two upgrade orders converge.
+   Like `breakage` and `onBreak`, the world layer for these two is SUSPENDED on requirement 15's read union while `## CraftingSystem` requirement 36 holds, because `Tool#toJSON` emits both keys and the in-system record decides every key it carries.
+2. **`repairRequirements` is a SEED, not a live parent.**
+   It is the shipped `Tool.repairRequirements` — the `flagBroken` repair recipe's ingredient groups — held at world scope as a starting point only.
+   It is copied out of the world defaults ONCE, when a tool is added to a system, and then diverges freely; nothing re-reads it from the world afterwards, and a later world edit never reaches a system that has already been seeded.
+   Resolution answers it from the MEMBERSHIP RECORD ALONE and never reads it back out of the world defaults, because a seeded value the system has since edited is the only truth about that system's repair recipe.
+   Modelling it as an INHERITED section with a permanently-false switch would be a lie the UI would then have to hide, and it would be untrue on its own terms: a repair recipe prices a set of referents FOR ONE SYSTEM, and a live world value would change what a repair costs in a system that never authored it.
+   That is a statement about COST and MEMBERSHIP, not about naming: a repair group may name world component ids, world essence ids and world tags, all of which world scope addresses (see `### Essence scope` requirement 5's addressability paragraph, which records the correction).
+   The seed is a DEEP copy, so neither scope can reach into the other through a shared reference — the one exception to requirement 11's aliasing rule.
+   A value structured cloning refuses degrades to a shallow copy rather than being dropped, because a seed that silently lost a repair recipe would be worse than one that shares a reference nothing structurally mutates.
+   Seeding is NOT the default treatment for a section whose shipped field names an in-system reference: `### Essence scope` requirement 5 settles `effectSource` as a LIVE PARENT on the opposite side of the same question, and records what distinguishes the two.
+   **The world default is AUTHORED through its own tool-family write action, never through the section writer.**
+   `updateWorldDefaultSection` refuses every name outside the scope's declared sections and `repairRequirements` is deliberately not one of them, so routing the write through it returns `false` and stores nothing.
+   The seed's WRITE path and its READ path are therefore deliberately asymmetric: the world holds it and a tool-family-only action writes it, while the membership record alone answers it.
+   **THE WORLD TOOL ENTRY IS A CALLER OF IT, alongside import, migration and adoption** (issue 1373, maintainer round 2).
+   The Breakage tab renders the SAME repair editor the system Tool rules editor mounts, over the WORLD component, essence and tag rosters, and routes its change to this action rather than to the section writer.
+   It is offered only in the `flagBroken` on-break mode, which is the only mode a repair route means anything in, and it states its own reach: the seed is copied when a system ADOPTS the Tool, so an edit reaches the next system to adopt it and none that already has it.
+   Currency is deliberately withheld there — units are world-wide but whether a cost is honoured is each system's `requirements.currency.enabled`, which a world default cannot state — so the editor is mounted with currency disabled and renders an imported cost read-only rather than offering a new one.
+   An earlier round removed a `REPAIR MATERIALS` card from this screen and recorded the rule that a screen may not offer a write over data it has declared itself unable to show; that rule STANDS, and this surface satisfies it by SHOWING the groups rather than by stating a bare count and offering to clear them.
+
+   **WHILE `## CraftingSystem` REQUIREMENT 36 HOLDS THE SEED IS TAKEN ONTO BOTH RECORDS, AND ONLY THE IN-SYSTEM COPY IS READ** (issue 1373).
+   `Tool.repairRequirements` is a shipped in-system field, so a normalized in-system record always carries it — and requirement 15's KEYS clause answers every key the in-system record carries FROM that record.
+   Measured: a membership record seeded with one repair group resolves to `[]` for a system whose in-system record carries the normalizer's empty array, so the membership seed alone is unreadable for the duration.
+   The copy the GM then edits is the in-system one, through the Tool editor, which is where requirement 2's "diverges freely" actually happens.
+   The membership copy is unchanged and remains the resolution source this requirement names; it becomes the READ one again when requirement 36 retires and the world layer re-takes precedence over the keys the in-system record carries.
+3. `enabled` KEEPS its shipped meaning verbatim, and it is a HARD block rather than the essence's soft disable: a reference to a tool that does not resolve, or that resolves to a disabled tool, blocks the attempt with `TOOL_BLOCKED` (`## Tool` requirement 3).
+   The two entities' meanings of one field name are deliberately different, and neither is derived from the other.
+
+   3a.
+   **The TOOL is the one scope that declares a WORLD MASTER SWITCH**, under requirement 7 of `## Scoped Entity Definitions`: its world defaults may carry `enabled`, and resolution answers `world.enabled && system.enabled`.
+   What blocks is the RESOLVED value, so a world-disabled tool blocks with `TOOL_BLOCKED` in every member system exactly as an unadopted or system-disabled one does — the block reason does not distinguish them, because a player cannot act on the difference.
+   The essence declares no such switch: its `enabled` is a soft disable of essence-carried BEHAVIOUR, and a world-wide veto over behaviour a GM cannot see in that scope's own screens would be a persisted field with no authoring surface.
+   The component declares none because it has no enabled flag at any scope at all.
+4. **The break mode is NOT a new field.**
+   The world/system pair is `toolBreakage.authority` (`## CraftingSystem` requirement 21) carrying the same two tokens `toolSpecific` / `checkDriven`; the per-tool control under `checkDriven` stays `checkBreakable`.
+   The prototype's `tool` / `check` / `immune` spellings are not introduced, and `immune` is a retired name.
+   The governing rule is unchanged and gains exactly one clause: **SCOPE decides where authority is authored; AUTHORITY still decides WHETHER.**
+5. **The WORLD tool-breakage authority is persisted by `fabricate.toolScope` ALONE and carries no per-system half.**
+   The per-system override stays where `## CraftingSystem` requirement 21 puts it — on the crafting system — because a second per-system home would author one field at two scopes, which the Purpose above prohibits.
+   It is ABSENCE-PRESERVING at world scope: an unauthored or unrecognized authority persists NO key rather than a minted `toolSpecific`, since a minted default is indistinguishable from a GM's deliberate choice.
+
+   **AND THE WRITE HALF IS ABSENCE-PRESERVING TOO, which is what keeps inheritance from being a one-way door.**
+   The world authority is authored through a tool-family-only world-scope action that writes the key for a recognized token and REMOVES it for anything else, so "no world authority" stays expressible on disk rather than only on first read.
+   An action that minted `toolSpecific` on a clear would leave a GM who authored a world value with no way back to the unauthored state, and every absence-preserving system would go on inheriting a choice nobody made.
+   It is STRUCTURALLY ABSENT on the component and essence write families rather than present and refusing, on the same rule this section's `setEnabled` states: a caller must not be able to conclude a write landed.
+
+   **It became LIVE at `1.30.0`.**
+   The crafting-system normalizer substituted `toolSpecific` for anything missing or unrecognised on EVERY normalize until that release, so every persisted system carried a concrete value and `system.toolBreakage.authority ?? world` could never fall through; the flip that makes it absence-preserving is what made this half reachable.
+   The migration WRITES NO WORLD AUTHORITY and TOUCHES NO SYSTEM'S VALUE: it treats every system's existing `toolBreakage.authority` as AUTHORED rather than defaulted, because the corpus cannot distinguish the two and treating a defaulted `toolSpecific` as absent would silently hand every existing system whatever authority the world later acquires.
+   The world authority therefore stays absent until a GM authors it, which means it is reachable only for a system whose override is cleared, or one created afterwards.
+   **The FOUR non-UI effective-authority readers are routed through the resolver** — the shared breakage evaluator, both crafting-engine breakage decisions and the inventory listing builder's exhaustion projection — because a reader that re-defaults locally re-creates the unreachability at its own call site and makes the flip inert exactly there.
+   They reach it through ONE shared seam, `effectiveToolBreakageAuthority` (`src/systems/toolBreakageAuthority.js`), which resolves the world value from the published tool scope store and delegates to this requirement's resolver; a second hand-rolled `?? "toolSpecific"` at any call site would re-create the defect the flip removes.
+   The UI readers are NOT a pending obligation on the world tool-breakage editor: the manager's selected-system projection resolves the authority once and publishes it, so every manager surface that draws or gates on the authority reads that resolved value and none re-defaults locally.
+   This is the same routing `## CraftingSystem` requirement 21a records; it is restated here only because this requirement previously assigned it forward, and the two must not disagree about the same readers.
+
+   **THE WORLD AUTHORITY DOES NOT TRAVEL WITH AN IMPORT, IN EITHER DIRECTION** (issue 1364).
+   An incoming one is DROPPED by the payload upcast and reported, rather than seeded into an unconfigured destination on the currency and travel precedent: because the migration writes none at all, that precedent would fire on essentially every import and hand a destination world an authority no GM there authored.
+   The DESTINATION's own authority survives an import VERBATIM, which the merge secures by building from the store's persisted projection rather than from the three sub-keys — normalization rebuilds a scope's unrecognised keys from its raw argument, so the narrower base would erase it.
+   The two halves are stated as a PAIR because forbidding the write says nothing about forbidding the erasure.
+
+   The two inherited sections' every-member precondition, and the addressability rule the third rests on, likewise bind an IMPORT-TIME write of a carried world default and are RE-DECIDED against the destination's merged corpus (`import-export/spec.md` -> World-default constraint re-check on import).
+6. **ADOPTING a world Tool into a crafting system is TWO writes while `## CraftingSystem` requirement 36 holds, and the IN-SYSTEM one is what makes the Tool exist there** (issue 1373).
+   Requirement 15 clause 3 makes the read union's ROW SET the in-system array's row set — "the world layer contributes rows only after requirement 36 retires" — so a membership record written on its own names a Tool that NO reader can see: it is absent from the system's tool list, no recipe there can reference it, and the screen that offered to add it goes on offering.
+   Adoption therefore writes the membership record AND creates the in-system `Tool` record, from the world entity's identity.
+   The order is membership first, because that write owns the already-a-member rule; if the `Tool` record is then refused the membership record is REMOVED again, because a membership record with no in-system record is exactly the unreadable state above, while an in-system record with no membership record is an ordinary pre-migration Tool.
+   An in-system record that already exists is NEVER rewritten: requirement 36 keeps it authoritative, and a migrated world's in-system record and world entity share an id by construction.
+
+   **NO INHERITED SECTION IS COPIED ONTO THE RECORD IT CREATES.**
+   The record adoption writes is IDENTITY plus the SEEDED `repairRequirements` of requirement 2, and nothing else.
+   `breakage` and `onBreak` were copied while requirement 15's retired clause 1 answered every key the in-system record carried: a normalizer emits both UNCONDITIONALLY, so an identity-only record won that contest with a value nobody authored — measured, a Tool whose world default was 25 uses adopted as `Unlimited uses` on a row stating "Inherits world defaults" beside it.
+   Clause 1a answers an INHERITING section from the world default instead, so the union makes that row's claim true and the copy no longer does; retaining it would leave an override-shaped value on a record whose every switch says `Inheriting`, invisible while they hold and wrong the first time one is flipped.
+   WIDENING the copy to all four sections is the reading to avoid: a freshly adopted Tool inherits every section, so the only moment any of these values is read back is after a switch is turned OFF, and the UI seeds THAT from the resolved value at that moment (`ui-integration/spec.md` -> Tools Tab), which is current where an adoption-time copy is a snapshot.
+   `repairRequirements` remains copied because it is NOT a section: the resolver never reads it back out of the world defaults, so no union can supply it and an adopted Tool without the copy would simply have no repair recipe.
+   `enabled` is deliberately NOT copied either: requirement 3a's master switch is a VETO applied over the merged rows, and freezing one moment's answer into the crafting system would make a later world ENABLE read back as disabled forever.
+
+## World Vocabulary
+
+### Purpose
+
+Model the vocabularies a world authors ONCE and every crafting system draws from — component
+categories, component tags and recipe categories — so that the same category is not authored
+per system and left to drift.
+
+TOP-LEVEL, and deliberately not a sub-section of `## Scoped Entity Definitions`.
+Requirement 12 there states the World Vocabulary is a separate concern and NOT a fourth layer, and
+`ui-integration/spec.md` records that folding the two together loses the boundary this file draws:
+a scoped entity is a RECORD with an identity, world defaults and per-system membership, and a
+vocabulary is a set of VALUES those records take.
+
+### Requirements
+
+1. **The World Vocabulary holds three independent vocabularies** — component categories, component
+   tags and recipe categories — never merged with one another, aliased or cross-populated.
+2. **It is persisted as ONE world setting**, `fabricate.worldVocabulary` (`scope: "world"`,
+   `config: false`, `type: Object`, default `{}`).
+   It is deliberately not a fourth member of `## Scoped Entity Definitions` requirement 13's
+   three-key table: those are the scoped-entity layers and this is not one.
+   One key for three vocabularies is the OPPOSITE of that requirement's three-key decision, and it
+   is safe here only because requirement 5 below keeps seededness honest per kind on a shared key
+   and requirement 6 keeps every destructive prune off this setting.
+3. **An entry is `{id, name}`**, with `id` derived from the trimmed lowercased name and used as the
+   de-duplication key and as the join key against the reference counter.
+   Nothing renames an entry, which is why the id is derived rather than minted.
+   De-duplication is on `id`, FIRST-WINS.
+   **This DIVERGES from the system-scope rule and the divergence is temporary and owned**:
+   `normalizeComponentCategory` preserves authored casing so `Reagent` and `reagent` remain
+   distinct system categories, while `## CraftingSystem` requirement 6c already keys their shared
+   icon map by the lowercased name — the inconsistency issue 1397 is the symptom of.
+   The world rule is the one the icon maps and the reference counter already assume; reconciling
+   the system half, and deciding how a world `reagent` and a system `Reagent` resolve in the merged
+   per-kind list `## Scoped Entity Definitions` requirement 12 mandates, is issue 1411's.
+4. **Each vocabulary's reserved general bucket is not a world entry.**
+   It is implicit per system, never persisted, and refused on add at both scopes
+   (`## CraftingSystem` requirements 1-2 for recipes, 6a for components).
+   Component tags have no reserved bucket and refuse nothing.
+5. **The setting preserves KEY ABSENCE per kind**, and `isSeeded(kind)` answers from raw key
+   presence — `false`, never a throw, for an unrecognised kind — so "never authored" and "authored
+   and emptied" stay distinguishable.
+   This DEPARTS from `## CharacterLibraries` and from the scoped-entity store shell, both of which
+   mark every sub-key seeded on any write: the persisted payload OMITS a kind that has never been
+   written, and a write seeds only the kinds it carries.
+   The refusal of an unrecognised kind must not be a throw, because the shared corpus reader that
+   the scoped-entity legs use probes this store with THEIR sub-key names inside a guard that
+   converts any throw into an unavailable projection — a legitimate published shape, with no error
+   and no failing test, that would silently blank the screen and its badge.
+6. **The in-system vocabularies stay live and authoritative.**
+   `## CraftingSystem` requirement 36 is unchanged; the system normalizer emits
+   `componentCategories`, `categories` and `itemTags` exactly as before; the world half of the
+   category-icon prune basis is deliberately NOT wired; and **the world vocabulary carries no icon
+   map** — `componentCategoryIcons` and `categoryIcons` still have no world destination, and where
+   a world category's icon lives is the consumer sweep's decision.
+   Wiring the world half into that basis is what the refusal prevents: a union basis is KNOWN
+   wherever either half is known, so it would arm the sharpest of the prune sites in a state that
+   prunes nothing today.
+7. **Deleting a world entry clears it from the world component DEFAULTS that carry it, the defaults
+   write is FIRST and AWAITED, and the vocabulary write is issued ONLY after the first has resolved
+   successfully.**
+   A failed first write abandons the cascade and changes nothing.
+   The two writes are separate settings and therefore non-atomic; ordering and gating the defaults
+   first means a torn write leaves an unused vocabulary entry — re-deletable, and the first leg is
+   idempotent so a retry converges — rather than a world default naming an entry no vocabulary
+   offers, a state only re-authoring fixes.
+   The gate is also the only thing that guarantees a remote client sees the two replication
+   broadcasts in the authored order.
+   A world default's `category` is CLEARED, never reassigned to `general` (forbidden by
+   `### Component scope` requirement 2), so the resolver reaches absence and the local value falls
+   through; `## CraftingSystem` requirement 6d remains the system-scope counterpart.
+   Nothing else cascades: a system's own `componentCategories`, `categories` and `itemTags` arrays,
+   its components and its recipes are untouched, and a membership record's `mutedTags` entry naming
+   a deleted tag is left in place and is inert — the tag resolver filters only the WORLD tags by
+   the muted set, so an orphaned mute cannot suppress a system's own same-named tag, and it
+   re-applies if the tag is re-added.
+   A recipe category's deletion rewrites nothing at all, because the world corpus holds no recipe
+   record.
+
 ## Tool
 
 ### Purpose
@@ -1740,6 +2750,17 @@ break across attempts and may require an actor-side expression to be truthy befo
 be used.
 Inline per-recipe / per-task tool authoring is not the canonical model — references
 are always by id into the per-system library.
+
+**What this record still OWNS after `1.30.0`, and what a World Identity Snapshot is.**
+The `1.30.0` world-scope migration (epic 1357, PR 3) lifted this record's IDENTITY — `name`, `img`, `description` and the source link — to a WORLD TOOL, and its `breakage`, `onBreak`, `repairRequirements` and `enabled` onto a per-system membership record.
+Those fields nevertheless **REMAIN THE SOURCE OF TRUTH** here.
+The readers now enter through the read union, which answers from this record for every field it carries EXCEPT a section this system INHERITS; this record REMAINS the source of truth for the rest while `## CraftingSystem` requirement 36 holds.
+This record PERMANENTLY retains `id`, `componentId` (which names a component in THAT system's candidate set), the user-authored `label`, `requirement`, `prerequisites`, `bonus` and `checkBreakable`.
+
+**"World Identity Snapshot" is NOT the per-tool DISPLAY SNAPSHOT this section already describes**, and capture time does NOT separate them — the Properties block below labels the shipped copy the "Registration/**migration-time** DISPLAY SNAPSHOT", so a discriminator built on the capture moment is denied by its own citation.
+SCOPE and SUBJECT-COPIED-FROM are what separate them.
+The display snapshot of requirements 1, 12 and 13 is PER-SYSTEM and is copied from the tool's OWN SOURCE — the registered Item at registration or relinking, or the linked managed component on every normalize — and it feeds requirement 13's display precedence.
+The World Identity Snapshot is WORLD-SCOPE, is copied FROM THIS IN-SYSTEM RECORD by the `1.30.0` migration, feeds no display precedence, and is written by nothing thereafter.
 
 ### Properties
 
@@ -1762,7 +2783,7 @@ Tool = {
   },
   prerequisites: {
     enabled: boolean,
-    ids: string[],                 // shared CraftingSystem.characterPrerequisites ids
+    ids: string[],                 // ids into the WORLD characterLibraries.characterPrerequisites
     gateMode: "bonus" | "usability",
   },
   bonus: {
@@ -1795,6 +2816,8 @@ Tool = {
    The `name` + `img` + `description` display snapshot is captured at registration or relinking time and is NOT auto-refreshed when the GM changes the source Item — parity with recipe-item definitions, not the component `updateItem` refresh path — because durable identity, not the snapshot, is the matching basis.
    The pre-existing user-authored `label` is a DISTINCT field and is NEVER written by snapshot capture, migration, or any refresh.
 2. Tools are **SYSTEM-OWNED**: the single canonical library lives on the crafting-system object as `system.tools` (persisted in the `craftingSystems` setting, populated by `CraftingSystemManager._normalizeSystem`).
+   `system.tools` is SHADOWED by the `fabricate.toolScope` world setting (issue 1359) and remains LIVE AND AUTHORITATIVE, for every key it still decides, while `## CraftingSystem` requirement 36 holds.
+   The readers now enter through the read union, which answers from this record for every field it carries EXCEPT a section this system INHERITS; this record REMAINS the source of truth for the rest while `## CraftingSystem` requirement 36 holds.
    Every consumer reads this one source — the recipe/step/ingredient-set/salvage tool gate (`RecipeManager`, `CraftingEngine`), the canvas interactable browser and item-drop resolution, and gathering.
    Gathering composition (`GatheringRichStateService.composeEnvironment`) sources `task.toolIds` lookups from `system.tools` (exposed on the composed environment as the non-enumerable `__libraryTools` map); it does **not** read a gathering-scoped tools copy.
    The 0.6.0 Catalyst→Tool migration writes migrated crafting Tools onto `system.tools`; the 0.7.0 migration reconciles any UI-authored `gatheringConfig.systems[id].tools` onto `system.tools` (dedupe by id, the system tool wins) and clears the gathering-config copy, so `system.tools` is the sole library going forward.
@@ -1815,7 +2838,11 @@ Tool = {
      The tool breaks when the numeric result is `< threshold`.
      Legacy `breakage.mode: "immune"` reads forward in both `Tool` construction and `_normalizeSystem` as `{ mode: "limitedUses", maxUses: null }` plus `checkBreakable: false`, and the next canonical write never emits `immune`.
 6. `prerequisites` always persists `{ enabled, ids, gateMode }`, and `bonus` always persists `{ enabled, expression }` even while either setting is inactive.
-   The system normalizer processes `characterPrerequisites` before Tools, prunes unknown Tool prerequisite ids in every state, retains valid ids while disabled, and changes an enabled gate to disabled when pruning leaves no ids.
+   **The prune of unknown Tool prerequisite ids is CONDITIONAL on a known-complete Valid Id Basis, and is NOT performed "in every state"** — that unqualified rule stood only while the library lived on the crafting system beside the Tools, and issue 1308 falsified it by moving the library to a world setting a given client may not have migrated.
+   The normalizer resolves the basis for the prerequisite library BEFORE Tools (`CraftingSystemManager._characterLibraryBasis`, the union of the world library and any surviving legacy in-system copy) and passes it in; when that basis is UNKNOWN the pass still runs and still rebuilds the record, but every id passes through untouched.
+   When the basis IS known-complete the prune is unchanged: an unknown id is dropped, valid ids are retained while the gate is disabled, and an enabled gate is changed to disabled when pruning leaves no ids.
+   The same basis MUST reach `upsertTool`, which does not go through `_normalizeSystem` and would otherwise derive an empty one of its own and clear a healthy world's gate on every Tool save.
+   An UNKNOWN basis is carried as a sentinel value that is not a `Set`, and every prune site tests for that rather than for emptiness, because an empty `Set` is a real, prunable basis and is exactly what the omitted-argument form of this failure looks like.
 7. Exactly one `onBreak.mode` is configured per Tool.
    `replaceWith` carries exactly one discriminator in `replacementTarget`: a managed Component id or a direct Item UUID; malformed, empty, or dual targets are invalid, and a Component target must differ from the Tool's own `componentId` when present.
    New Manager authoring is Component-only: the Tool Studio never creates or edits the direct Item discriminator.
@@ -1858,6 +2885,11 @@ Tool = {
     The precedence lives beside the `Tool` model rather than under the manager UI because the bound surfaces include engines, chat cards and the Run Journal projection, which cannot import from `src/ui/**` without inverting the layering — being unable to reach the reference implementation is what caused five further surfaces to re-derive it wrongly after issue 976 (issue 1119).
     Non-UI surfaces are bound by the same ordering: a chat card, a chat evidence projection, and the Run Journal step detail each render the Tool's own identity, never the linked component's alone and never the matched item's name ahead of an authored `label`.
     Breakage evidence records carry `toolId` alongside `componentId` precisely so a chat card can reach the Tool; without it the salvage card had no route back and emitted blank entries.
+14. This section describes the LIVE per-system shape and remains authoritative, for every key it still decides, while `## CraftingSystem` requirement 36 holds.
+    The readers now enter through the read union, which answers from this record for every field it carries EXCEPT a section this system INHERITS; this record REMAINS the source of truth for the rest while `## CraftingSystem` requirement 36 holds.
+    A reader's row is that shape PLUS the resolver's `member` and `inherited` keys, which no stored record carries.
+    `## Scoped Entity Definitions` is PARTLY LIVE per requirement — see its banner — and this section's own shape is SHADOWED by a world scope setting the `1.30.0` migration WRITES (identity, one fully-overriding membership record per system, and a world default per section elected from the oldest contributing system) (`## CraftingSystem` requirement 36).
+    Where the two disagree, this section is what the code does.
 
 ### Validation Matrix
 
@@ -1869,7 +2901,7 @@ Tool = {
 | `breakage.breakageChance.breakageChance` | integer `0..100`                                          | non-integer, out of range       |
 | `breakage.diceExpression.formula`        | non-empty string                                          | empty                           |
 | `breakage.diceExpression.threshold`      | finite number                                             | non-finite                      |
-| `prerequisites.ids`                      | known shared ids; at least one when enabled               | unknown or enabled-empty        |
+| `prerequisites.ids`                      | world-library ids; at least one when enabled              | enabled-empty; unknown only against a known-complete basis |
 | `bonus.expression`                       | non-empty when enabled                                    | enabled-empty                   |
 | `checkBreakable`                         | boolean                                                   | non-boolean canonical input     |
 | `onBreak.replaceWith.replacementTarget`  | exactly one valid Component id or Item UUID discriminator | absent, malformed, or dual      |
@@ -1953,6 +2985,125 @@ Result = {
 2. `quantity` must be positive.
 3. `propertyMacroUuid` is only valid when `features.propertyMacros` is true.
 
+## Versioned Run Lifecycle
+
+Applicable crafting runs, including alchemy, and gathering runs share these optional persisted fields.
+Salvage retains its existing contract.
+
+```js
+RunLifecycle = {
+  lifecycleVersion: 1,
+  runRevision: number, // non-negative integer; starts at zero
+  completionMode: "manual" | "worldTime", // new runs default to manual
+  pauseState?: { pausedAt: number, remainingSeconds: number },
+  pausedDurationSeconds: number, // starts at zero
+  executionJournal?: {
+    operationId: string,
+    requestId: string,
+    baseRunRevision: number,
+    status: "planned" | "committed" | "recoveryRequired",
+    intent: object | null,
+    effects: Array<{
+      effectId: string,
+      kind: string,
+      planned: object | null,
+      phase: "planned" | "applying" | "applied",
+      receipt?: object | null,
+    }>,
+    outcome?: object | null,
+  },
+}
+```
+
+### Requirements
+
+1. Only an absent `lifecycleVersion` selects legacy behavior, preserving existing consumption, refunds and automatic progression without migration or restamping.
+A present unsupported version remains readable and preserved, but mutation entrypoints refuse it before effects.
+2. New applicable runs explicitly request version 1; ordinary legacy manager callers remain unstamped.
+Accepted versioned mutations advance `runRevision`, and a stale expected revision is refused.
+Revision validation is not a cross-client lock; authoritative command arbitration owns that boundary.
+3. Pause records the current world time and remaining gate seconds, including zero.
+Paused runs retain their selections and completion preference and never mature through world-time processing.
+Resume reanchors readiness at the new world time plus the frozen remainder and accumulates paused duration.
+4. Manual and automatic execution refuse paused runs; cancellation remains available while paused.
+Recovery-required and unsupported-version runs refuse ordinary execution, cancellation and replay.
+5. The shared execution-journal transition implementation persists the complete plan before effects, one effect as `applying` before invoking its seam, and its actual receipt as `applied` afterward.
+Applied effects form a prefix; at most one effect is applying, and later effects remain planned.
+6. Resuming execution after reload with an applying effect, failure after its invocation begins, or inability to persist its receipt requires recovery and never replays the uncertain effect.
+A normal observing-client refresh during live execution does not itself trigger recovery.
+Committed requests return their recorded outcome.
+7. Gathering persists its terminal record with the planned execution journal before effects and updates receipts in that same history record by run ID.
+It does not delay terminal history until effects finish.
+8. Intent, effect plans, receipts and outcomes retain existing secret and blind-run redaction.
+Authority request deduplication and prepare tokens live in the private authority ledger; the run record retains effect evidence.
+9. Stage browsing is transient UI state and never changes the persisted executable stage index.
+
+### Authority Ledger and Recovery Boundary
+
+Every version-1 start or mutation MUST pass through the active-GM command authority, including an immediately executable public craft.
+The authority MUST re-resolve the actor, sender ownership, source actors, run revision and executable stage under its execution claim before applying the operation.
+The actor UUID identifies the command target; ownership MUST be checked against the attested sender rather than the executing GM's ambient `isOwner`.
+A local queue or revision comparison alone MUST NOT be treated as a cross-browser lock.
+
+The authority requires exactly one private JournalEntry ledger.
+The active GM MUST provision it automatically when the world holds none, during boot recovery and at the start of the command path, and MUST then run boot reconstruction against it.
+A non-GM realm MUST NOT provision a ledger and keeps its active-GM refusal.
+Provisioning MUST use a server-assigned top-level `_id`, never a fixed one: only the embedded duplicate-`_id` check is enforced, so a fixed top-level `_id` silently overwrites the existing ledger and its durable request state.
+A refused create — `JOURNAL_CREATE` is a revocable user permission — MUST surface its own availability reason rather than an unlabelled failure.
+
+Duplicate ledgers MUST be resolved without a human wherever that is provably safe.
+The active GM MUST rank candidates with a deterministic total order every session computes from the same stored values — a ledger holding durable evidence before a pristine one, then the server-assigned `_stats.createdTime`, then the lowest `_id` — where a pristine ledger is one with no recorded requests, no active prepare tokens and no claim page.
+`_stats.createdTime` is a server wall clock and MUST NOT be read as "first created"; it is a shared value the order converges on.
+Only a pristine non-winner may be deleted, and two or more ledgers holding durable evidence MUST remain `ledger-ambiguous` for a person to resolve.
+Because the client world collection is broadcast-fed, arbitration MUST resolve candidates through an authoritative server read, issued GM-side only because that read is not permission-filtered, ranking its detached documents and acting by ID against the live collection.
+A read that did not ANSWER — it rejected, or the client could not issue it — MUST yield an unsettled result and MUST NOT be collapsed to "the server reports none", because that answer is what authorises a create and two sessions reading through the same failure would each provision their own ledger.
+Exhausting the retry passes without settling MUST also report unsettled rather than ambiguous, which asserts a second ledger nothing has observed.
+A ledger deleted by a racing session mid-operation MUST be treated as replaced rather than failed: claim creation, receipt writes and prepare-token persistence MUST retry against the surviving ledger after relisting.
+Because the claim page lives inside the ledger it was created on, a retry that lands on a replacement has lost the lock, so the command MUST re-acquire its claim there.
+A command MUST NOT run on holding no claim on the ledger it is writing to: a re-acquisition that fails before the handler MUST refuse, and one that fails after it MUST settle as recovery-required.
+Explicit setup remains available as an idempotent ensure that returns the existing ledger rather than refusing it.
+
+The ledger holds durable request outcomes and one-use prepare tokens; an embedded JournalEntryPage with a fixed ID and `keepId` arbitrates the global execution claim.
+`keepId` is load-bearing: without it the server discards the fixed ID silently, and the cross-browser lock stops existing rather than failing.
+A claim MUST NOT expire on age alone, because an interrupted operation may already have produced irreversible effects.
+Its standing is judged from the REQUEST it guards, read from the ledger's own durable request state, within a bounded live window derived from the command timeout a caller itself waits before treating a reply as unknown.
+Inside that window the claim is live and `claim-held` is the correct, honest refusal.
+Past it the active GM MUST release a claim whose request is `settled`, `abandoned` or `reconciled`, or whose request was never recorded at all, because the operation it guarded provably finished or never began and the claim only leaked; that release is automatic, requires no console call, and MUST happen during boot recovery so a world already holding a leaked claim heals itself.
+Every other case MUST retain the claim and MUST keep requiring `reconcileJournalRunAuthority` — an uncertain effect, an unreadable acquisition stamp, an unknown status, and in particular a still-`processing` request whose holding session can no longer be running it, whose effect may be half applied.
+Only the elected GM releases; another realm judges the same claim for its own availability and writes nothing.
+An automatic release MUST be confined to the provably-leaked case, because releasing a claim that should have been kept is a data-integrity failure and is worse than the block it removes.
+
+Releasing a claim MUST confirm it server-side before dispatching the delete, through the same authoritative read the ledger arbitration uses, scoped to the one ledger.
+The embedded page collection is broadcast-fed and can still show a claim the server has already removed, and a delete naming an absent ID raises a user-visible Foundry notification that no caller can suppress, because the socket layer reports the error before it rejects the promise.
+A claim the server no longer holds MUST be reported as released rather than refused, which is what reconciliation already reports for that same state, while a claim that survived its delete MUST still report failure and a page another claim ID holds MUST NOT be deleted by any caller.
+The acquire keeps the duplicate embedded-`_id` rejection, which alone resolves the simultaneous-acquire race atomically, because ordinary contention never reaches it: a live claim is refused as `claim-held` before any create is dispatched.
+This arbitration and the execution journal are not a transaction across Foundry document writes, macros and publications, and MUST NOT be described as atomic execution or automatic rollback.
+
+Boot reconstruction MAY scan orphaned execution journals only under an exclusively acquired claim when no prior claim exists.
+An ordinary observing-client refresh MUST NOT reconstruct a potentially live execution.
+For a retained claim, `reconcileJournalRunAuthority({ claimId, disposition })` requires the active GM, the exact claim ID and a disposition of `reconciled` or `abandoned`.
+It MUST reconstruct that claim's matching execution evidence and durably record the disposition before releasing the claim.
+Reconciliation releases the authority claim only; the prior request remains non-replayable and any uncertain run effect remains recovery-required.
+A retained claim can block other versioned runs, and its availability reason MUST remain visible.
+The GM affordance that clears a retained claim MUST be offered wherever a GM views a live run while a claim is RETAINED, whichever run that is and whatever reason that run itself reports — the run holding the uncertain effect included, whose own evidence names its block.
+A LIVE claim offers no such affordance, because a command is still running and waiting is the only answer, and no viewer who may not reconcile is ever offered one.
+
+A published availability answer is a cached derivation, not a fact a surface may hold indefinitely.
+A refusal is true while it holds and MAY be published freely, but when it LIFTS the authority MUST announce the lift, because that is the moment every reading taken of it became false.
+A surface that captured a refusal MUST re-derive on that announcement, so a refusal naming a claim can never outlive the claim it names.
+This MUST NOT be implemented by polling or by re-deriving on every read.
+
+A refusal raised by an in-memory lifecycle guard before any document write MUST be reported as a refusal and MUST release its claim, even when the operation had already redeemed a mutating execution grant: redemption records intent, not an applied effect.
+An operation that fails by throwing remains uncertain, MUST retain its claim, and MUST stay recovery-required until reconciliation.
+The recovery rule MUST NOT be widened beyond the provable pre-write case, because releasing a genuinely half-applied effect is worse than the block it removes.
+
+Command replies MUST use transport-level recipient routing as well as attested-GM and recipient/session/request/run/revision correlation.
+The private ledger MUST NOT be copied into actor flags or reply payloads.
+Initial prompt redaction MUST use the initiating viewer's current entitlement before returning protected identity, image, formula, DC or modifier information.
+Post-commit evaluated-roll handoff MUST independently recheck entitlement against the current actor, viewer and run; that later check cannot protect an already-disclosed initial prompt.
+Secret checks MUST use generic local prompts, GM private posting and sanitized transition replies without serialized roll data.
+Non-secret entitled handoffs carry already-evaluated roll data for initiating-client posting, never client-supplied authoritative totals or awards.
+
 ## CraftingRun
 
 ### Purpose
@@ -2019,8 +3170,34 @@ CraftingRunStepState = {
 
   selectedIngredientSetId?: string,
 
-  // START-phase consumption snapshot for a time-gated step, written when the gate is ARMED
-  // and read at FINISH (source items are already deleted) and by the cancel reversal.
+  // Versioned current-stage intent; validated again against live requirements before spending.
+  selectionPlan?: {
+    selectedIngredientSetId: string | null,
+    ingredientOptionOverrides: Record<string, { optionIndex: number, heldItemId?: string }>,
+    ingredientEssenceAllocation?: {
+      stepId: string,
+      ingredientSetId: string,
+      allocation: Record<string, number>, // physical item key -> units
+    },
+  },
+  selectedRequirementSnapshot?: object, // full selected authored set, including route/currency/tag/essence
+
+  // Optional permitted historical meaning and purpose; never a live narrative lookup.
+  resolutionSnapshot?: { kind: "check" | "ingredients" | "none", mode: string },
+  presentationSnapshot?: { name: string, description: string },
+  currencySpends?: Array<{ unit: string, amount: number }>, // applied settledSpends only
+  essenceSpend?: {
+    labels: Record<string, string>, // essenceId -> captured label
+    carriers: Array<{
+      actorUuid: string | null, itemUuid: string, quantity: number,
+      name: string | null, img: string | null,
+      contributions: Array<{ essenceId: string, amount: number }>,
+    }>,
+  },
+
+  // START-phase consumption snapshot for a time-gated step, written when the stage STARTS
+  // and read at resolution (source items are already deleted) and by the cancel reversal.
+  // Its presence is what makes a versioned stage STARTED, and therefore locked.
   // Absent for instant / non-timed steps and on pre-snapshot historical records.
   preparedConsumption?: {
     selectedIngredientSetId: string | null,
@@ -2031,9 +3208,13 @@ CraftingRunStepState = {
       itemUuid: string | null, actorUuid: string | null, quantity: number,
       name: string | null, img: string | null, componentId: string | null,
     }>,
+    // Versioned only: the rehydratable consumed-item snapshots the resolution rebuilds
+    // its essence transfer, awards and history from, and the captured carrier spending.
+    consumedSnapshots?: Array<object>,
+    essenceSpend?: { labels: object, carriers: Array<object> },
   },
 
-  // Authored ingredient requirements snapshot, captured at run creation (`_buildStepStates`).
+  // Legacy authored ingredient requirements snapshot, captured at run creation (`_buildStepStates`).
   // Component-backed ingredients of the step's primary (first) ingredient set only; tag /
   // essence requirements carry no component id and are omitted. Persisting the stable ids
   // keeps a history entry's requirements intact after the recipe is later edited or deleted.
@@ -2069,6 +3250,7 @@ CraftingRunStepState = {
     itemUuid: string | null,
     quantity: number,
     componentId: string | null,
+    toolId?: string | null, // recorded library reference, not physical Item identity
     broken: boolean,
     // checkDriven-only evidence:
     authority?: string,
@@ -2107,6 +3289,31 @@ CraftingRunStepState = {
    It is a **complete** map over every key in `resolvedEssences`, not only the disabled ones, because run persistence is a flag merge that cannot delete a key inside a surviving run and an omitted key would resurrect with its old value.
    An ABSENT map — a run armed before the field existed — reads as all-enabled.
    A collapsed multi-step chain has no such snapshot at all, because it consumes nothing when its single gate is armed and executes every step live at maturity; it therefore evaluates enabled-ness at maturity, consistent with its already-live essence resolution.
+
+#### Optional historical evidence
+
+Versioned stage arming captures `presentationSnapshot` from the authoritative execution step when the initiating viewer may see the recipe.
+For an implicit single stage whose wrapper has no description, the permitted recipe description supplies that captured purpose.
+Its first permitted name and description remain unchanged through execution and completion; later narrative edits do not rewrite history or require whole-Journal invalidation.
+`resolutionSnapshot` captures effective resolution meaning, with the executed meaning retained at completion and across an applied-prefix reload.
+The canonical active-check resolver determines `kind: "check"`; an unchecked ingredient-routed stage records `"ingredients"`, and another confirmed unchecked stage records `"none"`.
+Actual rolls remain in `lastCheckResult` and selected route identity and authored thresholds remain in `selectedRequirementSnapshot`.
+Neither snapshot duplicates check formula, DC or modifier configuration.
+
+The consumption receipt captures each actor-qualified carrier's source contributions before source deletion can prevent later reads.
+`essenceSpend` retains one row per physical `(actorUuid, itemUuid)` carrier, its actual consumed quantity and every recorded essence contribution; spent totals are derived from those contributions rather than stored again.
+Applied-prefix reconstruction hydrates this evidence, and both successful and failed stage finalization retain it through the manager's persistence allowlist.
+`currencySpends` copies applied `settledSpends` only; prepared intent and an Item Piles deducted boolean are not itemized spend evidence.
+Legacy timed `preparedConsumption.currencySpends` remains a valid settled receipt.
+Missing optional evidence stays absent in persistence and projects as `null` (Not recorded), while an explicitly recorded empty array or empty carrier list establishes zero.
+Legacy records gain no retrospective mode, presentation or contribution data from the current catalogue.
+
+New evidence is allowlisted before actor-flag or receipt persistence and independently gated by viewer entitlement before projection.
+New historical enrichments require an affirmative current-viewer access evaluation or an explicit GM viewer; absent, throwing or indeterminate evaluators MUST withhold them, and actor ownership is not disclosure authority.
+Versioned consumption MUST receive an object whose UUID matches the consumed Item from the actual delete/update operation before recording positive consumption/contribution receipts or allowing subsequent awards.
+A veto or unconfirmed write, including after a successful prefix, leaves the invoked batch uncertain and recovery-required without replay or automatic rollback.
+Arming uses the attested initiating viewer and later GM execution resolves the run's recorded initiator, never ambient GM access as permission to expose protected identity.
+Opaque records omit these new snapshots and contribution evidence; arbitrary document flags, private formula/DC, modifier configuration and GM-only component configuration do not enter the allowlist.
 
 ## Actor Flags
 
@@ -2164,6 +3371,8 @@ Actor.flags.fabricate.learnedRecipes = {
   [recipeId: string]: {
     learnedAt: number,
     sourceItemUuid: string,
+    granted?: true,      // present only on a granted entry; never written `false`
+    grantedBy?: string,  // optional caller-supplied label, trimmed, at most 64 characters
   },
 }
 ```
@@ -2173,8 +3382,17 @@ Requirements:
 1. `recipeId` must reference a valid recipe.
 2. `learnedAt` must be a valid timestamp.
 3. `sourceItemUuid` should reference the matched owned recipe item used to learn.
-   It is an actor-owned item uuid, so it dangles permanently once that copy is deleted, and the craft-time auto-learn path writes it as `null`.
-4. Stored and read via `getFabricateFlag` / `setFabricateFlag`; the effective persisted path is the doubly nested `flags.fabricate.fabricate.learnedRecipes` (the flag helpers prefix `fabricate.`), so it is never read via a raw single-nested `actor.flags.fabricate.learnedRecipes` path.
+   It is an actor-owned item uuid, so it dangles permanently once that copy is deleted, and it is written as `null` by BOTH of the paths that learn without a book: the craft-time auto-learn (alchemy `learnOnCraft`) and the knowledge grant of requirement 4.
+   Two such writers rather than one is exactly what makes a null uuid insufficient on its own as a display discriminant, and is why a granted entry carries a flag of its own.
+4. `granted` and `grantedBy` are optional scalars written only by the companion contract's knowledge grant (see `companion-api` and `recipe-visibility`).
+   `granted` is written as `true` and is NEVER written `false`: an entry that was not granted OMITS the field, so its presence is the whole fact and no reader has to tell `false` from absent.
+   `grantedBy` is the caller-supplied label for what did the granting — trimmed, at most 64 characters, and absent when the caller supplied none.
+   The grant REFUSES a non-string, an over-long, or an object- or array-valued label rather than coercing or truncating it, and writes nothing in that case, because a truncated module id names a DIFFERENT module.
+   Neither field is ever written by either book-learn path.
+   The field is named `grantedBy` rather than joining the `source*` family because every `source*` field on this entry already means THE BOOK.
+   Adding the two fields does not widen what counts as an entry: the entry boundary is still a numeric `learnedAt`, so a node carrying only `granted` yields no entry at all.
+   Both fields are UNTRUSTED at display — the flag is public and any module may write it — so a surface tests `granted === true` and `typeof grantedBy === 'string'` strictly rather than for truth (see `ui-integration` _Knowledge Surface_).
+5. Stored and read via `getFabricateFlag` / `setFabricateFlag`; the effective persisted path is the doubly nested `flags.fabricate.fabricate.learnedRecipes` (the flag helpers prefix `fabricate.`), so it is never read via a raw single-nested `actor.flags.fabricate.learnedRecipes` path.
    A reader using the raw path finds nothing in a real world and silently reports zero.
 
 ### Alchemy Dead-Ends Flag
@@ -2235,13 +3453,15 @@ Define the unified, UI-safe projection the player-facing Journal screen reads (s
 It is a **derived, computed view**, not a persisted entity: there is no new actor flag or `CraftingSystem` field, mirroring the System Validation Report's derived-view contract.
 `RunJournalBuilder` recomputes it on demand from the selected actor's three native run sources — `craftingRuns` (see _CraftingRun_ / _CraftingRunStepState_), `salvageRuns`, and `gatheringRuns` — projecting each native run into a single superset `RunModel`.
 Crafting runs populate the step fields; gathering and salvage carry no steps.
-Like the gathering listing it never returns raw Foundry documents: every model is built from cloned primitives, so the Journal monitors and (crafting only) advances _existing_ runs without creating them.
+Like the gathering listing it never returns raw Foundry documents: every model is built from cloned primitives, so the Journal monitors existing runs without creating them.
+The action projection supports versioned crafting and gathering commands while preserving legacy crafting advance, legacy gathering automatic completion and salvage behavior.
 
 ### JournalListing
 
 ```js
 JournalListing = {
   selectedActorId: string | null,
+  selectedActorUuid: string | null,
   actor: object | null,                 // UI-safe actor option (image, name, id)
   worldTime: number,                    // current world time used for readiness derivation
   activeRuns: RunModel[],               // projected non-terminal runs
@@ -2255,9 +3475,21 @@ JournalListing = {
 ```js
 RunModel = {
   id: string,
+  key: string,                          // JSON-encoded actor UUID / native run type / run ID
+  actorUuid: string | null,
   runType: "crafting" | "salvage" | "gathering",
+  activityKind: "crafting" | "alchemy" | "salvage" | "gathering",
+  lifecycleContract: "legacy" | "current" | "unsupported",
+  lifecycleVersion: number | string | boolean | null,
+  runRevision: number,
+  completionMode: "manual" | "worldTime",
+  pauseState: { pausedAt: number, remainingSeconds: number } | null,
+  pausedDurationSeconds: number,
+  actions: { execute, pause, resume, setCompletionMode, beginStep, atStageStart, setSelection, cancel, dismiss, disabledReason },
+  awaitingChoice: boolean,               // the stage cannot proceed until this viewer chooses
+  recoveryEvidence: { status, required?, appliedEffectCount, effectCount, effects, uncertainEffectIndex } | null,
   status: string,                        // the native persisted status, passed through verbatim
-  derivedStatus: "waiting" | "ready" | "inProgress" | "succeeded" | "failed" | "cancelled",
+  derivedStatus: "paused" | "waiting" | "ready" | "inProgress" | "succeeded" | "failed" | "cancelled",
   craftingSystemId: string | null,
   craftingSystemName: string,
   names: { title: string, subtitle: string },
@@ -2265,7 +3497,7 @@ RunModel = {
   img: string,
   stepIndex: number | null,
   stepCount: number,
-  multiStep: boolean,                    // crafting only: the recipe has more than one step (false for single-step and non-crafting)
+  multiStep: boolean,                    // active crafting: enabled recipe structure; terminal crafting: more than one recorded attempt
   isFinalStep: boolean,                  // crafting only: the run is on its last step (single-step, or the last step of a multi-step recipe)
   stepLabel: string,                     // "" for single-step, gathering/salvage, and redacted crafting runs
   steps: StepModel[],                    // [] for gathering/salvage and for redacted crafting runs
@@ -2275,24 +3507,28 @@ RunModel = {
   updatedAt: number | null,
   finishedAt: number | null,
   structureLabel: string,                // localized single-step vs multi-step label (crafting only)
-  resolutionModeLabel: string,           // localized player-facing mode label (crafting only)
+  resolutionModeLabel: string,           // crafting: active mode or recorded terminal mode; unknown terminal mode is empty
   recipeId: string | null,               // null for non-crafting and redacted runs
   taskId: string | null,                 // gathering/salvage task reference
   flavor: string,
   failureReason: string | null,
-  createdResults: Array<{ componentId, itemUuid, quantity, name, img }>,
+  createdResults: Array<{ actorUuid, componentId, itemUuid, quantity, name, img }>,
+  createdResultsRecorded?: boolean,      // gathering/salvage receipt presence; crafting keeps this per stage
   createdResultCount: number,
+  craftingYield: object | null,          // current-stage authored preview, never an actual award
+  gatheringYield: object | null,         // permitted mode-specific preview and recorded roll evidence
   manualAdvance: boolean,                // true for every crafting run (the Trigger Next Step gate); redaction does not suppress it
-  canCancel: boolean,                    // crafting only: true when the run is live (non-terminal) and the viewer OWNS the actor — a player may self-cancel only their own in-progress craft, redacted or not
-  refundOnCancel: boolean,               // mirrors the system's features.refundOnPlayerCancel (default true), so the cancel affordance can tell the player whether inputs will be returned
+  canCancel: boolean,                    // crafting compatibility alias of actions.cancel, including lifecycle refusals
+  refundOnCancel: boolean,               // legacy refund policy; versioned cancel retains completed spending
 }
 ```
 
-A **player self-cancel** removes an in-progress crafting run (archived to history as `cancelled`), produces nothing, and discards any rolled check outcome so the recipe becomes craftable again.
+A **legacy player self-cancel** removes an in-progress crafting run (archived to history as `cancelled`), produces nothing, and discards any rolled check outcome so the recipe becomes craftable again.
 It is owner-scoped with no GM relay (the engine writes items directly), so the cancel edge blocks a non-owner exactly as the advance edge does.
 When the system's `features.refundOnPlayerCancel` policy is on (default), the reversal restores each consumed ingredient onto its recorded source actor and refunds the spent currency (the shared "un-consume" primitive, reused by the GM cancel/reverse); when off, the inputs are forfeit.
 The reversal is best-effort and reports the actual outcome — a partial or failed restore does not falsely report the inputs as returned, and the run is still archived so it can never be re-cancelled (which would double-restore).
 The currency refund is attempted for EVERY recorded group even when one fails, and its result distinguishes a full refund, a partial refund, and a total failure, because "one terminal base unit returned, another failed" and "nothing returned" require different operator responses.
+Versioned cancellation instead preserves completed-stage spending, awards and check evidence, forfeits elapsed time, and leaves unconsumed materials alone through the authoritative command boundary.
 
 ### StepModel
 
@@ -2305,9 +3541,9 @@ StepModel = {
   timeGate: object | null,
   detail: {
     requiredSeconds: number | null,
-    primaryToolName: string | null,
-    toolNames: string[],
+    tools: Array<{ id: string | null, name: string, img: string | null }>, // every REQUIRED tool; a step has no "primary" one
     checkLabel: string | null,           // rollFormula + resolved DC; no skill name (none is stored)
+    checkKind?: "check" | "none" | "unknown", // active disclosed configuration; omitted from terminal detail
     failureText: string | null,
   },
   lastCheckResult: {
@@ -2321,8 +3557,34 @@ StepModel = {
   } | null,
   // The step's authored required ingredients (persisted snapshot) and the items it
   // actually consumed, each a UI-safe result row. `[]` when absent or for a redacted run.
-  requirements: Array<{ componentId, itemUuid, quantity, name, img }>,
-  consumedIngredients: Array<{ componentId, itemUuid, quantity, name, img }>,
+  requirements: Array<{ actorUuid, componentId, itemUuid, quantity, name, img }>,
+  consumedIngredients: Array<{ actorUuid, componentId, itemUuid, quantity, name, img }>,
+  attempted: boolean, // completed/failed state or actual effects/checks, not startedAt alone
+  completedAt: number | null,
+  createdResults: Array<{ actorUuid, componentId, itemUuid, quantity, name, img }>,
+  createdResultsRecorded: boolean,
+  usedTools: Array<{ actorUuid, componentId, itemUuid, toolId, quantity, name, img, broken?, virtual?, spared?, skippedImmune? }>,
+  resolutionSnapshot: object | null, // allowlisted CraftingRunStepState shape above
+  presentationSnapshot: object | null,
+  essenceSpend: object | null,
+  currencySpends: Array<{ unit: string, amount: number }> | null,
+  selectionPlan: object | null,
+  selectedRequirementSnapshot: object | null,
+  requirementSnapshot: object | object[], // full selected-set snapshot, else legacy requirements
+  selectionAvailability: object | null,  // current-stage live solver projection only
+  craftingYield: object | null,          // current-stage authored output only
+  yieldPreview: object | null,           // entitled future-stage authored output, never historical awards
+  inputPreview: {                        // entitled future-stage authored inputs, never selection intent
+    source: "preview",
+    stageIndex: number,
+    routes: Array<{
+      id: string | null, name: string,
+      groups: Array<{
+        id: string | null, name: string,
+        options: Array<{ id, kind, name, img, icon, colorToken, need }>,
+      }>,
+    }>,
+  } | null,
 }
 ```
 
@@ -2330,18 +3592,85 @@ StepModel = {
 
 1. **`derivedStatus` is computed, never the persisted status.**
    A terminal `status` (`succeeded`, `failed`, `cancelled`) passes through to `derivedStatus` unchanged.
-   For a non-terminal run, readiness is derived from the active readiness gate's `availableAt`: `ready` when `availableAt <= worldTime`, otherwise `waiting`.
+   For a non-terminal run, a persisted pause takes precedence and projects `paused`; remaining time and progress use its frozen remainder even after the former gate deadline.
+   Otherwise readiness is derived from the active readiness gate's `availableAt`: `ready` when `availableAt <= worldTime`, otherwise `waiting`.
+   Progress on an unpaused gate is `requiredSeconds - (availableAt - worldTime)` over `requiredSeconds`, never elapsed wall time from `initiatedAt`.
+   Resuming re-anchors `availableAt` alone and leaves `requiredSeconds` and `initiatedAt` as authored, so only the deadline form carries the paused span; measuring from `initiatedAt` banks every paused second as work and reports a full bar beside a remaining-time label still counting down.
    A non-terminal run with no armed gate is `inProgress`.
-   The persisted `status` (e.g. a `waitingTime` that `processWorldTime` flips to `inProgress` asynchronously off the same world-time hook) is NEVER consulted for the active-run derivation — only the gate's `availableAt` against `worldTime` — so the readiness read is race-free.
+   Apart from terminal and pause precedence, the persisted `status` (e.g. a `waitingTime` that `processWorldTime` flips asynchronously) does not override the active gate's readiness.
    The `processWorldTime` write side (the salvage/crafting timed resume and its `_persist`/`setFlag` broadcast write) is **primary-GM-gated** (`game.users.activeGM?.id === game.user?.id`) so it fires exactly once even though `updateWorldTime` is a synced hook on every client — mirroring the gathering matured-run publication gate; a resume deferred while no GM is connected is caught up by the primary GM's startup `processWorldTime` pass.
+
+2. **Selection intent and live feasibility stay distinct from history.**
+   Current-stage availability MUST name the selected ingredient set and available routes, preserve stale set/option/item references as blocked, and never silently substitute a surviving route or option.
+   Explicit route changes replace scoped option overrides and essence allocation.
+   Each candidate MUST carry its own required amount and canonical solver feasibility against the whole stage's shared physical stock, including other fixed, choice and essence claims.
+   A stale selection MUST remain explicitly repairable even when only one option survives.
+   Waiting on a CHOICE and waiting on STOCK are separate states and MUST NOT be collapsed: a plan that does not resolve while nothing it names is short is waiting on a pick, and a finite `have < need` is waiting on an acquisition.
+   An essence requirement the carrier ledger can cover is an allocation the player may still redistribute and therefore a choice; one it cannot cover is a shortfall.
+   `awaitingChoice` reports the first of those, and only for a viewer who may act on it: an unpaused, unstarted current stage of their own live current-contract crafting run.
+   A started stage holds the choice it locked and a paused run holds the choices it already made, so neither is waiting on one.
+   **No control may be offered in a state where the command behind it refuses.**
+   The projection and the stage commands MUST answer readiness from ONE shared predicate rather than classify it independently, so an enabled control and the command's disposition cannot disagree.
+   That predicate names an unmade choice, a physical material shortfall, an essence gap the carrier ledger cannot cover, a price the actor cannot pay, and a required tool the actor does not hold, and both `actions.beginStep` and `actions.execute` MUST stay refused while any of them holds.
+   Affordability MUST be asked of the whole selection AGGREGATED onto the common base unit, as the engine's own gate asks it, not option by option: two currency ingredients each affordable alone but not together are not affordable.
+   The tool probe MUST exclude the items the selection will spend, as the engine's tool validation does, because one physical Item cannot be both a consumed ingredient and a held tool.
+   Two causes are knowable only asynchronously and so remain the engine's alone: a `macro` spend strategy, whose affordability only the macro can answer, and an Item Piles currency cost read through that module's API.
+   The projection stays OPTIMISTIC on both rather than inventing a refusal it cannot substantiate.
+   A stage's inputs are spent and its choice is locked when it starts, so a started stage is re-judged only on what is still re-validated live: its tools, which are never consumed and which a sale during the wait can remove.
+   The player's own pick MUST be judged on the PERSISTED plan, not on the resolver's verdict: the resolver invents a greedy option and a suggested essence allocation when neither is persisted and then reports success, so a stage whose multi-option group or essence allocation is unrecorded is waiting on a choice however well its inputs resolve.
+   Which control renders — the begin decision in place of the resolve action, or the resolve action itself — is decided by `actions.atStageStart` alone, never by `actions.beginStep` being truthy nor by matching `actions.disabledReason`: a refused cause at a stage's start boundary MUST keep the (disabled) begin control on screen rather than silently fall back to an enabled resolve action the command would refuse.
+   An untimed stage has no separate start boundary to withhold the begin control instead, so `actions.execute` MUST itself stay refused for the same causes.
+   `actions.disabledReason` reports the cause in its own words — `routeRequired`, `choiceRequired`, `selectionRequired`, `essenceRequired`, `currencyRequired`, `toolRequired` or `sourcesUnavailable` — and they MUST NOT be conflated, because an essence gap, a price and a missing tool are different problems with different fixes and none of them is "choose a route".
+   `sourcesUnavailable` is the run whose recorded component source actors no longer resolve: the engine refuses it outright, so the projection MUST report that rather than judging the stage against the crafting actor's inventory alone and naming whatever shortfall THAT inventory shows.
+   The two PICK causes are themselves distinct: `routeRequired` is the one decision a stage with more than one authored ingredient set opens, and `choiceRequired` names the option picks and essence allocation made WITHIN the route already taken, so a player on a single-route stage is never told to choose a route that has one value while the real gap is an allocation.
+   Both report `awaitingChoice`, because either way what the run is waiting on is the player's own decision, and both read as guidance rather than as a refusal.
+   A live stage's tool rows MUST state whether each tool is held, because a tool the stage lacks is a cause it is refused for.
+   A started stage whose locked route no longer resolves has no pick left to make and MUST NOT be reported as waiting on a choice it has no control to make; it reports the recipe edit (`routeUnavailable`) and keeps cancellation as its way out.
+   Alchemy check labels and completion-mode eligibility MUST use the canonical active-check resolver: none has no check, simple reads the simple slot, and tiered reads the routed slot.
+
+3. **Versioned actions are explicit capabilities.**
+   Unsupported versions MUST remain readable without inheriting legacy mutation fallbacks.
+   Authority, owner, pause, execution/recovery and check eligibility MUST govern the exposed capabilities; raw manual-advance flags cannot override a refusal.
+   User-specific terminal dismissals filter the composite key before counts without deleting native history.
+
+4. **Stage browsing is not execution.**
+   Browsing MUST NOT mutate the persisted step index or selections.
+   Inactive stages retain selected-set requirements or legacy array requirements alongside actual consumption, rolls and failures.
+   An unexecuted stage in a cancelled or failed run MUST NOT be presented as completed merely because it is before the browse anchor.
+   Terminal historical evidence retains every attempted stage's consumed inputs, created results, used tools and completion timestamp separately.
+   A future stage's entitled authored input preview MUST retain all requirement kinds, every option and all routes separately from selectedRequirementSnapshot; projecting it MUST NOT select, consume or persist future intent.
+   Confirmed empty arrays and recorded zero quantities MUST remain distinct from absent evidence or unknown quantities.
+   `attempted` requires an explicit succeeded/failed state, actual check or actual effect evidence; a manager-initialized next step's `startedAt` does not establish an attempt.
+   Terminal `multiStep` counts recorded attempts rather than consulting later recipe structure or system feature edits.
+   Terminal mode labels use captured resolution only, and terminal check/time detail does not consult live check configuration.
+   Captured material names take precedence over synchronous item-UUID resolution, then real component-ID resolution for a permitted reference.
+   Result rows retain `actorUuid`; absent names and quantities remain `null`, never the string `"null"`, a fabricated unit quantity or a zero roll.
+   A legacy timed consumed summary remains historical input evidence before and after finalization.
+   Historical tool enrichment MUST require affirmative current-viewer entitlement, with explicit GM access permitted.
+   The projection MUST preserve recorded actor and Item UUIDs, tool id, nullable quantity and the presence of recorded boolean state fields; absence MUST remain unknown rather than an inferred intact state.
+   Captured name and image MUST win over fallback metadata.
+   After the existing recorded-Item and actual component-reference lookups, the tool lookup MAY fill only missing name or image from the recorded tool id; unavailable or deleted tool definitions MUST retain unknown/default presentation.
+   Current tool metadata MUST NOT invent physical identity, quantities or historical state.
+   Presentation MAY group occurrences only by a recorded actor-qualified Item address whose optional actor qualifier agrees, retaining all stage-associated quantities and affirmative states in first-occurrence order without summing repeated uses.
+   Virtual tools and missing or contradictory identities MUST remain separate occurrences.
+
+5. **Recovery evidence is allowlisted, not a raw execution journal.**
+   The projection MUST retain ordered effect phases, known receipt presence, safe actual item/currency receipt rows for entitled viewers, and the index of the applying effect as an uncertain boundary.
+   Planned effects MUST be distinguished from confirmed and uncertain effects; unconfirmed receipt payloads MUST NOT be displayed as awards.
+   Raw intent, plans, document snapshots, arbitrary receipt properties, chat, formula and protected identity data MUST NOT pass through this projection.
+   Redacted crafting and opaque blind gathering retain generic recovery progress without receipt identities; recovery does not grant additional disclosure or replay permission.
 
 ### Startup Maintenance Passes
 
-The housekeeping passes `Fabricate#initialize` runs — `CraftingRunManager.cleanupInvalidRuns`, `CraftingRunManager.pruneInstantaneousActiveRuns`, `SalvageRunManager.cleanupInvalidRuns`, and `RecipeVisibilityService.cleanupLearnedRecipes` — drop run and learned-knowledge entries that name deleted content.
+The housekeeping passes `Fabricate#initialize` runs remove invalid references and legacy instantaneous phantom runs through their respective cleanup methods.
+`CraftingRunManager.pruneInstantaneousActiveRuns` MUST inspect legacy records only: valid version-1 instant runs can await manual execution, and unsupported present versions are preserved rather than treated as legacy phantoms.
+Removing an authored time requirement likewise MUST NOT cause this legacy pruning pass to delete a versioned run.
 They are governed by two rules that are deliberately DIFFERENT from the `processWorldTime` gate above (issue 970).
 
 **Write scoping.** Each pass walks only the actors the CURRENT client may update (`selectWritableActors`, keyed on `Actor#isOwner`), not all of `game.actors`.
-Fabricate has no socket-to-GM relay, so a pass that writes to an actor a player does not own is refused by Foundry, and `setFabricateFlag` REJECTS on a refused update by contract rather than reporting a phantom success.
+No socket-to-GM relay carries a housekeeping write, so a pass that writes to an actor a player does not own is refused by Foundry, and `setFabricateFlag` REJECTS on a refused update by contract rather than reporting a phantom success.
+That statement is scoped to these passes and is not a claim that Fabricate has no relay at all: the blind-gathering start relay and the complication delivery relay (issue 1286) both exist, and both are REQUEST/NOTIFY channels a client uses to ask the elected GM to take an action of its own.
+Neither is available to a housekeeping write, and neither may be recruited into one, because these passes are ownership-scoped idempotent key deletions on documents the acting client already owns — routing them through a GM would trade a refused write for a message with no acknowledgement, no retry and no ordering.
 `isOwner` is unconditionally true for a GM, so a GM client still sweeps the whole world while a player sweeps only their own characters.
 An ownership scope is chosen over a primary-GM gate because these passes are idempotent key deletions rather than state advances — several clients each doing their own share is harmless, and unlike a primary-GM gate it does not make cleanup hostage to a GM ever connecting.
 The predicate FAILS CLOSED: an actor that does not answer `isOwner === true` is skipped, because a skipped cleanup is strictly less harmful than the rejected startup a permissive default would restore.
@@ -2359,20 +3688,35 @@ The GM-only cascade walkers (`removeRunsForSystem`, `removeRunsForComponent`, an
    Gathering re-maps its native `*WorldTime` fields (`startedAtWorldTime` / `updatedAtWorldTime` / `completedAtWorldTime`) onto the common `startedAt` / `updatedAt` / `finishedAt`; salvage already uses the crafting `startedAt` / `updatedAt` / `finishedAt` names.
 3. **Viewer redaction (`redacted`).**
    For a non-GM viewer, a crafting or alchemy run whose recipe the viewer cannot see — a recipe that no longer resolves, or an undiscovered alchemy / knowledge-gated crafting recipe — is redacted: `redacted: true`, `names.title` becomes the generic localized label (`FABRICATE.App.Journal.Redacted.Title`), `recipeId` is `null`, `steps` / `createdResults` / `failureReason` / `stepLabel` are blanked, and `img` falls back to the default run image.
-   Redaction hides IDENTITY ONLY and is NOT an authorization gate (issue 966): `manualAdvance` and `canCancel` are unaffected by it, so an owner can still finish and abandon a redacted run.
+   Redaction is NOT an authorization gate (issue 966): an owner retains actions permitted by the lifecycle, while authority, pause, unsupported-version and execution/recovery refusals still apply.
    The GM bypass precedes the missing-recipe guard: a GM viewer is never redacted, even for a run whose recipe no longer resolves, so the GM still sees the run's persisted step snapshots (requirements, roll, consumed items) rather than a redacted empty card.
    Globally-visible recipes are likewise never redacted; with no recipe-visibility service available no redaction occurs.
    This mirrors the gathering blind-run redaction (the gathering listing builder), so the Journal never leaks a hidden crafting/alchemy recipe identity to a non-GM viewer.
    Gathering and salvage runs are not redacted by this projection (`redacted: false`); gathering's own blind-task redaction is applied upstream by its listing builder.
 4. **Step projection is crafting-only.**
-   `steps`, `currentStep`, `structureLabel`, `resolutionModeLabel`, `multiStep`, `isFinalStep`, each step's `detail.checkLabel`, and each step's `requirements` / `consumedIngredients` are populated for crafting runs only; gathering and salvage project `steps: []`, `currentStep: null`, empty structure/mode labels, and `multiStep: false` / `isFinalStep: false`.
-   A step's `requirements` come from its persisted snapshot and `consumedIngredients` from the persisted consumed refs; both resolve name/img via the same shared result mapper (consume-time capture, then the item-uuid and component-id fallbacks), so a deleted consumed item still labels from its captured or component name.
+   `steps`, `currentStep`, `structureLabel`, `multiStep`, `isFinalStep`, each step's `detail.checkLabel`, and each step's `requirements` / `consumedIngredients` are populated for crafting runs only; gathering and salvage project `steps: []`, `currentStep: null`, empty structure labels, and `multiStep: false` / `isFinalStep: false`.
+   Gathering's permitted mode-specific yield projection supplies its Direct, d100 or Check label independently of crafting step fields.
+   A step's `requirements` come from its persisted snapshot and `consumedIngredients` from the persisted consumed refs.
+   Historical consumption enrichment MUST clone rows and preserve captured nonempty name/image, physical identity, quantity, order and stage association.
+   Missing metadata MUST use consistent same-stage prepared summaries by exact actor-qualified Item UUID, then permitted exact live Item metadata, then consistent earlier entitled historical Item metadata, then scoped-component metadata only where a genuine component reference exists.
+   Conflicting nonempty candidates at a fallback level MUST leave that field unknown rather than proceed to weaker evidence.
+   A contradictory actor qualifier, bare id, UUID tail, name, image, requirement or array position MUST NOT establish physical identity.
+   Historical metadata sources MUST be currently entitled, earlier terminal legacy reported receipts or applied versioned receipts; planned versioned effects MUST NOT qualify.
+   Equal world-time timestamps MAY use the native newest-first terminal ledger's earlier suffix to establish chronology, but MUST NOT use display sorting or an unrelated collection's order.
+   Historical metadata fallback MUST NOT copy quantities or operational state, write actor flags, or claim new consume-time capture.
+   Recorded gathering yield MUST expose `rollModel: shared | perRow | unknown`, `roll: number | null`, per-row `rawRoll`, `effectiveRoll`, `threshold`, `cleared` and `qty`, and `unattributedAwardIndexes` into its actual receipt list.
+   Quantity attribution MUST prefer explicit row linkage, then exact scoped component identity, then proven full source identity through retained registered, origin or alias Item UUIDs.
+   Only equivalent simple Item compendium addresses with and without the explicit `Item` segment MAY normalize together within history matching; pack, document type and embedded ancestry MUST remain distinct.
+   Conflicting explicit linkage MUST NOT fall back to a weaker match, and an award MUST contribute to exactly one selected row or remain unattributed.
+   Multiple uniquely linked receipts MAY sum for one row; missing or invalid receipt quantities MUST remain unknown, and authored quantities or proportional division MUST NOT replace them.
    A redacted crafting run also projects `steps: []` (its requirements / consumed items never leak).
-   `multiStep` is `recipe.steps.length > 1`; `isFinalStep` is `stepCount <= 1 || currentStepIndex >= stepCount - 1` (true on a single-step recipe or the last step of a multi-step recipe, and — harmlessly, since a terminal run drives no action — on any terminal run whose `currentStepIndex` is null).
+   Active `multiStep` follows the enabled multi-step feature and `recipe.steps.length > 1`; terminal `multiStep` follows recorded attempts as specified above.
+   `isFinalStep` is `stepCount <= 1 || currentStepIndex >= stepCount - 1` for an active run; terminal records drive no execution action.
    `stepLabel` is a localized "Step X of Y" string only for a non-redacted multi-step crafting run; it is `""` for a single-step recipe (the structure label already conveys the single-step shape) and for a redacted run (so a hidden multi-step recipe never leaks its step count or active step name).
-5. **`manualAdvance` states what the run TYPE needs, not what the viewer may do.**
-   It is `true` for every crafting run — including a redacted one (issue 966) — and `false` for gathering, salvage, and recipe-less alchemy fizzle history entries, which resolve off the world-time hook or are terminal.
-   Authorization belongs to the advance seam (`resolveAdvanceSources`), not the projection; the player-facing advance contract is defined in `recipes-and-steps/spec.md` (_Run Progression — Player-Initiated Advance_).
+5. **`manualAdvance` is a legacy compatibility signal, not a versioned capability.**
+   It is `true` for crafting runs — including redacted ones (issue 966) — and `false` for gathering, salvage and recipe-less alchemy fizzle history entries.
+   Versioned gathering can nevertheless expose manual collection through `actions.execute`; every versioned mutation obeys the authoritative capability/refusal contract rather than this flag.
+   Legacy authorization belongs to the advance seam (`resolveAdvanceSources`); versioned authorization belongs to the active-GM command boundary.
 6. **`resolutionModeLabel` uses the player-facing label map.**
    It resolves through the localized mode-label map defined in `resolution-modes/spec.md` (_Player-Facing Mode Labels_) and never emits the raw `resolutionMode` token.
 7. **`counts.active` feeds the nav badge.**
@@ -2784,6 +4128,19 @@ Two macros writing the same path is supported, resolves last-writer-wins, and is
 A path that cannot be written (for example because an intermediate segment is `null` or a primitive) is logged and skipped.
 For the essence property macro loop specifically, that failure is isolated to the essence whose macro produced the unwritable path: every other essence's macro, and the result's own macro, still runs and still applies.
 
+#### The complication macro is the one macro surface that does NOT run on the acting client
+
+A component complication's `macroUuid` (issue 1286, behaviour in `recipes-and-steps/spec.md` _Complication Macros_) shares this contract's execution SHAPE and departs from it in three stated ways.
+
+- Its input context is its own: `{ kind: 'componentComplication', craftingSystemId, activity, resolutionId, resultId, bucket, effectRollTotal, component, complication, actor, token, speaker, requestingUser }`.
+  It carries no `recipe`, no `ingredientPool` and no `resolvedEssences`, because a complication is a consequence of a progressive STAGE rather than of an item build, and it returns no property map: nothing is applied from its return.
+- Its scope is Fabricate's `('context','args','scope')` binding under `"use strict"`, not Foundry's own `#executeScript` bindings, so every other name a macro author reaches for resolves as a GLOBAL on the executing client.
+  `canUserExecute` is not consulted and `MACRO_SCRIPT` remains deliberately unconsulted.
+- **It executes on a GM client rather than on the current user's**, so that a complication's authority does not depend on whether the activity was time-gated.
+  The consequence is that `game.user.character` is the GM's (normally none), `canvas` is whatever scene the GM is viewing and may not be ready, the token selection is the GM's, and `game.user.isGM` is TRUE — so a macro branching on it flips.
+  `speaker`, `actor` and `token` are therefore supplied explicitly on the scope, resolved GM-side from the addressing; a complication macro that needs the acting player's own client, such as any UI prompt, cannot work.
+  The bypass of `canUserExecute` is justified for this surface by the addressing-only payload, the server-attested sender and the GM-side actor re-authorization stated in `recipes-and-steps/spec.md` _Complication Macros_, and NOT by the "no added authority" argument the other macro surfaces rest on, which is false of a GM client.
+
 ### Success Macro Contract (Removed in 1.8.0)
 
 The step-level success macro has been removed.
@@ -2796,7 +4153,7 @@ A step failure is handled entirely by the engine's failure-consumption policy; t
 
 ## Foundry Multi-Write Invariants
 
-When one Fabricate operation uses multiple separate sequential Foundry settings, flag, or document API calls to establish one invariant, it MUST treat the calls as a compensating transaction.
+When one Fabricate operation uses multiple separate sequential Foundry settings, flag, or document API calls to establish one invariant, it MUST treat the calls as a compensating transaction, except for the versioned execution-journal operations specified below.
 Equality of the primary setting, flag, or document value MUST NOT short-circuit the operation when an ancillary invariant may still require repair.
 
 Before the first write, the operation MUST snapshot the complete pre-state needed to restore every affected key or document, including whether each key existed separately from its stored value.
@@ -2808,6 +4165,10 @@ Tests MUST cover a same-primary-value call that repairs an unsatisfied ancillary
 
 This requirement applies only when the application composes separate sequential API calls into one invariant.
 A single Foundry atomic or batched document operation does not require application-level compensation merely because its one API call writes several documents or fields.
+
+Versioned execution-journal operations deliberately use durable intent, ordered effect phases and actual receipts instead of compensating rollback.
+An ambiguous effect requires manual recovery and must never be replayed automatically.
+The journal records the known applied prefix and uncertain boundary; the preceding compensation requirements continue to apply outside this versioned exception.
 
 **Reverse-compensating a delete cannot restore document identity.**
 Value and key presence are restorable; a document's `_id` and its `_stats` are not.
@@ -2875,13 +4236,34 @@ A pass that declares no basis MUST be omitted, so that a destructive pass cannot
 **Both doors MUST share that one builder.**
 Two independently written gates on the same collaborators drift, and the half that drifts is the half nobody is looking at; the mutation-time composition site therefore supplies its own pass-to-entity-kind declarations to the same builder rather than restating the partition.
 
+**THERE ARE TWO ENFORCEMENT SHAPES, and the second is not a footnote on the first.**
+The rule above — omit the pass — is the shape available when the pass exists only to prune, so that not running it is a complete and honest outcome; that is true of every startup and mutation-time cleanup pass, and it stays the DEFAULT shape because an omitted pass is directly assertable from a pure builder.
+It is unavailable when the prune is one step inside a pass that MUST still run for another reason.
+`CraftingSystemManager._normalizeSystem` is the case that established the second shape (issue 1308): it is a whitelist rebuild that produces the persisted crafting-system record, so omitting it does not decline to prune — it declines to emit the record at all, and the caller writes nothing or writes a shape the corpus cannot carry.
+The same is true of `upsertTool`, whose job is to save a Tool.
+
+**In that shape the UNKNOWN basis MUST be carried to the prune site as a SENTINEL, and ONLY the prune is skipped.**
+The pass runs, every non-destructive derivation it performs still happens, and the reference lists it would have filtered pass through unchanged.
+Three rules make that safe, and all three are consequences of the first shape rather than new licence:
+
+- **The sentinel MUST be distinguishable from an EMPTY basis by its TYPE, never by its size.**
+  An empty basis is a real, prunable answer — the GM deleted every entry — and it is also precisely what an omitted argument produces, so a site testing `size === 0` cannot tell "prune everything" from "prune nothing" and would silently pick one of them.
+  The reference implementation passes `null` and every prune site tests `instanceof Set`, so a caller that supplies nothing gets the safe direction.
+- **Every prune site that can receive the sentinel MUST test for it**, including sites reached only through an argument default.
+  An argument default of an EMPTY set is this requirement's own failure mode reached by an omitted argument, so those defaults become the sentinel too.
+- **The basis MUST be threaded as an argument rather than read from a collaborator inside the pass**, so the pass stays a function of its arguments and a caller that cannot vouch for the ids can say so.
+  A pass that digs the basis out of ambient state cannot be handed an UNKNOWN one, and cannot be tested for what it does with one.
+
+**The sentinel shape does NOT relax what makes a basis known-complete**, and it is not a licence to skip pruning where the first shape applies.
+It is the same gate with a different lever, chosen because the pass cannot be omitted, and it reports nothing because the pass itself still ran; what the first shape reports as an omission, this shape leaves visible as unpruned references that the next known-complete normalize resolves.
+
 **An omission MUST be reported.**
 Neither door's caller reads what its runner returns — the startup runner returns only FAILED labels and its caller discards them, and the mutation-time callers discard the outcome entirely — so a gate that omitted every pass is otherwise indistinguishable from a run that found nothing to prune.
 The report names the omitted passes and the entity kinds that decided them.
 It MUST NOT fail the operation it reports on: an omitted pass is what this gate exists to survive, so it must not stop a boot and must not fail a GM's delete.
 
 **One destructive door remains OUTSIDE this requirement, and it is not safe.**
-The one-shot version-keyed flag auto-stamps are corpus-derived and set their done-marker unconditionally, so an id set that was defaulted rather than derived — or one built from a corpus read that failed — burns the one shot and leaves the world permanently under-stamped, repairable only through the manual item-data repair action.
+The one-shot version-keyed flag auto-stamps are corpus-derived and set their done-marker unconditionally, EXCEPT where the pass consumes a migration's output — the component and tool flag stamps withhold their advance until `migrationVersion` reaches `1.30.0`, because the deferred branch of a migration pass returns normally and an unconditional advance would gate the repair off forever (issue 1363), so an id set that was defaulted rather than derived — or one built from a corpus read that failed — burns the one shot and leaves the world permanently under-stamped, repairable only through the manual item-data repair action.
 It is recorded here so that this gate is not read as making it safe.
 The mutation-time door recorded here previously — the flag cleanup reachable from recipe deletion, bulk recipe deletion, the public orphaned-flag entry point, compendium re-import, and system-scoped state cleanup — is now inside the requirement, per the prune-kind scoping above.
 
@@ -2978,9 +4360,10 @@ Closing the five stores over those four gates moves exactly one of them.
 `journal` already consumes every domain feeding all four gates — the recipe-access evaluation it reads for redaction is `access-and-knowledge` plus `held-inventory` for the owned-copy branch, both of which it consumes.
 `gathering` gains `resolution-config` and `materials-and-yield` from the system-validity gate, taking it from three domains to five.
 
-`journal`'s exclusion from `narrative` survives the closure, and is structurally robust rather than incidental: the run journal's redaction reads a single boolean off the access result, and the builder has NO prose-bearing output field at all — its three flavour fields are hardcoded empty literals and every other value it emits is a name, an image, a structural count or a boolean, so prose returned by a collaborator would have nowhere to land.
+`journal`'s exclusion from `narrative` survives the closure: its recipe-access evaluation consumes access facts, while its permitted stage-purpose prose comes from the run's captured `presentationSnapshot`, not the live authored description.
+The snapshot changes through run persistence, whose refresh path is independent of authored narrative invalidation.
 
-The single routing decision this taxonomy exists to make observable is that the run journal does NOT consume `narrative`: it reads no authored description anywhere.
+The single routing decision this taxonomy exists to make observable is that the run journal does NOT consume `narrative`: later authored description changes do not change captured purpose.
 A description-only edit therefore MUST NOT rebuild it, and that assertion MUST be made from a WARMED counter — a "did not rebuild" assertion against a cold fixture compares zero with zero and observes nothing.
 
 ## Summary Projections

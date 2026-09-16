@@ -8,6 +8,7 @@ import {
   CRAFTING_APP_RAW_MODULES,
   CRAFTING_APP_COMPILED_MODULES,
 } from '../helpers/svelte-component-harness.js';
+import { chipToneOf } from '../helpers/chipTone.js';
 import {
   craftability,
   essenceCraftability,
@@ -174,7 +175,7 @@ describe('RecipeDetail mounted behavior', () => {
     assert.equal(sufficient.getAttribute('role'), 'img', 'a fixed slot is not a button');
     assert.ok(sufficient.getAttribute('aria-label').includes('Iron'), 'and carries a name');
 
-    assert.ok(sufficient.querySelector('.crafting-thumb img'), 'tile renders the component image');
+    assert.ok(sufficient.querySelector('[data-medallion="image"] img'), 'tile renders the image');
     assert.equal(
       sufficient.querySelector('.requirement-slot-pip').textContent.trim(),
       '2/2',
@@ -222,14 +223,17 @@ describe('RecipeDetail mounted behavior', () => {
     });
 
     const tiles = target.querySelectorAll('[data-recipe-section="requirement-rail"] [data-requirement-slot]');
-    const essenceGlyph = tiles[0].querySelector('.requirement-slot-glyph i');
+    const essenceGlyph = tiles[0].querySelector('[data-medallion="glyph"] i');
     assert.ok(essenceGlyph, 'first-class essence renders an authored glyph, not an image');
     assert.ok(essenceGlyph.classList.contains('fa-heart'));
     assert.ok(!tiles[0].querySelector('img'), 'essence does not render an image');
     // `delivered`, never `have`: the essence branch upstream stopped answering the
     // have question, so a `have` read would print 0/2 on a partly funded tile.
     assert.equal(tiles[0].querySelector('.requirement-slot-pip').textContent.trim(), '1/2');
-    assert.equal(tiles[1].querySelector('.crafting-thumb img').getAttribute('src'), 'icons/iron.webp');
+    assert.equal(
+      tiles[1].querySelector('[data-medallion="image"] img').getAttribute('src'),
+      'icons/iron.webp'
+    );
 
     const legacyIcons = target.querySelectorAll(
       '[data-io-group="essences"] .crafting-io-essence-icon'
@@ -254,7 +258,7 @@ describe('RecipeDetail mounted behavior', () => {
       '[data-io-group="tools"] .crafting-io-row .crafting-io-tool-label'
     );
     assert.ok(label, 'tool label wrapper rendered');
-    const thumb = label.querySelector('.crafting-thumb img');
+    const thumb = label.querySelector('[data-medallion="image"] img');
     const name = label.querySelector('.crafting-io-name');
     assert.ok(thumb, 'tool image rendered');
     assert.equal(name.textContent.trim(), 'Mortar & Pestle');
@@ -321,7 +325,10 @@ describe('RecipeDetail mounted behavior', () => {
     assert.ok(cardB.querySelector('.crafting-option-status.tone-danger'), 'blocked status is red');
 
     // Product tile with a quantity pip.
-    assert.ok(cardA.querySelector('.crafting-option-product .crafting-thumb img'), 'product image');
+    assert.ok(
+      cardA.querySelector('.crafting-option-product [data-medallion="image"] img'),
+      'product image'
+    );
     assert.equal(
       cardA.querySelector('.crafting-option-product-pip').textContent.trim(),
       '×1',
@@ -849,7 +856,39 @@ describe('RecipeDetail mounted behavior', () => {
 
   it('shows a select-a-recipe hint when no recipe is provided', async () => {
     const target = await harness.mount({ recipe: null });
-    assert.ok(target.querySelector('[data-crafting-detail-state="empty"]'), 'empty hint rendered');
+    const empty = target.querySelector('[data-crafting-detail-state="empty"]');
+    assert.ok(Boolean(empty), 'empty hint rendered');
+    // A PANE, NOT A VIEW ROOT, AND THE FRAME MOVE IS PUBLISHED HERE (issue 1514).
+    //
+    // This pane hand-rolled the same centred fill the five player view ROOTS drew, so it was
+    // first routed through the shared composition as a sixth caller. It is not a sixth of the
+    // same thing: each of those five roots declared `background: var(--fab-surface)` for
+    // itself, and this pane declared `padding: var(--fab-space-4)` and NO background. Routed
+    // through the composition it filled the centre column — which is `--fab-surface-soft`
+    // with a border and `overflow: hidden` — edge to edge with the opaque surface, visibly
+    // darker than the tinted right column beside it in the same frame.
+    //
+    // So the pane keeps its own wrapper and nests the panel, which is the caller-owned answer
+    // five other sites in this change already take. TWO frame deltas remain and both are
+    // accepted rather than discovered: the bare 28px glyph over a 13px muted sentence becomes
+    // the shared panel's 46px tile over a 13px/600 serif title in `--fab-text-secondary`, and
+    // the panel is what the primitive draws rather than what this file drew. The fill and the
+    // inset are not among them any more.
+    assert.ok(
+      Boolean(empty.querySelector('.manager-empty')),
+      'the pane draws the shared no-state panel rather than a bare glyph over a paragraph'
+    );
+    assert.ok(
+      !empty.classList.contains('fab-view-state') && !empty.querySelector('.fab-view-state'),
+      'and it does NOT route through the view-state composition, which carries the opaque ' +
+        'view-ROOT fill and would paint over the centre column`s own soft tint'
+    );
+    assert.equal(
+      empty.getAttribute('aria-busy'),
+      null,
+      'and it carries NO `aria-busy`: this is a PANE state with no loading branch at all, so ' +
+        'it must not claim to be busy'
+    );
   });
 
   it('renders the blocking-reasons callout when applicable', async () => {
@@ -863,7 +902,34 @@ describe('RecipeDetail mounted behavior', () => {
       craftability: craftability({ canCraft: false }),
     });
 
-    assert.ok(target.querySelector('[data-recipe-blocking]'), 'blocking callout rendered');
+    const blocking = target.querySelector('[data-recipe-blocking]');
+    assert.ok(Boolean(blocking), 'blocking notice rendered');
+    // THE WELL IS A NON-BLOCKING `Notice` (issue 1514), which is the only routing that keeps the
+    // `role="status"` this markup already carried — `Callout` emits `role="note"` or nothing.
+    // Both attributes matched on their exact values: `status` is a substring of nothing the
+    // primitive emits today, but a later role could contain it, and the ARIA contract is the
+    // whole reason this site went to `Notice` rather than to the strip beside it.
+    assert.equal(blocking.getAttribute('role'), 'status', 'the status role survives the conversion');
+    assert.equal(
+      blocking.getAttribute('aria-live'),
+      'polite',
+      'and non-blocking KEEPS the polite live region the `role="status"` already implied — ' +
+        'the role carries the announcement, and the explicit attribute restates it'
+    );
+    assert.equal(
+      blocking.getAttribute('data-recipe-blocking'),
+      '',
+      'the hook was written BARE on the deleted element, so it is passed with an empty ' +
+        '`dataValue` rather than being coerced to `="true"` the way a bare attribute on a ' +
+        'component tag would be'
+    );
+    assert.ok(
+      !blocking.querySelector('li'),
+      'the `<ul>` goes: `Notice` takes `title` and `detail` as STRINGS and has no children slot, ' +
+        'and `CraftingListingBuilder._blockingReasons` returns `key ? [localize(key)] : []` — at ' +
+        'most ONE reason for every browse status there is, so the bulleted list was always a ' +
+        'one-item list. A second reason would land in `detail` rather than being dropped'
+    );
     // A non-craftable recipe still renders a (disabled) craft button.
     const craftButton = target.querySelector('[data-crafting-craft]');
     assert.ok(craftButton, 'craft button present');
@@ -895,9 +961,15 @@ describe('RecipeDetail mounted behavior', () => {
       null,
       'the labelled status badge is dropped in favour of the pip'
     );
-    assert.ok(
-      header.querySelector('[data-recipe-blocking].is-uncraftable'),
-      'the blocking callout uses the error palette when uncraftable'
+    // The well is a non-blocking `Notice` since issue 1514, so the palette is the primitive's
+    // resolved TONE rather than this file's `is-uncraftable` modifier class. Matched on the
+    // attribute's exact value: `danger` is a substring of nothing else the primitive emits, but
+    // a `.includes` on the class list would have gone on passing against `is-danger-soft` or
+    // any other name a later tone takes.
+    assert.equal(
+      header.querySelector('[data-recipe-blocking]').getAttribute('data-notice-tone'),
+      'danger',
+      'the blocking notice uses the error palette when uncraftable'
     );
   });
 
@@ -917,5 +989,20 @@ describe('RecipeDetail mounted behavior', () => {
       null,
       'no thumbnail pip when craftable'
     );
+  });
+
+  it('draws that badge as the shared chip, in the tone the map routes it to', async () => {
+    // Issue 1506: `AVAILABLE` returns `tone: 'success'`, which `Chip` does not paint. Bound
+    // straight on, the craftable header would have lost its green with nothing red anywhere.
+    const target = await harness.mount({
+      recipe: recipe({ browseStatus: 'available' }),
+      selectedSetId: recipe().defaultSetId,
+    });
+
+    const chip = target.querySelector('.crafting-detail-header-meta [data-crafting-status]');
+    assert.ok(chip.classList.contains('manager-chip'), 'the badge IS the shared chip now');
+    assert.equal(chipToneOf(chip), 'positive', 'and an available recipe still reads as green');
+    assert.ok(chip.classList.contains('is-list'), 'at the browser row scale');
+    assert.ok(chip.textContent.trim().length > 0, 'the detail header keeps its label');
   });
 });

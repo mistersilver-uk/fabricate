@@ -73,11 +73,69 @@ test('measures the content box rather than the padded and bordered border box', 
 test('rejects multi-track and none computed grids', async () => {
   await assert.rejects(
     assertViewLabLayout(layoutFrame({ columns: '480px 480px' }), EXPECTATION, 'multi-track'),
-    /exactly one resolved grid track/
+    /exactly 1 resolved grid track/
   );
   await assert.rejects(
     assertViewLabLayout(layoutFrame({ columns: 'none' }), EXPECTATION, 'none'),
     /resolved to "none"/
+  );
+});
+
+// ── The track count is an INPUT (issue 1362) ────────────────────────────────────────────
+//
+// The five 1024px responsive cases assert "this stacked", and the assertion was literally
+// `tracks.length !== 1`. A full-width route asserts the opposite shape — rail plus one
+// released content column, and NO inspector — so a case has to be able to say which.
+
+const FULL_WIDTH_EXPECTATION = {
+  containerSelector: '.layout-container',
+  gridSelector: '.layout-grid',
+  expectedTracks: 2,
+  absentSelector: '.manager-inspector',
+};
+
+test('accepts the declared track count and rejects any other', async () => {
+  await assert.doesNotReject(
+    assertViewLabLayout(
+      layoutFrame({ columns: '220px 1040px' }),
+      FULL_WIDTH_EXPECTATION,
+      'two-track'
+    )
+  );
+  await assert.rejects(
+    assertViewLabLayout(
+      layoutFrame({ columns: '220px 740px 300px' }),
+      FULL_WIDTH_EXPECTATION,
+      'three-track'
+    ),
+    /exactly 2 resolved grid track/
+  );
+});
+
+test('rejects a route that released its column but still renders the aside', async () => {
+  // The two edits are separable, and doing only the stylesheet half leaves the empty aside
+  // wrapped to an implicit grid row — where the track count is still two and the frame still
+  // photographs a dead strip. Measured rather than inferred, for exactly that reason.
+  const withAside = frame({
+    '.layout-container': element({ width: 1280 }),
+    '.layout-grid': element({ width: 1280, gridTemplateColumns: '220px 1040px' }),
+    '.manager-inspector': element({ width: 300 }),
+  });
+  await assert.rejects(
+    assertViewLabLayout(withAside, FULL_WIDTH_EXPECTATION, 'dead-strip'),
+    /must not be rendered on this route/
+  );
+});
+
+test('skips the width bound when a case declares none', async () => {
+  // A full-width case has no `maxContentBoxInlineSize`: it is not asserting a breakpoint, and
+  // an accidental default would silently bound every frame at the responsive cases' 960px.
+  await assert.doesNotReject(
+    assertViewLabLayout(
+      layoutFrame({ containerWidth: 1280, columns: '220px 1060px' }),
+      FULL_WIDTH_EXPECTATION,
+      'unbounded'
+    )
   );
 });
 

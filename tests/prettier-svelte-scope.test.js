@@ -60,6 +60,24 @@
  * lane gates actually produce (2-3 other full `npm test` runs in flight at once) — well past the
  * previous 60000ms cap, which is exactly what turned a slow-but-healthy run into a `# cancelled 1`
  * that read as a flake. Narrowing this back down "to tidy it" reintroduces that.
+ *
+ * THOSE NUMBERS GREW WITH ISSUE #1660. `format:check` is `prettier --check .` now, so the real
+ * argv this executes covers the repository rather than about eighty paths: ~24s run alone, against
+ * the ~7.5s above. That is a deliberate cost and it is worth naming beside its neighbour, because
+ * the same change moved a 23-second ESLint check OUT of `npm test` on the grounds that CPU-bound
+ * seconds here starve the browser-backed suites. The two are not in conflict, but they are close
+ * enough that the difference should be stated rather than left to be rediscovered: this test was
+ * ALREADY executing a real Prettier run, so #1660 added ~16s to an existing cost, while
+ * `lint:debt` would have added ~272s of entirely new work. If this ever needs to come down, the
+ * lever is running it in a CI job of its own — not narrowing the argv, which is the one thing
+ * that would make it stop testing what it exists to test.
+ *
+ * ONE MORE THING THE GLOB TOOK AWAY. Dropping `prettier-plugin-svelte` from `.prettierrc.json`
+ * used to make `format:check` exit 2 with "No parser could be inferred", because the script named
+ * `src/**\/*.svelte` and Prettier refuses a file it was handed and cannot parse. Under
+ * `prettier --check .` it exits 0 — directory expansion just skips such a file. Measured, not
+ * assumed. So the `resolves a Svelte parser` and `registers prettier-plugin-svelte` assertions
+ * below are no longer belt-and-braces over a loud CLI failure; they ARE the gate.
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -87,105 +105,13 @@ const ignorePath = [path.join(repoRoot, '.gitignore'), path.join(repoRoot, '.pre
 const components = listSvelteComponents(path.join(repoRoot, 'src'));
 const packageJson = JSON.parse(readFileSync(path.join(repoRoot, 'package.json'), 'utf8'));
 
-// The full file scope `format`/`format:check` share, beyond the component glob. Both scripts are
-// pinned FROM this one list rather than as two separately-typed ~30-entry arrays, so the two
-// pins can never silently drift apart from each other by a copy-paste edit to only one of them.
-const GATE_TARGETS = [
-  componentGlob,
-  'src/{models,utils,integrations,config,migration,canvas,systems}/**/*.js',
-  'src/toolBreakageRuntime.js',
-  'scripts/lib/semver.js',
-  'scripts/lib/releaseTags.js',
-  'scripts/lib/publishGuard.js',
-  'scripts/lib/promoteGuards.js',
-  'scripts/lib/hotfixPreflight.js',
-  'scripts/lib/foundrySmokeSignal.js',
-  'scripts/lib/managerLayoutGuards.js',
-  'scripts/lib/screenshotCaptureMap.js',
-  'scripts/lib/foundryCanvasReadiness.js',
-  'scripts/lib/foundryRunIdentity.js',
-  'scripts/lib/foundryRunBudget.js',
-  'scripts/lib/foundryTourSuppression.js',
-  'scripts/lib/agentModelTiers.js',
-  'scripts/lib/foundryDataPreparation.js',
-  'scripts/lib/smokeSectionFixture.js',
-  'scripts/lib/svelteComponentFiles.js',
-  'scripts/lib/svelteCompilerWarnings.js',
-  'scripts/release-s3.js',
-  'scripts/validate-release-tag.mjs',
-  'scripts/hotfix-preflight.mjs',
-  'scripts/compare-svelte-render.mjs',
-  'scripts/check-svelte-warnings.mjs',
-  'scripts/lib/zipRead.js',
-  'scripts/lib/foundryImagePin.js',
-  'scripts/lib/foundryChromeCache.js',
-  'scripts/lib/foundryChromeSpec.js',
-  'scripts/lib/viewLabCases.js',
-  'scripts/lib/viewLabLayoutAssertion.js',
-  'scripts/view-lab-chrome.mjs',
-  'scripts/view-lab-screenshots.mjs',
-  'scripts/lib/viewLabIndex.js',
-  'scripts/view-lab-index.mjs',
-  'scripts/lib/foundrySmokeArms.js',
-  'scripts/lib/foundryBrowserBoot.js',
-  'scripts/foundry-version-assert.mjs',
-  // The screen-agnostic visual-parity harness (issue 1096). It replaced a single
-  // prototype-specific extractor: the prototype, its region map and its fixture are
-  // development-time artefacts under `tmp/` and are not in the tree at all.
-  'scripts/visual-parity/extract.mjs',
-  'scripts/visual-parity/compare.mjs',
-  // The STRUCTURAL pass, which is what lets the harness see absence at all: a comparison
-  // of computed styles can only ever measure regions that exist on both sides.
-  'scripts/visual-parity/inventory.mjs',
-  // The PAGE-SIDE runtime: every routine that runs inside the measured document, as real
-  // code. It used to cross into the page as source strings reconstituted with `new Function`.
-  'scripts/visual-parity/lib/page-runtime.js',
-  'scripts/visual-parity/lib/schema.js',
-  'scripts/visual-parity/lib/inventory.js',
-  // The ONE live subject both passes measure, and the View Lab boot behind it.
-  'scripts/visual-parity/lib/subject.js',
-  // The deterministic performance harness (issue 1071). The three libraries carry all the
-  // reusable behaviour — the two `.mjs` entry points export nothing, because
-  // `unicorn/no-exports-in-scripts` forbids a CLI from also being a module.
-  // The PATH-walking executable resolver, extracted out of compare-svelte-render.mjs so the
-  // benchmark envelope can share it instead of copying a security-sensitive helper.
-  'scripts/lib/resolveExecutable.js',
-  'scripts/lib/benchmarkBaselines.js',
-  'scripts/lib/benchmarkEnvelope.js',
-  'scripts/lib/benchmarkStats.js',
-  'scripts/lib/benchmarkRunner.js',
-  'scripts/benchmark-performance.mjs',
-  'scripts/benchmark-compare.mjs',
-  // The Foundry performance profile (issue 1073): the pure derivations it depends on — the
-  // measurement registry, the seeding transform, the preconditions, the run record and the
-  // browser-side capture summarizers — plus the scenarios and the runner itself.
-  'scripts/lib/foundryPerfMeasurements.js',
-  'scripts/lib/foundryPerfSeed.js',
-  'scripts/lib/foundryPerfPreflight.js',
-  'scripts/lib/foundryPerfRecord.js',
-  'scripts/lib/foundryPerfCapture.js',
-  'scripts/lib/foundryPerfScenarios.js',
-  'scripts/foundry-perf-run.mjs',
-  'scripts/visual-parity/lib/view-lab.js',
-  // The screenshot-evidence matcher (issue 1133): the pure derivation that decides which
-  // published frames answer a PR's changed files, shared by the evidence gate and its workflow.
-  'scripts/lib/screenshotEvidenceMatching.js',
-  // The icon-catalogue generator and its bundle reader (issue 1269). Run by a maintainer against a
-  // Foundry install rather than by CI, which has none, so nothing else would ever format them. The
-  // FA6/FA7 compatibility layer, the smoke-arm bundle expectations and the companion probe (PR
-  // #1276) share the same maintainer-only entry point, so they are pinned together.
-  'scripts/lib/fontAwesomeBundle.js',
-  'scripts/lib/fontAwesomeCompatibility.js',
-  'scripts/lib/fontAwesomeSmokeExpectations.js',
-  'scripts/foundry-icon-bundle-assert.mjs',
-  'scripts/generate-icon-catalogue.mjs',
-  // The archive-completeness gate (issue 1565): the pure derivation behind the refusal that no
-  // published archive may be short a chunk its own entry script references. Only `release-s3.js`
-  // imports it from a gated file, and `scripts/release.js` — its other caller — is acknowledged
-  // ungated debt, so without this entry the new file would be formatted by nothing.
-  'scripts/lib/releaseZipChunks.js',
-  'eslint.config.js',
-];
+// The file scope `format` and `format:check` share. Issue #1660 made both a glob over the
+// repository, so this is one entry where it was eighty-one — the exclusions live in
+// `.prettierignore`, with a stated reason each, and `tests/lint-coverage.test.js` asserts the
+// resulting coverage is a superset of what the enumeration reached. Both scripts are still pinned
+// FROM this one list rather than as two separately-typed arrays, so the two pins cannot drift
+// apart from each other by a copy-paste edit to only one of them.
+const GATE_TARGETS = ['.'];
 const FORMAT_ARGV = ['prettier', '--write', ...GATE_TARGETS];
 const FORMAT_CHECK_ARGV = ['prettier', '--check', ...GATE_TARGETS];
 
@@ -413,9 +339,11 @@ describe('the argv pin actually fails on the reported hole', () => {
       },
     };
     assert.ok(
-      withDecoyIgnorePath.scripts['format:check'].includes(componentGlob),
-      'the decoy command must still contain the glob substring — that is exactly what the old' +
-        ' substring-only assertion could not see past'
+      withDecoyIgnorePath.scripts['format:check'].includes('--check .'),
+      'the decoy command must still contain the substring a naive check would look for — that is' +
+        ' exactly what the old substring-only assertion could not see past. (It used to look for' +
+        ' the component glob; the scope is the repository root since issue #1660, so the' +
+        ' stand-in for "the command still looks right" is the check flag and its target.)'
     );
     assert.throws(
       () => assertGateArgv(withDecoyIgnorePath, 'format:check', FORMAT_CHECK_ARGV),
@@ -424,21 +352,24 @@ describe('the argv pin actually fails on the reported hole', () => {
     );
   });
 
-  it('fails when the component glob is removed from the script', () => {
-    const withoutGlob = {
+  it('fails when the corpus target is removed from the script', () => {
+    // `prettier --check` with nothing to check exits 0 having looked at no file at all, which is
+    // the same silent success issue 946 reported by a different route. The argv pin must see the
+    // missing element.
+    const withoutTarget = {
       scripts: {
-        'format:check': packageJson.scripts['format:check'].replace(`"${componentGlob}" `, ''),
+        'format:check': packageJson.scripts['format:check'].replace(' .', ''),
       },
     };
     assert.notEqual(
-      withoutGlob.scripts['format:check'],
+      withoutTarget.scripts['format:check'],
       packageJson.scripts['format:check'],
       'the replacement must actually have removed something, or this proves nothing'
     );
     assert.throws(
-      () => assertGateArgv(withoutGlob, 'format:check', FORMAT_CHECK_ARGV),
+      () => assertGateArgv(withoutTarget, 'format:check', FORMAT_CHECK_ARGV),
       /parsed argv must equal/,
-      'removing the component glob must break the argv pin'
+      'removing the corpus target must break the argv pin'
     );
   });
 });

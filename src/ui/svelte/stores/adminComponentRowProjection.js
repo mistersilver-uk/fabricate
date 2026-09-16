@@ -38,10 +38,12 @@
  * Deliberately a LEAF under `stores/`: no `.svelte` imports from `src/ui/svelte/stores/`,
  * so this module cannot reach a mounted-component test's dependency closure.
  */
+import { resolvedComponentEssencesById } from '../../../systems/resolvedComponentEssences.js';
 import {
   plainTextDescription as _plainTextDescription,
   descriptionTextCandidate as _descriptionTextCandidate,
 } from '../../../utils/plainTextDescription.js';
+import { componentEssenceChips } from '../apps/manager/scoped/componentScoped.js';
 
 function _buildSalvageSummary(item, salvageEnabled) {
   if (!salvageEnabled || item?.salvage?.enabled !== true) return null;
@@ -177,14 +179,22 @@ function _stableStringify(value) {
 // toggle is a system-level change that is neither an item field nor a system-id
 // change, so it MUST live in the signature to invalidate) and the resolved
 // essence name/icon per essence id (an essence-catalog edit is system-level).
+//
+// IT CARRIES NO ESSENCE COLOUR AND NO RESOLVED ESSENCE MAP, and that is not an omission
+// (issue 1371 r19-store2). This memo guards ONLY the async source resolution — the uuid
+// display and the enriched description — which no essence field feeds. The card's own
+// `essences` array is rebuilt on every `_createItemCard` call, so a recolour or a world
+// map edit cannot be served stale from here, and a term for either would cost a
+// serialization per essence per card and buy nothing.
 export function itemCardSignature(item, showTags, showEssences, showSalvage, essenceDefinitionById) {
   const essenceResolution = Object.keys(item?.essences || {})
     .sort((a, b) => a.localeCompare(b))
-    .map((id) => [
-      id,
-      essenceDefinitionById.get(id)?.name || id,
-      essenceDefinitionById.get(id)?.icon,
-    ]);
+    .map((id) => {
+      // ONE catalogue read per essence, not one per field (issue 1371 r18-colour): the scale guard
+      // in `admin-browser-page-scope-guards.test.js` counts these reads as the signature's cost.
+      const definition = essenceDefinitionById.get(id);
+      return [id, definition?.name || id, definition?.icon];
+    });
   return _stableStringify({
     item,
     showTags,
@@ -252,8 +262,20 @@ async function _resolveItemCardSource(uuid, storedDescription, enrichToHtml) {
  * @returns {object} the projected card.
  */
 function _createItemCard(item, systemId, options) {
-  const { showTags, showEssences, showSalvage, essenceDefinitionById, enrichToHtml, cache } =
-    options;
+  const {
+    showTags,
+    showEssences,
+    showSalvage,
+    essenceDefinitionById,
+    resolvedEssencesById,
+    enrichToHtml,
+    cache,
+  } = options;
+  // WHAT THE SYSTEM RESOLVES, not what its own row stores (issue 1371 r19-store2). See
+  // `resolvedComponentEssencesById` (`systems/resolvedComponentEssences.js`). The persisted row is
+  // the fallback, for a card built from a manager with no read union and for a row the union does
+  // not answer for.
+  const essenceMap = resolvedEssencesById?.get(item.id) ?? item.essences;
   const registeredItemUuidDisplay = _sourceUuidForItemCard(item);
   const storedDescription = _plainTextDescription(item.description);
 
@@ -268,13 +290,37 @@ function _createItemCard(item, systemId, options) {
     description: storedDescription,
     hasDescription: storedDescription.length > 0,
     tags: showTags ? item.tags || [] : [],
+    // ── TWO RUNS, BECAUSE THE CARD ANSWERS TWO QUESTIONS (issue 1371 r22-store4, the Foundry
+    //    integrator's round-8 finding 1) ─────────────────────────────────────────────────────
+    //
+    // `essences` is WHAT THIS SYSTEM RESOLVES, whole and un-narrowed, and it is the card's
+    // AUTHORING answer: `componentForEdit` IS this card, so `buildComponentEditorState` and
+    // `ComponentEditView`'s `carriedComponentEssences` are both seeded from it. A world map is
+    // not narrowed to the ids a given system holds, so narrowing this run makes the carried set
+    // — the ids that have no row and must travel forward untouched — EMPTY by construction, and
+    // the editor's next save silently drops every off-roster essence. r21 narrowed it and that
+    // is exactly what happened: a tag-only save on an inheriting pair flipped `inherit.essences`
+    // and persisted the roster's ids alone, durably losing the rest.
+    //
+    // `essenceChips` is WHAT THE ROW DRAWS: the same map through the one shared chip model, in
+    // this system's roster order (its stored essence definitions), with no chip for an id the
+    // roster does not list — which is
+    // the id a deleted essence leaves behind, and a chip reading `3` under a fallback glyph and
+    // no name states a count of nothing. The row, the inspector and the browser's essence filter
+    // read this one; nothing that SEEDS an editor may.
     essences: showEssences
-      ? Object.entries(item.essences || {}).map(([id, quantity]) => ({
+      ? Object.entries(essenceMap || {}).map(([id, quantity]) => ({
           id,
           name: essenceDefinitionById.get(id)?.name || id,
           icon: essenceDefinitionById.get(id)?.icon || 'fas fa-mortar-pestle',
+          // The essence's colour as the bare `--fab-tag-*` key (issue 1371 r18-colour, M29),
+          // '' when unauthored — what the row's chips and the inspector's run draw it in.
+          colorToken: essenceDefinitionById.get(id)?.colorToken || '',
           quantity,
         }))
+      : [],
+    essenceChips: showEssences
+      ? componentEssenceChips(essenceMap, [...essenceDefinitionById.values()])
       : [],
     registeredItemUuidDisplay,
     hasRegisteredItemUuid: Boolean(registeredItemUuidDisplay),
@@ -361,6 +407,29 @@ function _createItemCard(item, systemId, options) {
 // there is no world-item-delete refresh hook (foundryBridge ignores non-actor items), so
 // today such a change is already reflected only on the next unrelated refresh. No
 // USER-edited field goes stale — a user edit mutates the stored item → signature miss.
+/**
+ * Each component's RESOLVED essence map for one system, keyed by component id (issue 1371
+ * r19-store2, reviewer round 5; repointed at the shared accessor at r20-store3, round 6).
+ *
+ * ── WHY THE ROW CANNOT READ `getItems` FOR THIS ────────────────────────────────────────────
+ * `essences` became a component world-default SECTION at r18: a world record carries the map and
+ * every system inherits it unless its membership record overrides. `getItems` is the AUTHORING
+ * accessor and answers the PERSISTED in-system row by design — repointing it would hand the
+ * manager a merged row no writer can save back, which its own docblock says. So the row set, the
+ * search filter and every other field still come from `getItems`, and the essence map alone is
+ * overlaid from the read union, exactly as the world essence COLOUR is overlaid onto the essence
+ * definitions. Without it the rules list drew each component's own stale numbers while the rules
+ * editor and every engine reader answered the world map — and after the `1.32.0` election that is
+ * every component in a one-system world.
+ *
+ * THE READ ITSELF IS NOT THIS MODULE'S. `systems/resolvedComponentEssences.js` owns it, because
+ * round 6 found the same "which of the two maps is this reader looking at" defect again in the
+ * essence usage counts and the delete-impact dialog; one accessor consumed by every reader is what
+ * stops a third copy answering differently. It stays optional by construction there — a manager
+ * with no read union, or one that throws, answers `null` and every card reads its persisted row
+ * exactly as before.
+ */
+
 export async function buildItemCards(
   systemManager,
   selectedSystem,
@@ -375,6 +444,9 @@ export async function buildItemCards(
     showEssences,
     showSalvage,
     essenceDefinitionById,
+    resolvedEssencesById: showEssences
+      ? resolvedComponentEssencesById(systemManager, selectedSystem.id)
+      : null,
     enrichToHtml,
     cache,
     onHydrated,

@@ -41,6 +41,7 @@ import { routedSuccessTierOptions } from '../utils/routedOutcomeKeywords.js';
 
 import { readStackQuantity } from './itemStackQuantity.js';
 import { buildPassInventorySnapshot } from './passInventorySnapshot.js';
+import { resolvedComponentsFor, resolvedEssencesFor } from './scopedEntityReads.js';
 import { SignatureValidator } from './SignatureValidator.js';
 
 function stringOrEmpty(value) {
@@ -189,7 +190,7 @@ export class AlchemyListingBuilder {
       craftingActor,
       ...this._filterActors(componentSourceActors),
     ]);
-    const components = Array.isArray(activeSystem.components) ? activeSystem.components : [];
+    const components = resolvedComponentsFor(activeSystem);
     const recipes = activeEntry.recipes;
     const learnedMap = this._getLearnedMap(craftingActor);
 
@@ -579,7 +580,7 @@ export class AlchemyListingBuilder {
   _projectEssenceOption(option, system) {
     const match = option?.match ?? {};
     const essenceId = String(match.essenceId || '').trim();
-    const defs = Array.isArray(system?.essenceDefinitions) ? system.essenceDefinitions : [];
+    const defs = resolvedEssencesFor(system);
     const def = defs.find((candidate) => candidate.id === essenceId) ?? null;
     return {
       componentId: null,
@@ -640,7 +641,7 @@ export class AlchemyListingBuilder {
    */
   _resolveEssenceList(rawMap, system) {
     const raw = rawMap && typeof rawMap === 'object' ? rawMap : {};
-    const defs = Array.isArray(system?.essenceDefinitions) ? system.essenceDefinitions : [];
+    const defs = resolvedEssencesFor(system);
     const defById = new Map(defs.map((def) => [def.id, def]));
     const out = [];
     for (const [essenceId, quantity] of Object.entries(raw)) {

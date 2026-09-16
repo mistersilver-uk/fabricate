@@ -1,0 +1,616 @@
+/**
+ * The world scoped-entry editor's BUFFERED DRAFT (issue 1372, epic 1357).
+ *
+ * `scopedEntryDraft.js` is the shared seam behind the world essence entry editor's explicit Save,
+ * and behind the world tool entry editor's next. Everything in it is pure, so this file is the
+ * whole of its contract; the RENDERED half — that typing writes nothing until Save, and that the
+ * button is disabled until there is something to write — is
+ * `tests/components/essence-world-scope-screens-mounted.test.js`, because those are questions
+ * about the DOM.
+ *
+ * ── WHAT EACH CLAUSE IS ACTUALLY GUARDING ─────────────────────────────────────────────────────
+ * Three of these are the difference between a buffered editor that works and one that opens
+ * dirty, saves too much, or never clears:
+ *
+ *  - a section value is stored OPAQUELY and may be a bare string or an `{id, name}` pair, so
+ *    identity comparison reports every store round-trip as a change and every reload opens the
+ *    editor with unsaved work in it;
+ *  - a Save writes only the keys that DIFFER, so re-pointing one world default does not restate
+ *    the name and description over whatever another client wrote to them meanwhile;
+ *  - the exit guard answers `true` SYNCHRONOUSLY on the clean path, because the shell's route-exit
+ *    cascade preserves the promise identity of what it is handed and a resolved promise there
+ *    would put every route activation in the manager one microtask later.
+ */
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+
+import {
+  SCOPED_ENTRY_IDENTITY_STEP,
+  confirmScopedEntryExit,
+  finishScopedEntryExit,
+  flushScopedEntryDraft,
+  scopedEntryBaseline,
+  scopedEntryDirty,
+  scopedEntryWrites,
+  withScopedEntryDefault,
+  withScopedEntryIdentity,
+} from '../src/ui/svelte/apps/manager/scoped/scopedEntryDraft.js';
+import {
+  SCOPED_SAVE_STEP_FRAGMENTS,
+  reportRefusedScopedEntrySave,
+} from '../src/ui/svelte/apps/manager/scoped/scopedStudio.js';
+import { WORLD_SCOPE_DESCRIPTORS } from '../src/ui/svelte/stores/worldScopeProjection.js';
+
+/** The essence entry editor's own shape, which is what the shipped caller passes. */
+const SHAPE = Object.freeze({
+  identityFields: Object.freeze(['name', 'icon', 'colorToken', 'description']),
+  sections: Object.freeze(['effectSource', 'macro']),
+});
+
+/**
+ * A projected entry, in the shape `worldScopeProjection` builds.
+ *
+ * @param {object} [overrides]
+ * @returns {object}
+ */
+function entryOf({ entity = {}, defaults = null } = {}) {
+  return {
+    id: 'ash',
+    entity: { id: 'ash', name: 'Ash', icon: 'fas fa-fire', colorToken: 'ember', ...entity },
+    defaults,
+  };
+}
+
+describe('the persisted snapshot a draft is seeded from and measured against', () => {
+  it('reads exactly the declared identity fields and sections, and NOTHING else', () => {
+    const baseline = scopedEntryBaseline(
+      entryOf({
+        entity: { description: 'Cinders', membershipCount: 4, enabled: false },
+        defaults: { id: 'ash', effectSource: 'Item.ember', macro: 'Macro.temper' },
+      }),
+      SHAPE
+    );
+    assert.deepEqual(baseline.identity, {
+      name: 'Ash',
+      icon: 'fas fa-fire',
+      colorToken: 'ember',
+      description: 'Cinders',
+    });
+    assert.deepEqual(baseline.defaults, {
+      effectSource: 'Item.ember',
+      macro: 'Macro.temper',
+    });
+  });
+
+  it('normalizes an ABSENT identity field to the empty string the control renders', () => {
+    // An absent `description` and an authored empty one are the same state on this screen, and
+    // treating them as different opens a never-edited editor dirty — which would light Save and
+    // raise the unsaved-changes prompt on the way out of a screen nobody touched.
+    const baseline = scopedEntryBaseline(entryOf(), SHAPE);
+    assert.equal(baseline.identity.description, '');
+    assert.equal(scopedEntryDirty({ ...baseline }, baseline), false);
+  });
+
+  it('normalizes an ABSENT section to null, which is the value that CLEARS one', () => {
+    const baseline = scopedEntryBaseline(entryOf(), SHAPE);
+    assert.deepEqual(baseline.defaults, { effectSource: null, macro: null });
+  });
+
+  it('lets a shape name a READER per section, for a buffered field that is not under `defaults` (M34)', () => {
+    // The entry's aliases live on the ENTITY record, so the baseline reads them through a reader;
+    // a section with no reader keeps the `defaults[section] ?? null` snapshot.
+    const entry = { entity: { name: 'Coal', aliasItemUuids: ['Item.a'] }, defaults: { category: 'Raw' } };
+    const baseline = scopedEntryBaseline(entry, {
+      identityFields: ['name'],
+      sections: ['category', 'aliases'],
+      readers: { aliases: (record) => record?.entity?.aliasItemUuids ?? null },
+    });
+    assert.deepEqual(baseline, {
+      identity: { name: 'Coal' },
+      defaults: { category: 'Raw', aliases: ['Item.a'] },
+    });
+    assert.deepEqual(
+      scopedEntryBaseline({ entity: {} }, { sections: ['aliases'], readers: { aliases: (record) => record?.entity?.aliasItemUuids ?? null } }).defaults,
+      { aliases: null },
+      'an absent buffered field is null, exactly as an absent section is'
+    );
+  });
+
+  it('answers a shape for a MISSING entry rather than throwing', () => {
+    // Reached on every mount before the world corpus publishes, and again when the record the
+    // route is open on is deleted from under it.
+    const baseline = scopedEntryBaseline(null, SHAPE);
+    assert.deepEqual(baseline.identity, { name: '', icon: '', colorToken: '', description: '' });
+    assert.deepEqual(baseline.defaults, { effectSource: null, macro: null });
+  });
+});
+
+describe('an edit produces a NEW draft object', () => {
+  it('never mutates the draft it was handed, on either part', () => {
+    // This module's own answers depend on it: `scopedEntryWrites` takes the draft and the
+    // persisted snapshot as two values, and the caller seeds the draft FROM that snapshot — so a
+    // wither that mutated its argument would make the two one object and report every edit as no
+    // change. That is why it is asserted here, as a property of the function, rather than left to
+    // each caller to remember.
+    const baseline = scopedEntryBaseline(entryOf(), SHAPE);
+    const named = withScopedEntryIdentity(baseline, 'name', 'Aether');
+    assert.notEqual(named, baseline);
+    assert.notEqual(named.identity, baseline.identity);
+    assert.equal(baseline.identity.name, 'Ash', 'the original draft was mutated');
+
+    const pointed = withScopedEntryDefault(named, 'macro', 'Macro.temper');
+    assert.notEqual(pointed.defaults, named.defaults);
+    assert.equal(named.defaults.macro, null, 'the original draft was mutated');
+    assert.equal(pointed.identity.name, 'Aether', 'the other part was dropped');
+  });
+});
+
+describe('what a Save writes, and what it deliberately does not', () => {
+  it('writes only the identity fields that DIFFER, and no section at all', () => {
+    const baseline = scopedEntryBaseline(entryOf(), SHAPE);
+    const writes = scopedEntryWrites(withScopedEntryIdentity(baseline, 'name', 'Aether'), baseline);
+    assert.deepEqual(writes.identity, { name: 'Aether' });
+    assert.deepEqual(writes.sections, []);
+  });
+
+  it('writes only the sections that DIFFER, and no identity patch at all', () => {
+    const baseline = scopedEntryBaseline(entryOf(), SHAPE);
+    const writes = scopedEntryWrites(
+      withScopedEntryDefault(baseline, 'macro', 'Macro.temper'),
+      baseline
+    );
+    assert.equal(
+      writes.identity,
+      null,
+      're-pointing one world default must not restate the name and description over whatever ' +
+        'another client wrote to them while this editor was open'
+    );
+    assert.deepEqual(writes.sections, [{ section: 'macro', value: 'Macro.temper' }]);
+  });
+
+  it('treats CLEARING a section as a write of null, not as no change', () => {
+    const baseline = scopedEntryBaseline(
+      entryOf({ defaults: { id: 'ash', effectSource: 'Item.ember' } }),
+      SHAPE
+    );
+    const writes = scopedEntryWrites(
+      withScopedEntryDefault(baseline, 'effectSource', null),
+      baseline
+    );
+    assert.deepEqual(writes.sections, [{ section: 'effectSource', value: null }]);
+  });
+
+  it('compares an OPAQUE section value STRUCTURALLY, so a round-trip is not a change', () => {
+    // `updateWorldDefaultSection` writes the value opaquely and the normalizer coerces shape
+    // rather than meaning, so the same authored default arrives as a NEW object on every publish.
+    // Reference comparison would report it as an edit and open the editor dirty, for ever.
+    const stored = { id: 'Item.ember', name: 'Ember Brand' };
+    const baseline = scopedEntryBaseline(
+      entryOf({ defaults: { id: 'ash', effectSource: stored } }),
+      SHAPE
+    );
+    const republished = scopedEntryBaseline(
+      entryOf({ defaults: { id: 'ash', effectSource: { name: 'Ember Brand', id: 'Item.ember' } } }),
+      SHAPE
+    );
+    assert.notEqual(baseline.defaults.effectSource, republished.defaults.effectSource);
+    assert.equal(scopedEntryDirty(baseline, republished), false);
+    // …and a value that really did change is still a change, so the equality above is not a
+    // comparison that always answers "same".
+    const moved = withScopedEntryDefault(baseline, 'effectSource', {
+      id: 'Item.frost',
+      name: 'Ember Brand',
+    });
+    assert.equal(scopedEntryDirty(moved, republished), true);
+  });
+
+  it('is not dirty for a draft that has not been seeded', () => {
+    assert.equal(scopedEntryDirty(null, scopedEntryBaseline(entryOf(), SHAPE)), false);
+  });
+});
+
+describe('flushing a draft through the world-scope write family', () => {
+  /** A recording stand-in for one entity type's action family. */
+  function actionsOf({ updateEntity = async () => true, updateWorldDefaultSection = async () => true } = {}) {
+    const calls = [];
+    return {
+      calls,
+      updateEntity: async (...args) => {
+        calls.push(['updateEntity', ...args]);
+        return updateEntity(...args);
+      },
+      updateWorldDefaultSection: async (...args) => {
+        calls.push(['updateWorldDefaultSection', ...args]);
+        return updateWorldDefaultSection(...args);
+      },
+    };
+  }
+
+  it('lands the identity patch FIRST and then each section, in the declared order', () => {
+    const actions = actionsOf();
+    return flushScopedEntryDraft({
+      entityId: 'ash',
+      writes: {
+        identity: { name: 'Aether' },
+        sections: [
+          { section: 'effectSource', value: 'Item.ember' },
+          { section: 'macro', value: null },
+        ],
+      },
+      actions,
+    }).then((landed) => {
+      assert.equal(landed, true);
+      assert.deepEqual(actions.calls, [
+        ['updateEntity', 'ash', { name: 'Aether' }],
+        ['updateWorldDefaultSection', 'ash', 'effectSource', 'Item.ember'],
+        ['updateWorldDefaultSection', 'ash', 'macro', null],
+      ]);
+    });
+  });
+
+  it('STOPS at the first refusal and reports it, so a half-written record cannot pass for saved', async () => {
+    const actions = actionsOf({ updateEntity: async () => false });
+    const landed = await flushScopedEntryDraft({
+      entityId: 'ash',
+      writes: {
+        identity: { name: 'Aether' },
+        sections: [{ section: 'macro', value: 'Macro.temper' }],
+      },
+      actions,
+    });
+    assert.equal(landed, false);
+    assert.deepEqual(
+      actions.calls.map(([name]) => name),
+      ['updateEntity'],
+      'the section write ran after the identity patch had already refused'
+    );
+  });
+
+  // ── issue 1371 r18-entry, maintainer ruling M34 ──────────────────────────────────────────────
+  it('lets a shape name a WRITER per section, so a buffered field that is not a world default lands through its own action, in the declared order', async () => {
+    // The world Component entry buffers its tags (`setWorldTags`) and its aliases (`updateEntity`'s
+    // `aliasItemUuids`) beside its two real sections; without a writer map the flush would hand
+    // `updateWorldDefaultSection` a name it refuses before it writes, silently.
+    const actions = actionsOf();
+    actions.setWorldTags = async (...args) => {
+      actions.calls.push(['setWorldTags', ...args]);
+      return true;
+    };
+    const landed = await flushScopedEntryDraft({
+      entityId: 'coal',
+      writes: {
+        identity: null,
+        sections: [
+          { section: 'category', value: 'Raw' },
+          { section: 'tags', value: ['fuel'] },
+          { section: 'essences', value: { flame: 2 } },
+          { section: 'aliases', value: ['Item.a'] },
+        ],
+      },
+      actions,
+      writers: {
+        tags: (family, entityId, value) => family.setWorldTags(entityId, value ?? []),
+        aliases: (family, entityId, value) => family.updateEntity(entityId, { aliasItemUuids: value ?? [] }),
+      },
+    });
+    assert.equal(landed, true);
+    assert.deepEqual(actions.calls, [
+      ['updateWorldDefaultSection', 'coal', 'category', 'Raw'],
+      ['setWorldTags', 'coal', ['fuel']],
+      ['updateWorldDefaultSection', 'coal', 'essences', { flame: 2 }],
+      ['updateEntity', 'coal', { aliasItemUuids: ['Item.a'] }],
+    ]);
+  });
+
+  it('and a writer’s refusal stops the flush like any other', async () => {
+    const actions = actionsOf();
+    const landed = await flushScopedEntryDraft({
+      entityId: 'coal',
+      writes: { identity: null, sections: [{ section: 'tags', value: [] }, { section: 'essences', value: {} }] },
+      actions,
+      writers: { tags: async () => false },
+    });
+    assert.equal(landed, false);
+    assert.deepEqual(actions.calls, [], 'the essence write after the refused tag write never ran');
+  });
+
+  // ── A FOUNDRY-REFUSED WRITE REJECTS; IT DOES NOT ANSWER `false` (issue 1371 r19-entry2) ──────
+  // These verbs end in `game.settings.set` on a WORLD setting, and Foundry's socket layer posts
+  // its own error toast and then REJECTS. Everything here tested `=== false` and nothing caught,
+  // so a real refusal left this function as a rejected promise: the route-exit guard's
+  // `(await handle.save()) !== false` rejected instead of declining the exit, and the header's
+  // `onclick={() => onSave()}` dropped it unhandled. Under M34 that is four writes as one
+  // sequence, so it also matters WHICH of them had already landed.
+  it('a REJECTING write answers false, stops the sequence, and reports the step and what had landed', async () => {
+    const actions = actionsOf();
+    const refusals = [];
+    const landed = await flushScopedEntryDraft({
+      entityId: 'coal',
+      writes: {
+        identity: null,
+        sections: [
+          { section: 'category', value: 'Raw' },
+          { section: 'tags', value: ['fuel'] },
+          { section: 'essences', value: { flame: 2 } },
+          { section: 'aliases', value: ['Item.a'] },
+        ],
+      },
+      actions,
+      writers: {
+        tags: async () => {
+          throw new Error('The requested Setting update was refused');
+        },
+      },
+      onRefused: (refusal) => refusals.push(refusal),
+    });
+    assert.equal(landed, false, 'the promise RESOLVES false rather than rejecting');
+    assert.deepEqual(
+      actions.calls,
+      [['updateWorldDefaultSection', 'coal', 'category', 'Raw']],
+      'the sequence stopped where it refused: essences and aliases were never attempted'
+    );
+    assert.equal(refusals.length, 1, 'reported once');
+    assert.equal(refusals[0].step, 'tags', 'and it names the section that refused');
+    assert.deepEqual(
+      refusals[0].landed,
+      ['category'],
+      'and the section that HAD landed durably before it, which is the half Foundry’s own toast cannot say'
+    );
+    assert.equal(refusals[0].error.message, 'The requested Setting update was refused');
+  });
+
+  it('names the IDENTITY patch as the step when that is what rejected, and reports nothing landed', async () => {
+    const actions = actionsOf({
+      updateEntity: async () => {
+        throw new Error('refused');
+      },
+    });
+    const refusals = [];
+    const landed = await flushScopedEntryDraft({
+      entityId: 'coal',
+      writes: { identity: { name: 'Coal' }, sections: [{ section: 'category', value: 'Raw' }] },
+      actions,
+      onRefused: (refusal) => refusals.push(refusal),
+    });
+    assert.equal(landed, false);
+    assert.equal(refusals[0].step, SCOPED_ENTRY_IDENTITY_STEP);
+    assert.deepEqual(refusals[0].landed, [], 'nothing had landed, so the sentence says so');
+    assert.deepEqual(
+      actions.calls.map(([name]) => name),
+      ['updateEntity'],
+      'no section was attempted after the identity patch refused'
+    );
+  });
+
+  it('does NOT report a `false` refusal, because the verb that answered it has already said so', async () => {
+    // The two sentences would otherwise stack: a verb that declines a write reports its own
+    // refusal, and Foundry toasts a rejected one. This callback is for the second case only.
+    const actions = actionsOf({ updateWorldDefaultSection: async () => false });
+    const refusals = [];
+    assert.equal(
+      await flushScopedEntryDraft({
+        entityId: 'coal',
+        writes: { identity: null, sections: [{ section: 'category', value: 'Raw' }] },
+        actions,
+        onRefused: (refusal) => refusals.push(refusal),
+      }),
+      false
+    );
+    assert.deepEqual(refusals, []);
+  });
+
+  // ── A REPORT MAY NOT RE-REJECT THE FLUSH (issue 1371 r20-entry3, Foundry review round 6 F5) ──
+  it('survives an `onRefused` that THROWS, and still answers false rather than rejecting', async () => {
+    const actions = actionsOf({
+      updateWorldDefaultSection: async () => {
+        throw new Error('The requested Setting update was refused');
+      },
+    });
+    // `onRefused` is a documented public parameter, so the contract "answers `false` when a write
+    // refused OR rejected" may not rest on every future caller's callback being total: a throw
+    // from it inside the catch would escape as a rejection from this very function, putting the
+    // route-exit guard back where the unhandled rejection left it.
+    const landed = await flushScopedEntryDraft({
+      entityId: 'coal',
+      writes: { identity: null, sections: [{ section: 'category', value: 'Raw' }] },
+      actions,
+      onRefused: () => {
+        throw new Error('the reporter itself blew up');
+      },
+    });
+    assert.equal(landed, false, 'the flush RESOLVED false over a throwing report');
+  });
+
+  it('refuses an empty entity id rather than writing against nothing', async () => {
+    const actions = actionsOf();
+    assert.equal(
+      await flushScopedEntryDraft({ entityId: '', writes: { identity: {}, sections: [] }, actions }),
+      false
+    );
+    assert.deepEqual(actions.calls, []);
+  });
+});
+
+describe('the route-exit guard', () => {
+  it('answers true SYNCHRONOUSLY when there is nothing to ask, and asks nothing', () => {
+    // Load-bearing rather than an optimization: the shell's cascade preserves the promise
+    // identity of what it is handed, so a resolved promise on the clean path would put EVERY
+    // route activation in the manager one microtask later.
+    let asked = 0;
+    const answer = confirmScopedEntryExit({
+      dirty: false,
+      confirm: () => {
+        asked += 1;
+        return 'cancel';
+      },
+      save: () => true,
+      discard: () => {},
+    });
+    assert.equal(answer, true);
+    assert.equal(typeof answer?.then, 'undefined', 'the clean path returned a promise');
+    assert.equal(asked, 0);
+  });
+
+  it('gates navigation on the SAVE landing, not on the choice being made', async () => {
+    const refused = await confirmScopedEntryExit({
+      dirty: true,
+      confirm: () => Promise.resolve('save'),
+      save: () => Promise.resolve(false),
+      discard: () => assert.fail('discard ran on the save branch'),
+    });
+    assert.equal(refused, false, 'a Save that did not land must leave the GM on the editor');
+
+    const landed = await confirmScopedEntryExit({
+      dirty: true,
+      confirm: () => Promise.resolve('save'),
+      save: () => Promise.resolve(true),
+      discard: () => assert.fail('discard ran on the save branch'),
+    });
+    assert.equal(landed, true);
+  });
+
+  it('discards and proceeds, or cancels and stays, on the other two answers', () => {
+    let discarded = 0;
+    assert.equal(
+      finishScopedEntryExit('discard', { save: () => assert.fail('saved'), discard: () => (discarded += 1) }),
+      true
+    );
+    assert.equal(discarded, 1);
+    assert.equal(
+      finishScopedEntryExit('cancel', { save: () => assert.fail('saved'), discard: () => assert.fail('discarded') }),
+      false
+    );
+  });
+
+  it('reads the BOOLEAN answers the two-way fallback prompt gives, which the shared dialog answers with when no three-way one exists', () => {
+    // `_confirmDiscardDirtyDraft` degrades to a yes/no `confirmDialog` when the services bag
+    // carries no `choiceDialog`, and that path answers `'discard' | 'cancel'` — but the boolean
+    // pair reaches this shape from `confirmDiscardDirtyToolsDraft`, so both are read.
+    let discarded = 0;
+    assert.equal(
+      finishScopedEntryExit(true, { save: () => assert.fail('saved'), discard: () => (discarded += 1) }),
+      true
+    );
+    assert.equal(discarded, 1);
+    assert.equal(
+      finishScopedEntryExit(false, { save: () => assert.fail('saved'), discard: () => assert.fail('discarded') }),
+      false
+    );
+  });
+});
+
+// ── THE REFUSED-SAVE SENTENCE, WHICH ALL THREE ENTRY EDITORS NOW COMPOSE FROM ONE TABLE ────────
+// (issue 1371 r20-entry3; Foundry review round 6 findings 4 and 6.)
+// The component entry carried its own four-name map while its two siblings read the shared
+// section table and reported nothing at all, so a rejection on either sibling left the GM with
+// Foundry's raw message. `reportRefusedScopedEntrySave` is the one composer; what is tested here
+// is the sentence it makes and the table it makes it from.
+describe('the refused-save sentence', () => {
+  /** A localizer with NO translations, so every assertion reads the English floor. */
+  const format = (key, fallback, data) => {
+    let result = fallback;
+    for (const [token, value] of Object.entries(data ?? {})) {
+      result = result.replaceAll(`{${token}}`, String(value));
+    }
+    return result;
+  };
+
+  const sentenceFor = (refusal, entityType) => {
+    const said = [];
+    reportRefusedScopedEntrySave({
+      refusal,
+      entityType,
+      identityStep: SCOPED_ENTRY_IDENTITY_STEP,
+      format,
+      notify: (message) => {
+        said.push(message);
+      },
+    });
+    return said;
+  };
+
+  it('names the step that stopped AND the steps that had already landed durably', () => {
+    assert.deepEqual(
+      sentenceFor(
+        {
+          step: 'tags',
+          error: new Error('The requested Setting update was refused'),
+          landed: ['category'],
+        },
+        'component'
+      ),
+      [
+        'Saving the world tags did not complete; the world category had already been saved. The requested Setting update was refused',
+      ]
+    );
+  });
+
+  it('says only what stopped when NOTHING had landed, rather than an empty landed clause', () => {
+    assert.deepEqual(
+      sentenceFor({ step: 'category', error: new Error('refused'), landed: [] }, 'component'),
+      ['Saving the world category did not complete. refused']
+    );
+  });
+
+  it('names the IDENTITY patch per entity type, and names NO field it cannot promise', () => {
+    // A GM told "the name, icon, colour and description did not save" on the tool entry — which
+    // buffers its name alone — has been told something false, so the identity fragment is per
+    // entity type rather than one sentence for all three. The two enumerating labels became the
+    // FIELD SET at r21-store4 (UX round 7): every fragment is an item in the list the landed
+    // clause joins, so a fragment that is itself a comma list makes the join unreadable.
+    const identity = { step: SCOPED_ENTRY_IDENTITY_STEP, error: new Error('refused'), landed: [] };
+    assert.deepEqual(sentenceFor(identity, 'component'), [
+      'Saving the shared identity fields did not complete. refused',
+    ]);
+    assert.deepEqual(sentenceFor(identity, 'essence'), [
+      'Saving the shared identity fields did not complete. refused',
+    ]);
+    assert.deepEqual(sentenceFor(identity, 'tool'), [
+      'Saving the name did not complete. refused',
+    ]);
+    for (const entityType of ['component', 'essence', 'tool']) {
+      assert.ok(
+        !sentenceFor(identity, entityType)[0].split(' did not complete')[0].includes(','),
+        `the ${entityType} identity fragment carries no comma of its own`
+      );
+    }
+  });
+
+  it('joins SEVERAL landed steps as a list, not with a bare comma', () => {
+    // UX round 7. Three landed steps read "a, b, c had already been saved", which is a run-on the
+    // moment any fragment carries a comma — and reads as a list of clauses rather than of things
+    // even when none does. `Intl.ListFormat` says what the GM's own language says.
+    assert.deepEqual(
+      sentenceFor(
+        {
+          step: 'aliases',
+          error: new Error('refused'),
+          landed: [SCOPED_ENTRY_IDENTITY_STEP, 'category', 'tags'],
+        },
+        'component'
+      ),
+      [
+        'Saving the import aliases did not complete; the shared identity fields, the world category, and the world tags had already been saved. refused',
+      ]
+    );
+  });
+
+  it('EVERY section a scope descriptor declares has a fragment, so no sentence can name a raw key', () => {
+    // The mirror guard. The fragment table is hand-maintained beside `SECTION_COPY`, and a
+    // section added to a descriptor without one would fall through to its own key — putting
+    // `Saving effectSource did not complete.` in front of a GM. The two entry-level steps the
+    // component's draft stages (M34) are not descriptor sections and are named explicitly.
+    const declared = new Set(['tags', 'aliases']);
+    for (const descriptor of Object.values(WORLD_SCOPE_DESCRIPTORS)) {
+      for (const section of descriptor.sections ?? []) declared.add(section);
+    }
+    const missing = [...declared].filter(
+      (section) => !SCOPED_SAVE_STEP_FRAGMENTS.includes(section)
+    );
+    assert.deepEqual(
+      missing,
+      [],
+      `these save steps have no sentence fragment, so a refusal would name them by raw key: ${missing.join(', ')}`
+    );
+  });
+});

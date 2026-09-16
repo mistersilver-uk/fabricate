@@ -33,16 +33,33 @@
  */
 export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/foundryBridge.js',
+  'src/ui/svelte/util/listReorderAnnouncement.js',
   'src/ui/svelte/util/foundryIconVocabulary.js',
   'src/ui/svelte/util/foundryIconCatalogue.js',
   'src/ui/svelte/util/iconPickerPopover.js',
+  'src/ui/svelte/util/listboxNavigation.js',
+  'src/ui/svelte/util/overlayHost.js',
   'src/ui/svelte/util/essenceIcons.js',
   'src/ui/svelte/components/stepperLabels.js',
   'src/systems/characterModifierPrerequisiteCopy.js',
   'src/systems/characterPrerequisites.js',
   'src/ui/svelte/actions/dismissOnOutsideClick.js',
   'src/ui/svelte/actions/portal.js',
+  'src/ui/svelte/actions/anchoredPopover.js',
+  'src/ui/svelte/util/overlayBounds.js',
   'src/ui/svelte/apps/manager/checks/checksReadiness.js',
+  // The Validation route's focus half (issue 1517). `ChecksView` awaits it after opening the
+  // activity a validation row names, so it is in the STATIC import graph of every suite that
+  // mounts the studio root — `check-preview-mounted`, `checks-modifier-catalogue-mounted` and
+  // the must-not-regress characterization suite. Mechanical, like the rest of this manifest:
+  // omit it and the harness's own closure validator refuses to set those suites up at all.
+  'src/ui/svelte/apps/manager/validationFocus.js',
+  // …and the announcement half beside it (issue 1517, review r1): the panel fallback for a
+  // route-only row, the control's accessible name, and the handoff to the module's shared
+  // "move focus, then announce" ordering rule — which is why `util/announceAfterFocus.js` is
+  // a raw module here too. It was five copies inside five hosts before it was one leaf.
+  'src/ui/svelte/apps/manager/validationAnnouncement.js',
+  'src/ui/svelte/util/announceAfterFocus.js',
   // The ONE copy map (issue 1096): the Validation route and the section-level Callout both
   // render an issue's sentence from it, so both halves of the checks tree import it.
   'src/ui/svelte/apps/manager/checks/checksCopy.js',
@@ -56,6 +73,7 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   // The attribute-name literals the rule group renders, hoisted out of Svelte markup so
   // `tests/view-lab-cases.test.js` can import rather than restate them (issue 1095).
   'src/ui/svelte/apps/manager/checks/modifierPolicyAttrs.js',
+  'src/systems/characterLibraries.js',
   'src/systems/checkModifierResolver.js',
   'src/systems/salvageCheckUsability.js',
   'src/utils/checkModifierPicks.js',
@@ -64,6 +82,7 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   // Issue 1118: the resolver ranks a rolling modifier by the deterministic average this
   // import-free leaf computes, and the same walk is what tells it a modifier rolls at all.
   'src/utils/rollExpressionAverage.js',
+  'src/utils/rollFormulaRollability.js',
   'src/utils/routedOutcomeKeywords.js',
   // Issue 1098: `routedOutcomeKeywords.js` now reads the failure-result policy to decide
   // which outcome tiers a result-authoring control may offer, so this leaf joins the
@@ -82,6 +101,7 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/checks/checkPreview.js',
   'src/ui/svelte/apps/manager/checks/checkOdds.js',
   'src/systems/checkRoll.js',
+  'src/systems/bulkChatVisibility.js',
   'src/utils/progressiveAward.js',
   // The progressive PREVIEW SANDBOX derivation (issue 1097). BOTH halves of the checks tree
   // import it — `ChecksView` to read and write the order, `ChecksRightMenu` to keep the
@@ -93,6 +113,26 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   // evaluator reads like over-filling; it is not, and the check is mechanical — drop any
   // one of them and the checks suites HANG rather than fail.
   'src/toolBreakageRuntime.js',
+  // Issue 1363 (epic 1357, PR 3): `toolBreakageRuntime.js` now resolves the EFFECTIVE
+  // tool-breakage authority through the world scope rather than re-defaulting locally, so its
+  // closure gains the resolver and the two pure scope modules underneath it. Mechanical, like
+  // every entry in this block: drop one and the suite HANGS rather than fails.
+  'src/systems/toolBreakageAuthority.js',
+  'src/systems/toolScope.js',
+  'src/systems/scopedDefinitions.js',
+  'src/systems/scopedDefinitionStore.js',
+  'src/utils/scalars.js',
+  // Issue 1370 (epic 1357, PR 8a): `toolBreakageRuntime.js` now reads the system's TOOL LIBRARY
+  // through the shared read seam as well, so the closure gains the seam and the two scope
+  // modules its sibling exports need. `scopedDefinitionStore.js` gained the migration module's
+  // lifted-identity field list, which is the one definition of that list in the tree. Same
+  // mechanical rule as the rest of this block: drop one and the suite HANGS rather than fails.
+  'src/systems/scopedEntityReads.js',
+  'src/systems/componentScope.js',
+  'src/systems/essenceScope.js',
+  'src/migration/worldScopeEntityGrouping.js',
+  'src/utils/definitionIndex.js',
+  'src/utils/sourceReferenceUnion.js',
   'src/config/flags.js',
   'src/config/stackQuantityPathPresets.js',
   'src/models/Ingredient.js',
@@ -131,32 +171,56 @@ export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/RowDisclosure.svelte',
   'src/ui/svelte/components/ThresholdBandStrip.svelte',
   'src/ui/svelte/components/Stepper.svelte',
+  // The shared labelled-field primitive (issue 1428). The Checks Studio authors its DC, its
+  // formula and every trigger condition through `.manager-field` columns, so this component is
+  // in the static graph of every suite that mounts the studio; an omission HANGS them.
+  'src/ui/svelte/components/Field.svelte',
   // The shared button primitive. Every list in the studio is extended by the prototype's
   // full-width dashed control, which is this primitive's `dashed` role (issue 1096).
   'src/ui/svelte/components/ManagerButton.svelte',
+  // The shared on/off switch (issue 1040). The right rail's activation card renders BOTH of
+  // its non-default forms — the live switch and the locked `role="img"` reading — so it is
+  // in this tree's static import closure whichever mode a test drives.
+  'src/ui/svelte/components/StatusToggle.svelte',
+  // The shared card shell (issue 1427). The Checks Studio is its densest consumer — 25 of the
+  // sweep's 48 converted sites are under `apps/manager/checks/` — so every suite that mounts
+  // any part of this tree reaches it.
+  'src/ui/svelte/components/InspectorCard.svelte',
   'src/ui/svelte/apps/manager/Callout.svelte',
-  'src/ui/svelte/apps/manager/Chip.svelte',
-  'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
+  'src/ui/svelte/components/Chip.svelte',
+  'src/ui/svelte/components/EditorValidationSurface.svelte',
   'src/ui/svelte/apps/manager/EmptyState.svelte',
+  // `Chip.svelte` travels with it since issue 1371: `IconFactRow` renders the manager's ONE
+  // chip for its trailing badge, so it is now in the row's STATIC closure. Omitting it does
+  // not fail a suite, it HANGS it and reports `# cancelled`.
   'src/ui/svelte/apps/manager/IconFactRow.svelte',
+  'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/apps/manager/InspectorActionButton.svelte',
   'src/ui/svelte/apps/manager/ExplainerCard.svelte',
-  'src/ui/svelte/apps/manager/RadioCardGroup.svelte',
+  'src/ui/svelte/components/RadioCardGroup.svelte',
   'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
   // The manager's ONE searchable picker. The rail's "Preview as" actor control renders
   // through it rather than through a native `<select>`, so every checks suite that mounts
   // the rail compiles it — omit it and those suites HANG (`# cancelled`), they do not fail.
   // Its own closure (`Chip`, `EmptyState`, `iconPickerPopover.js`, `dismissOnOutsideClick.js`,
   // `portal.js`) is already declared here for other reasons.
-  'src/ui/svelte/apps/manager/SearchablePopover.svelte',
-  'src/ui/svelte/apps/manager/ToggleCard.svelte',
+  'src/ui/svelte/components/SearchablePopover.svelte',
+  'src/ui/svelte/components/ToggleCard.svelte',
   // The On-failure section's failure-result policy card (issue 1098), rendered by all
   // three activity routes and by the alchemy branch through one snippet in `ChecksView`.
   'src/ui/svelte/apps/manager/checks/CheckFailurePolicy.svelte',
   'src/ui/svelte/apps/manager/checks/CheckOddsPanel.svelte',
   'src/ui/svelte/apps/manager/checks/CheckOutcomePreview.svelte',
+  // THE manager's editor tab strip (issue 1362). `ChecksEditorTabs` is a caller of it
+  // since issue 1429 gave it the Rail Marker Family, so omitting it HANGS every checks
+  // suite (`# cancelled`) rather than failing one.
+  'src/ui/svelte/components/EditorTabs.svelte',
   'src/ui/svelte/apps/manager/checks/ChecksEditorTabs.svelte',
   'src/ui/svelte/apps/manager/checks/ChecksRightMenu.svelte',
   'src/ui/svelte/apps/manager/checks/ChecksValidationTab.svelte',
   'src/ui/svelte/apps/manager/checks/CraftingModifierCatalogueCard.svelte',
+  // The catalogue's entry row, extracted so the Tool Studio's check-bonus picker draws the
+  // same one (issue 1373, maintainer round 4). Static in that card's graph, so omitting it
+  // HANGS every checks suite rather than failing one.
+  'src/ui/svelte/apps/manager/ModifierLibraryRow.svelte',
 ]);

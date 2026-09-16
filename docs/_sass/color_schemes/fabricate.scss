@@ -1,0 +1,52 @@
+// Fabricate colour scheme for the documentation site.
+//
+// Selected by `color_scheme: fabricate` in _config.yml. That name is load-bearing, not
+// decoration: _includes/css/callouts.scss.liquid tests the scheme NAME against the literal
+// string "dark", and under "dark" it collapses both callout palette levels onto -300. That is
+// why every callout title used to be drawn in a near-black hue on a near-black page — .note
+// came out as #183385 on #27262b, around 1.2:1. Under any other name the levels stay apart:
+// -000 draws the 1px hairline and -300 the title and left bar, which is the two-tone shape the
+// module's own Callout.svelte uses.
+//
+// Do not add `callouts_level` to _config.yml. `loud` collapses the levels again.
+//
+// The import below resolves through the Sass load path rather than relative to this file, and
+// finds the gem's own dark scheme. It brings $color-scheme: dark — which drives
+// `:root { color-scheme }` in the theme's base.scss, and so the dark form controls and
+// scrollbars — along with the accessible-pygments github-dark syntax palette. Do not
+// re-declare $color-scheme after it.
+@import "./color_schemes/dark";
+
+// Tokens come from custom/setup.scss, imported before this file.
+
+$body-background-color: $fab-bg-1;
+$body-heading-color: $fab-text;
+$body-text-color: $fab-text-secondary;
+$link-color: $fab-accent;
+$nav-child-link-color: $fab-text-secondary;
+$sidebar-color: $fab-bg-0;
+$base-button-color: $fab-bg-2;
+$table-background-color: $fab-bg-2;
+$search-background-color: $fab-bg-2;
+$search-result-preview-color: $fab-text-muted-opaque;
+$code-background-color: $fab-bg-0;
+
+// Despite the name this is the base text colour of every code block, not just the line-number
+// gutter: code.scss applies it to `.highlight, pre.highlight`, and any syntax token without an
+// explicit colour of its own inherits it.
+$code-linenumber-color: $fab-text;
+
+// Not $fab-accent. .btn-primary is btn-color($white, $btn-primary-color), so an accent fill
+// would put white text on light tan. custom.scss gives .btn-primary its accent treatment.
+$btn-primary-color: $fab-bg-3;
+
+// Opaque on purpose. navigation.scss passes this through rgba($feedback-color, 1) to build the
+// active-nav gradient, and layout.scss and search.scss reuse it for the site-title, aux-link
+// and expander hovers and for the search-result hover. Because rgba() replaces alpha, a
+// translucent token here renders as a solid bar rather than a wash.
+$feedback-color: $fab-bg-2;
+
+// Opaque on purpose. tables.scss draws row separators with rgba($border-color, 0.5), which
+// replaces the alpha rather than multiplying it — a translucent token would come out at 50%
+// and band the rows. Rules written by hand in custom.scss use $fab-border directly.
+$border-color: $fab-border-opaque;

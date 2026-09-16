@@ -45,12 +45,25 @@ const CONSUMERS = Object.freeze([
     'visibleEssenceOptions',
   ],
   ['src/ui/svelte/apps/manager/recipe/RecipeIngredientOption.svelte', 'visibleEssenceOptions'],
-  [
-    'src/ui/svelte/apps/manager/recipe/RecipeIngredientGroupCard.svelte',
-    'selectableEssenceOptions',
-  ],
-  ['src/ui/svelte/apps/manager/recipe/RecipeIngredientSetCard.svelte', 'selectableEssenceOptions'],
+  // The world Component entry's `Essence contribution` card (issue 1371 r18-entry, maintainer
+  // ruling M31): the same quantity grid over the WORLD essence catalogue, whose `enabled` is the
+  // world master switch — an offer and the editing surface for the world map at once.
+  ['src/ui/svelte/apps/manager/scoped/WorldComponentEntryPage.svelte', 'visibleEssenceOptions'],
 ]);
+
+// TWO ENTRIES LEFT WITH THE CHOICE THEY MADE (issue 1373, maintainer round 5), and the removal
+// is recorded rather than performed silently.
+//
+// `RecipeIngredientGroupCard` and `RecipeIngredientSetCard` were listed against
+// `selectableEssenceOptions` because their essence ADDERS chose an essence: the set-level one
+// was a picker, and the alternative one SEEDED its new row with the first selectable essence.
+// Both now create a row carrying its kind and no value, so neither offers an essence at all —
+// the offer moved into `RecipeIngredientOption`'s own name field, which is listed above and
+// which narrows it with `visibleEssenceOptions`.
+//
+// The marker list below moved with them for the same reason: `data-recipe-add="…essence…"` now
+// marks a control that CREATES AN EMPTY ESSENCE ROW, which is not an offer and cannot leak a
+// disabled essence. What marks an offer is the row's own essence field.
 
 function read(relativePath) {
   return readFileSync(join(repoRoot, relativePath), 'utf8');
@@ -96,8 +109,7 @@ test('1036/18: the consumer list is CLOSED — no unlisted file renders an essen
   // even before it has a test. Without this, a seventh consumer would silently ship
   // unfiltered and every per-consumer test below would still be green.
   const ADD_MARKERS = [
-    /data-recipe-add="alternative-essence"/,
-    /triggerAddMarker="essence-requirement"/,
+    /data-recipe-option-essence/,
     /<EssenceQuantityCard/,
     /class="essence-card"/,
   ];

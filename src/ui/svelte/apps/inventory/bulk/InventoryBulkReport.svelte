@@ -35,7 +35,11 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
-  import StatusPill from '../../../components/StatusPill.svelte';
+  import { statusChipTone } from '../../../util/statusChipTone.js';
+  import Chip from '../../../components/Chip.svelte';
+  import Notice from '../../../components/Notice.svelte';
+  import EmptyState from '../../manager/EmptyState.svelte';
+  import Kicker from '../../../components/Kicker.svelte';
   import InventoryBulkSection from './InventoryBulkSection.svelte';
   import InventoryBulkRow from './InventoryBulkRow.svelte';
 
@@ -239,18 +243,22 @@
 </script>
 
 <div class="bulk-report" data-inventory-bulk-report={isDestroy ? 'destroy' : 'salvage'}>
-  <p class={`bulk-banner is-${bannerTone}`} data-inventory-bulk-banner={status}>
-    <i class={bannerIcon} aria-hidden="true"></i>
-    <span class="bulk-banner-text">
-      <span class="bulk-banner-title">{bannerTitle}</span>
-      <span class="bulk-banner-summary">{bannerSummary}</span>
-    </span>
-  </p>
+  <Notice
+    tone={bannerTone}
+    icon={bannerIcon}
+    title={bannerTitle}
+    detail={bannerSummary}
+    dataAttr="data-inventory-bulk-banner"
+    dataValue={status}
+  />
 
   {#if cancelled}
-    <p class="inventory-detail-empty-note" data-inventory-bulk-cancelled>
-      {localize('FABRICATE.App.Inventory.Bulk.ReportCancelled')}
-    </p>
+    <EmptyState
+      note
+      hint={localize('FABRICATE.App.Inventory.Bulk.ReportCancelled')}
+      dataAttr="data-inventory-bulk-cancelled"
+      dataValue=""
+    />
   {/if}
   {#if runError}
     <p class="bulk-report-error" data-inventory-bulk-error>
@@ -275,13 +283,13 @@
           {#snippet trailing()}
             {#if Number.isFinite(item.rollValue)}
               <span class="bulk-roll">
-                <span class="bulk-roll-label"
-                  >{localize('FABRICATE.App.Inventory.Bulk.ReportRoll')}</span
-                >
+                <Kicker as="span">{localize('FABRICATE.App.Inventory.Bulk.ReportRoll')}</Kicker>
                 <span class="bulk-roll-value">{item.rollValue}</span>
               </span>
             {/if}
-            <StatusPill tone={visual.tone} icon={visual.icon} label={localize(visual.labelKey)} />
+            <Chip tone={statusChipTone(visual.tone)} icon={visual.icon}
+              >{localize(visual.labelKey)}</Chip
+            >
           {/snippet}
         </InventoryBulkRow>
       {/each}
@@ -299,9 +307,12 @@
       {/each}
     </InventoryBulkSection>
   {:else if !isDestroy}
-    <p class="inventory-detail-empty-note" data-inventory-bulk-nothing-added>
-      {localize('FABRICATE.App.Inventory.Bulk.ReportNothingAdded')}
-    </p>
+    <EmptyState
+      note
+      hint={localize('FABRICATE.App.Inventory.Bulk.ReportNothingAdded')}
+      dataAttr="data-inventory-bulk-nothing-added"
+      dataValue=""
+    />
   {/if}
 
   {#if lost.length > 0}
@@ -326,66 +337,6 @@
     gap: var(--fab-space-4);
   }
 
-  /* The salvage panel's banner shape (icon + title over a quiet rule), carrying a
-     COUNT roll-up rather than a single outcome — which is why the one-outcome
-     `.salvage-ribbon` was not extracted for it. */
-  .bulk-banner {
-    display: flex;
-    align-items: flex-start;
-    gap: var(--fab-space-2);
-    margin: 0;
-    padding: 10px;
-    border: 1px solid var(--fab-border);
-    border-radius: 9px;
-    background: var(--fab-surface-soft);
-  }
-
-  .bulk-banner.is-success {
-    border-color: var(--fab-success-border);
-    background: var(--fab-success-soft);
-    color: var(--fab-success-text);
-  }
-
-  /* "Mixed" is neither of the other two, so it takes the neutral accent rather than a
-     third colour ramp invented for "some of each" — the same call the aggregate chat
-     card makes for its own mixed state. Destroy shares it: a completed destroy is
-     what the player asked for, not a success or a failure. */
-  .bulk-banner.is-accent {
-    border-color: var(--fab-accent-border);
-    background: var(--fab-accent-soft);
-    color: var(--fab-accent);
-  }
-
-  .bulk-banner.is-danger {
-    border-color: var(--fab-danger-border);
-    background: var(--fab-danger-soft);
-    color: var(--fab-danger-text);
-  }
-
-  .bulk-banner-text {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
-  }
-
-  .bulk-banner-title {
-    font-size: 11.5px;
-    font-weight: 700;
-  }
-
-  /* `tabular-nums` WITHOUT the mono family: this is a sentence ("2 recovered · 0
-     recovered nothing · 0 unresolved"), not a figure, and the mono face set it as code
-     directly under the detail total. Tabular figures still keep the counts from
-     jittering as the run resolves. */
-  .bulk-banner-summary {
-    font-size: 11px;
-    font-weight: 400;
-    line-height: 1.5;
-    color: var(--fab-text-muted);
-    font-variant-numeric: tabular-nums;
-  }
-
   /* Two signals, never colour alone: the danger ramp AND a glyph. */
   .bulk-report-error {
     display: flex;
@@ -403,14 +354,6 @@
     display: inline-flex;
     align-items: baseline;
     gap: 4px;
-  }
-
-  .bulk-roll-label {
-    font-size: 9.5px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--fab-text-subtle);
   }
 
   .bulk-roll-value {

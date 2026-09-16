@@ -27,10 +27,11 @@
    - onPatch(patch).
 -->
 <script>
-  import Chip from '../Chip.svelte';
+  import Chip from '../../../components/Chip.svelte';
   import EmptyState from '../EmptyState.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import SegmentedControl from '../SegmentedControl.svelte';
+  import StatusToggle from '../../../components/StatusToggle.svelte';
 
   import { prerequisitePreview } from '../../../../../systems/characterPrerequisites.js';
 
@@ -298,23 +299,15 @@
                   )}</span
             >
           </div>
-          <button
-            type="button"
-            class={`manager-status-toggle ${limitUses ? 'is-on' : 'is-off'}`}
-            data-recipe-item-limit-uses
-            aria-pressed={limitUses}
-            aria-label={text('FABRICATE.Admin.Manager.RecipeItem.Limits.LimitedUse', 'Limited use')}
+          <StatusToggle
+            on={limitUses}
+            label={limitUses
+              ? text('FABRICATE.Admin.Manager.StatusOn', 'On')
+              : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}
+            ariaLabel={text('FABRICATE.Admin.Manager.RecipeItem.Limits.LimitedUse', 'Limited use')}
+            data-recipe-item-limit-uses=""
             onclick={toggleLimitUses}
-          >
-            <span class="manager-status-toggle-track" aria-hidden="true"
-              ><span class="manager-status-toggle-knob"></span></span
-            >
-            <span class="manager-status-toggle-label"
-              >{limitUses
-                ? text('FABRICATE.Admin.Manager.StatusOn', 'On')
-                : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}</span
-            >
-          </button>
+          />
         </div>
 
         {#if limitUses}
@@ -341,10 +334,16 @@
                 <span class="manager-recipe-item-stepper-value" data-recipe-item-uses-value
                   >{maxUses}</span
                 >
+                <!-- THE CONTROL HALF of the validation row action (issue 1517). The
+                     `usesValid` blocker fires when limited use is on and the count is below
+                     one, so the control that ANSWERS it is the increment: a real `<button>`,
+                     which needs no tabindex. `RecipeItemValidationTab` addresses it as
+                     `recipe-item-uses`. -->
                 <button
                   type="button"
                   class="manager-recipe-item-stepper-button"
                   data-recipe-item-uses-inc
+                  data-validation-target="recipe-item-uses"
                   aria-label={text(
                     'FABRICATE.Admin.Manager.RecipeItem.Limits.Increment',
                     'Increase'
@@ -416,26 +415,18 @@
                   )}</span
             >
           </div>
-          <button
-            type="button"
-            class={`manager-status-toggle ${limitLearning ? 'is-on' : 'is-off'}`}
-            data-recipe-item-limit-learning
-            aria-pressed={limitLearning}
-            aria-label={text(
+          <StatusToggle
+            on={limitLearning}
+            label={limitLearning
+              ? text('FABRICATE.Admin.Manager.StatusOn', 'On')
+              : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}
+            ariaLabel={text(
               'FABRICATE.Admin.Manager.RecipeItem.Limits.LimitedLearning',
               'Limited learning'
             )}
+            data-recipe-item-limit-learning=""
             onclick={toggleLimitLearning}
-          >
-            <span class="manager-status-toggle-track" aria-hidden="true"
-              ><span class="manager-status-toggle-knob"></span></span
-            >
-            <span class="manager-status-toggle-label"
-              >{limitLearning
-                ? text('FABRICATE.Admin.Manager.StatusOn', 'On')
-                : text('FABRICATE.Admin.Manager.StatusOff', 'Off')}</span
-            >
-          </button>
+          />
         </div>
 
         {#if limitLearning}
@@ -485,10 +476,14 @@
                   <span class="manager-recipe-item-stepper-value" data-recipe-item-learns-value
                     >{learnsAllowed}</span
                   >
+                  <!-- THE CONTROL HALF for the `learnsValid` blocker (issue 1517), on the
+                       same rule as the uses stepper above: the increment is what answers it.
+                       Addressed as `recipe-item-learns`. -->
                   <button
                     type="button"
                     class="manager-recipe-item-stepper-button"
                     data-recipe-item-learns-inc
+                    data-validation-target="recipe-item-learns"
                     aria-label={text(
                       'FABRICATE.Admin.Manager.RecipeItem.Limits.Increment',
                       'Increase'
@@ -638,7 +633,7 @@
                     icon="fas fa-user-shield"
                     title={text(
                       'FABRICATE.Admin.Manager.RecipeItem.Limits.CharacterPrerequisitesNone',
-                      'No prerequisites yet — add them in System Settings.'
+                      'No prerequisites yet — add them in System Settings; they are shared by every crafting system.'
                     )}
                     dataAttr="data-recipe-item-character-prereq-empty"
                   />

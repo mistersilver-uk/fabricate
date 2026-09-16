@@ -18,6 +18,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-check-recipe-tiers-',
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/components/stepperLabels.js',
   ],
   compiledModules: [

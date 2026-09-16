@@ -1,14 +1,24 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  InventoryFilters is the left-column header: a search box, a row of filter chips
+  InventoryFilters is the left-column header: a search box, the kind filter
   (All / Components / Essences / Tools / Books & Scrolls — this fixed order, each
   with an icon and a live count), and a sort select (Name / Quantity / Type).
   Prop-driven so it stays presentational; callbacks route back to the inventory
-  store. The search + chip markup mirrors the Crafting browser so the two tabs
-  feel identical.
+  store.
+
+  THE KIND FILTER IS THE SHARED `SegmentedControl` (issue 1514), drawn as a pill run
+  in the soft-accent family. It was five `aria-pressed` buttons in a `role="group"`
+  and is now one radiogroup, which is the semantics a one-of-N choice has; see the
+  markup below for the two props that reproduce its construction and its paint.
+
+  THE SORT CONTROL IS THE SHARED `Select` (issue 1511), so the list it opens is the app's own
+  rather than the operating system's. The search field is still NOT converted: it belongs to the
+  controls issue.
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import Select from '../../components/Select.svelte';
+  import SegmentedControl from '../manager/SegmentedControl.svelte';
 
   let {
     search = '',
@@ -20,16 +30,31 @@
     onSort = null,
   } = $props();
 
+  // The fixed kind order, as `SegmentedControl` takes it: `value` rather than `id`, and a
+  // WHOLE Font Awesome class rather than the bare glyph name, because the primitive renders
+  // `class={option.icon}` verbatim where the hand-rolled markup composed `fas ${pill.icon}`.
   const PILLS = [
-    { id: 'all', labelKey: 'FABRICATE.App.Inventory.Filters.All', icon: 'fa-layer-group' },
-    { id: 'components', labelKey: 'FABRICATE.App.Inventory.Filters.Components', icon: 'fa-cube' },
-    { id: 'essences', labelKey: 'FABRICATE.App.Inventory.Filters.Essences', icon: 'fa-droplet' },
+    { value: 'all', labelKey: 'FABRICATE.App.Inventory.Filters.All', icon: 'fas fa-layer-group' },
     {
-      id: 'tools',
-      labelKey: 'FABRICATE.App.Inventory.Filters.Tools',
-      icon: 'fa-screwdriver-wrench',
+      value: 'components',
+      labelKey: 'FABRICATE.App.Inventory.Filters.Components',
+      icon: 'fas fa-cube',
     },
-    { id: 'recipeItems', labelKey: 'FABRICATE.App.Inventory.Filters.RecipeItems', icon: 'fa-book' },
+    {
+      value: 'essences',
+      labelKey: 'FABRICATE.App.Inventory.Filters.Essences',
+      icon: 'fas fa-droplet',
+    },
+    {
+      value: 'tools',
+      labelKey: 'FABRICATE.App.Inventory.Filters.Tools',
+      icon: 'fas fa-screwdriver-wrench',
+    },
+    {
+      value: 'recipeItems',
+      labelKey: 'FABRICATE.App.Inventory.Filters.RecipeItems',
+      icon: 'fas fa-book',
+    },
   ];
 
   const SORTS = [
@@ -38,11 +63,42 @@
     { id: 'type', labelKey: 'FABRICATE.App.Inventory.Filters.SortType' },
   ];
 
+  // The live per-kind tally rides the primitive's own `count` slot. It is coerced here rather
+  // than in the markup because `SegmentedControl` renders the slot only for a FINITE number, so
+  // a missing key has to arrive as 0 rather than as `undefined`.
+  const pillOptions = $derived(
+    PILLS.map((pill) => ({ ...pill, count: Number(counts?.[pill.value] ?? 0) }))
+  );
+
+  // The caption this control is named by, per instance: the inventory header can be rendered
+  // twice on one screen by the GM preview, and two triggers must not share one caption id.
+  const instanceId = $props.id();
+  const sortCaptionId = `${instanceId}-sort`;
+
+  const sortOptions = $derived(
+    SORTS.map((option) => ({ value: option.id, label: localize(option.labelKey) }))
+  );
+
+  /**
+   * THE PANEL'S OWN FLOOR, WHICH IS NOT THE TRIGGER'S (issue 1511, review round 1).
+   *
+   * The rule is stated once in `Select.svelte`'s band docblock: an `inline` caller states a
+   * `minWidth` whenever its widest option label needs more than the panel's resolved width less
+   * the row's chrome. This site needs one, and the first shipping of this conversion did not have
+   * it — `Quantity` opened the list reading `Quanti…`.
+   *
+   * The two faces disagree on nothing that matters here, so the figure is the wider: measured in
+   * `tests/fixtures/player-select/` under Chromium, the `Quantity` ROW's label is 44.70px in
+   * Arial and 44.36px in Signika, at the panel's fixed 12px rather than the trigger's 11.5px. A
+   * ticked row spends 52px on chrome before the label gets any — 2px of panel border, 12px of
+   * panel padding, 2px of row border, 16px of row padding, the 12px tick gutter and the 8px row
+   * gap — so the panel needs 44.70 + 52 = 96.70px and takes the next whole pixel. The rung's own
+   * floor is 96px, which is why one pixel of shortfall was enough to ellipsise the label.
+   */
+  const SORT_PANEL_MIN_WIDTH = 97;
+
   function onInput(event) {
     onSearch?.(event.currentTarget.value);
-  }
-  function onSortInput(event) {
-    onSort?.(event.currentTarget.value);
   }
 </script>
 
@@ -59,43 +115,49 @@
   </div>
 
   <div class="inventory-filters-row">
-    <div
-      class="inventory-pills"
-      role="group"
-      aria-label={localize('FABRICATE.App.Inventory.Filters.SearchLabel')}
-    >
-      {#each PILLS as pill (pill.id)}
-        <button
-          type="button"
-          class="inventory-pill"
-          class:is-active={filter === pill.id}
-          data-inventory-pill={pill.id}
-          aria-pressed={filter === pill.id}
-          onclick={() => onFilter?.(pill.id)}
-        >
-          <i class={`fas ${pill.icon}`} aria-hidden="true"></i>
-          <span>{localize(pill.labelKey)}</span>
-          <span class="inventory-pill-count" data-inventory-pill-count
-            >{Number(counts?.[pill.id] ?? 0)}</span
-          >
-        </button>
-      {/each}
-    </div>
+    <!-- THE KIND FILTER IS A RADIOGROUP, not five toggles (issue 1514). Choosing a kind is a
+         genuinely one-of-N choice and the hand-rolled strip spelled it as five independent
+         `aria-pressed` buttons in a `role="group"`, which announces each one's state on its
+         own and never says the set is exclusive. `shape="pill"` is the construction the strip
+         already had — a run of separate pills, no track fill, no track edge, radius 999 — and
+         `tone="accent-soft"` is the paint it already had, an unfilled resting tile behind a
+         `--fab-border` hairline against a chosen one on `--fab-accent-soft` inside
+         `--fab-accent-border` in `--fab-accent` ink. Both are the shipped values rather than a
+         near miss, which is why this converts as a frame move rather than a restyle.
 
-    <label class="inventory-sort">
-      <span class="inventory-sort-label"
+         `aria-label` is the SearchLabel string the `role="group"` carried, forwarded verbatim
+         rather than corrected: the label a screen reader announces here is not this change's
+         to move. -->
+    <SegmentedControl
+      options={pillOptions}
+      value={filter}
+      onChange={(next) => onFilter?.(next)}
+      groupName="inventory-filter-kind"
+      ariaLabel={localize('FABRICATE.App.Inventory.Filters.SearchLabel')}
+      optionDataAttr="data-inventory-pill"
+      shape="pill"
+      tone="accent-soft"
+    />
+
+    <!-- A `<span>` RATHER THAN THE `<label>` THIS WAS (issue 1511): the control is a `<button>`
+         toggling a portaled panel, and a `<label>` forwards a caption click into it, so with the
+         list open the caption's own mousedown would dismiss the panel and the forwarded click
+         would re-open it. The caption keeps its class and names the trigger through
+         `aria-labelledby` instead of through the deleted `aria-label` that duplicated it. -->
+    <span class="inventory-sort">
+      <span class="inventory-sort-label" id={sortCaptionId}
         >{localize('FABRICATE.App.Inventory.Filters.SortLabel')}</span
       >
-      <select
+      <Select
+        size="inline"
         value={sort}
-        aria-label={localize('FABRICATE.App.Inventory.Filters.SortLabel')}
-        onchange={onSortInput}
-      >
-        {#each SORTS as option (option.id)}
-          <option value={option.id}>{localize(option.labelKey)}</option>
-        {/each}
-      </select>
-    </label>
+        options={sortOptions}
+        ariaLabelledBy={sortCaptionId}
+        minWidth={SORT_PANEL_MIN_WIDTH}
+        triggerData={{ 'data-inventory-sort': '' }}
+        onChange={(next) => onSort?.(next)}
+      />
+    </span>
   </div>
 </div>
 
@@ -140,66 +202,6 @@
     gap: 8px;
   }
 
-  .inventory-pills {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    min-width: 0;
-  }
-
-  .inventory-pill {
-    box-sizing: border-box;
-    /* Foundry's global `.app button` height/centering reset (EnvironmentCard pattern):
-       a chip that sets only min-height gets cropped. */
-    appearance: none;
-    -webkit-appearance: none;
-    height: auto;
-    margin: 0;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    min-height: 28px;
-    padding: 3px 10px;
-    border: 1px solid var(--fab-border);
-    border-radius: 999px;
-    background: var(--fab-surface-soft);
-    color: var(--fab-text-muted);
-    font: inherit;
-    font-size: 11px;
-    font-weight: 500;
-    line-height: 1;
-    cursor: pointer;
-  }
-
-  .inventory-pill:hover {
-    background: var(--fab-surface-raised);
-    color: var(--fab-text);
-  }
-
-  .inventory-pill:focus-visible {
-    outline: 2px solid var(--fab-accent);
-    outline-offset: 2px;
-  }
-
-  .inventory-pill.is-active {
-    border-color: var(--fab-accent-border);
-    background: var(--fab-accent-soft);
-    color: var(--fab-accent);
-    font-weight: 600;
-  }
-
-  .inventory-pill i {
-    font-size: 11px;
-  }
-
-  /* NOT mono. The brief scopes mono to quantities, roll totals and DC values; a chip's
-     population count is part of the chip's own label, and the chip is pinned to the sans
-     face. So it inherits the chip's family, weight AND colour (which is what makes the
-     active state track automatically) and only drops back in emphasis. */
-  .inventory-pill-count {
-    opacity: 0.7;
-  }
-
   .inventory-sort {
     display: inline-flex;
     align-items: center;
@@ -213,20 +215,33 @@
     white-space: nowrap;
   }
 
-  .inventory-sort select {
-    box-sizing: border-box;
-    height: 28px;
-    padding: 0 8px;
-    border: 1px solid var(--fab-border);
-    border-radius: 8px;
-    background: var(--fab-surface);
-    color: var(--fab-text-secondary);
-    font-size: 11px;
-    font-weight: 500;
-  }
+  /* A WIDTH FLOOR, AND WHY THIS ROW CAN ABSORB ONE (issue 1511). Height, corner, fill, type and
+     the focus treatment are the `inline` rung's now; the one property left to this file is the
+     width, because a `<select>` sized itself to its widest option while a `<button>` hugs the
+     one it is showing - so choosing Type after Quantity would visibly shrink the control and
+     shuffle the pill run beside it. The floor is the measured width of the TRIGGER showing the
+     widest of the three `SORTS` labels - `Quantity` - so every value renders at one width.
+     MEASURED IN BOTH FACES in `tests/fixtures/player-select/` under Chromium and floored at the
+     next whole pixel above the wider: 76.83px under the Arial fallback the repository's Chromium
+     gates render against, 76.52px under Foundry's own Signika, both at the `inline` rung's
+     11.5px.
 
-  .inventory-sort select:focus-visible {
-    outline: 2px solid var(--fab-accent);
-    outline-offset: 2px;
+     RE-DERIVED AT REVIEW ROUND 1, and this floor MOVED: 90px stood on a recorded pair of 88.33
+     and 86.58 that the fixture does not reproduce. Both figures were 11.50px - one whole rung
+     font-size - above what the control measures, at all three floored sites alike, so they were
+     arithmetic rather than measurement. The floor now stands where its own sentence says it
+     does.
+
+     It is NOT the panel's floor, and the two are 20px apart: see `SORT_PANEL_MIN_WIDTH` above
+     for the 97px the open list needs, which is the same label read at the panel's 12px behind
+     52px of row chrome. Widening the trigger to cover the panel would be the wrong knob twice
+     over - it would move the closed control to fix an open one.
+
+     The row is `flex-wrap: wrap` with `justify-content: space-between`, which is what makes an
+     over-sized floor wrap the pill run rather than widen the control - so the figure is the
+     measured widest value and not a round number above it. Ancestor-qualified, because a leading
+     bare `:global()` would reach every trigger in the document. */
+  .inventory-sort :global(.fabricate-select-trigger) {
+    min-width: 77px;
   }
 </style>

@@ -16,7 +16,8 @@
   import { localize } from '../../../util/foundryBridge.js';
   import RecipeResultItemRow from './RecipeResultItemRow.svelte';
   import RecipeRoutingAssignment from './RecipeRoutingAssignment.svelte';
-  import SearchablePopover from '../SearchablePopover.svelte';
+  import SearchablePopover from '../../../components/SearchablePopover.svelte';
+  import IconButton from '../../../components/IconButton.svelte';
 
   let {
     group = {},
@@ -81,6 +82,15 @@
     }
     return result;
   }
+
+  // THE CONTROL HALF of the validation row action (issue 1517). An unrouted-result-set
+  // warning is about THIS set's routing, so the card is the destination and
+  // `recipeReadiness.js` addresses it as `result-group-<id>`. Same literal on both sides,
+  // held together behaviourally by the pair of gates named in `recipeReadiness.js`'s own
+  // header — `recipe-validation-tab.test.js` reads the address the `unroutedResultGroup`
+  // warning emits, and `recipe-edit-mounted.test.js` finds it on this element. An id-less
+  // draft group gets no address and the producer emits a route-only issue.
+  const validationTarget = $derived(group?.id ? `result-group-${group.id}` : undefined);
 
   const results = $derived(Array.isArray(group?.results) ? group.results : []);
 
@@ -239,6 +249,9 @@
   class={`manager-recipe-ingredient-set ${chromeless ? 'is-chromeless' : ''} ${reserved ? 'is-reserved' : ''}`}
   data-recipe-set
   data-recipe-result-set-id={group?.id || ''}
+  data-validation-target={validationTarget}
+  tabindex="-1"
+  data-keyboard-focus="true"
 >
   {#if !chromeless}
     <div class="manager-recipe-ingredient-set-head">
@@ -301,13 +314,12 @@
         />
       {/if}
       {#if !hideRemove && !reserved}
-        <button
-          type="button"
-          class="manager-icon-button is-danger"
+        <IconButton
+          class="is-danger"
           data-recipe-remove="result-set"
-          aria-label={text('FABRICATE.Admin.Manager.Recipe.RemoveResultSet', 'Remove result set')}
+          ariaLabel={text('FABRICATE.Admin.Manager.Recipe.RemoveResultSet', 'Remove result set')}
           title={text('FABRICATE.Admin.Manager.Recipe.RemoveResultSet', 'Remove result set')}
-          onclick={() => onRemove()}><i class="fas fa-trash" aria-hidden="true"></i></button
+          onclick={() => onRemove()}><i class="fas fa-trash" aria-hidden="true"></i></IconButton
         >
       {/if}
     </div>
@@ -350,21 +362,6 @@
               handleResultDrop(index);
             }}
           >
-            <!-- Grip, then a SEPARATE order badge — the salvage stage row's shape
-                 (issue 676). The order was stacked UNDER the grip inside one handle,
-                 which read as a decorated grip rather than as the stage number that the
-                 award loop actually spends down. -->
-            <span
-              class="manager-recipe-stage-grip"
-              aria-hidden="true"
-              title={text('FABRICATE.Admin.Manager.Recipe.DragResult', 'Drag to reorder')}
-              ><i class="fas fa-grip-vertical" aria-hidden="true"></i></span
-            >
-            <span
-              class="manager-recipe-stage-ordinal"
-              data-recipe-result-ordinal={String(index + 1)}
-              aria-hidden="true">{index + 1}</span
-            >
             <RecipeResultItemRow
               {item}
               {componentOptions}
@@ -373,6 +370,29 @@
               onChange={(nextItem) => updateItem(index, nextItem)}
               onRemove={() => removeItem(index)}
             >
+              {#snippet leadingControls()}
+                <!-- Grip, then a SEPARATE order badge — the salvage stage row's shape
+                     (issue 676). The order was stacked UNDER the grip inside one handle,
+                     which read as a decorated grip rather than as the stage number that the
+                     award loop actually spends down.
+
+                     They are a SNIPPET rather than the card's own first two children
+                     (issue 1286) so that a stage carrying a complication band can put them
+                     on the band's own line: as the card's leading flex items they pushed
+                     the full-bleed band ~58px in. The row renders them unchanged and in the
+                     same place when there is no band. -->
+                <span
+                  class="manager-recipe-stage-grip"
+                  aria-hidden="true"
+                  title={text('FABRICATE.Admin.Manager.Recipe.DragResult', 'Drag to reorder')}
+                  ><i class="fas fa-grip-vertical" aria-hidden="true"></i></span
+                >
+                <span
+                  class="manager-recipe-stage-ordinal"
+                  data-recipe-result-ordinal={String(index + 1)}
+                  aria-hidden="true">{index + 1}</span
+                >
+              {/snippet}
               {#snippet reorderControls()}
                 <!-- Reorder lives to the RIGHT of the component's DC (issue 643): after
                      the DC + Edit pair, before the remove control. Drag is an
@@ -418,14 +438,14 @@
   {/if}
 
   {#if progressive}
-    <p class="sr-only" aria-live="polite" data-recipe-result-order-status>{announcement}</p>
+    <p class="visually-hidden" aria-live="polite" data-recipe-result-order-status>{announcement}</p>
   {/if}
 
   <div class="manager-recipe-ingredient-set-add">
     <SearchablePopover
       options={componentPickerOptions}
       pickerClass="manager-recipe-component-picker manager-recipe-add-component"
-      triggerClass="manager-button is-dashed manager-recipe-add-component-trigger manager-recipe-add-result"
+      triggerClass="fabricate-button manager-button is-dashed manager-recipe-add-component-trigger manager-recipe-add-result"
       triggerIcon="fas fa-plus"
       triggerLabel={progressive
         ? text('FABRICATE.Admin.Manager.Recipe.AddResultStage', 'Add result stage')

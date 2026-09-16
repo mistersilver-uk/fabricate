@@ -101,6 +101,15 @@ async function main() {
               {
                 locator: region.locator,
                 groups: region.groups,
+                // The EXPLICIT property list, when a region declares one. `propertiesOf` in
+                // `lib/page-runtime.js` reads `entry.properties` in preference to `groups`,
+                // and `compare.mjs` already measures the subject on exactly the properties the
+                // fixture holds — so a region that widened its set here was measured on the
+                // groups alone, recorded the narrower set, and the comparison then asserted
+                // that narrower set on both sides. The extension went missing without a word,
+                // which is the worst way for a gate to lose an assertion: the spec said it
+                // measured `marginTop`, the run agreed it was green, and nothing measured it.
+                properties: region.properties,
                 effectiveBackground: region.effectiveBackground === true,
               },
             ])

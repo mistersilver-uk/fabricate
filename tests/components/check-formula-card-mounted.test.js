@@ -19,9 +19,11 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-check-formula-',
   rawModules: [
     'src/ui/svelte/util/foundryBridge.js',
+    'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/config/modifierExpressionSuggestions.js',
     'src/config/gatheringCharacterModifierPresets.js',
     'src/utils/rollExpressionAverage.js',
+    'src/utils/rollFormulaRollability.js',
   ],
   compiledModules: ['src/ui/svelte/apps/manager/checks/CheckFormulaFields.svelte'],
   componentPath: 'src/ui/svelte/apps/manager/checks/CheckFormulaFields.svelte',

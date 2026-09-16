@@ -28,7 +28,7 @@
  * The three model tiers, ordered least to most capable. The order is load-bearing:
  * model-tier floors clamp on it and `ESCALATE_TIER` steps up it.
  */
-const TIER_ORDER = ['small', 'medium', 'large'];
+export const TIER_ORDER = ['small', 'medium', 'large'];
 
 /**
  * Provider pins per model tier — the single source of truth every binding is gated
@@ -80,6 +80,7 @@ export const HIGH_RISK_PATHS = [
   'AGENTS.md',
   'CLAUDE.md',
   '.agents/skills/**',
+  '.agents/docs/**',
   '.claude/agents/**',
   '.codex/agents/**',
 ];
@@ -106,6 +107,12 @@ export const STAGE_THRESHOLDS = {
  * reaches no other family. Edit/Write stay banned for them.
  */
 const READONLY_BASH_ALLOWED = new Set(['foundry_integrator']);
+
+/** Tools that let a role mutate the workspace. A read-only sandbox must allow none of them. */
+export const WRITE_TOOLS = ['Edit', 'Write', 'MultiEdit', 'NotebookEdit'];
+
+/** Tools that let a role spawn or route sub-agents. Role agents must never nest. */
+export const SPAWN_TOOLS = ['Agent', 'Task'];
 
 /** The `openspec/specs/**` model-tier floor, expressed as a matcher entry list. */
 const SPEC_FLOOR_PATHS = ['openspec/specs/**'];
@@ -334,6 +341,54 @@ export function selectModelTier(spawn) {
   const base = baseModelTier({ paths, size, source, limits });
   const floor = modelTierFloor(spawn, paths);
   return { tier: higherTier(base.tier, floor), baseTier: base.tier, rule: base.rule };
+}
+
+/**
+ * Gate one role's Claude tool allowlist against its Codex sandbox mode.
+ *
+ * ONE rule, two callers: `scripts/validate-agent-bindings.mjs` applies it to the bindings on
+ * disk and `scripts/lib/agentBindingRender.js` applies it to the record a binding is rendered
+ * FROM, so an unsafe record cannot be written in the first place. `subject` and `against` are
+ * labels so each caller names what it is actually checking.
+ *
+ * @param {object} parity
+ * @param {string} parity.token Routing token; the `Bash` exemption resolves against its family.
+ * @param {string[] | null} parity.tools The declared allowlist, or `null` when absent.
+ * @param {boolean} parity.readOnly Is the Codex sandbox `read-only`?
+ * @param {string} parity.subject What carries the allowlist.
+ * @param {string} parity.against What the allowlist must match.
+ * @returns {string[]}
+ */
+export function toolParityErrors({ token, tools, readOnly, subject, against }) {
+  if (!tools) {
+    return [`${subject} must declare an explicit tools: allowlist (no default inheritance)`];
+  }
+  const errors = [];
+  for (const banned of SPAWN_TOOLS) {
+    if (tools.includes(banned)) {
+      errors.push(`${subject} must not include ${banned} — role agents must not spawn or route`);
+    }
+  }
+  if (!readOnly) {
+    if (!tools.includes('Edit') || !tools.includes('Write')) {
+      errors.push(`${subject} must allow Edit and Write to match ${against} full-access sandbox`);
+    }
+    return errors;
+  }
+  const writeTools = tools.filter((t) => WRITE_TOOLS.includes(t));
+  if (writeTools.length > 0) {
+    errors.push(
+      `${subject} must omit all mutation tools (${WRITE_TOOLS.join('/')}) to match ${against} sandbox_mode = "read-only"; found ${writeTools.join(', ')}`
+    );
+  }
+  // Resolved against the BASE FAMILY token, so foundry_integrator keeps its read-only Bash
+  // exemption at all three model tiers and no other family gains it.
+  if (tools.includes('Bash') && !isReadonlyBashAllowed(token)) {
+    errors.push(
+      `${subject} must omit Bash to match ${against} sandbox_mode = "read-only" (or add its base family to READONLY_BASH_ALLOWED in scripts/lib/agentModelTiers.js with a reason)`
+    );
+  }
+  return errors;
 }
 
 // --- internals --------------------------------------------------------------

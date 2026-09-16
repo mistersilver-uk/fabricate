@@ -25,10 +25,30 @@ import { BROAD_SIGNAL_PATTERN, VIEW_LAB_CASES, normalizePath } from '../scripts/
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
-/** The two windows the lab mounts. Everything reachable from these is photographable. */
+/**
+ * The windows the lab mounts. Everything reachable from these is photographable.
+ *
+ * FIVE since issue 1520 registered the three GM canvas windows. They have to be here, and the
+ * second test below is why: it fails a `sourceMatches` pattern that claims a component NO mounted
+ * window renders, so the moment a case claimed `InteractableConfigRoot.svelte` while this list
+ * held two roots, the registry would have looked as though it were claiming a phantom. The two
+ * halves are a pair — a root registered in the case registry and not here reports its own real
+ * claims as phantoms, and a root here with no case reports its whole subtree as unclaimed.
+ *
+ * Measured when the three were added: the closure grows by exactly three, 319 to 322. The reason
+ * is NOT that they import no components — they render twelve of the shared primitives between
+ * them, and an earlier revision of this note said otherwise. It is that every one of those
+ * twelve was ALREADY in the closure, reachable from the manager or the player root, and already
+ * claimed by a case there. So the three roots add themselves and no unclaimed subtree, which is
+ * the property this list needs; a window that reached for a component nothing else renders would
+ * add that component too, and the second test below is what would say so.
+ */
 const MOUNTED_ROOTS = [
   'src/ui/svelte/apps/FabricateAppRoot.svelte',
   'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
+  'src/ui/svelte/apps/InteractableBrowserRoot.svelte',
+  'src/ui/svelte/apps/InteractableConfigRoot.svelte',
+  'src/ui/svelte/apps/interactables/InteractablesManagerRoot.svelte',
 ];
 
 /**
@@ -38,7 +58,25 @@ const MOUNTED_ROOTS = [
  * that no longer resolves to a tracked file, or that has left the closure, fails — so a stale
  * exemption cannot outlive the thing it exempted.
  */
-const UNCLAIMED_BY_DESIGN = Object.freeze([]);
+const UNCLAIMED_BY_DESIGN = Object.freeze([
+  // `Essence` LEFT THIS LIST at issue 1372, and it left rather than being kept alongside a claim.
+  // The exemption's own text names the condition that ends it — "PRs 6a, 6b and 6c ship the row
+  // that opens it and its case together, and delete this entry" — and the world essence catalogue
+  // now ships that row, so `world-essence-entry` is reachable by the walk and claims the page. An
+  // exemption left beside a live claim is a standing waiver for a component that no longer needs
+  // one, which is exactly the stale-exemption shape this file's last clause reds on.
+  ...['Component', 'Tool'].map((entity) => ({
+    path: `src/ui/svelte/apps/manager/scoped/World${entity}EntryPage.svelte`,
+    reason:
+      `The world ${entity} entry route exists and normalizes (issue 1362), but NOTHING NAVIGATES ` +
+      'TO IT until its catalogue ships: the deep link is a catalogue row, and this PR ships the ' +
+      'catalogue as a placeholder. A case could only reach it by seeding a state no GM can, ' +
+      'which is the fixture-bypass hazard already recorded against this registry — and a case ' +
+      'that claimed it WITHOUT reaching it would publish a frame of a different screen as its ' +
+      'evidence, which is the exact failure this gate exists to prevent. PRs 6a, 6b and 6c ship ' +
+      'the row that opens it and its case together, and delete this entry.',
+  })),
+]);
 
 /**
  * Components a case may match even though no mounted window renders them.

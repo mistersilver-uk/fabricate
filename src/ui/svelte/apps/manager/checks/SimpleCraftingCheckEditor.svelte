@@ -23,6 +23,7 @@
   Controlled component: renders `value` and emits the next value via `onChange`.
 -->
 <script>
+  import Field from '../../../components/Field.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import IconFactRow from '../IconFactRow.svelte';
   import ThresholdBandStrip from '../../../components/ThresholdBandStrip.svelte';
@@ -31,6 +32,7 @@
   import CheckFormulaFields from './CheckFormulaFields.svelte';
   import CheckRecipeTiers from './CheckRecipeTiers.svelte';
   import CheckTriggers from './CheckTriggers.svelte';
+  import InspectorCard from '../../../components/InspectorCard.svelte';
 
   // `breakageAuthority` (issue 419): the unified CheckTriggers editor is always
   // rendered; under `checkDriven` it also exposes the per-trigger break-tools toggle.
@@ -143,7 +145,7 @@
 
 <div class="manager-checks-editor" data-simple-check-editor>
   {#if shows('roll')}
-    <section class="manager-inspector-card manager-checks-card" data-roll-formula-card>
+    <InspectorCard class="manager-checks-card" data-roll-formula-card="">
       <div class="manager-checks-card-head">
         <div>
           <h3 class="manager-checks-card-title">
@@ -167,7 +169,7 @@
           onChange={emit}
         />
       </div>
-    </section>
+    </InspectorCard>
 
     <!-- DIFFICULTY, in its own card (issue 1096): the DC, the meet/exceed comparison and —
          on this slot alone — where the number comes from. The simple check is the one that
@@ -188,7 +190,7 @@
        badge. It renders in every mode precisely because it is the mode's outcome model;
        hiding it would leave the section blank on the one mode that has nothing else. -->
   {#if shows('outcomes')}
-    <section class="manager-inspector-card manager-checks-card" data-simple-outcomes>
+    <InspectorCard class="manager-checks-card" data-simple-outcomes="">
       <div class="manager-checks-card-head">
         <div>
           <h3 class="manager-checks-card-title">
@@ -207,7 +209,7 @@
              upward rather than held here, so the simulator and the strip can never be reading
              different records. -->
         {#if previewRecords.length > 1}
-          <label class="manager-field manager-checks-band-record">
+          <Field as="label" class="manager-checks-band-record">
             <span
               >{text(
                 'FABRICATE.Admin.Manager.Checks.Crafting.PreviewAgainst',
@@ -223,7 +225,7 @@
                 <option value={record.id}>{record.label}</option>
               {/each}
             </select>
-          </label>
+          </Field>
         {/if}
 
         <ThresholdBandStrip
@@ -275,7 +277,7 @@
           />
         </div>
       </div>
-    </section>
+    </InspectorCard>
   {/if}
 
   {#if shows('triggers')}
@@ -292,13 +294,13 @@
     <!-- THE TIER LIST RENDERS UNDER BOTH MODES (issue 1096). The macro is handed the tier's
          DC as its anchor and returns the final number, so the two COMPOSE rather than
          compete; hiding the tiers under dynamic would hide half of what the engine reads. -->
-    <section class="manager-inspector-card manager-checks-card" data-static-dc>
+    <InspectorCard class="manager-checks-card" data-static-dc="">
       <CheckRecipeTiers
         tiers={value?.tiers || []}
         defaultDc={value?.dc ?? 0}
         onChange={(tiers) => emit({ tiers })}
       />
-    </section>
+    </InspectorCard>
     {#if dcMode === 'dynamic'}
       <CheckDcMacroCard macroUuid={value?.macroUuid ?? null} onChange={emit} />
     {/if}

@@ -14,7 +14,7 @@ const themeIds = Object.values(FABRICATE_THEME_IDS);
 // The bulk edit panels' muted copy is SVELTE-SCOPED, not in the global sheet — `grep -c
 // fab-bulk-edit styles/fabricate.css` returns 0. Injecting only `styles/fabricate.css` and
 // then adding a `.fab-bulk-edit-*` node to the fixture would match no rule at all: the node
-// would inherit `--fab-mv2-text`, score the contrast of a colour this panel never renders,
+// would inherit `--fab-text`, score the contrast of a colour this panel never renders,
 // and pass no matter what the panel's own declarations said. So this gate reproduces what
 // Svelte actually ships, exactly as the font-size gates do — the component's real compiled
 // CSS appended AFTER the global sheet (matching `css: 'injected'` ordering in
@@ -23,12 +23,12 @@ const themeIds = Object.values(FABRICATE_THEME_IDS);
 //
 // ── WHAT THESE TWO SAMPLES DO AND DO NOT COVER ───────────────────────────────────────
 // Issue 1015 moved EIGHT declarations across three components from `--fab-text-subtle` to
-// `--fab-mv2-text-muted`. All eight land on the same token, so what actually varies between
+// `--fab-text-muted`. All eight land on the same token, so what actually varies between
 // them is the COLUMN they render on, and that is what is sampled here: one probe per
 // distinct backdrop, not one probe per declaration.
-//  - `--fab-mv2-surface-1`, the inspector rail's own fill, where the shell's and
+//  - `--fab-bg-2`, the inspector rail's own fill, where the shell's and
 //    `BulkEditSection`'s copy renders — sampled through `.fab-bulk-edit-subhint`.
-//  - `--fab-mv2-bg`, the Recipe Studio pick card's fill, a DIFFERENT colour inside the same
+//  - `--fab-bg-1`, the Recipe Studio pick card's fill, a DIFFERENT colour inside the same
 //    rail — sampled through `.fab-bulk-book-pick-meta`, nested two levels inside the card.
 // NEITHER background is restated by this fixture. Both are resolved by walking the probe's
 // own ancestors to the first opaque fill, so both come from the rule that actually ships —
@@ -126,7 +126,7 @@ function themePage(theme, width, height, body) {
             line-height: 1.35;
           }
           /* NO preview helper stands in for a bulk panel's background. There used to be one
-             (.preview-bulk-surface, --fab-mv2-surface-1) because contrastSample jumped
+             (.preview-bulk-surface, --fab-bg-2) because contrastSample jumped
              straight from a sample's own fill to [data-surface-backdrop], so a probe with no
              fill of its own was scored against the manager root's column rather than the
              rail's. inspectRenderedSurface now walks ancestors to the first opaque fill, so
@@ -153,18 +153,18 @@ function managerRows() {
           <p>Recipe, component, essence, and environment management</p>
         </div>
       </div>
-      <button type="button" class="manager-status-toggle ${index % 2 ? 'is-off' : 'is-on'}" data-contrast-soft data-boundary>
+      <button type="button" class="fabricate-toggle manager-status-toggle ${index % 2 ? 'is-off' : 'is-on'}" data-contrast-soft data-boundary>
         <span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span>
         <span class="manager-status-toggle-label">${index % 2 ? 'Off' : 'On'}</span>
       </button>
-      <button type="button" class="manager-button" data-boundary>Open</button>
+      <button type="button" class="fabricate-button manager-button fab-manager-button" data-boundary>Open</button>
     </article>
   `).join('');
 }
 
 /*
  * The bulk edit panel's STANDING SENTENCE, rendered on the inspector's own fill — which is
- * `.manager-inspector`'s shipped `--fab-mv2-surface-1` rule in the global sheet, resolved by
+ * `.manager-inspector`'s shipped `--fab-bg-2` rule in the global sheet, resolved by
  * the ancestor walk rather than restated by the fixture.
  *
  * It carries its OWN `data-contrast-*` hook rather than reusing one: `contrastSample` reads
@@ -187,7 +187,7 @@ function bulkEditSubhint() {
 
 /*
  * The Recipe Studio pick card's muted meta line — the SECOND column the issue 1015 recolour
- * has to clear. It sits in the same rail as the sub-hint above but on `--fab-mv2-bg`, and
+ * has to clear. It sits in the same rail as the sub-hint above but on `--fab-bg-1`, and
  * six of the seven themes failed AA on it before the recolour, so a gate that sampled only
  * the rail's own fill would have called that pass.
  *
@@ -197,7 +197,7 @@ function bulkEditSubhint() {
  * it jumped straight to `[data-surface-backdrop]`, the transparent meta line composited to
  * the backdrop unchanged and the card was skipped entirely, so recolouring
  * `.fab-bulk-book-pick` to its own text colour rendered the card unreadable and moved this
- * ratio by nothing. It read right only because `--fab-mv2-bg` happens to compute to the same
+ * ratio by nothing. It read right only because `--fab-bg-1` happens to compute to the same
  * value as the manager root in all seven themes — a coincidence, unasserted, and the ratio
  * of a card this gate was not actually looking at.
  *
@@ -238,7 +238,7 @@ function managerFixture(theme, width, height) {
           <p class="manager-subtitle preview-copy">Checks buttons, tags, toggles, text, focus rings, and fixed app-width layout.</p>
         </div>
         <div class="manager-header-actions">
-          <button id="focus-target" type="button" class="manager-button is-primary" data-hit data-contrast-solid data-boundary>Create System</button>
+          <button id="focus-target" type="button" class="fabricate-button manager-button fab-manager-button is-primary" data-hit data-contrast-solid data-boundary>Create System</button>
         </div>
       </header>
       <div class="manager-body">
@@ -246,12 +246,12 @@ function managerFixture(theme, width, height) {
           <button type="button" class="manager-nav-button is-active" data-boundary>
             <i aria-hidden="true">*</i>
             <span class="manager-nav-label">Crafting Systems With Extra Words</span>
-            <span class="manager-nav-count">6</span>
+            <span class="manager-nav-count" data-contrast-nav-count-active>6</span>
           </button>
           <button type="button" class="manager-nav-button" data-boundary>
             <i aria-hidden="true">*</i>
             <span class="manager-nav-label">Recipes</span>
-            <span class="manager-nav-count">12</span>
+            <span class="manager-nav-count" data-contrast-nav-count-idle>12</span>
           </button>
           <button type="button" class="manager-nav-button" data-boundary>
             <i aria-hidden="true">*</i>
@@ -260,8 +260,8 @@ function managerFixture(theme, width, height) {
           </button>
         </nav>
         <section class="manager-main" data-region data-boundary>
-          <div class="manager-toolbar">
-            <input class="manager-search" value="Alchemy and harvesting" aria-label="Search">
+          <div class="fabricate-filter-bar manager-toolbar">
+            <input class="fabricate-search manager-search" value="Alchemy and harvesting" aria-label="Search">
             <span class="manager-chip manager-selected-tag-pill" data-contrast-soft data-boundary>Rare ingredient category <button type="button">x</button></span>
             <span class="manager-chip is-warning" data-contrast-soft data-boundary>Warning</span>
           </div>
@@ -270,7 +270,7 @@ function managerFixture(theme, width, height) {
         <aside class="manager-inspector" data-region data-boundary>
           <h2 data-contrast-surface>Palette</h2>
           <p class="manager-empty-copy preview-copy">Shared theme tokens drive every mounted Fabricate surface.</p>
-          <button type="button" class="manager-button is-danger" data-hit data-contrast-solid data-boundary>Delete</button>
+          <button type="button" class="fabricate-button manager-button fab-manager-button is-danger" data-hit data-contrast-solid data-boundary>Delete</button>
           <!-- The armed half of the inline two-step row confirmation (issue 785). It is
                the product's first SOLID fab-danger surface, so it carries its OWN
                contrast probe: contrastSample reads the FIRST node matching a
@@ -279,7 +279,18 @@ function managerFixture(theme, width, height) {
                node. The fab-on-accent token fails 4.5:1 against fab-danger in
                foundry-native and is marginal in ironblood-forge, which is why
                fab-on-danger exists at all. -->
-          <button type="button" class="manager-button is-danger is-armed" data-armed="true" data-contrast-solid-armed data-boundary>Confirm?</button>
+          <button type="button" class="fabricate-button manager-button is-danger is-armed" data-armed="true" data-contrast-solid-armed data-boundary>Confirm?</button>
+          <!-- The two QUIET roles (issue 1118). Both paint muted ink on no fill at all -
+               is-ghost and is-dashed both take fab-text-muted, is-dashed at 11px -
+               and between them they are now the treatment for every navigational verb and
+               every content-authoring append verb in the manager, across every theme.
+               Nothing measured either: the three probes above sample surface text, a chip
+               and a SOLID action, and a muted-on-transparent label is none of those. A role
+               whose whole design is to recede is exactly the one a theme's contrast can fail
+               quietly, so each carries its own probe. They sit here rather than in the header
+               because contrastSample reads the FIRST node matching a selector. -->
+          <button type="button" class="fabricate-button manager-button fab-manager-button is-ghost" data-contrast-quiet-ghost data-boundary>Back to systems</button>
+          <button type="button" class="fabricate-button manager-button fab-manager-button is-dashed" data-contrast-quiet-dashed data-boundary>Add outcome tier</button>
           ${bulkEditSubhint()}
           ${bulkBookPickCard()}
         </aside>
@@ -336,9 +347,32 @@ function assertRenderedResult(result, theme, surfaceId, width) {
   assert.ok(contrastSample(result, '[data-contrast-soft]') >= 4.5, `${theme}/${surfaceId}/${width} chip/status text contrast should pass WCAG AA`);
   assert.ok(contrastSample(result, '[data-contrast-solid]') >= 4.5, `${theme}/${surfaceId}/${width} solid action contrast should pass WCAG AA`);
   assert.ok(contrastSample(result, '[data-contrast-solid-armed]') >= 4.5, `${theme}/${surfaceId}/${width} armed danger action contrast should pass WCAG AA`);
+  // The two quiet roles, muted ink on no fill (issue 1118). Non-vacuity FIRST, for the same
+  // reason the scoped samples check it: these two are the only probes here whose rule paints
+  // a MUTED scale over the panel's inherited primary ink, so a role rule that stopped
+  // applying computes the inherited colour and passes on a ratio that measures nothing. The
+  // ratio is in the message because a failure is a THEME TOKEN decision and the number is
+  // what decides it.
+  for (const [hook, role] of [['[data-contrast-quiet-ghost]', 'ghost'], ['[data-contrast-quiet-dashed]', 'dashed']]) {
+    const sample = result.contrastSamples.find(entry => entry.selector === hook);
+    assert.ok(sample, `expected a contrast sample for the ${role} role at ${hook}`);
+    assert.notEqual(sample.color, sample.inheritedColor, `${theme}/${surfaceId}/${width} the ${role} role computed the inherited ink (${sample.color}) — its rule did not apply, so the ratio would prove nothing`);
+    const ratio = contrastSample(result, hook);
+    assert.ok(ratio >= 4.5, `${theme}/${surfaceId}/${width} the ${role} role's label should pass WCAG AA against the surface it recedes into, got ${ratio.toFixed(2)}:1`);
+  }
   // The bulk edit panels' muted copy (issue 1015), one probe per COLUMN it renders on.
   assertScopedSamplePassesAA(result, '[data-contrast-bulk-muted]', `${theme}/${surfaceId}/${width} bulk edit muted copy on the rail fill`);
   assertScopedSamplePassesAA(result, '[data-contrast-bulk-bg-muted]', `${theme}/${surfaceId}/${width} bulk edit book pick meta on the card fill`);
+  // The rail's bare-numeral `.manager-nav-count` (issue 1304), one probe per GROUND it
+  // renders on: the idle rail's own `--fab-bg-0` fill, and `--fab-surface-active` under the
+  // active row. A 0.625rem/600 numeral is not large text, so the bar is 4.5:1 on both — and
+  // the two grounds are different enough that a token clearing one used to fail the other
+  // (the active row's translucent tint sits closer to the rail's own ink than the opaque
+  // idle fill does).
+  const idleCountRatio = contrastSample(result, '[data-contrast-nav-count-idle]');
+  assert.ok(idleCountRatio >= 4.5, `${theme}/${surfaceId}/${width} the idle rail's nav count should pass WCAG AA, got ${idleCountRatio.toFixed(2)}:1`);
+  const activeCountRatio = contrastSample(result, '[data-contrast-nav-count-active]');
+  assert.ok(activeCountRatio >= 4.5, `${theme}/${surfaceId}/${width} the active row's nav count should pass WCAG AA against --fab-surface-active, got ${activeCountRatio.toFixed(2)}:1`);
 }
 
 /*
@@ -355,7 +389,7 @@ function assertScopedSamplePassesAA(result, selector, label) {
   assert.notEqual(
     sample.color,
     sample.inheritedColor,
-    `${label} computed the inherited --fab-mv2-text (${sample.color}) — its scoped rule did not apply, so the ratio would prove nothing`
+    `${label} computed the inherited --fab-text (${sample.color}) — its scoped rule did not apply, so the ratio would prove nothing`
   );
   assert.ok(contrastSample(result, selector) >= 4.5, `${label} contrast should pass WCAG AA`);
 }
@@ -395,7 +429,7 @@ async function inspectRenderedSurface(page) {
     // to the backdrop's, which made a probe with no fill of its own score against a column
     // it does not render on — and, worse, made the fill of every intermediate CARD invisible
     // to the gate: `.fab-bulk-book-pick-meta` declares no background, so the pick card's
-    // `--fab-mv2-bg` could be changed to the same colour as its own text, rendering the card
+    // `--fab-bg-1` could be changed to the same colour as its own text, rendering the card
     // unreadable, without moving the ratio by 0.001. The walk is what makes each nested
     // probe's real card fill load-bearing.
     //
@@ -416,14 +450,14 @@ async function inspectRenderedSurface(page) {
       }
       return layers;
     };
-    const contrastSamples = ['[data-contrast-surface]', '[data-contrast-soft]', '[data-contrast-solid]', '[data-contrast-solid-armed]', '[data-contrast-bulk-muted]', '[data-contrast-bulk-bg-muted]'].map(selector => {
+    const contrastSamples = ['[data-contrast-surface]', '[data-contrast-soft]', '[data-contrast-solid]', '[data-contrast-solid-armed]', '[data-contrast-quiet-ghost]', '[data-contrast-quiet-dashed]', '[data-contrast-bulk-muted]', '[data-contrast-bulk-bg-muted]', '[data-contrast-nav-count-idle]', '[data-contrast-nav-count-active]'].map(selector => {
       const element = document.querySelector(selector);
       const style = getComputedStyle(element);
       return {
         selector,
         color: style.color,
         backgroundLayers: backgroundLayersUnder(element),
-        // What the node would read as with no rule of its own — the inherited `--fab-mv2-text`
+        // What the node would read as with no rule of its own — the inherited `--fab-text`
         // from `.fabricate-manager`. A probe whose scoped rule silently stopped applying
         // computes exactly this, so comparing against it is what keeps the sample honest.
         inheritedColor: getComputedStyle(element.parentElement).color
@@ -519,10 +553,10 @@ function liveUpdateFixture(origin) {
       </head>
       <body>
         <section id="mounted-surface" class="fabricate fabricate-manager" data-fabricate-theme="fabricate" data-manager-view="systems">
-          <header class="manager-header"><h1 class="manager-title">Mounted Fabricate Surface</h1><button class="manager-button is-primary">Action</button></header>
+          <header class="manager-header"><h1 class="manager-title">Mounted Fabricate Surface</h1><button class="fabricate-button manager-button fab-manager-button is-primary">Action</button></header>
           <div class="manager-body">
             <nav class="manager-rail"><button class="manager-nav-button is-active">Systems</button></nav>
-            <main class="manager-main"><div class="manager-toolbar"><span class="manager-chip manager-selected-tag-pill">Live theme</span></div></main>
+            <main class="manager-main"><div class="fabricate-filter-bar manager-toolbar"><span class="manager-chip manager-selected-tag-pill">Live theme</span></div></main>
             <aside class="manager-inspector"><p>Inspector stays mounted.</p></aside>
           </div>
         </section>

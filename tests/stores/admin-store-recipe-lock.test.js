@@ -169,13 +169,57 @@ describe('adminStore toggleRecipeEnabled blocked-enable suppression', () => {
     const store = blockedStore(notified);
     await store.refresh();
 
+    const parted = [];
     assert.equal(
-      await store.toggleRecipeEnabled('r1', true, { onBlocked: (message) => flashed.push(message) }),
+      await store.toggleRecipeEnabled('r1', true, {
+        onBlocked: (message, parts) => {
+          flashed.push(message);
+          parted.push(parts);
+        },
+      }),
       false
     );
 
     assert.deepEqual(flashed, ['recipe is incomplete'], 'the flash receives the localized reason');
     assert.deepEqual(notified, [], 'the same error must not also fire as a Foundry notification');
+    // A PLAIN ERROR HAS NO PARTS TO SPLIT (issue 1515). The sink's second argument is the same
+    // refusal as `{ title, detail }` and exists only for an activation error, which carries the
+    // recipe name and the coded issues separately; anything else answers `null` so the caller
+    // falls back to the one-line message rather than drawing an empty detail line.
+    assert.deepEqual(parted, [null], 'a non-activation refusal supplies no title/detail split');
+  });
+
+  it('hands the flash the title/detail split when the refusal is an activation error', async () => {
+    const { RecipeActivationError } = await import('../../src/systems/RecipeActivationError.js');
+    const notified = [];
+    const store = createAdminStore(
+      createServices({
+        recipes: [makeRecipe({ id: 'r1', enabled: false })],
+        notify: { info: () => {}, warn: () => {}, error: (message) => notified.push(message) },
+        updateRecipe: async () => {
+          throw new RecipeActivationError('Mana Potion', [
+            { code: null, params: {}, message: 'It has no result groups.' },
+          ]);
+        },
+      })
+    );
+    await store.refresh();
+
+    let received = null;
+    await store.toggleRecipeEnabled('r1', true, {
+      onBlocked: (message, parts) => {
+        received = { message, parts };
+      },
+    });
+
+    assert.ok(received.parts, 'an activation refusal splits');
+    assert.match(received.parts.title, /Mana Potion/, 'the title names the recipe');
+    assert.ok(
+      !received.parts.title.includes('result groups'),
+      'and carries none of the reasons, which are the detail'
+    );
+    assert.equal(received.parts.detail, 'It has no result groups.');
+    assert.deepEqual(notified, [], 'the split refusal is still suppressed as a toast');
   });
 });
 

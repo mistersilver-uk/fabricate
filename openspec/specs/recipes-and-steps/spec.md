@@ -7,7 +7,8 @@ An ingredient set contributes its own Tool ids only when the Crafting System use
 Recipe-wide Tools apply to every step, active step Tools apply to that step, and active ingredient-set Tools apply only when that set is selected.
 Legacy recipe `toolBonusModes` data is ignored and omitted from canonical Recipe writes; Recipe data never owns Tool behavior.
 
-An enabled Tool shared-prerequisite gate resolves every selected id against `system.characterPrerequisites` and evaluates the resolved definitions with AND semantics.
+An enabled Tool shared-prerequisite gate resolves every selected id against the WORLD character-prerequisite library (issue 1308) and evaluates the resolved definitions with AND semantics.
+Unlike the learning gate, it fails CLOSED: an id that resolves to nothing leaves the gate unpassed, so under `gateMode: "usability"` the tool is unusable and the attempt is blocked.
 An unresolved selected id fails closed.
 For an owned Tool, presence matching, prerequisite evaluation, and bonus-expression evaluation bind to the same matched Item's owning actor, so multiple actors cannot collectively satisfy one Tool.
 A virtual-present Tool binds those evaluations to the primary acting or check actor.
@@ -137,6 +138,88 @@ A presence-only match is spared from usage/breakage and recorded as skipped, and
 
 ## Execution Lifecycle
 
+### Versioned Run Execution
+
+New applicable crafting and alchemy runs use lifecycle version 1, as defined in `data-models/spec.md`.
+Only an absent version selects the legacy contract; unsupported present versions are preserved and refuse mutation.
+The versioned rules in this section supersede legacy arming and cancellation behaviour for those new runs alone.
+
+Public `Fabricate.craft`, the global crafting helper and `/craft` MUST preserve one-call execution when the stage is ready and all choices are supplied.
+New public starts MUST select version 1 and use the same active-GM authority for start and execution; this convenience does not bypass ownership, validation, checks or execution receipts.
+A stage that has not started keeps its choices editable in the Journal and has spent nothing; only a later stage of a multi-step run can be in that state, because run start commits the first one.
+Journal start controls may create a run for later manual completion rather than promising immediate execution.
+
+- A stage with a positive honoured time requirement MUST be STARTED before it can resolve, and that start is a single irreversible commit.
+Starting it persists the scoped choices and the full selected authored-requirement snapshot, LOCKS them, consumes the stage's materials and settles its currency, and arms the gate.
+Run start is the first stage's start, so every versioned run spends its materials when it starts.
+A later stage of a multi-step run is started by its own explicit begin operation; a manual execute on an unstarted stage is refused rather than silently starting it.
+An automatic world-time advance MAY start an unstarted stage it is otherwise permitted to complete, after its conservative blocker has decided, so a blocked automatic stage still spends nothing.
+A stage armed by a release that consumed at execute carries a gate and no start-phase consumption record, and nothing backfills it.
+Every reader of "has this stage started" — the begin operation, the roll-readiness rule, the execute guard and the projection alike — MUST treat such a stage as STARTED, so a run already in flight resolves on the pre-consumption path instead of deadlocking between a begin that refuses it as already started and an execute that refuses it as unstarted.
+- Once a stage has started its selection is authoritative: a caller-supplied selection plan is IGNORED rather than refused, so a redundant resend can never fail a craft the player already committed to.
+A started stage's check, resolution and awards read the start snapshot rather than re-resolving inventory the consumption has emptied.
+- A stage check MUST NOT be describable or rollable until every other stage requirement is met, elapsed time included; the projected actions withhold the roll and the engine refuses it.
+- A stage with no honoured time requirement has no waiting window, so beginning and resolving it remain one act that still consumes as part of that act.
+This governs a LATER stage of a multi-step run, which is reached only by resolving the stage before it.
+Run start is different: it CREATES a run, so the first stage commits at run start whether or not it has an honoured time requirement.
+A first stage whose materials cannot be met refuses the start and leaves no run record, rather than creating an active run that has taken nothing and can be started again against the same stock.
+A start that THROWS is such a refusal: unless one of its effects applied, the run it created MUST be discarded too, because a run left active carrying uncertain evidence refuses every control it has — cancel included — and so cannot be cleared by the player at all.
+An effect that refused DEFINITELY, establishing that nothing reached the database, MUST NOT record uncertain evidence; its plan is discarded and the operation stays retryable.
+No versioned run may therefore be active with an unstarted first stage.
+- Execution re-resolves the current run, revision, source actors, selected ingredient set, inventory, Tools and requirements under the authoritative operation when the stage did not start separately.
+Fixed ingredients, alternatives and essence carriers share the canonical physical-item allocation, so one unit cannot fund two requirements.
+- A stale route, option or held-item reference MUST remain blocked instead of selecting a surviving alternative implicitly.
+Explicit route changes replace the previous route's option overrides and shared essence allocation.
+Several stale selections MAY be repaired incrementally, but execution MUST wait for the whole stage to validate.
+The selected authored-requirement snapshot MUST be resolved by the authority from the actual selected set, not accepted as client-supplied evidence.
+It includes route, component, tag, essence and currency requirements and remains distinct from actual spending receipts in history.
+- Each irreversible spending, award and publication operation persists its applying phase before invocation and its actual receipt before the next operation.
+Versioned physical-item consumption MUST receive the matching Item document from delete/update before recording confirmed spending or proceeding to awards; a non-throwing unconfirmed return is insufficient.
+Ambiguous writes preserve recovery evidence and cannot be replayed or automatically compensated.
+History distinguishes authored requirements, actual spending, actual rolls and actual awards.
+Successful and failed stage finalization MUST retain the optional permitted historical evidence defined in `data-models/spec.md`, including captured purpose, executed resolution meaning, carrier contributions and settled currency amounts.
+Future-stage previews remain authored possibilities rather than captured execution or selected intent.
+- New runs default to manual completion.
+An actively counting-down stage without a player check may retain a world-time completion preference even while editable requirements remain unresolved.
+Automatic execution uses the same guarded operation as manual execution and stops without spending when the stage requires material, choice, currency, essence, Tool or player-check input, or validation fails.
+Selecting materials in advance does not authorize automatic material spending; eligible no-input stages alone may complete automatically.
+The preference survives that blocker; world-time jumps cannot bypass a check or execute a stage twice.
+- Pausing freezes remaining world time and retains choices; resuming reanchors readiness.
+Paused runs cannot advance manually or through world-time processing, but may be cancelled.
+- Pausing never refunds: the run keeps both the time it has run and the choices it has made.
+- Versioned cancellation forfeits elapsed time and preserves completed-stage spending and awards.
+It reverses a started-but-unresolved stage's consumption through the same shared reversal the legacy cancel uses, honouring the system's `features.refundOnPlayerCancel` flag and reporting the ACTUAL outcome rather than the policy intent.
+A stage START is not an attempt, so a cancelled run's started-but-unresolved stage records no attempted stage.
+Legacy consumption and refund behavior and salvage remain unchanged.
+- A recipe-less alchemy fizzle persists its versioned terminal-history execution journal before recording a dead end or consuming submitted items.
+It honors the existing consume-on-failure policy and history visibility rules without revealing a recipe or replaying uncertain effects.
+
+### Captured Execution Evidence
+
+A completed managed write — a legacy or version-1 crafting stage, a recipe-less alchemy fizzle, or a native salvage run, each persisted through its own run manager — MUST capture the permitted evidence below.
+Capture is gated by initiating-viewer entitlement at write time and by current-viewer entitlement at projection time; an unknown or failing entitlement evaluation is never affirmative.
+The evidence records what that write actually did, so deleting the recipe, component, task or system configuration afterwards cannot change it.
+
+- **Executed resolution.** Every such write MUST record `resolutionSnapshot` as `{kind, mode}` for the resolution it executed, derived from the canonical active-check derivation at execution rather than from configuration read back later.
+A legacy timed crafting stage captures it on the finishing write rather than on the arming write, because the resolution is unknowable while the gate is still running.
+- **Physical effects.** Consumption and awards MUST be captured at the actual update or delete boundary: require the matching document's acknowledgment, derive each decrement from the captured source quantity, and capture name, image and actor-qualified identity before deletion.
+A requested plan, a swallowed failure, or a calculated after-value alone MUST NOT establish complete consumption.
+Native salvage `consumedComponents` additionally carry `actorUuid`, `name` and `img` while preserving their existing `itemUuid`, `quantity`, lifecycle and public signatures.
+A fizzle record MAY carry permitted `consumedIngredients` and `createdResults` and its explicit no-match, no-check meaning, without a synthetic crafting stage, recipe id or signature.
+- **Settlement state.** `historySettlement.consumption` and `historySettlement.awards` each take `pending`, `complete`, `uncertain` or `notApplicable`, as defined in `data-models/spec.md`.
+A genuinely unattempted fact — a consume-on-failure policy that consumes nothing, a stage armed and waiting — is `notApplicable`, which is neither unknown nor zero.
+A confirmed prefix is retained separately from an uncertain remainder; `pending` and `uncertain` prove no award and authorize no replay, rollback or automatic compensation.
+A further invocation on the same native run MUST refuse while an invoked effect is pending or uncertain or a settlement has failed, through the existing lifecycle and signatures; ordinary timed waiting is not an invoked pending effect.
+- **Five distinct states.** Unknown, withheld, not applicable, complete-empty and uncertain are five separate states, decided per row and per field.
+Missing evidence MUST NOT be rendered as a confirmed no-check resolution, as zero, or as an award.
+Withheld evidence MUST NOT be encoded as a complete empty receipt.
+- **No inference from success.** An older record carrying no captured `resolutionSnapshot` is unknown, whatever its recorded check result says.
+A `lastCheckResult` of `{success: true, reason: 'Success', data: {}}` carries no captured resolution strategy and MUST read as unknown, never as a confirmed no-check resolution.
+- **Identity fallbacks never supply a quantity.** A historical metadata fallback MAY supply a missing name or image under the precedence in `data-models/spec.md`, and MUST NOT supply, copy or scale a quantity, contribution or operational state.
+
+These fields are optional on older records and allowlisted before persistence.
+They change no existing contract: the crafting and gathering economies, legacy cancellation and refund behaviour, permitted failure awards, execution authority, the no-replay rule, and the native salvage lifecycle and public signatures all remain as specified elsewhere in this spec.
+
 ### Start or Resume
 
 1. Resolve recipe and active step.
@@ -206,9 +289,7 @@ A presence-only match is spared from usage/breakage and recorded as skipped, and
    for an instant (non-timed) step the craft aborts BEFORE any consumption (a zero-mutation
    abort — no ingredients, currency, or tools consumed or broken) and reports failure, never
    a player success with zero items.
-   Timed exception: a time-gated step consumes at START (the check outcome is unknowable
-   until the gate matures), so the same misconfiguration detected at FINISH records a step
-   FAILURE with no refund and still reports failure — never a false success with zero items.
+   Legacy timed exception: an unversioned time-gated step consumes at START (the check outcome is unknowable until the gate matures), so the same misconfiguration detected at FINISH records a step FAILURE with no refund and still reports failure — never a false success with zero items.
 
 3. **A FAILED check resolves an authored FAILURE result group when the policy permits it**
    (`craftingCheck.failureResultPolicy`, `data-models` requirement 35).
@@ -255,6 +336,25 @@ A presence-only match is spared from usage/breakage and recorded as skipped, and
 3. Apply property macros per result item when enabled: every contributing essence's own property macro runs first, in essence-library order, and then the result's own macro, so a recipe-specific macro is the last writer at any path the two share.
 4. Create result items.
 
+### Component Complications (progressive crafting)
+
+A progressive craft fires the component complications its committed award earned (`data-models/spec.md` § Component requirements 19-25, condition semantics in `resolution-modes/spec.md` § Component Complications).
+
+1. The firing point is AFTER the award is committed — the result items exist and the run record is written — and BEFORE the crafting chat card is posted, so the card can report what fired.
+   Both crafting paths carry the site: the immediate path and the timed FINISH path, each classifying against the award report its OWN result creation published rather than against a re-resolution.
+2. Firing happens **once per STEP resolution**, not once per `craft()` call.
+   A collapsed multi-step chain recurses into the crafting flow per step, so a three-step chain fires three times; three steps are three progressive resolutions with three separate awards.
+3. **Result-group resolution is NOT a firing site and must not become one.**
+   Result groups are resolved up to THREE times for one craft — the pre-consumption misconfiguration gate, the failure-award preflight, and again where the result items are actually created — and the engine may ask that many times only because the resolution is PURE, so asking twice agrees with itself.
+   Firing there would fire more than once, and would fire on a craft that then aborts having consumed nothing, because the first of those calls runs before any consumption precisely so a misconfigured recipe can abort cleanly.
+   Resolution PUBLISHES the stage facts; the engine fires.
+4. The crafting FAILURE-award path needs no firing site and has none.
+   A progressive resolution publishes no `disposition`, so the failure-award predicate is false for it and a progressive craft awards nothing there.
+5. Complications are strictly DOWNSTREAM of the award and never influence it.
+   A macro runs arbitrary code, and one that mutated the actor mid-award would corrupt the consumed-item and created-record bookkeeping the run depends on.
+6. Error isolation is three nested guards: per complication, so one bad complication does not cost the resolution its others; per effect, so a failed effect roll still lets the macro request be made; and a whole-call guard at the engine site, so a complication can never turn a committed craft into a thrown one.
+   A complication that cannot fire is a lost narrative beat; a throw here would be lost items.
+
 ### Run Progression
 
 - On step success, advance to the next step.
@@ -263,8 +363,8 @@ A presence-only match is spared from usage/breakage and recorded as skipped, and
 
 #### Player-Initiated Advance ("Trigger Next Step")
 
-Crafting is the only player-triggerable run type.
-A matured crafting step — one whose `timeGate.availableAt` has been reached, or that never carried a time gate — does NOT auto-advance: it requires a manual player trigger.
+This subsection describes legacy crafting advance; version-1 crafting and gathering use the authoritative execution contract above and in `gathering-and-harvesting/spec.md`.
+A matured legacy crafting step — one whose `timeGate.availableAt` has been reached, or that never carried a time gate — does NOT auto-advance: it requires a manual player trigger.
 The player-facing Journal screen exposes this as a "Trigger Next Step" action (see `ui-integration/spec.md` *Journal App*).
 
 - Triggering re-invokes the crafting flow for the run's id (`advanceCraftingRun({ actorId, runId, recipeId })` re-enters `craft(actor, recipe, { runId, componentSourceActors })`), so the same engine path that started the run advances it.
@@ -276,9 +376,9 @@ A non-owner is told to ask an owner or GM rather than the run advancing silently
 
 #### Maturity Asymmetry Between Run Types
 
-A matured crafting step waits for the manual trigger above.
-By contrast, matured gathering and salvage runs **auto-resolve** on world time: their timed-completion path resolves them without any player action (see *Salvage Execution* below and `gathering-and-harvesting/spec.md`).
-The Journal therefore presents gathering and salvage runs as auto-resolving and offers them no trigger button.
+A matured legacy crafting step waits for the manual trigger above.
+By contrast, matured legacy gathering and salvage runs **auto-resolve** on world time: their timed-completion path resolves them without any player action (see *Salvage Execution* below and `gathering-and-harvesting/spec.md`).
+The Journal therefore offers legacy gathering and salvage no trigger button, while version-1 crafting and gathering default to manual completion and expose their eligible actions explicitly.
 
 ## Alchemy Execution Lifecycle
 
@@ -386,6 +486,115 @@ In addition to the shared property-macro context (`data-models/spec.md` *Propert
    Salvage never transfers effects (its synthetic recipe view sets `transferEffects: false`), so the macro half is the only essence-carried behaviour reachable there.
 10. A time-gated craft evaluates the disabled-essence gate from the enabled-ness snapshot taken at START (see `data-models/spec.md` *CraftingRunStep*), never from the live definitions.
 
+## Complication Macros
+
+A component complication may name a `macroUuid` (`data-models/spec.md` § Component requirements 19-25 and § Property Macro Contract).
+The contract is CROSS-ACTIVITY — it governs progressive crafting, progressive salvage and progressive gathering alike — and it is defined ONCE, here.
+`gathering-and-harvesting/spec.md` references this section rather than restating it, which is what keeps the cross-activity argument for the record's placement from being contradicted at the spec level.
+
+This section is not in `integrations/spec.md`, deliberately.
+That spec governs INBOUND third-party integration and its first principle is that users must never be required to write, paste or maintain macros; recording a GM-authored macro hook there would read as an exception to the principle it exists to state.
+The codebase's convention is that a macro contract lives with the surface that owns it, deferring the shared payload shape to `data-models/spec.md` § Property Macro Contract, exactly as § Essence Property Macros does.
+
+### Extend, never constitute
+
+A macro may EXTEND a Fabricate capability; it may never CONSTITUTE one (issue 912).
+A complication satisfies that rule and adopts every condition issue 912 attached to a future macro seam:
+
+1. The complication is a complete, authorable Fabricate capability WITHOUT a macro.
+   Its name, description, severity, audience, conditions and effect roll all work with no macro attached, and the macro is a strictly optional second effect.
+2. Nothing in Fabricate's behaviour is delegated to the macro.
+   No award, no consumption, no run state, no chat visibility and no player-facing outcome depends on a macro running, or on what it returns; a complication's macro return is not read and nothing is applied from it.
+3. A world that never authors a macro loses no capability, and a macro that never runs — because none is connected, because it does not resolve, or because it throws — leaves the resolution exactly as it was.
+
+### GM-authoritative execution
+
+**Every complication macro executes on a GM client**, so its authority does not depend on whether the activity was time-gated.
+The elected executor is Foundry's own designated active GM, which is a pure function of replicated user state that every client evaluates identically; a hand-rolled "first active GM by id" would elect an assistant over a gamemaster and is wrong.
+
+The acting client commits the award, posts the player-facing card itself, and RELAYS the complication to the elected GM.
+There is no new socket: Foundry registers exactly one socket event per package, so this is a new action on the module's existing channel, dispatched from the single router inside its own guard, because a throw on one payload must never starve the others sharing the channel.
+The module manifest's socket opt-in is a hard prerequisite of this whole section; removing it would silently discard every emit with no error anywhere.
+
+### The relay payload carries ADDRESSING ONLY
+
+The payload names the crafting system, the component, the authored complication, the stage occurrence, the resolution and the acting actor, plus the outcome facts an output echoes.
+**It carries no `macroUuid`, no `visibility`, and no name, description, severity, chat content or speaker.**
+
+- The elected GM RE-READS the authored complication from its OWN copy of the `craftingSystems` world setting and takes every executable and disclosure decision from that lookup.
+  A payload naming a component or a complication that does not exist there is DROPPED.
+  A forged payload can therefore do no more than fire a complication the GM themselves authored.
+- The sender is the SERVER-ATTESTED socket sender, never a value carried in the request.
+  A blank or absent sender is refused fail-closed.
+- The GM RE-AUTHORIZES the addressed actor against that attested sender's own permission, directly.
+  **Any ownership predicate whose first disjunct reads `isOwner` is INERT on a GM-side apply path**, because `isOwner` resolves against the ambient user and is unconditionally true for a GM on every document in the world; such a predicate would pass for a sender who owns nothing and would never consult the sender at all.
+- The speaker and the acting actor are resolved GM-side from the addressing, never read from the payload.
+- Inbound deliveries are rate limited per sender, applied LAST so a malformed or unauthenticated message never consumes a sender's budget, and charged per MESSAGE rather than per complication.
+- **A message is addressed to ONE crafting system and ONE actor, so the unit of relay is the addressed `(craftingSystemId, actorUuid)` pair, not the run.**
+  Both are authorization inputs — the GM re-reads the authored complication from that system's record and re-authorizes that actor against the attested sender — so neither can be carried per entry without moving the authorization decision onto the wire.
+- ONE resolution is therefore always exactly ONE message, however many complications it carries.
+  A **bulk salvage** relays one message per distinct addressed pair, which is exactly one for the ordinary run and is bounded above by the **25-target selection cap** (`ui-integration/spec.md` § Bulk Salvage Execution) in the worst case, where every selected row names a different actor or system.
+  What is forbidden is the PER-ROW emit: a run of N rows against one pair must relay once, not N times, or a long run silently loses its tail on a path the player never sees.
+- **The per-sender bound is sized against that worst case, not against the ordinary one.**
+  The legitimate ceiling in one window is the selection cap times the number of fully fanned-out runs a window can hold, plus headroom for deliberate one-at-a-time resolutions and for a collapsed crafting chain, which relays once per step.
+  A bound sized on "a bulk salvage of any size is one message" reopens exactly the silent tail loss this requirement exists to close, because two selection-capped multi-actor runs inside one window legitimately spend fifty units.
+  The refusal is silent to the player by construction — it is a GM-side drop of a narrative beat — so the bound must not be reachable by ordinary play; making a scripted flood useless is the only thing it is for.
+
+The residual abuse surface is stated precisely: an authenticated player can ask the GM to fire complications their own actors are eligible for, at the limiter's bound.
+That is a self-inflicted nuisance rather than privilege escalation.
+The stage bucket, the result id and the effect-roll total are client-supplied outcome facts the GM cannot verify, so a GM-facing output presents them as the acting client's CLAIM rather than as GM-attested.
+
+### The `script` gate is a call-site check, at the site where the macro RUNS
+
+The `type === 'script'` check stays a CALL-SITE check for the reason § Essence Property Macros requirement 7 gives: `command` is a required string on chat macros too, the Macro type defaults to `chat`, and imported systems and hand-edited settings never pass through an editor's drop handler at all.
+The shared macro runner is UNCHANGED by this feature; centralising the gate into it would turn a chat-type essence property macro's deliberate silent skip into a per-essence-per-result error notification.
+
+That call site is the **GM-side apply body**, not the acting client.
+Compendium ownership is GM-configurable per role, so an acting player's resolution of a uuid can miss a macro the GM resolves fine; gating on the acting client would silently drop a valid macro and make the "report the miss on the GM-facing output" rule incoherent.
+The uuid is resolved at the gate AND again inside the runner, deliberately: settling "is this a script macro at all" before entering the try is the only way to distinguish a broken GM link, which is silent, from a macro that blew up, which is reported.
+A uuid that does not resolve to a script macro is skipped and reported on the GM-facing output, because pack ownership is a real GM-facing case.
+That report rides the GM-only complication card, which is posted for a skipped or failed macro even when the addressed system's `features.chatOutput` is off and then carries the faulted complications alone, because that toggle suppresses the result narration Fabricate composes and never the report of a configuration only the GM can repair.
+
+### No GM connected: DROP, not block
+
+With no elected GM:
+
+- The award, the player-facing card and the run record are UNAFFECTED, because the award commits on the acting client before the relay.
+- A GM-only output is not created and is dropped.
+  It cannot be created locally: a player may not author a message as the GM, and one they did author would render in their own sidebar.
+  It must not be written to the run record either, because that record is an actor flag the player can read.
+- No macro runs.
+  A player-client fallback is FORBIDDEN: it would reintroduce the authority split this design removes, on exactly the path where no GM is watching.
+- Player-visible complications are unaffected, because they ride the card the acting client builds and posts.
+- The drop is reported as a local warning on the acting client and never to the player.
+
+This deliberately DIVERGES from the blind-gathering relay, which BLOCKS when no GM is connected (`gathering-and-harvesting/spec.md` § Blind Gathering).
+A complication is strictly downstream of a committed award, so blocking it would strand a completed craft.
+There is deliberately no "delivered when a GM next connects" promise: a non-GM client may not author a GM message, must not write the run record and cannot write a world setting, so there is no store such a promise could be kept from.
+
+### Delivery is at-most-once, may be silently lost, and is not ordered
+
+The relay is fire-and-forget: an elected GM reloading, disconnecting or erroring mid-handler drops the message with no retry and no persistence.
+**This is accepted**: the award is already durable, and a lost complication is a missing narrative beat rather than a lost item.
+A far-side failure is contained by the executing client's own guards and never propagates back to the acting client, which has already returned.
+
+Only the EMISSION is ordered — after the award commits, before the chat card is posted.
+A GM-side macro executes asynchronously and may complete after the card; complication macros are not ordered relative to each other or to the card, and a macro must not assume it can mutate the card it was fired alongside.
+
+**A complication macro must tolerate running more than once.**
+Deliveries are de-duplicated per executing context on `(resolutionId, resultId, complicationId)` in a bounded, non-persistent set, and every one of the three parts is load-bearing: `complicationId` alone repeats across components, `resultId` is what keeps two legitimate firings of one complication on two occurrences of one component apart (`resolution-modes/spec.md` § Once per result entry, never once per component), and `resolutionId` is what keeps two legitimate resolutions apart.
+Foundry elects a USER rather than a client, and a user may hold several sockets, so an elected GM with the world open in two tabs is two contexts with two empty sets: the duplicate that case produces is a STATED, ACCEPTED residual rather than a defect.
+The addressing-only contract bounds it — a duplicate can only re-run the macro the GM themselves authored.
+
+### Per-complication isolation
+
+One complication's failure must not cost the resolution its others, at any layer: the condition roll, the effect roll, the macro resolve and the macro body are each isolated, and a macro that throws costs neither the award nor the next complication.
+
+### An imported system cannot ship an executable body
+
+`import-export/spec.md` § Reference handling classifies macro UUIDs as EXTERNAL references: an export carries the uuid, never the Macro document, so an imported system can only reference a macro the destination world already has.
+That bounds the surface but does not close it — an import can still re-point a complication at a macro the destination GM already owns — which is why every complication macro uuid is surfaced to the GM at import time with its owning COMPONENT named.
+
 ## Persistence and Run State
 
 - In-progress runs may be stored under `Actor.flags.fabricate.craftingRuns`.
@@ -447,7 +656,8 @@ Routed and progressive salvage require their roll formula and fail loudly (with 
 5. **Consume**: remove N = `Component.salvage.ingredientQuantity` instances (default 1, any positive integer) of the component from the actor's inventory, matching §Implicit Ingredient and `data-models/spec.md`.
 Apply tool usage/breakage as applicable.
 6. **Create**: Create result items on the actor.
-7. **Chat**: when `features.chatOutput` is enabled, post a salvage result card on resolved success or rolled failure only (never on cancelled, misconfigured, or time-gated outcomes); card creation failures are non-fatal.
+7. **Complications**: fire the component complications a committed PROGRESSIVE award earned (see § Component Complications (progressive salvage) below).
+8. **Chat**: when `features.chatOutput` is enabled, post a salvage result card on resolved success or rolled failure only (never on cancelled, misconfigured, or time-gated outcomes); card creation failures are non-fatal.
 See the `ui-integration` chat card contract.
 
 If `Component.salvage.timeRequirement` is absent, salvage resolves immediately.
@@ -485,6 +695,30 @@ The failure branch builds the salvage recipe view the success branch builds.
   actions persisted under the `salvage:<componentId>` scope, honouring
   `Component.salvage.allowPlayerResultReorder` (cross-reference `ui-integration` §Player Salvage Surface).
   The GM toggle is authored policy, exported and honoured.
+
+### Component Complications (progressive salvage)
+
+A progressive salvage fires the component complications of its YIELD components — the components the ordered stages produce — on the same contract progressive crafting uses (`resolution-modes/spec.md` § Component Complications).
+
+1. **The firing point is between the award and the card**: after the result items are on the actor and the run is completed, and before the salvage chat card is posted.
+   The ORDERING is award, then complications, then chat, and it is fixed: the card reports what fired, and a complication is a consequence of an award that already happened.
+2. The ordered stage list and the award report are captured BESIDE the resolution they must agree with, and held until the firing point.
+   Completing the run reassigns the run record, and the ordered list is read off the run's captured `resultOrder`, so re-deriving the list after the completion write would silently fall back to the AUTHORED order for a run whose completed record does not carry the capture — and a complication would then name a different stage from the one the award actually spent against.
+   The runless invariant of § Resolution Mode Application is unchanged: no run manager means no run, no captured order, and the authored order, with no settings fallback.
+3. **The FAILURE branch fires nothing, and needs no site.**
+   Progressive salvage returns no result group on a failed check, so a failed progressive salvage has no stages, no award and no candidates.
+   This is a stated requirement rather than an implementation consequence, so that adding a failure-award path to progressive salvage later cannot silently acquire complication firing.
+4. A component appearing several times in the ordered list contributes several stage occurrences, each with its own result id and each its own award, so each fires its complications independently and every firing names the occurrence that produced it.
+   Neither the engine nor any surface may collapse those firings onto one occurrence, and none may mark every occurrence of a component from a single firing.
+5. **`firedComplications` is written onto the salvage run record**, as `[{ resultId, componentId, complicationId, buckets }]`.
+   `resultId` is REQUIRED and is the same id class the awarded-result ids use, because firing is per stage OCCURRENCE and so is the player's per-stage surface: keying on `componentId` alone would mark every occurrence of a component fired, or none, and would make several genuine firings indistinguishable from one another.
+   The list MAY therefore hold several records differing only in `resultId`, and a writer MUST NOT de-duplicate them.
+   `buckets` is a LIST for the persisted shape's sake; a firing belongs to one entry, so it carries that entry's one bucket, and a record written before the per-entry firing rule may still hold several.
+6. **The run record is REDACTED at write time.**
+   It is written through the player-safe projection, never through a role-aware filter: the salvage run record is an actor flag replicated to every client with permission on that actor, so a projection parameterised on the acting user's role would write `gmOnly` complications into a player-readable document every time a GM was the acting user.
+   No `gmOnly` complication, and no `when`, `rollCondition`, `effectRoll` or `macroUuid`, may reach that record.
+   The same rule governs every engine return a player-facing surface reads.
+7. **Bulk salvage batches delivery.** Each row is its own resolution and fires its own complications, but the whole run's GM requests are delivered as ONE message alongside the aggregate card rather than one per row (see § Complication Macros).
 
 ### Failure Consumption and Failure-Result Policy
 

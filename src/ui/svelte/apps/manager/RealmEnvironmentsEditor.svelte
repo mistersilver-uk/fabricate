@@ -7,9 +7,12 @@
   includedRealmIds; each list is searchable and paginated independently.
 -->
 <script>
-  import Chip from './Chip.svelte';
+  import Chip from '../../components/Chip.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
+  import IconButton from '../../components/IconButton.svelte';
+  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
+  import { createRealmEnvironmentsBrowserState } from '../../../../utils/managerBrowserViewState.js';
 
   let {
     realm = null,
@@ -17,15 +20,22 @@
     saving = false,
     onAdd = () => {},
     onRemove = () => {},
+    // ── THE TWO PICKERS' VIEW-STATE IS LIFTED (issue 1438) ───────────────────────────────
+    // Both searches and both pages live on an object World > Travel's owner holds, because
+    // collapsing the realm row unmounts this editor and the Realms tab unmounts underneath it.
+    browserState = $bindable(null),
   } = $props();
 
   const PAGE_SIZE = 6;
   const FALLBACK_ICON = 'fas fa-seedling';
 
-  let availableSearch = $state('');
-  let availablePage = $state(0);
-  let includedSearch = $state('');
-  let includedPage = $state(0);
+  let ownBrowserState = $state(createRealmEnvironmentsBrowserState());
+  const ui = $derived(browserState ?? ownBrowserState);
+
+  const availableSearch = $derived(String(ui.availableSearchTerm || ''));
+  const availablePage = $derived(ui.availablePageIndex || 0);
+  const includedSearch = $derived(String(ui.includedSearchTerm || ''));
+  const includedPage = $derived(ui.includedPageIndex || 0);
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -33,6 +43,20 @@
   }
 
   const realmId = $derived(realm?.id || '');
+
+  // "Which environments is this realm still missing" is a question about ONE realm, so the two
+  // terms and pages reset when the realm changes. The sentinel lives on the lifted object for
+  // the reason issue 1036 recorded for the studios: a component-local one re-initialises on
+  // every mount, so re-expanding the same row would read as a realm change and clear the state
+  // the lift exists to preserve.
+  $effect(() => {
+    if (realmId === ui.realmId) return;
+    ui.realmId = realmId;
+    ui.availableSearchTerm = '';
+    ui.availablePageIndex = 0;
+    ui.includedSearchTerm = '';
+    ui.includedPageIndex = 0;
+  });
 
   function inRealm(environment) {
     return (
@@ -62,10 +86,11 @@
   // Keep page indices in range as the filtered sets change.
   $effect(() => {
     if (availablePage > 0 && availablePage * PAGE_SIZE >= filteredAvailable.length)
-      availablePage = 0;
+      ui.availablePageIndex = 0;
   });
   $effect(() => {
-    if (includedPage > 0 && includedPage * PAGE_SIZE >= filteredIncluded.length) includedPage = 0;
+    if (includedPage > 0 && includedPage * PAGE_SIZE >= filteredIncluded.length)
+      ui.includedPageIndex = 0;
   });
 
   const pagedAvailable = $derived(
@@ -86,21 +111,18 @@
           'Available environments'
         )}
       </h4>
-      <label class="manager-search">
-        <i class="fas fa-search" aria-hidden="true"></i>
-        <input
-          type="search"
-          bind:value={availableSearch}
-          placeholder={text(
-            'FABRICATE.Admin.Manager.Travel.Realms.EnvSearchPlaceholder',
-            'Search environments...'
-          )}
-          aria-label={text(
-            'FABRICATE.Admin.Manager.Travel.Realms.EnvSearchLabel',
-            'Search environments'
-          )}
-        />
-      </label>
+      <ManagerSearchField
+        value={availableSearch}
+        onInput={(next) => (ui.availableSearchTerm = next)}
+        placeholder={text(
+          'FABRICATE.Admin.Manager.Travel.Realms.EnvSearchPlaceholder',
+          'Search environments...'
+        )}
+        ariaLabel={text(
+          'FABRICATE.Admin.Manager.Travel.Realms.EnvSearchLabel',
+          'Search environments'
+        )}
+      />
       {#if filteredAvailable.length === 0}
         <p class="manager-muted">
           {availableEnvironments.length === 0
@@ -128,10 +150,9 @@
                   >{text('FABRICATE.Admin.Manager.Travel.DisabledChip', 'Disabled')}</Chip
                 >
               {/if}
-              <button
-                type="button"
-                class="manager-icon-button manager-realm-env-add"
-                aria-label={text(
+              <IconButton
+                class="manager-realm-env-add"
+                ariaLabel={text(
                   'FABRICATE.Admin.Manager.Travel.Realms.AddEnvironment',
                   'Add environment to realm'
                 )}
@@ -143,7 +164,7 @@
                 onclick={() => onAdd(environment.id, realmId)}
               >
                 <i class="fas fa-plus" aria-hidden="true"></i>
-              </button>
+              </IconButton>
             </li>
           {/each}
         </ul>
@@ -152,7 +173,7 @@
           pageSize={PAGE_SIZE}
           pageIndex={availablePage}
           pageSizeOptions={[PAGE_SIZE]}
-          onPageChange={(next) => (availablePage = next)}
+          onPageChange={(next) => (ui.availablePageIndex = next)}
         />
       {/if}
     </section>
@@ -165,21 +186,18 @@
           'Included environments'
         )}
       </h4>
-      <label class="manager-search">
-        <i class="fas fa-search" aria-hidden="true"></i>
-        <input
-          type="search"
-          bind:value={includedSearch}
-          placeholder={text(
-            'FABRICATE.Admin.Manager.Travel.Realms.EnvSearchPlaceholder',
-            'Search environments...'
-          )}
-          aria-label={text(
-            'FABRICATE.Admin.Manager.Travel.Realms.EnvSearchLabel',
-            'Search environments'
-          )}
-        />
-      </label>
+      <ManagerSearchField
+        value={includedSearch}
+        onInput={(next) => (ui.includedSearchTerm = next)}
+        placeholder={text(
+          'FABRICATE.Admin.Manager.Travel.Realms.EnvSearchPlaceholder',
+          'Search environments...'
+        )}
+        ariaLabel={text(
+          'FABRICATE.Admin.Manager.Travel.Realms.EnvSearchLabel',
+          'Search environments'
+        )}
+      />
       {#if filteredIncluded.length === 0}
         <p class="manager-muted">
           {includedEnvironments.length === 0
@@ -207,10 +225,9 @@
                   >{text('FABRICATE.Admin.Manager.Travel.DisabledChip', 'Disabled')}</Chip
                 >
               {/if}
-              <button
-                type="button"
-                class="manager-icon-button is-danger manager-realm-env-remove"
-                aria-label={text(
+              <IconButton
+                class="is-danger manager-realm-env-remove"
+                ariaLabel={text(
                   'FABRICATE.Admin.Manager.Travel.Realms.RemoveEnvironment',
                   'Remove environment from realm'
                 )}
@@ -222,7 +239,7 @@
                 onclick={() => onRemove(environment.id, realmId)}
               >
                 <i class="fas fa-xmark" aria-hidden="true"></i>
-              </button>
+              </IconButton>
             </li>
           {/each}
         </ul>
@@ -231,7 +248,7 @@
           pageSize={PAGE_SIZE}
           pageIndex={includedPage}
           pageSizeOptions={[PAGE_SIZE]}
-          onPageChange={(next) => (includedPage = next)}
+          onPageChange={(next) => (ui.includedPageIndex = next)}
         />
       {/if}
     </section>

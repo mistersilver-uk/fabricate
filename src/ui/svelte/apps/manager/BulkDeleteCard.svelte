@@ -11,9 +11,11 @@
   description association, the live region, the label-in-name rule and the busy state.
 
   It lives under `apps/manager/` rather than in either studio's folder, beside
-  `BulkEditPanelShell`, for that file's reason: `--fab-mv2-*` is declared on
-  `.fabricate-manager` and staying here keeps it in scope. Two consequences of that placement
-  are load-bearing and both are hand-maintained mirrors:
+  `BulkEditPanelShell`, for that file's reason: `components/` holds the area-agnostic leaves
+  and this card is manager-scoped. The token half of that reason — that the placement keeps
+  an area-scoped `--fab-manager-*` property in scope — has LAPSED, since a scoped `<style>`
+  may not reach one from any directory. Two consequences of that placement are load-bearing
+  and both are hand-maintained mirrors:
 
    - `scripts/lib/viewLabCases.js` must CLAIM this file, or `view-lab-source-coverage.test.js`
      fails: a component a mounted window renders that no case claims does not produce no
@@ -98,7 +100,8 @@
    - onArm(token) / onDisarm(token) / onConfirm(token).
 -->
 <script>
-  import ArmedDangerButton from './ArmedDangerButton.svelte';
+  import ArmedDangerButton from '../../components/ArmedDangerButton.svelte';
+  import InspectorCard from '../../components/InspectorCard.svelte';
   import { announceAfterFocusMove } from '../../util/announceAfterFocus.js';
 
   let {
@@ -264,7 +267,7 @@
   const rowHook = (key) => hook(rowAttr, key);
 </script>
 
-<section class="manager-inspector-card fab-bulk-delete-card" {...cardHook}>
+<InspectorCard class="fab-bulk-delete-card" {...cardHook}>
   <div class="manager-edit-card-heading">
     <h3 class="manager-card-title">{heading}</h3>
   </div>
@@ -317,18 +320,22 @@
   <p id={announceId} class="visually-hidden" aria-live="polite" {...announceHook}>
     {announcement}
   </p>
-</section>
+</InspectorCard>
 
 <style>
-  /* Manager-scoped by PLACEMENT — this component lives under `apps/manager/`, so
-     `--fab-mv2-*` (declared on `.fabricate-manager`) is in scope. Its appearance lives HERE
-     rather than in `styles/fabricate.css` so `VIEW_RECIPES` in
+  /* THEME-ROOT tokens only. The reason once recorded here — that living under
+     `apps/manager/` puts an area-scoped `--fab-manager-*` property in scope — has LAPSED:
+     a scoped `<style>` may not reach one from ANY directory, because a component is placed
+     in a directory and not in a DOM subtree (design-system spec, *The token namespace is
+     one generation and names its purpose*), and `tests/token-generation-gate.test.js` fails
+     any scoped block that tries. The placement's surviving consequence is the screenshot
+     map: this appearance lives HERE rather than in `styles/fabricate.css` so `VIEW_RECIPES` in
      `scripts/ui-pr-screenshot-evidence.mjs` routes a change to the studios that actually
      render it instead of matching the broad `theme-or-global-ui` recipe.
 
      `display: flex; flex-direction: column; gap: var(--fab-space-2)` is deliberately NOT
      restated. Both retired per-studio blocks declared it, and it is a verbatim duplicate of
-     `.fabricate-manager .manager-inspector-card` in `styles/fabricate.css`, which this card
+     `.fabricate-card.manager-inspector-card` in `styles/fabricate.css`, which this card
      still carries. */
 
   /* The card is the first thing under `BulkEditPanelShell`'s sticky Apply dock, and the dock's
@@ -336,8 +343,22 @@
      `gap: var(--fab-space-3)` exactly — measured, the dock's border-box bottom and this card's
      top land on the same y coordinate, so the card's border meets the dock's `border-top`
      hairline across an opaque strip. Margins do not collapse in that flex column, so the gap is
-     restored here as the same token the rail's gap uses, and the two cannot drift apart. */
-  .fab-bulk-delete-card {
+     restored here as the same token the rail's gap uses, and the two cannot drift apart.
+
+     `:global()` AND CHAINED (issue 1427), for the reason `ItemPageInspector` states at length.
+     The card shell is an `<InspectorCard>` now, so `fab-bulk-delete-card` rides the `class`
+     prop onto an element THIS component does not write, and Svelte stamps its `svelte-<hash>`
+     only onto the ones it does. This rule was one of the two in the sweep that went dead
+     SILENTLY rather than being pruned. Measured against Svelte 5.56.3, a class that lives only
+     on a component tag is normally pruned to `/* (unused) … *\/` behind a `css_unused_selector`
+     warning — but this component spreads attributes onto three REGULAR elements (`<ul>`,
+     `<li>`, `<p>`), and one such spread makes every class selector in the block
+     possibly-matching, so the compiler emitted this with the hash attached and
+     `lint:svelte:warnings` reported nothing. A spread is not the only trigger: a `class` whose
+     value is any expression, on a regular element, does the same, and the same attribute on a
+     COMPONENT tag does neither — `ui-integration/spec.md` records the measured matrix. Chained onto `.manager-inspector-card` rather
+     than left bare so the selector stays at (0,2,0), exactly where the scoped form put it. */
+  :global(.manager-inspector-card.fab-bulk-delete-card) {
     margin-top: var(--fab-space-3);
   }
 
@@ -350,8 +371,14 @@
      untouched too — only the type scale changes.
 
      It must also hold for the BUSY face, which no frame had ever shown before this card
-     existed: a face that missed this rule would re-type the button mid-write. */
-  .fab-bulk-delete-card :global(.manager-button) {
+     existed: a face that missed this rule would re-type the button mid-write.
+
+     WHOLLY `:global()` (issue 1427). It was `.fab-bulk-delete-card :global(.manager-button)`,
+     which compiled to `.fab-bulk-delete-card.svelte-<hash> .manager-button`; the ancestor half
+     stopped matching for the reason stated above, so the whole rule had to move inside the
+     `:global()`. `.manager-inspector-card` is chained for the specificity, leaving this at
+     (0,3,0) exactly as before. */
+  :global(.manager-inspector-card.fab-bulk-delete-card .manager-button) {
     min-height: 34px;
     padding: 0 var(--fab-space-3);
     font-size: 0.72rem;
@@ -378,7 +405,7 @@
      not read as a fourth thing being counted. */
   .fab-bulk-delete-hint {
     margin: 0;
-    color: var(--fab-mv2-text-muted);
+    color: var(--fab-text-muted);
     font-size: 0.66rem;
     font-weight: 600;
     line-height: 1.35;

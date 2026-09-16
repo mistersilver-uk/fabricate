@@ -104,13 +104,25 @@ function setupGame() {
  */
 function makeCapturingActor() {
   const captured = [];
-  return {
+  const actor = {
+    uuid: 'Actor.crafter',
     captured,
+    // Foundry answers a successful embedded create with the CREATED documents —
+    // parented to this actor and carrying its own descendant uuid — which is what the
+    // acknowledged-award contract reads before it records a receipt for the award.
     createEmbeddedDocuments: async (_type, dataArray) => {
+      const first = captured.length;
       captured.push(...dataArray);
-      return dataArray.map((data) => ({ ...data, uuid: 'Item.crafted-instance' }));
+      return dataArray.map((data, index) => {
+        const created = structuredClone(data);
+        created.parent = actor;
+        created.uuid = `${actor.uuid}.Item.crafted-${first + index}`;
+        created._source = structuredClone(data);
+        return created;
+      });
     },
   };
+  return actor;
 }
 
 /**

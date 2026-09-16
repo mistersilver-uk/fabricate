@@ -31,9 +31,11 @@
 <script>
   import EmptyState from './EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
-  import Medallion from '../../components/Medallion.svelte';
+  import ManagerButton from '../../components/ManagerButton.svelte';
+  import Avatar from '../../components/Avatar.svelte';
   import KnowledgeTabs from './knowledge/KnowledgeTabs.svelte';
   import KnowledgeRoster from './knowledge/KnowledgeRoster.svelte';
+  import { createKnowledgeRosterBrowserState } from '../../../../utils/managerBrowserViewState.js';
   import KnowledgeRecipeItemsTab from './knowledge/KnowledgeRecipeItemsTab.svelte';
   import KnowledgeLearnedRecipesTab from './knowledge/KnowledgeLearnedRecipesTab.svelte';
   import {
@@ -51,9 +53,19 @@
     onErase = () => {},
     onResetSystem = () => {},
     onResetAll = () => {},
+    // ── THE ROSTER SEARCH IS LIFTED (issue 1438) ─────────────────────────────────────────
+    // The roster is a controlled child and this view has always owned its term, which is the
+    // right level for every in-surface interaction: selecting a character, expending, erasing
+    // and resetting all keep this component mounted. What it does NOT survive is leaving the
+    // Knowledge route, because this whole view is one branch of the root's `currentView`
+    // chain — so the owner has to be the root, not the immediate parent.
+    browserState = $bindable(null),
   } = $props();
 
-  let searchTerm = $state('');
+  let ownBrowserState = $state(createKnowledgeRosterBrowserState());
+  const ui = $derived(browserState ?? ownBrowserState);
+
+  const searchTerm = $derived(String(ui.searchTerm || ''));
   let armedToken = $state('');
   // Seeded ONCE from the store's `defaultTab` (itself resolved once on surface
   // entry from the DEFINITION count). Never a live `$derived` over that count: a
@@ -106,7 +118,7 @@
   }
 
   function handleSearch(term) {
-    searchTerm = term;
+    ui.searchTerm = term;
     armedToken = '';
   }
 
@@ -181,7 +193,7 @@
     {:else}
       <header class="manager-knowledge-detail-header" data-knowledge-detail-header>
         <div class="manager-knowledge-detail-identity">
-          <Medallion src={selectedCharacter.img} icon="fas fa-user" size={50} alt="" />
+          <Avatar art={selectedCharacter.img} name={selectedCharacter.name} size={50} alt="" />
           <div class="manager-knowledge-detail-copy">
             <p class="manager-kicker">{selectedSystemName}</p>
             <h2 class="manager-knowledge-detail-name" title={selectedCharacter.name}>
@@ -240,9 +252,8 @@
             'Knowledge reset actions'
           )}
         >
-          <button
-            type="button"
-            class="manager-button is-danger"
+          <ManagerButton
+            role="danger"
             data-knowledge-reset="system"
             onclick={() => {
               armedToken = '';
@@ -252,10 +263,9 @@
             <i class="fas fa-rotate-left" aria-hidden="true"></i>
             <span>{text('FABRICATE.Admin.Manager.Knowledge.ResetSystem', 'Reset this system')}</span
             >
-          </button>
-          <button
-            type="button"
-            class="manager-button is-danger"
+          </ManagerButton>
+          <ManagerButton
+            role="danger"
             data-knowledge-reset="all"
             onclick={() => {
               armedToken = '';
@@ -264,7 +274,7 @@
           >
             <i class="fas fa-eraser" aria-hidden="true"></i>
             <span>{text('FABRICATE.Admin.Manager.Knowledge.ResetAll', 'Reset all systems')}</span>
-          </button>
+          </ManagerButton>
         </div>
       </header>
 
@@ -279,6 +289,7 @@
         class="manager-editor-tab-panel manager-knowledge-panel"
         role="tabpanel"
         tabindex="-1"
+        data-keyboard-focus="true"
         bind:this={panelElement}
         id={`knowledge-panel-${activeTab}`}
         aria-labelledby={`knowledge-tab-${activeTab}`}

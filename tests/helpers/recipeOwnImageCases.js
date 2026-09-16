@@ -11,10 +11,18 @@
  * the point of the design: a fixture that dropped the key would pass vacuously,
  * whereas a retained one fails the moment anyone re-adds the borrow at a render
  * site. Shared here rather than copied per suite because `tests/**` counts fully
- * toward SonarCloud's new-code duplication gate, and the four call sites are two
- * different DOM shapes (a `Medallion` image and a bare `.manager-recipe-thumb`) —
- * so a fixture-only helper would still leave four near-identical
- * mount-query-assert blocks behind.
+ * toward SonarCloud's new-code duplication gate.
+ *
+ * THE PREMISE THAT CHANGED, AND THE ONE THAT DID NOT (issue 1506). This helper was
+ * written over FOUR call sites in TWO different DOM shapes — a `Medallion` image and
+ * a bare `<img>` carrying a manager sheet class — and the art-tile unification
+ * collapsed that to one shape: all four render the shared tile now, and each suite's
+ * `selectImg` reads the primitive's own `img`. The DOM argument for sharing this
+ * therefore lapses, and the duplication one does not: four near-identical
+ * mount-query-assert blocks are four near-identical blocks whatever markup they
+ * query. What the four still have in common is the property itself — that each
+ * resolves through the ONE shared `resolveRecipeImage` chokepoint — which is what
+ * this helper has always been for.
  */
 import { it } from 'node:test';
 import assert from 'node:assert/strict';

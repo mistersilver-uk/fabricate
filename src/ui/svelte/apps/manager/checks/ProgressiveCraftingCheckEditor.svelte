@@ -18,6 +18,7 @@
   import CheckFormulaFields from './CheckFormulaFields.svelte';
   import CheckAwardMode from './CheckAwardMode.svelte';
   import CheckTriggers from './CheckTriggers.svelte';
+  import InspectorCard from '../../../components/InspectorCard.svelte';
 
   // `section` (issue 1096) selects which of this editor's cards render, so the Checks
   // Studio's five-section strip can host the SAME editor rather than a per-section fork.
@@ -51,7 +52,7 @@
 
 <div class="manager-checks-editor" data-progressive-check-editor>
   {#if shows('roll')}
-    <section class="manager-inspector-card manager-checks-card" data-roll-formula-card>
+    <InspectorCard class="manager-checks-card" data-roll-formula-card="">
       <div class="manager-checks-card-head">
         <div>
           <h3 class="manager-checks-card-title">
@@ -75,7 +76,7 @@
           onChange={emit}
         />
       </div>
-    </section>
+    </InspectorCard>
   {/if}
 
   {#if shows('triggers')}
@@ -93,7 +94,7 @@
        Outcomes in every mode: hiding it here would remove this control from the UI
        entirely, which no test would have seen. -->
   {#if shows('outcomes')}
-    <section class="manager-inspector-card manager-checks-card" data-award-mode>
+    <InspectorCard class="manager-checks-card" data-award-mode="">
       <div class="manager-checks-card-head">
         <h3 class="manager-checks-card-title">
           {text('FABRICATE.Admin.Manager.Checks.Crafting.AwardModeTitle', 'Award mode')}
@@ -106,6 +107,6 @@
           onChange={(awardMode) => emit({ awardMode })}
         />
       </div>
-    </section>
+    </InspectorCard>
   {/if}
 </div>

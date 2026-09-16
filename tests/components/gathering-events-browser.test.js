@@ -22,8 +22,20 @@ describe('GatheringEventsBrowserView source contract', () => {
   it('renders an event library tabpanel with the expected toolbar filters', () => {
     assert.ok(browserSource.includes("class=\"manager-gathering-panel manager-gathering-panel-events\""), 'browser should use the event panel class');
     assert.ok(browserSource.includes('data-gathering-events-browser'), 'browser should expose a data attribute hook for tests');
-    assert.ok(browserSource.includes("type=\"search\""), 'browser should include a search input');
-    assert.ok(browserSource.includes('bind:value={searchTerm}'), 'browser should bind the search term');
+    // The search input's markup moved into `components/ManagerSearchField.svelte` (issue
+    // 1039), so the browser is asserted to RENDER the primitive rather than to write the
+    // input itself — a source assertion left pointing at moved markup passes for the wrong
+    // reason or fails for one.
+    assert.ok(browserSource.includes('<ManagerSearchField'), 'browser should render the shared search field');
+    // The term is no longer this component's to own (issue 1438): it lives on the lifted
+    // `browserState` the manager root binds, so the field reads a `$derived` alias and writes
+    // back through `ui`. Both halves are asserted — a read with no writer renders a field the
+    // GM cannot type into, and passes a presence-only check.
+    assert.ok(browserSource.includes('value={searchTerm}'), 'browser should render the search term');
+    assert.ok(
+      browserSource.includes('onInput={(next) => (ui.searchTerm = next)}'),
+      'browser should write the search term back to the lifted view-state'
+    );
     assert.ok(browserSource.includes("value={statusFilter}"), 'browser should expose a status filter');
     assert.equal(browserSource.includes("value={regionFilter}"), false, 'region filter is removed (region is geography, not composition)');
     assert.ok(browserSource.includes("value={biomeFilter}"), 'browser should expose a biome filter');
@@ -40,13 +52,17 @@ describe('GatheringEventsBrowserView source contract', () => {
     assert.ok(browserSource.includes('onToggleEventEnabled'), 'browser should call onToggleEventEnabled');
   });
 
-  it('renders the card-style row with four column headers (Event / Tags / Status / Actions)', () => {
+  it('renders the card-style row with four column labels (Event / Tags / Status / Actions)', () => {
     const headBlockStart = browserSource.indexOf('manager-table-head manager-gathering-event-table-head');
     assert.ok(headBlockStart >= 0, 'head block should be present');
     const headBlockEnd = browserSource.indexOf('</div>', headBlockStart);
     const headBlock = browserSource.slice(headBlockStart, headBlockEnd);
-    const headerMatches = headBlock.match(/role="columnheader"/g) || [];
-    assert.equal(headerMatches.length, 4, 'expected four column headers');
+    // See `gathering-task-browser-redesign.test.js`: issue 1515 made this browser a list, so the
+    // strip is `aria-hidden` and its labels carry no `columnheader` role.
+    assert.ok(headBlock.includes('aria-hidden="true"'), 'the column strip should be aria-hidden');
+    assert.equal(headBlock.includes('role="columnheader"'), false, 'no column headers in a list');
+    const headerMatches = headBlock.match(/<span/g) || [];
+    assert.equal(headerMatches.length, 4, 'expected four column labels');
     for (const removed of ['DangerTags', 'DropRate', 'Environments']) {
       assert.equal(
         headBlock.includes(`FABRICATE.Admin.Manager.Environment.Events.${removed}`),
@@ -64,13 +80,19 @@ describe('GatheringEventsBrowserView source contract', () => {
     assert.equal(browserSource.includes('regionChips('), false, 'region chips are removed (region is geography, not composition)');
     assert.ok(browserSource.includes('data-gathering-event-tags'), 'tags cell exposes a data attribute');
     assert.ok(browserSource.includes("icon: 'fa-solid fa-triangle-exclamation'"), 'danger chips should render a triangle warning icon');
-    assert.ok(browserSource.includes('{#if chip.icon}<i class={chip.icon} aria-hidden="true"></i>{/if}'), 'row chip icons should be decorative');
+    // DECORATIVE ON BOTH BRANCHES (issue 1515). The three FACET chips render through the shared
+    // `Chip` now, which draws its `icon` prop `aria-hidden` itself, so what this file can pin is
+    // that the glyph is handed to the primitive rather than written beside it; the danger chip
+    // does not convert - its six colour levels are a ramp no chip tone states - so its own glyph
+    // still carries the attribute here.
+    assert.ok(browserSource.includes('icon={chip.icon}'), 'facet row chips hand their glyph to the chip primitive');
+    assert.ok(browserSource.includes('<i class={chip.icon} aria-hidden="true"></i>'), 'the danger chip glyph is decorative');
     assert.equal(/function\s+activeEnvironmentCount\s*\(/.test(browserSource), false, 'activeEnvironmentCount should be removed');
     assert.equal(/function\s+dropRateLabel\s*\(/.test(browserSource), false, 'dropRateLabel should be removed');
   });
 
   it('uses a four-column grid for the event table and a scrollable tags cell', () => {
-    const gridMatch = css.match(/--fab-mv2-gathering-event-grid:([^;]+);/);
+    const gridMatch = css.match(/--fab-manager-gathering-event-grid:([^;]+);/);
     assert.ok(gridMatch, 'event grid CSS variable should be defined');
     // Count top-level columns with a depth-aware scan (no regex) so whitespace
     // inside a function like minmax(0, 1fr) does not split that column in two.
