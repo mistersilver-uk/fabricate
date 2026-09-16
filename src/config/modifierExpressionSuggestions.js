@@ -27,35 +27,16 @@
 
 import { getCharacterModifierPresetsForFoundrySystem } from './gatheringCharacterModifierPresets.js';
 
-/**
- * The preset ids surfaced as system-specific chips, in row order. Every id here is
- * present in both shipped bundles; an id a bundle lacks is skipped rather than
- * rendered with a missing expression, so a partial bundle degrades to fewer chips
- * instead of a broken one.
- *
- * @type {ReadonlyArray<string>}
- */
+/** The preset ids surfaced as system-specific chips, in row order. */
 const SUGGESTED_PRESET_IDS = Object.freeze(['intelligence', 'wisdom', 'survival']);
 
-/**
- * Terms that reference no roll data and are therefore valid in every game system.
- *
- * @type {ReadonlyArray<{id: string, expression: string, label: string}>}
- */
+/** Terms that reference no roll data and are therefore valid in every game system. */
 const SYSTEM_AGNOSTIC_SUGGESTIONS = Object.freeze([
   Object.freeze({ id: 'flat-2', expression: '2', label: 'Flat bonus' }),
   Object.freeze({ id: 'die-1d4', expression: '1d4', label: '1d4' }),
 ]);
 
-/**
- * The suggestion chips offered under a modifier expression for the active world.
- *
- * @param {string} foundrySystemId Foundry game system id (`game.system.id`).
- * @returns {Array<{id: string, expression: string, label: string, systemSpecific: boolean}>}
- *   Ordered chips: the system-specific roll-data terms first, then the agnostic ones.
- *   An unsupported world yields the agnostic terms alone rather than a `dnd5e` row
- *   mislabelled as universal.
- */
+/** The suggestion chips offered under a modifier expression for the active world. */
 export function getModifierExpressionSuggestions(foundrySystemId) {
   const presets = getCharacterModifierPresetsForFoundrySystem(foundrySystemId);
   const byId = new Map(presets.map((preset) => [String(preset.id), preset]));
@@ -73,27 +54,10 @@ export function getModifierExpressionSuggestions(foundrySystemId) {
   ];
 }
 
-// A trailing arithmetic operator (or an opening bracket) the GM has already typed. The
-// suggestion completes it rather than adding a second `+` beside it.
+// A trailing arithmetic operator (or an opening bracket) the GM has already typed.
 const TRAILING_OPERATOR = /[+\-*/(]$/;
 
-/**
- * Append a suggested term to an authored expression.
- *
- * Appending — not replacing — is the whole point: the chips build up a compound
- * expression such as `@abilities.wis.mod + 1d4`. Three cases the naive
- * `${current} + ${term}` gets wrong, and this does not:
- *
- *  - an EMPTY expression yields the term alone, never a leading `+`;
- *  - an expression the GM left ending in an operator (`@abilities.wis.mod +`) is
- *    COMPLETED by the term rather than given a second `+`;
- *  - surrounding whitespace is normalised, so a trailing space does not defeat the
- *    operator check above.
- *
- * @param {*} current The stored expression, possibly empty.
- * @param {*} term The suggested term to append.
- * @returns {string} The expression to persist.
- */
+/** Append a suggested term to an authored expression. */
 export function appendModifierExpressionTerm(current, term) {
   const base = String(current ?? '').trim();
   const addition = String(term ?? '').trim();

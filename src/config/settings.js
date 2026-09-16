@@ -28,96 +28,34 @@ export const SETTING_KEYS = Object.freeze({
   // actor's purse. Each crafting system keeps only `requirements.currency.enabled`, which
   // decides whether that system PARTICIPATES in the world's currency, not what it is.
   CURRENCY_CONFIG: 'currencyConfig',
-  // Issue 1282: the world-scoped travel configuration — the realm library, the reveal mode and
-  // the modifier visibility. It is world scope because realms are GEOGRAPHY: the same valley is
-  // the same valley whichever crafting system a character is there to serve, so two systems
-  // cannot meaningfully disagree about where a party is standing. Each crafting system keeps
-  // only `gatheringRealmSettings.enabled`, which decides whether it PARTICIPATES.
+  // Issue 1282: the world-scoped travel configuration — the realm library, the reveal mode and the
+  // modifier visibility.
   TRAVEL_CONFIG: 'travelConfig',
-  // Issue 1308: the world-scoped character libraries — the character-prerequisite library and
-  // the modifier library, as `{ characterPrerequisites: [], modifiers: [] }`. They are world
-  // scope because both resolve against the acting CHARACTER rather than against any one
-  // crafting system, so three crafting systems used to mean three copies of the same
-  // "Medicine proficiency at least 1" and three copies of the same `@abilities.med.mod`.
-  // Unlike currency and travel, NO per-system participation flag remains: an unreferenced
-  // entry already costs nothing, so there is no meaningful "off" state to model.
-  //
-  // ONE key for TWO independent libraries, and that is a persistence decision rather than a
-  // modelling one. They share no key, no reference, no invariant and no reader; the key is
-  // shared only so a fourth near-identical persistence shell is not written beside
-  // `CurrencyConfigStore` and `GatheringRealmStore`. Splitting it later would be a pure
-  // persistence change. The cost, accepted knowingly: a write to either library rewrites both,
-  // so two GMs editing DIFFERENT libraries can clobber each other where two keys would not.
+  // Issue 1308: the world-scoped character libraries — the character-prerequisite library and the
+  // modifier library, as `{ characterPrerequisites: [], modifiers: [] }`.
   CHARACTER_LIBRARIES: 'characterLibraries',
-  // Issue 1359 (epic 1357): the three WORLD-SCOPE entity definition settings — the World
-  // Component, World Essence and World Tool rosters, their world defaults, and the
-  // per-`(entity, system)` membership records. Each carries `{ entities, defaults, membership }`;
-  // `toolScope` carries the WORLD tool-breakage authority beside them, and nothing else does.
-  //
-  // THREE KEYS RATHER THAN ONE, and the reason is SEEDEDNESS INDEPENDENCE rather than write
-  // amplification — the counter-case to `CHARACTER_LIBRARIES` above, which shares one key for two
-  // libraries. `isSeeded()` is what makes a destructive prune decidable, and on a shared key it
-  // cannot be honest per entity type: a store writes the whole object, so one entity type's first
-  // write persists the others as EMPTY and converts UNKNOWN bases into real, empty, PRUNABLE ones
-  // in a single keystroke. Across three entity types whose references reach recipe ingredients,
-  // results, salvage, gathering drop rows, tool links and essence source components, that is not
-  // survivable. The accepted cost, stated as `CHARACTER_LIBRARIES` states its own: three keys are
-  // three non-atomic writes, so a partially-migrated corpus becomes observable — which is fine,
-  // because each entity type's union read and Valid Id Basis are independently valid in every
-  // interleaving.
-  //
-  // ADDITIVE UNTIL THE MIGRATION. Nothing writes these yet, so every world reads the registered
-  // default and `## CraftingSystem`'s `components` / `essenceDefinitions` / `tools` stay live and
-  // authoritative.
+  // Issue 1359 (epic 1357): the three WORLD-SCOPE entity definition settings — the World Component,
+  // World Essence and World Tool rosters, their world defaults, and the per-`(entity, system)`
+  // membership records.
   COMPONENT_SCOPE: 'componentScope',
   ESSENCE_SCOPE: 'essenceScope',
   TOOL_SCOPE: 'toolScope',
-  // Issue 1392 (epic 1357, PR 7a): the WORLD VOCABULARY — component categories, component tags
-  // and recipe categories, authored once for the world instead of once per crafting system.
-  //
-  // A FOURTH WORLD KEY, NOT A FOURTH SCOPED-ENTITY LAYER. `## Scoped Entity Definitions`
-  // requirement 12 states the World Vocabulary is a separate concern, so it is deliberately
-  // absent from that requirement's three-key table and is modelled by `## World Vocabulary` in
-  // `data-models`. It holds VALUES the scoped entities draw from — it has no entity roster, no
-  // world defaults and no membership records.
-  //
-  // ONE KEY FOR THREE VOCABULARIES, which is the OPPOSITE of the three-key decision above, and
-  // the reason is that the hazard those three keys exist to avoid does not arise here. That
-  // hazard is a shared key making `isSeeded()` dishonest per entity type and arming a
-  // DESTRUCTIVE prune. This key arms none: `CraftingSystemManager._vocabularyBasis` deliberately
-  // does not consult it (`## World Vocabulary` requirement 6), and `WorldVocabularyStore` keeps
-  // seededness honest anyway by OMITTING a kind that has never been written from the payload it
-  // persists, so key absence per kind survives a round trip.
-  //
-  // `type: Object` and NOT a `DataModel`, and that is load-bearing rather than conventional.
-  // Foundry 14.365 applies no schema to a plain-constructor type — `ClientSettings##cleanJSON`
-  // hands the value straight to `JSON.stringify` into the `Setting` document's `JSONField` — so
-  // an absent sub-key stays absent on disk. A `DataModel`-typed setting would run `fromSource`
-  // and fill every declared key back in, which is exactly what the store must not have.
+  // Issue 1392 (epic 1357, PR 7a): the WORLD VOCABULARY — component categories, component tags and
+  // recipe categories, authored once for the world instead of once per crafting system.
   WORLD_VOCABULARY: 'worldVocabulary',
-  // Issue 1363 (epic 1357, PR 3): the `1.30.0` migration's DURABLE DECISION RECORD — the
-  // per-system `{ components: {oldId: newId}, tools: {...} }` re-key map, written as the FIRST
-  // writeback leg so a torn pass is recoverable whichever later legs landed. It is TRANSIENT:
-  // the one-shot `ready` pass that restamps owned-Item identity flags consumes it and clears
-  // it. It carries no essence leg — `REKEYABLE_ENTITY_TYPES` is `['components', 'tools']` — and the
-  // `1.34.0` merge re-keys essence ids under `WORLD_ESSENCE_MERGE_MAP` below instead (issue 1654).
+  // Issue 1363 (epic 1357, PR 3): the `1.30.0` migration's DURABLE DECISION RECORD — the per-system
+  // `{ components: {oldId: newId}, tools: {...} }` re-key map, written as the FIRST writeback leg
+  // so a torn pass is recoverable whichever later legs landed.
   WORLD_SCOPE_REKEY_MAP: 'worldScopeRekeyMap',
   // Issue 1654: the `1.34.0` equivalent-essence merge's durable decision record, written as the
   // second writeback leg (after `worldScopeRekeyMap`, before `recipes`) so a torn pass is
-  // recoverable. Shape `{systems: {[systemId]: {essences: {loserId: survivorId}}}, retired: {...}}`,
-  // one lifetime per leg: the one-shot `ready` remap clears the transient `systems`, while
-  // `retired` is never cleared, because `mintEssenceId` would otherwise reissue a retired id. The
-  // legs nest so a crafting system whose id is literally `retired` cannot collide with that key.
+  // recoverable.
   WORLD_ESSENCE_MERGE_MAP: 'worldEssenceMergeMap',
   GATHERING_ENVIRONMENTS: 'gatheringEnvironments',
   GATHERING_CONFIG: 'gatheringConfig',
   GATHERING_PARTIES: 'gatheringParties',
-  // Issue 901: secret state for in-flight BLIND gathering runs, keyed by run id —
-  // the drawn task, its start-time snapshot, and its provisional node reservation.
-  // `scope: 'world'` is the WHOLE POINT: only a GM may update a world Setting, so a
-  // player can no longer forge the task their blind run will yield (it used to live
-  // on an Actor flag they own). It is NOT a confidentiality store — Foundry has no
-  // server-side read authorization — see `GatheringBlindRunStore`.
+  // Issue 901: secret state for in-flight BLIND gathering runs, keyed by run id — the drawn task,
+  // its start-time snapshot, and its provisional node reservation.
   GATHERING_BLIND_RUNS: 'gatheringBlindRuns',
   LAST_CRAFTING_ACTOR: 'lastCraftingActor',
   LAST_GATHERING_ACTOR: 'lastGatheringActor',
@@ -133,91 +71,48 @@ export const SETTING_KEYS = Object.freeze({
   THEME: 'theme',
   EXPERIMENTAL_FEATURES: 'experimentalFeatures',
   INTERACTION_PROMPT_POSITION: 'interactionPromptPosition',
-  // Issue 555 (repurposed by issue 567): version stamp for the one-shot primary-GM
-  // recipe-item durable-flag backfill. Bumped past `RECIPE_ITEM_FLAG_STAMP_TARGET` once the
-  // pass has run so it never repeats. Target 2 backfills the per-system
-  // `roles[systemId].recipeItemDefinitionId` leaf (v1 stamped the retired scalar).
+  // Issue 555 (repurposed by issue 567): version stamp for the one-shot primary-GM recipe-item
+  // durable-flag backfill.
   RECIPE_ITEM_FLAG_STAMP_VERSION: 'recipeItemFlagStampVersion',
-  // Issue 556: version stamp for the one-shot primary-GM component durable-flag backfill
-  // that writes `flags.fabricate.roles[systemId].componentId` on registered component
-  // sources. Bumped past `COMPONENT_FLAG_STAMP_TARGET` once the pass has run.
+  // Issue 556: version stamp for the one-shot primary-GM component durable-flag backfill that
+  // writes `flags.fabricate.roles[systemId].componentId` on registered component sources.
   COMPONENT_FLAG_STAMP_VERSION: 'componentFlagStampVersion',
-  // Issue 561: version stamp for the one-shot primary-GM TOOL durable-flag backfill that
-  // writes `flags.fabricate.roles[systemId].toolId` on registered tool sources. Bumped past
-  // `TOOL_FLAG_STAMP_TARGET` once the pass has run.
+  // Issue 561: version stamp for the one-shot primary-GM TOOL durable-flag backfill that writes
+  // `flags.fabricate.roles[systemId].toolId` on registered tool sources.
   TOOL_FLAG_STAMP_VERSION: 'toolFlagStampVersion',
   // Issue 600 (#540 Phase 2): version stamp for the one-shot active-GM re-stamp that writes
-  // `flags.fabricate.roles[systemId].componentId` onto OWNED ACTOR items that currently
-  // resolve to a component by name ONLY. Bumped past `OWNED_ITEM_COMPONENT_STAMP_TARGET`
-  // once the pass has run so it never repeats.
+  // `flags.fabricate.roles[systemId].componentId` onto OWNED ACTOR items that currently resolve to
+  // a component by name ONLY.
   OWNED_ITEM_COMPONENT_STAMP_VERSION: 'ownedItemComponentStampVersion',
   // Issue 1363 (epic 1357, PR 3): version stamp for the one-shot active-GM pass that remaps the
-  // durable identity flags the `1.30.0` re-key invalidates. A NUMBER, deliberately, and not a
-  // semver string: the gate is a numeric `>=` and `MigrationRunner.compareSemver` is not on this
-  // path. It gates whether the pass RUNS; whether the pass may DESTROY the re-key map is gated
-  // separately on `migrationVersion`, because a `ready`-body one-shot runs even when the
-  // migration pass DEFERRED.
+  // durable identity flags the `1.30.0` re-key invalidates.
   WORLD_SCOPE_IDENTITY_FLAG_VERSION: 'worldScopeIdentityFlagVersion',
   // Issue 1654: version stamp for the one-shot active-GM pass that remaps the durable identity
-  // flags the `1.34.0` essence merge invalidates. Separate from its `1.30.0` sibling above, because
-  // a world can have consumed one decision record while still owing the other. It gates whether the
-  // pass runs; whether the pass may destroy the map's transient leg is gated on `migrationVersion`.
+  // flags the `1.34.0` essence merge invalidates.
   WORLD_ESSENCE_MERGE_FLAG_VERSION: 'worldEssenceMergeFlagVersion',
   // Issue 1024: the ADDITIONAL actor types a GM designates as player characters.
-  // `'character'` is unioned in by `resolvePlayerCharacterTypes` and is never stored
-  // here, so an existing dnd5e/pf2e world is unaffected by the default `[]`. Edited
-  // through the `playerCharacterActorTypes` settings menu, not a config field.
   ADDITIONAL_PLAYER_CHARACTER_ACTOR_TYPES: ADDITIONAL_PLAYER_CHARACTER_ACTOR_TYPES_KEY,
-  // Issue 1024 (#853 proposal 1): the dotted path Fabricate reads AND writes for an
-  // item's stack size. `world`-scoped because a Foundry world runs exactly one game
-  // system and one owned Item can participate in two crafting systems at once — a
-  // per-crafting-system path would make a single document's stack count AMBIGUOUS
-  // rather than configurable.
+  // Issue 1024 (#853 proposal 1): the dotted path Fabricate reads AND writes for an item's stack
+  // size.
   ITEM_STACK_QUANTITY_PATH: 'itemStackQuantityPath',
 });
 
-// The target version for the one-shot recipe-item flag auto-stamp. When the stored
-// `RECIPE_ITEM_FLAG_STAMP_VERSION` is below this, the primary GM runs the backfill once
-// on `ready` and writes this value back. Bumped 1 → 2 by issue 567: v1 stamped the retired
-// scalar `flags.fabricate.recipeItemDefinitionId`, v2 backfills the per-system
-// `roles[systemId].recipeItemDefinitionId` leaf, so a world stamped at v1 re-runs once.
+// The target version for the one-shot recipe-item flag auto-stamp.
 export const RECIPE_ITEM_FLAG_STAMP_TARGET = 2;
 
-// The target version for the one-shot component flag auto-stamp (issue 556). When the
-// stored `COMPONENT_FLAG_STAMP_VERSION` is below this, the primary GM runs the backfill
-// once on `ready` and writes this value back. Bumped 1 -> 2 by issue 1363: the `1.30.0`
-// world-scope migration RE-KEYS component ids, so every source Item stamped at v1 carries a
-// `roles[systemId].componentId` naming a retired id. The source-side writer overwrites when
-// the stored value differs, so re-running the stamp is what repairs the SOURCE half; the
-// OWNED half is the separate `remapWorldScopeIdentityFlags` pass, because the shipped
-// owned-item restamp returns early for any item that already carries a durable identity flag
-// — precisely the population the re-key invalidates.
+// The target version for the one-shot component flag auto-stamp (issue 556).
 export const COMPONENT_FLAG_STAMP_TARGET = 2;
 
-// The target version for the one-shot tool flag auto-stamp (issue 561). When the stored
-// `TOOL_FLAG_STAMP_VERSION` is below this, the primary GM runs the backfill once on `ready`
-// (AFTER the 1.15.0 settings-data migration populates tool source refs) and writes it back.
-// Bumped 1 -> 2 by issue 1363, for the reason `COMPONENT_FLAG_STAMP_TARGET` states: `1.30.0`
-// re-keys tool ids too.
+// The target version for the one-shot tool flag auto-stamp (issue 561).
 export const TOOL_FLAG_STAMP_TARGET = 2;
 
-// The target version for the one-shot owned-item component re-stamp (issue 600, #540 Phase
-// 2). When the stored `OWNED_ITEM_COMPONENT_STAMP_VERSION` is below this, the active GM runs
-// the name-fallback back-fill once on `ready` (AFTER the source-side component auto-stamp)
-// and writes this value back.
+// The target version for the one-shot owned-item component re-stamp (issue 600, #540 Phase 2).
 export const OWNED_ITEM_COMPONENT_STAMP_TARGET = 1;
 
 // The target version for the one-shot world-scope identity-flag remap (issue 1363, epic 1357).
-// When the stored `WORLD_SCOPE_IDENTITY_FLAG_VERSION` is below this AND the world scope corpus is
-// seeded, the active GM runs the remap once on `ready` and writes this value back — UNLESS it
-// withheld the re-key map clear, in which case it withholds this advance too, so the pass genuinely
-// re-runs on a later boot rather than orphaning the map forever.
 export const WORLD_SCOPE_IDENTITY_FLAG_TARGET = 1;
 
-// The target version for the one-shot essence-merge identity-flag remap (issue 1654). When the
-// stored `WORLD_ESSENCE_MERGE_FLAG_VERSION` is below this, the active GM runs the remap once on
-// `ready` and writes this value back — unless it withheld the merge-map clear, in which case it
-// withholds this advance too, so the pass re-runs on a later boot rather than orphaning the map.
+// The target version for the one-shot essence-merge identity-flag remap (issue 1654).
 export const WORLD_ESSENCE_MERGE_FLAG_TARGET = 1;
 
 const BASE_DEFINITIONS = Object.freeze({
@@ -256,9 +151,7 @@ const BASE_DEFINITIONS = Object.freeze({
     type: Object,
     default: {},
   },
-  // Issue 1359. `scope: 'world'` here is what admits each key to the DERIVED
-  // `WORLD_SCOPED_SETTING_KEYS` below — that set is filtered out of these definitions precisely so
-  // it cannot drift, so nothing restates these three there.
+  // Issue 1359.
   [SETTING_KEYS.COMPONENT_SCOPE]: {
     name: 'World Component Scope',
     scope: 'world',
@@ -280,8 +173,7 @@ const BASE_DEFINITIONS = Object.freeze({
     type: Object,
     default: {},
   },
-  // Issue 1392 (epic 1357, PR 7a). `scope: 'world'` admits it to the DERIVED
-  // `WORLD_SCOPED_SETTING_KEYS` below exactly as the three above, so nothing restates it there.
+  // Issue 1392 (epic 1357, PR 7a).
   [SETTING_KEYS.WORLD_VOCABULARY]: {
     name: 'World Vocabulary',
     scope: 'world',
@@ -289,9 +181,7 @@ const BASE_DEFINITIONS = Object.freeze({
     type: Object,
     default: {},
   },
-  // Issue 1363. TRANSIENT: written as the FIRST leg of the `1.30.0` migration's writeback and
-  // cleared by the one-shot `ready` pass that consumes it. `scope: 'world'` because it is the
-  // decision record of a world-scope migration and every client must see the same one.
+  // Issue 1363.
   [SETTING_KEYS.WORLD_SCOPE_REKEY_MAP]: {
     name: 'World Scope Re-key Map',
     scope: 'world',
@@ -299,10 +189,7 @@ const BASE_DEFINITIONS = Object.freeze({
     type: Object,
     default: {},
   },
-  // Issue 1654. Part-transient: the one-shot `ready` pass clears the per-system re-key legs and
-  // leaves the `retired` tombstone in place forever. `scope: 'world'` because the Manager's
-  // essence-id minter reads it on every client. Registered here because `game.settings.get` throws
-  // on an unregistered key.
+  // Issue 1654.
   [SETTING_KEYS.WORLD_ESSENCE_MERGE_MAP]: {
     name: 'World Essence Merge Map',
     scope: 'world',
@@ -332,8 +219,6 @@ const BASE_DEFINITIONS = Object.freeze({
     default: [],
   },
   // Map of `runId -> { taskId, snapshot, reservation }` for in-flight blind runs.
-  // Written ONLY by the active GM (a player's start is relayed there), because
-  // `game.settings.set` replaces rather than merges and there is no compare-and-set.
   [SETTING_KEYS.GATHERING_BLIND_RUNS]: {
     name: 'Blind Gathering Runs',
     scope: 'world',
@@ -403,12 +288,8 @@ const BASE_DEFINITIONS = Object.freeze({
     type: Boolean,
     default: false,
   },
-  // Player-side "hide unavailable (locked) environments" preference for the
-  // Gathering app's Environments column. `scope: 'client'` persists it in the
-  // browser's `localStorage`, so the choice is per client/device, not per user
-  // account, and does not follow the user to a second device. Hidden from the
-  // Foundry settings menu (`config: false`); toggled from the app UI. Defaults
-  // to false (show all).
+  // Player-side "hide unavailable (locked) environments" preference for the Gathering app's
+  // Environments column.
   [SETTING_KEYS.GATHERING_HIDE_UNAVAILABLE]: {
     name: 'Hide Unavailable Gathering Environments',
     scope: 'client',
@@ -419,22 +300,8 @@ const BASE_DEFINITIONS = Object.freeze({
   [SETTING_KEYS.PROGRESSIVE_RESULT_ORDER]: {
     name: 'Progressive Result Order Preferences',
     // `user` scope (issue 651), NOT `client`: a player's chosen stage order is a standing
-    // preference that must reach them on any device they open this world from, rather
-    // than sit in one browser's localStorage. This is per user PER WORLD (the same player
-    // in a second world gets a fresh order) — never describe it as following the account,
-    // which is wrong for `user` scope. Note also that `set` is now an async, replicated
-    // document write that can reject, not a synchronous localStorage write.
-    //
-    // The flip needed no data migration, and the reason is NOT "nothing reads it" —
-    // that would not imply absence. The real reason: NO WRITER EXISTED before this
-    // change introduced one. The scope flip and the first real writer,
-    // `setProgressiveResultOrder`, landed in the same commit, so no stored value
-    // predated it: until then the only `setSetting` call for this key lived in
-    // `cleanupStalePreferences`, which fires only when `changed` is true, which
-    // required entries nothing created, so the map stayed its `{}` default. Foundry
-    // also has no scope-migration facility (`ClientSettings#get` dispatches on scope
-    // at read time), so any pre-existing localStorage key is orphaned in place —
-    // never read, never deleted, never an error.
+    // preference that must reach them on any device they open this world from, rather than sit in
+    // one browser's localStorage.
     scope: 'user',
     config: false,
     type: Object,
@@ -512,18 +379,9 @@ const BASE_DEFINITIONS = Object.freeze({
     type: Number,
     default: 0,
   },
-  // `config: false` — edited through the settings-menu picker
-  // (`registerPlayerCharacterTypesMenu`), not a raw text field, because the valid
-  // values are the actor types the active world declares and a free-text list would
-  // be unguessable. No `onChange`, for two independent reasons: propagation already runs
-  // through the shared setting listener in `main.js`, and registering both would
-  // double-fire (Foundry calls `doc._onUpdate` — which invokes `onChange` — and THEN
-  // `Hooks.callAll` on the same document in the same callback); and an `onChange` is the
-  // one setting callback with no error containment around it. It runs inside
-  // `doc._onUpdate`, BEFORE `Hooks.callAll('updateSetting')`, so a throw there propagates
-  // and kills the broadcast for the whole batch on every client. A `Hooks.on` listener has
-  // no such hazard — `Hooks.#call` try/catches each listener and routes to
-  // `Hooks.onError`.
+  // `config: false` — edited through the settings-menu picker (`registerPlayerCharacterTypesMenu`),
+  // not a raw text field, because the valid values are the actor types the active world declares
+  // and a free-text list would be unguessable.
   [SETTING_KEYS.ADDITIONAL_PLAYER_CHARACTER_ACTOR_TYPES]: {
     name: 'FABRICATE.Settings.PlayerCharacterActorTypes.Name',
     hint: 'FABRICATE.Settings.PlayerCharacterActorTypes.Hint',
@@ -532,14 +390,9 @@ const BASE_DEFINITIONS = Object.freeze({
     type: Array,
     default: [],
   },
-  // `config: true` — free text, deliberately, and NOT a `choices` dropdown: the design
-  // refuses to auto-append a `.value` leaf and the set of real paths in the wild is
-  // open-ended (`.value`, `.val`, `.qty`, bare numbers). The `default` and `hint` are
-  // overlaid per game system at registration time by `withActiveSystemDefaults` below.
-  // No `onChange`, for the same reason as the setting above: the shared setting
-  // listener in `main.js` re-invokes `configureItemStackQuantityPath` and then runs the
-  // probe, and registering both would double-fire — two full world scans and two
-  // permanent notifications per save, on every client.
+  // `config: true` — free text, deliberately, and NOT a `choices` dropdown: the design refuses to
+  // auto-append a `.value` leaf and the set of real paths in the wild is open-ended (`.value`,
+  // `.val`, `.qty`, bare numbers).
   [SETTING_KEYS.ITEM_STACK_QUANTITY_PATH]: {
     name: 'FABRICATE.Settings.ItemStackQuantityPath.Name',
     hint: 'FABRICATE.Settings.ItemStackQuantityPath.Hint',
@@ -553,65 +406,14 @@ const BASE_DEFINITIONS = Object.freeze({
 const keys = Object.values(SETTING_KEYS);
 
 /**
- * The setting keys stored at `scope: 'world'`, derived from the definitions above
- * rather than restated, so it cannot drift as settings are added or re-scoped.
- *
- * These are the keys an ordinary player cannot update. The real gate is
- * `BaseSetting.#canModify` -> `user.hasPermission('SETTINGS_MODIFY')`, identical in V13
- * and V14, and `SETTINGS_MODIFY` has `defaultRole: ASSISTANT` in both — so a GM may grant
- * it to any role, and it is a PERMISSION rather than a role list.
- *
- * `requiredRoles` is version-dependent, and both earlier versions of this comment got it
- * wrong in opposite directions:
- *
- *   - V13's `SETTINGS_MODIFY` has NO `requiredRoles` (it declares `disableGM: false`), so
- *     a GM's permission there is grantable and revocable like any other.
- *   - V14 (which `module.json` verifies against, and which the smoke boots) DOES declare
- *     `requiredRoles: [USER_ROLES.GAMEMASTER]` in `common/constants.mjs`, and
- *     `User#hasPermission` returns `true` up front when the user's role appears in it.
- *     That means "these roles hold this permission UNREVOKABLY" — a GM cannot be denied
- *     `SETTINGS_MODIFY` — and NOT "only these roles hold it"; the `defaultRole` ladder
- *     still runs for everyone else.
- *
- * The guardrail is unchanged under every reading — a plain player cannot write a world
- * setting by default — but the accurate description is "SETTINGS_MODIFY only", never
- * "GM only".
- *
- * A code path reachable by a user without that permission which writes one of these
- * fails at the server with `User <name> lacks permission to update Setting [...]`, so
- * any such write must be routed to the active GM. Exported so tests can model that
- * refusal instead of assuming an omnipotent settings seam.
- *
- * @type {ReadonlySet<string>}
+ * The setting keys stored at `scope: 'world'`, derived from the definitions above rather than
+ * restated, so it cannot drift as settings are added or re-scoped.
  */
 export const WORLD_SCOPED_SETTING_KEYS = Object.freeze(
   new Set(keys.filter((key) => BASE_DEFINITIONS[key]?.scope === 'world'))
 );
 
-/**
- * Overlay the ACTIVE game system's defaults onto a frozen base definition.
- *
- * `BASE_DEFINITIONS` is frozen at module import, when `game` may not exist at all, so
- * the per-system stack-quantity preset has to be applied here instead. Three details
- * are load-bearing:
- *
- *   - every `game` read is optional-chained, because existing tests call
- *     `registerFabricateSettings()` against a stub with no `system` and no `i18n`;
- *   - a NEW object is built rather than the shared entry mutated, since `Object.freeze`
- *     is shallow and `ClientSettings#register` mutates the object it is handed; and
- *   - the result can never be `undefined`, because `register` applies
- *     `data.default ??= null`, which would make every read return `null` rather than a
- *     usable path.
- *
- * The hint names the active system's default VERBATIM so a GM edits a known-good string
- * rather than inventing one. Foundry localizes a hint at render time and
- * `Localization#localize` returns a non-key string unchanged, so pre-formatting here is
- * safe.
- *
- * @param {string} key The setting key.
- * @param {object} definition The frozen base definition.
- * @returns {object} The definition to register.
- */
+/** Overlay the ACTIVE game system's defaults onto a frozen base definition. */
 function withActiveSystemDefaults(key, definition) {
   if (key !== SETTING_KEYS.ITEM_STACK_QUANTITY_PATH) return definition;
   const preset = stackQuantityPathPresetFor(globalThis.game?.system?.id);

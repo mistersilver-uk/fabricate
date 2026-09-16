@@ -1,28 +1,12 @@
-/**
- * Per-folder collector for folder-aware bulk import (issue 771).
- *
- * The existing `collectFolderItems` / `collectCompendiumFolderItemUuids` helpers in
- * `SvelteCraftingSystemManagerApp.svelte.js` FLATTEN a folder drop to a single UUID
- * list, discarding the folder provenance the mapping UI needs. This module groups the
- * same drops into `[{ folderId, folderName, itemCount, itemUuids }]` — one row per
- * distinct source folder (the dropped folder AND each nested subfolder), so the GM can
- * assign a category/tags per folder before the import commits.
- *
- * Two facts drive the compendium path (foundry-integrator, v13/v14):
- *  - Folder membership is read from `pack.index[].folder` — a DEFAULT-indexed Item
- *    field, so no document is loaded — grouped by folder, with display names from
- *    `pack.folders`.
- *  - `Folder#getSubfolders` filters `game.folders` (world-only) and returns `[]` for a
- *    packed folder, so it is deliberately NOT used here (the flat
- *    `collectCompendiumFolderItemUuids` relied on it and silently dropped nested in-pack
- *    items). Descendants are computed from the `pack.folders` parent links instead.
- *
- * Everything here is pure and Foundry-global-free: the app resolves the live Folder /
- * pack objects and passes them in, and the unit tests pass plain fixtures of the same
- * shape.
- */
+// Per-folder collector for folder-aware bulk import (issue 771). The app's flat collectors discard
+// the folder PROVENANCE the mapping UI needs, so this groups the same drops one row per distinct
+// source folder — the dropped folder and each nested subfolder — for a per-folder category and tags.
+// Two facts drive the compendium path on v13/v14: membership is read from `pack.index[].folder`, a
+// DEFAULT-indexed field, so no document is loaded; and `Folder#getSubfolders` filters `game.folders`
+// and returns `[]` for a PACKED folder, so descendants come from `pack.folders` parent links instead
+// — relying on it silently dropped nested in-pack items.
+// Pure and Foundry-global-free: the app resolves the live Folder and pack objects and passes them in.
 
-/** Values of a folder collection, tolerating a Map, an array, or a `.contents` list. */
 function folderCollectionValues(folders) {
   if (!folders) return [];
   if (Array.isArray(folders)) return folders;
@@ -32,12 +16,10 @@ function folderCollectionValues(folders) {
   return [];
 }
 
-/** A folder document's own document type, across the shapes Foundry/tests expose. */
 function folderDocumentType(folder) {
   return folder?.documentType || folder?.type || folder?.folderDocumentType || '';
 }
 
-/** The immediate child folders of `folder`, from its own `children` or the collection. */
 function folderChildFolders(folder, folders) {
   const explicit = Array.isArray(folder?.children) ? folder.children : [];
   const explicitChildren = explicit
@@ -52,15 +34,8 @@ function folderChildFolders(folder, folders) {
   return [...explicitChildren, ...collectionChildren];
 }
 
-/**
- * Group a flat list of `{ uuid, folderId }` item rows into folder groups, omitting
- * folders with no items and preserving first-seen order. A row with no `folderId`
- * (a whole-pack item filed at pack root) collects under the `unfiledName` group.
- *
- * @param {Array<{uuid: string, folderId?: string|null}>} items
- * @param {{ folderNames?: Map<string,string>, unfiledName?: string }} [options]
- * @returns {Array<{folderId: string|null, folderName: string, itemCount: number, itemUuids: string[]}>}
- */
+// Omits empty folders and preserves first-seen order; a row with no `folderId` — an item filed at
+// pack root — collects under the `unfiledName` group.
 export function buildFolderGroupsFromItems(items, { folderNames, unfiledName = '' } = {}) {
   const names = folderNames instanceof Map ? folderNames : new Map();
   const order = [];
@@ -82,15 +57,8 @@ export function buildFolderGroupsFromItems(items, { folderNames, unfiledName = '
   }));
 }
 
-/**
- * Collect per-folder groups from a resolved WORLD folder document. Traverses the
- * dropped folder plus its descendant Item folders (depth-first, cycle-guarded), keeping
- * each folder's own items attributed to that folder. Non-Item folders yield no items.
- *
- * @param {object} folder the resolved world Folder document.
- * @param {*} folders the `game.folders` collection (for the child-lookup fallback).
- * @returns {Array<{folderId: string|null, folderName: string, itemCount: number, itemUuids: string[]}>}
- */
+// Depth-first and cycle-guarded over the dropped folder and its descendant Item folders, keeping
+// each folder's own items attributed to it. A non-Item folder yields no items.
 export function collectWorldFolderGroups(folder, folders) {
   const items = [];
   const folderNames = new Map();
@@ -111,55 +79,28 @@ export function collectWorldFolderGroups(folder, folders) {
   return buildFolderGroupsFromItems(items, { folderNames });
 }
 
-/**
- * Whether a collected group list warrants the mapping modal: it must carry at least one
- * REAL source folder. A drop that resolves to only the folderless "unfiled" group (a pack
- * with no folder structure) has nothing to categorize per-folder, so it falls back to the
- * one-shot import instead of opening the modal. This is the group-level divert decision
- * shared by every branch of `collectImportFolderGroups`.
- *
- * @param {Array<{folderId: string|null}>} groups
- * @returns {boolean}
- */
+// The modal needs at least one REAL source folder: a drop resolving only to the folderless
+// "unfiled" group has nothing to categorize per folder, so it falls back to the one-shot import.
+// This is the divert decision every branch of `collectImportFolderGroups` shares.
 export function hasRealFolderGroups(groups) {
   return Array.isArray(groups) && groups.some((group) => group.folderId);
 }
 
-/**
- * Import each non-skipped folder decision's items, then apply that folder's category and
- * tags to the freshly imported component set via the manager's set-apply primitive. The
- * shared commit loop behind the import mapping modal (issue 771); Foundry-global-free —
- * the caller injects the `systemManager` so it is unit testable against a real
- * `CraftingSystemManager`.
- *
- * The WHOLE run — every folder's items and every folder's set-apply — is persisted by ONE
- * `save()` at the end (issue 1086). Each `save()` replaces the entire `craftingSystems`
- * world setting and replicates it to every connected client, so the per-item write this
- * used to issue made a folder import quadratic in corpus size. Both collaborator calls
- * therefore run with `persist: false` and this function owns the single terminal write.
- *
- * `save` is optional-chained so a synchronous-storing mock manager (which needs no
- * settings flush) stays a valid injection; a real `CraftingSystemManager` always defines
- * it, so production always issues its one write.
- *
- * @param {{
- *   addItemFromUuid: (systemId: string, uuid: string, options?: {persist?: boolean}) => Promise<{item?: {id?: string}, action: string, sourceFallbacks?: Array}>,
- *   applyBulkEditToComponents: (systemId: string, ids: string[], edit: object, options?: {persist?: boolean}) => Promise<object>,
- *   save?: () => Promise<void>
- * }} systemManager
- * @param {string} systemId
- * @param {Array<{itemUuids?: string[], category?: string, addTags?: string[]}>} decisions
- * @returns {Promise<{added: number, updated: number, skipped: number, total: number, sourceFallbacks: Array}>}
- */
+// The shared commit loop behind the import mapping modal (issue 771), with the `systemManager`
+// injected so it is testable against a real `CraftingSystemManager`.
+// The WHOLE run is persisted by ONE `save()` at the end (issue 1086): each `save()` replaces the
+// entire `craftingSystems` world setting and replicates it to every client, so the per-item write
+// this used to issue made a folder import quadratic in corpus size. Both collaborator calls run
+// with `persist: false` and this function owns the single terminal write.
+// `save` is optional-chained so a synchronous-storing mock manager stays a valid injection.
 export async function applyFolderImportDecisions(systemManager, systemId, decisions) {
   let added = 0;
   let updated = 0;
   let skipped = 0;
   let total = 0;
   const sourceFallbacks = [];
-  // Whether anything actually changed the corpus. A run whose every item is already
-  // present AND whose folders carry no category/tags mutates nothing, so it writes
-  // nothing — the same no-op an unbatched all-skipped re-drop was.
+  // A run whose every item is already present AND whose folders carry no category or tags mutates
+  // nothing, so it writes nothing.
   let dirty = false;
   try {
     for (const decision of decisions || []) {
@@ -179,12 +120,10 @@ export async function applyFolderImportDecisions(systemManager, systemId, decisi
       }
       const addTags = Array.isArray(decision.addTags) ? decision.addTags : [];
       if (importedIds.length > 0 && (decision.category || addTags.length > 0)) {
-        // Applied to EVERY imported id, INCLUDING a 'skipped' (re-dropped, already-existing)
-        // component: re-dropping a folder deliberately re-categorizes its items, so the
-        // overwrite-on-redrop here is intended, not a leak.
-        // Import stages only the two axes it owns: it supplies NEITHER `essences` nor
-        // `difficulty`, so the primitive's presence-based guard is false for both and an
-        // import never clears a component's essences or DC (issue 772).
+        // Applied to EVERY imported id, including a skipped (already-existing) one: re-dropping a
+        // folder deliberately re-categorizes its items. Import stages only the two axes it owns and
+        // supplies neither `essences` nor `difficulty`, so the primitive's presence guard is false
+        // for both and an import never clears a component's essences or DC (issue 772).
         const applied = await systemManager.applyBulkEditToComponents(
           systemId,
           importedIds,
@@ -195,44 +134,33 @@ export async function applyFolderImportDecisions(systemManager, systemId, decisi
       }
     }
   } finally {
-    // `finally`, not a trailing statement: an item that throws part-way through must still
-    // persist the folders and items already committed, which the per-item writes used to
-    // give for free. The error still propagates — this flushes, it does not swallow.
+    // `finally`, not a trailing statement: an item throwing part-way through must still persist
+    // what was already committed, which the per-item writes gave for free. The error propagates.
     if (dirty) await systemManager.save?.();
   }
   return { added, updated, skipped, total, sourceFallbacks };
 }
 
-/** A pack folder document's parent folder id, across the shapes v13 exposes. */
 function packFolderParentId(packFolder) {
   const parent = packFolder?.folder ?? packFolder?.parent ?? packFolder?._source?.folder;
   if (!parent) return null;
   return typeof parent === 'object' ? parent.id || null : String(parent);
 }
 
-/** A pack index entry's folder id (the entry's `.folder` is an id or a Folder object). */
 function packEntryFolderId(entry) {
   const folder = entry?.folder;
   if (!folder) return null;
   return typeof folder === 'object' ? folder.id || null : String(folder);
 }
 
-/** The compendium UUID of a pack index entry, built from the packId when not present. */
 function packEntryUuid(entry, packId) {
   if (entry?.uuid) return entry.uuid;
   const id = entry?._id || entry?.id;
   return id ? `Compendium.${packId}.Item.${id}` : null;
 }
 
-/**
- * The set of folder ids in the subtree rooted at `rootFolderId` (inclusive), derived
- * from `pack.folders` parent links — the world-only `Folder#getSubfolders` is never
- * used. Returns `null` for a whole-pack drop (no root: every folder qualifies).
- *
- * @param {string|null} rootFolderId
- * @param {Array<{id: string, parentId: string|null}>} folderParents
- * @returns {Set<string>|null}
- */
+// Derived from `pack.folders` parent links; the world-only `Folder#getSubfolders` is never used.
+// `null` means a whole-pack drop, where every folder qualifies.
 export function descendantFolderIdSet(rootFolderId, folderParents) {
   if (!rootFolderId) return null;
   const childrenByParent = new Map();
@@ -254,16 +182,7 @@ export function descendantFolderIdSet(rootFolderId, folderParents) {
   return subtree;
 }
 
-/**
- * Collect per-folder groups from a compendium pack, for both the whole-pack drop
- * (`rootFolderId` omitted → every folder) and the in-pack-folder drop (`rootFolderId`
- * set → that folder plus its descendants). Membership comes from `pack.index[].folder`
- * grouped by folder, with names from `pack.folders` — no document is loaded.
- *
- * @param {{collection?: string, metadata?: {id?: string}, index?: Iterable, folders?: Iterable}} pack
- * @param {{ rootFolderId?: string|null, unfiledName?: string }} [options]
- * @returns {Array<{folderId: string|null, folderName: string, itemCount: number, itemUuids: string[]}>}
- */
+// Serves the whole-pack drop and the in-pack-folder drop alike. No document is loaded.
 export function collectPackFolderGroups(pack, { rootFolderId = null, unfiledName = '' } = {}) {
   const packId = pack?.collection || pack?.metadata?.id || '';
   const packFolders = Array.from(pack?.folders || []);
@@ -281,8 +200,7 @@ export function collectPackFolderGroups(pack, { rootFolderId = null, unfiledName
     const uuid = packEntryUuid(entry, packId);
     if (!uuid) continue;
     const folderId = packEntryFolderId(entry);
-    // In-pack-folder drop: keep only entries inside the dropped subtree. Whole-pack
-    // drop (subtree === null): keep every entry, filing folderless ones under unfiled.
+    // A null subtree is the whole-pack drop: keep every entry, filing folderless ones as unfiled.
     if (subtree && !(folderId && subtree.has(folderId))) continue;
     items.push({ uuid, folderId });
   }

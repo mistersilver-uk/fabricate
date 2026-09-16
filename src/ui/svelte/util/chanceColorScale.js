@@ -7,13 +7,7 @@ const TOOL_BREAKAGE_CHANCE_STOPS = [
   { at: 100, color: 'var(--fab-danger)' },
 ];
 
-/**
- * Resolve a value continuously between theme-aware CSS colour stops.
- *
- * @param {number|string} value
- * @param {Array<{at: number, color: string}>} stops
- * @returns {string}
- */
+// Resolve a value continuously between theme-aware CSS colour stops.
 export function interpolateCssColorScale(value, stops) {
   const chance = normalizeRateForTier(value);
   const scale = [...stops].sort((left, right) => left.at - right.at);
@@ -34,12 +28,7 @@ export function interpolateCssColorScale(value, stops) {
   return scale.at(-1).color;
 }
 
-/**
- * Resolve Tool breakage risk onto the shared Fabricate status palette.
- *
- * @param {number|string} value
- * @returns {string}
- */
+// Tool breakage risk, onto the shared Fabricate status palette.
 export function toolBreakageChanceColor(value) {
   return interpolateCssColorScale(value, TOOL_BREAKAGE_CHANCE_STOPS);
 }

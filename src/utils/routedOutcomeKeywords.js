@@ -1,20 +1,4 @@
-/**
- * Canonical reserved routing keywords for routed-mode outcome matching.
- *
- * The routed `check` provider routes a crafting-check outcome to a `ResultGroup`
- * by NAME. Certain normalized names are RESERVED for the failure path and never
- * match (or name) a real result group:
- *
- *  - the FAIL family:  fail / failed / failure / f
- *  - the MISS family:  miss / missed / m / nothing / none / whiff / whiffed
- *  - the HAZARD family: hazard / danger / complication / trap / oops
- *
- * This single shared set is the source of truth for both
- * `ResolutionModeService` (runtime resolution for the `check` provider) and
- * `Recipe.js` (routed `ResultGroup.name` validation), so the two never drift.
- * Living in the utils layer keeps it importable from both `src/models` and
- * `src/systems` without a layering violation.
- */
+/** Canonical reserved routing keywords for routed-mode outcome matching. */
 
 import { permitsFailureResults } from './failureResultPolicy.js';
 
@@ -32,11 +16,7 @@ export const MISS_KEYWORDS = Object.freeze([
 
 export const HAZARD_KEYWORDS = Object.freeze(['hazard', 'danger', 'complication', 'trap', 'oops']);
 
-/**
- * Trim + lowercase a candidate routing name to its normalized comparison form.
- * @param {*} name
- * @returns {string}
- */
+/** Trim + lowercase a candidate routing name to its normalized comparison form. */
 export function normalizeRoutedName(name) {
   return String(name || '')
     .trim()
@@ -47,31 +27,19 @@ const FAIL_SET = new Set(FAIL_KEYWORDS);
 const MISS_SET = new Set(MISS_KEYWORDS);
 const HAZARD_SET = new Set(HAZARD_KEYWORDS);
 
-/**
- * Does the (already-normalized or raw) name take the FAIL path? The fail family
- * plus the hazard family route to failure under canonical routed resolution.
- * @param {*} name
- * @returns {boolean}
- */
+/** Does the (already-normalized or raw) name take the FAIL path? */
 export function isFailKeyword(name) {
   const normalized = normalizeRoutedName(name);
   return FAIL_SET.has(normalized) || HAZARD_SET.has(normalized);
 }
 
-/**
- * Does the name take the MISS path?
- * @param {*} name
- * @returns {boolean}
- */
+/** Does the name take the MISS path? */
 export function isMissKeyword(name) {
   return MISS_SET.has(normalizeRoutedName(name));
 }
 
 /**
- * Is the name reserved (fail/miss/hazard) and therefore forbidden as a routed
- * `ResultGroup.name`?
- * @param {*} name
- * @returns {boolean}
+ * Is the name reserved (fail/miss/hazard) and therefore forbidden as a routed `ResultGroup.name`?
  */
 export function isReservedRoutedName(name) {
   const normalized = normalizeRoutedName(name);
@@ -79,18 +47,9 @@ export function isReservedRoutedName(name) {
 }
 
 /**
- * Match result groups to a routed `outcome` by NORMALIZED name — the single
- * shared sub-step of the three otherwise-distinct routing models (crafting's
- * `check` provider, gathering's system-check tier). Only the name comparison and
- * the first-vs-all selection are shared here; reserved-keyword handling,
- * tier→result-set assignment, and per-system status shapes stay in the callers.
- *
- * @param {*} outcome the routed outcome/tier name (raw; normalized internally)
- * @param {Array<{name?: *}>} groups candidate result groups
- * @param {object} [options]
- * @param {boolean} [options.firstOnly=false] keep only the first match (crafting
- *   routes to a single group via `slice(0, 1)`); gathering keeps all matches.
- * @returns {Array} the matching groups in order
+ * Match result groups to a routed `outcome` by NORMALIZED name — the single shared sub-step of the
+ * three otherwise-distinct routing models (crafting's `check` provider, gathering's system-check
+ * tier).
  */
 export function matchResultGroupsByName(outcome, groups, { firstOnly = false } = {}) {
   const normalized = normalizeRoutedName(outcome);
@@ -101,17 +60,8 @@ export function matchResultGroupsByName(outcome, groups, { firstOnly = false } =
 }
 
 /**
- * Build the `{id, name}` options for the recipe editor's check-mode result-set
- * assignment control from a routed crafting check's active outcome-tier list.
- * Only SUCCESS tiers (`success === true`) with an id are offered — a failed check
- * produces no result set to route to, so failure tiers are excluded. The active
- * list is the `fixedOutcomes` when `type === 'fixed'`, else `relativeOutcomes`.
- *
- * Pure (no `$derived`/Foundry deps) so it can be unit-tested directly and reused
- * by the recipe-readiness evaluator that needs the same success-filtered list.
- *
- * @param {?{type?: string, relativeOutcomes?: Array, fixedOutcomes?: Array}} routed
- * @returns {Array<{id: string, name: string}>}
+ * Build the `{id, name}` options for the recipe editor's check-mode result-set assignment control
+ * from a routed crafting check's active outcome-tier list.
  */
 export function routedSuccessTierOptions(routed) {
   if (!routed) return [];
@@ -121,17 +71,7 @@ export function routedSuccessTierOptions(routed) {
     .map((tier) => ({ id: tier.id, name: tier.name || tier.id }));
 }
 
-/**
- * ALL outcome tiers (success AND failure) as `{id, name}`, in authored order. Unlike
- * {@link routedSuccessTierOptions} this keeps failure tiers, because a result group may
- * be routed to any tier and a consumer resolving a group's `checkOutcomeIds` to tier
- * NAMES (e.g. the library inspector's routed-by-check headings) needs every tier's name.
- *
- * Pure (no `$derived`/Foundry deps) so it can be unit-tested directly.
- *
- * @param {?{type?: string, relativeOutcomes?: Array, fixedOutcomes?: Array}} routed
- * @returns {Array<{id: string, name: string}>}
- */
+/** ALL outcome tiers (success AND failure) as `{id, name}`, in authored order. */
 export function routedOutcomeTierOptions(routed) {
   if (!routed) return [];
   const tiers = routed.type === 'fixed' ? routed.fixedOutcomes : routed.relativeOutcomes;
@@ -141,24 +81,8 @@ export function routedOutcomeTierOptions(routed) {
 }
 
 /**
- * The outcome-tier options a RESULT-AUTHORING control may offer, chosen by the owning
- * activity's failure-result policy (issue 1098, decision 7).
- *
- * It is a SWAP between the two functions above, not a third derivation: `never` reads
- * {@link routedSuccessTierOptions} and a permitting policy reads
- * {@link routedOutcomeTierOptions}, which already serves the library inspector. The
- * picker and `recipeReadiness.collectRoutedCheckIssues` both call this, so the control
- * can never offer a tier the validator calls unroutable — and neither can offer one
- * `ResolutionModeService._resolveRoutedTierId` refuses to resolve, because all three read
- * the same policy.
- *
- * `minSuccessOutcomeId` is deliberately NOT a caller: it names a minimum SUCCESS tier, a
- * failure-marked tier is never a candidate for it, and its picker keeps reading the
- * success-filtered set under every policy value.
- *
- * @param {?{type?: string, relativeOutcomes?: Array, fixedOutcomes?: Array}} routed
- * @param {*} failureResultPolicy the owning activity check's policy
- * @returns {Array<{id: string, name: string}>}
+ * The outcome-tier options a RESULT-AUTHORING control may offer, chosen by the owning activity's
+ * failure-result policy (issue 1098, decision 7).
  */
 export function routedTierOptionsForPolicy(routed, failureResultPolicy) {
   return permitsFailureResults(failureResultPolicy)
@@ -166,20 +90,7 @@ export function routedTierOptionsForPolicy(routed, failureResultPolicy) {
     : routedSuccessTierOptions(routed);
 }
 
-/**
- * Does the routed check have ANY outcome tier defined (regardless of success)?
- * The active list is `fixedOutcomes` when `type === 'fixed'`, else `relativeOutcomes`.
- *
- * This is the companion to {@link routedSuccessTierOptions}: it returns `true` even
- * when every tier is a failure tier, so callers can tell "no tiers authored yet"
- * apart from "tiers exist but none is a Success" — two states that both make
- * `routedSuccessTierOptions` return `[]` but need different guidance in the UI.
- *
- * Pure (no `$derived`/Foundry deps) so it can be unit-tested directly.
- *
- * @param {?{type?: string, relativeOutcomes?: Array, fixedOutcomes?: Array}} routed
- * @returns {boolean}
- */
+/** Does the routed check have ANY outcome tier defined (regardless of success)? */
 export function routedHasOutcomeTiers(routed) {
   if (!routed) return false;
   const tiers = routed.type === 'fixed' ? routed.fixedOutcomes : routed.relativeOutcomes;
@@ -187,20 +98,8 @@ export function routedHasOutcomeTiers(routed) {
 }
 
 /**
- * How many outcome tiers a routed check has authored — success AND failure tiers,
- * counted by id exactly as {@link routedHasOutcomeTiers} tests. The active list is
- * `fixedOutcomes` when `type === 'fixed'`, else `relativeOutcomes`.
- *
- * The manager titlebar reports this beside the resolution-mode label ("Routed by
- * check · 4 outcome tiers"), so it must agree with the has-any predicate: a count
- * derived from tier NAMES would silently drop an id-bearing tier the GM has not
- * named yet, and the titlebar would disagree with the editor about how many tiers
- * exist.
- *
- * Pure (no `$derived`/Foundry deps) so it can be unit-tested directly.
- *
- * @param {?{type?: string, relativeOutcomes?: Array, fixedOutcomes?: Array}} routed
- * @returns {number}
+ * How many outcome tiers a routed check has authored — success AND failure tiers, counted by id
+ * exactly as {@link routedHasOutcomeTiers} tests.
  */
 export function routedOutcomeTierCount(routed) {
   if (!routed) return 0;
@@ -209,34 +108,13 @@ export function routedOutcomeTierCount(routed) {
 }
 
 /**
- * The recipe-tier list offered to the recipe editor's "Check tier" dropdown for
- * the selected system, resolved from its active crafting-check mode. Recipe tiers
- * are authored on a RELATIVE check (simple-static or routed-relative), so this
- * returns the active mode's tier list only in those two cases:
- *
- *  - simple mode + static `dcMode` → `craftingCheck.simple.tiers`
- *  - routed mode + relative type (`routed.type !== 'fixed'`) → `craftingCheck.routed.tiers`
- *
- * Everything else — simple + dynamic dcMode, routed + fixed type, progressive,
- * or a null/unknown mode — yields `[]` (no tier selection is meaningful). The
- * routed gate mirrors CraftingCheckEditor's `type` normalization
- * (`type === 'fixed' ? 'fixed' : 'relative'`), so an omitted/undefined routed
- * `type` is treated as relative and its tiers are offered.
- *
- * Pure (no `$derived`/Foundry deps) so it can be unit-tested directly and reused
- * by the recipe editor's `$derived` without adding a new module dependency.
- *
- * @param {?{simple?: {dcMode?: string, tiers?: Array}, routed?: {type?: string, tiers?: Array}}} craftingCheck
- * @param {?string} craftingCheckMode the active crafting-check mode: 'simple' |
- *   'routed' | 'progressive' | null
- * @returns {Array} the tier objects for the active mode, or `[]`
+ * The recipe-tier list offered to the recipe editor's "Check tier" dropdown for the selected
+ * system, resolved from its active crafting-check mode.
  */
 export function resolveRecipeCheckTierOptions(craftingCheck, craftingCheckMode) {
   if (craftingCheckMode === 'simple') {
-    // Mirror SimpleCraftingCheckEditor's `dcMode === 'dynamic' ? 'dynamic' : 'static'`
-    // normalization: only an explicit `dynamic` hides tiers; every other value
-    // (including omitted) is static and offers them. Structurally symmetric with the
-    // routed `type === 'fixed'` gate below.
+    // Only an explicit `dcMode === 'dynamic'` hides tiers; every other value, omission included,
+    // is static and offers them. Structurally symmetric with the routed `type === 'fixed'` gate.
     return craftingCheck?.simple?.dcMode === 'dynamic' ? [] : craftingCheck?.simple?.tiers || [];
   }
   if (craftingCheckMode === 'routed') {
@@ -246,29 +124,8 @@ export function resolveRecipeCheckTierOptions(craftingCheck, craftingCheckMode) 
 }
 
 /**
- * The success outcome tiers offered to a recipe's "Minimum success tier" dropdown,
- * for a FIXED-type routed crafting check only. A recipe may demand a minimum tier so
- * that a shared fixed check carries different difficulty per recipe; a roll landing
- * below the chosen tier fails the craft outright. Only success tiers (`success ===
- * true`) with an id are offered — a failure tier is not a meaningful "minimum for
- * success" — ranked ascending by `start` (the fixed-tier rank) so the dropdown reads
- * low → high.
- *
- * Returns `[]` for every case other than `routedByCheck` + fixed, so the editor
- * control auto-hides otherwise. The gate is the system's real `resolutionMode`, NOT
- * the collapsed check-shape mode, because the minimum-tier gate is only APPLIED on the
- * `routedByCheck` runtime path: `routedByIngredients` authors its check on the shared
- * `craftingCheck.simple` pass/fail slot and has no outcome tiers, and while alchemy
- * `checkMode: tiered` dispatches through the same `_runRoutedCheck` runner, that
- * dispatch forces `minOutcomeId: null` (`applyMinSuccessOutcome: false`), so a
- * `minSuccessOutcomeId` carried outside `routedByCheck` is inert at runtime and
- * surfacing the control there would author a dead value. Names are returned raw (empty when unnamed) so the UI applies its own
- * "Unnamed tier" label rather than leaking a tier's generated secret id. Pure (no
- * `$derived`/Foundry deps) so it can be unit-tested directly.
- *
- * @param {?{routed?: {type?: string, fixedOutcomes?: Array}}} craftingCheck
- * @param {?string} resolutionMode the system's crafting `resolutionMode`
- * @returns {Array<{id: string, name: string, start: number}>}
+ * The success outcome tiers offered to a recipe's "Minimum success tier" dropdown, for a FIXED-type
+ * routed crafting check only.
  */
 export function resolveRecipeFixedOutcomeTierOptions(craftingCheck, resolutionMode) {
   if (resolutionMode !== 'routedByCheck') return [];
@@ -281,18 +138,8 @@ export function resolveRecipeFixedOutcomeTierOptions(craftingCheck, resolutionMo
 }
 
 /**
- * All NON-EMPTY outcome-tier NAMES of a routed check's active type — success AND
- * failure tiers — in author order. The active list is the `fixedOutcomes` when
- * `type === 'fixed'`, else `relativeOutcomes`. This is the single source of truth
- * for "what outcome names can be routed", shared by the per-component salvage
- * routing UI and `ResolutionModeService` salvage validation so the editor and the
- * validator can never disagree about which outcomes exist (the bug that left
- * routed salvage permanently invalid when the two read different fields).
- *
- * Pure (no `$derived`/Foundry deps) so it can be unit-tested directly.
- *
- * @param {?{type?: string, relativeOutcomes?: Array, fixedOutcomes?: Array}} routed
- * @returns {Array<string>}
+ * All NON-EMPTY outcome-tier NAMES of a routed check's active type — success AND failure tiers — in
+ * author order.
  */
 export function routedOutcomeTierNames(routed) {
   if (!routed) return [];
@@ -304,24 +151,8 @@ export function routedOutcomeTierNames(routed) {
 
 /**
  * The tier NAMES a routed-salvage `outcomeRouting` select may offer, chosen by the salvage
- * failure-result policy (issue 1098, decision 7) — the name-keyed twin of
- * {@link routedTierOptionsForPolicy}.
- *
- * {@link routedOutcomeTierNames} is unfiltered, so that select has always offered failure
- * tier names; until this issue they were DEAD OPTIONS, because `CraftingEngine.salvage()`
- * returned before `_resolveSalvageResultGroups` on a failed check and nothing ever routed
- * through them. Now they route when the policy permits, and are hidden when it does not.
- *
- * The VALIDATOR is deliberately not made policy-conditional alongside it:
- * `ResolutionModeService.validateSalvage` reads the unfiltered names, and an assignment
- * authored under a permitting policy must not become a validation ERROR when the GM
- * switches to `never` — it stops being offered and stops routing, and returns when the
- * policy permits. That is the same non-destructive rule `ResultGroup.checkOutcomeIds`
- * follows on the crafting side.
- *
- * @param {?{type?: string, relativeOutcomes?: Array, fixedOutcomes?: Array}} routed
- * @param {*} failureResultPolicy the salvage check's policy
- * @returns {Array<string>}
+ * failure-result policy (issue 1098, decision 7) — the name-keyed twin of {@link
+ * routedTierOptionsForPolicy}.
  */
 export function routedOutcomeTierNamesForPolicy(routed, failureResultPolicy) {
   const names = routedOutcomeTierNames(routed);

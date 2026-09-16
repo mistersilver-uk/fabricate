@@ -5,43 +5,18 @@ import {
   resolveInteractionPromptPositionStyle,
 } from './interactionPromptPosition.js';
 
-/**
- * The non-blocking, SINGLETON player prompt for a Fabricate interactable region
- * (region-first model). When the controlling player's token enters an eligible
- * `fabricate.interactable` region, the manager calls
- * {@link InteractionPromptApp.show} to raise a small, NOT-modal toast anchored
- * bottom-center carrying the interactable's name, an optional prompt line, and
- * an "Interact" button. On token exit the manager calls
- * {@link InteractionPromptApp.dismiss}.
- *
- * ROBUSTNESS contract: this is a PLAIN fixed-position DOM toast appended to
- * `document.body` — NOT an ApplicationV2. ApplicationV2 applies its own inline
- * positioning (overriding our stylesheet) and on the Vite dev server the module
- * stylesheet may not even be loaded, so a frameless ApplicationV2 prompt landed
- * mispositioned/unstyled and could overlay the sidebar. All CRITICAL layout
- * (fixed, bottom-center, non-blocking) lives in INLINE styles on the toast so it
- * works with zero external CSS; the `fabricate-interaction-prompt` class remains
- * for purely cosmetic theming via `styles/fabricate.css`.
- *
- * SINGLETON contract: only ONE prompt exists at a time. `show()` REPLACES the
- * live prompt (a fresh region-enter supersedes a stale one); the most recently
- * shown `behaviorRef` is tracked so `dismiss(behaviorRef)` only closes when the
- * ref matches the live prompt (a stale exit for a region the player already left
- * must not tear down a newer prompt). A bare `dismiss()` always closes.
- *
- * Registered via the app factory (NOT a static import chain) so Node test
- * environments never pull a render dependency. The pure show/dismiss singleton
- * decision is extracted into {@link planPromptDismiss} for unit testing.
- */
+// The non-blocking SINGLETON player prompt for a Fabricate interactable region.
+// ROBUSTNESS: a PLAIN fixed-position DOM toast on `document.body`, NOT an ApplicationV2, which
+// applies its own inline positioning over the stylesheet and — on the Vite dev server, where the
+// module stylesheet may not be loaded at all — landed mispositioned and could overlay the sidebar.
+// Every CRITICAL layout property is INLINE, so the toast works with zero external CSS; the class is
+// cosmetic theming only.
+// SINGLETON: `show()` REPLACES the live prompt, and the `behaviorRef` it is showing is tracked so a
+// `dismiss(behaviorRef)` closes only on a MATCH — a stale exit for a region the player already left
+// must not tear down a newer prompt, while a bare `dismiss()` always closes.
+// Registered through the app factory rather than a static import chain, so a Node test environment
+// never pulls a render dependency; the pure decision lives in `planPromptDismiss`.
 
-/**
- * Localize a key through the Foundry i18n bridge, falling back to plain English
- * when the bridge or the key is unavailable (Node test env, missing lang).
- *
- * @param {string} key
- * @param {string} fallback
- * @returns {string}
- */
 function localizeLabel(key, fallback) {
   try {
     const translated = globalThis.game?.i18n?.localize?.(key);
@@ -56,20 +31,7 @@ export class InteractionPromptApp {
   static _instance = null;
   static _behaviorRef = null;
 
-  /**
-   * Show (or REPLACE) the singleton prompt for one interactable region.
-   *
-   * @param {object} params
-   * @param {string} params.behaviorRef  A stable key for the region behaviour
-   *   (e.g. `${sceneId}.${regionId}.${behaviorId}`); used so a matching
-   *   `dismiss` tears this prompt down and a stale dismiss does not.
-   * @param {string} [params.name]       Interactable display name.
-   * @param {string|null} [params.promptText]  Optional prompt line.
-   * @param {() => void} [params.onInteract]   Invoked when the player clicks Interact.
-   * @returns {HTMLElement|null} The toast element, or null when no DOM is available.
-   */
   static show({ behaviorRef, name = '', promptText = null, onInteract = null } = {}) {
-    // Replace any live prompt (a fresh enter supersedes a stale one).
     InteractionPromptApp._removeInstance();
 
     const doc = globalThis.document;
@@ -81,11 +43,8 @@ export class InteractionPromptApp {
     toast.className = 'fabricate fabricate-interaction-prompt';
     toast.setAttribute('role', 'dialog');
     toast.setAttribute('aria-live', 'polite');
-    // CRITICAL layout/positioning lives INLINE so the toast works with zero
-    // external CSS: fixed, anchored, above most UI, non-blocking. The anchor is
-    // a per-client setting (default bottom-center) so a player can move it away
-    // from a conflicting on-screen widget; an unreadable setting falls back to
-    // the default.
+    // The anchor is a per-client setting so a player can move the toast away from a conflicting
+    // widget; an unreadable setting falls back to the default.
     toast.style.cssText = [
       'position:fixed',
       ...resolveInteractionPromptPositionStyle(InteractionPromptApp._readConfiguredPosition()),
@@ -94,7 +53,6 @@ export class InteractionPromptApp {
       'pointer-events:auto'
     ].join(';');
 
-    // Close affordance.
     const closeBtn = doc.createElement('button');
     closeBtn.type = 'button';
     closeBtn.className = 'fabricate-interaction-prompt__close';
@@ -102,7 +60,6 @@ export class InteractionPromptApp {
     closeBtn.innerHTML = '<i class="fas fa-xmark"></i>';
     closeBtn.addEventListener('click', () => InteractionPromptApp._removeInstance());
 
-    // Body: name + optional prompt line.
     const body = doc.createElement('div');
     body.className = 'fabricate-interaction-prompt__body';
     if (name) {
@@ -118,7 +75,7 @@ export class InteractionPromptApp {
       body.appendChild(textEl);
     }
 
-    // Interact action (one-shot: fire, then dismiss).
+    // One-shot: fire, then dismiss.
     const actionBtn = doc.createElement('button');
     actionBtn.type = 'button';
     actionBtn.className = 'fabricate-interaction-prompt__action';
@@ -145,28 +102,13 @@ export class InteractionPromptApp {
     return toast;
   }
 
-  /**
-   * Dismiss the live prompt. With a `behaviorRef`, only closes when it MATCHES the
-   * live prompt's ref (a stale exit must not tear down a newer prompt). With no
-   * ref, always closes the live prompt.
-   *
-   * @param {string} [behaviorRef]
-   * @returns {void}
-   */
   static dismiss(behaviorRef) {
     if (!planPromptDismiss(InteractionPromptApp._behaviorRef, behaviorRef)) return;
     InteractionPromptApp._removeInstance();
   }
 
-  /**
-   * Read the configured prompt anchor from the per-client setting, tolerating a
-   * not-yet-ready or absent `game.settings` (Node tests, dev server) by falling
-   * back to the default. Read inline (literal namespace/key) to preserve the
-   * module's zero-import robustness contract. The style resolver additionally
-   * defaults any unknown value, so a stale/corrupt setting is safe.
-   *
-   * @returns {string} A position anchor id.
-   */
+  // Read INLINE, with a literal namespace and key, to preserve this module's zero-import
+  // robustness contract; the style resolver defaults any unknown value, so a corrupt setting is safe.
   static _readConfiguredPosition() {
     try {
       const value = globalThis.game?.settings?.get?.('fabricate', 'interactionPromptPosition');
@@ -176,10 +118,7 @@ export class InteractionPromptApp {
     }
   }
 
-  /**
-   * Tear down the live toast element (defensive/no-throw) and clear singleton
-   * state. Safe to call when nothing is showing or when no DOM is available.
-   */
+  // No-throw, and safe when nothing is showing or no DOM is available.
   static _removeInstance() {
     const el = InteractionPromptApp._instance;
     InteractionPromptApp._instance = null;
@@ -196,6 +135,5 @@ export class InteractionPromptApp {
 
 export { planPromptDismiss, buildPromptBehaviorRef };
 
-// Register with the factory so the manager can resolve this class without a
-// static import chain.
+// Registered so the manager resolves this class without a static import chain.
 registerInteractionPromptApp(InteractionPromptApp);
