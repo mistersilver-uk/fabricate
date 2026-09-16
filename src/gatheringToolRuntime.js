@@ -1,20 +1,17 @@
 /**
- * The virtually-present componentIds that apply to one crafting-system scope.
- * A virtual-present tool is keyed by BOTH `componentId` and the active tool's `systemId`, and
- * `componentId` is a PER-SYSTEM id — so a present tool from system A must NOT satisfy a system-B
- * task sharing the componentId string. This returns the present ids only on a systemId match, and
- * an empty set otherwise, leaving the tool inert. A legacy bare `string[]` carries no scope and is
- * likewise ignored.
+ * The virtually-present componentIds that apply to one crafting-system scope. `componentId` is a
+ * PER-SYSTEM id, so a present tool from system A must NOT satisfy a system-B task sharing the
+ * string: present ids are returned only on a `systemId` match, and a legacy bare `string[]`, which
+ * carries no scope, is ignored.
  */
 export function resolvePresentComponentIds({ presentTools, systemId } = {}) {
   return resolvePresentIds({ presentTools, systemId, key: 'componentIds' });
 }
 
 /**
- * The `toolId` twin of `resolvePresentComponentIds` (issue 1119). Virtual presence was keyed only
- * by `componentId`, which an item-sourced Tool does not have — and since `upsertTool` force-nulls
- * `componentId` for any item source, that was every Tool station a GM could build. The same
- * per-system scope guard applies, because a library tool id is unique per system only.
+ * The `toolId` twin of `resolvePresentComponentIds` (issue 1119): virtual presence was keyed on
+ * `componentId`, which `upsertTool` force-nulls for any item source — every Tool station a GM could
+ * build. The same per-system scope guard applies, a library tool id being unique per system only.
  */
 export function resolvePresentToolIds({ presentTools, systemId } = {}) {
   return resolvePresentIds({ presentTools, systemId, key: 'toolIds' });
@@ -86,11 +83,10 @@ export function createGatheringToolAvailability({ craftingSystemManager, evaluat
 }
 
 /**
- * Resolve required tools to owned `{ tool, item }` pairs against an actor.
- * A required tool named by the active canvas Tool's `presentTools` matches as VIRTUALLY present
- * with no owned item, as `{ tool, item: null, virtual: true }`: it satisfies availability but is
- * excluded from breakage and usage, since there is no item to mutate. An owned, non-broken item
- * still takes precedence. `resolvePresentComponentIds` enforces the per-system scope.
+ * Resolve required tools to owned `{ tool, item }` pairs against an actor. One named by the active
+ * canvas Tool's `presentTools` matches as `{ tool, item: null, virtual: true }`: it satisfies
+ * availability but is excluded from breakage and usage, there being no item to mutate. An owned,
+ * non-broken item still takes precedence, and the per-system scope guard applies.
  */
 export function matchGatheringTools({ actor, system, task, tools = [], craftingSystemManager, presentTools = null } = {}) {
   const matchedItems = [];
@@ -106,10 +102,9 @@ export function matchGatheringTools({ actor, system, task, tools = [], craftingS
   for (const tool of tools) {
     // Attempt validation: a broken tool counts as unavailable (missing).
     const available = items.filter(candidate => !isToolBroken(candidate));
-    // Durable-identity selection (issue 557): PREFER an owned item matching the tool by durable
-    // identity — the only kind that may be consumed or destroyed — and fall back to a presence-only
-    // match tagged `breakable: false`, which the shared breakage runtime spares. That runtime is
-    // matcher-agnostic, so this selection layer is its single identity source.
+    // Durable-identity selection (issue 557): PREFER an owned item matching by durable identity, the
+    // only kind that may be consumed or destroyed, falling back to a presence-only match tagged
+    // `breakable: false`. The shared runtime is matcher-agnostic, so this layer is its only source.
     const identityItem = available.find(candidate => identityMatcher(syntheticRecipe, tool, candidate)) || null;
     const item = identityItem || available.find(candidate => matcher(syntheticRecipe, tool, candidate)) || null;
     if (item) {
@@ -126,13 +121,12 @@ export function matchGatheringTools({ actor, system, task, tools = [], craftingS
 }
 
 /**
- * Classify each required tool's per-actor state for display as `present`, `damaged` ("Broken") or
- * `missing`, through the SAME matcher as `matchGatheringTools` so the UI cannot disagree with
- * attempt validation; the only difference is that a broken match becomes `damaged` not `missing`.
- * WORKING-ITEM PRECEDENCE: `damaged` is reached only when nothing working matched, and has two
- * sources — every matched item for the tool's own component carrying `flags.fabricate.toolBroken`,
- * or a `replaceWith` tool whose discriminated replacement target the actor holds. That second
- * recognition is DISPLAY-ONLY and changes no attempt validation. Tolerant of a null actor.
+ * Classify each required tool's per-actor state as `present`, `damaged` ("Broken") or `missing`,
+ * through the SAME matcher as `matchGatheringTools` so the UI cannot disagree with attempt
+ * validation, the only difference being that a broken match becomes `damaged`.
+ * WORKING-ITEM PRECEDENCE: `damaged` is reached only when nothing working matched, from either every
+ * matched item carrying `flags.fabricate.toolBroken` or a held `replaceWith` replacement target —
+ * the second recognition being DISPLAY-ONLY. Tolerant of a null actor.
  */
 export function classifyGatheringToolStates({ actor, system, task, tools = [], craftingSystemManager, presentTools = null } = {}) {
   const syntheticRecipe = syntheticToolRecipe({ system, task });
@@ -153,8 +147,7 @@ export function classifyGatheringToolStates({ actor, system, task, tools = [], c
     }
 
     // A held `replaceWith` broken variant is a separate managed component carrying no toolBroken
-    // flag, so it never matches the tool's own component above. Probe for it only when nothing
-    // working matched, and surface it as `damaged` — display-only.
+    // flag, so probe for it only when nothing working matched and surface it as display-only.
     if (state === 'missing' && tool?.onBreak?.mode === 'replaceWith') {
       const target = tool.onBreak.replacementTarget || (
         typeof tool.onBreak.replacementComponentId === 'string'
@@ -193,10 +186,7 @@ function syntheticToolRecipe({ system, task }) {
   };
 }
 
-/**
- * Resolve the tool/item matcher, preferring the manager's own `toolMatchesItem` and falling back to
- * its `recipeManager`. Answers a bound function, or a never-match fallback.
- */
+/** The tool/item matcher: the manager's `toolMatchesItem`, then its `recipeManager`, then never-match. */
 function resolveToolMatcher(craftingSystemManager) {
   if (typeof craftingSystemManager?.toolMatchesItem === 'function') {
     return (recipe, tool, candidate) => craftingSystemManager.toolMatchesItem(recipe, tool, candidate);
@@ -210,10 +200,9 @@ function resolveToolMatcher(craftingSystemManager) {
 
 /**
  * The durable-identity matcher deciding which owned item may be CONSUMED or DESTROYED (issue 557),
- * mirroring `resolveToolMatcher` but binding `toolMatchesItemByIdentity`.
- * FAIL-SAFE BY DESIGN: with no identity matcher resolvable this answers `() => false`, so every
- * candidate is SPARED. The shared breakage runtime carries no component set of its own, so a
- * missing matcher here is its only signal and the safe direction is to spare.
+ * mirroring `resolveToolMatcher` but binding `toolMatchesItemByIdentity`. FAIL-SAFE BY DESIGN: with
+ * none resolvable it answers `() => false` and every candidate is SPARED, this being the shared
+ * runtime's only signal.
  */
 function resolveToolIdentityMatcher(craftingSystemManager) {
   if (typeof craftingSystemManager?.toolMatchesItemByIdentity === 'function') {

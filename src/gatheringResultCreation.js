@@ -1,16 +1,14 @@
 /**
- * The gathering award seam, split out of `main.js` so it is runtime-importable under `node --test`.
- * It turns a task's authored result rows into owned Items: resolve each to its award source, then
- * stack onto an owned quantity item or create a new document.
+ * The gathering award seam, split out of `main.js` so it is runtime-importable under `node --test`:
+ * it resolves a task's authored result rows to award sources, then stacks or creates owned Items.
  * THE DURABLE-IDENTITY STACK GUARD IS THE LOAD-BEARING PART (issue 556) — a fresh award is handed
- * the awarding system's resolved component set and id, so it is never folded into an owned item
- * that resolves to a DIFFERENT component through a transitive `_stats.duplicateSource`.
+ * the awarding system's component set and id, so it is never folded into an owned item resolving to
+ * a DIFFERENT component through a transitive `_stats.duplicateSource`.
  */
 
 import { stampItemDataRoleIdentity } from './config/flags.js';
-// Routed onto the configured stack-quantity path (issue 1024) but deliberately NOT consolidated
-// onto `createOrStackComponentItem`: the absent-field default and this path's own stack-match
-// resolution both differ, so merging them is its own change.
+// Routed onto the configured stack-quantity path (issue 1024) but deliberately NOT consolidated onto
+// `createOrStackComponentItem`: the absent-field default and the stack-match resolution both differ.
 import {
   hasStackQuantity,
   setStackQuantity,
@@ -23,9 +21,8 @@ export function flattenGatheringResults(resultGroups = []) {
   return resultGroups.flatMap((group) => (Array.isArray(group?.results) ? group.results : []));
 }
 
-// Resolve the awarding system's component set exactly as `resolveGatheringResultSource` does. The
-// stack guard must be handed this set and `system.id`, or a fresh award can be folded into an owned
-// item resolving to a different component (issue 556).
+// The awarding system's component set, exactly as `resolveGatheringResultSource` resolves it: the
+// stack guard must be handed this and `system.id`, or a fresh award can fold wrongly (issue 556).
 export function resolveGatheringSystemComponents(system, craftingSystemManager) {
   const own = resolvedComponentsFor(system);
   if (own.length > 0) return own;
@@ -33,11 +30,10 @@ export function resolveGatheringSystemComponents(system, craftingSystemManager) 
 }
 
 /**
- * Resolve a result row to the thing that will be awarded, as `{ source, componentId }`.
- * `componentId` is non-null ONLY when the award resolved through a MANAGED COMPONENT, because the
- * identity stamp (issue 780) keys off that fact and not off what the row authored — a row may carry
- * an `itemUuid` AND a `componentId`. An `itemUuid` that fails to resolve falls back to the component
- * lookup, matching the `registeredItemUuid` branch, which otherwise silently dropped the award.
+ * Resolve a result row to what will be awarded, as `{ source, componentId }`. `componentId` is
+ * non-null ONLY when the award resolved through a MANAGED COMPONENT — the identity stamp (issue 780)
+ * keys off that fact, not off what the row authored, a row being able to carry both. An unresolvable
+ * `itemUuid` falls back to the component lookup, which otherwise silently dropped the award.
  */
 export function resolveGatheringResultAward(result, system, craftingSystemManager) {
   if (result?.itemUuid) {
@@ -82,8 +78,8 @@ function stringOrNull(value) {
 }
 
 /**
- * Resolve every row up front so an unresolvable one is caught BEFORE anything is created.
- * Answers `{ awards, unresolved }`, the latter describing rows with no award source.
+ * Resolve every row up front so an unresolvable one is caught BEFORE anything is created, answering
+ * `{ awards, unresolved }`.
  */
 function resolveAllResults(resultGroups, system, craftingSystemManager) {
   const awards = [];
@@ -119,8 +115,8 @@ export function normalizeFoundryCollection(collection) {
 
 /**
  * `componentId` is carried so a ref built BEFORE creation still has an identity: a planned award
- * resolving to a bare component has no `uuid` yet, and a uuid-only identity made downstream discard
- * every such award, emptying the chat card and run journal for a gather that did award items.
+ * resolving to a bare component has no `uuid` yet, and a uuid-only identity emptied the chat card
+ * and run journal for a gather that did award items.
  */
 export function gatheringRunItemRef(actor, item, quantity = null, componentId = null) {
   const ref = {
@@ -141,9 +137,8 @@ export function gatheringRunItemRef(actor, item, quantity = null, componentId = 
 
 export function createGatheringResultCreator(craftingSystemManager) {
   return {
-    // Unresolved rows are DIAGNOSTICS, not a quietly shortened list. The engine turns them into a
-    // blocked, misconfigured start BEFORE the node and stamina are committed, so a broken drop
-    // reference costs the player nothing and can be retried once the GM fixes it.
+    // Unresolved rows are DIAGNOSTICS, never a quietly shortened list: the engine turns them into a
+    // blocked start BEFORE the node and stamina are committed, so a broken row costs nothing.
     async plan({ actor, system, resultGroups = [] } = {}) {
       const { awards, unresolved } = resolveAllResults(resultGroups, system, craftingSystemManager);
       if (unresolved.length > 0) {
@@ -199,11 +194,9 @@ export function createGatheringResultCreator(craftingSystemManager) {
           globalThis.foundry?.utils?.setProperty?.(itemData, 'flags.core.sourceId', source.uuid);
         }
 
-        // Stamp the awarded component's durable per-system identity (issue 780) on the CREATED
-        // item. NEVER `source.id` — in the `registeredItemUuid` case that is a Foundry Item id.
-        // The gate is the RESOLVER's `componentId`, never a raw `result.componentId`: a row may
-        // carry both an `itemUuid` and a `componentId`, so only "the award resolved AS that
-        // component" may stamp. The stack branch never touches `itemData`, so this is create-only.
+        // Stamp the awarded component's durable per-system identity (issue 780) on the CREATED item.
+        // NEVER `source.id`, a Foundry Item id in the `registeredItemUuid` case, and the gate is the
+        // RESOLVER's `componentId` rather than a raw `result.componentId`. Create-only.
         if (componentId) {
           stampItemDataRoleIdentity(itemData, system?.id, 'componentId', componentId);
         }

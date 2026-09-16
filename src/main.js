@@ -212,11 +212,8 @@ import { readPooledHoldings as readPooledHoldingsAcrossActors } from './systems/
 import { consumePooledHoldings as consumePooledHoldingsFromActors } from './systems/companionPooledConsumption.js';
 
 /**
- * `rollActorCheck`'s OWN refusal strings for the shared authorization preamble, hoisted to module
- * scope so the delegator reads on one line rather than restating a four-line object literal — the
- * same duplicated run between this file and its harness mirror the shipped two members carry.
- * There is deliberately NO second pair for `resolveBulkCheckDecision`: that member takes no
- * `actorId` and never reaches the preamble, so a pair for it would be dead.
+ * `rollActorCheck`'s OWN refusal strings for the shared authorization preamble. There is deliberately
+ * NO pair for `resolveBulkCheckDecision`: it takes no `actorId` and never reaches the preamble.
  */
 const ROLL_ACTOR_CHECK_GATE_KEYS = Object.freeze({
   gmOnlyKey: CHECK_ROLL_MESSAGE_KEYS[COMPANION_OUTCOMES.gmOnly],
@@ -224,9 +221,8 @@ const ROLL_ACTOR_CHECK_GATE_KEYS = Object.freeze({
 });
 
 /**
- * `awardComponents`' and `creditCurrency`'s OWN refusal strings, hoisted for the same reason (issue
- * 1301). TWO PAIRS AND NOT ONE: the point of parameterising the preamble is that a refused award
- * reports itself in the award's words and a refused credit in the credit's.
+ * `awardComponents`' and `creditCurrency`'s OWN refusal strings (issue 1301). TWO PAIRS AND NOT ONE:
+ * a refused award reports itself in the award's words and a refused credit in the credit's.
  */
 const AWARD_COMPONENTS_GATE_KEYS = Object.freeze({
   gmOnlyKey: COMPONENT_AWARD_MESSAGE_KEYS[COMPANION_OUTCOMES.gmOnly],
@@ -239,11 +235,8 @@ const CREDIT_CURRENCY_GATE_KEYS = Object.freeze({
 });
 
 /**
- * The two pooled members carry NO hoisted refusal-string trio, and that absence is deliberate (issue
- * 1342). Every member above hands its preamble its own keys because the SINGULAR preamble's
- * `message` is read verbatim; the SET-valued preamble's is not. Both pooled delegators branch on
- * `gate.outcome` alone and answer through their own result builder, so a key threaded through the
- * gate could only restate the string the builder is about to derive.
+ * The two pooled members carry NO hoisted refusal-string trio (issue 1342): the SET-valued preamble's
+ * `message` is not read verbatim, so both branch on `gate.outcome` and build their own result.
  */
 import {
   affordsCurrencySpends,
@@ -610,11 +603,9 @@ function createJournalCommandsForFabricate(fabricate) {
       getCraftingRunManager: () => fabricate.craftingRunManager,
       getGatheringRunManager: () => fabricate.gatheringRunManager,
     }),
-    // A refusal that has LIFTED invalidates every surface that captured it. The Journal reads
-    // availability when it builds its listing, so a `claim-held` captured while a command ran
-    // would otherwise keep refusing every run until something unrelated rebuilt the view
-    // (issue 1648, M25). Broadcast the lift, never the refusal: a refusal is true while it
-    // holds, and announcing it would only repaint the Journal mid-command.
+    // A refusal that has LIFTED invalidates every surface that captured it, the Journal having read
+    // availability when it built its listing (issue 1648, M25). Broadcast the LIFT, never the
+    // refusal: a refusal is true while it holds, and announcing it repaints mid-command.
     onAvailabilityRestored: () => Hooks.callAll('fabricate.journalRunAuthorityRestored'),
   });
   let service = null;
@@ -650,23 +641,18 @@ function createJournalCommandsForFabricate(fabricate) {
   return service;
 }
 
-// The GM notice for each way a startup migration pass can DEFER (issue 1242): a corpus
-// could not be read, or could not be written. One complete localized sentence per reason,
-// selected by a positive lookup, because the two differ in what the GM must do — only the
-// writeback failure instructs a reload, since only that path leaves this session holding a
-// transformed copy of data that was never saved.
+// The GM notice for each way a startup migration pass can DEFER (issue 1242). One complete localized
+// sentence per reason, because the two differ in what the GM must do: only the writeback failure
+// instructs a reload, that path alone leaving this session holding unsaved transformed data.
 const MIGRATION_DEFERRAL_NOTICES = Object.freeze({
   [MIGRATION_DEFERRAL_REASONS.CORPUS_READ_FAILED]: 'FABRICATE.Migration.Deferred.CorpusUnreadable',
   [MIGRATION_DEFERRAL_REASONS.WRITEBACK_FAILED]: 'FABRICATE.Migration.Deferred.WritebackFailed'
 });
 
-// The GM-only crafting system manager app is deferred to a lazy chunk so non-GM players never
-// download its subtree at module init; the dynamic import runs the registration side effect once.
+// The GM-only manager app is deferred to a lazy chunk so non-GM players never download its subtree.
 // THE MEMOIZATION LIVES IN `src/utils/memoizedModuleLoad.js` (issue 1565), where a unit test can
-// execute it. It clears the memo when an attempt REJECTS, so the session does not retain a dead
-// promise — NOT a retry capability: the host records a failed module fetch in the realm's own
-// module map, so a later import() resolves to the recorded failure. Only a reload recovers.
-/** Lazily load and register the GM crafting system manager app class. */
+// execute it; it clears on REJECTION so no dead promise is retained, which is not a retry capability
+// — the host records a failed fetch, so only a reload recovers.
 const loadCraftingSystemManagerAppClass = createMemoizedLoad(() =>
   import('./ui/SvelteCraftingSystemManagerApp.svelte.js').then(() =>
     getCraftingSystemManagerAppClass()
@@ -678,37 +664,26 @@ const showCraftingSystemManagerApp = () =>
   loadCraftingSystemManagerAppClass().then((AppClass) => AppClass.show());
 
 /**
- * Report a failed deferred load of the manager subtree to the user (issue 1565). NOT GM-GATED: the
- * Items Directory button sits behind an `isGM` check but `openRecipeManager` does not, so a player
- * invoking it from a macro must not get a silent failure.
- * THE INJECTED FUNCTIONS ARE CLOSURES OVER `ui.notifications`, NOT BARE MEMBER VALUES, and that is
- * load-bearing: both members touch `Notifications`' private fields, so `notify:
- * ui.notifications.error` throws a TypeError at call time, on the failure branch of a path only a
- * stale client reaches — reproducing the exact dead-button defect this change exists to remove.
+ * Report a failed deferred load of the manager subtree (issue 1565). NOT GM-GATED, `openRecipeManager`
+ * being macro-reachable. THE INJECTED FUNCTIONS ARE CLOSURES OVER `ui.notifications`, NOT BARE
+ * MEMBER VALUES: both touch private fields, so a bare one throws on the failure branch alone.
  */
 const reportManagerLoadFailure = createDeferredChunkFailureReporter({
   notify: (message, options) => ui.notifications?.error?.(message, options),
   hasNotice: (notice) => ui.notifications?.has?.(notice),
-  // `console.error`, pinned by `tests/release-build.test.js` matching THIS CALL in the built bundle
-  // — a spy in a unit test passes at any level, so only the artefact can hold that line. NOT pinned
-  // by the literal reaching the bundle: Rolldown may drop a declared-pure call only when its RETURN
-  // VALUE IS UNUSED, and this concise arrow returns it. The stale-entry write below does strip.
+  // `console.error`, pinned by `tests/release-build.test.js` against the BUILT BUNDLE: a spy passes
+  // at any level. Rolldown drops a declared-pure call only when its RETURN VALUE IS UNUSED, and this
+  // concise arrow returns it; the stale-entry write below does strip.
   log: (error) => console.error(DEFERRED_CHUNK_LOAD_CONSOLE_MESSAGE, error),
   localize: (key, data) => (data ? game.i18n?.format?.(key, data) : game.i18n?.localize?.(key))
 });
 
 /**
- * Tell this client, once per session, that it is running a stale entry script (issue 1565).
- * THE DIRECT DETECTION, as opposed to reacting to a rejected import: Foundry renders the `esmodules`
- * entry with no cache-busting parameter, while the version a client REPORTS comes from
- * server-injected package data read from `module.json` on disk — which is what lets `game.modules`
- * say 1.9.4 while the running JavaScript is 1.9.3.
- * EVERY READ OF `__FABRICATE_BUILD_VERSION__` IS INSIDE THE `typeof` GUARD BELOW, and there is no
- * module-scope read anywhere. `vite.config.js` declares the define under `build` ONLY, so the
- * identifier is genuinely UNDECLARED in every non-build run — the dev server, each mounted suite's
- * harness, the screenshot lab and `node --test` alike — where a bare read is a `ReferenceError`
- * during module evaluation. ESLint cannot catch it, the identifier being declared a readonly global.
- * The comparison, and the silence unless BOTH sides are known and differ, is `buildStaleEntryNotice`'s.
+ * Tell this client, once per session, that it is running a stale entry script (issue 1565). THE
+ * DIRECT DETECTION: the `esmodules` entry has no cache-busting parameter while the reported version
+ * comes from `module.json` on disk. EVERY READ OF `__FABRICATE_BUILD_VERSION__` IS INSIDE THE
+ * `typeof` GUARD BELOW — `vite.config.js` declares it under `build` ONLY, so a bare read is a
+ * `ReferenceError` everywhere else and ESLint cannot catch it.
  */
 function reportStaleEntryScript() {
   const buildVersion =
@@ -718,12 +693,10 @@ function reportStaleEntryScript() {
     data ? game.i18n?.format?.(key, data) : game.i18n?.localize?.(key)
   );
   if (!message) return;
-  // `warn`, not `error`: a baked-versus-installed divergence in the smoke's install path must not
-  // redden the smoke through core's own console mirror. `{ console: false }` because core mirrors
-  // every notification from inside its queue drain, and that mirror cannot carry the detail INSTEAD
-  // — it is deferred behind the five-notice cap and lost outright if `clear()` or an unload beats
-  // it. At `console.warn` because this write is an expression STATEMENT, so the declared
-  // `log`/`info`/`debug` purity would let Rolldown delete it. `release-build.test.js` asserts both.
+  // `warn`, not `error`, so a baked-versus-installed divergence cannot redden the smoke through
+  // core's console mirror. `{ console: false }` because that mirror is deferred behind the
+  // five-notice cap and lost to a `clear()`. `console.warn` because the declared `log`/`info`/`debug`
+  // purity would let Rolldown delete this expression STATEMENT. `release-build.test.js` asserts both.
   console.warn(STALE_ENTRY_SCRIPT_CONSOLE_MESSAGE, { buildVersion, installedVersion });
   ui.notifications?.warn?.(message, { console: false });
 }
@@ -745,9 +718,8 @@ const getGatheringSelectableActors = createGatheringSelectableActorsGetter({
 });
 
 /**
- * The selection predicate for the actor-selection top bar, combining the ownership rule gathering
- * attempt authorization reuses with the player-character concept. This NARROWS the bar's list
- * without modifying attempt authorization.
+ * The actor-selection top bar's predicate: attempt authorization's ownership rule plus the
+ * player-character concept. It NARROWS the bar, never attempt authorization.
  */
 function isSelectableBarActor({ actor, viewer } = {}) {
   return isGatheringActorSelectableByUser(actor, viewer) && isPlayerCharacterActor(actor);
@@ -760,14 +732,9 @@ const getBarSelectableActors = createGatheringSelectableActorsGetter({
 });
 
 /**
- * Push the configured item stack-quantity path into the accessor, then optionally probe it against
- * the world's items and warn the GM when it looks wrong (issue 1024).
- * ORDER IS LOAD-BEARING: the re-configure happens BEFORE the probe, or a GM editing the path
- * mid-session gets counts for the NEW path while every engine read and write continues on the OLD
- * one until reload — an advisory asserting a state that is not live.
- * The re-configure is UNGATED, the engine path having to be live on every client, while the
- * notification is GM-only: a permanent toast is actionable for the GM who just saved it and pure
- * noise for a player who cannot change it.
+ * Push the configured item stack-quantity path into the accessor, then optionally probe it and warn
+ * the GM (issue 1024). ORDER IS LOAD-BEARING: re-configure BEFORE the probe. The re-configure is
+ * UNGATED, the engine path having to be live everywhere, while the notification is GM-only.
  */
 function applyItemStackQuantityPathSetting({ notify = false } = {}) {
   let stored = null;
@@ -780,12 +747,9 @@ function applyItemStackQuantityPathSetting({ notify = false } = {}) {
   const path = configureItemStackQuantityPath(stored);
   if (!notify || game.user?.isGM !== true) return path;
 
-  // `game.items` ONLY: a bounded, synchronous, read-only scan that resolves nothing and rewrites
-  // nothing. THAT SCOPE IS A REAL LIMIT — a world whose items all live in compendia and on actor
-  // sheets yields verdict `'no-items'` and no warning at all, while every consume on those items
-  // destroys stacks, so `'no-items'` is SILENCE and never a clean bill of health. Widening the scan
-  // would make startup walk the whole world. The suggested correction is the ACTIVE SYSTEM's preset,
-  // not the built-in default, which on tormenta20 would name the wrong field.
+  // `game.items` ONLY, a bounded read-only scan, and THAT SCOPE IS A REAL LIMIT: a world whose items
+  // all live in compendia and on sheets yields `'no-items'`, which is SILENCE and never a clean bill
+  // of health. The suggested correction is the ACTIVE SYSTEM's preset, not the built-in default.
   const report = probeStackQuantityPath(game.items ?? [], {
     path,
     defaultPath: stackQuantityPathPresetFor(game.system?.id),
@@ -799,11 +763,8 @@ function applyItemStackQuantityPathSetting({ notify = false } = {}) {
 }
 
 /**
- * The GM-facing advisory for a stack-quantity probe result, or `null` when healthy. THE DECISION
- * belongs to `stackQuantityAdvisory` in the accessor module, where it is pure and testable against a
- * report; this wrapper is the i18n edge, because that module never touches `game`.
- * The chosen string names the CONSEQUENCE in plain language: a GM reading "0 of 412" has no reason
- * to connect it to inventory destruction.
+ * The GM-facing advisory for a stack-quantity probe result, or `null` when healthy: THE DECISION is
+ * `stackQuantityAdvisory`'s and this is the i18n edge. The string names the CONSEQUENCE plainly.
  */
 function describeStackQuantityProbe(report) {
   const advisory = stackQuantityAdvisory(report);
@@ -821,11 +782,9 @@ function isCurrentWorldPaused() {
 }
 
 /**
- * The ACTIVE-GM edge for a relayed BLIND gathering start (issue 901).
- * THE GM RE-RUNS THE WHOLE ATTEMPT WITH THE REQUESTING USER AS THE VIEWER rather than itself, so
- * every gate the player would have faced is re-evaluated GM-side against the player who asked and
- * `_isOpaqueBlindTask` stays TRUE — running it as the GM's own viewer would write the real task id
- * onto the flag. The `senderId` is Foundry's server-attested socket sender, never a payload field.
+ * The ACTIVE-GM edge for a relayed BLIND gathering start (issue 901). THE GM RE-RUNS THE WHOLE
+ * ATTEMPT WITH THE REQUESTING USER AS THE VIEWER, so every gate is re-evaluated against the player
+ * who asked and `_isOpaqueBlindTask` stays TRUE. `senderId` is the attested socket sender.
  */
 async function applyGatheringBlindStart({ senderId, environmentId, actorUuid, taskId = null, interactableRef = null } = {}) {
   const requester = game.users?.get?.(senderId) ?? null;
@@ -853,20 +812,14 @@ function resolveComplicationActor(actorUuid) {
   try { return resolve(String(actorUuid)) ?? null; } catch (_) { return null; }
 }
 
-/**
- * The components the ADDRESSED crafting system holds on THIS client — the corpus the GM-side re-read
- * resolves against (issue 1286). Split out so `applyComplicationDelivery` reads as
- * authorize-then-apply, the addressing-only contract itself being enforced by the pure
- * `findAuthoredComplication`.
- */
+/** The corpus the GM-side re-read resolves against (issue 1286): THIS client's own components. */
 function complicationComponentsFor(craftingSystemId) {
   return fabricate.craftingSystemManager?.getComponentsForSystem?.(craftingSystemId) ?? [];
 }
 
 /**
- * The token and speaker the GM side resolves for an addressed actor, NEVER read from the payload —
- * a payload carries no speaker, so a forged one cannot make the GM's card speak as anything.
- * Guarded because a `getSpeaker` that threw would reject out of the writer's fire-and-forget apply.
+ * The token and speaker the GM side resolves for an addressed actor, NEVER read from the payload.
+ * Guarded: a throwing `getSpeaker` would reject out of the fire-and-forget apply.
  */
 function resolveComplicationSpeaker(actor) {
   try {
@@ -879,15 +832,9 @@ function resolveComplicationSpeaker(actor) {
 }
 
 /**
- * Run one complication's authored macro on this elected-GM client and REPORT what happened. Never
- * throws: one bad complication must not cost a resolution its others.
- * THE `type === 'script'` GATE IS A CALL-SITE CHECK AND THIS IS THE CALL SITE, here rather than on
- * the acting client because compendium ownership is GM-configurable per role, so a player's
- * `fromUuid` can miss a macro the GM resolves fine. The uuid is resolved here AND again inside
- * `MacroExecutor.run`, because only settling "is this a script macro at all" before the try can tell
- * a broken link from a macro that blew up.
- * THE RETURN IS A REPORT, not the macro's own return value: nothing in Fabricate may read a macro's
- * return, and the miss has to be reportable on the GM-facing output, which a `console.warn` is not.
+ * Run one complication's authored macro on this elected-GM client and REPORT what happened, never
+ * throwing; `recipes-and-steps/spec.md` § Complication Macros owns the `script` call-site gate, the
+ * double uuid resolve and why the return is a REPORT rather than the macro's own value.
  */
 async function runComplicationMacro({ craftingSystemId, component, complication, entry, actor, token, speaker, senderUser, resolutionId }) {
   const macroUuid = complication.macroUuid;
@@ -916,9 +863,8 @@ async function runComplicationMacro({ craftingSystemId, component, complication,
 }
 
 /**
- * Everything the elected GM DOES for one re-read complication: roll a `gmOnly` effect roll, then run
- * the macro. Both are effects of the same authored complication and independent, so each carries its
- * own guard. The effect roll goes first only because the card reports it; the macro is unordered.
+ * Everything the elected GM DOES for one re-read complication: a `gmOnly` effect roll, then the
+ * macro. Independent, so each carries its own guard, and the macro is unordered.
  */
 async function runComplicationDelivery({ craftingSystemId, component, complication, entry, actor, token, speaker, senderUser, resolutionId }) {
   const effect = await rollGmComplicationEffect({ complication, actor, speaker });
@@ -929,28 +875,18 @@ async function runComplicationDelivery({ craftingSystemId, component, complicati
 }
 
 /**
- * Whether the ADDRESSED crafting system narrates to chat at all (issue 1286). `features.chatOutput`
- * is a per-system GM toggle every other Fabricate chat poster consults, and the GM complication card
- * is unambiguously chat.
- * NEITHER THE MACRO NOR THE EFFECT ROLL IS GATED BY THIS, and the rule is card-vs-dice-message
- * rather than chat-vs-not-chat: the toggle has only ever gated the cards Fabricate composes about
- * its own resolutions and has never gated a die. `evaluateCheckRoll` posts on `options.interactive`
- * alone, so a `chatOutput: false` system already puts check rolls in chat with no card. The
- * argument is NOT that roll and posting are one call — `evaluateSideRoll` takes a `post` option.
- * THE TOGGLE IS NARROWER THAN "the card is chat": it suppresses result NARRATION, never the news
- * that a configuration is broken, so this predicate does not veto the card — it chooses which ROWS
- * the card is built from. Read from THIS client's own copy, and defaulted CLOSED for a system that
- * does not resolve.
+ * Whether the ADDRESSED crafting system narrates to chat at all (issue 1286). NEITHER THE MACRO NOR
+ * THE EFFECT ROLL IS GATED BY THIS, and it SELECTS ROWS rather than vetoing the card —
+ * `recipes-and-steps/spec.md` § Complication Macros owns both rules. Read from THIS client's copy,
+ * defaulted CLOSED.
  */
 function complicationChatOutputEnabled(craftingSystemId) {
   return fabricate.craftingSystemManager?.getSystem?.(craftingSystemId)?.features?.chatOutput === true;
 }
 
 /**
- * Whether one delivered row's macro reports a CONFIGURATION FAULT rather than an outcome.
- * `skipped` is a `macroUuid` that did not resolve to a script macro; `failed` is a script macro
- * whose body threw. Both are the GM's OWN authorship to repair and both are invisible everywhere
- * else. `none` and `ran` are outcomes rather than faults and report nothing on their own.
+ * Whether one delivered row's macro reports a CONFIGURATION FAULT rather than an outcome: `skipped`
+ * is an unresolvable `macroUuid` and `failed` a body that threw; `none` and `ran` are outcomes.
  */
 function hasComplicationMacroFault(row) {
   const status = row?.report?.macro?.status;
@@ -959,40 +895,23 @@ function hasComplicationMacroFault(row) {
 
 /**
  * The GM-only chat card for one delivered resolution — the OUTPUT half of a `gmOnly` complication
- * (issue 1286). `gmOnly` is the AUTHORED DEFAULT, so without it such a complication with no macro
- * fires, pays the whole socket cost and produces nothing observable.
- * EVERY DELIVERED COMPLICATION GETS A ROW, not only the `gmOnly` ones: a delivery only reaches this
- * client for one that is `gmOnly` OR carries a macro, so the rows are exactly those that asked this
- * GM to run something, and their outcome has to be reported against a complication the card names.
- * `features.chatOutput` SELECTS THE ROWS AND DOES NOT VETO THE CARD. It suppresses per-resolution
- * NARRATION, not the news that a macro link is broken, and `recipes-and-steps/spec.md` § "The
- * `script` gate is a call-site check" requires an unresolvable uuid to be reported on the GM-facing
- * output — which this card is the only instance of. So the gate chooses the SET: every delivered
- * row when the system narrates, the faulted rows ALONE when it does not. A surviving row is NOT
- * re-projected for that case, and the residual is stated rather than hidden.
- * FOUR STEPS, IN AN ORDER THAT IS LOAD-BEARING: the `chatOutput` gate first and over the ROW SET,
- * taken from `applied` itself so a gated-off system with nothing faulted returns before any
- * projection; SPEAKER before the visibility pass, which `applyBulkChatVisibility` states as a
- * caller contract; VISIBILITY before `create`, through an EXPLICIT `gmroll` and never the
- * client-scoped `core.rollMode`; and `create` INSIDE the same guard, so a token the running Foundry
- * cannot map throws BEFORE the message exists — a GM-only card that could not be made GM-only must
- * not be posted at all.
- * The row MODEL is `gmComplicationCardEntries`, so a suite can drive it with rows that disagree.
+ * (issue 1286); `recipes-and-steps/spec.md` § Complication Macros owns the row set and the
+ * `chatOutput` rule. FOUR STEPS, IN AN ORDER THAT IS LOAD-BEARING: the `chatOutput` gate first and
+ * over the ROW SET, so a gated-off system with nothing faulted returns before any projection;
+ * SPEAKER before the visibility pass, which `applyBulkChatVisibility` states as a caller contract;
+ * VISIBILITY before `create`, through an EXPLICIT `gmroll`; and `create` INSIDE the same guard, so
+ * a card that could not be made GM-only is never posted.
  */
 async function postGmComplicationCard({ craftingSystemId, actor, speaker, senderUser, applied = [] }) {
   try {
-    // The toggle SELECTS rows; it does not veto the card. A configuration error is reported
-    // whatever it says, narration is not. The filter runs over `applied` rather than the projected
-    // entries, so the suppressed case — gate off, nothing faulted — returns before any projection
-    // or localization, which is what made an early gate worth having.
+    // Over `applied` rather than the projected entries, so the suppressed case returns early.
     const delivered = Array.isArray(applied) ? applied : [];
     const reported = complicationChatOutputEnabled(craftingSystemId)
       ? delivered
       : delivered.filter((row) => hasComplicationMacroFault(row));
     if (reported.length === 0) return null;
-    // `gmComplicationCardEntries` — the GM-facing projection, deliberately the only one that may
-    // carry an authored description or a severity to a GM surface — augmented with what THIS client
-    // did, which is the half no projection of the acting client's report could hold.
+    // `gmComplicationCardEntries` — the only projection that may carry an authored description or a
+    // severity to a GM surface — augmented with what THIS client did. A suite can drive it directly.
     const entries = gmComplicationCardEntries(reported);
     const content = buildGmComplicationCardContent(
       { entries, actorName: actor?.name ?? '', reporterName: senderUser?.name ?? '' },
@@ -1010,34 +929,25 @@ async function postGmComplicationCard({ craftingSystemId, actor, speaker, sender
 }
 
 /**
- * The ELECTED-GM edge for a relayed complication delivery (issue 1286). It runs strictly downstream
- * of an award the acting client has already committed, so it never influences one and never reports
- * back. What it adds is AUTHORITY — the macro runs on a GM client and both it and the GM-only card
- * come from the complication the GM's OWN world setting holds.
- * THE `senderId` IS FOUNDRY'S SERVER-ATTESTED SOCKET SENDER, never a payload field, and the actor is
- * re-authorized against THAT user rather than this client's ambient permissions. Each complication
- * is isolated: one that resolves to nothing is dropped and the rest still run.
- * The Foundry EDGE only; the re-read, the `script` discriminant and the isolation are pure and live
- * in `complicationSocket.js`, a source-text pin here being unable to see a positional fallback.
+ * The ELECTED-GM edge for a relayed complication delivery (issue 1286); `recipes-and-steps/spec.md`
+ * § Complication Macros owns the re-read, the attested `senderId` and the per-complication
+ * isolation. The Foundry EDGE only — the pure half lives in `complicationSocket.js`.
  */
 async function applyComplicationDelivery({ senderId, craftingSystemId, actorUuid, resolutionId, complications = [] } = {}) {
   const senderUser = game.users?.get?.(senderId) ?? null;
   if (!senderUser) return null;
   const actor = resolveComplicationActor(actorUuid);
-  // Failing CLOSED is right — nothing may run against an actor whose permissions cannot be asked —
-  // but the drop has to be VISIBLE. `fromUuidSync` resolves a compendium uuid to a plain index entry
-  // carrying no `testUserPermission`, so a well-formed delivery addressed at one is refused with no
-  // roll, no macro, no card and otherwise no trace for the one client that could diagnose it.
+  // Failing CLOSED is right, but VISIBLY: `fromUuidSync` answers a compendium uuid with an index
+  // entry carrying no `testUserPermission`, so such a delivery would be refused with no trace.
   if (!actor || typeof actor.testUserPermission !== 'function') {
     console.warn('Fabricate | Refused a complication delivery: the addressed actor could not be resolved to a permission-testable document', {
       senderId, actorUuid
     });
     return null;
   }
-  // Ask the ATTESTED SENDER's own permission, directly. Any predicate whose first disjunct reads
-  // `actor.isOwner` resolves it against the AMBIENT `game.user`, which on the elected GM's client
-  // owns every actor in the world, so it would pass for a sender who owns nothing. THE RULE (issue
-  // 1288) IS THAT NO OWNERSHIP PREDICATE ON A GM-SIDE APPLY PATH MAY READ `isOwner`.
+  // Ask the ATTESTED SENDER's own permission directly: `actor.isOwner` resolves against the AMBIENT
+  // `game.user`, which on the elected GM's client owns every actor. THE RULE (issue 1288) IS THAT NO
+  // OWNERSHIP PREDICATE ON A GM-SIDE APPLY PATH MAY READ `isOwner`.
   if (actor.testUserPermission(senderUser, 'OWNER') !== true) {
     console.warn('Fabricate | Refused a complication delivery: the sender does not own the addressed actor', {
       senderId, actorUuid
@@ -1168,9 +1078,8 @@ function localizeGathering(key, data = {}) {
 }
 
 /**
- * Dispatch startup and `updateWorldTime` processing for crafting, salvage and gathering. Timed
- * gathering completion is delegated to the module-internal GatheringEngine, which is intentionally
- * not exposed through `game.fabricate`.
+ * Dispatch startup and `updateWorldTime` processing for crafting, salvage and gathering; timed
+ * gathering completion goes to the module-internal GatheringEngine, never exposed on `game.fabricate`.
  */
 function processFabricateWorldTime(worldTime = Number(game.time?.worldTime || 0)) {
   return Promise.all(processWorldTimeCallbacksSafely([
@@ -1196,10 +1105,7 @@ function processFabricateWorldTime(worldTime = Number(game.time?.worldTime || 0)
 // rather than on every call.
 const _deprecationWarned = new Set();
 
-/**
- * Emit a one-time console deprecation notice for a renamed public API method, used by the
- * `*Region*` to `*Realm*` delegates so existing macros keep working. Never throws.
- */
+/** One-time console deprecation notice for a renamed public API method. Never throws. */
 function deprecate(oldName, newName) {
   if (_deprecationWarned.has(oldName)) return;
   _deprecationWarned.add(oldName);
@@ -1229,9 +1135,8 @@ class Fabricate {
     // Lazily-built player-facing inventory listing projector, built on first read.
     this._inventoryListingBuilder = null;
     // Lazily-built bulk salvage and destroy collaborators (issue 859), cached like the listing
-    // builders. Deliberately NOT exported onto `game.fabricate`: `salvageComponents` and
-    // `destroyComponents` are the only supported entry points, because that is where the
-    // per-target ownership gate is.
+    // builders and deliberately NOT on `game.fabricate`: `salvageComponents` and `destroyComponents`
+    // are the only supported entry points, because that is where the per-target ownership gate is.
     this._bulkSalvageService = null;
     this._bulkDestroyService = null;
     this.itemPilesIntegration = null;
@@ -1239,18 +1144,14 @@ class Fabricate {
     this.actorPropertyCoinSpender = null;
     this.compendiumImporter = null;
     this.ready = false;
-    // Replay-safe readiness signal, resolving once `initialize()` completes. Unlike the one-shot
-    // `fabricate.ready` Hook, awaiting this settled promise works even when readiness was reached
-    // before the caller subscribed, so a late manager launch can never latch on a spent event.
+    // Replay-safe readiness signal: unlike the one-shot `fabricate.ready` Hook, awaiting this settled
+    // promise works even when readiness was reached before the caller subscribed.
     this._readyPromise = new Promise((resolve) => {
       this._resolveReady = resolve;
     });
   }
 
-  /**
-   * Replay-safe readiness: resolves when the module has finished initializing, immediately if
-   * startup already completed.
-   */
+  /** Replay-safe readiness: resolves when initialization finished, immediately if it already had. */
   whenReady() {
     return this._readyPromise;
   }
@@ -1260,101 +1161,85 @@ class Fabricate {
     console.log('Fabricate | Initializing...');
 
     // Explicit performance boundaries around startup (issue 1073), so "ready time attributable to
-    // Fabricate" is measured rather than guessed from a stopwatch that also times Foundry.
-    // `createStartupMarks` is total — an absent `performance` degrades to a no-op.
+    // Fabricate" is measured rather than guessed. Total: an absent `performance` degrades to a no-op.
     this._startupMarks = createStartupMarks();
     this._startupMarks.begin(STARTUP_PHASES.INITIALIZE);
 
     this.registerSettings();
     applyCurrentFabricateTheme(getSetting, SETTING_KEYS.THEME);
-    // Push the configured item stack-quantity path into the accessor BEFORE anything reads or
-    // writes a stack. It must precede `_runMigrations()`, since a migration may touch owned items,
-    // and follow `registerSettings()`, the key not being readable until registered. There is no
-    // MIGRATIONS entry: the key is new, so no prior stored value exists to migrate.
+    // BEFORE anything reads or writes a stack: it must precede `_runMigrations()`, a migration being
+    // able to touch owned items, and follow `registerSettings()`. No MIGRATIONS entry — the key is
+    // new, so no prior stored value exists to migrate.
     applyItemStackQuantityPathSetting();
     // Run data migrations before managers load persisted data.
     this._startupMarks.begin(STARTUP_PHASES.MIGRATIONS);
     await this._runMigrations();
     this._startupMarks.end(STARTUP_PHASES.MIGRATIONS);
-    // Both seams are lazy closures because `craftingSystemManager` is constructed on the next
-    // statement, needing `recipeManager` in ITS constructor. `getCraftingSystemManager` (issue 1072)
-    // is what the twelve paths inside RecipeManager that used to read `game.fabricate` go through.
-    // The world currency configuration (issue 1278) is constructed FIRST because both the recipe
-    // manager and the crafting engine take it as a collaborator: currency is world scope.
+    // Both seams are lazy closures, `craftingSystemManager` being constructed on the next statement
+    // from `recipeManager`; `getCraftingSystemManager` (issue 1072) is what RecipeManager's twelve
+    // former `game.fabricate` reads go through. The world currency configuration (issue 1278) is
+    // FIRST, both the recipe manager and the crafting engine taking it as a collaborator.
     this.currencyConfigStore = new CurrencyConfigStore({
       getSetting,
       setSetting,
       randomID: () => foundry.utils.randomID()
     });
     this.currencyConfigStore.load();
-    // Issue 1308: the world character libraries, constructed and loaded HERE, before both managers,
-    // because `CraftingSystemManager` derives its Valid Id Basis from this store on every normalize.
-    // NOT where the travel store sits, and copying that placement would be wrong: realms are read on
-    // demand, whereas these libraries are read during normalization itself.
+    // Issue 1308: the world character libraries, loaded HERE before both managers, because
+    // `CraftingSystemManager` derives its Valid Id Basis from this store on every normalize — unlike
+    // the travel store's realms, which are read on demand.
     this.characterLibrariesStore = new CharacterLibrariesStore({
       getSetting,
       setSetting,
       randomID: () => foundry.utils.randomID()
     });
     this.characterLibrariesStore.load();
-    // Issue 1359: the three WORLD-SCOPE entity stores. Constructed and loaded HERE — AFTER
-    // `registerSettings()`, AFTER `await this._runMigrations()`, and BEFORE both managers — and THE
-    // ORDER IS SILENT WHEN WRONG: reading an unregistered key throws inside `assertSetting` and
-    // `load()` is guarded, so a mis-ordering degrades to a permanently UNSEEDED store and a `null`
-    // Valid Id Basis, against which the manager prunes every world reference. A source-order
-    // assertion in `tests/scoped-definition-read-and-basis.test.js` pins it.
+    // Issue 1359: the three WORLD-SCOPE entity stores, loaded AFTER `registerSettings()`, AFTER
+    // `await this._runMigrations()` and BEFORE both managers. THE ORDER IS SILENT WHEN WRONG —
+    // `load()` is guarded, so a mis-ordering degrades to an UNSEEDED store and a `null` Valid Id
+    // Basis against which the manager prunes every world reference — and a source-order assertion
+    // in `tests/scoped-definition-read-and-basis.test.js` pins it.
     this.componentScopeStore = createComponentScopeStore({ getSetting, setSetting });
     this.componentScopeStore.load();
     this.essenceScopeStore = createEssenceScopeStore({ getSetting, setSetting });
     this.essenceScopeStore.load();
     this.toolScopeStore = createToolScopeStore({ getSetting, setSetting });
     this.toolScopeStore.load();
-    // Issue 1392: the WORLD VOCABULARY store, beside the three above for consistency and for the
-    // shipped source-order assertion. Its own HARD constraint is only "after `registerSettings()`";
-    // the prune-basis rationale belongs to the entity stores, this one being wired into no basis,
-    // so a mis-order degrades to an unseeded store and a rail badge reading 0.
+    // Issue 1392: the WORLD VOCABULARY store, beside the three above for the source-order assertion.
+    // Its own HARD constraint is only "after `registerSettings()`", it being wired into no prune
+    // basis, so a mis-order degrades to an unseeded store and a rail badge reading 0.
     this.worldVocabularyStore = createWorldVocabularyStore({ getSetting, setSetting });
     this.worldVocabularyStore.load();
-    // 1.30.0 (issue 1370): THE WORLD IDENTITY DRIFT AUDIT, run once per session.
-    // HERE, AND NOT IN THE MIGRATION'S NOTICE SLOT, because DRIFT IS NOT A MIGRATION EVENT: it
-    // appears on the GM's FIRST identity edit after the migration and every session after, so it
-    // belongs after the loads and before either manager — the last point at which nothing has read
-    // the union. ACTIVE GM, NOT `isGM`, which would post once per assistant too. INFO, NEVER WARN:
-    // nothing is wrong, and a permanent warning would redden every View Lab capture.
-    // The COMPOSITION is not here, a grep being able to pin a DISPATCH but never a SUM.
+    // 1.30.0 (issue 1370): THE WORLD IDENTITY DRIFT AUDIT, once per session. HERE, NOT IN THE
+    // MIGRATION'S NOTICE SLOT, because DRIFT IS NOT A MIGRATION EVENT — it appears on the GM's first
+    // identity edit and every session after. ACTIVE GM, NOT `isGM`. INFO, NEVER WARN.
     if (game.users?.activeGM?.id === game.user?.id) {
       const worldIdentityDrift = reportWorldIdentityDrift(readPersistedCraftingSystems(), {
         components: this.componentScopeStore.corpus(),
         essences: this.essenceScopeStore.corpus(),
         tools: this.toolScopeStore.corpus()
       });
-      // THE FULL LEDGER GOES TO THE CONSOLE, AND FABRICATE HAS TO PUT IT THERE ITSELF.
-      // `ui.notifications.info` defaults `console: true`, but what core logs is the CAPPED message
-      // it was handed, so without this line the withheld records are unrecoverable from a running
-      // client. `info`, NOT `debug`, which maps to a DevTools level Chromium filters out by default;
-      // written through `logMigrationNoticeDetail` because a bare `console.info` is stripped (1737).
+      // THE FULL LEDGER GOES TO THE CONSOLE AND FABRICATE PUTS IT THERE ITSELF, core logging the
+      // CAPPED message it was handed; the level and the wrapper are § Migration Notices' (1737).
       const driftDetail = describeWorldIdentityDrift(worldIdentityDrift);
       logMigrationNoticeDetail('world identity drift', driftDetail);
-      // CONSOLE ONLY (maintainer, 2026-09-06): the toast this used to raise repeated the whole
-      // drifted list in the notification bar and read as an alarm for a state its own copy calls
-      // harmless. The `info` line above is the whole report.
+      // CONSOLE ONLY (maintainer, 2026-09-06): the toast read as an alarm for a harmless state.
     }
     this.recipeManager = new RecipeManager({
       getCraftingSystem: (systemId) => this.craftingSystemManager?.getSystem?.(systemId) ?? null,
       getCraftingSystemManager: () => this.craftingSystemManager ?? null,
       currencyConfigStore: this.currencyConfigStore,
     });
-    // Issue 800: the manager RESOLVES source descriptions through Foundry's own enricher at its
-    // async ingestion boundaries. Both seams default to pass-throughs, `enrichHTML` being unable to
-    // run under happy-dom, so wiring the real implementations here is what makes production resolve.
+    // Issue 800: the manager RESOLVES source descriptions through Foundry's enricher at its async
+    // ingestion boundaries. Both seams default to pass-throughs, `enrichHTML` not running under
+    // happy-dom, so wiring the real implementations here is what makes production resolve.
     this.craftingSystemManager = new CraftingSystemManager(this.recipeManager, {
       enrichToHtml: (raw, options) => enrichToHtml(raw, options),
       primeEnricherCache: (rawTexts) => primeEnricherCache(rawTexts)
     });
-    // Wire the real primary-GM check into the timed world-time resume paths (issue 656). Both
-    // managers and the gathering engine default this to `() => true`, fail-open so unit fixtures
-    // resume, so passing the real `activeGM` check here is LOAD-BEARING: it gates the synced-hook
-    // `setFlag` writes, item creation and node depletion to exactly one client.
+    // Wire the real primary-GM check into the timed world-time resume paths (issue 656). The
+    // collaborators default it to a fail-open `() => true` so unit fixtures resume, so passing the
+    // real check here is LOAD-BEARING: it gates every resume write to exactly one client.
     const isPrimaryGM = () => game.users?.activeGM?.id === game.user?.id;
     this.craftingRunManager = new CraftingRunManager({ isPrimaryGM });
     this.salvageRunManager = new SalvageRunManager({ isPrimaryGM });
@@ -1366,9 +1251,8 @@ class Fabricate {
       this.recipeManager,
       this.craftingSystemManager,
       undefined,
-      // A per-pass INVENTORY SNAPSHOT collaborator, not a visibility one (issue 1228). Every
-      // production snapshot is built with the same identity pair, so the one this service hands
-      // down is interchangeable with the crafting listing's rather than a half of one.
+      // A per-pass INVENTORY SNAPSHOT collaborator, not a visibility one (issue 1228): every
+      // production snapshot is built with the same identity pair.
       findMatchingComponent
     );
     this.resolutionModeService = new ResolutionModeService(this.craftingSystemManager, {
@@ -1376,17 +1260,15 @@ class Fabricate {
     });
     this.itemPilesIntegration = new ItemPilesIntegration();
     this.itemPilesIntegration.detect();
-    // The generic actor-inventory spender resolves a per-system coin adapter by `game.system.id`;
-    // pf2e is the sole registered adapter, through an internal map rather than a plugin registry.
-    // The actor-property spender is generic and needs no system-specific wiring.
+    // The actor-inventory spender resolves a per-system coin adapter by `game.system.id` through an
+    // internal map, pf2e being the only one; the actor-property spender needs no such wiring.
     this.actorInventoryCoinSpender = new ActorInventoryCoinSpender({
       adapters: new Map([['pf2e', new Pf2eInventoryCoinAdapter()]]),
     });
     this.actorPropertyCoinSpender = new ActorPropertyCoinSpender();
-    // Wire the gathering persistence seams the GM UI path already passes, so the public API surface
-    // persists the gathering authoring bundle instead of silently dropping it (issue 699). The
-    // environment store is constructed AFTER this importer, so it resolves lazily through a thin
-    // delegating object — the `exportSystem` idiom — rather than capturing a still-undefined field.
+    // Wire the gathering persistence seams the GM UI path already passes, so the public API persists
+    // the authoring bundle rather than dropping it (issue 699). The environment store is constructed
+    // AFTER this importer, so it resolves lazily through a delegating object.
     this.compendiumImporter = new CompendiumImporter(this.craftingSystemManager, this.recipeManager, {
       environmentStore: {
         list: () => this.gatheringEnvironmentStore?.list?.() ?? [],
@@ -1396,10 +1278,9 @@ class Fabricate {
       getSetting: (key) => getSetting(key),
       setSetting: (key, value) => setSetting(key, value),
       isGM: () => game.user?.isGM === true,
-      // The three world-scope entity stores (issue 1364) resolve lazily through thin delegating
-      // objects: the merge fails CLOSED on an absent store, so a seam capturing a still-undefined
-      // field would make every world-scope import merge NOTHING and still report success. A
-      // delegator closes over the FIELD, so a rename cannot slip past it.
+      // The three world-scope entity stores (issue 1364) resolve lazily: the merge fails CLOSED on an
+      // absent store, so a seam capturing a still-undefined field would merge NOTHING and still
+      // report success. A delegator closes over the FIELD, so a rename cannot slip past it.
       componentScopeStore: scopeStoreDelegate(() => this.componentScopeStore),
       essenceScopeStore: scopeStoreDelegate(() => this.essenceScopeStore),
       toolScopeStore: scopeStoreDelegate(() => this.toolScopeStore)
@@ -1427,9 +1308,8 @@ class Fabricate {
     await this.recipeManager.initialize();
     await this.craftingSystemManager.initialize();
     this._startupMarks.end(STARTUP_PHASES.DATA_LOAD);
-    // The WORLD travel configuration (issue 1282): the realm library, the reveal mode and the
-    // modifier visibility. Constructed FIRST because the environment store validates realm
-    // references against it, and the resolver and engine both read realms through it.
+    // The WORLD travel configuration (issue 1282), FIRST because the environment store validates
+    // realm references against it and the resolver and engine both read realms through it.
     this.gatheringRealmStore = new GatheringRealmStore({
       getSetting,
       setSetting,
@@ -1446,9 +1326,8 @@ class Fabricate {
       }
     });
     this.gatheringEnvironmentStore.load();
-    // Fabricate-managed parties and the current-realm resolver for location-aware gathering. Both
-    // are world scope; the resolver is constructor-injected into the engine and never imported, so
-    // the engine stays testable without Foundry.
+    // Fabricate-managed parties and the current-realm resolver, both world scope. The resolver is
+    // constructor-injected rather than imported, so the engine stays testable without Foundry.
     this.gatheringPartyStore = new GatheringPartyStore({
       getSetting,
       setSetting,
@@ -1460,10 +1339,9 @@ class Fabricate {
     this.gatheringLocationService = new GatheringLocationService({
       partyStore: this.gatheringPartyStore,
       travelStore: this.gatheringRealmStore,
-      // Live token-derived sensing: which Scene Region UUIDs the party's travel marker sits inside.
-      // PREFER Foundry's AUTHORITATIVE membership (`TokenDocument#regions`), which is not subject to
-      // the move-animation lag that makes position hit-testing report the region just left; fall
-      // back to hit-testing only when membership is unavailable.
+      // Which Scene Region UUIDs the party's travel marker sits inside. PREFER Foundry's
+      // AUTHORITATIVE `TokenDocument#regions`, free of the move-animation lag that makes position
+      // hit-testing report the region just left; hit-test only when membership is unavailable.
       senseSceneRegions: (travelActorUuid) => {
         const resolve = globalThis.fromUuidSync;
         if (typeof resolve !== 'function' || !travelActorUuid) return [];
@@ -1486,15 +1364,13 @@ class Fabricate {
         return uuids;
       }
     });
-    // Environment resource-node pools live in the `gatheringEnvironments` WORLD setting, and only a
-    // GM may update a world Setting — so a player gathering from a node-backed task cannot write
-    // their own decrement, and without this relay the write rejects and the pool never depletes. On
-    // a GM client the writer applies locally, a socket emit never reaching the emitter.
+    // Node pools live in the `gatheringEnvironments` WORLD setting and only a GM may write one, so
+    // without this relay a player's decrement rejects and the pool never depletes. On a GM client
+    // the writer applies locally, a socket emit never reaching the emitter.
     this.gatheringNodeDepletionWriter = createGatheringNodeDepletionWriter({
       isActiveGM: () => game.user?.id === game.users?.activeGM?.id,
-      // `Users#activeGM` is null when no GM is connected, so nobody would apply the relayed write.
-      // Report it rather than emitting into the void: the gather still succeeds, having never gated
-      // on this write, and only the pool fails to deplete.
+      // `Users#activeGM` is null with no GM connected, so report rather than emit into the void: the
+      // gather still succeeds, having never gated on this write, and only the pool fails to deplete.
       hasActiveGM: () => !!game.users?.activeGM,
       onUnroutable: ({ environmentId, taskId }) => console.warn(
         'Fabricate | Gathering node depletion was not applied: no active GM is connected to write the world setting',
@@ -1513,9 +1389,8 @@ class Fabricate {
       getUserId: () => game.user?.id || null,
       hooks: Hooks,
       evaluateExpression: evaluateGatheringExpression,
-      // Calendar-aware regen and respawn intervals: day and week lengths track the active world
-      // calendar, falling back to the Earth table. Resolved per call so a mid-session reconfig
-      // is picked up.
+      // Calendar-aware regen and respawn intervals, falling back to the Earth table and resolved per
+      // call so a mid-session reconfig is picked up.
       secondsPerUnit: (unit) => secondsPerUnitFromCalendar(unit, game.time?.calendar ?? null),
       // Interactable-scoped node seams (issue 302): resolve a behaviour by ref and route its
       // scoped-node write through the active GM.
@@ -1580,23 +1455,18 @@ class Fabricate {
       evaluatePreparedRunCheck,
     });
     await this.journalRunCommands?.bootstrapJournalRunAuthority?.();
-    // Issue 901. A blind run's secret state — the drawn task, its start-time
-    // snapshot, and its provisional node reservation — lives in the
-    // `gatheringBlindRuns` WORLD setting, which only a GM may update. That is the
-    // integrity boundary: a player can still READ world state (Foundry has no
-    // server-side read authorization) but can no longer FORGE the task their run
-    // will yield, which they could when it sat on an Actor flag they own.
+    // Issue 901. A blind run's secret state lives in the `gatheringBlindRuns` WORLD setting, which
+    // only a GM may update. That is the integrity boundary: a player can still READ world state, but
+    // can no longer FORGE the task their run yields as they could on an Actor flag they own.
     this.gatheringBlindRunStore = new GatheringBlindRunStore({
       getSetting,
       setSetting,
       settingKey: SETTING_KEYS.GATHERING_BLIND_RUNS,
       // Load-bearing: the active GM is the SINGLE writer. `game.settings.set` replaces rather than
-      // merges and there is no compare-and-set anywhere, so a second concurrent writer would
-      // clobber another run's record.
+      // merges, so a second concurrent writer would clobber another run's record.
       isActiveGM: () => game.user?.id === game.users?.activeGM?.id,
-      // Liveness: a record only counts while its run is still active. That is what keeps a
-      // reservation PROVISIONAL under every path that never reaches the maturity release — a GM
-      // deleting the environment, the task or the actor.
+      // Liveness: a record only counts while its run is active, which is what keeps a reservation
+      // PROVISIONAL under every path that never reaches the maturity release.
       isRunActive: ({ actorUuid, runId }) => {
         const resolve = globalThis.fromUuidSync;
         if (typeof resolve !== 'function' || !actorUuid || !runId) return true;
@@ -1607,10 +1477,9 @@ class Fabricate {
       },
       nowWorldTime: () => Number(game.time?.worldTime || 0)
     });
-    // Only a GM may write that setting and, more importantly, the blind DRAW must happen somewhere
-    // the acting player cannot rig it. A player's blind timed start is routed to the active GM over
-    // the same channel the node-depletion relay uses (issue 983), and the GM re-runs the whole
-    // attempt with the requesting user as the viewer.
+    // The blind DRAW must happen somewhere the acting player cannot rig it, so a player's blind
+    // timed start routes to the active GM over the node-depletion relay's channel (issue 983) and
+    // the GM re-runs the whole attempt with the requesting user as the viewer.
     this.gatheringBlindStartWriter = createGatheringBlindStartWriter({
       isActiveGM: () => game.user?.id === game.users?.activeGM?.id,
       hasActiveGM: () => !!game.users?.activeGM,
@@ -1619,26 +1488,23 @@ class Fabricate {
         { environmentId }
       ),
       emitStart: (message) => game.socket?.emit(EVENT_SCENE_SOCKET, message),
-      // The local-apply branch has no socket sender to attest, so supply the current user. Reached
-      // only if a GM ever routes its own start; the engine short-circuits before that, because a
-      // client that may write the setting never relays.
+      // The local-apply branch has no socket sender to attest, so supply the current user; reached
+      // only if a GM ever routes its own start, which the engine short-circuits before.
       applyStart: (payload) => applyGatheringBlindStart({ senderId: game.user?.id, ...payload })
     });
     gatheringEngine.installBlindRunRelay({
       store: this.gatheringBlindRunStore,
       relayStart: (args) => this.gatheringBlindStartWriter.start(args)
     });
-    // A complication's GM-only card and its macro must happen on a GM client: a player cannot author
-    // a message as the GM, and a macro on the acting client would carry the acting client's
-    // authority. Relayed ADDRESSING ONLY — the elected GM re-reads the authored complication from
-    // its own record (issue 1286) — and applies locally on that GM, a broadcast excluding the emitter.
+    // A complication's GM-only card and its macro must happen on a GM client, a macro on the acting
+    // client carrying that client's authority. Relayed ADDRESSING ONLY — the elected GM re-reads the
+    // authored complication from its own record (issue 1286) — and applied locally on that GM.
     this.complicationDeliveryWriter = createComplicationDeliveryWriter({
       isActiveGM: () => game.user?.id === game.users?.activeGM?.id,
       hasActiveGM: () => !!game.users?.activeGM,
       // Unlike the blind-start relay this DROPS rather than blocks: a complication is strictly
-      // downstream of a committed award, so refusing it would strand a completed craft. The award,
-      // the player-facing card and the run record stay unaffected; only the GM-only card and the
-      // macro are lost, and there is no store to defer them into.
+      // downstream of a committed award, so refusing would strand a completed craft. Only the
+      // GM-only card and the macro are lost, and there is no store to defer them into.
       onUnroutable: ({ resolutionId }) => console.warn(
         'Fabricate | Complications were not delivered: no active GM is connected to run them',
         { resolutionId }
@@ -1651,18 +1517,15 @@ class Fabricate {
       // on that branch, the acting user.
       applyComplications: (payload) => applyComplicationDelivery({ senderId: game.user?.id, ...payload })
     });
-    // EXPLICIT injection into both engines that fire complications. Each also falls back to
-    // `game.fabricate.complicationDeliveryWriter`, but a seam only the fallback ever satisfies is
-    // not a seam: it cannot be substituted in a test that builds its own engine. Optional-chained
-    // so a future reorder cannot take the whole boot down over a narrative beat.
+    // EXPLICIT injection into both engines that fire complications: each also falls back to
+    // `game.fabricate.complicationDeliveryWriter`, but a seam only the fallback satisfies cannot be
+    // substituted in a test. Optional-chained so a reorder cannot take the boot down.
     this.craftingEngine?.installComplicationDelivery({ writer: this.complicationDeliveryWriter });
     gatheringEngine?.installComplicationDelivery({ writer: this.complicationDeliveryWriter });
     // Housekeeping that drops entries naming deleted content. Each pass is INDEPENDENTLY GUARDED
-    // (issue 970): they write to actor documents, and a refused write must never prevent `this.ready`
-    // below, since every facade method throws through `_requireReady()`. Each pass is also scoped to
-    // the actors this client owns, so this guard is the belt to that braces.
-    // The list is composed by `composeStartupPassList` (issue 1224); the call sits BELOW both
-    // `initialize()` calls so its id sets derive from the corpus this boot loaded.
+    // (issue 970): a refused actor write must never prevent `this.ready` below, every facade method
+    // throwing through `_requireReady()`. The list is composed by `composeStartupPassList` (issue
+    // 1224) BELOW both `initialize()` calls, so its id sets derive from the corpus this boot loaded.
     this._startupMarks.begin(STARTUP_PHASES.STARTUP_MAINTENANCE);
     await runStartupMaintenance(composeStartupPassList({
       recipeManager: this.recipeManager,
@@ -1680,10 +1543,9 @@ class Fabricate {
     registerFragmentDiscoveryHook(this.craftingSystemManager, this.recipeVisibilityService);
     registerRecipeItemLearningHook(this.recipeVisibilityService);
 
-    // Close the outer span BEFORE readiness is announced, so anything waiting on `whenReady()`
-    // observes a complete `fabricate:initialize` measure. It sits ABOVE `this.ready = true`
-    // deliberately: `manager-launch-readiness.test.js` pins that line and `this._resolveReady?.();`
-    // as ADJACENT, and that adjacency guards readiness against drifting from the flag.
+    // Close the outer span BEFORE readiness is announced, so a `whenReady()` waiter observes a
+    // complete `fabricate:initialize` measure. ABOVE `this.ready = true` deliberately:
+    // `manager-launch-readiness.test.js` pins that line and `this._resolveReady?.();` as ADJACENT.
     this._startupMarks.end(STARTUP_PHASES.INITIALIZE);
     this.ready = true;
     this._resolveReady?.();
@@ -1693,32 +1555,26 @@ class Fabricate {
 
   /** Run versioned startup data migrations via MigrationRunner. */
   async _runMigrations() {
-    // Primary-GM only, so exactly one client runs the pass and no player or assistant races the
-    // world-scoped writes. `isGM` is TRUE FOR ASSISTANT GMs, who hold SETTINGS_MODIFY, so an `isGM`
-    // gate would let the full GM and every assistant transform-and-write concurrently;
-    // `activeGM` fires on exactly one client, matching the primary-GM startup writers below.
+    // Primary-GM only, so exactly one client runs the pass. `isGM` is TRUE FOR ASSISTANT GMs, who
+    // hold SETTINGS_MODIFY, so an `isGM` gate would let every assistant transform-and-write
+    // concurrently; `activeGM` fires on exactly one client.
     if (game.users?.activeGM?.id !== game.user?.id) return;
     const runner = new MigrationRunner({
       getSetting,
       setSetting,
-      // The GM-only interactive recovery prompt, invoked by the runner on a fatal abort. "Keep
-      // existing data" is the default and matches what the runner already did; the fix/retry choice
-      // is INFORMATIONAL ONLY — the GM repairs and RELOADS, and migrations re-run because
-      // `migrationVersion` was not advanced. There is NO same-pass auto-retry.
+      // The GM-only recovery prompt, invoked by the runner on a fatal abort. "Keep existing data" is
+      // the default and matches what the runner already did; the fix/retry choice is INFORMATIONAL
+      // ONLY — the GM repairs and RELOADS. There is NO same-pass auto-retry.
       promptRecovery: (context) => this._promptMigrationRecovery(context)
     });
     const summary = await runner.run();
     const localize = (key, data) => (data ? game.i18n?.format?.(key, data) : game.i18n?.localize?.(key));
 
-    // A DEFERRED pass (issue 1242) persisted nothing and left `migrationVersion` where it found it.
-    // It is NOT an abort — there is no failed document to remediate and no downgrade target to
-    // recommend — so it gets its own permanent GM notice rather than the recovery dialog. Placed
-    // ABOVE the abort branch because a deferred summary reports `aborted: false`.
+    // A DEFERRED pass (issue 1242) is NOT an abort, so it gets its own permanent notice rather than
+    // the dialog — ABOVE that branch, a deferred summary reporting `aborted: false`.
     if (summary?.deferred === true) {
-      // A COMPLETE localized sentence per reason, and only the writeback failure instructs a reload
-      // — that distinction is the point. On a writeback failure the migrations have already
-      // transformed this session's live values, so a GM who keeps working writes migrated records
-      // back under an un-advanced version; the read failure refuses before any migration runs.
+      // A COMPLETE sentence per reason, and only the writeback failure instructs a reload: it alone
+      // leaves this session holding transformed values under an un-advanced version.
       const key = MIGRATION_DEFERRAL_NOTICES[summary.deferredReason] ?? MIGRATION_DEFERRAL_NOTICES[MIGRATION_DEFERRAL_REASONS.CORPUS_READ_FAILED];
       const notice = composeMigrationNotice(key, undefined, localize);
       console.error(`Fabricate | migration pass deferred (${summary.deferredReason}): ${notice.detail}`, summary.deferredError ?? '');
@@ -1726,9 +1582,8 @@ class Fabricate {
       return;
     }
 
-    // An ABORTED pass rolled the in-memory data back and persisted nothing, leaving
-    // `migrationVersion` unchanged. Surface a GM-facing error and return WITHOUT firing any success
-    // notice; the runner has already emitted per-document recovery guidance to the console.
+    // An ABORTED pass rolled back and persisted nothing. Surface a GM-facing error and return
+    // WITHOUT any success notice; the runner already emitted per-document guidance to the console.
     if (summary?.aborted === true) {
       if (game.user?.isGM) {
         ui.notifications?.error?.(composeMigrationNotice('FABRICATE.Migration.Aborted.Notice', undefined, localize).message);
@@ -1745,9 +1600,7 @@ class Fabricate {
       ui.notifications?.info?.(message);
     }
 
-    // 0.9.0 unified legacy realms on one or more systems: name them so the GM can re-enable Travel
-    // & Realms, which stays disabled by default, and knows realm-scoped records may now appear in
-    // more environments. GM-only, and only when something was migrated.
+    // 0.9.0 unified legacy realms: name the systems so the GM can re-enable Travel & Realms.
     const unifiedRegionSystems = Array.isArray(summary?.unifiedRegionSystems) ? summary.unifiedRegionSystems : [];
     if (unifiedRegionSystems.length > 0 && game.user?.isGM) {
       const notice = composeMigrationNotice('FABRICATE.Migration.UnifyRegions.Notice', { systems: unifiedRegionSystems.join(', ') }, localize);
@@ -1755,19 +1608,16 @@ class Fabricate {
       ui.notifications?.info?.(notice.message);
     }
 
-    // 1.6.0 removed the legacy routed result-selection providers, dropping roll-table references —
-    // the draw mechanism is gone — and stripping gathering-task result selections. Name the
-    // affected recipes and tasks so the GM can reconfigure them. GM-only, and only when something
-    // was actually dropped.
+    // 1.6.0 removed the legacy routed result-selection providers, dropping roll-table references and
+    // stripping gathering-task result selections; name them so the GM can reconfigure.
     const removedProviders = summary?.removedResultSelectionProviders ?? null;
     const droppedRollTableRecipes = Array.isArray(removedProviders?.droppedRollTableRecipes)
       ? removedProviders.droppedRollTableRecipes : [];
     const strippedGatheringTasks = Array.isArray(removedProviders?.strippedGatheringTasks)
       ? removedProviders.strippedGatheringTasks : [];
     if ((droppedRollTableRecipes.length > 0 || strippedGatheringTasks.length > 0) && game.user?.isGM) {
-      // Console recovery log naming the affected recipes and tasks. A routed gathering task now
-      // resolves via the system gathering check, so the GM must populate
-      // `gatheringCraftingCheck.routed.rollFormula` for any stripped task.
+      // Console recovery log naming the affected recipes and tasks: a routed gathering task now
+      // resolves via `gatheringCraftingCheck.routed.rollFormula`, which the GM must populate.
       console.warn(
         'Fabricate | 1.6.0 migration removed legacy result-selection providers. ' +
           'Populate gatheringCraftingCheck.routed.rollFormula for any stripped gathering task. Affected items:',
@@ -1775,9 +1625,7 @@ class Fabricate {
       );
     }
 
-    // 1.17.0 disabled recipes to clear a newly-introduced alchemy signature collision, since
-    // folding per-set essences into signature-bearing groups can overlap two sets. Name the
-    // disabled recipes so the GM can rework and re-enable them.
+    // 1.17.0 disabled recipes to clear an alchemy signature collision; name them so the GM can fix.
     const essenceCollisionDisabledRecipes = Array.isArray(summary?.essenceCollisionDisabledRecipes)
       ? summary.essenceCollisionDisabledRecipes
       : [];
@@ -1790,10 +1638,8 @@ class Fabricate {
       ui.notifications?.warn?.(notice.message);
     }
 
-    // 1.21.0 retired the check-modifier roll-formula placeholder, and its consequences are behaviour
-    // changes rather than no-ops. PRIMARY-GM ONLY, not merely GM-only, `_runMigrations` returning
-    // early unless this client is the active GM. THE COMPOSITION IS NOT HERE, for the reason the
-    // sibling below states — three semantic mutations survived a green suite while it lived inline.
+    // 1.21.0 retired the check-modifier roll-formula placeholder, its consequences being behaviour
+    // changes. THE COMPOSITION IS NOT HERE: three semantic mutations survived a green suite inline.
     const retiredCraftingModCounts = Array.isArray(summary?.retiredCraftingModCounts)
       ? summary.retiredCraftingModCounts : [];
     if (retiredCraftingModCounts.length > 0 && game.user?.isGM) {
@@ -1803,10 +1649,8 @@ class Fabricate {
       else ui.notifications?.info?.(notice.message);
     }
 
-    // 1.23.0: where the same modifier id was authored in BOTH libraries the gathering entry was
-    // RE-KEYED. That is a visible rename in the authoring surface, so it is reported rather than
-    // left to be discovered; only systems that actually collided are listed, and a clean merge is
-    // silent. PRIMARY-GM ONLY, like every notice above it.
+    // 1.23.0: an id authored in BOTH libraries had its gathering entry RE-KEYED, a visible rename, so
+    // it is reported rather than discovered. Only colliding systems are listed.
     const unifiedModifierCollisions = Array.isArray(summary?.unifiedModifierCollisions)
       ? summary.unifiedModifierCollisions : [];
     if (unifiedModifierCollisions.length > 0 && game.user?.isGM) {
@@ -1818,10 +1662,8 @@ class Fabricate {
       ui.notifications?.warn?.(notice.message, { permanent: true });
     }
 
-    // 1.28.0 (issue 1308): the character-library id collisions where two systems disagreed about
-    // what an id MEANS. Identical copies are filtered upstream, so everything here changed a real
-    // rule — and the change is INVISIBLE without this notice, because the reference still resolves,
-    // to the other system's definition. The migration's own label promises this report by name.
+    // 1.28.0 (issue 1308): the character-library id collisions where two systems disagreed about what
+    // an id MEANS. Identical copies are filtered upstream, so every one here changed a rule INVISIBLY.
     const characterLibraryCollisions = Array.isArray(summary?.characterLibraryCollisions)
       ? summary.characterLibraryCollisions : [];
     if (characterLibraryCollisions.length > 0 && game.user?.isGM) {
@@ -1834,10 +1676,8 @@ class Fabricate {
     }
 
     // 1.30.0 (issue 1363): what the world-scope entity migration did. THE COMPOSITION IS NOT HERE —
-    // the counts, the rename list and the references that already resolve to nothing (which the pass
-    // REPORTS and never prunes) live in `buildWorldScopeEntityNotice`, because nothing in this file
-    // is executable by a unit test and a grep can pin a DISPATCH but never a SUM. The report is
-    // `null` unless the migration ran, so an omission fails SILENT — hence the PRESENCE assertion.
+    // it lives in `buildWorldScopeEntityNotice` — and the report is `null` unless the migration ran,
+    // so an omission fails SILENT, hence the PRESENCE assertion.
     const worldScopeEntityReport = summary?.worldScopeEntityReport ?? null;
     if (worldScopeEntityReport && game.user?.isGM) {
       const notice = buildWorldScopeEntityNotice(worldScopeEntityReport, localize);
@@ -1848,10 +1688,8 @@ class Fabricate {
       }
     }
 
-    // 1.34.0 (issue 1654): the equivalent-essence merge notice. ALWAYS a permanent warning, because
-    // every case that produces a message is one the GM must act on — the merge is irreversible and
-    // a refusal is not retried. The toast names the groups under a cap; the explanation, the
-    // item-override scope and every id go to the console at `info` (issue 1737).
+    // 1.34.0 (issue 1654): the equivalent-essence merge notice, ALWAYS a permanent warning, every
+    // case that produces a message being one the GM must act on (§ Migration Notices, issue 1737).
     const worldEssenceMergeReport = summary?.worldEssenceMergeReport ?? null;
     if (worldEssenceMergeReport && game.user?.isGM) {
       const essenceNotice = buildWorldEssenceMergeNotice(worldEssenceMergeReport, localize);
@@ -1863,9 +1701,8 @@ class Fabricate {
   }
 
   /**
-   * The thin Foundry edge for the GM migration-abort recovery prompt. GM-only and defensive, never
-   * throwing: a failure to open the dialog must not break startup, the console guidance and the
-   * abort notification having already covered the GM.
+   * The thin Foundry edge for the GM migration-abort recovery prompt. GM-only and never throwing:
+   * the console guidance and the abort notification have already covered the GM.
    */
   async _promptMigrationRecovery(context) {
     try {
@@ -1908,10 +1745,8 @@ class Fabricate {
   }
 
   /**
-   * Get the crafting engine instance. `COMPANION`'s `handle` tier (issue 1289): the promise is that
-   * it answers the object Fabricate itself uses, or `null` before `initialize` has run — not a
-   * promise about `CraftingEngine`'s method surface, the one exception being `findComponentItems`.
-   * It is never ready-gated, so the pre-readiness `null` is the constructor's field, not a check.
+   * Get the crafting engine instance. `COMPANION`'s `handle` tier (issue 1289), whose one carve-out
+   * is `findComponentItems`; ungated, per § The Ungated Handle Accessors.
    */
   getCraftingEngine() {
     return this.craftingEngine;
@@ -1920,12 +1755,9 @@ class Fabricate {
   /**
    * Re-run the `1.30.0` world-scope identity-flag repair (issue 1363). A GM-FACING RECOVERY ACTION,
    * not a test hook, reachable exactly when the boot-time one-shot WITHHELD itself: a TORN MIGRATION
-   * or a PARTIAL REMAP, both of which leave the map PENDING. Once the boot pass clears it this
-   * answers `null`. A LOCKED-PACK skip is deliberately not one of those states.
-   * ACTIVE-GM ONLY, a SINGLE-WRITER rule rather than a permission check: the pass walks the
-   * UNFILTERED actor collection, so a player invoking it would have every write it does not own
-   * rejected and mis-booked as a locked-pack skip.
-   * IDEMPOTENT: it performs the remap ONLY, neither clearing the map nor advancing the version.
+   * or a PARTIAL REMAP, both of which leave the map PENDING; a LOCKED-PACK skip is not one of them.
+   * ACTIVE-GM ONLY, a SINGLE-WRITER rule rather than a permission check, the pass walking the
+   * UNFILTERED actor collection. IDEMPOTENT: it remaps only, clearing and advancing nothing.
    */
   async remapWorldScopeIdentityFlags() {
     if (game.users?.activeGM?.id !== game.user?.id) {
@@ -1940,12 +1772,9 @@ class Fabricate {
   }
 
   /**
-   * Re-run the `1.34.0` equivalent-essence merge's durable-flag repair (issue 1654). A GM-facing
-   * recovery action for the two states its `1.30.0` sibling `remapWorldScopeIdentityFlags` serves;
-   * a locked-pack skip is not one of them.
-   * Active-GM only, and it WARNS rather than returning silently, because a player's writes across
-   * the unfiltered actor collection would all be rejected and a silent `null` would read as success.
-   * Idempotent: it remaps only, neither clearing the map nor advancing the one-shot version.
+   * Re-run the `1.34.0` equivalent-essence merge's durable-flag repair (issue 1654), for the two
+   * states its `1.30.0` sibling `remapWorldScopeIdentityFlags` serves. Active-GM only, and it WARNS
+   * rather than returning silently, a silent `null` reading as success. Idempotent.
    */
   async remapWorldEssenceIdentityFlags() {
     if (game.users?.activeGM?.id !== game.user?.id) {
@@ -1973,10 +1802,7 @@ class Fabricate {
     return this.salvageRunManager;
   }
 
-  /**
-   * Get the gathering environment store, exposing persisted environment management without
-   * exposing the module-internal GatheringEngine.
-   */
+  /** Get the gathering environment store, without exposing the module-internal GatheringEngine. */
   getGatheringEnvironmentStore() {
     return this.gatheringEnvironmentStore;
   }
@@ -1988,35 +1814,24 @@ class Fabricate {
   }
 
   /**
-   * Get the world currency configuration store (issue 1278). World scope, not per crafting system:
-   * a world runs one Foundry game system and so has one way actors store coins, and a crafting
-   * system decides only whether it participates.
-   * DELIBERATELY NOT `_requireReady()`-gated, matching the coin-spender accessors: this is the
-   * global fallback `getCurrencyRequirementConfig` reads when no seam was injected, and that
-   * resolver guards with optional chaining, which catches an absent accessor but NOT a throw — so
-   * a readiness throw would crash the craftability path instead of yielding the empty ladder.
+   * Get the world currency configuration store (issue 1278). World scope: a world runs one game
+   * system and so has one way actors store coins. UNGATED, per § The Ungated Handle Accessors.
    */
   getCurrencyConfigStore() {
     return this.currencyConfigStore ?? null;
   }
 
   /**
-   * Get the world character libraries store (issue 1308). World scope, not per crafting system,
-   * because both libraries resolve against the acting CHARACTER; nothing stays per system.
-   * DELIBERATELY NOT `_requireReady()`-gated, for the reason `getCurrencyConfigStore` is not: these
-   * gate craftability, learning and tool usability, and every call site guards with optional
-   * chaining, which catches an absent accessor but NOT a throw.
+   * Get the world character libraries store (issue 1308). World scope, both libraries resolving
+   * against the acting CHARACTER. UNGATED, per § The Ungated Handle Accessors.
    */
   getCharacterLibrariesStore() {
     return this.characterLibrariesStore ?? null;
   }
 
   /**
-   * Get the world COMPONENT scope store (issue 1359). DELIBERATELY NOT `_requireReady()`-gated,
-   * matching `getCurrencyConfigStore` and emphatically NOT `getGatheringRealmStore`:
-   * `CraftingSystemManager` resolves this lazily during `initialize()` and guards with optional
-   * chaining, which absorbs an ABSENT accessor but not a THROW — which would surface as a crash
-   * inside `_normalizeSystem`, the issue-970 shape where the manager never initializes at all.
+   * Get the world COMPONENT scope store (issue 1359). UNGATED, per § The Ungated Handle Accessors,
+   * and emphatically NOT like `getGatheringRealmStore`: a throw here crashes `_normalizeSystem`.
    */
   getComponentScopeStore() {
     return this.componentScopeStore ?? null;
@@ -2027,22 +1842,16 @@ class Fabricate {
     return this.essenceScopeStore ?? null;
   }
 
-  /**
-   * Get the world TOOL scope store (issue 1359). Ungated, for `getComponentScopeStore`'s reason.
-   * It carries the WORLD tool-breakage authority beside the three sub-keys.
-   */
+  /** The world TOOL scope store (1359), ungated; it carries the WORLD tool-breakage authority. */
   getToolScopeStore() {
     return this.toolScopeStore ?? null;
   }
 
   /**
-   * Get the world VOCABULARY store (issue 1392). DELIBERATELY UNGATED, and for its OWN reason:
-   * nothing normalizes against this store, so the issue-970 shape the entity accessors guard against
-   * does not apply. What does apply is `worldScopeProjection`'s `readCorpus`, which converts ANY
-   * throw into a legitimate `{available: false, total: 0}` with no error and no failing test — so a
-   * readiness throw would silently blank the world Tags & Categories screen.
-   * THE NAME IS FIXED BY ITS CONSUMER, `adminStore` resolving it inside a gateway file this lane
-   * may not open.
+   * Get the world VOCABULARY store (issue 1392). UNGATED for its OWN reason: nothing normalizes
+   * against it, but `worldScopeProjection`'s `readCorpus` converts ANY throw into a legitimate
+   * `{available: false, total: 0}`, so a readiness throw would silently blank Tags & Categories.
+   * THE NAME IS FIXED BY ITS CONSUMER, `adminStore`.
    */
   getVocabularyScopeStore() {
     return this.worldVocabularyStore ?? null;
@@ -2067,9 +1876,8 @@ class Fabricate {
   }
 
   /**
-   * Read redaction-safe current-realm evidence for a selected actor, gated on a system.
-   * Player-callable: only the resolved source token and disclosure-safe display data, never a raw
-   * secret realm record.
+   * Read redaction-safe current-realm evidence for a selected actor, gated on a system and
+   * player-callable: the resolved source token and display data only, never a secret realm record.
    */
   getGatheringLocationForActor({ actorId = null, actor = null, systemId = null } = {}) {
     this._requireReady();
@@ -2088,8 +1896,8 @@ class Fabricate {
   }
 
   /**
-   * Set a party's manual current-realm override. GM-only. A party has ONE override since issue
-   * 1282, so `systemId` gates the write rather than selecting which override is written.
+   * Set a party's manual current-realm override. GM-only, and a party has ONE override since issue
+   * 1282, so `systemId` gates the write rather than selecting which one is written.
    */
   setGatheringPartyRealmOverride({ partyId = null, systemId = null, realmIds = [] } = {}) {
     this._requireReady();
@@ -2123,8 +1931,8 @@ class Fabricate {
   }
 
   /**
-   * Reveal a realm's discovery on an actor. GM-only; the realm must exist in the WORLD library
-   * before anything is written. `systemId` is the participation gate, not an ownership claim.
+   * Reveal a realm's discovery on an actor. GM-only, the realm must exist in the WORLD library, and
+   * `systemId` is the participation gate rather than an ownership claim.
    */
   revealGatheringRealmForActor({ actorId = null, actor = null, systemId = null, realmId = null, source = 'manual', partyId = null } = {}) {
     this._requireReady();
@@ -2196,20 +2004,16 @@ class Fabricate {
   }
 
   /**
-   * Get the `actorInventory` strategy's coin spender. `COMPANION`'s `handle` tier (issue 1289): the
-   * promise is that it answers the object Fabricate itself uses, or `null` before readiness.
-   * DELIBERATELY NOT `_requireReady()`-GATED, matching `getCurrencyConfigStore`: the field is `null`
-   * from the constructor, so a pre-readiness read answers `null` rather than throwing.
+   * Get the `actorInventory` strategy's coin spender. `COMPANION`'s `handle` tier (issue 1289),
+   * ungated per § The Ungated Handle Accessors.
    */
   getActorInventoryCoinSpender() {
     return this.actorInventoryCoinSpender;
   }
 
   /**
-   * Get the `actorProperty` strategy's coin spender. `COMPANION`'s `handle` tier (issue 1289): the
-   * promise is that it answers the object Fabricate itself uses, or `null` before readiness.
-   * DELIBERATELY NOT `_requireReady()`-GATED, matching `getCurrencyConfigStore`: the field is `null`
-   * from the constructor, so a pre-readiness read answers `null` rather than throwing.
+   * Get the `actorProperty` strategy's coin spender. `COMPANION`'s `handle` tier (issue 1289),
+   * ungated per § The Ungated Handle Accessors.
    */
   getActorPropertyCoinSpender() {
     return this.actorPropertyCoinSpender;
@@ -2220,11 +2024,9 @@ class Fabricate {
   }
 
   /**
-   * Merge caller `options` with the persisted remembered-actor default: a TRUTHY id overrides, a
-   * null or empty one falls back to the persisted last-gathering selection.
-   * IT MUST COALESCE, NOT SPREAD. The UI passes `store.selectedActorId ?? null`, which on a fresh
-   * open is `null` before the actor bar settles — a spread let that explicit `null` clobber the
-   * default, so the engine resolved `selectableActors[0]` and every required tool read "missing".
+   * Merge caller `options` with the persisted remembered-actor default: a TRUTHY id overrides and a
+   * null or empty one falls back. IT MUST COALESCE, NOT SPREAD — the UI passes
+   * `store.selectedActorId ?? null`, which on a fresh open is `null` before the actor bar settles.
    */
   _withRememberedActorDefault(options = {}) {
     return {
@@ -2234,11 +2036,9 @@ class Fabricate {
   }
 
   /**
-   * List gathering environments and tasks for the current user and selected actor; the engine
-   * receives the current Foundry user as viewer, whatever the caller supplied. An omitted or null
-   * `rememberedActorId` falls back to the persisted selection rather than the engine's arbitrary
-   * first-selectable fallback. The engine resolves the id against its OWNERSHIP selectable list,
-   * not the narrower player-character list, so a legacy persisted id is still honoured.
+   * List gathering environments and tasks for the current user and selected actor; the engine always
+   * receives the current Foundry user as viewer. An omitted `rememberedActorId` falls back to the
+   * persisted selection, resolved against the OWNERSHIP list rather than the player-character one.
    */
   listGatheringForActor(options = {}) {
     if (!this.ready) {
@@ -2321,8 +2121,7 @@ class Fabricate {
       resolutionModeService: this.resolutionModeService,
       craftingSystemManager: this.craftingSystemManager,
       // Read ONLY for `findActiveRunForRecipe`, so the projection can name the step a run is parked
-      // on (issue 917). Safe to capture in the cached builder: `this.craftingRunManager` is
-      // constructed once during init and never reassigned.
+      // on (issue 917). Safe to capture: `this.craftingRunManager` is never reassigned.
       craftingRunManager: this.craftingRunManager,
       localize: (key, data) =>
         data !== undefined
@@ -2331,19 +2130,18 @@ class Fabricate {
       nowWorldTime: () => game.time?.worldTime ?? 0,
       resolveCheckFormula: (formula, actor, craftingModifier) =>
         resolveCheckFormulaDisplay(formula, actor, craftingModifier),
-      // How a held document resolves to a managed component, for the summary phase's per-pass
-      // tallies (issue 1075). The SAME full resolver `InventoryListingBuilder` matches owned stacks
-      // with, so the crafting row's "looks makeable" and the inventory tab's owned count cannot
-      // disagree. Injected rather than imported, so its matcher graph stays out of the harness.
+      // How a held document resolves to a managed component (issue 1075): the SAME full resolver
+      // `InventoryListingBuilder` matches owned stacks with, so the crafting row's "looks makeable"
+      // and the inventory tab's owned count cannot disagree. Injected, so its graph stays out of
+      // the harness.
       resolveComponentForItem: findMatchingComponent,
     });
     return this._craftingListingBuilder;
   }
 
   /**
-   * Resolve a stored crafting actor preference against Foundry's actor collection; null for a stale
-   * id. DEFENCE IN DEPTH: for a non-GM viewer the actor must pass the same ownership predicate the
-   * gathering attempt path uses, so a console-supplied id cannot have its inventory read.
+   * Resolve a stored crafting actor preference; null for a stale id. DEFENCE IN DEPTH: a non-GM
+   * viewer's actor must pass the gathering attempt path's ownership predicate.
    */
   _resolveCraftingActor(actorId) {
     const actor = actorId ? (game.actors?.get?.(actorId) ?? null) : null;
@@ -2353,8 +2151,8 @@ class Fabricate {
   }
 
   /**
-   * Resolve the effective crafting actor and component-source actors, applying the persisted
-   * defaults. A truthy `rememberedActorId` overrides; stale ids resolve to nothing.
+   * Resolve the effective crafting actor and component-source actors against the persisted defaults;
+   * a truthy `rememberedActorId` overrides and stale ids resolve to nothing.
    */
   _resolveCraftingSources({ rememberedActorId = null, componentSourceActorIds = null } = {}) {
     const actorId = rememberedActorId || this.getSelectedCraftingActorId() || null;
@@ -2369,8 +2167,8 @@ class Fabricate {
   }
 
   /**
-   * Build the player-facing Crafting listing. The current Foundry user is ALWAYS the viewer,
-   * whatever the caller supplied; the visibility service honours the GM bypass.
+   * Build the player-facing Crafting listing. The current Foundry user is ALWAYS the viewer, and the
+   * visibility service honours the GM bypass.
    */
   listCraftingForActor(options = {}) {
     this._requireReady();
@@ -2383,13 +2181,11 @@ class Fabricate {
   }
 
   /**
-   * DETAIL PHASE — the exact rich model for ONE recipe (issue 1075), the companion of
-   * `listCraftingForActor`, which returns cheap summary rows. The player app calls this for the
-   * selected recipe only, so the exact craftability, check resolution and stages are computed for
-   * what is on screen rather than for the whole corpus.
-   * `recipeId` arrives from a client and is NOT trusted: the actor and sources are re-resolved
-   * through the same ownership-gated `_resolveCraftingSources`, and the builder re-evaluates
-   * visibility, so an id the viewer may not see answers `null` and never a model.
+   * DETAIL PHASE — the exact rich model for ONE recipe (issue 1075), companion to
+   * `listCraftingForActor`'s cheap summary rows, so craftability, check resolution and stages are
+   * computed for what is on screen. `recipeId` is NOT trusted: the actor and sources are re-resolved
+   * through `_resolveCraftingSources` and visibility is re-evaluated, so an id the viewer may not
+   * see answers `null`.
    */
   hydrateCraftingRecipe({ recipeId = null, actorId = null, componentSourceActorIds = null } = {}) {
     this._requireReady();
@@ -2407,8 +2203,8 @@ class Fabricate {
   }
 
   /**
-   * Lazily build and cache the `InventoryListingBuilder` projecting the owned-component view.
-   * `recipeVisibility` is injected so a non-GM viewer's used-by list never names a teaser recipe.
+   * Lazily build and cache the `InventoryListingBuilder`; `recipeVisibility` is injected so a non-GM
+   * viewer's used-by list never names a teaser recipe.
    */
   _getInventoryListingBuilder() {
     if (this._inventoryListingBuilder) return this._inventoryListingBuilder;
@@ -2433,8 +2229,8 @@ class Fabricate {
   }
 
   /**
-   * Build the player-facing Inventory listing, reusing the crafting selection so the Inventory and
-   * Crafting tabs agree on what the player owns. The current Foundry user is always the viewer.
+   * Build the player-facing Inventory listing, reusing the crafting selection so the two tabs agree
+   * on what the player owns. The current Foundry user is always the viewer.
    */
   listInventoryForActor(options = {}) {
     this._requireReady();
@@ -2447,9 +2243,8 @@ class Fabricate {
   }
 
   /**
-   * Learn one recipe from an owned recipe-item book, against the same scope the listing was computed
-   * for, then delegated to the visibility service, which enforces the per-document learn budget for
-   * capped systems and leaves uncapped books intact.
+   * Learn one recipe from an owned book against the scope the listing was computed for, delegated to
+   * the visibility service, which enforces the per-document learn budget for capped systems.
    */
   async learnRecipeFromInventory({ actorId = null, recipeId = null, componentSourceActorIds = null } = {}) {
     this._requireReady();
@@ -2469,12 +2264,10 @@ class Fabricate {
   }
 
   /**
-   * The ONE authorization rule every GM-gated, actor-targeted facade member applies: the caller is a
-   * GM, and `actorId` resolves to an actor the caller may act as (issue 1289).
+   * The ONE authorization rule every GM-gated, actor-targeted facade member applies (issue 1289);
    * `companion-api/spec.md` § Behavioural Member Rules owns the normative GM -> actor -> readiness
-   * order. THE MESSAGE KEYS ARE PARAMETERS, because a failed grant must not report itself in the
-   * words of a failed reset. A SECOND COPY of this rule lives on the GM Knowledge surface's shell;
-   * unifying them crosses the facade/UI boundary and is a follow-up, named so a THIRD copy meets it.
+   * order. THE MESSAGE KEYS ARE PARAMETERS. A SECOND COPY lives on the GM Knowledge surface's shell,
+   * unifying them crossing the facade/UI boundary; named here so a THIRD copy meets it.
    */
   _requireGmActor(actorId, { gmOnlyKey, noActorKey }) {
     if (game.user?.isGM !== true) {
@@ -2489,11 +2282,9 @@ class Fabricate {
 
   /**
    * The SET-VALUED extension of `_requireGmActor`, for the two pooled members (issue 1342).
-   * `companion-api/spec.md` § Behavioural Member Rules owns every rule: the GM text is DUPLICATED
-   * rather than shared, the address is a UUID and never an id, the document must be an Actor and a
-   * WORLD actor, a compendium address is refused, and both duplications are pinned as literal source
-   * strings here and in the harness mirror. It takes NO refusal strings — each pooled delegator
-   * answers through its own result builder, the one home of the member's words.
+   * `companion-api/spec.md` § Behavioural Member Rules owns every rule, the DUPLICATED GM text and
+   * the UUID address included. It takes NO refusal strings — each pooled delegator answers through
+   * its own result builder.
    */
   _requireGmActors(actorUuids) {
     if (game.user?.isGM !== true) {
@@ -2510,9 +2301,8 @@ class Fabricate {
 
   /**
    * GM-only crafting-knowledge reset (issue 773), clearing one actor's learned recipes and scoped
-   * discovery progress for one system, or across every system when `systemId` is null.
-   * EXPLICITLY GM-GATED even though it is GM-only, because it mutates player-owned actor state and,
-   * for `total`-scope books, a world setting. It NEVER THROWS, answering `{ success, message }`.
+   * discovery for one system, or every system when `systemId` is null. EXPLICITLY GM-GATED, it
+   * mutating player-owned actor state and, for `total`-scope books, a world setting. NEVER THROWS.
    */
   async resetActorKnowledge({ actorId = null, systemId = null, freeLearnBudget = true } = {}) {
     const gate = this._requireGmActor(actorId, {
@@ -2533,11 +2323,10 @@ class Fabricate {
   }
 
   /**
-   * `COMPANION.grantRecipeKnowledge` — teach one actor one recipe with NO owned book required (issue
-   * 1289). It is unbounded by design, WHICH IS WHY the behaviour lives in the free function
-   * `grantRecipeKnowledgeToActor` rather than on `RecipeVisibilityService`: that service is handed
-   * out LIVE AND UNGATED, so an unbounded self-benefiting write there would be reachable by any
-   * player from the console. It owns preconditions 1-3 only.
+   * `COMPANION.grantRecipeKnowledge` — teach one actor one recipe with NO owned book (issue 1289).
+   * Unbounded by design, WHICH IS WHY it lives in the free function `grantRecipeKnowledgeToActor`:
+   * `RecipeVisibilityService` is handed out LIVE AND UNGATED, so the write would be reachable from
+   * any player's console. It owns preconditions 1-3 only.
    */
   async grantRecipeKnowledge({ actorId = null, recipeId = null, grantedBy = null } = {}) {
     const gate = this._requireGmActor(actorId, {
@@ -2560,9 +2349,8 @@ class Fabricate {
 
   /**
    * `COMPANION.checkAffordability` — can this actor afford `amount` of `unitId` against the WORLD
-   * coin ladder (issue 1289)? World scope, never a crafting system, so it consults no
-   * `requirements.currency` toggle; ladder-aware, so the caller aggregates nothing; it writes nothing.
-   * GM-gated for the reason the grant is, plus one of its own: on a `macro`-strategy world the check
+   * coin ladder (issue 1289)? World scope, so no `requirements.currency` toggle; ladder-aware; it
+   * writes nothing. GM-gated for the grant's reason plus its own: on a `macro`-strategy world it
    * triggers GM-authored macro code with caller-chosen arguments.
    */
   async checkAffordability({ actorId = null, unitId = null, amount = null } = {}) {
@@ -2577,10 +2365,9 @@ class Fabricate {
   }
 
   /**
-   * The ONE seam bag both WORLD-scoped currency members inject (issue 1301), hoisted so neither
-   * delegator restates it. `isElectedExecutor` is deliberately NOT here: the check gates on no call
-   * site, writing nothing, and a seam read by one of its two consumers is how a gate ends up
-   * assumed rather than declared. `creditCurrency` spreads this bag and adds it.
+   * The ONE seam bag both WORLD-scoped currency members inject (issue 1301). `isElectedExecutor` is
+   * deliberately NOT here — the check gates on no call site, writing nothing — and `creditCurrency`
+   * spreads this bag and adds it.
    */
   _worldCurrencySeams() {
     return {
@@ -2592,12 +2379,10 @@ class Fabricate {
 
   /**
    * `COMPANION.creditCurrency` — credit `amount` of `unitId` to an actor against the WORLD coin
-   * ladder (issue 1301), sharing its request resolution with `checkAffordability` so the two cannot
-   * disagree about `50 gp`. SITED BESIDE IT AND THE BAG THEY SHARE so the two delegators are not
-   * adjacent in either this file or its harness mirror — MEASURED: adjacent near-identical
-   * delegators concatenate into ONE duplicated run and the pair measured over the debt bar.
-   * It routes through the spender's `refund`, so `caller: 'award'` is what lets a GM's `increment`
-   * macro tell a credit from a cancel. NOT IDEMPOTENT: crediting 50 gp twice is 100 gp.
+   * ladder (issue 1301), sharing request resolution with `checkAffordability`. SITED BESIDE IT so
+   * the two delegators are not adjacent here or in the harness mirror — MEASURED: adjacent
+   * near-identical delegators concatenate into ONE duplicated run over the debt bar. It routes
+   * through the spender's `refund`, so `caller: 'award'` tells a credit from a cancel. NOT IDEMPOTENT.
    */
   async creditCurrency({ actorId = null, unitId = null, amount = null, callSite = null } = {}) {
     const gate = this._requireGmActor(actorId, CREDIT_CURRENCY_GATE_KEYS);
@@ -2611,11 +2396,10 @@ class Fabricate {
   }
 
   /**
-   * The seam bag `readPooledHoldings` injects (issue 1342). It SPREADS `_worldCurrencySeams` rather
-   * than restating the coin bindings, the read's currency axis being the same WORLD ladder
-   * `checkAffordability` reads. `findComponentItems` is the PUBLISHED matcher, which keeps what this
-   * read COUNTS and what the consume TAKES from disagreeing. THREE SEAMS THE LEAF DECLARES ARE
-   * DELIBERATELY ABSENT, for the reason `createOrStack` is absent from the award bag.
+   * The seam bag `readPooledHoldings` injects (issue 1342). It SPREADS `_worldCurrencySeams`, the
+   * read's currency axis being the same WORLD ladder; `findComponentItems` is the PUBLISHED matcher,
+   * so what this COUNTS and what the consume TAKES cannot disagree. THREE SEAMS THE LEAF DECLARES
+   * ARE DELIBERATELY ABSENT, for the reason `createOrStack` is absent from the award bag.
    */
   _pooledHoldingsSeams() {
     return {
@@ -2628,9 +2412,8 @@ class Fabricate {
 
   /**
    * `COMPANION.readPooledHoldings` — what a SET of characters holds between them (issue 1342);
-   * `companion-api/spec.md` § The Read Is Not A Reservation owns the rules. Sited HERE, beside the
-   * world-currency members whose bag it spreads, for the duplicated-run reason on `creditCurrency`.
-   * The first member addressed by actor UUID — `_requireGmActors` states why the address, not the id.
+   * `companion-api/spec.md` § The Read Is Not A Reservation owns the rules. Sited HERE for the
+   * duplicated-run reason on `creditCurrency`, and the first member addressed by actor UUID.
    */
   async readPooledHoldings({ actorUuids = null, costs = null } = {}) {
     const gate = this._requireGmActors(actorUuids);
@@ -2641,8 +2424,7 @@ class Fabricate {
   }
 
   /**
-   * The ONE seam bag both Standalone Check Roll members inject, hoisted so neither delegator
-   * restates it and the harness mirror has one thing to substitute. `resolveActor` and `isGm` are
+   * The ONE seam bag both Standalone Check Roll members inject. `resolveActor` and `isGm` are
    * deliberately ABSENT, both gates living in the facade; `prompt` and `promptBulk` exist because
    * both prompt functions AUTO-CONFIRM where there is no `DialogV2`.
    */
@@ -2664,8 +2446,7 @@ class Fabricate {
 
   /**
    * `COMPANION.rollActorCheck` — roll ONE formula for ONE actor, graded against a `dc` or ungraded
-   * (issue 1293). A Standalone Check Roll, as `companion-api/spec.md` defines it. It owns
-   * preconditions 1-3 only, reusing the shared preamble VERBATIM; the leaf owns the call-site gate.
+   * (issue 1293). It owns preconditions 1-3 only; the leaf owns the call-site gate.
    */
   async rollActorCheck({ actorId = null, callSite = null, formula = null, dc = null, compare = null, label = null, interactive = false, rollDecision = null } = {}) {
     const gate = this._requireGmActor(actorId, ROLL_ACTOR_CHECK_GATE_KEYS);
@@ -2677,9 +2458,8 @@ class Fabricate {
 
   /**
    * `COMPANION.resolveBulkCheckDecision` — answer ONE roll decision the caller will apply to N rolls
-   * it makes (issue 1293). It rolls nothing. GM-gated INLINE rather than through `_requireGmActor`,
-   * and not a second copy of the rule: `companion-api/spec.md` § Behavioural Member Rules scopes
-   * the shared preamble to ACTOR-TARGETED members, and this one targets no actor.
+   * it makes (issue 1293). It rolls nothing, and is GM-gated INLINE rather than through
+   * `_requireGmActor`, which § Behavioural Member Rules scopes to ACTOR-TARGETED members.
    */
   async resolveBulkCheckDecision({ callSite = null, formulas = null } = {}) {
     const gmOnly = game.user?.isGM !== true ? COMPANION_OUTCOMES.gmOnly : null;
@@ -2690,10 +2470,9 @@ class Fabricate {
   }
 
   /**
-   * The seam bag `awardComponents` injects (issue 1301). FIVE seams, and the sixth the leaf declares
-   * — `createOrStack` — is deliberately ABSENT: the leaf defaults it to the shared import, so
-   * passing it here would give the create primitive two spellings and let a facade change route the
-   * award past the seam whose normalisation the answer's truthfulness rests on.
+   * The seam bag `awardComponents` injects (issue 1301). FIVE seams, the sixth — `createOrStack` —
+   * deliberately ABSENT: the leaf defaults it to the shared import, so passing it here would give
+   * the create primitive two spellings and let a facade change route the award past the seam.
    */
   _componentAwardSeams() {
     return {
@@ -2706,10 +2485,9 @@ class Fabricate {
   }
 
   /**
-   * `COMPANION.awardComponents` — place one or more of a crafting system's components onto an
-   * actor's sheet (issue 1301); `companion-api/spec.md` § The Award Members owns the rules.
-   * It owns preconditions 1-3 only, reusing the shared preamble VERBATIM, and the leaf owns the
-   * call-site gate, the election and the `awards` validation. NOT IDEMPOTENT: there is no natural key.
+   * `COMPANION.awardComponents` — place components onto an actor's sheet (issue 1301);
+   * `companion-api/spec.md` § The Award Members owns the rules. Preconditions 1-3 only; the leaf
+   * owns the call-site gate, the election and the `awards` validation. NOT IDEMPOTENT.
    */
   async awardComponents({ actorId = null, systemId = null, awards = null, callSite = null } = {}) {
     const gate = this._requireGmActor(actorId, AWARD_COMPONENTS_GATE_KEYS);
@@ -2720,10 +2498,9 @@ class Fabricate {
   }
 
   /**
-   * The seam bag `consumePooledHoldings` injects (issue 1342). It spreads `_worldCurrencySeams` and
-   * adds the election, as `creditCurrency` does, because this member WRITES.
-   * THE COMPONENT TRIO IS BOUND IDENTICALLY TO THE AWARD'S, and that identity is the point: what an
-   * award stacks onto, what salvage consumes and what this TAKES must resolve through one matcher.
+   * The seam bag `consumePooledHoldings` injects (issue 1342): `_worldCurrencySeams` plus the
+   * election, as `creditCurrency` does, this member WRITING. THE COMPONENT TRIO IS BOUND IDENTICALLY
+   * TO THE AWARD'S, award, salvage and take having to resolve through one matcher.
    */
   _pooledConsumptionSeams() {
     return {
@@ -2736,10 +2513,9 @@ class Fabricate {
   }
 
   /**
-   * `COMPANION.consumePooledHoldings` — take a set of costs from what a SET of characters holds
-   * between them (issue 1342); `companion-api/spec.md` § The Pooled Holdings Members owns the rules.
-   * The first published member that REMOVES value. Sited HERE rather than beside the read it pairs
-   * with, for the duplicated-run reason recorded on `creditCurrency`.
+   * `COMPANION.consumePooledHoldings` — take costs from what a SET of characters holds between them
+   * (issue 1342); § The Pooled Holdings Members owns the rules. The first published member that
+   * REMOVES value, sited HERE for the duplicated-run reason recorded on `creditCurrency`.
    */
   async consumePooledHoldings({ actorUuids = null, callSite = null, costs = null } = {}) {
     const gate = this._requireGmActors(actorUuids);
@@ -2751,29 +2527,14 @@ class Fabricate {
 
 
   /**
-   * Craft a recipe for the current selection, delegating to {@link Fabricate#craft}.
-   * Resolves the crafting actor + component sources from the supplied ids (or the
-   * persisted defaults) so the attempt uses the same inventory scope the listing
-   * was computed for.
-   * New starts use version 1 and preserve ready, fully supplied one-call execution.
-   * Waiting or unresolved choices leave the run in the Journal without editable-material spending.
-   * Unlike {@link Fabricate#craft}, this player-facing method accepts actor IDs, not documents.
-   *
-   * @param {object} options
-   * @param {string|null} [options.actorId] Crafting actor id.
-   * @param {string} options.recipeId Recipe id.
-   * @param {string|null} [options.ingredientSetId] Chosen ingredient set id.
-   * @param {Object<string, {optionIndex: number, heldItemId?: string}>|null}
-   *   [options.ingredientOptionOverrides] Explicit ingredient-group choices.
-   * @param {{stepId: string|null, ingredientSetId: string|null,
-   *   allocation: Record<string, number>}|null} [options.ingredientEssenceAllocation]
-   *   Physical carrier units scoped to the current step and ingredient set.
-   *   Stale or mismatched intent blocks versioned execution until explicitly repaired.
-   * @param {string[]|null} [options.componentSourceActorIds] Source actor ids.
-   * @param {boolean} [options.interactive=false] Forwarded crafting option.
-   *   Versioned required checks use the authority's prepare/prompt/resolve exchange regardless
-   *   of this legacy opt-in. Cancelling the prompt leaves the stage unexecuted, not the run absent.
-   * @returns {Promise<object>} Start/wait, execution, cancellation or refusal result.
+   * Craft a recipe for the current selection, delegating to {@link Fabricate#craft} but taking actor
+   * IDS rather than documents, and resolving the crafting actor and component sources so the attempt
+   * uses the inventory scope the listing was computed for. New starts use version 1 and preserve
+   * ready, fully supplied one-call execution; waiting or unresolved choices leave the run in the
+   * Journal without editable-material spending, and a stale `ingredientEssenceAllocation` blocks
+   * versioned execution until repaired. Versioned required checks use the authority's
+   * prepare/prompt/resolve exchange whatever `interactive` says, and cancelling the prompt leaves
+   * the stage unexecuted rather than the run absent.
    */
   async craftRecipe({ actorId = null, recipeId, ingredientSetId = null, ingredientOptionOverrides = null, ingredientEssenceAllocation = null, componentSourceActorIds = null, interactive = false } = {}) {
     this._requireReady();
@@ -2799,11 +2560,10 @@ class Fabricate {
   }
 
   /**
-   * Salvage one owned component for the current selection (issue 675), behind the Inventory tab's
-   * Salvage panel. TAKES AN `actorId`, NEVER AN `actorUuid`: `CraftingEngine.salvage` performs NO
-   * ownership check, so `_resolveCraftingActor` is the ONLY gate on this path, and a uuid would go
-   * straight to `fromUuid()` where a stale or foreign one reaches the server and THROWS rather than
-   * returning the `{ success: false, message }` a store expects. `craftRecipe` parity is the contract.
+   * Salvage one owned component for the current selection (issue 675). TAKES AN `actorId`, NEVER AN
+   * `actorUuid`: `CraftingEngine.salvage` performs NO ownership check, so `_resolveCraftingActor` is
+   * the ONLY gate here, and a uuid would reach `fromUuid()` and THROW rather than answering the
+   * `{ success: false, message }` a store expects. `craftRecipe` parity is the contract.
    */
   async salvageComponent({ actorId = null, systemId, componentId, interactive = false } = {}) {
     this._requireReady();
@@ -2818,10 +2578,9 @@ class Fabricate {
 
   /**
    * Lazily build and cache the `BulkSalvageService` behind `salvageComponents` (issue 859), every
-   * collaborator injected so the service reaches no Foundry global.
-   * CACHING IS SOUND BECAUSE EVERY COLLABORATOR IS READ OFF `this` AT CALL TIME, not captured at
-   * construction: `this.craftingEngine` is `null` until `initialize()`, so a service that captured
-   * the field's value could hold `null` forever. `_getBulkDestroyService` restates the rule.
+   * collaborator injected so it reaches no Foundry global. CACHING IS SOUND BECAUSE EVERY
+   * COLLABORATOR IS READ OFF `this` AT CALL TIME: `this.craftingEngine` is `null` until
+   * `initialize()`, so a captured field value could hold `null` forever.
    */
   _getBulkSalvageService() {
     if (this._bulkSalvageService) return this._bulkSalvageService;
@@ -2831,15 +2590,13 @@ class Fabricate {
       getCraftingSystem: (systemId) => this.craftingSystemManager.getSystem(systemId),
       promptRollDecision: promptBulkCheckRoll,
       postChatMessage: (message) => this._postBulkSalvageChatMessage(message),
-      // The BATCHED complication relay (issue 1286), read off `this` at call time because the
-      // writer is composed during `initialize()`. One message per addressed (system, actor) PAIR
-      // rather than per ROW, both halves being GM-side authorization inputs and the rate limit
-      // being sized against the fanned-out pair count.
+      // The BATCHED complication relay (issue 1286), read off `this` at call time. One message per
+      // addressed (system, actor) PAIR rather than per ROW, both halves being GM-side authorization
+      // inputs and the rate limit being sized against the pair count.
       deliverComplications: (message) => this.complicationDeliveryWriter?.deliver(message),
       // The executing user's stored progressive stage order, through the SAME edge
       // `ResolutionModeService` and `CraftingEngine` are given (issue 1286). Only the pre-run
-      // forecast consumes it; the RUN path uses the order its own run captured at start. Left
-      // unwired the forecast quietly reads the AUTHORED order while the run reads the player's.
+      // forecast consumes it; left unwired it quietly reads the AUTHORED order instead.
       getPlayerResultOrder: entry => this._readPlayerResultOrder(entry),
       // Key-only, matching every card module's `localize` contract; the aggregate card substitutes
       // its own counts.
@@ -2853,15 +2610,13 @@ class Fabricate {
     if (this._bulkDestroyService) return this._bulkDestroyService;
     this._bulkDestroyService = new BulkDestroyService({
       getCraftingSystem: (systemId) => this.craftingSystemManager.getSystem(systemId),
-      // Destroy MUST resolve documents through the identical matcher salvage uses, including its
-      // case-SENSITIVE name fallback: a destroy that matched more broadly than salvage would delete
-      // things the player was shown as a different component. Read off `this.craftingEngine` at
-      // CALL time, because this service is cached and the engine is assigned during `initialize()`.
+      // Destroy MUST resolve documents through the identical matcher salvage uses, case-SENSITIVE
+      // name fallback included, or it would delete what the player was shown as a different
+      // component. Read off `this.craftingEngine` at CALL time, this service being cached.
       findComponentItems: (actor, component, system) =>
         this.craftingEngine.findComponentItems(actor, component, system),
-      // Must RETURN the deleted documents: the service derives `unitsDeleted` from what came back
-      // and never from what it asked for, because a `preDeleteItem` hook can veto individual ids
-      // silently while the rest of the batch deletes.
+      // Must RETURN the deleted documents: `unitsDeleted` comes from what came back, never from what
+      // was asked for, a `preDeleteItem` hook being able to veto individual ids silently.
       deleteItems: (actor, itemIds) => actor.deleteEmbeddedDocuments('Item', itemIds)
     });
     return this._bulkDestroyService;
@@ -2869,19 +2624,16 @@ class Fabricate {
 
   /**
    * Post the ONE aggregated bulk-salvage chat card. THE ORDER OF THE THREE STEPS IS LOAD-BEARING:
-   * SPEAKER first, because `applyMode`'s `ic` branch reads `chatData.speaker.actor` unguarded;
-   * VISIBILITY before `create`, the legacy `rollMode` create option being honoured only for a
-   * message carrying rolls and this card carrying none; and `create` LAST, with `author`, the V14
-   * schema having no `user` field and no shim.
-   * THE SPEAKER IS BUILT, NEVER INFERRED: `getSpeaker()` with no actor falls through to the
-   * CONTROLLED TOKENS, so a GM with an unrelated NPC selected would have the card attributed to it.
-   * NEVER read `core.messageMode`: `assertSetting` throws on V13, and `??` does not catch a throw.
+   * SPEAKER first, `applyMode`'s `ic` branch reading `chatData.speaker.actor` unguarded; VISIBILITY
+   * before `create`, the legacy `rollMode` option being honoured only for a message carrying rolls;
+   * and `create` LAST, with `author`, the V14 schema having no `user` field. THE SPEAKER IS BUILT,
+   * NEVER INFERRED — `getSpeaker()` with no actor falls through to the CONTROLLED TOKENS. NEVER read
+   * `core.messageMode`: `assertSetting` throws on V13 and `??` does not catch a throw.
    */
   async _postBulkSalvageChatMessage({ content, rollMode, actorUuid, actorNames = [] }) {
-    // `globalThis.` rather than the bare global this file uses elsewhere: optional chaining does
-    // not rescue an UNDECLARED identifier, so a bare `fromUuidSync?.()` still throws a
-    // ReferenceError under a harness that has not installed it, and this poster must never be the
-    // thing that costs a completed run its report.
+    // `globalThis.` rather than the bare global: optional chaining does not rescue an UNDECLARED
+    // identifier, so a bare `fromUuidSync?.()` throws under a harness that has not installed it,
+    // and this poster must never cost a completed run its report.
     const actor = actorUuid ? (globalThis.fromUuidSync?.(actorUuid) ?? null) : null;
     const alias = actorNames.filter(Boolean).join(', ') || game.user?.name || '';
     const speaker = actor
@@ -2894,10 +2646,9 @@ class Fabricate {
   }
 
   /**
-   * Gate a bulk target list, resolving ONE actor per row from `target.actorId ?? actorId` and
-   * NOTHING ELSE. There is deliberately no persisted-selection tail, unlike `_resolveCraftingSources`:
-   * a bulk run may span actors, so that fallback would silently RETARGET a row whose own actor did
-   * not resolve, destroying the wrong character's items with no error anywhere. Order is preserved.
+   * Gate a bulk target list, resolving ONE actor per row from `target.actorId ?? actorId` and NOTHING
+   * ELSE. No persisted-selection tail, unlike `_resolveCraftingSources`: a bulk run may span actors,
+   * so that fallback would silently RETARGET an unresolved row. Order is preserved.
    */
   _gateBulkTargets(targets, actorId) {
     return (targets || []).filter(Boolean).map((target) => ({
@@ -2908,8 +2659,7 @@ class Fabricate {
 
   /**
    * Weave a service's result rows back into the caller's ORIGINAL target order, substituting a
-   * refusal row wherever the gate resolved no actor. A run that reordered its own rows would make
-   * "the third one failed" unreadable.
+   * refusal row where the gate resolved no actor, or "the third one failed" is unreadable.
    */
   _mergeBulkRows(gated, ranItems, buildRefusedRow) {
     const rows = [];
@@ -2926,8 +2676,8 @@ class Fabricate {
   }
 
   /**
-   * The identity fields every refusal row carries, resolved from the crafting system so a refused
-   * row still READS as the thing the player selected rather than as an unconnectable blank line.
+   * The identity fields every refusal row carries, resolved from the crafting system so it still
+   * READS as the thing the player selected rather than as a blank line.
    */
   _buildNotPermittedRow(target) {
     const system = this.craftingSystemManager?.getSystem?.(target?.systemId) ?? null;
@@ -2939,25 +2689,20 @@ class Fabricate {
       componentId: target?.componentId ?? null,
       name: component?.name || '',
       img: component?.img || '',
-      // The facade's own outcome, added to the service vocabulary rather than folded into
-      // `skipped`: "you may not act on this actor" and "this row was not runnable" are different
-      // answers and the panel gives them different chips.
+      // The facade's own outcome, never folded into `skipped`: "you may not act on this actor" and
+      // "this row was not runnable" are different answers and the panel chips them differently.
       outcome: 'notPermitted',
       skipReason: null
     };
   }
 
   /**
-   * Salvage MANY owned components in one gesture (issue 859), the seam behind the Inventory tab's
-   * bulk panel.
-   * IT TAKES AN `actorId` PER TARGET, NEVER AN `actorUuid`, AT ANY NESTING LEVEL. Neither the engine
-   * nor `BulkSalvageService` performs an ownership check, so the per-target `_resolveCraftingActor`
-   * is the ONLY gate — and it resolves through `game.actors`, so neither a compendium-backed actor
-   * nor an unlinked token actor can ever be a target. An unresolvable actor becomes a
-   * `notPermitted` ROW rather than a throw, so one refused row costs the player none of the others.
-   * `interactive` defaults TRUE here, unlike the automation-facing `salvageComponent`.
-   * STATED LIMIT: `onProgress`'s `total` counts the rows the SERVICE was given, so a run containing
-   * a refused row finishes below the caller's own denominator.
+   * Salvage MANY owned components in one gesture (issue 859). IT TAKES AN `actorId` PER TARGET,
+   * NEVER AN `actorUuid`, AT ANY NESTING LEVEL: neither the engine nor `BulkSalvageService` performs
+   * an ownership check, so the per-target `_resolveCraftingActor` is the ONLY gate, and it resolves
+   * through `game.actors`, excluding compendium-backed and unlinked token actors. An unresolvable
+   * actor becomes a `notPermitted` ROW rather than a throw. `interactive` defaults TRUE here, unlike
+   * `salvageComponent`. STATED LIMIT: `onProgress`'s `total` counts the rows the SERVICE was given.
    */
   async salvageComponents({ actorId = null, targets = [], interactive = true, onProgress = null } = {}) {
     this._requireReady();
@@ -3001,12 +2746,10 @@ class Fabricate {
   }
 
   /**
-   * Permanently destroy MANY owned components in one gesture (issue 859), under the same gate,
-   * order-preserving merge and `onProgress` limit as `salvageComponents`.
-   * DELETES WHOLE STACKS, and is deliberately NOT gated on `features.salvage` or a component's
-   * `salvage.enabled`: a player can already delete their own Items from the Foundry sheet, so this
-   * adds ergonomics and not capability. No chat card — a result card reports what a run PRODUCED.
-   * The caller owns the confirmation; this executes against the snapshot it named.
+   * Permanently destroy MANY owned components in one gesture (issue 859), under `salvageComponents`'
+   * gate, merge and `onProgress` limit. DELETES WHOLE STACKS, deliberately NOT gated on
+   * `features.salvage` or `salvage.enabled`: a player can already delete their own Items, so this is
+   * ergonomics and not capability. No chat card. The caller owns the confirmation.
    */
   async destroyComponents({ actorId = null, targets = [], onProgress = null } = {}) {
     this._requireReady();
@@ -3039,9 +2782,8 @@ class Fabricate {
   }
 
   /**
-   * Re-evaluate the craftability of ONE ingredient set with in-session per-group option overrides
-   * applied (issue 552), through the SAME `evaluateCraftability` seam the engine consumes.
-   * Synchronous, because the store reads it from a `$derived`.
+   * Re-evaluate ONE ingredient set's craftability with in-session per-group overrides (issue 552),
+   * through the SAME `evaluateCraftability` seam the engine consumes. Synchronous, for a `$derived`.
    */
   evaluateSelectedSet({ recipeId = null, setId = null, optionOverrides = null, essenceAllocation = null, stepId = null, actorId = null, componentSourceActorIds = null } = {}) {
     this._requireReady();
@@ -3055,9 +2797,9 @@ class Fabricate {
       ? componentSourceActors
       : (craftingActor ? [craftingActor] : []);
     if (sources.length === 0) return null;
-    // Resolve through the EXECUTION STEPS, not `recipe.ingredientSets`, which is EMPTY for every
-    // explicit multi-step recipe. `resolveStepIngredientSet` also enforces the two rules that make
-    // this safe: with no `stepId` the ACTIVE step decides, and a set id is matched WITHIN it.
+    // Resolve through the EXECUTION STEPS, not the `recipe.ingredientSets` that is EMPTY for every
+    // explicit multi-step recipe; `resolveStepIngredientSet` also enforces the two rules that make
+    // this safe.
     const resolved = resolveStepIngredientSet({
       steps: this.resolutionModeService?.getExecutionSteps?.(recipe) ?? [],
       stepId,
@@ -3065,9 +2807,8 @@ class Fabricate {
       setId,
     });
     if (!resolved) return null;
-    // Narrow the evaluation to the one selected set through the SHARED step view the engine crafts
-    // against, so the step's tool union applies, keeping the recipe's data fields and the
-    // IngredientSet instance methods.
+    // Narrow to the one selected set through the SHARED step view the engine crafts against, so the
+    // step's tool union applies and the IngredientSet instance methods survive.
     const singleSetRecipe = {
       ...buildStepRecipeView(recipe, resolved.step),
       ingredientSets: [resolved.set],
@@ -3079,10 +2820,7 @@ class Fabricate {
     }) ?? null;
   }
 
-  /**
-   * Lazily build and cache the `AlchemyListingBuilder` projecting the leak-safe workbench view — a
-   * Foundry-global-free read-side collaborator wired with the existing managers.
-   */
+  /** Lazily cache the `AlchemyListingBuilder`: the leak-safe, Foundry-global-free workbench view. */
   _getAlchemyListingBuilder() {
     if (this._alchemyListingBuilder) return this._alchemyListingBuilder;
     this._alchemyListingBuilder = new AlchemyListingBuilder({
@@ -3093,18 +2831,17 @@ class Fabricate {
         data !== undefined
           ? (game.i18n?.format?.(key, data) ?? key)
           : (game.i18n?.localize?.(key) ?? key),
-      // The per-pass inventory snapshot's component resolver (issue 1228). The workbench never
-      // reads component tallies itself; this is here so its snapshot is the same complete value
-      // every other pass builds.
+      // The per-pass inventory snapshot's component resolver (issue 1228): the workbench reads no
+      // tallies itself, but its snapshot must be the same complete value every other pass builds.
       resolveComponentForItem: findMatchingComponent,
     });
     return this._alchemyListingBuilder;
   }
 
   /**
-   * Build the leak-safe player Alchemy workbench listing, scoped to `craftingSystemId`. The current
-   * user is always the viewer, and the actor is resolved through the SAME owner gate as crafting —
-   * a non-owner viewer's actor resolves to null, so the builder answers a denied, empty listing.
+   * Build the leak-safe player Alchemy workbench listing for `craftingSystemId`. The current user is
+   * always the viewer and the actor goes through crafting's owner gate, so a non-owner viewer's
+   * actor resolves to null and the builder answers a denied, empty listing.
    */
   listAlchemyForActor({ actorId = null, craftingSystemId = null, componentSourceActorIds = null } = {}) {
     this._requireReady();
@@ -3122,9 +2859,9 @@ class Fabricate {
 
   /**
    * Submit a workbench of components as an alchemy brew attempt. Owner-scoped like `craftRecipe`,
-   * then delegated to `CraftingEngine#craftAlchemy`, which is AUTHORITATIVE — it matches against all
-   * enabled recipes known and undiscovered, and fizzles with no check and no roll otherwise.
-   * `interactive` prompts on a MATCHED brew only; a fizzle runs no check, so it never does.
+   * then delegated to the AUTHORITATIVE `CraftingEngine#craftAlchemy`, which matches every enabled
+   * recipe known and undiscovered and otherwise fizzles with no check and no roll. `interactive`
+   * prompts on a MATCHED brew only.
    */
   async submitAlchemyAttempt({
     actorId = null,
@@ -3171,8 +2908,8 @@ class Fabricate {
   }
 
   /**
-   * The actors the current user may select as crafting or component-source actors, filtered exactly
-   * like the actor-selection bar so the two pickers offer the same characters. Display data only.
+   * The actors the current user may select as crafting or component-source actors, filtered like the
+   * actor-selection bar so the two pickers agree. Display data only.
    */
   listCraftingSourceActors() {
     this._requireReady();
@@ -3185,8 +2922,8 @@ class Fabricate {
   }
 
   /**
-   * Resolve the current selection's component-source actors as real Foundry actors, for the pure
-   * shopping-list aggregator. Owner-scoped via the persisted ids only — it widens no access.
+   * Resolve the current selection's component-source actors as real Foundry actors for the pure
+   * shopping-list aggregator. Owner-scoped via the persisted ids only; it widens no access.
    */
   getCraftingSourceActors() {
     this._requireReady();
@@ -3236,8 +2973,7 @@ class Fabricate {
 
   /**
    * The player's stored progressive result orders. USER-scoped, NOT client-scoped: per user PER
-   * WORLD, so the same player in another world gets a fresh map and it does NOT follow the account
-   * globally. The `getFavouriteRecipeIds` neighbour IS client-scoped.
+   * WORLD, so another world gets a fresh map. The `getFavouriteRecipeIds` neighbour IS client-scoped.
    */
   getProgressiveResultOrder() {
     const stored = getSetting(SETTING_KEYS.PROGRESSIVE_RESULT_ORDER);
@@ -3245,8 +2981,8 @@ class Fabricate {
   }
 
   /**
-   * The Foundry edge for the `getPlayerResultOrder` seam (issue 651). Deliberately a settings read
-   * answering DATA rather than a sorted array: the reconciliation is in `applyPlayerResultOrder`.
+   * The Foundry edge for the `getPlayerResultOrder` seam (issue 651): a settings read answering DATA,
+   * the reconciliation living in `applyPlayerResultOrder`.
    */
   _readPlayerResultOrder(entry) {
     const key = progressiveOrderKey(entry);
@@ -3257,8 +2993,8 @@ class Fabricate {
 
   /**
    * Persist the player's preferred result order for one namespaced key. ASYNC AND MUST BE AWAITED:
-   * under `user` scope `set` is a real replicated write that can REJECT, unlike the client-scoped
-   * fire-and-forget in `toggleFavouriteRecipe`, so swallowing it would report an order never stored.
+   * under `user` scope `set` is a replicated write that can REJECT, unlike the client-scoped
+   * fire-and-forget in `toggleFavouriteRecipe`.
    */
   async setProgressiveResultOrder(key, orderedIds) {
     const current = this.getProgressiveResultOrder();
@@ -3269,8 +3005,8 @@ class Fabricate {
   }
 
   /**
-   * Whether the player has opted to hide unavailable gathering environments. `scope: 'client'`, so
-   * it persists in that browser's `localStorage` and is per device, not per user.
+   * Whether the player hides unavailable gathering environments. `scope: 'client'`, so it persists in
+   * that browser's `localStorage`, per device rather than per user.
    */
   getHideUnavailableEnvironments() {
     // `Boolean()` rather than `=== true`: the setting is registered `type: Boolean`, and the
@@ -3279,8 +3015,8 @@ class Fabricate {
   }
 
   /**
-   * Persist the "hide unavailable environments" preference. Client-scoped, so it is remembered per
-   * device. View-only: it changes no saved data, no engine listing and no GM configuration.
+   * Persist the "hide unavailable environments" preference, client-scoped and view-only: it changes
+   * no saved data, no engine listing and no GM configuration.
    */
   setHideUnavailableEnvironments(value) {
     return setSetting(SETTING_KEYS.GATHERING_HIDE_UNAVAILABLE, value === true);
@@ -3289,7 +3025,7 @@ class Fabricate {
   /**
    * Start a gathering attempt for the current user; the raw GatheringEngine stays module-internal so
    * every public attempt carries current-user viewer enforcement. `interactive` prompts on the
-   * routed and progressive paths only — the d100 and timed paths roll elsewhere and never prompt.
+   * routed and progressive paths only.
    */
   startGatheringAttempt(options = {}) {
     if (!this.ready) {
@@ -3308,15 +3044,11 @@ class Fabricate {
     );
     Object.assign(withRememberedActor, { actor: selectedActor, lifecycleVersion: 1 });
 
-    // `requestStart`, not `startAttempt`: a blind timed start this client may not
-    // write is routed to the active GM before any task is drawn (issue 901). Every
-    // other start delegates straight to `startAttempt` and is unchanged.
-    //
-    // Wrapped in `executePublicGather` so a READY attempt still finishes in one call. The
-    // `lifecycleVersion: 1` stamped above routes a ready attempt into a started run awaiting
-    // execution instead of the engine's immediate resolution, so without this the public API
-    // answers `accepted: true` and awards nothing (issue 1759). A waiting or timed attempt is
-    // untouched and still matures at world time.
+    // `requestStart`, not `startAttempt`: a blind timed start this client may not write is routed to
+    // the active GM before any task is drawn (issue 901). Wrapped in `executePublicGather` so a
+    // READY attempt still finishes in one call — the `lifecycleVersion: 1` stamped above routes it
+    // into a started run awaiting execution, so without this the public API answers
+    // `accepted: true` and awards nothing (issue 1759). A waiting or timed attempt is untouched.
     return executePublicGather({
       requestStart: () =>
         callGatheringRuntimeWithCurrentViewer(
@@ -3332,8 +3064,8 @@ class Fabricate {
   }
 
   /**
-   * The per-drop "What you might find" breakdown for one opened task, defaulting the remembered
-   * actor to the persisted selection and enforcing the current user as viewer.
+   * The per-drop "What you might find" breakdown for one opened task, defaulting the remembered actor
+   * to the persisted selection and enforcing the current user as viewer.
    */
   getGatheringDropBreakdown(options = {}) {
     if (!this.ready) {
@@ -3364,8 +3096,8 @@ class Fabricate {
   }
 
   /**
-   * Read current gathering conditions and configured tag vocabularies. Player-safe: the global
-   * weather and time-of-day state and the available tags, but no GM-only library internals.
+   * Read current gathering conditions and configured tag vocabularies. Player-safe: weather,
+   * time-of-day and the available tags, but no GM-only library internals.
    */
   getGatheringConditions() {
     this._requireReady();
@@ -3387,8 +3119,8 @@ class Fabricate {
   }
 
   /**
-   * Atomically update global gathering conditions; an omitted field keeps its current value. A
-   * mutation requires a GM and validates its tags through the rich state service.
+   * Atomically update global gathering conditions, an omitted field keeping its value. A mutation
+   * requires a GM and validates its tags through the rich state service.
    */
   setGatheringConditions(conditions = {}) {
     this._requireReady();
@@ -3415,10 +3147,7 @@ class Fabricate {
     return this.gatheringRichStateService?.adjustActorStamina(actor, options);
   }
 
-  /**
-   * Read a crafting system's gathering economy block. Player-safe — the mode and regen cadence are
-   * surfaced in the player UI.
-   */
+  /** Read a crafting system's gathering economy block. Player-safe: mode and regen cadence. */
   getGatheringEconomy(options = {}) {
     this._requireReady();
     return this.gatheringRichStateService?.systemEconomy(options.systemId) ?? null;
@@ -3438,9 +3167,8 @@ class Fabricate {
     const systemId = options.systemId;
     const service = this.gatheringRichStateService;
     if (!service || !systemId) return [];
-    // Player characters only, per the CONFIGURED player-character actor types (issue 1024) — so a
-    // Fallout `robot` appears once the GM ticks it and a dnd5e `npc` never does. A character with no
-    // rolled pool reports `max: null`, and the panel offers Roll.
+    // Player characters only, per the CONFIGURED player-character actor types (issue 1024), so a
+    // Fallout `robot` appears once the GM ticks it. No rolled pool reports `max: null`.
     return Array.from(game.actors?.contents ?? [])
       .filter(actor => isPlayerCharacterActor(actor))
       .map(actor => {
@@ -3479,23 +3207,15 @@ class Fabricate {
   }
 
   /**
-   * Submit a current-lifecycle operation through active-GM authority after initialization.
-   * Actor UUIDs address this authenticated command boundary, whose GM handler rechecks the
-   * attested sender's ownership. They do not replace actor IDs in the player crafting facades.
-   * A timeout is an unknown response, not proof that execution failed or permission to replay.
-   *
-   * `options` MUST be forwarded. It carries `interactive`, which decides whether a required
-   * check opens the roll dialog or settles on the engine's own defaults, and the public
-   * crafting API passes `false` because it has no user to answer one. This signature took only
-   * `command` while its caller below passed both, so the flag was dropped here and reverted to
-   * its interactive default: `game.fabricate.craft()` on a recipe with a check opened a dialog
-   * nobody could answer and waited forever. The source pin covering that caller went on passing,
-   * because it pinned the CALL and nothing pinned this signature (issue 1759).
-   * @param {{actorUuid: string, runType: 'crafting'|'gathering', runId: string,
-   *   expectedRevision: number, action: string, payload?: object}} command
-   *   Start uses an empty runId and revision zero. Alchemy uses runType `crafting`.
-   * @param {{interactive?: boolean}} [options] Forwarded verbatim to the command service.
-   * @returns {Promise<object>} Authoritative result or explicit refusal.
+   * Submit a current-lifecycle operation through active-GM authority after initialization. Actor
+   * UUIDs address this authenticated command boundary, whose GM handler rechecks the attested
+   * sender's ownership; they do not replace actor IDs in the player crafting facades. A timeout is
+   * an unknown response, not proof of failure and not permission to replay. `command` start uses an
+   * empty runId and revision zero, and alchemy uses runType `crafting`.
+   * `options` MUST BE FORWARDED: it carries `interactive`, and this signature once took `command`
+   * alone while its caller passed both, so `game.fabricate.craft()` on a checked recipe opened a
+   * dialog nobody could answer and waited forever — the source pin covered the CALL, not this
+   * signature (issue 1759).
    */
   executeJournalRunCommand(command, options) {
     this._requireReady();
@@ -3504,10 +3224,8 @@ class Fabricate {
   }
 
   /**
-   * Hide a terminal entry for the current user in this world, preserving actor history.
-   * The awaited user-scoped setting write follows the user across devices and can reject.
-   * @param {{actorUuid: string, runType: string, runId: string}} options Native run identity.
-   * @returns {Promise<object>} `{success, key}` on persistence or a refusal for an invalid target.
+   * Hide a terminal entry for the current user in this world, preserving actor history. The awaited
+   * user-scoped write follows the user across devices and can reject.
    */
   dismissJournalRun(options) {
     this._requireReady();
@@ -3515,19 +3233,12 @@ class Fabricate {
       ?? Promise.resolve(authorityUnavailableRefusal());
   }
 
-  /**
-   * Read this user's hidden native run keys for one actor, without changing history.
-   * @param {{actorUuid: string, viewerId?: string}} options A different viewer gets an empty set.
-   * @returns {Set<string>}
-   */
+  /** This user's hidden native run keys for one actor; a different viewer gets an empty set. */
   getDismissedJournalRunKeys(options) {
     return this.journalRunCommands?.getDismissedJournalRunKeys(options) ?? new Set();
   }
 
-  /**
-   * Read cached authority availability. This neither provisions a ledger nor releases a claim.
-   * @returns {{available: boolean, reason: string|null}}
-   */
+  /** Cached authority availability; it neither provisions a ledger nor releases a claim. */
   getJournalRunAuthorityAvailability() {
     return this.journalRunCommands?.getJournalRunAuthorityAvailability()
       ?? authorityUnavailableAvailability();
@@ -3535,10 +3246,8 @@ class Fabricate {
 
   /**
    * Ensure the private run-authority ledger exists, as the active GM. Idempotent: an existing
-   * ledger is returned rather than refused, and no second ledger is ever created.
-   * Boot recovery and the command path already provision automatically, so this is a no-op in a
-   * healthy world. It never clears a retained execution claim.
-   * @returns {Promise<object>} `{success: true, ledgerId}` or `{success: false, reason}`.
+   * ledger is returned rather than refused, boot recovery and the command path already provision
+   * automatically, and it never clears a retained execution claim.
    */
   setupJournalRunAuthority() {
     return this.journalRunCommands?.setupJournalRunAuthority()
@@ -3546,49 +3255,26 @@ class Fabricate {
   }
 
   /**
-   * Record manual disposition of an exact retained execution claim as the active GM.
-   * Inspect actual receipts and the uncertain applying boundary first, after confirming no
-   * other GM realm is still executing. Planned amounts are not proof of awards or spending.
-   * Matching run evidence is reconstructed and disposition persisted before releasing the claim.
-   * This releases authority only: the old request stays non-replayable and an uncertain run
-   * effect remains recovery-required. It performs no replay, compensation or automatic rollback.
-   * @param {{claimId: string, disposition: 'reconciled'|'abandoned'}} options
-   *   claimId is the claim's random token, not the fixed embedded page ID or a run ID.
-   * @returns {Promise<object>} `{success: true, disposition}` or `{success: false, reason}`.
-   * @example
-   * // Active-GM macro after reviewing the interrupted operation and its receipts.
-   * await game.fabricate.whenReady();
-   * const ledgers = [...game.journal].filter(
-   *   (entry) => entry.getFlag('fabricate', 'journalRunAuthorityLedger') === true
-   * );
-   * if (ledgers.length !== 1) throw new Error('Expected one authority ledger');
-   * const page = ledgers[0].pages.get('FabRunAuthority1');
-   * const claimId = page?.getFlag('fabricate', 'journalRunClaimId');
-   * if (!claimId) throw new Error('No retained claim to reconcile');
-   * const result = await game.fabricate.reconcileJournalRunAuthority({
-   *   claimId,
-   *   disposition: 'reconciled',
-   * });
-   * if (!result.success) throw new Error(result.reason);
+   * Record manual disposition of an exact retained execution claim as the active GM. Inspect actual
+   * receipts and the uncertain applying boundary first, after confirming no other GM realm is still
+   * executing; planned amounts are not proof of awards or spending. `claimId` is the claim's random
+   * token (the `journalRunClaimId` flag on the ledger's `FabRunAuthority1` page), never the page id
+   * or a run id. THIS RELEASES AUTHORITY ONLY: the old request stays non-replayable, an uncertain
+   * run effect remains recovery-required, and it performs no replay, compensation or rollback.
    */
   reconcileJournalRunAuthority(options) {
     return this.journalRunCommands?.reconcileJournalRunAuthority(options)
       ?? Promise.resolve(authorityUnavailableRefusal());
   }
 
-  /**
-   * Current world time in seconds (the Foundry-facing read seam). Lives on this
-   * edge so the Journal store and pure UI utils stay free of `game.*`.
-   *
-   * @returns {number}
-   */
+  /** Current world time in seconds, on this edge so the Journal store stays free of `game.*`. */
   getWorldTime() {
     return Number(game.time?.worldTime || 0);
   }
 
   /**
-   * Calendar components for an absolute world time, augmented with `daysPerYear` where derivable so
-   * the pure `worldTimeLabel` util can compose an absolute campaign day without touching `game.*`.
+   * Calendar components for an absolute world time, plus `daysPerYear` where derivable, so the pure
+   * `worldTimeLabel` util can compose a campaign day without touching `game.*`.
    */
   getWorldTimeComponents(worldTime = this.getWorldTime()) {
     const calendar = game.time?.calendar ?? null;
@@ -3604,10 +3290,7 @@ class Fabricate {
     }
   }
 
-  /**
-   * Lazily construct the singleton `RunJournalBuilder`, held on the instance so a fresh builder is
-   * not rebuilt per listing call.
-   */
+  /** Lazily construct the singleton `RunJournalBuilder`, so it is not rebuilt per listing call. */
   _getRunJournalBuilder() {
     if (!this._runJournalBuilder) {
       this._runJournalBuilder = new RunJournalBuilder({
@@ -3634,9 +3317,8 @@ class Fabricate {
         getViewer: () => game.user,
         localize: (key, data) => localizeGathering(key, data),
         nowWorldTime: () => this.getWorldTime(),
-        // The per-pass inventory snapshot's component resolver (issue 1228). The Journal never reads
-        // component tallies itself; this is here so its snapshot is the same complete value every
-        // other pass builds.
+        // The per-pass inventory snapshot's component resolver (issue 1228): the Journal reads no
+        // tallies itself, but its snapshot must be the same complete value every other pass builds.
         resolveComponentForItem: findMatchingComponent,
         getComponentSourceActors: ({ actor, run }) => {
           const uuids = Array.isArray(run?.componentSourceActorUuids)
@@ -3680,9 +3362,9 @@ class Fabricate {
   }
 
   /**
-   * Resolve a system library tool to `{ id, name, img }` through the `data-models` requirement 13
-   * precedence. THE SNAPSHOT RUNG IS LOAD-BEARING — without it an item-sourced Tool, whose
-   * `componentId` is null by construction, printed its raw id (issue 1119).
+   * Resolve a system library tool to `{ id, name, img }` through `data-models` requirement 13's
+   * precedence. THE SNAPSHOT RUNG IS LOAD-BEARING: an item-sourced Tool has a null `componentId` by
+   * construction and without it printed its raw id (issue 1119).
    */
   _resolveJournalTool(systemId, toolId) {
     const system = this.craftingSystemManager?.getSystem(systemId);
@@ -3700,8 +3382,8 @@ class Fabricate {
   }
 
   /**
-   * Resolve a gathering run's task to `{ name, img }` via the COMPOSED environment, which carries
-   * the authored task name and image where the raw store does not; null leaves the raw-id fallback.
+   * Resolve a gathering run's task to `{ name, img }` via the COMPOSED environment, which alone
+   * carries the authored name and image; null leaves the raw-id fallback.
    */
   _resolveJournalGatheringTask(environmentId, taskId) {
     if (!environmentId || !taskId) return null;
@@ -3712,8 +3394,8 @@ class Fabricate {
   }
 
   /**
-   * Resolve a run's awarded item to `{ name, img }` by its recorded uuid, so the Journal can label
-   * history recorded before name and img were captured at award time. Best-effort and synchronous.
+   * Resolve a run's awarded item to `{ name, img }` by recorded uuid, labelling history written
+   * before name and img were captured at award time. Best-effort and synchronous.
    */
   _resolveJournalResultItem(itemUuid) {
     if (!itemUuid || typeof fromUuidSync !== 'function') return null;
@@ -3727,8 +3409,8 @@ class Fabricate {
   }
 
   /**
-   * Resolve a system component to `{ name, img }` for the Journal, powering a salvage run's title
-   * and the fallback for a created result that captured neither; null leaves the raw-id fallback.
+   * Resolve a system component to `{ name, img }` for the Journal: a salvage run's title and the
+   * fallback for a result that captured neither; null leaves the raw-id fallback.
    */
   _resolveJournalComponent(systemId, componentId) {
     if (!systemId || !componentId) return null;
@@ -3738,8 +3420,8 @@ class Fabricate {
   }
 
   /**
-   * Resolve the Journal's selected actor against the bar-selectable list, preferring a remembered id
-   * and then the first selectable. Mirrors the gathering listing's remembered-actor seam.
+   * Resolve the Journal's selected actor against the bar-selectable list, remembered id first, then
+   * the first selectable — the gathering listing's remembered-actor seam.
    */
   _resolveJournalActor(rememberedActorId) {
     const selectable = getBarSelectableActors({ viewer: game.user });
@@ -3761,10 +3443,9 @@ class Fabricate {
   }
 
   /**
-   * Advance a crafting run's current step — the single player-triggerable advance boundary. Since
-   * `craft()` writes directly to the source actors a non-owner cannot advance, which answers a
-   * "needs owner" message rather than throwing. THE RECIPE COMES FROM THE RESOLVED RUN, NEVER THE
-   * CALLER (issue 966): trusting a client-supplied id let a caller advance run X while naming Y.
+   * Advance a crafting run's current step — the single player-triggerable advance boundary. `craft()`
+   * writes directly to the source actors, so a non-owner gets a "needs owner" message rather than a
+   * throw. THE RECIPE COMES FROM THE RESOLVED RUN, NEVER THE CALLER (issue 966).
    */
   async advanceCraftingRun({ actorId, runId, interactive = false } = {}) {
     this._requireReady();
@@ -3788,8 +3469,7 @@ class Fabricate {
 
   /**
    * Cancel a player's in-progress craft (issue 848), reusing `advanceCraftingRun`'s ownership guard:
-   * `cancelCraft` restores items to the source actors, so a non-owner is blocked gracefully rather
-   * than by a Foundry permission throw.
+   * `cancelCraft` restores items to the source actors, so a non-owner is blocked gracefully.
    */
   async cancelCraftingRun({ actorId, runId } = {}) {
     this._requireReady();
@@ -3822,29 +3502,14 @@ class Fabricate {
   }
 
   /**
-   * Craft a recipe for a resolved Actor, preserving one-call execution when the stage is ready
-   * and all choices are supplied. New starts use version 1 through active-GM authority.
-   * Waiting stages or unresolved choices remain in the Journal without editable-material spending.
-   * Resuming an existing unversioned run preserves its legacy contract.
-   * Use {@link Fabricate#craftRecipe} for the player-facing actor-ID selection facade.
-   * Required versioned checks still use the authority's player prompt and GM evaluation.
-   * Secret checks use a generic prompt and GM private posting without player roll-data handoff.
-   * Foundry whisper/private-roll presentation is not a server confidentiality guarantee.
-   * @param {Actor} actor The Actor document performing the craft, not its ID or UUID string.
-   * @param {string|Recipe} recipe Recipe ID or resolved Recipe.
-   * @param {object} [options]
-   * @param {Actor[]} [options.componentSourceActors] Resolved source documents, defaulting to actor.
-   * @param {string} [options.runId] Existing active run to continue.
-   * @param {string|null} [options.ingredientSetId] Chosen ingredient route.
-   * @param {Object<string, {optionIndex: number, heldItemId?: string}>}
-   *   [options.ingredientOptionOverrides] Explicit group choices.
-   * @param {{stepId: string, ingredientSetId: string, allocation: Object<string, number>}}
-   *   [options.ingredientEssenceAllocation] Shared physical carrier allocation.
-   * @returns {Promise<object>} Execution, start/wait or refusal result.
-   * @example
-   * await game.fabricate.whenReady();
-   * const actor = game.actors.get('YOUR_ACTOR_ID');
-   * const result = await game.fabricate.craft(actor, 'YOUR_RECIPE_ID');
+   * Craft a recipe for a resolved Actor DOCUMENT — never an id or uuid string; {@link
+   * Fabricate#craftRecipe} is the player-facing actor-ID facade. One-call execution is preserved
+   * when the stage is ready and all choices are supplied; new starts use version 1 through active-GM
+   * authority, waiting stages and unresolved choices stay in the Journal without editable-material
+   * spending, and resuming an existing unversioned run keeps its legacy contract.
+   * Required versioned checks use the authority's player prompt and GM evaluation; a SECRET check
+   * uses a generic prompt and GM private posting with no player roll-data handoff, and Foundry's
+   * whisper presentation is not a server confidentiality guarantee.
    */
   async craft(actor, recipe, options = {}) {
     if (!this.ready) {
@@ -3881,8 +3546,8 @@ class Fabricate {
   }
 
   /**
-   * Delete a recipe by id, routed through `CraftingSystemManager.deleteRecipes` (issue 1132) so this
-   * public API and the GM studio cannot disagree about what deleting a recipe reaches.
+   * Delete a recipe by id through `CraftingSystemManager.deleteRecipes` (issue 1132), so this public
+   * API and the GM studio cannot disagree about what deleting a recipe reaches.
    */
   async deleteRecipe(recipeId) {
     if (!this.ready) {
@@ -3900,18 +3565,16 @@ class Fabricate {
 
 const fabricate = new Fabricate();
 
-// Register the init-time Foundry CONFIG entries for the canvas Interactable foundation. Defensive
-// and idempotent, so it is safe from BOTH `init` and `ready` — the latter being the backstop for a
-// late module evaluation that registers the `init` callback for an already-spent event.
+// The init-time Foundry CONFIG entries for the canvas Interactable foundation. Idempotent, so it is
+// safe from BOTH `init` and `ready`, the latter backstopping a late module evaluation.
 function registerFabricateConfig() {
   // Register the region-first `fabricate.interactable` data model and its type icon. Defensive and
   // idempotent: a no-op when the Foundry region APIs are unavailable.
   registerInteractableRegionBehavior(CONFIG);
 
-  // Register the CORE schema-driven `RegionBehaviorConfig` as the document sheet for the
-  // `fabricate.interactable` subtype. The rich `InteractableConfigApp` is an ApplicationV2, NOT a
-  // DocumentSheet, so registering it left `behavior.sheet` null and broke the edit pencil; the rich
-  // panel stays reachable from the HUD entry and the scene-control opener.
+  // The CORE schema-driven `RegionBehaviorConfig` as the document sheet for `fabricate.interactable`:
+  // the rich `InteractableConfigApp` is an ApplicationV2, NOT a DocumentSheet, so registering it
+  // left `behavior.sheet` null and broke the edit pencil. The rich panel stays on the HUD entry.
   try {
     const DocumentSheetConfig = foundry?.applications?.apps?.DocumentSheetConfig
       ?? globalThis.DocumentSheetConfig;
@@ -3931,9 +3594,8 @@ function registerFabricateConfig() {
   }
 }
 
-// Bind the public API onto the live `game.fabricate` global. A pure assignment, so it is idempotent
-// and safe from BOTH `init` and `ready`. The `ready` call is the backstop for a late module
-// evaluation that leaves `game.fabricate` unassigned and stalls the manager on "still loading".
+// Bind the public API onto the live `game.fabricate` global. A pure assignment, idempotent and safe
+// from BOTH `init` and `ready`, the latter backstopping a manager stalled on "still loading".
 function bindFabricateGlobal() {
   game.fabricate = fabricate;
   // Expose the manager singleton so the region behaviour event handlers can resolve
@@ -3995,9 +3657,8 @@ function bindFabricateGlobal() {
     // Public hook names module authors may subscribe to.
     HOOKS: FABRICATE_HOOKS,
     // The named, versioned contract for outbound BEHAVIOURAL consumption (issue 1289), frozen at
-    // module load and assigned HERE AND NOWHERE ELSE, so a companion can version-check from
-    // Fabricate's own `init`. ITS `stable` MEMBERS ARE METHODS ON THE FACADE, not entries in this
-    // class bag: publishing a grant symbol here would hand out a GM-gated write without its gate.
+    // module load and assigned HERE AND NOWHERE ELSE. ITS `stable` MEMBERS ARE METHODS ON THE
+    // FACADE: publishing a grant symbol here would hand out a GM-gated write without its gate.
     COMPANION: COMPANION_CONTRACT
   };
   managerExtensions.bindPublicApi(game.fabricate.api);
@@ -4018,8 +3679,8 @@ function bindFabricateGlobal() {
     const recipes = recipeManager.getRecipes({ craftingSystemId: systemId }).map(r => r.toJSON());
     const version = game.modules?.get('fabricate')?.version || '0.0.0';
     // Gathering authoring rides along, mirroring `adminStore.exportSystem`: the FULL environment
-    // array and the whole `gatheringConfig` setting, which the exporter then slices. Passing three
-    // args dropped both, making the public-API export lossy against the import path (issue 642).
+    // array and the whole `gatheringConfig`, which the exporter slices. Passing three args dropped
+    // both and made the public-API export lossy against the import path (issue 642).
     const gatheringEnvironments = fabricate.gatheringEnvironmentStore?.list?.() ?? [];
     const gatheringConfig = getSetting(SETTING_KEYS.GATHERING_CONFIG) || {};
     // The world currency ladder rides along too (issue 1278). It is WORLD scope, so there is
@@ -4031,9 +3692,8 @@ function bindFabricateGlobal() {
     // And the world character libraries (issue 1308), same reason, same consequence: omit them and
     // every learning gate, tool requirement and check modifier in the payload lands unresolvable.
     const characterLibraries = fabricate.characterLibrariesStore?.get?.() ?? {};
-    // And the three WORLD-SCOPE ENTITY settings (issue 1364), with a sharper consequence: these
-    // slices are membership-filtered, so omitting them exports a system whose world roster,
-    // defaults and membership records are all empty.
+    // And the three WORLD-SCOPE ENTITY settings (issue 1364), sharper because these slices are
+    // membership-filtered: omitting them exports an empty roster, defaults and membership.
     const componentScope = fabricate.getComponentScopeStore?.()?.get?.() ?? {};
     const essenceScope = fabricate.getEssenceScopeStore?.()?.get?.() ?? {};
     const toolScope = fabricate.getToolScopeStore?.()?.get?.() ?? {};
@@ -4067,17 +3727,16 @@ function bindFabricateGlobal() {
     });
   };
 
-  // GM "prepare for uninstall" cleanup (issue 535). `fabricate.interactable` is a module-defined
-  // RegionBehavior sub-type Foundry does NOT remove when Fabricate is disabled, so it errors on
-  // every scene load. This strips ONLY what Fabricate owns and NEVER deletes a parent Region, a
-  // foreign behaviour or a GM's own Token.
+  // GM "prepare for uninstall" cleanup (issue 535): `fabricate.interactable` is a module-defined
+  // RegionBehavior sub-type Foundry does NOT remove on disable, so it errors on every scene load.
+  // This strips ONLY what Fabricate owns, never a parent Region, a foreign behaviour or a Token.
   game.fabricate.cleanupInteractables = () => runInteractableWorldCleanup();
 }
 
 /**
- * The DESTINATION world's entity roster (issue 1364). A copy-mode import matches every incoming
- * entity's SOURCE REFERENCES against this rather than minting a duplicate. An absent store answers
- * an empty list, so everything mints — correct for an unmigrated world.
+ * The DESTINATION world's entity roster (issue 1364), which a copy-mode import matches incoming
+ * SOURCE REFERENCES against rather than minting a duplicate. An absent store answers an empty list,
+ * so everything mints — correct for an unmigrated world.
  */
 function buildWorldEntityIndex(fabricate) {
   return {
@@ -4087,10 +3746,7 @@ function buildWorldEntityIndex(fabricate) {
   };
 }
 
-/**
- * The GM-invocable uninstall-safe interactable cleanup edge. GM-gated and no-throw; answers `null`
- * when it did not run.
- */
+/** The GM-invocable uninstall-safe interactable cleanup edge: no-throw, `null` when it did not run. */
 async function runInteractableWorldCleanup() {
   const t = (key, fallback, data) => {
     const i18n = globalThis.game?.i18n;
@@ -4154,9 +3810,8 @@ Hooks.once('init', async () => {
   bindFabricateGlobal();
 });
 
-// GM-only Compendium Directory bulk-import action, registered at module top-level and NOT in the
-// `ready` body: that context menu is built once in `_onFirstRender`, which runs BEFORE `ready`, so
-// a `ready`-body listener could miss it. The listener MUTATES `contextOptions` in place.
+// GM-only Compendium Directory bulk-import action, at module top-level and NOT in the `ready` body:
+// that context menu is built once in `_onFirstRender`, BEFORE `ready`. It MUTATES in place.
 Hooks.on('getCompendiumContextOptions', (application, contextOptions) => {
   contextOptions.push(buildCompendiumImportContextOption({
     localize: bridgeLocalize,
@@ -4177,9 +3832,8 @@ Hooks.once('ready', async () => {
   // Issue 1565: FIRST, because it depends on nothing Fabricate has built and a client on a stale
   // entry script may fail below. In the `ready` body, not `initialize()`, which the View Lab calls.
   reportStaleEntryScript();
-  // Backstop for a missed `init`, which a late module evaluation can cause. Both helpers are
-  // idempotent, so re-running guarantees `game.fabricate` and the Interactable CONFIG exist before
-  // readiness flips; otherwise the manager stalls on "still loading" forever.
+  // Backstop for the `init` a late module evaluation can miss. Both helpers are idempotent, so this
+  // guarantees `game.fabricate` and the Interactable CONFIG exist before readiness flips.
   registerFabricateConfig();
   bindFabricateGlobal();
   await fabricate.initialize();
@@ -4204,8 +3858,8 @@ Hooks.once('ready', async () => {
   notifyUnresolvedItemDescriptions();
 
   // Issue 1024: the GM-only advisory for a stack-quantity path that resolves nothing, or reads on
-  // the prepared document but is absent from `_source`, so every write is silently discarded. The
-  // path was configured during `initialize()`; this adds the world scan, which needs `game.items`.
+  // the prepared document but is absent from `_source` so every write is discarded. The path was
+  // configured during `initialize()`; this adds the world scan, which needs `game.items`.
   applyItemStackQuantityPathSetting({ notify: true });
 
   // Wire the region-first canvas Interactable foundation: drop interception, the region-enter
@@ -4221,15 +3875,11 @@ Hooks.once('ready', async () => {
         (error) => console.error('Fabricate | Journal run socket command failed', error)
       );
     }
-    // `senderId` is Foundry's server-attested sender user id (the trusted 2nd
-    // callback arg of a custom module socket broadcast — set from the authenticated
-    // session in `dist/server/sockets.mjs handleCustomSocket`, NOT from the client
-    // payload). The interactable handler authenticates privileged edges against it
-    // (issue 593); payload `userId` fields are client-supplied and spoofable.
-    // Defensive: the event router shares the `module.fabricate` channel with the
-    // canvas Interactable round-trip. Guard it so a throw on an event payload can
-    // never prevent a non-event Interactable payload from reaching
-    // handleInteractableSocketMessage below.
+    // `senderId` is Foundry's server-attested sender user id — the trusted 2nd callback arg of a
+    // custom module socket broadcast, set from the authenticated session in
+    // `dist/server/sockets.mjs handleCustomSocket` — which the interactable handler authenticates
+    // privileged edges against (issue 593); payload `userId` fields are spoofable. Guarded because
+    // this router shares the `module.fabricate` channel with the Interactable round-trip below.
     try {
       routeEventSceneSocketMessage(payload, {
         currentUserId: () => game.user?.id,
@@ -4240,9 +3890,8 @@ Hooks.once('ready', async () => {
     } catch (_error) {
       // Defensive: never block the Interactable payload below.
     }
-    // The same channel carries the environment node depletion a player emits from a node-backed
-    // task: only the active GM may write `gatheringEnvironments`, so the single-unit decrement is
-    // applied here, recomputed from its own stored state.
+    // The same channel carries the environment node depletion a player emits: only the active GM may
+    // write `gatheringEnvironments`, so the decrement is applied here from its own stored state.
     try {
       routeGatheringNodeDepleteMessage(payload, {
         isActiveGM: () => game.user?.id === game.users?.activeGM?.id,
@@ -4261,8 +3910,7 @@ Hooks.once('ready', async () => {
       // Defensive: never block the Interactable payload below.
     }
     // The same channel carries a player's BLIND gathering start (issue 901): only the active GM may
-    // write `gatheringBlindRuns`, and only a client the player does not control may draw the task
-    // without the player being able to rig it.
+    // write `gatheringBlindRuns`, and only a client the player does not control may draw the task.
     try {
       routeGatheringBlindStartMessage(payload, {
         isActiveGM: () => game.user?.id === game.users?.activeGM?.id,
@@ -4278,8 +3926,7 @@ Hooks.once('ready', async () => {
       // Defensive: never block the Interactable payload below.
     }
     // The same channel carries a relayed COMPLICATION delivery (issue 1286): the GM-only card and
-    // macro must run on a GM client, from the complication that GM's OWN record holds. Addressing
-    // only — nothing on the wire names a macro, a visibility or any content.
+    // macro run from that GM's OWN record. Addressing only — the wire names no macro or content.
     try {
       routeComplicationDeliveryMessage(payload, {
         isActiveGM: () => game.user?.id === game.users?.activeGM?.id,
@@ -4299,9 +3946,8 @@ Hooks.once('ready', async () => {
     } catch (_error) {
       // Defensive: never block the Interactable payload below.
     }
-    // The same channel carries the Interactable node-update action and the region-first activation
-    // round-trip. Only the active GM applies node and behaviour writes and validates activation;
-    // only the targeted user opens a granted session.
+    // The same channel carries the Interactable node-update and region-first activation round-trip:
+    // only the active GM writes and validates, and only the targeted user opens a granted session.
     handleInteractableSocketMessage(payload, {
       senderId,
       isSenderGM: (id) => game.users?.get(id)?.isGM === true,
@@ -4318,12 +3964,11 @@ Hooks.once('ready', async () => {
     void fabricate.craftingSystemManager?.refreshComponentMetadataForUpdatedItem(item, changes);
   });
 
-  // Env-node-driven marker swap: when a task node depletes or recharges, every linked Tile marker
-  // flips to or from `depletedBehavior.swapImage`. Both the gather decrement and the world-time
-  // respawn write `fabricate.gatheringEnvironments`, so reacting to that setting covers BOTH.
-  // THE HANDLER TAKES THE `Setting` DOCUMENT ONLY, the create and update hooks differing in their
-  // second argument. The try/catch buys a Fabricate-owned failure signal, not broadcast survival;
-  // the collaborators are resolved PER CALL, and shared so the two listeners cannot drift.
+  // Env-node-driven marker swap: a depleting or recharging task node flips every linked Tile marker
+  // to or from `depletedBehavior.swapImage`, and both the gather decrement and the world-time
+  // respawn write `fabricate.gatheringEnvironments`, so reacting to that setting covers BOTH. THE
+  // HANDLER TAKES THE `Setting` DOCUMENT ONLY, the two hooks differing in their second argument;
+  // collaborators are resolved PER CALL and shared so the two listeners cannot drift.
   const fabricateSettingChangeTargets = () => ({
     craftingSystemManager: fabricate.craftingSystemManager,
     recipeManager: fabricate.recipeManager,
@@ -4331,9 +3976,8 @@ Hooks.once('ready', async () => {
     currencyConfigStore: fabricate.currencyConfigStore,
     travelStore: fabricate.gatheringRealmStore,
     characterLibrariesStore: fabricate.characterLibrariesStore,
-    // Issue 1359. Without these three the bridge legs receive `undefined` and NO-OP silently: the
-    // key still counts as handled, so nothing reports the miss and the client's corpus stays at its
-    // boot value for the rest of the session.
+    // Issue 1359. Without these three the bridge legs receive `undefined` and NO-OP silently — the
+    // key still counts as handled — so the client's corpus stays at its boot value all session.
     componentScopeStore: fabricate.componentScopeStore,
     essenceScopeStore: fabricate.essenceScopeStore,
     toolScopeStore: fabricate.toolScopeStore,
@@ -4352,19 +3996,17 @@ Hooks.once('ready', async () => {
         // separate the advisory from the typo by an arbitrary amount of destroyed inventory.
         applyItemStackQuantityPathSetting({ notify: true });
       }
-      // Dismissals are `scope: 'user'`, so `updateSetting` delivers EVERY user's document to
-      // every client; only this user's own hiding changes what this client shows. `Setting#user`
-      // is an id (`idOnly: true` on V14.365); the `.id` read costs nothing and stays honest.
+      // Dismissals are `scope: 'user'`, so `updateSetting` delivers EVERY user's document to every
+      // client. `Setting#user` is an id (`idOnly: true` on V14.365); the `.id` read stays honest.
       if (
         key === `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.JOURNAL_RUN_DISMISSALS}`
         && (setting?.user?.id ?? setting?.user) === game.user?.id
       ) {
         Hooks.callAll('fabricate.journalDismissalsChanged');
       }
-      // Cross-client refresh: `craftingSystemsChanged` / `recipesChanged` are local
-      // `Hooks.callAll`s fired only on the GM's client. The setting hooks fire on every
-      // client when the replicated world setting lands, so reload the stale in-memory
-      // manager here and re-emit the local change hook so open player apps refresh.
+      // Cross-client refresh: `craftingSystemsChanged` / `recipesChanged` fire only on the GM's
+      // client, while the setting hooks fire everywhere the replicated world setting lands, so
+      // reload the stale in-memory manager here and re-emit the local hook.
       handleFabricateSettingChange(key, fabricateSettingChangeTargets());
     } catch (error) {
       console.error('Fabricate | Failed to handle a Fabricate setting change', error);
@@ -4372,8 +4014,7 @@ Hooks.once('ready', async () => {
   };
   Hooks.on('updateSetting', handleFabricateSettingDocumentChange);
   // THE FIRST EVER WRITE TO A WORLD SETTING IS A CREATE, NOT AN UPDATE (issue 1024), so without this
-  // line a GM setting a new value for the first time propagates to nobody until reload. BOTH LEGS
-  // SHARE ONE LISTENER, pinned by two tests: nothing downstream distinguishes the two.
+  // a first-time value propagates to nobody until reload. BOTH LEGS SHARE ONE LISTENER.
   Hooks.on('createSetting', handleFabricateSettingDocumentChange);
   const refreshJournalRunAuthorityAvailability = () => {
     void fabricate.journalRunCommands?.refreshJournalRunAuthorityAvailability?.();
@@ -4398,8 +4039,8 @@ Hooks.once('ready', async () => {
 
 /**
  * Issue 555 (repurposed by 567) — the one-shot, primary-GM-gated backfill stamping
- * `roles[systemId].recipeItemDefinitionId` on every recipe-item definition's source Item, PER OWNING
- * SYSTEM so a source registered twice lands both leaves. NOT a MigrationRunner entry.
+ * `roles[systemId].recipeItemDefinitionId` on each definition's source Item, PER OWNING SYSTEM so a
+ * source registered twice lands both leaves. NOT a MigrationRunner entry.
  */
 async function runRecipeItemFlagAutoStamp() {
   try {
@@ -4420,9 +4061,8 @@ async function runRecipeItemFlagAutoStamp() {
 
 /**
  * Issue 556 — the one-shot, primary-GM-gated backfill stamping `roles[system.id].componentId` onto
- * every registered component's source Item. PLACED BEFORE THE `updateItem` HOOK REGISTERS, so
- * restamp writes cannot trigger a metadata-refresh storm. ITS VERSION ADVANCE IS WITHHELD while
- * `1.30.0` has not completed (issue 1363), the spec's requirement 17 owning why.
+ * every registered component's source Item, BEFORE THE `updateItem` HOOK REGISTERS so restamp writes
+ * cannot storm. ITS VERSION ADVANCE IS WITHHELD while `1.30.0` has not completed (requirement 17).
  */
 async function runComponentFlagAutoStamp() {
   try {
@@ -4448,8 +4088,7 @@ async function runComponentFlagAutoStamp() {
 /**
  * Issue 561 — the one-shot, primary-GM-gated backfill stamping `roles[system.id].toolId` onto every
  * registered tool's source Item, withholding its advance for `runComponentFlagAutoStamp`'s reason.
- * ORDERING IS LOAD-BEARING: after the `1.15.0` migration populates each tool's source refs, and
- * before the `updateItem` hook registers. Sources only.
+ * ORDERING IS LOAD-BEARING: after `1.15.0` populates the source refs, before `updateItem` registers.
  */
 async function runToolFlagAutoStamp() {
   try {
@@ -4473,10 +4112,9 @@ async function runToolFlagAutoStamp() {
 }
 
 /**
- * Issue 600 — the one-shot, active-GM-gated re-stamp writing `roles[systemId].componentId` onto
- * OWNED actor items resolving to a component by NAME ONLY. SCOPE: `game.actors` only, never an
- * unlinked synthetic-token actor, whose delta-based flags are fragile to write. NOT a
- * MigrationRunner entry: that runner has no Item handle, identical to the source stamps.
+ * Issue 600 — the one-shot, active-GM-gated re-stamp writing `roles[systemId].componentId` onto OWNED
+ * actor items resolving to a component by NAME ONLY. SCOPE: `game.actors` only, never an unlinked
+ * synthetic-token actor. NOT a MigrationRunner entry: that runner has no Item handle.
  */
 async function runOwnedItemComponentIdentityRestamp() {
   try {
@@ -4507,9 +4145,8 @@ async function runOwnedItemComponentIdentityRestamp() {
 
 /**
  * Issue 1363 — the one-shot, active-GM-gated pass remapping every durable identity flag the `1.30.0`
- * re-key invalidated. THE TWO GATES ARE DIFFERENT AND MUST STAY SO;
- * `destructive-changes-and-migrations/spec.md` § World-Scope Entity Migration requirements 13 and 17
- * own the run gate, the clear gate, the `compareSemver` rule and the withheld version advance.
+ * re-key invalidated. THE TWO GATES ARE DIFFERENT AND MUST STAY SO; § World-Scope Entity Migration
+ * requirements 13 and 17 own both, the `compareSemver` rule and the withheld version advance.
  */
 async function runWorldScopeIdentityFlagRemap() {
   try {
@@ -4521,10 +4158,9 @@ async function runWorldScopeIdentityFlagRemap() {
     ) {
       return;
     }
-    // THE RUN GATE IS CORPUS-DERIVED, and this is that predicate: a seeded scope with no pending
-    // map has nothing to remap. A world with NOTHING to remap still falls through to the version
-    // advance so it stops re-checking every boot, and that advance is itself gated on migration
-    // completion, so a world whose migration deferred before writing the map re-runs.
+    // THE RUN GATE IS CORPUS-DERIVED: a seeded scope with no pending map has nothing to remap, and a
+    // world with nothing to remap still falls through to the version advance so it stops re-checking
+    // — an advance itself gated on migration completion, so a deferred migration re-runs.
     const rekeyMap = getSetting(SETTING_KEYS.WORLD_SCOPE_REKEY_MAP) ?? {};
     let summary = null;
     if (hasPendingWorldScopeRekey(() => rekeyMap)) {
@@ -4539,9 +4175,8 @@ async function runWorldScopeIdentityFlagRemap() {
       );
       return;
     }
-    // THE SECOND WITHHOLD, a different question from the first: that gate asks whether the PRODUCING
-    // migration completed, this whether THIS pass did. A rejected write leaves that actor naming
-    // retired ids, and destroying the map would strand it and un-withhold the startup prune.
+    // THE SECOND WITHHOLD, asking whether THIS pass completed where the first asks about the
+    // PRODUCING migration: destroying the map would strand a rejected write's actor on retired ids.
     if (!remapCompletedCleanly(summary)) {
       console.warn(
         `Fabricate | world-scope re-key map RETAINED: ${summary.skippedErrors} document(s) could not be updated, so the repair is incomplete and its decision record is not destroyed. Fix the cause and reload, or run game.fabricate.remapWorldScopeIdentityFlags().`
@@ -4563,9 +4198,8 @@ async function applyWorldScopeIdentityFlagRemap(rekeyMap) {
     const summary = await remapIdentityFlagsAcrossActors({
       actors: game.actors ?? [],
       rekeyMap,
-      // Two depths, deliberately: the crafting and salvage containers, the roles map and the legacy
-      // scalar are DOUBLY nested under `flags.fabricate.fabricate.<key>`, while `gatheringRuns` is
-      // written with a bare `setFlag` at the single-scope path.
+      // Two depths, deliberately: the containers, the roles map and the legacy scalar are DOUBLY
+      // nested under `flags.fabricate.fabricate.<key>`, while `gatheringRuns` is single-scope.
       readFlag: (document, key, fallback = null, options = {}) =>
         options.bare
           ? (document?.getFlag?.('fabricate', key) ?? fallback)
@@ -4588,8 +4222,7 @@ async function applyWorldScopeIdentityFlagRemap(rekeyMap) {
 /**
  * Issue 1654 — the one-shot, active-GM-gated pass remapping every durable essence reference the
  * `1.34.0` merge invalidated. It mirrors `runWorldScopeIdentityFlagRemap` but carries its OWN
- * decision record, so a world that consumed one may still owe the other, and writes a forced
- * replacement because it rewrites key sets. Its ordering against that sibling is at the call site.
+ * decision record, so a world that consumed one may still owe the other.
  */
 async function runWorldEssenceMergeFlagRemap() {
   try {
@@ -4625,9 +4258,8 @@ async function runWorldEssenceMergeFlagRemap() {
       );
       return;
     }
-    // The `systems` leg only, with `retired` written back explicitly: `retired` is the tombstone
-    // keeping a retired essence id taken for the life of the world, so a clear writing `{}` would
-    // let `mintEssenceId` reissue one.
+    // The `systems` leg only, `retired` written back explicitly: it is the tombstone keeping a
+    // retired essence id taken for the life of the world, so a `{}` clear would let it reissue.
     const stored = getSetting(SETTING_KEYS.WORLD_ESSENCE_MERGE_MAP) ?? {};
     await setSetting(SETTING_KEYS.WORLD_ESSENCE_MERGE_MAP, {
       systems: {},
@@ -4643,14 +4275,13 @@ async function runWorldEssenceMergeFlagRemap() {
 }
 
 /**
- * Apply the essence remap; the gating above is the decision, this is the work. EVERY WRITE IS A
- * FORCED REPLACEMENT, never `setFabricateFlag`: an essence id is an object KEY and `Document#update`
- * merges inner objects without deleting, so a merge write would leave the retired key beside it.
+ * Apply the essence remap; the gating above is the decision. EVERY WRITE IS A FORCED REPLACEMENT,
+ * never `setFabricateFlag`: an essence id is an object KEY and `Document#update` merges without
+ * deleting, so a merge write would leave the retired key beside the new one.
  */
 async function applyWorldEssenceMergeFlagRemap(mergeMap) {
-  // A write counts as landed on the strength of not throwing, so the remapped counts can overstate.
-  // Deliberately: the only tighter bucket is `skippedErrors`, which `remapCompletedCleanly` reads
-  // to withhold the clear, and the overstatement reaches no gate.
+  // A write counts as landed on the strength of not throwing, so the counts can overstate —
+  // deliberately, the overstatement reaching no gate that `skippedErrors` does not already serve.
   const replace = (document, path, value) => document?.update?.({ [path]: value });
   const summary = await remapEssenceFlagsAcrossActors({
     actors: game.actors ?? [],
@@ -4680,8 +4311,8 @@ async function applyWorldEssenceMergeFlagRemap(mergeMap) {
 }
 
 /**
- * Run the env-node-driven marker image sync across all scenes, resolving the environment and task
- * the way InteractableManager does and writing the tile texture as the active GM.
+ * Run the env-node-driven marker image sync across all scenes, resolving environment and task the
+ * way InteractableManager does and writing the tile texture as the active GM.
  */
 async function runInteractableMarkerSync() {
   try {
@@ -4707,8 +4338,8 @@ Hooks.on('updateWorldTime', (worldTime) => {
 });
 
 // Cross-client run-cache coherence (issues 733 + 739): the run managers cache an actor's runs and
-// never learn of a write another client made, so the stale cache is dropped when the synced
-// document lands. THE KEY FILTER IS LOAD-BEARING — `updateActor` also fires on every HP tick.
+// never learn of another client's write, so the stale cache is dropped when the synced document
+// lands. THE KEY FILTER IS LOAD-BEARING — `updateActor` also fires on every HP tick.
 Hooks.on('updateActor', (actor, changes) => {
   invalidateRunCachesForActorUpdate(actor, changes);
 });
@@ -4745,9 +4376,9 @@ Hooks.on('getSceneControlButtons', (controls) => {
   });
 });
 
-// GM-only discoverability: a config button on a placeable's HUD when it is a linked interactable
-// visual, resolving the owning behaviour from the reverse linked-visual flags. The thin edge the
-// Tile and Token HUDs share; it NEVER touches a token's actor.
+// GM-only discoverability: a config button on a linked interactable visual's HUD, resolving the
+// owning behaviour from the reverse linked-visual flags. Shared by both HUDs; it never touches an
+// actor.
 function installInteractableConfigHudEntry(hud, element, { localizeKey }) {
   try {
     const document = hud?.object?.document ?? hud?.document ?? null;
@@ -4795,9 +4426,8 @@ Hooks.on('renderTokenHUD', (hud, element) => {
 });
 
 // The `fabricate.interactable` Region Behaviour creation edge (issues 334 + 342). An empty `system`
-// is VALID-but-UNCONFIGURED since #342, so the create is ALLOWED, the sentinel is stamped and the
-// behaviour is born inert. AN INHERITED MARKER LINK IS NEUTRALISED HERE, region duplication cloning
-// `linkedVisual` verbatim. The thin no-throw edge; it never touches a non-interactable subtype.
+// is VALID-but-UNCONFIGURED since #342, so the create is ALLOWED and the behaviour is born inert.
+// AN INHERITED MARKER LINK IS NEUTRALISED HERE, region duplication cloning `linkedVisual` verbatim.
 Hooks.on('preCreateRegionBehavior', (document) => {
   try {
     // The decision seam always allows through now; it is referenced so the edge keeps one decision
@@ -4819,8 +4449,8 @@ Hooks.on('preCreateRegionBehavior', (document) => {
 });
 
 /**
- * Stamp the unconfigured sentinel onto any identity field the empty-system instantiation left
- * empty. `updateSource` is the V13 preCreate seam — a preCreate hook mutates the source in place.
+ * Stamp the unconfigured sentinel onto any identity field the empty-system instantiation left empty;
+ * `updateSource` is the V13 preCreate seam, a preCreate hook mutating the source in place.
  */
 function applyUnconfiguredSentinelStamp(document) {
   const system = readInteractableBehaviorSystem(document) ?? document?.system ?? {};
@@ -4842,10 +4472,7 @@ function notifyUnconfiguredInteractableCreated() {
   ui.notifications?.info?.(message);
 }
 
-/**
- * A freshly-created interactable NEVER inherits another's marker link, the region-duplication case.
- * The pure neutralisation helper is type-agnostic, so the caller gates it.
- */
+/** A fresh interactable NEVER inherits another's marker link; type-agnostic, so the caller gates it. */
 function neutralizeInheritedInteractableLink(document) {
   const neutralised = neutralizeInheritedLinkedVisual(document?.system);
   if (neutralised.changed && typeof document?.updateSource === 'function') {
@@ -4856,15 +4483,11 @@ function neutralizeInheritedInteractableLink(document) {
   }
 }
 
-/**
- * System-agnostic crafting button integration
- * Add Craft button to Items Directory sidebar (works with all game systems)
- */
 
 /**
- * Add the Craft button to Items Directory header
- * Inject when an element exists; ready can precede the sidebar's first render.
- * The renderItemDirectory hook retries for each rendered sidebar or popout instance.
+ * Add the system-agnostic Craft button to the Items Directory header, injecting when an element
+ * exists — `ready` can precede the sidebar's first render, so `renderItemDirectory` retries per
+ * rendered sidebar or popout instance.
  */
 function addModuleButtonsToItemsDirectory(itemsDir = ui.items) {
   if (!itemsDir?.element) {
@@ -5044,9 +4667,8 @@ export const __test = {
 
 /**
  * The rest of the `ready` startup, exported so a Foundry-free host can run it: these flag
- * auto-stamps populate the tier-1 `roles` identity `sourceUuid.js` resolves against before any name
- * fallback, and the listed ORDER is load-bearing. Exported as a BLOCK because several tests assert
- * on the literal source text of these functions.
+ * auto-stamps populate the tier-1 `roles` identity `sourceUuid.js` resolves against, and the listed
+ * ORDER is load-bearing. Exported as a BLOCK, several tests asserting on their literal source text.
  */
 export {
   processFabricateWorldTime,

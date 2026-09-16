@@ -1,6 +1,6 @@
 /**
- * Build the selectable gathering actor adapter GatheringEngine uses. The engine passes an explicit
- * viewer during player listing and attempt flows; direct callers fall back to the current user.
+ * The selectable gathering actor adapter GatheringEngine uses; the engine passes an explicit viewer,
+ * direct callers falling back to the current user.
  */
 export function createGatheringSelectableActorsGetter({
   getActors,
@@ -14,8 +14,8 @@ export function createGatheringSelectableActorsGetter({
 }
 
 /**
- * Resolve a token's scene UUID across the shapes V13 adapters present: production TokenDocuments
- * expose `parent`, while tests and compatibility callers may still pass `scene`.
+ * A token's scene UUID across the shapes V13 adapters present: production TokenDocuments expose
+ * `parent`, while tests and compatibility callers may still pass `scene`.
  */
 export function getTokenSceneUuid(token) {
   return token?.parent?.uuid
@@ -25,10 +25,9 @@ export function getTokenSceneUuid(token) {
 }
 
 /**
- * The scene-link gate: an attemptability gate, not a listing filter, so a failure returns a blocked
- * result the player app can localize. It restricts EVERY user including GMs, additively with the
- * region and stamina gates — the user must be viewing the linked scene with one of the acting
- * actor's tokens on it.
+ * The scene-link gate: an attemptability gate rather than a listing filter, so a failure returns a
+ * blocked result the player app can localize. It restricts EVERY user including GMs, additively
+ * with the region and stamina gates.
  */
 export function createGatheringSceneAccess({ getCurrentScene } = {}) {
   return {
@@ -54,11 +53,10 @@ export function createGatheringSceneAccess({ getCurrentScene } = {}) {
 }
 
 /**
- * Evaluate a gathering formula through Foundry's Roll API. Deliberately system-generic: dnd5e and
- * pf2e expression detail comes from the actor's roll data and the active Roll implementation.
- * Rolls are non-interactive, so an automated gathering roll raises no manual-fulfilment dialog.
- * `kind` names the callsite (`check`, `gate`, `stamina`, `attemptLimit`, `characterModifier`); the
- * extra per-row keys reach a macro only where the Roll engine reads `actor.getRollData()`.
+ * Evaluate a gathering formula through Foundry's Roll API, deliberately system-generic: dnd5e and
+ * pf2e detail comes from the actor's roll data. Rolls are non-interactive. `kind` names the callsite
+ * (`check`, `gate`, `stamina`, `attemptLimit`, `characterModifier`), and the extra per-row keys reach
+ * a macro only where the Roll engine reads `actor.getRollData()`.
  */
 export async function evaluateGatheringExpression(payload = {}) {
   const expression = payload?.expression;
@@ -78,10 +76,7 @@ export async function evaluateGatheringExpression(payload = {}) {
   return Number.isFinite(numeric) ? numeric : null;
 }
 
-/**
- * Replace any caller-supplied viewer with the current Foundry user, so a macro or UI caller
- * cannot spoof GM visibility by passing a different viewer into the engine.
- */
+/** Replace any caller-supplied viewer with the current Foundry user, so GM visibility cannot be spoofed. */
 export function withCurrentGatheringViewer(options = {}, getCurrentUser = () => globalThis.game?.user) {
   return {
     ...options,
@@ -95,8 +90,8 @@ export function callGatheringRuntimeWithCurrentViewer(runtime, methodName, optio
 }
 
 /**
- * Run independent world-time processors so one failure cannot stop the rest. The promises are
- * returned for tests; a fire-and-forget Foundry hook caller may ignore them.
+ * Run independent world-time processors so one failure cannot stop the rest; the promises are
+ * returned for tests and a fire-and-forget hook caller may ignore them.
  */
 export function processWorldTimeCallbacksSafely(processors = [], { onError = defaultWorldTimeProcessorError } = {}) {
   return normalizeList(processors).map(({ label = 'Unknown', callback } = {}) => {
