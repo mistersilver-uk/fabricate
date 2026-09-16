@@ -256,6 +256,9 @@ test('the ledger reports the two figures epic 1656 tracks', (t) => {
   // file threshold and its constructor under the 100-line function threshold. Regenerated from
   // the merged tree rather than reconciled by hand: these counts are derived, so picking a side
   // of the conflict would have pinned a figure no tree actually has.
+  //
+  // 118/123 on this branch: the scoped-pages sweep takes five more `.svelte` files under the
+  // threshold on comment lines alone, on top of the figure main carries.
   assert.equal(files, 118, 'oversized files');
   assert.equal(keys.length - files, 123, 'oversized functions');
 });
