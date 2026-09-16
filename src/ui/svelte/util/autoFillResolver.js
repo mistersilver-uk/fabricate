@@ -1,29 +1,15 @@
-/**
- * autoFillResolver — Pure function for auto-fill algorithm (Task 5, Phase B)
- *
- * Given a recipe, the system's components, and the current palette, determines
- * the best ingredient set to satisfy from the workbench and returns the
- * resolved component entries to place in the workbench.
- *
- * This module has no Foundry dependencies and is fully unit-testable.
- */
+// Which components the workbench auto-fill places, given a recipe, the system's components and the
+// current palette. Each ingredient set is tried in order; the first fully satisfiable one wins, and
+// with none the BEST PARTIAL (fewest unfulfilled groups) is returned rather than nothing.
+// No Foundry dependency.
 
-/**
- * Attempt to satisfy a single ingredient set using the palette.
- *
- * @param {object} ingredientSet - { ingredientGroups: [{ options, quantity }] }
- * @param {object[]} systemComponents - All components in the system
- * @param {object[]} palette - Current palette entries [{ componentId, inventoryQuantity }]
- * @param {Function} expandGroupFn - expandGroupToComponentIds(group, systemComponents) => Set<string>
- * @returns {{ entries: object[], unfulfilled: object[], fulfilled: boolean }}
- */
 function _attemptSet(ingredientSet, systemComponents, palette, expandGroupFn) {
   const groups = Array.isArray(ingredientSet.ingredientGroups)
     ? ingredientSet.ingredientGroups
     : [];
 
   const paletteMap = new Map(palette.map(e => [e.componentId, e]));
-  // Track how many of each component we've committed in this attempt
+  // What this attempt has already committed, so one palette entry cannot be spent twice.
   const committed = new Map();
 
   const entries = [];
@@ -33,7 +19,6 @@ function _attemptSet(ingredientSet, systemComponents, palette, expandGroupFn) {
     const quantity = Number(group.quantity) || 1;
     const candidateIds = expandGroupFn(group, systemComponents);
 
-    // Find the first candidate component with sufficient available quantity
     let chosen = null;
     let chosenAvailable = 0;
 
@@ -67,7 +52,6 @@ function _attemptSet(ingredientSet, systemComponents, palette, expandGroupFn) {
         });
       }
     } else {
-      // Could not satisfy this group — record as unfulfilled
       unfulfilled.push({ group, quantity, candidateIds: [...candidateIds] });
     }
   }
@@ -79,22 +63,6 @@ function _attemptSet(ingredientSet, systemComponents, palette, expandGroupFn) {
   };
 }
 
-/**
- * Resolve the auto-fill workbench entries for a recipe.
- *
- * Algorithm:
- * 1. Try each ingredient set in order.
- * 2. Use the first fully satisfiable set.
- * 3. If none fully satisfiable, use the "best partial" (fewest unfulfilled groups).
- *
- * @param {object} recipe - Recipe with ingredientSets array
- * @param {object[]} systemComponents - All components in the system
- * @param {object[]} palette - Palette entries [{ componentId, name, img, inventoryQuantity }]
- * @param {Function} expandGroupFn - (group, systemComponents) => Set<string> of candidate component IDs
- * @returns {{ entries: object[], unfulfilled: object[] }}
- *   entries: [{ componentId, name, img, quantity }] — items to put in workbench
- *   unfulfilled: groups that could not be satisfied
- */
 export function resolveAutoFill(recipe, systemComponents, palette, expandGroupFn) {
   const sets = Array.isArray(recipe?.ingredientSets) ? recipe.ingredientSets : [];
 
@@ -111,7 +79,6 @@ export function resolveAutoFill(recipe, systemComponents, palette, expandGroupFn
       return { entries: result.entries, unfulfilled: [] };
     }
 
-    // Track best partial (fewest unfulfilled)
     if (
       bestPartial === null ||
       result.unfulfilled.length < bestPartial.unfulfilled.length
@@ -120,7 +87,6 @@ export function resolveAutoFill(recipe, systemComponents, palette, expandGroupFn
     }
   }
 
-  // No fully satisfiable set — return best partial
   return {
     entries: bestPartial?.entries ?? [],
     unfulfilled: bestPartial?.unfulfilled ?? []

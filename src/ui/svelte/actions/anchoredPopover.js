@@ -1,128 +1,33 @@
-/**
- * ONE anchored-popover action, and the seven copies it replaces (issue 1500).
- *
- * ── THE DEFECT THIS REPLACES ────────────────────────────────────────────────────────────────
- * Seven surfaces each carried the same positioning pass, hand-written:
- *
- *   function updatePopoverPosition() {
- *     if (!open || !triggerButton || typeof window === 'undefined') return;
- *     const hostRect = overlayHostRect(resolveOverlayHost(pickerRoot, { component: '…' }));
- *     const triggerRect = triggerButton.getBoundingClientRect();
- *     const layout = computeIconPickerPopoverLayout({ …host-relative trigger… }, …);
- *     popoverStyle = [`left: ${layout.left}px;`, 'right: auto;', …].join(' ');
- *   }
- *
- * plus, in every one of them, a `$effect` that called it once, added `resize` on `window` and a
- * CAPTURE-phase `scroll` on `document`, and removed both on teardown. The bodies agreed on the
- * hard parts — the host is the coordinate origin, the vertical branch writes `top: auto` when it
- * flips — and disagreed on the incidental ones, which is the shape a copy always takes: four of
- * them clipped with `closest()`, one walked `parentElement`, one filtered scrolls that started
- * inside the panel, one guarded `typeof window.addEventListener !== 'function'` and the others
- * did not.
- *
- * Six were shared components. The seventh was a screen region — the environments browser's biome
- * colour picker — and it is the reason this header says seven rather than six: it was found by
- * review AFTER the six converted, in the one directory nobody had thought to grep, which is the
- * ordinary way a family like this is undercounted.
- *
- * A copy is not a defect until it drifts, and this family had already drifted in the direction
- * that matters: `src/ui/svelte/util/overlayHost.js` records six copies of the HOST lookup going
- * wrong at once. This action is the same consolidation applied one layer out — the measurement,
- * the flip, the clamp, the style write and the listener pair, resolved once.
- *
- * ── WHAT IS DELIBERATELY *NOT* IN HERE ──────────────────────────────────────────────────────
- * `layout` is a REQUIRED option with no default, and that is a dependency decision rather than a
- * style one. Two layout algorithms ship — `util/iconPickerPopover.js` for the pickers and
- * `util/actionMenuLayout.js` for the overflow menus — and a default would make this module import
- * one of them, which would put it in the static-import closure of EVERY caller. The mounted-test
- * harness walks that closure (`tests/helpers/svelte-component-harness.js`), so a manifest that
- * compiles only `ActionMenu` would be forced to declare the picker layout it never runs. Each
- * caller passes the function from the module it already imports; this file imports neither.
- *
- * For the same reason there are NO app-specific selectors here. A caller's clipping boundary
- * arrives through `bounds`, as a selector string or as a resolver; `src/ui/svelte/util/
- * overlayBounds.js` owns the manager's own selectors and the `parentElement` walk.
- *
- * ── THE HOST IS THE ORIGIN, ALWAYS ──────────────────────────────────────────────────────────
- * The element this action portals into and the element it measures against are the same one, and
- * they are the same one because a single call answers both. `util/overlayHost.js` records at
- * length what happens when those two answers are computed separately: byte-identical markup, a
- * panel in the wrong place, and nothing in the repository able to see it.
- */
+// ONE anchored-popover action, replacing the seven hand-written positioning passes that had
+// already drifted apart (issue 1500): the measurement, the flip, the clamp, the style write and the
+// resize/capture-scroll listener pair, resolved once.
+// `layout` is a REQUIRED option with NO default, and that is a dependency decision: a default would
+// put one of the two layout modules in the static-import closure of every caller, and the mounted
+// harness walks that closure. For the same reason there are no app-specific selectors here — a
+// caller's boundary arrives through `bounds`, and `util/overlayBounds.js` owns the manager's own.
+// The element this portals into and the element it measures against are ONE, because one call
+// answers both; `util/overlayHost.js` states what separating them costs.
 import { overlayHostRect, resolveOverlayHost } from '../util/overlayHost.js';
 
 import { portal } from './portal.js';
 
-/**
- * The inset a clipping boundary keeps from the panel, in CSS pixels.
- *
- * 16, because that is what all seven copies used and what `computeIconPickerPopoverLayout`'s own
- * `viewportMargin` defaults to. It is the popover family's margin rather than any one app's, so
- * it belongs here while the SELECTOR that finds the boundary does not.
- */
+// The popover family's own margin — `computeIconPickerPopoverLayout`'s `viewportMargin` default —
+// so it belongs here while the SELECTOR that finds the boundary does not.
 const BOUNDS_INSET = 16;
 
-/**
- * The three declarations that make a MEASURED width the whole answer (issue 1520 review round 2).
- *
- * ── THE DEFECT ──────────────────────────────────────────────────────────────────────────────
- * `computeIconPickerPopoverLayout` already resolves the caller's band into ONE number:
- * `clamp(max(triggerWidth, minWidth), minWidth, maxWidth)`, with `maxWidth` itself floored at the
- * space between the clipping bounds. By the time a width reaches here every constraint the caller
- * stated has been applied to it. Writing it as a bare `width` then leaves that answer at the mercy
- * of whatever `min-width`/`max-width` the panel's own class rules happen to carry — and a `max-width`
- * constrains a used `width` REGARDLESS of where the width came from, so a stylesheet ceiling beats
- * an inline width. It is not a cascade contest an inline declaration can win, because it is not a
- * cascade contest at all.
- *
- * Measured, three times, before this was written:
- *
- *   - `.fabricate-picker-popover.fabricate-select-popover-form` caps the panel at 340px, so the
- *     three interactables windows' full-width triggers (450, 394 and 508px) each dropped a 340px
- *     option list, with the `maxWidth` prop each window passes — 480, 420 and 560 — reaching the
- *     element as an inline `width` the sheet then clipped. That is the finding this answers.
- *   - `.fabricate-picker-popover.manager-recipe-or-popover` records the FLOOR half of the same
- *     defect: a caller asking for 150 rendered at 240 "with the inline declaration sitting there
- *     looking honoured", and the fix at the time was to restate the band in CSS per call site.
- *   - `Select.svelte`'s three rung rules restate their bands for that same reason.
- *
- * Restating a band in CSS answers one call site and leaves the next one to rediscover it, which is
- * exactly what happened. Writing all three declarations answers every caller once: the number this
- * action computed is the number the box takes.
- *
- * ── WHAT THIS DOES *NOT* CHANGE ─────────────────────────────────────────────────────────────
- * Nothing whose CSS band already agreed with its props, which is every other shipped caller — the
- * three `Select` rungs (240/340, 96/240, 160/320) mirror the sheet exactly, `IconPicker` (260/340)
- * and `EssenceSourceSelector` (280/340) sit strictly inside the shared 240/340 box, the two colour
- * pickers ask for 220 against a rule that states `width: 220px` and no bounds at all, and
- * `manager-recipe-or-popover` asks for 150 against a rule restating 150. The class rules stay where
- * they are: they are still the box when `layout` declines to place the panel and `clear()` wipes
- * this style, and for `applyWidth: false` callers they are the only width there has ever been.
- *
- * `ActionMenu` is untouched for a stronger reason — `computeActionMenuLayout` returns no `width` at
- * all (it takes the panel's already-measured box as an INPUT), so this branch never runs for it.
- *
- * @param {number} width The layout's own resolved width, in CSS pixels.
- * @returns {string[]} The declarations, in `panelStyle` order.
- */
+// ALL THREE, so a measured width is the whole answer (issue 1520). The layout has already applied
+// every constraint the caller stated, but a bare inline `width` is still constrained by whatever
+// `min-width`/`max-width` the panel's class rules carry — a `max-width` bounds a used `width`
+// regardless of where that width came from, so it is not a cascade contest an inline declaration
+// can win. Restating the band in CSS answers one call site and leaves the next to rediscover it.
 function panelWidthDeclarations(width) {
   return [`width: ${width}px;`, `min-width: ${width}px;`, `max-width: ${width}px;`];
 }
 
-/**
- * Adapt a `computeIconPickerPopoverLayout`-shaped function to this action's `layout` contract.
- *
- * The picker layout takes a HOST-RELATIVE trigger box and a `{ width, height }` viewport, while
- * the action hands its `layout` raw viewport rects plus the host's own box — the shape the menu
- * layout wants. Six of the seven callers need exactly the same translation between the two, so it
- * is written once here rather than six times as an inline arrow.
- *
- * It imports nothing: the caller supplies `compute`, so this module still pulls no layout module
- * into anyone's dependency closure.
- *
- * @param {(triggerRect: object, viewport: {width: number, height: number}, options: object) => object|null} compute
- * @returns {(triggerRect: DOMRect, panelRect: DOMRect, hostRect: object, bounds: object, options: object) => object|null}
- */
+// The picker layout wants a HOST-RELATIVE trigger box and a viewport; this action hands `layout`
+// raw viewport rects plus the host's box, which is the shape the MENU layout wants. Six callers
+// need the same translation, so it is written once — and `compute` is a parameter, so this module
+// still pulls no layout module into anyone's dependency closure.
 export function hostRelativePopoverLayout(compute) {
   return (triggerRect, panelRect, hostRect, bounds, options) =>
     compute(
@@ -142,44 +47,15 @@ export function hostRelativePopoverLayout(compute) {
     );
 }
 
-/**
- * Position a portaled overlay panel against its trigger, in its application host's coordinates.
- *
- * @param {HTMLElement} node The panel. It is portaled into the resolved host and its inline
- *   `style` is written by this action, so the component must NOT also bind `style` on it.
- * @param {object} params
- * @param {string} params.component REQUIRED. The component name `resolveOverlayHost` reports an
- *   unhosted overlay under. It deduplicates per name, so a shared default would let the first
- *   mis-mounted overlay silence every other one for the session.
- * @param {HTMLElement|(() => HTMLElement|null)|null} params.trigger The anchor. A function is
- *   re-read on every pass, which is what lets a caller whose trigger UNMOUNTS while open
- *   (`SearchablePopover`'s inline-search mode) fall back to its picker root.
- * @param {boolean} [params.open] Defaults to true, because the usual caller only renders the
- *   panel while it is open.
- * @param {(triggerRect: DOMRect, panelRect: DOMRect, hostRect: object, bounds: object, options: object) => object|null} params.layout
- *   REQUIRED. See the header for why there is no default.
- * @param {() => object} [params.layoutOptions] Called on EVERY measure, so a caller whose options
- *   are themselves measured (`IconPicker`'s row pitch and popover chrome) keeps re-measuring.
- *   A value read only INSIDE this closure is not a dependency of the action's `update`: the
- *   closure is re-run on the next measure, not when the value changes, so a caller whose option
- *   can change while the panel is OPEN must re-measure it (an event, or an `$effect` that reads
- *   it and re-applies the action). Every shipped caller's options are fixed for the life of one
- *   open, which is why none of them do.
- * @param {string|((hostRect: object, anchor: HTMLElement|null) => object)} [params.bounds] The
- *   clipping boundary. A string is `anchor.closest(selector)`, contributing nothing when it
- *   misses; a function is a caller-supplied resolver.
- * @param {object|(() => object)} [params.targets] Secondary style targets. `list` receives the
- *   layout's `listMaxHeight` (issue 1280's whole-row flooring).
- * @param {number} [params.maxHeightCap] A post-hoc cap on the layout's own `maxHeight`. `0`
- *   (the default) means uncapped.
- * @param {boolean} [params.applyWidth] Whether the layout's `width` is written — as a WIDTH AND
- *   AS BOTH ITS BOUNDS; see {@link panelWidthDeclarations}. False for a panel that sizes to its
- *   content (`width: max-content`), where writing a width would fix the box.
- * @param {boolean} [params.ignoreScrollWithin] Drop viewport events that started inside the panel
- *   itself. The panel is anchored to the trigger and scrolling INSIDE it moves neither, so the
- *   answer a re-measure would recompute is the one already applied.
- * @returns {{update(next: object): void, destroy(): void}}
- */
+// This action writes `node`'s inline `style`, so the component must NOT also bind `style` on it.
+// `component` is REQUIRED because `resolveOverlayHost` deduplicates its missing-host report per
+// name, so a shared default would let the first mis-mounted overlay silence every other one.
+// A FUNCTION `trigger` is re-read on every pass, which is what lets a caller whose trigger unmounts
+// while open fall back to its picker root. `layoutOptions` is called on EVERY measure, but a value
+// read only inside that closure is NOT a dependency of `update`, so a caller whose option can
+// change while the panel is open must re-measure it; no shipped caller's can.
+// `applyWidth: false` is for a panel that sizes to its content, where writing a width fixes the box;
+// `ignoreScrollWithin` drops events from inside the panel, which move neither it nor its trigger.
 export function anchoredPopover(node, params = {}) {
   if (typeof document === 'undefined') {
     return {
@@ -295,27 +171,18 @@ export function anchoredPopover(node, params = {}) {
     }
 
     write(node, panelStyle(layout));
-    // Null on the first pass, before any row has been laid out to measure. The list then falls
-    // back to filling the panel, which is one frame of the previous behaviour rather than a
-    // guessed height that jumps once the real one arrives.
+    // Null on the first pass, before a row exists to measure: the list fills the panel for one
+    // frame rather than taking a guessed height that jumps when the real one arrives.
     write(
       styleTargets().list,
       Number.isFinite(layout.listMaxHeight) ? `max-height: ${layout.listMaxHeight}px;` : ''
     );
   }
 
-  /**
-   * Did this event start inside the panel? See `ignoreScrollWithin`.
-   *
-   * THE TARGET IS NOT ALWAYS A NODE. `resize` fires on `window`, and `Node.contains()` takes a
-   * `Node?` — so `node.contains(window)` THROWS rather than answering false. The six copies this
-   * action replaces all carried that shape, and in the one caller that sets `ignoreScrollWithin`
-   * (`IconPicker`) it meant a window resize threw out of the listener and the reposition it was
-   * supposed to trigger never ran. Issue 1500 fixes it here: a non-`Node` target did not start
-   * inside the panel, so a resize now RE-MEASURES. That is this action's one deliberate
-   * behaviour change, and it moves the panel back to its trigger after a resize instead of
-   * leaving it where the pre-resize measurement put it.
-   */
+  // THE TARGET IS NOT ALWAYS A NODE: `resize` fires on `window` and `Node.contains()` takes a
+  // `Node?`, so `node.contains(window)` THROWS rather than answering false — which is how a resize
+  // used to throw out of the listener and skip the reposition it was meant to trigger. A non-`Node`
+  // target did not start inside the panel, so a resize RE-MEASURES (issue 1500).
   function startedInsidePanel(event) {
     const target = event?.target;
     if (!target) return false;

@@ -248,10 +248,26 @@ test('the ledger reports the two figures epic 1656 tracks', (t) => {
   // own, which the block cannot have while it is one branch inside a larger file. Not bundled
   // here, because a blocked maintainer is waiting on the defect this commit fixes, and a new
   // `.svelte` child additionally has to join `writeCompiledSvelte` and four mount harnesses.
-  // 126 after merging origin/main, then 120 under issue 1681. Both falls are comment
-  // condensation: 38 component headers took Chip and IconButton back under the .svelte
-  // threshold, then the manager sub-folders took six more units under. Neither is debt
-  // discharged -- the code is what it was, and only the measurement moved.
-  assert.equal(files, 120, 'oversized files');
-  assert.equal(keys.length - files, 124, 'oversized functions');
+  // 126 after merging origin/main, which condensed 38 component headers and took Chip and
+  // IconButton back under the .svelte threshold -- two of this branch's entries removed by
+  // someone else's work rather than by ours.
+  //
+  // 123/123 after merging #1682's sweep, which took `src/models/Recipe.js` under the 800-line
+  // file threshold and its constructor under the 100-line function threshold. Regenerated from
+  // the merged tree rather than reconciled by hand: these counts are derived, so picking a side
+  // of the conflict would have pinned a figure no tree actually has.
+  //
+  // 122/120 on this branch. Four rows leave the ledger with its comment mass --
+  // `interactableRegionFlags.js::buildInteractableBehaviorSchema`, `main.js::Hooks.once>on`,
+  // `migrateRecipeForModeChange` and `remapWorldScopeIdentityFlags.js` -- on top of the figure
+  // main carries.
+  //
+  // 116/120 here: on top of everything main now carries, the issue-1681 sweep of the 15 manager
+  // sub-folders takes six more units under the file threshold on comment lines alone --
+  // `essences/EssenceBrowserInspector.svelte`, `essences/EssenceBulkEditPanel.svelte`,
+  // `essences/essenceStudio.js`, `tools/ToolBehaviorPreview.svelte`,
+  // `tools/ToolBrowserInspector.svelte` and `tools/toolStudio.js`. None of it is debt
+  // discharged: the code is what it was, and only the measurement moved.
+  assert.equal(files, 116, 'oversized files');
+  assert.equal(keys.length - files, 120, 'oversized functions');
 });

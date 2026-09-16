@@ -1,26 +1,8 @@
 /**
- * Pure activation pipeline for `fabricate.interactable` Region Behaviours.
- *
- * The activation pipeline has one shared path (see plan — Activation pipeline):
- *   1. evaluateActivationEligibility  — state-based gate (run on the player's
- *      client to decide whether to show the prompt).
- *   2. buildActivationRequest         — the socket payload emitted on "Interact".
- *   3. validateActivationRequest      — the active-GM re-check before granting.
- *   4. describeGrant                  — which tab + context shape the granted
- *      player client should open.
- *
- * Everything here is PURE: all Foundry collaborators (whether the user controls
- * the actor, whether the token is still inside, whether the source/environment
- * still resolves, the current world time, GM status) are INJECTED, so the full
- * checklist is unit-testable without Foundry. No `globalThis` access.
- *
- * Activation eligibility is purely the behaviour's own
- * `enabled/locked/consumed/uses/cooldown` gate (shared by tool stations and
- * gathering-task shortcuts). Resource-node depletion/respawn is orthogonal to this
- * gate and enforced by the gathering engine when the scoped session opens — never
- * here — whether the interactable is LINKED to the task (default, shared
- * `environment.nodeRuntime[taskId]`) or UNLINKED with its own independent pool
- * (issue 302, `taskNodeLink === 'unlinked'` on the behaviour `system.node`).
+ * The pure activation pipeline: eligibility gate, socket request, active-GM re-check, grant shape
+ * (`data-models/spec.md` § fabricate.interactable Region Behaviour, requirements 4 to 6).
+ * Every Foundry collaborator is INJECTED — actor control, containment, source resolution, world
+ * time, GM status — so the whole checklist is testable and nothing reads `globalThis`.
  */
 
 import { numberOrNull } from './coercion.js';
@@ -29,26 +11,8 @@ import { isUnconfiguredInteractable } from './interactableRegionFlags.js';
 const ACTIVATION_ACTION = 'interactableActivate';
 
 /**
- * Evaluate whether an interactable is currently eligible for activation from its
- * behaviour `system` state. Returns the FIRST blocking reason in precedence
- * order, or `{ eligible: true, reason: null }`.
- *
- * Precedence: DISABLED → LOCKED → CONSUMED → USES_EXHAUSTED → COOLDOWN.
- *
- * Resource-node depletion is orthogonal to this gate and enforced by the
- * gathering engine when the scoped session opens — against the environment's
- * `nodeRuntime[taskId]` (default, linked) or the interactable's own independent
- * pool when `taskNodeLink === 'unlinked'` (issue 302) — so there is no
- * NODE_DEPLETED gate here.
- *
- * `isGM` is accepted for future use but eligibility is purely state-based here
- * (authority/override checks live in `validateActivationRequest`).
- *
- * @param {object} system  A behaviour system (or normalized view from readInteractableBehaviorSystem).
- * @param {object} ctx
- * @param {number} ctx.now      Current world time (seconds).
- * @param {boolean} [ctx.isGM]  Reserved; eligibility is state-based.
- * @returns {{ eligible: boolean, reason: string|null }}
+ * The FIRST blocking reason in precedence order, else `{ eligible: true, reason: null }`. Node
+ * depletion is absent by design: the gathering engine enforces it when the session opens.
  */
 export function evaluateActivationEligibility(system, { now, isGM } = {}) {
   void isGM;
@@ -79,76 +43,28 @@ function blocked(reason) {
 }
 
 /**
- * Decide whether the on-enter prompt should fire for an interactable, based on
- * its VISIBILITY (not its full activation eligibility). PURE.
- *
- * An interactable is concealed from players — and therefore raises NO prompt —
- * when it is DISABLED (`state.enabled === false`) OR explicitly HIDDEN
- * (`presentation.hidden === true`). In every other case the prompt fires: a
- * LOCKED / consumed / uses-exhausted / cooling-down interactable still SHOWS the
- * prompt, and the Interact-time validation (`validateActivationRequest`) is what
- * denies the actual activation with the specific reason.
- *
- * This is deliberately distinct from {@link evaluateActivationEligibility}: the
- * prompt is gated by visibility, the ACTIVATION is gated by eligibility. That is
- * what gives Lock real teeth (prompt + "This is locked." denial) separate from
- * Disable (no prompt + concealed marker).
- *
- * @param {object} system  A behaviour system (raw or normalized view).
- * @returns {boolean}
+ * PURE. Gated by VISIBILITY, not eligibility: a locked, consumed, exhausted or cooling-down
+ * interactable still prompts and is denied at Interact, which is what gives Lock teeth.
  */
 export function shouldPromptOnEnter(system) {
   return !isConcealed(system);
 }
 
-/**
- * Decide whether the linked marker tile should be HIDDEN from players. PURE.
- *
- * The marker is hidden (Foundry `tile.hidden = true`, so only the GM sees it)
- * exactly when the interactable is concealed — DISABLED (`state.enabled === false`)
- * OR explicitly HIDDEN (`presentation.hidden === true`). A LOCKED interactable is
- * NOT hidden: it stays visible to players (the prompt fires and Interact is denied).
- *
- * @param {object} system  A behaviour system (raw or normalized view).
- * @returns {boolean}
- */
+/** PURE. Hide the marker exactly when the interactable is concealed; a LOCKED one stays visible. */
 export function resolveMarkerHidden(system) {
   return isConcealed(system);
 }
 
 /**
- * Whether an interactable is concealed from players: UNCONFIGURED (issue 342),
- * DISABLED, or explicitly HIDDEN. Shared by {@link shouldPromptOnEnter} (no prompt)
- * and {@link resolveMarkerHidden} (hidden marker) so the two decisions can never
- * drift.
- *
- * An UNCONFIGURED interactable (born via the native "+ Add Behavior" path, not yet
- * given a real source) is INERT: it raises no on-enter prompt and its marker is
- * hidden from players, exactly like a disabled one, until a GM configures it.
- *
- * @param {object} system
- * @returns {boolean}
+ * Concealed: UNCONFIGURED (issue 342), DISABLED, or HIDDEN. Shared by {@link shouldPromptOnEnter}
+ * and {@link resolveMarkerHidden} so the two cannot drift.
  */
 function isConcealed(system) {
   if (isUnconfiguredInteractable(system)) return true;
   return system?.state?.enabled === false || system?.presentation?.hidden === true;
 }
 
-/**
- * Build the activation request payload emitted over the module socket when a
- * player presses "Interact". PURE; no Foundry. The shape matches the plan exactly.
- *
- * @param {object} system  The behaviour system (carries the source identity).
- * @param {object} ctx
- * @param {string} ctx.regionId
- * @param {string} ctx.behaviorId
- * @param {string} ctx.sceneId
- * @param {string} ctx.actorId
- * @param {string} ctx.userId
- * @param {string} ctx.activationSource   e.g. 'regionEnter' | 'gmTest'.
- * @param {number} ctx.ts                 Timestamp (ms).
- * @returns {object}
- */
+/** PURE. The socket payload emitted when a player presses Interact. */
 export function buildActivationRequest(
   system,
   { regionId, behaviorId, sceneId, actorId, userId, activationSource, ts } = {}
@@ -172,38 +88,16 @@ export function buildActivationRequest(
 }
 
 /**
- * Validate an activation request on the active GM before granting. PURE: all
- * collaborators are injected booleans/values. Returns the FIRST failing reason,
- * or `{ ok: true, reason: null }`.
- *
- * Checklist (per plan):
- *   - behaviourSystem present + interactableType matches the request;
- *   - state eligibility re-check via evaluateActivationEligibility;
- *   - canControlActor === true (or isGM);
- *   - tokenInside !== false;
- *   - sourceExists !== false;
- *   - for gatheringTask, environmentExists !== false.
- *
- * @param {object} request
- * @param {object} ctx
- * @param {object|null} ctx.behaviorSystem
- * @param {number} ctx.now
- * @param {boolean} [ctx.isGM]
- * @param {boolean} [ctx.canControlActor]
- * @param {boolean} [ctx.sourceExists]
- * @param {boolean} [ctx.environmentExists]
- * @param {boolean} [ctx.tokenInside]
- * @returns {{ ok: boolean, reason: string|null }}
+ * PURE. The active-GM re-check, returning the FIRST failing reason: behaviour present and
+ * type-matched, eligibility, actor control, containment, source, and a gatheringTask's environment.
  */
 export function validateActivationRequest(
   request,
   { behaviorSystem, now, isGM, canControlActor, sourceExists, environmentExists, tokenInside } = {}
 ) {
   if (!behaviorSystem || typeof behaviorSystem !== 'object') return fail('NO_BEHAVIOR');
-  // An UNCONFIGURED interactable (issue 342) is inert: it never grants activation
-  // and must never throw. Deny it FIRST with a dedicated reason — clearer for the
-  // GM than the generic SOURCE_MISSING ("no longer available"), and ahead of the
-  // TYPE_MISMATCH check (the sentinel's default type may not match a stale request).
+  // An UNCONFIGURED interactable is inert and must never throw. Denied FIRST with its own reason,
+  // and ahead of TYPE_MISMATCH — the sentinel's default type may not match a stale request.
   if (isUnconfiguredInteractable(behaviorSystem)) return fail('UNCONFIGURED');
   if (request?.interactableType !== behaviorSystem.interactableType) return fail('TYPE_MISMATCH');
 
@@ -224,16 +118,7 @@ function fail(reason) {
   return { ok: false, reason };
 }
 
-/**
- * Map an activation denial `reason` (as returned by {@link validateActivationRequest}
- * or {@link evaluateActivationEligibility}) to a player-facing localization key under
- * `FABRICATE.Canvas.Interactable.Denied.*`. PURE — no Foundry, no localization here
- * (the caller resolves the key). Any unknown/blank reason falls back to the generic
- * key so a denied request is never silent.
- *
- * @param {string|null|undefined} reason
- * @returns {string} A `FABRICATE.Canvas.Interactable.Denied.*` key.
- */
+/** PURE. A denial reason to its `Denied.*` key; an unknown one falls back, never silence. */
 export function activationDenialMessageKey(reason) {
   const key = DENIAL_MESSAGE_KEYS[reason];
   return key ?? DENIAL_MESSAGE_KEYS.__default;
@@ -241,12 +126,7 @@ export function activationDenialMessageKey(reason) {
 
 const DENIAL_PREFIX = 'FABRICATE.Canvas.Interactable.Denied';
 
-/**
- * Every reason {@link validateActivationRequest}/{@link evaluateActivationEligibility}
- * can return → a non-default key. `__default` is the generic fallback for any
- * unmapped/blank reason (NO_BEHAVIOR + TYPE_MISMATCH are internal mismatches with
- * no dedicated player copy, so they intentionally resolve to the generic key).
- */
+/** `NO_BEHAVIOR` and `TYPE_MISMATCH` are internal mismatches and resolve to `__default`. */
 const DENIAL_MESSAGE_KEYS = {
   DISABLED: `${DENIAL_PREFIX}.Disabled`,
   LOCKED: `${DENIAL_PREFIX}.Locked`,
@@ -262,20 +142,8 @@ const DENIAL_MESSAGE_KEYS = {
 };
 
 /**
- * Describe WHICH tab + context shape the granted player client should open. PURE.
- * The manager fills in the live `activeCanvasTool` (built by `buildActiveCanvasTool`)
- * — this only encodes the shape.
- *
- * A Tool station belongs to CRAFTING (the active station tool is a virtual-present
- * crafting tool), so it opens the Crafting tab. The Crafting tab is still a
- * placeholder, so this shows the placeholder with the active-tool chip in the
- * header until the Crafting route lands.
- *
- *   tool          → { tab:'crafting', context:{ activeCanvasTool:null } }
- *   gatheringTask → { tab:'gathering', context:{ environmentId, taskId } }
- *
- * @param {object} system  The behaviour system (normalized view or raw).
- * @returns {{ tab: string, context: object } | null}
+ * PURE. A tool station is a virtual-present crafting tool, so it opens Crafting with a null
+ * `activeCanvasTool` for the manager to fill; a gatheringTask opens Gathering scoped to its pair.
  */
 export function describeGrant(system) {
   if (system?.interactableType === 'tool') {

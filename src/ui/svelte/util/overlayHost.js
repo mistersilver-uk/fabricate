@@ -1,146 +1,26 @@
-/**
- * Where a portaled overlay lives, and what its coordinates are measured from (issue 1466).
- *
- * ── THE DEFECT THIS REPLACES ────────────────────────────────────────────────────────────────
- * Six components each carried their own copy of this:
- *
- *   function getPopoverHost() {
- *     if (!pickerRoot || typeof document === 'undefined') return null;
- *     return pickerRoot.closest('.fabricate-manager');
- *   }
- *
- * and then, in the positioning pass:
- *
- *   const hostRect = host?.getBoundingClientRect?.() ?? { left: 0, top: 0, width: innerWidth, ... };
- *
- * Outside the manager the `closest` returns null, so TWO things happen at once and they
- * disagree with each other. `use:portal` no-ops, leaving the panel inside the trigger's own
- * container; and the rect falls back to the VIEWPORT, so the `left`/`top` written onto that
- * `position: absolute` panel are viewport coordinates being interpreted against a completely
- * different containing block. The panel renders somewhere else entirely.
- *
- * The markup is byte-identical either way, which is why nothing caught it: there is no missing
- * element, no missing class, no thrown error and no failing DOM assertion — only a panel in the
- * wrong place, which is the failure mode least likely to be noticed by a test.
- *
- * Three of the six lived in `src/ui/svelte/components/`, the shared directory whose entire
- * premise is that a component there works wherever it is mounted. Each silently did not.
- *
- * ── THE RULE THIS MODULE ENFORCES ───────────────────────────────────────────────────────────
- * THE COORDINATE ORIGIN AND THE PORTAL TARGET MUST BE THE SAME ELEMENT. That is the whole
- * invariant, and the old code's real fault was not "the selector was too narrow" — it was that
- * the two answers were computed independently and were allowed to diverge. Both callers here
- * resolve through `resolveOverlayHost` against the same node, so they cannot.
- *
- * ── THE ROOT SET, AND WHY IT IS EXACTLY THESE TWO ───────────────────────────────────────────
- * Fabricate ships five Svelte applications. Their roots are:
- *
- *   SvelteCraftingSystemManagerApp  window `.crafting-system-manager`  root `.fabricate-manager`
- *   SvelteFabricateApp              window `.fabricate-app.fabricate-app-window`
- *                                                                     root `.fabricate-app-shell`
- *   InteractablesManagerApp         window `.fabricate-interactables-manager.fabricate-app`
- *   InteractableBrowserApp          window `.fabricate-interactable-browser-app.fabricate-app`
- *   InteractableConfigApp           window `.fabricate-interactable-config-app.fabricate-app`
- *
- * Each also emits `.fabricate`, the module root. `fabricate-app` is the shared PLAY-surface area
- * skin — typography, colour, `color-scheme` — and issue 1520 put it on the last three;
- * `fabricate-app-window` is the player window's drag-resize size floor, split off that skin in
- * the same change so adopting it could not inflate a 420px window to 1024px.
- *
- * A SIXTH stood here until issue 1520: the standalone component-editor application, window
- * `.component-editor-app` over root `.fabricate-component-editor`. It was orphaned — its only
- * constructor call was a manager service nothing consumed — and issue 1520 deleted it.
- * `ComponentEditorRoot.svelte` survives it and is not mounted by any application, so its root
- * class is no longer an application root and is deliberately absent from the list above.
- *
- * TWO CLASSES ARE ELIGIBLE, AND SINCE ISSUE 1520 THEY COVER FOUR OF THE FIVE WINDOWS. The list
- * below is a list of CLASSES, not of applications, and those two counts moved independently: the
- * eligible list stayed at two while `fabricate-app` went from being emitted by one window to
- * being emitted by four. Eligibility is POSITIONING rather than taxonomy — a host is usable as a
- * coordinate origin only if it is also the containing block of the `position: absolute` panel
- * appended to it, i.e. only if it is itself positioned.
- *
- *   - `.fabricate-manager` declares `position: relative; isolation: isolate` in
- *     `styles/fabricate.css`. It is the manager's own Svelte root, inside the window content.
- *   - `.fabricate-app` is an ApplicationV2 FRAME class, which Foundry positions absolutely and
- *     writes `left`/`top` onto. `SvelteFabricateApp` emitted it alone until issue 1520 adopted
- *     it on `InteractableBrowserApp`, `InteractableConfigApp` and `InteractablesManagerApp`, all
- *     three in their `DEFAULT_OPTIONS.classes` array — at the FRAME, deliberately. The frame is
- *     also the only ancestor OUTSIDE `.window-content`, which
- *     `.fabricate.fabricate-app .window-content` sets to `overflow: hidden`, so a panel portalled
- *     to it escapes that clip and one portalled inside it would not.
- *     `.fabricate-app-shell`, the player window's Svelte root one level in, is a static flex
- *     container and would NOT serve — which is exactly the kind of near-miss that makes "the
- *     nearest `.fabricate-*` thing" the wrong rule and an explicit, measured list the right one.
- *     The same near-miss is why the three windows above take the class at the frame rather than
- *     on their own Svelte roots, which are static too.
- *
- * `tests/components/portal-host-app-root.test.js` pins both halves: that no component
- * hard-codes a root of its own, and that every class named here is genuinely positioned.
- *
- * WHICH WINDOWS REACH AN OVERLAY COMPONENT IS A SEPARATE, NARROWER QUESTION, and the answer is
- * ALL FIVE — measured by walking the import graph from each app root. It was "the manager and the
- * player app" for one phase of issue 1520 and is no longer: the three canvas windows adopted the
- * class BEFORE reaching an overlay, on purpose, and the later phase that spent the prerequisite
- * landed in the same change. Twelve native `<select>` elements across those three windows are the
- * shared `Select` now, which is a thin composition over `SearchablePopover`, so each one opens a
- * panel appended to its own window's frame. Without the frame class each of those panels would
- * portal to `<body>`, lose window stacking, and emit the console error below on every scroll tick
- * — the exact defect this module exists to prevent, arriving through the conversion meant to
- * modernise the control.
- *
- * ── WHY THE FALLBACK IS LOUD RATHER THAN SILENT ─────────────────────────────────────────────
- * `resolveOverlayHost` never returns null while a document exists. Landing on `document.body`
- * keeps the origin and the target agreeing — the panel is still drawn where its trigger is,
- * merely unclipped by any app — so the visible failure mode is degraded, not wrong. But being
- * outside every Fabricate application root is a WIRING FAULT, so it also reports itself.
- *
- * It reports through `console.error` deliberately, and not through `notifyError`: the
- * positioning pass runs on every scroll and resize, so a Foundry notification would paint a
- * toast into every View Lab capture frame and every screenshot the moment it fired once. For
- * the same reason the report is deduplicated per component; without that, one mis-mounted
- * picker emits a line per scroll tick.
- */
+// Where a portaled overlay lives and what its coordinates are measured from (issues 1466, 1520).
+// INVARIANT: the coordinate origin and the portal target are the same element — both resolve
+// through `resolveOverlayHost`, because computing them apart is what let them diverge (the defect
+// this replaces). A class is eligible only if it is itself positioned, so it is the containing
+// block of the absolute panel appended to it; `tests/components/portal-host-app-root.test.js` pins
+// that, and that no component hard-codes a root of its own.
 
-/**
- * The application roots an overlay may be portaled into and measured against.
- *
- * Read by `tests/components/portal-host-app-root.test.js`, which is what makes this the single
- * source of truth rather than a comment: a root added here is a root the guard then requires to
- * be positioned, and a root removed here is one no component may name.
- *
- * @type {readonly string[]}
- */
 export const OVERLAY_HOST_ROOT_CLASSES = Object.freeze(['fabricate-manager', 'fabricate-app']);
 
-/** The `OVERLAY_HOST_ROOT_CLASSES` as one selector, for `closest`. */
 export const OVERLAY_HOST_SELECTOR = OVERLAY_HOST_ROOT_CLASSES.map((cls) => `.${cls}`).join(', ');
 
-/**
- * Components already reported as having no application root.
- *
- * Module-level, because "warn once" has to outlive the component instance that warned — a
- * picker is destroyed and recreated every time its view re-renders, so per-instance state would
- * report again on each one. `resetOverlayHostDiagnostics` is the seam that keeps this testable
- * rather than a hidden singleton.
- */
+// Module-level: "warn once" must outlive the instance that warned, which is recreated per render.
 const reported = new Set();
 
-/** Clear the warn-once registry. For tests that assert the diagnostic fires. */
 export function resetOverlayHostDiagnostics() {
   reported.clear();
 }
 
-/**
- * Report, once per component, that an overlay was mounted outside every Fabricate application.
- *
- * @param {string} component Component name, for the message.
- */
 function reportMissingHost(component) {
   if (reported.has(component)) return;
   reported.add(component);
-  // `console.error`, not `notifyError`: see the header. A Foundry toast raised from a pass that
-  // runs on every scroll and resize would land in every View Lab capture frame.
+  // `console.error`, not `notifyError`: this pass runs on every scroll and resize, so a Foundry
+  // toast would paint itself into every View Lab capture frame the moment it fired once.
   console.error(
     `Fabricate: ${component} rendered an overlay outside every Fabricate application root ` +
       `(${OVERLAY_HOST_SELECTOR}), so its panel is hosted by <body> and is not clipped by any ` +
@@ -149,17 +29,6 @@ function reportMissingHost(component) {
   );
 }
 
-/**
- * The nearest Fabricate application root containing `node`.
- *
- * @param {Element|null|undefined} node Any element inside the overlay's own subtree — the
- *   picker root, the trigger button, or the portaled node itself. All three give the same
- *   answer, because they share every ancestor above the picker.
- * @param {object} [options]
- * @param {string} [options.component] Component name used in the missing-host report.
- * @returns {HTMLElement|null} The host, `document.body` when the node sits outside every
- *   application root, or `null` when there is no document at all (SSR/module scope).
- */
 export function resolveOverlayHost(node, { component = 'An overlay component' } = {}) {
   if (typeof document === 'undefined') return null;
   if (!node) return null;
@@ -171,18 +40,8 @@ export function resolveOverlayHost(node, { component = 'An overlay component' } 
   return document.body;
 }
 
-/**
- * The host's box, used as the origin for the panel's `left`/`top`.
- *
- * There is deliberately NO viewport fallback here. A viewport-origin rect combined with a panel
- * that did not move is precisely the defect this module exists to remove, and a fallback that
- * produced one would reintroduce it for any caller that mis-wires the host. A zero box degrades
- * to the callers' existing `hostRect.width || window.innerWidth` sizing guard while keeping the
- * origin honest.
- *
- * @param {Element|null} host Result of {@link resolveOverlayHost}.
- * @returns {{left: number, top: number, width: number, height: number}} The origin box.
- */
+// Deliberately NO viewport fallback: a viewport-origin rect under a panel that did not move is
+// exactly the defect above. Zero degrades to the callers' own `|| window.innerWidth` sizing guard.
 export function overlayHostRect(host) {
   return host?.getBoundingClientRect?.() ?? { left: 0, top: 0, width: 0, height: 0 };
 }

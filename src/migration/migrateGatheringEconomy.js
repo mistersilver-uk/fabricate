@@ -1,16 +1,8 @@
 /**
- * 0.3.0 migration — system-level gathering economy modes.
- *
- * The gathering attempt-limitation feature replaces the legacy per-environment
- * `economyMode` field (`time|nodes|stamina|hybrid`) with a per-crafting-system
- * limitation mode (`none|stamina|nodes`) stored under
- * `gatheringConfig.systems[systemId].economy`, and removes the unused
- * per-task `attemptLimit` scaffold.
- *
- * This migration is pure and idempotent: it strips the removed fields and, when
- * an environment still carries a legacy non-`time` economyMode, preserves that
- * intent by seeding the owning system's economy mode (only while it is still
- * the default `none`).
+ * `0.3.0` — replace the per-environment `economyMode` with a per-system limitation mode under
+ * `gatheringConfig.systems[systemId].economy`, and drop the unused per-task `attemptLimit`.
+ * Pure and idempotent: a legacy non-`time` environment mode seeds the owning system's mode, but only
+ * while that is still the default `none`.
  */
 
 const LEGACY_MODE_MAP = Object.freeze({
@@ -31,16 +23,10 @@ function defaultEconomy(mode = 'none') {
   };
 }
 
-/**
- * @param {object} gatheringConfig Raw gathering config setting.
- * @param {Array<object>} environments Raw gathering environments setting.
- * @returns {{gatheringConfig: object, environments: Array<object>}}
- */
 export function migrateGatheringEconomy(gatheringConfig = {}, environments = []) {
   const envs = Array.isArray(environments) ? environments : [];
 
-  // Derive a desired non-default mode per system from legacy env economyMode
-  // (first non-`time` value wins for a given system).
+  // First non-`time` legacy value wins for a given system.
   const legacyModeBySystem = {};
   for (const env of envs) {
     const legacy = env?.economyMode;
@@ -55,8 +41,7 @@ export function migrateGatheringEconomy(gatheringConfig = {}, environments = [])
     }
   }
 
-  // Seed/update economy only where a legacy mode must be preserved, so worlds
-  // with the default `time` economy see no config churn.
+  // Only where a legacy mode must be preserved, so a default-`time` world sees no config churn.
   const systems = { ...gatheringConfig?.systems };
   let systemsChanged = false;
   for (const [systemId, desiredMode] of Object.entries(legacyModeBySystem)) {

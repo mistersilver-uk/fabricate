@@ -57,6 +57,13 @@ The **awarding** half of that pair is now published in its own right.
 `awardComponents` is a `stable` member that consumes the carve-out internally, so a companion placing a component on a sheet has a supported route that never requires it to call the carve-out at all, and never has to defend against either of its throw conditions.
 The carve-out remains published because a companion still reads what an actor already holds through it, and because the award deliberately publishes no item handle of its own.
 
+## The Ungated Handle Accessors
+
+A `handle` accessor whose consumer resolves it LAZILY and guards the result with optional chaining MUST NOT be `_requireReady()`-gated, and MUST answer its constructor-`null` field instead, because optional chaining absorbs an ABSENT accessor but NOT a THROW.
+The accessors bound by this rule are `getCraftingEngine`, `getCurrencyConfigStore`, `getCharacterLibrariesStore`, `getComponentScopeStore`, `getEssenceScopeStore`, `getToolScopeStore`, `getVocabularyScopeStore`, `getActorInventoryCoinSpender` and `getActorPropertyCoinSpender`.
+A readiness throw from any of them would crash the path its consumer expected to degrade: the craftability read that should have yielded an empty coin ladder, `CraftingSystemManager._normalizeSystem` — where a throw is the issue-970 shape in which the manager never initializes at all — or a world screen that should have reported an unavailable corpus.
+`getGatheringRealmStore` is the deliberate counter-example and stays gated, no consumer resolving it during initialization.
+
 ## Behavioural Member Rules
 
 Every `stable` member **that reads or acts on one specific actor** takes an **`actorId`**, never an actor uuid, and resolves it through `Fabricate#_resolveCraftingActor`.

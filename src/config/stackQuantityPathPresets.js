@@ -13,33 +13,16 @@
  * setting when their system differs.
  */
 
-/**
- * The path used by dnd5e, pf2e, and most other Foundry systems.
- *
- * @type {string}
- */
+/** The path used by dnd5e, pf2e, and most other Foundry systems. */
 export const DEFAULT_ITEM_STACK_QUANTITY_PATH = 'system.quantity';
 
-/**
- * Known per-system overrides, keyed by `game.system.id`.
- *
- * @type {Readonly<Record<string, string>>}
- */
+/** Known per-system overrides, keyed by `game.system.id`. */
 export const ITEM_STACK_QUANTITY_PATH_PRESETS = Object.freeze({
-  // Tormenta20 stores the stack count as `qtd` (quantidade). Reported in #853.
+  // Tormenta20 stores the stack count as `qtd` (quantidade).
   tormenta20: 'system.qtd',
 });
 
-/**
- * The default stack-quantity path for a Foundry system id.
- *
- * NEVER returns `undefined`: the value is used as a setting `default`, and Foundry's
- * `ClientSettings#register` applies `data.default ??= null`, which would make every
- * read of an unconfigured world return `null` rather than a usable path.
- *
- * @param {unknown} systemId `game.system.id`, or anything at all.
- * @returns {string} The preset path, or {@link DEFAULT_ITEM_STACK_QUANTITY_PATH}.
- */
+/** The default stack-quantity path for a Foundry system id. */
 export function stackQuantityPathPresetFor(systemId) {
   if (typeof systemId !== 'string') return DEFAULT_ITEM_STACK_QUANTITY_PATH;
   const key = systemId.trim();

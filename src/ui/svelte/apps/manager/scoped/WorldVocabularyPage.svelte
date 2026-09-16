@@ -13,7 +13,7 @@
   narrow column each.
 
   Fabricate cannot draw three columns even if it wanted to. `VocabularyPanel`'s row list is
-  `repeat(auto-fill, minmax(340px, 1fr))` (`styles/fabricate.css:8972`), and this route's
+  `repeat(auto-fill, minmax(340px, 1fr))` (`styles/fabricate.css:6682`), and this route's
   `.manager-main` keeps `overflow-x: hidden`, so a column narrower than that track CLIPS with no
   scrollbar rather than scrolling. At the capture case's 1280px width the main column is about
   1028px inside its inset: two columns give about 506px each and clear the track comfortably;
@@ -35,7 +35,7 @@
   The sort pair sits inside a `<ManagerToolbar class="manager-scoped-list-toolbar">` rather than
   as a bare row, and that is mechanical rather than cosmetic: a `<select>` styled only from this
   file's scoped block compiles to `select.svelte-<hash>` at (0,1,1) and LOSES to Foundry core's
-  own element rule - a failure `styles/fabricate.css:9950` records verbatim, where the control
+  own element rule - a failure `styles/fabricate.css:7422` records verbatim, where the control
   came out 14px and full width and wrapped the row into three lines. Reusing the shipped host
   takes the global rules already written for it with no edit to that sheet.
 
@@ -495,7 +495,7 @@
     background: var(--fab-bg-0);
     color: var(--fab-text);
     /* THE CONTROL TYPE SCALE AS A LITERAL, and `var(--fab-recipe-control-font)` deliberately not.
-       That property is declared once, on `.fabricate-manager` (`styles/fabricate.css:1252`), which
+       That property is declared once, on `.fabricate-manager` (`styles/fabricate.css:1061`), which
        makes it AREA-SCOPED: a scoped block is attached to a component, and a component is placed in
        a directory rather than in a DOM subtree, so this rule cannot guarantee its host renders
        under that root. Where it does not, the property is undefined and the declaration falls back

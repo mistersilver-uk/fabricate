@@ -1,19 +1,4 @@
-/**
- * Cascade planning for vocabulary deletion (issue 689).
- *
- * Deleting a category or tag that records still reference is a DESTRUCTIVE record
- * rewrite, not a silent orphaning: a deleted recipe/component category reassigns
- * the affected records' `category` back to the reserved `general` bucket, and a
- * deleted item tag is stripped from every component carrying it AND from every
- * recipe tag-placeholder ingredient (`match.type === 'tags'`) that names it. The
- * placeholder strip is what keeps the tag reference count — which credits those
- * placeholders (see vocabularyUsage.js) — honest: every reference the confirm
- * copy promises to clear is actually rewritten, so nothing is left dangling.
- *
- * These planners are pure: they read the current records and return the minimal
- * set of record patches to apply. The store owns applying them through the
- * recipe/component update paths, then replacing the vocabulary array + icon map.
- */
+/** Cascade planning for vocabulary deletion (issue 689). */
 
 import { GENERAL_COMPONENT_CATEGORY } from './componentCategories.js';
 import { GENERAL_RECIPE_CATEGORY } from './recipeCategories.js';
@@ -38,40 +23,20 @@ function reassignmentsFor(records, categoryName, generalBucket) {
   return reassignments;
 }
 
-/**
- * Recipes whose `category` matches the deleted recipe category, each patched back
- * to `general`. Empty when the category is `general` or unreferenced.
- *
- * @param {Array<{id: string, category?: string}>} recipes
- * @param {string} categoryName
- * @returns {Array<{id: string, category: string}>}
- */
+/** Recipes whose `category` matches the deleted recipe category, each patched back to `general`. */
 export function planRecipeCategoryReassignments(recipes, categoryName) {
   return reassignmentsFor(recipes, categoryName, GENERAL_RECIPE_CATEGORY);
 }
 
 /**
- * Components whose `category` matches the deleted component category, each patched
- * back to `general`. Empty when the category is `general` or unreferenced.
- *
- * @param {Array<{id: string, category?: string}>} components
- * @param {string} categoryName
- * @returns {Array<{id: string, category: string}>}
+ * Components whose `category` matches the deleted component category, each patched back to
+ * `general`.
  */
 export function planComponentCategoryReassignments(components, categoryName) {
   return reassignmentsFor(components, categoryName, GENERAL_COMPONENT_CATEGORY);
 }
 
-/**
- * Components carrying the deleted tag, each patched with the tag removed from its
- * `tags` array. Empty when the tag is unreferenced. Comparison is
- * case-insensitive because item tags are stored lowercase but a stray mixed-case
- * value should still be stripped.
- *
- * @param {Array<{id: string, tags?: string[]}>} components
- * @param {string} tagName
- * @returns {Array<{id: string, tags: string[]}>}
- */
+/** Components carrying the deleted tag, each patched with the tag removed from its `tags` array. */
 export function planTagRemovals(components, tagName) {
   const target = vocabularyKey(tagName);
   if (!target) return [];
@@ -89,12 +54,8 @@ export function planTagRemovals(components, tagName) {
   return removals;
 }
 
-// Rewrite a single ingredient `match`, returning a new match with the deleted tag
-// removed, or null when it is not a tag placeholder naming the target. A match
-// whose only tag was the deleted one is left with an empty `tags` array — the
-// honest, incomplete placeholder that results from deleting the tag it relied on
-// (persisted via updateRecipe's allowIncomplete path, exactly like a category
-// reassignment), never a match naming a tag the vocabulary no longer holds.
+// Rewrite a single ingredient `match`, returning a new match with the deleted tag removed, or null
+// when it is not a tag placeholder naming the target.
 function rewriteMatch(match, target) {
   if (match?.type !== 'tags') return null;
   const tags = Array.isArray(match.tags) ? match.tags : [];
@@ -102,8 +63,8 @@ function rewriteMatch(match, target) {
   return { ...match, tags: tags.filter((tag) => vocabularyKey(tag) !== target) };
 }
 
-// Rebuild a `{ match }`-bearing list (a group's options or a legacy ingredient
-// set's ingredients), returning a new array only when a member changed.
+// Rebuild a `{ match }`-bearing list (a group's options or a legacy ingredient set's ingredients),
+// returning a new array only when a member changed.
 function stripTagFromRefs(refs, target) {
   if (!Array.isArray(refs)) return null;
   let changed = false;
@@ -127,20 +88,15 @@ function stripTagFromGroups(groups, target) {
   return changed ? next : null;
 }
 
-// Mirror vocabularyUsage.matchesOf: prefer the grouped-options shape, falling
-// back to the legacy bare-`ingredients` list so the strip covers exactly what the
-// reference count credits.
+// Mirror vocabularyUsage.matchesOf: prefer the grouped-options shape, falling back to the legacy
+// bare-`ingredients` list so the strip covers exactly what the reference count credits.
 function stripTagFromIngredientSet(set, target) {
   const groups = Array.isArray(set?.ingredientGroups) ? set.ingredientGroups : [];
   if (groups.length > 0) {
     const next = stripTagFromGroups(groups, target);
     if (!next) return null;
-    // The `...set` spread used to carry a STALE flat mirror through unchanged, so a tag
-    // cascade left the retired `ingredients` alias still naming the tag it had just
-    // removed. `toJSON` no longer emits that alias (issue 1135) and `IngredientSet`
-    // derives it from the groups on read, so DROP it rather than recompute it. Only a set
-    // that HAS groups reaches here, which is why no flat-authored set can lose its only
-    // ingredient data to this branch.
+    // The `...set` spread used to carry a STALE flat mirror through unchanged, so a tag cascade
+    // left the retired `ingredients` alias still naming the tag it had just removed.
     const rewritten = { ...set, ingredientGroups: next };
     delete rewritten.ingredients;
     return rewritten;
@@ -174,20 +130,9 @@ function stripTagFromSteps(steps, target) {
 }
 
 /**
- * Recipes whose tag-placeholder ingredients (`match.type === 'tags'`) name the
- * deleted tag, each paired with the minimal `updateRecipe` patch that strips the
- * tag out of every placeholder — at the top level (`ingredientSets`) and per step
- * (`steps[].ingredientSets`). Empty when no recipe placeholder names the tag.
- *
- * The patch replaces only the arrays that changed; `updateRecipe` shallow-spreads
- * it over the recipe, so a whole-array replace is exactly what is needed. Apply it
- * with `allowIncomplete: true` because a placeholder emptied by the strip is
- * structurally incomplete.
- *
- * @param {Array<{id: string, ingredientSets?: object[], steps?: object[]}>} recipes
- *   plain recipe projections (`toJSON()` shape).
- * @param {string} tagName
- * @returns {Array<{id: string, updates: {ingredientSets?: object[], steps?: object[]}}>}
+ * Recipes whose tag-placeholder ingredients (`match.type === 'tags'`) name the deleted tag, each
+ * paired with the minimal `updateRecipe` patch that strips the tag out of every placeholder — at
+ * the top level (`ingredientSets`) and per step (`steps[].ingredientSets`).
  */
 export function planRecipeTagRemovals(recipes, tagName) {
   const target = vocabularyKey(tagName);

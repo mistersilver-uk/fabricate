@@ -1,26 +1,9 @@
 /**
- * 1.13.0 — Invert the recipe ↔ recipe-item (book/scroll) link (issue 511).
- *
- * Membership used to be a scalar reverse ref on each recipe
- * (`recipe.recipeItemId`, + legacy `recipe.linkedRecipeItemUuid`), so a recipe could
- * belong to at most ONE book. This migration moves membership onto each recipe item
- * definition as a `recipeIds[]` list (many-to-many: a recipe may belong to several
- * books) and strips the now-relocated fields from every recipe.
- *
- * For each recipe it resolves its book the SAME way the old runtime did — by
- * `recipeItemId` against a definition id, else by `linkedRecipeItemUuid` against a
- * definition's `originItemUuid` (legacy `sourceItemUuid`) — and pushes the recipe id onto that definition's
- * `recipeIds` (deduped). Then it deletes `recipeItemId` / `linkedRecipeItemUuid`.
- *
- * Idempotent: after a run the recipes carry neither field, so a re-run finds nothing
- * to push and the deletes are no-ops; existing `def.recipeIds` are preserved.
- *
- * Pure: returns `{ systems, recipes }` and performs no I/O.
- *
- * @param {object} data Runner payload.
- * @param {Array<object>} [data.systems] Raw craftingSystems setting.
- * @param {Array<object>} [data.recipes] Raw recipes setting.
- * @returns {{ systems: Array<object>, recipes: Array<object> }}
+ * `1.13.0` — invert the recipe-to-recipe-item link (issue 511): membership moves off each recipe's
+ * scalar reverse ref, which allowed at most ONE book, onto each definition's many-to-many
+ * `recipeIds[]`, and the relocated fields are stripped. Each recipe's book is resolved the SAME way
+ * the old runtime did — by `recipeItemId`, else by `linkedRecipeItemUuid` against an origin uuid.
+ * Pure and idempotent: after a run the recipes carry neither field, and existing `recipeIds` survive.
  */
 export function migrateInvertRecipeItemLink(data = {}) {
   const systems = _clone(data.systems);
@@ -45,9 +28,8 @@ export function migrateInvertRecipeItemLink(data = {}) {
       if (!Array.isArray(def.recipeIds)) def.recipeIds = [];
       const id = String(def.id || '').trim();
       if (id) byId.set(id, def);
-      // New-name-first, legacy-name-tolerant (issue 560): this 1.13.0 migration runs
-      // ahead of the 1.16.0 field rename, so it normally sees the legacy `sourceItemUuid`,
-      // but tolerating the renamed `originItemUuid` keeps it correct regardless of order.
+      // New-name-first, legacy-name-tolerant: this runs ahead of the `1.16.0` field rename, so it
+      // normally sees the legacy spelling, but tolerating the new one keeps it correct either way.
       const source = String(def.originItemUuid || def.sourceItemUuid || '').trim();
       if (source) bySource.set(source, def);
     }
@@ -59,11 +41,9 @@ export function migrateInvertRecipeItemLink(data = {}) {
     const recipeId = String(recipe.id || '').trim();
     const sysIdx = systemIndex.get(String(recipe.craftingSystemId || ''));
 
-    // Track which reverse ref actually resolved the book independently: only the
-    // `linkedRecipeItemUuid` (bySource) path being the resolver makes that uuid a book
-    // alias that may be stripped. If `recipeItemId` resolves the book while a DISTINCT
-    // `linkedRecipeItemUuid` points elsewhere (a standalone alchemy formula item), that
-    // formula link is unrelated and MUST survive.
+    // Only the `linkedRecipeItemUuid` path resolving the book makes that uuid a book alias that may
+    // be stripped. If `recipeItemId` resolves the book while a DISTINCT `linkedRecipeItemUuid` points
+    // elsewhere — a standalone alchemy formula item — that link is unrelated and MUST survive.
     let linkedUuidResolvedBook = false;
     if (recipeId && sysIdx) {
       const recipeItemId = String(recipe.recipeItemId || '').trim();
@@ -78,10 +58,8 @@ export function migrateInvertRecipeItemLink(data = {}) {
       if (def && !def.recipeIds.includes(recipeId)) def.recipeIds.push(recipeId);
     }
 
-    // Book membership now lives on the definition, so drop the book-only `recipeItemId`
-    // reverse ref unconditionally. Drop `linkedRecipeItemUuid` ONLY when it was itself the
-    // ref that resolved to a book (a legacy book alias); otherwise preserve it — it is the
-    // recipe's standalone alchemy formula-item link.
+    // Drop the book-only `recipeItemId` unconditionally; drop `linkedRecipeItemUuid` ONLY when it
+    // was itself the ref that resolved to a book, else it is the standalone formula-item link.
     if ('recipeItemId' in recipe) delete recipe.recipeItemId;
     if (linkedUuidResolvedBook && 'linkedRecipeItemUuid' in recipe) {
       delete recipe.linkedRecipeItemUuid;

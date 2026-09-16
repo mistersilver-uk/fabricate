@@ -112,6 +112,13 @@ A pre-`4` payload carries its realm library on the system at `gatheringRealms` (
 This hoist MUST also run branch-independently, and MUST be idempotent: once the envelope carries a library the lift is a no-op, and a system already reduced to `{ enabled }` has nothing left to strip.
 It is idempotent: once the envelope carries units the hoist is a no-op, and a system already reduced to `{ enabled }` has nothing left to strip.
 
+**The already-lifted guard on BOTH the currency and the travel hoist MUST key on the envelope slice carrying ANY world configuration, never on its LIST being non-empty.**
+A schema-`3` export from a world that chose the macro spend strategy before authoring a ladder carries scalars and an empty `units`, and a schema-`4` export from a world that chose `alwaysVisible` before authoring a realm carries scalars and an empty `realms`; a list-count guard would read either as un-lifted, rebuild over it, and discard the strategy, provider, macro UUIDs, reveal mode and modifier visibility the GM set.
+That is the exact opposite of the character-libraries guard above, and the two differ because those two slices carry SCALARS while the character-libraries slice carries none.
+
+**The unified-modifier-library upcast MUST run AFTER the check-modifier catalogue lift, and here the ORDER IS OBSERVABLE** rather than merely symmetrical with the world ladder.
+A pre-`1.22.0` bundle still holds its catalogue at the old `craftingCheck.checkModifiers` key while the merge reads only the new system-level one, so the reverse order would merge an EMPTY catalogue and then retire it, dropping every check modifier in the bundle (issue 1117).
+
 A pre-`5` payload carries both character libraries on the system at `characterPrerequisites` and `modifiers`, and `migrateExportPayload` MUST hoist them to the envelope-level `characterLibraries` and DELETE the system's own keys, using the SAME transforms the world-side `1.28.0` migration applies (`buildWorldCharacterLibraries` / `stripSystemCharacterLibraries`), not a second implementation of them.
 Nothing is left behind on the system: unlike currency and travel there is no participation flag, so the strip is a deletion rather than a reduction.
 This hoist MUST also run branch-independently, for the reason every other field-level upcast does, and MUST be idempotent.
