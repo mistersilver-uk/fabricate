@@ -18,7 +18,12 @@ The pass or fail check is optional in simple and Routed by ingredients modes.
 It is optional in Alchemy mode too: a Simple alchemy check has an Active switch you can turn off, which resolves every matched brew as a success.
 A Tiered alchemy check is required, because it routes result sets by outcome tier and so cannot resolve without a roll.
 The outcome-tier check is required in Routed by check mode.
-Each attempt runs the check automatically, before any materials are consumed.
+Each attempt runs the check automatically.
+When that check runs relative to the spend depends on how the craft was started.
+
+A run you START and then resolve from the Journal spends its materials when the stage begins, and rolls the check afterwards, when you resolve that stage.
+If the check fails and the system's **Consume ingredients on failure** setting is off, what the stage spent is returned to you.
+A one-call craft that resolves immediately — a macro or API `craft()`, with no run to begin — rolls the check first and consumes only afterwards, so a failure under that same setting never takes anything in the first place.
 
 ## Dynamic DC macros
 

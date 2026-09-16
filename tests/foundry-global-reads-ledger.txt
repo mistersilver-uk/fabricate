@@ -2,8 +2,8 @@ src/config/settings.js	3
 src/models/Recipe.js	1
 src/systems/CoinSpenders.js	2
 src/systems/CompendiumImporter.js	2
-src/systems/CraftingEngine.js	46
-src/systems/CraftingRunManager.js	6
+src/systems/CraftingEngine.js	66
+src/systems/CraftingRunManager.js	9
 src/systems/CraftingSystemManager.js	25
 src/systems/FragmentDiscoveryHook.js	3
 src/systems/RecipeManager.js	19

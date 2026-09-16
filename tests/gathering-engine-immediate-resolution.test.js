@@ -3,7 +3,54 @@ import assert from 'node:assert/strict';
 
 import { GatheringEngine } from '../src/systems/GatheringEngine.js';
 import { GatheringRunManager } from '../src/systems/GatheringRunManager.js';
+import { normalizeGatheringResultGroups } from '../src/systems/gatheringResultGroups.js';
 import { routedRoll, routedSystemCheck, stubRoll } from './helpers/gathering.js';
+import { createPersistedGatheringHistory } from './helpers/journal-fixtures.js';
+
+for (const mode of ['straight', 'd100', 'routed', 'progressive']) {
+  for (const timed of [false, true]) {
+    for (const versioned of [false, true]) {
+      test(`actual gathering writer chain preserves ${mode}, timed=${timed}, v1=${versioned}`, async () => {
+        const fixture = await createPersistedGatheringHistory({ mode, timed, versioned });
+        assert.equal(fixture.error, null, JSON.stringify(fixture));
+        assert.ok(fixture.record, JSON.stringify(fixture.response));
+        assert.equal(fixture.record.resolutionSnapshot.mode, mode);
+        assert.equal(fixture.model.gatheringYield.mode, mode);
+        assert.deepEqual(fixture.model.createdResults.map((entry) => entry.quantity), [2, 1]);
+        const receipts = versioned ? fixture.record.executionJournal.effects.find((effect) => effect.effectId === 'results').receipt : fixture.record.createdResults;
+        assert.equal(new Set(receipts.map((entry) => entry.resultRowId)).size, 2);
+        assert.deepEqual(fixture.publications.at(-1).map((entry) => entry.quantity), [2, 1]);
+      });
+    }
+  }
+}
+
+for (const versioned of [false, true]) {
+  test(`actual gathering creation refusal keeps its confirmed prefix without publication (v1=${versioned})`, async () => {
+    const fixture = await createPersistedGatheringHistory({ refuseAt: 2, versioned });
+    assert.ok(fixture.error);
+    assert.equal(fixture.creates, 2);
+    assert.equal(fixture.publications.length, 0);
+    assert.equal(fixture.model.recoveryEvidence.required, true);
+    const recorded = fixture.model.recoveryEvidence.effects.flatMap((effect) => effect.receipt?.items ?? []);
+    assert.deepEqual(recorded.map((entry) => entry.quantity), [2]);
+    assert.equal(fixture.record.id, fixture.model.id);
+  });
+}
+
+for (const refuseHistory of ['initial', 'settlement']) {
+  test(`actual gathering ${refuseHistory} refusal never publishes planned awards`, async () => {
+    const fixture = await createPersistedGatheringHistory({ refuseHistory });
+    assert.equal(fixture.publications.length, 0);
+    assert.equal(fixture.creates, refuseHistory === 'initial' ? 0 : 2);
+    if (refuseHistory === 'initial') assert.equal(fixture.record, undefined);
+    else {
+      assert.ok(fixture.error);
+      assert.equal(fixture.record.historySettlement.awards, 'pending');
+      assert.deepEqual(fixture.model.createdResults, []);
+    }
+  });
+}
 
 const viewer = { id: 'user-1', isGM: false };
 const gmViewer = { id: 'gm-1', isGM: true };
@@ -27,6 +74,9 @@ function makeEngine({
   runManager = null,
   gatheringCraftingCheck = null,
   systemManager = null,
+  richState = null,
+  eventSceneTrigger = null,
+  hookPublisher = null,
   calls = {}
 } = {}) {
   calls.resolveProgressive = [];
@@ -38,6 +88,7 @@ function makeEngine({
   calls.failureFeedback = [];
   calls.createTerminalRun = [];
   calls.createWaitingRun = [];
+  calls.published = [];
 
   const libraryToolsMap = new Map(libraryTools.map(tool => [tool.id, tool]));
 
@@ -126,6 +177,7 @@ function makeEngine({
       }
     },
     runManager: runManager ?? {
+      settleHistory: async (_actor, id, payload) => ({ id, status: 'succeeded', ...payload }),
       findActiveRunForTask: () => null,
       createWaitingRun: async (...args) => calls.createWaitingRun.push(args),
       createTerminalRun: async (...args) => {
@@ -139,6 +191,9 @@ function makeEngine({
         };
       }
     },
+    richState,
+    eventSceneTrigger,
+    hookPublisher,
     localize: (key, data) => data ? `${key}:${JSON.stringify(data)}` : key,
     ...(systemManager ? { systemManager } : {})
   });
@@ -167,10 +222,18 @@ function routedTask(overrides = {}) {
     resultGroups: [{
       id: 'group-a',
       name: 'Iron',
-      results: [{ id: 'result-a', componentId: 'comp-a', quantity: 2 }]
+      results: [{ id: 'result-a', resultRowId: 'group-a:result-a:0', componentId: 'comp-a', quantity: 2 }]
     }],
     ...overrides
   };
+}
+
+function straightTask(overrides = {}) {
+  return routedTask({
+    resolutionMode: 'straight',
+    dropRows: [{ id: 'inactive-drop', componentId: 'comp-c', quantity: 99, dropRate: 100 }],
+    ...overrides
+  });
 }
 
 class FakeActor {
@@ -188,6 +251,7 @@ class FakeActor {
   async setFlag(namespace, key, value) {
     if (!this.flags[namespace]) this.flags[namespace] = {};
     this.flags[namespace][key] = JSON.parse(JSON.stringify(value));
+    return this;
   }
 }
 
@@ -241,7 +305,7 @@ function assertNoBlindTerminalLeak(call) {
 
 test('immediate routed success creates result items and writes succeeded terminal history', async () => {
   const calls = {};
-  const createdResults = [{ actorUuid: actor.uuid, itemUuid: 'Item.iron', quantity: 2 }];
+  const createdResults = [{ actorUuid: actor.uuid, itemUuid: 'Item.iron', quantity: 2, name: null, img: null }];
   const usedTools = [{ actorUuid: actor.uuid, itemUuid: 'Item.pick', quantity: 1 }];
   const task = routedTask({ toolIds: ['tool-pick'] });
   routedRoll(true);
@@ -271,12 +335,175 @@ test('immediate routed success creates result items and writes succeeded termina
     assert.equal(calls.createTerminalRun[0][2], 'succeeded');
     // The terminal history carries the formula-derived check result; the routed
     // tier name ('Iron') matched the same-named result group.
-    assert.deepEqual(calls.createTerminalRun[0][3].createdResults, createdResults);
+    assert.deepEqual(calls.createTerminalRun[0][3].createdResults, []);
+    assert.equal(calls.createTerminalRun[0][3].historySettlement.awards, 'pending');
     assert.deepEqual(calls.createTerminalRun[0][3].usedTools, usedTools);
     assert.equal(calls.createTerminalRun[0][3].checkResult.outcome, 'Iron');
     assert.equal(calls.createTerminalRun[0][3].checkResult.success, true);
   } finally {
     delete globalThis.Roll;
+  }
+});
+
+test('immediate straight resolution awards its sole result group without a check or yield roll', async () => {
+  const calls = {};
+  const task = straightTask();
+  const createdResults = [{ actorUuid: actor.uuid, itemUuid: 'Item.iron', quantity: 2, name: null, img: null }];
+  const engine = makeEngine({ task, createdResults, calls });
+
+  const result = await engine.startAttempt({
+    viewer,
+    actor,
+    environmentId: 'env-a',
+    taskId: 'task-a'
+  });
+
+  assert.equal(result.accepted, true);
+  assert.equal(result.state, 'succeeded');
+  assert.deepEqual(calls.evaluateCheck, []);
+  assert.deepEqual(calls.resolveProgressive, []);
+  assert.deepEqual(calls.createResults[0].resultGroups, task.resultGroups);
+  assert.deepEqual(result.createdResults, createdResults);
+  assert.equal(calls.createTerminalRun[0][3].checkResult, undefined);
+});
+
+test('straight validation rejects empty groups or multiple groups before terminal side effects', async () => {
+  for (const resultGroups of [
+    [],
+    [{ ...routedTask().resultGroups[0], results: [] }],
+    [
+      routedTask().resultGroups[0],
+      { ...routedTask().resultGroups[0], id: 'group-b', name: 'Copper' }
+    ]
+  ]) {
+    const calls = {};
+    const engine = makeEngine({ task: straightTask({ resultGroups }), calls });
+
+    const result = await engine.startAttempt({
+      viewer,
+      actor,
+      environmentId: 'env-a',
+      taskId: 'task-a'
+    });
+
+    assert.equal(result.accepted, false);
+    assert.deepEqual(codes(result), ['TASK_MISCONFIGURED']);
+    assertNoTerminalSideEffects(calls);
+  }
+});
+
+test('straight and routed reject invalid fixed result quantities before terminal side effects', async () => {
+  for (const [mode, quantity] of [
+    ['straight', -1],
+    ['routed', 'three']
+  ]) {
+    const calls = {};
+    const task = routedTask({
+      resolutionMode: mode,
+      resultGroups: [{
+        ...routedTask().resultGroups[0],
+        results: [{ ...routedTask().resultGroups[0].results[0], quantity }]
+      }]
+    });
+    const engine = makeEngine({ task, calls });
+
+    const result = await engine.startAttempt({
+      viewer,
+      actor,
+      environmentId: 'env-a',
+      taskId: 'task-a'
+    });
+
+    assert.equal(result.accepted, false, `${mode} rejects quantity ${quantity}`);
+    assert.deepEqual(codes(result), ['TASK_MISCONFIGURED']);
+    assertNoTerminalSideEffects(calls);
+  }
+});
+
+test('normalized zero result quantity remains invalid at the runtime start boundary', async () => {
+  const resultGroups = normalizeGatheringResultGroups([
+    {
+      id: 'group-a',
+      name: 'Iron',
+      results: [{ id: 'result-a', componentId: 'comp-a', quantity: 0 }]
+    }
+  ]);
+  assert.equal(resultGroups[0].results[0].quantity, 0, 'normalization preserves the invalid input');
+  const calls = {};
+  const engine = makeEngine({ task: straightTask({ resultGroups }), calls });
+
+  const result = await engine.startAttempt({
+    viewer,
+    actor,
+    environmentId: 'env-a',
+    taskId: 'task-a'
+  });
+
+  assert.equal(result.accepted, false);
+  assert.deepEqual(codes(result), ['TASK_MISCONFIGURED']);
+  assertNoTerminalSideEffects(calls);
+});
+
+test('immediate straight and routed attempts resolve one independent environmental event', async () => {
+  for (const mode of ['straight', 'routed']) {
+    const calls = {};
+    const event = { id: `event-${mode}`, name: `${mode} cave-in` };
+    const evidence = { rows: [], events: [{ eventId: event.id, contributions: [] }] };
+    const eventCalls = [];
+    const sceneCalls = [];
+    const task = routedTask({ resolutionMode: mode });
+    const richState = {
+      resolveEnvironmentalEvents: async (payload) => {
+        eventCalls.push(payload);
+        return {
+          status: 'failed',
+          events: [event],
+          eventPolicy: 'failureWithEvent',
+          characterModifierSnapshot: evidence
+        };
+      }
+    };
+    const environment = targetedEnvironment({ events: [event] });
+    if (mode === 'routed') routedRoll(true);
+    try {
+      const engine = makeEngine({
+        environment,
+        task,
+        richState,
+        eventSceneTrigger: {
+          apply: async (payload) => {
+            sceneCalls.push(payload);
+          }
+        },
+        hookPublisher: {
+          publishAttemptCompleted: (payload) => {
+            calls.published.push(payload);
+          }
+        },
+        calls
+      });
+
+      const result = await engine.startAttempt({
+        viewer,
+        actor,
+        environmentId: 'env-a',
+        taskId: 'task-a'
+      });
+
+      assert.equal(result.accepted, true, mode);
+      assert.equal(result.state, 'failed', `${mode} applies failureWithEvent`);
+      assert.equal(eventCalls.length, 1, `${mode} rolls events exactly once`);
+      assert.deepEqual(calls.createResults, [], `${mode} event failure withholds results`);
+      const persistedCheck = calls.createTerminalRun[0][3].checkResult;
+      assert.deepEqual(persistedCheck.events, [event]);
+      assert.equal(persistedCheck.eventPolicy, 'failureWithEvent');
+      assert.deepEqual(persistedCheck.characterModifierSnapshot, evidence);
+      assert.deepEqual(calls.createTerminalRun[0][3].characterModifierSnapshot, evidence);
+      assert.deepEqual(sceneCalls[0].events, [event]);
+      assert.deepEqual(calls.published[0].checkResult.events, [event]);
+    } finally {
+      if (mode === 'routed') delete globalThis.Roll;
+    }
   }
 });
 
@@ -323,8 +550,8 @@ test('progressive success awards expected results from numeric check value', asy
   const calls = {};
   const task = progressiveTask();
   const createdResults = [
-    { actorUuid: actor.uuid, itemUuid: 'Item.ore-a', quantity: 1 },
-    { actorUuid: actor.uuid, itemUuid: 'Item.ore-b', quantity: 1 }
+    { actorUuid: actor.uuid, itemUuid: 'Item.ore-a', quantity: 1, name: null, img: null },
+    { actorUuid: actor.uuid, itemUuid: 'Item.ore-b', quantity: 1, name: null, img: null }
   ];
   stubRoll(8); // system gathering check rolls 8 → drives the numeric award value
   try {
@@ -465,8 +692,8 @@ test('terminal history persistence failure prevents results, tools, and failure 
 test('real run manager persists immediate non-blind history with the same created and used refs as response', async () => {
   const calls = {};
   const actingActor = new FakeActor();
-  const createdResults = [{ actorUuid: actingActor.uuid, itemUuid: 'Item.iron', quantity: 2 }];
-  const usedTools = [{ actorUuid: actingActor.uuid, itemUuid: 'Item.pick', quantity: 1 }];
+  const createdResults = [{ actorUuid: actingActor.uuid, itemUuid: 'Item.iron', quantity: 2, name: null, img: null }];
+  const usedTools = [{ actorUuid: actingActor.uuid, itemUuid: 'Item.pick', quantity: 1, name: null, img: null }];
   const task = routedTask({ toolIds: ['tool-pick'] });
   const runManager = new GatheringRunManager({
     randomID: () => 'run-terminal',
@@ -705,7 +932,7 @@ test('GM blind terminal response may include task and result details for inspect
     id: 'secret-mooncap-task',
     name: 'Secret Mooncap Patch'
   });
-  const createdResults = [{ actorUuid: actor.uuid, itemUuid: 'Item.secret-mooncap', quantity: 1 }];
+  const createdResults = [{ actorUuid: actor.uuid, itemUuid: 'Item.secret-mooncap', quantity: 1, name: null, img: null }];
   routedRoll(true);
   try {
     const engine = makeEngine({
@@ -1128,6 +1355,31 @@ test('_resolveRoutedFormulaOutcome: a winning tier with no matching result group
     assert.deepEqual(outcome.resultGroups, []);
     // The roll is still reported, so the GM can see which tier failed to route.
     assert.equal(outcome.checkResult.outcome, 'Iron');
+  } finally {
+    delete globalThis.Roll;
+  }
+});
+
+test('_resolveRoutedFormulaOutcome: duplicate normalized tier-name matches are MISCONFIGURED', async () => {
+  const task = routedTask({
+    resultGroups: [
+      routedTask().resultGroups[0],
+      { ...routedTask().resultGroups[0], id: 'group-duplicate', name: ' iron ' }
+    ]
+  });
+  const routed = routedSystemCheck().routed;
+  stubRoll(18, [{ number: 1, faces: 20, total: 18 }]);
+  try {
+    const engine = makeEngine({ task });
+    const outcome = await engine._resolveRoutedFormulaOutcome({
+      routed,
+      rollFormula: routed.rollFormula,
+      actor,
+      task
+    });
+
+    assert.equal(outcome.status, 'misconfigured');
+    assert.equal(outcome.code, 'ROUTED_TIER_AMBIGUOUS');
   } finally {
     delete globalThis.Roll;
   }

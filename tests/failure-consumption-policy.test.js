@@ -78,8 +78,11 @@ function buildFakeItem(id, quantity = 1) {
     updatePayloads: [],
     getFlag(ns, key) { return flags[`${ns}.${key}`]; },
     async setFlag(ns, key, value) { flags[`${ns}.${key}`] = value; return value; },
+    // Foundry resolves the DOCUMENT from both writes, and the acknowledged-receipt
+    // contract reads that return before recording an actual consumption.
     async delete() {
       this.deleteCalled = true;
+      return this;
     },
     async update(payload) {
       this.updateCalled = true;
@@ -87,6 +90,7 @@ function buildFakeItem(id, quantity = 1) {
       if (payload['system.quantity'] !== undefined) {
         this.system.quantity = payload['system.quantity'];
       }
+      return this;
     }
   };
   return item;

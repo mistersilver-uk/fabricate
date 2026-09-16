@@ -56,6 +56,7 @@
     onclick = () => {},
     children = undefined,
     class: extraClass = '',
+    size = 'default',
     element = $bindable(null),
     ...rest
   } = $props();
@@ -65,7 +66,9 @@
   // parses to build its probes. `icon-button-source-contract.test.js` pins this file's
   // occurrences of the contract class at exactly 1 — the one place that writes it.
   const classes = $derived(
-    ['fabricate-icon-button', 'manager-icon-button', extraClass].filter(Boolean).join(' ')
+    ['fabricate-icon-button', 'manager-icon-button', size === 24 ? 'is-size-24' : '', extraClass]
+      .filter(Boolean)
+      .join(' ')
   );
 
   const accessibleName = $derived(ariaLabel || undefined);

@@ -17,7 +17,6 @@
   import ManagerButton from '../../components/ManagerButton.svelte';
   import Stepper from '../../components/Stepper.svelte';
   import { stepperLabels } from '../../components/stepperLabels.js';
-  import RadioCardGroup from '../../components/RadioCardGroup.svelte';
   import IconButton from '../../components/IconButton.svelte';
   import Select from '../../components/Select.svelte';
 
@@ -69,46 +68,9 @@
     };
   }
 
-  // Gathering resolution mode is system config (default d100, the only implemented gathering
-  // resolution). `progressive` and `routed` are modelled but not implemented, so they render
-  // disabled with a "Coming soon" badge.
+  // Retain the former system-level value in the read/write shape for compatibility.
+  // Resolution is authored per task now, so this view deliberately exposes no control for it.
   const GATHERING_RESOLUTION_MODES = ['d100', 'progressive', 'routed'];
-
-  const gatheringResolutionModeOptions = [
-    {
-      value: 'd100',
-      labelKey: 'FABRICATE.Admin.Manager.Economy.Resolution.D100',
-      fallback: 'd100 roll',
-      descKey: 'FABRICATE.Admin.Manager.Economy.Resolution.D100Desc',
-      descFallback:
-        'Each attempt rolls a d100 against the task’s drop tables to determine what is gathered.',
-    },
-    {
-      value: 'progressive',
-      labelKey: 'FABRICATE.Admin.Manager.Economy.Resolution.Progressive',
-      fallback: 'Progressive',
-      descKey: 'FABRICATE.Admin.Manager.Economy.Resolution.ProgressiveDesc',
-      descFallback: 'A numeric check awards every drop whose difficulty threshold is met.',
-      disabled: true,
-      badgeKey: 'FABRICATE.Admin.SystemSettings.ResolutionComingSoon',
-      badgeFallback: 'Coming soon',
-    },
-    {
-      value: 'routed',
-      labelKey: 'FABRICATE.Admin.Manager.Economy.Resolution.Routed',
-      fallback: 'Routed by check',
-      descKey: 'FABRICATE.Admin.Manager.Economy.Resolution.RoutedDesc',
-      descFallback: 'The gathering check outcome selects which drop group is returned.',
-      disabled: true,
-      badgeKey: 'FABRICATE.Admin.SystemSettings.ResolutionComingSoon',
-      badgeFallback: 'Coming soon',
-    },
-  ];
-
-  function setResolutionMode(mode) {
-    economy.resolutionMode = GATHERING_RESOLUTION_MODES.includes(mode) ? mode : 'd100';
-    void persistEconomy();
-  }
 
   // Reload economy + actor stamina whenever the selected system changes.
   $effect(() => {
@@ -274,26 +236,6 @@
 </script>
 
 <div class="manager-gathering-economy" data-gathering-economy-view>
-  <section class="manager-economy-card" data-gathering-resolution-card>
-    <!--
-      `configCards={false}` is EXPLICIT and load-bearing (issue 1509): this site passed no `variant`
-      at all, and the retired `ResolutionModeCard` shim derived `isConfigCard` from it and so handed
-      the primitive FALSE, where `RadioCardGroup`'s own default is TRUE. Omitting the prop would
-      flip this card from its compact single-column rows to the two-column config-card face.
-    -->
-    <RadioCardGroup
-      legendKey="FABRICATE.Admin.Manager.Economy.GatheringResolutionMode"
-      legend="Gathering resolution mode"
-      options={gatheringResolutionModeOptions}
-      selectedValue={economy.resolutionMode}
-      groupName="manager-gathering-resolution-mode"
-      dataAttr="data-gathering-resolution-mode"
-      optionDataAttr="data-gathering-resolution-mode-option"
-      configCards={false}
-      onChange={setResolutionMode}
-    />
-  </section>
-
   <section class="manager-economy-card" data-economy-mode-card>
     <header class="manager-economy-card-head">
       <h3 class="manager-economy-card-title">

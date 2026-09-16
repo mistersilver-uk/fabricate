@@ -4,13 +4,41 @@
   "nothing here" message renders through it, and the player window's `PlayerViewState` composes it.
 
   Props:
-  | prop | values | default | contract |
-  | --- | --- | --- | --- |
-  | `icon` / `title` / `hint` | string | `''` | omit `icon` for a panel with no tile and `title` for a one-sentence panel; `hint` is the optional explanatory line |
-  | `compact` / `inline` / `note` | boolean | `false` | smaller tile and tighter padding for sidebars; the ONE-LINE form, where the stack becomes a ROW and the 46px tile is RELEASED rather than resized; and the POPOVER form, where the panel itself is released. `note` declares `place-items: start` and `text-align: left` on ITSELF, so a caller cannot restore a centred line through a wrapper. |
-  | `filtered` / `field` | boolean | `false` | the filtered-to-nothing treatment (one quieter, wider-padded dashed panel, no icon or title), and a short placeholder at full control width and 34px height |
-  | `contextClass` / `dataAttr` / `dataValue` | string | `''` | extra classes whose rules live in the global sheet because they describe how a container PLACES this panel — never for appearance — and an optional test and screenshot hook |
-  | `children` | snippet | | trailing content INSIDE the panel: a Clear-filters button, a CTA or a docs link, which is the way out of the dead end |
+   - icon: Font Awesome classes for the glyph (omit for a panel with no tile).
+   - title: the short statement of what is absent (omit for a one-sentence panel).
+   - hint: the optional explanatory sentence beneath it.
+   - compact: smaller tile and tighter padding for sidebars, popovers and inline panels.
+   - inline: the ONE-LINE form (issue 1286) — the stack becomes a ROW and the 46px icon
+     tile is released into a bare inline glyph, so the panel reads as a single sentence
+     with a leading mark rather than as a centred hero block. It is NOT a smaller
+     `compact`: `compact` keeps the tile (at 32px) and keeps the column, and a "nothing
+     goes wrong with this component yet" line sitting directly above an Add button cannot
+     afford either. The Component Studio's complications section is its first consumer.
+     (This clause used to go on to refuse the PLAYER app's own empties as "a different area
+     shell". That refusal is retired with the one at the foot of this block, and for the same
+     reason — see there.)
+   - note: the POPOVER form (issue 1373) — the panel itself is released. No dashed edge, no
+     corner, no fill and no tile: one quiet line at the popover's own type scale, reading from
+     the left. It is NOT a smaller `inline`; `inline` puts the sentence on one line and KEEPS
+     the box, and a bordered card inside a 240px picker panel is the shape the design does not
+     draw (`proto:2262` is `padding:7px; font:500 10px var(--sans); color:var(--subtle)` and
+     nothing else). `SearchablePopover` is its consumer, which is every picker in the manager
+     and the player window's actor bar.
+   - filtered: the filtered-to-nothing treatment — a quieter, wider-padded panel for
+     "your filters match nothing", which is not an absence of content and deliberately
+     skips the icon/title apparatus while keeping ONE dashed panel vocabulary.
+   - field: default false; sizes a short placeholder to full control width and 34px height.
+     Pair with inline for availability fields; the dashed edge and typography stay intact.
+   - fill: default false; stretches the panel to a bounded host's full width/height,
+     with zero minimum height. The caller owns the allocation, independently of content.
+   - contextClass: extra class(es) whose rules live in the global sheet because they
+     describe how a specific container places this panel (fill, min-height). Never use it
+     for appearance — add a prop here instead.
+   - dataAttr / dataValue: an optional test/screenshot hook, e.g.
+     `dataAttr="data-knowledge-learned-empty"`.
+   - children: trailing content inside the panel — a "Clear filters" button, a primary
+     CTA, or a docs link. It is the way out of the dead end, so it belongs inside the
+     panel rather than beside it.
 
   Invariants:
   - The DOM shape is part of the contract: the icon, title and body rules are written as
@@ -30,6 +58,7 @@
     compact = false,
     inline = false,
     field = false,
+    fill = false,
     note = false,
     filtered = false,
     contextClass = '',
@@ -49,6 +78,7 @@
   class:is-compact={compact}
   class:is-inline={inline}
   class:is-field={field}
+  class:is-fill={fill}
   class:is-note={note}
   class:is-filtered={filtered}
   {...hookAttributes}
@@ -177,9 +207,28 @@
     padding: var(--fab-space-1) var(--fab-space-2);
   }
 
-  /* THE POPOVER NOTE: the one variant that releases the PANEL, because a picker's popover is
-     already a bordered, shadowed panel and a second box inside it reads as a card the GM might act
-     on. Written AFTER `.is-inline` so a caller that set both still gets the released panel. */
+  /* Bounded host allocation, independent of content count; defaults remain padding-driven. */
+  .manager-empty.is-fill {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+  }
+
+  /* ── THE POPOVER NOTE (issue 1373) ────────────────────────────────────────────────────
+     The one variant that releases the PANEL. Every other member of this family — base,
+     `is-compact`, `is-inline`, `is-filtered` — keeps the dashed box, because each of them
+     answers for a region of a screen and a box is what marks the region out. A picker's
+     popover is not a region: it is already a bordered, shadowed panel 228-340px wide, and a
+     second bordered box drawn inside it reads as a card the GM might be able to act on.
+     `proto:2262` states it as one line and nothing else, and `proto:2281` states the sibling
+     popover's the same way.
+
+     Written AFTER `.is-inline` so a caller that set both still gets the released panel, and
+     the tile is released the way `is-inline` releases it rather than resized — a third tile
+     size is exactly what that variant's own comment refuses.
+
+     26px had no step on the spacing scale and took 24; 7px has none either and takes
+     `--fab-space-chip`. */
   .manager-empty.is-note {
     place-items: start;
     padding: var(--fab-space-chip);

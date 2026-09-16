@@ -45,6 +45,34 @@ export const V14_CHAT_MODE_BY_LEGACY_ROLL_MODE = Object.freeze({
 });
 
 /**
+ * The chat option that carries a roll's visibility on the RUNNING Foundry, key and token
+ * chosen TOGETHER.
+ *
+ * V13 and V14 have disjoint vocabularies and crossing them fails two different ways: a legacy
+ * token handed to V14's `applyMode` THROWS, and a V14 token handed to V13 silently posts
+ * public. `Roll#toMessage` translates only the legacy `rollMode` key (it maps it internally),
+ * so a value passed as `messageMode` reaches `applyMode` UNTRANSLATED — which is why
+ * switching the key without switching the vocabulary is a new defect rather than a fix.
+ *
+ * The probe is `typeof ChatMessage.applyMode === 'function'`: a static, which a subclassed
+ * `CONFIG.ChatMessage.documentClass` inherits and therefore cannot fool. It is deliberately a
+ * `ChatMessage` static deciding a `Roll` option, because `toMessage({rollMode})` is deprecated
+ * on V14 in favour of `messageMode` and the translation table is core's own.
+ *
+ * @param {string} rollMode A legacy token (`publicroll`/`gmroll`/`blindroll`/`selfroll`). A
+ *   token with no entry in the table passes through unchanged, matching
+ *   {@link module:src/systems/bulkChatVisibility.applyBulkChatVisibility}.
+ * @returns {{rollMode: string}|{messageMode: string}} One option, spread into `toMessage`'s
+ *   options bag.
+ */
+export function chatModeOption(rollMode) {
+  if (typeof globalThis.ChatMessage?.applyMode === 'function') {
+    return { messageMode: V14_CHAT_MODE_BY_LEGACY_ROLL_MODE[rollMode] || rollMode };
+  }
+  return { rollMode };
+}
+
+/**
  * Apply `rollMode`'s visibility to `chatData`, translating the token when the running
  * Foundry expects V14's vocabulary.
  *

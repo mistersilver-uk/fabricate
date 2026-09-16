@@ -88,7 +88,7 @@ class FakeActor {
   async setFlag(ns, key, value) {
     this._flags[ns] = this._flags[ns] || {};
     this._flags[ns][key] = value;
-    return value;
+    return this;
   }
   async update(payload) {
     if (this._failUpdate) throw new Error('update refused');

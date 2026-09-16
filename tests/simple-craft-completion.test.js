@@ -40,7 +40,7 @@ function makeActor(id = 'a1') {
     id,
     uuid: `Actor.${id}`,
     getFlag(ns, key) { return flags[key]; },
-    setFlag(ns, key, value) { flags[key] = value; return Promise.resolve(); }
+    setFlag(ns, key, value) { flags[key] = value; return Promise.resolve(this); }
   };
 }
 
@@ -95,7 +95,7 @@ test('T-091: cache returns fresh state immediately after completeRun (stale-flag
     },
     setFlag(ns, key, value) {
       persistedContainer = value;
-      return Promise.resolve();
+      return Promise.resolve(this);
     }
   };
 

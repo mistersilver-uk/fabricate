@@ -1,0 +1,2590 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { after, afterEach, before, describe, it } from 'node:test';
+import { chromium } from 'playwright';
+
+import { flushSync } from '../../node_modules/svelte/src/index-client.js';
+import { getItemSourceReferences } from '../../src/utils/sourceUuid.js';
+import { RunJournalBuilder } from '../../src/systems/RunJournalBuilder.js';
+import { ResolutionModeService } from '../../src/systems/ResolutionModeService.js';
+import { RecipeVisibilityService } from '../../src/systems/RecipeVisibilityService.js';
+import { IngredientSet } from '../../src/models/IngredientSet.js';
+import { Recipe } from '../../src/models/Recipe.js';
+import { getCaseById, VIEW_LAB_CASES } from '../../scripts/lib/viewLabCases.js';
+import { buildLabActors } from '../view-lab/world/labActors.js';
+import {
+  stockJournalPrototype,
+  JOURNAL_PROTOTYPE_BINDINGS,
+} from '../view-lab/world/labJournalPrototype.js';
+import { chooseSelectOption } from '../helpers/select-control.js';
+import {
+  PLAYER_APP_COMPILED_MODULES,
+  SEARCHABLE_POPOVER_RAW_MODULES,
+  SELECT_COMPILED_MODULES,
+  STATUS_TONE_RAW_MODULES,
+  createMountedComponentHarness,
+} from '../helpers/svelte-component-harness.js';
+import {
+  buildLabContent,
+  LAB_SYSTEM_IDS,
+  seedJournalNoCheckFixture,
+} from '../view-lab/world/labContent.js';
+import {
+  LAB_JOURNAL_CASE_STATE_RUN_IDS,
+  LAB_RETAINED_CLAIM,
+  buildLabRunStates,
+  createLabJournalCaseController,
+} from '../view-lab/world/labRunStates.js';
+import { LAB_HISTORY_DATA_STATES } from '../view-lab/world/labHistoryEvidence.js';
+
+const repoRoot = resolve(import.meta.dirname, '../..');
+const english = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8'));
+const component = (name) => `src/ui/svelte/components/${name}.svelte`;
+const harness = createMountedComponentHarness({
+  repoRoot,
+  tmpPrefix: 'fabricate-journal-lifecycle-',
+  rawModules: [
+    ...SEARCHABLE_POPOVER_RAW_MODULES,
+    ...STATUS_TONE_RAW_MODULES,
+    'src/ui/svelte/util/listReorderAnnouncement.js',
+    'src/ui/svelte/util/formatDuration.js',
+    'src/ui/svelte/util/worldTimeLabel.js',
+    // Issue 1648: the shared authority-refusal wording the Journal panels and stores read.
+    'src/ui/svelte/util/journalRunReasons.js',
+    'src/systems/foundryCalendar.js',
+    'src/ui/svelte/apps/journal/journalRunStatus.js',
+    'src/ui/svelte/apps/journal/historyPresentation.js',
+    'src/ui/svelte/apps/journal/runStateNotice.js',
+    'src/ui/svelte/apps/journal/runDetailPresentation.js',
+    'src/ui/svelte/apps/journal/stageHeading.js',
+    'src/ui/svelte/apps/journal/runRecovery.js',
+  ],
+  runeModules: ['src/ui/svelte/stores/journalStore.svelte.js'],
+  compiledModules: [
+    ...SELECT_COMPILED_MODULES,
+    ...PLAYER_APP_COMPILED_MODULES,
+    'src/ui/svelte/components/ManagerSearchField.svelte',
+    component('Pagination'),
+    'src/ui/svelte/components/IconButton.svelte',
+    component('ManagerButton'),
+    'src/ui/svelte/components/InspectorCard.svelte',
+    component('RunActionBar'),
+    component('SlotTile'),
+    component('ChoiceOptionList'),
+    component('SlotRow'),
+    'src/ui/svelte/components/RadioCardGroup.svelte',
+    'src/ui/svelte/components/Stepper.svelte',
+    component('EssencePool'),
+    component('RunProgress'),
+    component('StageNav'),
+    component('StageCard'),
+    component('ListRow'),
+    component('YieldScale'),
+    component('OutcomeLadder'),
+    'src/ui/svelte/apps/journal/JournalCard.svelte',
+    'src/ui/svelte/apps/journal/JournalListShell.svelte',
+    'src/ui/svelte/apps/journal/JournalFactRow.svelte',
+    'src/ui/svelte/apps/journal/RunCard.svelte',
+    'src/ui/svelte/apps/journal/ActiveRunsList.svelte',
+    'src/ui/svelte/apps/journal/HistoryRow.svelte',
+    'src/ui/svelte/apps/journal/HistoryList.svelte',
+    'src/ui/svelte/apps/journal/StepDetails.svelte',
+    'src/ui/svelte/apps/journal/TimeRemainingBox.svelte',
+    'src/ui/svelte/apps/journal/ActionsPanel.svelte',
+    'src/ui/svelte/apps/journal/RunDetail.svelte',
+    'src/ui/svelte/apps/journal/HistoricalRunDetail.svelte',
+    'src/ui/svelte/apps/journal/ThisRun.svelte',
+    'src/ui/svelte/apps/journal/JournalView.svelte',
+  ],
+  rootClass: 'fabricate-app',
+  componentPath: 'src/ui/svelte/apps/journal/JournalView.svelte',
+});
+
+const ACTOR_UUID = 'Actor.actor-1';
+const SYSTEM = {
+  id: 'sys-test',
+  name: 'Test Forge',
+  resolutionMode: 'simple',
+  features: { multiStepRecipes: true },
+  craftingCheck: { simple: { rollFormula: null, dc: 12 } },
+  gatheringCraftingCheck: {
+    routed: {
+      type: 'relative',
+      rollFormula: '1d20',
+      relativeOutcomes: [
+        { id: 'standard-tier', name: 'Standard', success: true, dc: 0 },
+        { id: 'failed-tier', name: 'Failed', success: false, dc: -10 },
+      ],
+    },
+  },
+  essenceDefinitions: [
+    { id: 'earth', name: 'Earth', icon: 'fas fa-mountain', colorToken: 'earth' },
+    { id: 'fire', name: 'Fire', icon: 'fas fa-fire', colorToken: 'fire' },
+  ],
+  components: [
+    { id: 'iron', name: 'Iron', img: 'icons/iron.webp' },
+    { id: 'copper', name: 'Copper', img: 'icons/copper.webp' },
+    { id: 'horseshoe', name: 'Horseshoe', img: 'icons/horseshoe.webp' },
+  ],
+};
+const item = (id, componentId, quantity) => ({
+  id,
+  uuid: `Item.${id}`,
+  name: `${componentId} stock`,
+  img: `icons/${componentId}.webp`,
+  componentId,
+  system: { quantity },
+});
+const ACTOR = {
+  id: 'actor-1',
+  uuid: ACTOR_UUID,
+  name: 'Brenna',
+  img: 'icons/brenna.webp',
+  isOwner: true,
+  items: [item('iron-a', 'iron', 3), item('copper-a', 'copper', 2)],
+};
+
+function ingredientSet(id, groups) {
+  return new IngredientSet({ id, name: id, ingredientGroups: groups });
+}
+
+function componentOption(id, componentId, quantity = 1) {
+  return { id, match: { type: 'component', componentId }, quantity };
+}
+
+function recipe(id, name, sets, stepCount = 1) {
+  const steps = Array.from({ length: stepCount }, (_unused, index) => ({
+    id: `${id}-step-${index + 1}`,
+    name: `Stage ${index + 1}`,
+    ingredientSets: sets,
+    resultGroups: [],
+    toolIds: [],
+    timeRequirement: { hours: 1 },
+  }));
+  return {
+    id,
+    name,
+    img: `icons/${id}.webp`,
+    craftingSystemId: SYSTEM.id,
+    steps: stepCount > 1 ? steps : [],
+    ingredientSets: sets,
+    getExecutionSteps: () => steps,
+  };
+}
+
+const FIXED_SET = ingredientSet('fixed-set', [
+  { id: 'metal', name: 'Metal', options: [componentOption('iron', 'iron')] },
+]);
+const CHOICE_SET = ingredientSet('choice-set', [
+  {
+    id: 'metal',
+    name: 'Metal',
+    options: [componentOption('iron', 'iron'), componentOption('copper', 'copper')],
+  },
+]);
+const SHORT_SET = ingredientSet('short-set', [
+  { id: 'metal', name: 'Metal', options: [componentOption('iron', 'iron', 6)] },
+]);
+const ESSENCE_GROUPS = [
+  {
+    id: 'earth-group',
+    name: 'Earth essence',
+    options: [{ match: { type: 'essence', essenceId: 'earth', amount: 6 } }],
+  },
+  {
+    id: 'fire-group',
+    name: 'Fire essence',
+    options: [{ match: { type: 'essence', essenceId: 'fire', amount: 3 } }],
+  },
+];
+const ESSENCE_SET = {
+  id: 'essence-set',
+  name: 'Shared essence',
+  ingredientGroups: ESSENCE_GROUPS,
+  toJSON: () => ({
+    id: 'essence-set',
+    name: 'Shared essence',
+    ingredientGroups: structuredClone(ESSENCE_GROUPS),
+  }),
+  resolveIngredientSelection(_items, _matcher, { essenceAllocation = {} } = {}) {
+    const allocatedUnits = Math.max(0, Number(essenceAllocation?.['Item.iron-a']) || 0);
+    const earth = allocatedUnits * 6;
+    const fire = allocatedUnits * 3;
+    return {
+      success: earth >= 6 && fire >= 3,
+      selectedIngredients: [],
+      missingGroups: earth >= 6 && fire >= 3 ? [] : ESSENCE_GROUPS,
+      essencePool: {
+        requirements: [
+          {
+            groupId: 'earth-group',
+            essenceId: 'earth',
+            need: 6,
+            delivered: earth,
+            owned: 18,
+            satisfied: earth >= 6,
+          },
+          {
+            groupId: 'fire-group',
+            essenceId: 'fire',
+            need: 3,
+            delivered: fire,
+            owned: 9,
+            satisfied: fire >= 3,
+          },
+        ],
+        carriers: [
+          {
+            itemKey: 'Item.iron-a',
+            item: ACTOR.items[0],
+            perUnit: { earth: 6, fire: 3 },
+            ownedUnits: 3,
+            allocatedUnits,
+          },
+        ],
+        allocation: structuredClone(essenceAllocation),
+        suggested: { 'Item.iron-a': 1 },
+        totals: { earth, fire },
+      },
+    };
+  },
+};
+const RECIPES = [
+  recipe('sm-r-horseshoe', 'Bend Horseshoe', [FIXED_SET]),
+  recipe('sm-r-quenchoil', 'Quench in Fire-Bearing Stock', [CHOICE_SET]),
+  recipe('sm-r-pattern-blade', 'Forge Pattern Blade', [FIXED_SET], 3),
+  recipe('sm-r-chainmail', 'Rivet Chainmail', [SHORT_SET]),
+  recipe('jw-r-cast', 'Cast Jewellery', [FIXED_SET]),
+  recipe('rw-r-blade', 'Inscribe Runeblade', [FIXED_SET]),
+  recipe('sm-r-deepbind', 'Deepbind Ingot', [ESSENCE_SET]),
+  recipe('al-r-fire', 'Distil Firebomb', [FIXED_SET]),
+];
+const TASKS = ['straight', 'd100', 'routed'].map((mode) => ({
+  id: `task-${mode}`,
+  name: `${mode} task`,
+  craftingSystemId: SYSTEM.id,
+  resolutionMode: mode,
+  dropRows: [{ id: `${mode}-drop`, componentId: 'iron', quantity: 1, dropRate: 65, enabled: true }],
+  resultGroups: [
+    { id: `${mode}-group`, name: 'Standard', results: [{ componentId: 'iron', quantity: 1 }] },
+  ],
+}));
+const ENVIRONMENTS = [{ id: 'environment-1', craftingSystemId: SYSTEM.id }];
+
+function makeBuilder(
+  containers,
+  dismissed,
+  nowWorldTime,
+  {
+    recipes = RECIPES,
+    system = SYSTEM,
+    visible = true,
+    authority = { available: true, reason: null },
+    resolveItemEssences = null,
+    content = null,
+    actor = ACTOR,
+    viewer = { id: 'user-1', isGM: false },
+  } = {}
+) {
+  const recipeById = new Map(recipes.map((entry) => [entry.id, entry]));
+  const componentById = new Map(system.components.map((entry) => [entry.id, entry]));
+  const getSystem = (id) => content?.systems.find((entry) => entry.id === id) ?? system;
+  const getComponent = (systemId, id) =>
+    getSystem(systemId)?.components.find((entry) => entry.id === id) ??
+    componentById.get(id) ??
+    null;
+  return new RunJournalBuilder({
+    localize: (key, data) =>
+      data ? globalThis.game.i18n.format(key, data) : globalThis.game.i18n.localize(key),
+    craftingRunManager: {
+      getActiveRuns: () => Object.values(containers.craftingRuns.active),
+      getRunHistory: () => containers.craftingRuns.history,
+    },
+    salvageRunManager: {
+      getActiveRuns: () => Object.values(containers.salvageRuns.active),
+      getRunHistory: () => containers.salvageRuns.history,
+    },
+    gatheringRunSource: {
+      getActiveRuns: () => Object.values(containers.gatheringRuns.active),
+      getRunHistory: () => containers.gatheringRuns.history,
+    },
+    recipeManager: {
+      getRecipe: (id) => recipeById.get(id) ?? null,
+      // Production matches on the SOURCE-REFERENCE UNION, never on the owned uuid: a real owned
+      // item's uuid is `<actor.uuid>.Item.<id>` and its origin lives in `flags.core.sourceId`.
+      // Comparing `held.uuid` only ever worked while the lab double conflated the two.
+      ingredientMatchesItem: (_recipe, option, held) =>
+        option?.match?.componentId === held?.componentId ||
+        getItemSourceReferences(held).includes(
+          getComponent(_recipe.craftingSystemId, option?.match?.componentId)?.originItemUuid
+        ),
+    },
+    resolutionModeService: new ResolutionModeService({ getSystem }),
+    recipeVisibility: content
+      ? new RecipeVisibilityService(null, { getSystem })
+      : { evaluateRecipeAccess: () => ({ visible }) },
+    getSystem,
+    getComponent,
+    getGatheringTask: (_environmentId, taskId) =>
+      content?.gatheringConfig.tasks.find((entry) => entry.id === taskId) ??
+      TASKS.find((entry) => entry.id === taskId),
+    getViewer: () => viewer,
+    nowWorldTime,
+    resolveItemEssences:
+      resolveItemEssences ??
+      (content
+        ? ({ item, recipe }) =>
+            getSystem(recipe.craftingSystemId).components.find((entry) =>
+              getItemSourceReferences(item).includes(entry.originItemUuid)
+            )?.essences ?? {}
+        : null),
+    getComponentSourceActors: () => [actor],
+    resolveComponentForItem: (held) => componentById.get(held?.componentId) ?? null,
+    getDismissedRunKeys: () => dismissed,
+    getJournalActionAvailability: () => authority,
+  });
+}
+
+function persistedRuntime(state, builderOptions) {
+  const recipes = builderOptions?.recipes ?? RECIPES;
+  const actor = builderOptions?.actor ?? ACTOR;
+  const viewer = builderOptions?.viewer ?? { id: 'user-1', isGM: false };
+  const containers = buildLabRunStates({
+    actor,
+    userId: viewer.id,
+    recipes,
+    environments: builderOptions?.content?.environments ?? ENVIRONMENTS,
+    tasks: builderOptions?.content?.gatheringConfig.tasks ?? TASKS,
+    journalCaseState: state,
+  });
+  const dismissed = new Set();
+  const notifications = [];
+  let worldTime = 1_209_600;
+  const builder = makeBuilder(containers, dismissed, () => worldTime, builderOptions);
+  const controller = createLabJournalCaseController({
+    actor,
+    containers,
+    state,
+    recipes,
+    nowWorldTime: () => worldTime,
+  });
+  const services = {
+    getWorldTime: () => worldTime,
+    getWorldTimeComponents: () => ({ day: 15, hour: 0, minute: 0, secondsPerDay: 86_400 }),
+    getSelectedActorId: () => actor.id,
+    listJournalForActor: async () =>
+      builder.buildListing({
+        actor,
+        viewer,
+      }),
+    executeJournalRunCommand: controller.execute,
+    dismissJournalRun: async ({ runId, runType }) => {
+      dismissed.add(JSON.stringify([actor.uuid, runType, runId]));
+      return { success: true };
+    },
+    notify: (message) => {
+      notifications.push(message);
+    },
+    craftErrorMessage: () => 'Craft failed.',
+  };
+  return {
+    actor,
+    containers,
+    commands: controller.events,
+    notifications,
+    services,
+    dismissed,
+    advanceWorldTime: (seconds) => (worldTime += seconds),
+  };
+}
+
+let createJournalStore;
+
+function labRecipes(content) {
+  const previous = globalThis.foundry;
+  let index = 0;
+  try {
+    globalThis.foundry = { utils: { randomID: () => `journal-result-${++index}` } };
+    return content.recipes.map((entry) => new Recipe(entry));
+  } finally {
+    globalThis.foundry = previous;
+  }
+}
+
+async function mountState(state, { prepare = null, initialLoad = true, builderOptions } = {}) {
+  const runtime = persistedRuntime(state, builderOptions);
+  prepare?.(runtime);
+  const store = createJournalStore({ services: runtime.services });
+  if (initialLoad) await store.load();
+  flushSync();
+  const target = await harness.mount({
+    services: {
+      journal: store,
+      actorBar: { selectedActorId: state === 'no-actor-empty' ? null : runtime.actor.id },
+      getWorldTimeComponents: runtime.services.getWorldTimeComponents,
+    },
+  });
+  return { ...runtime, store, target };
+}
+
+/**
+ * The mounted detail card's REAL layout, measured in Chromium.
+ *
+ * happy-dom computes no cascade, so every earlier pin on this header could only read source
+ * text. The markup and the injected component CSS are both taken from the mount, so the scope
+ * hashes agree by construction rather than by a second compile that might not (issue 1648,
+ * UX2-1).
+ */
+async function measureDetailLayout(target, { width = 1240 } = {}) {
+  const styles = [...globalThis.document.head.querySelectorAll('style')]
+    .map((node) => node.textContent)
+    .join('\n');
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width, height: 900 } });
+    // The WHOLE app, at the window width the frame was taken at. Measuring the detail card on
+    // its own gives it the full window and hides the defect: the header only wraps — and a
+    // shrink-to-fit actions block only left-aligns — at the width the detail PANE really has
+    // beside the run list.
+    await page.setContent(`<!doctype html><html><head><meta charset="utf-8">
+      <style>${readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8')}</style>
+      <style>${styles}</style>
+      <style>
+        :root { --font-primary: Arial, sans-serif; }
+        html, body { margin: 0; padding: 0; width: ${width}px; }
+      </style></head>
+      <body><div class="fabricate fabricate-app" data-fabricate-theme="dark">
+        ${target.innerHTML}
+      </div></body></html>`);
+    // `await`ed inside the try: a bare `return` of the promise lets `finally` close the browser
+    // before it settles.
+    return await page.evaluate(() => {
+      const box = (selector) => {
+        const node = document.querySelector(selector);
+        return node ? node.getBoundingClientRect() : null;
+      };
+      const detail = document.querySelector('[data-journal-detail]');
+      const style = getComputedStyle(detail);
+      const rect = detail.getBoundingClientRect();
+      return {
+        contentRight: rect.right - parseFloat(style.paddingRight) - parseFloat(style.borderRightWidth),
+        cancelRight: box('[data-run-cancel-decision]')?.right ?? null,
+        beginRight: box('[data-run-begin]')?.right ?? null,
+        actionsRight: box('[data-journal-actions]')?.right ?? null,
+      };
+    });
+  } finally {
+    await browser.close();
+  }
+}
+
+/**
+ * A prototype-cohort case, mounted in the same world its frame is captured from rather than
+ * against a hand-built double, with its run selected.
+ */
+async function mountPrototypeState(state, builderOptions = {}) {
+  const content = buildLabContent({ journalCaseState: state });
+  const actor = buildLabActors(content)[0];
+  await stockJournalPrototype(actor, content, state);
+  const mounted = await mountState(state, {
+    builderOptions: {
+      content,
+      actor,
+      recipes: labRecipes(content),
+      viewer: { id: 'user-lab-player', isGM: false },
+      ...builderOptions,
+    },
+  });
+  mounted.store.select(mounted.store.activeRuns.find((entry) => entry.id === `lab-v1-${state}`));
+  flushSync();
+  return mounted;
+}
+
+async function settleAction() {
+  await new Promise((resolve) => setImmediate(resolve));
+  flushSync();
+}
+
+function selectionFixture(sets, plan, { mode = 'simple' } = {}) {
+  const authored = recipe('sm-r-horseshoe', 'Selection trial', sets);
+  authored.getExecutionSteps()[0].resultGroups = sets.map((set, index) => ({
+    id: set.resultGroupId,
+    name: set.name,
+    results: [
+      { id: `yield-${index}`, componentId: index === 0 ? 'iron' : 'copper', quantity: index + 1 },
+    ],
+  }));
+  return {
+    builderOptions: { recipes: [authored], system: { ...SYSTEM, resolutionMode: mode } },
+    prepare({ containers }) {
+      const run = containers.craftingRuns.active['lab-v1-ready-single'];
+      run.currentStepIndex = 0;
+      run.steps = [
+        { stepId: authored.getExecutionSteps()[0].id, status: 'inProgress', selectionPlan: plan },
+      ];
+    },
+  };
+}
+
+function assertScrollContract(target) {
+  for (const kind of ['active', 'finished']) {
+    const section = target.querySelector(`[data-journal-list="${kind}"]`);
+    const scroller = section?.querySelector('[data-journal-list-scroll]');
+    const pager = section?.querySelector('.manager-pagination');
+    assert.ok(section && scroller && pager, `${kind} has section, scroller, and pager`);
+    assert.ok(!scroller.contains(pager), `${kind} pager stays outside its scroller`);
+  }
+}
+
+function assertActionAlignment(target) {
+  const header = target.querySelector('.journal-detail-header');
+  const identity = header?.querySelector('.journal-detail-identity');
+  const actions = header?.querySelector('[data-journal-actions]');
+  assert.ok(header && identity && actions, 'identity and actions share the detail header');
+}
+
+function assertLockedStage(target) {
+  const card = target.querySelector('[data-stage-card][data-stage-state="future"]');
+  assert.ok(card, 'future stage is visible');
+  assert.ok(
+    !card.querySelector('button, input, select'),
+    'future stage exposes no editing control'
+  );
+}
+
+// A missing key formats to the key, and the component renders the same key, so an expectation
+// built from one would match the defect. Refuse the key itself before it becomes the expectation.
+function localizedLabel(key, data = {}) {
+  const value = globalThis.game.i18n.format(key, data);
+  assert.notEqual(value, key, `${key} must resolve in lang/en.json`);
+  return value;
+}
+const historyLabel = (key, data = {}) =>
+  localizedLabel(`FABRICATE.App.Journal.History.${key}`, data);
+const quantityLabel = (n) => localizedLabel('FABRICATE.App.Journal.Quantity', { n });
+const guidanceOf = (target) => target.querySelector('[data-journal-guidance]').textContent;
+const textsOf = (root, selector) =>
+  [...root.querySelectorAll(selector)].map((node) => node.textContent);
+const namesOf = (root) => textsOf(root, '.fabricate-list-row-name');
+const quantitiesOf = (root) => textsOf(root, '.fabricate-list-row-quantity');
+const section = (target, kind) => target.querySelector(`[data-history-items="${kind}"]`);
+const yieldRows = (target) => [...target.querySelectorAll('[data-yield-entry]')];
+
+/**
+ * What each history-data frame must prove, asserted on the rendered DOM of the selected record.
+ * The registry selector names the same evidence structurally; these read the values it cannot.
+ */
+const HISTORY_DATA_WITNESS = {
+  'history-data-legacy-row-rolls'(target) {
+    const rows = yieldRows(target);
+    assert.deepEqual(
+      rows.map((row) => row.getAttribute('data-yield-entry')),
+      ['legacy-iron-ore-roll-12', 'legacy-copper-ore-roll-94']
+    );
+    assert.deepEqual(namesOf(target.querySelector('[data-yield-scale]')), [
+      'Iron Ore',
+      'Copper Ore',
+    ]);
+    // The receipts, not the evaluated rows: those record 3 and 5 and can establish nothing.
+    assert.deepEqual(quantitiesOf(target.querySelector('[data-yield-scale]')), [
+      quantityLabel(2),
+      quantityLabel(1),
+    ]);
+    for (const excluded of [3, 5]) {
+      assert.ok(
+        !target.querySelector('[data-yield-scale]').textContent.includes(quantityLabel(excluded)),
+        `an evaluated row quantity of ${excluded} is not an award`
+      );
+    }
+    assert.equal(target.querySelectorAll('[data-yield-cut], [data-yield-shared-roll]').length, 0);
+    assert.ok(guidanceOf(target).includes(historyLabel('ClosedSuccess')));
+  },
+  'history-data-shared-roll-control'(target) {
+    // The control for #1648 A8: genuinely SHARED evidence has one cut to describe, so it keeps
+    // the heading that names one roll. Only `perRow`/`unknown` take the wording that does not.
+    assert.equal(
+      target.querySelector('[data-yield-scale] .fab-yield-kicker').textContent,
+      historyLabel('Scale')
+    );
+    const cut = target.querySelector('[data-yield-cut]');
+    assert.ok(cut.textContent.includes(historyLabel('RolledValue', { roll: 40 })));
+    assert.ok(cut.textContent.includes(historyLabel('Cut')));
+    const rows = yieldRows(target);
+    assert.ok(
+      rows.every((row) =>
+        row.textContent.includes(historyLabel('EffectiveRollValue', { roll: 55 }))
+      ),
+      'a raw roll differs from the effective roll the rows were read against'
+    );
+    assert.ok(!rows[0].textContent.includes(historyLabel('RolledValue', { roll: 40 })));
+    assert.deepEqual(
+      rows.map((row) => row.className.includes('is-cleared')),
+      [true, true, false]
+    );
+  },
+  'history-data-recovered-materials'(target) {
+    const consumed = section(target, 'consumed');
+    assert.deepEqual(namesOf(consumed), ['Steel Billet', 'Coal', historyLabel('UnknownMaterial')]);
+    assert.deepEqual(quantitiesOf(consumed), [
+      quantityLabel(2),
+      quantityLabel(2),
+      quantityLabel(3),
+    ]);
+    const rows = [...consumed.querySelectorAll('[data-list-row]')];
+    assert.equal(rows.length, 3, 'exactly the three rows the record consumed');
+    assert.ok(rows[0].querySelector('img'), 'a recovered identity carries its captured art');
+    assert.ok(rows[1].querySelector('img'));
+    assert.ok(!rows[2].querySelector('img'), 'an unknown row illustrates nothing');
+    assert.ok(rows[2].querySelector('i.fa-box'), 'and draws the fallback glyph instead');
+    // The captured name won over the live component name, which the same frame also shows.
+    assert.deepEqual(namesOf(section(target, 'produced')), ['Steel Ingot']);
+  },
+  'history-data-unknown-material-resolution'(target) {
+    const rows = yieldRows(target);
+    assert.ok(
+      target
+        .querySelector('[data-yield-shared-roll]')
+        .textContent.includes(historyLabel('RolledValue', { roll: 55 }))
+    );
+    assert.equal(
+      target.querySelectorAll('[data-yield-cut]').length,
+      0,
+      'a row with no recorded outcome leaves the roll unable to cut'
+    );
+    assert.deepEqual(quantitiesOf(target.querySelector('[data-yield-scale]')), [
+      quantityLabel(3),
+      historyLabel('NotRecorded'),
+      historyLabel('NotRecorded'),
+    ]);
+    assert.deepEqual(
+      rows.map((row) => [row.className.includes('is-cleared'), row.className.includes('is-missed')]),
+      [
+        [true, false],
+        [true, false],
+        [false, false],
+      ],
+      'a known outcome, a known outcome with an unknown amount, and a neutral unknown'
+    );
+    assert.ok(rows[1].textContent.includes(historyLabel('CheckCleared')));
+    for (const key of ['ThresholdNotRecorded', 'OutcomeNotRecorded']) {
+      assert.ok(rows[2].textContent.includes(historyLabel(key)), key);
+    }
+    const unattributed = target.querySelector('[data-history-unattributed]');
+    // A SUBSET, not the haul (#1648 A6). The gate moved from all-or-nothing to a per-award
+    // subset and this record has one unmatched award among three rows, so the whole-haul
+    // sentence — "Actual awards are listed once below" — and the whole-haul heading both state
+    // the list is the total. Subset copy and a subset heading say what this list actually is.
+    assert.ok(unattributed.textContent.includes(historyLabel('UnattributedSome')));
+    assert.ok(
+      !unattributed.textContent.includes(historyLabel('UnattributedAwards')),
+      'the whole-haul sentence must not appear over a partial list'
+    );
+    assert.equal(
+      unattributed.nextElementSibling,
+      section(target, 'produced'),
+      'the unresolved awards are listed immediately under the note that explains them'
+    );
+    assert.ok(
+      section(target, 'produced').textContent.includes(historyLabel('UnattributedBroughtBack')),
+      'and under its own heading rather than the whole haul’s'
+    );
+    assert.deepEqual(namesOf(section(target, 'produced')), ['Cave Ruby']);
+  },
+  'history-data-settled-zero'(target) {
+    assert.equal(target.querySelector('[data-journal-verdict]').dataset.journalVerdict, 'failed');
+    assert.ok(
+      target.querySelector('[data-yield-cut]').textContent.includes(historyLabel('TopCut'))
+    );
+    assert.deepEqual(
+      quantitiesOf(target.querySelector('[data-yield-scale]')),
+      Array.from({ length: 3 }, () => quantityLabel(0)),
+      'a confirmed empty award states zero rather than omitting a quantity'
+    );
+    assert.ok(guidanceOf(target).includes(historyLabel('ClosedFailedEmpty')));
+    assert.ok(!guidanceOf(target).includes(historyLabel('ClosedMissing')));
+    assert.ok(!section(target, 'produced'), 'a confirmed zero lists no award');
+    assert.equal(
+      target.querySelectorAll('[data-yield-entry].is-cleared').length,
+      0,
+      'no row cleared the roll'
+    );
+  },
+  'history-data-uncertain-awards'(target) {
+    const evidence = target.querySelector('[data-journal-recovery-evidence]');
+    assert.equal(
+      target.querySelector('[data-journal-recovery]').dataset.journalRecovery,
+      'true'
+    );
+    const phases = [...evidence.querySelectorAll('[data-effect-phase]')];
+    assert.deepEqual(namesOf(phases[0]), ['Iron Ore']);
+    assert.deepEqual(
+      phases.map((node) => node.dataset.effectPhase),
+      ['applied', 'applying', 'planned']
+    );
+    assert.deepEqual(namesOf(phases[1]), ['Iron Ingot']);
+    assert.deepEqual(quantitiesOf(phases[1]), [quantityLabel(1)]);
+    const history = target.querySelector('[data-journal-history-detail]');
+    const order = [...evidence.parentElement.children];
+    assert.ok(
+      order.indexOf(evidence) < order.indexOf(history) && order.includes(history),
+      'the confirmed prefix and its uncertain remainder come before the closed-run guidance'
+    );
+    const guidance = history.querySelector('[data-journal-guidance]');
+    assert.ok(guidance.textContent.includes(historyLabel('ClosedRecovery')));
+    assert.ok(!guidance.textContent.includes(historyLabel('ClosedSuccess')));
+    assert.equal(
+      target.querySelectorAll('[data-history-items]').length,
+      0,
+      'an unreconciled record shows its receipts, not an ordinary award list'
+    );
+  },
+  'history-data-fizzle'(target, { protectedText }) {
+    const detail = target.querySelector('[data-journal-detail]');
+    assert.ok(
+      detail.textContent.includes(
+        globalThis.game.i18n.localize('FABRICATE.App.Journal.Fizzle.Title')
+      )
+    );
+    assert.ok(target.querySelector('[data-history-summary="none"]'));
+    assert.deepEqual(namesOf(section(target, 'consumed')), ['Quicksilver', 'Yellow Sulphur']);
+    assert.deepEqual(quantitiesOf(section(target, 'consumed')), [
+      quantityLabel(1),
+      quantityLabel(2),
+    ]);
+    assert.equal(target.querySelector('[data-journal-verdict]').dataset.journalVerdict, 'failed');
+    assert.equal(section(target, 'consumed').querySelectorAll('img.fab-medallion-img').length, 2);
+    assert.ok(protectedText.length > 0, 'the protected roster is not empty');
+    for (const disclosure of protectedText) {
+      assert.ok(!detail.textContent.includes(disclosure), `${disclosure} is not disclosed`);
+    }
+    assert.ok(!section(target, 'produced'), 'a fizzle banks nothing');
+    assert.ok(guidanceOf(target).includes(historyLabel('ClosedFailedEmpty')));
+  },
+  'history-data-salvage'(target) {
+    const produced = section(target, 'produced');
+    assert.deepEqual(namesOf(produced), ['Iron Ore', 'Iron Ore']);
+    assert.deepEqual(quantitiesOf(produced), [quantityLabel(1), quantityLabel(2)]);
+    const fact = produced.nextElementSibling;
+    assert.equal(fact.dataset.journalFact, '');
+    assert.ok(fact.textContent.includes(historyLabel('NotApplicable')));
+    assert.ok(fact.textContent.includes(historyLabel('MaterialsUsed')));
+    assert.equal(produced.querySelectorAll('[data-list-row]').length, 2);
+    assert.ok(!section(target, 'consumed'), 'nothing was spent, so nothing is listed as spent');
+    assert.equal(target.querySelector('[data-journal-verdict]').dataset.journalVerdict, 'failed');
+    assert.ok(guidanceOf(target).includes(historyLabel('ClosedFailureAwards')));
+  },
+};
+
+function assertCaseWitness(target, capture) {
+  assert.ok(
+    target.querySelector(capture.expectSelector) ?? document.querySelector(capture.expectSelector),
+    `${capture.id}: ${capture.expectSelector}`
+  );
+  const history = target.querySelector('[data-journal-history-detail]');
+  if (!history) return;
+  // A row id that names its recorded roll is a hand-maintained mirror of the record; the capture
+  // selector reads the id and only this reads the number, so drift between them fails here.
+  for (const row of history.querySelectorAll('[data-yield-entry]')) {
+    const recorded = /-roll-(\d+)$/.exec(row.getAttribute('data-yield-entry'));
+    if (!recorded) continue;
+    assert.ok(
+      row.textContent.includes(historyLabel('RolledValue', { roll: recorded[1] })),
+      `${row.getAttribute('data-yield-entry')} must show the roll its id names`
+    );
+  }
+  assert.ok(
+    history.querySelectorAll('[data-history-summary]').length <= 1,
+    'one final summary at most'
+  );
+  const summary = history.querySelector('[data-history-summary]');
+  const material = history.querySelector('[data-history-items]');
+  if (summary && material) {
+    const siblings = [...history.children];
+    assert.ok(
+      siblings.indexOf(summary) < siblings.indexOf(material),
+      'Final check/Resolution precedes materials and awards'
+    );
+  }
+  assert.ok(
+    history.querySelectorAll('[data-yield-cut]').length <= 1,
+    'one historical d100 cut at most'
+  );
+  assert.doesNotMatch(history.textContent, /null\s*[·×]|undefined\s*[·×]|PLANNED_ONLY_SENTINEL/);
+}
+
+function proveTerminalWitness(target, capture) {
+  const detail = target.querySelector('[data-journal-detail]');
+  for (const attr of [
+    'data-run-action-bar',
+    'data-stage-nav',
+    'data-run-progress',
+    'data-journal-summary',
+    'data-journal-time-remaining',
+    'data-journal-record',
+  ]) {
+    const intrusion = document.createElement('div');
+    intrusion.setAttribute(attr, '');
+    detail.appendChild(intrusion);
+    assert.equal(detail.querySelectorAll(`[${attr}]`).length, 1, `injected ${attr}`);
+    assert.throws(() => assertCaseWitness(target, capture), `${attr} must red the witness`);
+    intrusion.remove();
+    assertCaseWitness(target, capture);
+  }
+  const summary = detail.querySelector('[data-history-summary]');
+  const duplicate = summary.cloneNode(true);
+  summary.after(duplicate);
+  assert.equal(detail.querySelectorAll('[data-history-summary]').length, 2);
+  assert.throws(
+    () => assertCaseWitness(target, capture),
+    'duplicate Final check must red the witness'
+  );
+  duplicate.remove();
+  const parent = summary.parentNode;
+  parent.appendChild(summary);
+  assert.ok(parent.lastElementChild === summary);
+  assert.throws(
+    () => assertCaseWitness(target, capture),
+    'Final check below materials must red the witness'
+  );
+  parent.prepend(summary);
+  assertCaseWitness(target, capture);
+}
+
+function craftingPreviewFixture(mode, checkMode = 'none') {
+  const system = structuredClone(SYSTEM);
+  system.resolutionMode = mode;
+  system.alchemy = { checkMode };
+  system.craftingCheck = {
+    failureResultPolicy: 'never',
+    simple: { rollFormula: checkMode === 'simple' ? '1d20' : '', dc: 12 },
+    routed: {
+      type: 'fixed',
+      fixedOutcomes: [
+        { id: 'failed', name: 'Setback', success: false, start: 1, end: 9 },
+        { id: 'fine', name: 'Fine', success: true, start: 10, end: 20 },
+      ],
+    },
+    progressive: { rollFormula: '2d6', awardMode: 'partial' },
+  };
+  system.components[0].difficulty = 2;
+  system.components[1].difficulty = 5;
+  const authored = recipe('sm-r-horseshoe', 'Yield trial', [FIXED_SET], 3);
+  const groups = [
+    {
+      id: 'fine-results',
+      name: 'Fine',
+      checkOutcomeIds: ['fine'],
+      results: [
+        { id: 'iron-result', componentId: 'iron', quantity: 2 },
+        { id: 'copper-result', componentId: 'copper', quantity: 3 },
+      ],
+    },
+  ];
+  if (mode === 'routedByIngredients')
+    groups.push({
+      id: 'other-route',
+      name: 'Other route',
+      results: [{ id: 'other', componentId: 'horseshoe', quantity: 9 }],
+    });
+  for (const [index, step] of authored.steps.entries()) {
+    step.resultGroups = structuredClone(groups);
+    if (index === 2) step.resultGroups[0].results[0].quantity = 7;
+  }
+  return {
+    builderOptions: { system, recipes: [authored] },
+    prepare({ containers }) {
+      const run = containers.craftingRuns.active['lab-v1-ready-single'];
+      run.currentStepIndex = 1;
+      run.steps = authored.steps.map((step, index) => ({
+        stepId: step.id,
+        stepName: step.name,
+        status: index === 0 ? 'succeeded' : 'inProgress',
+        selectionPlan: { selectedIngredientSetId: 'fixed-set' },
+        selectedRequirementSnapshot: { id: 'fixed-set', resultGroupId: 'fine-results' },
+      }));
+    },
+  };
+}
+
+describe('Journal versioned lifecycle (mounted)', () => {
+  before(async () => {
+    await harness.setup();
+    globalThis.game.i18n.localize = (key) =>
+      key.split('.').reduce((value, part) => value?.[part], english) ?? key;
+    globalThis.game.i18n.format = (key, data) =>
+      globalThis.game.i18n
+        .localize(key)
+        .replace(/\{(\w+)\}/g, (match, name) => data[name] ?? match);
+    ({ createJournalStore } = await harness.loadRuneModule(
+      'src/ui/svelte/stores/journalStore.svelte.js'
+    ));
+  });
+  afterEach(() => harness.remount());
+  after(() => harness.teardown());
+
+  it('retains readable identity and compact timing without expanded internal identifiers', async () => {
+    const { target } = await mountState('ready-single');
+    assert.match(target.querySelector('.journal-detail-identity').textContent, /Bend Horseshoe/);
+    assert.ok(!target.querySelector('[data-journal-record]'));
+    assert.match(target.querySelector('[data-journal-this-run]').textContent, /Started/);
+    await harness.remount();
+    const gathering = await mountState('gathering-straight');
+    assert.match(
+      gathering.target.querySelector('.journal-detail-identity').textContent,
+      /straight task/
+    );
+    assert.ok(!gathering.target.querySelector('[data-journal-record]'));
+  });
+
+  /**
+   * UX2-1. `.journal-actions` carried NO rule at all, so it was a shrink-to-fit flex item and
+   * `margin-left: auto` inside the bar pushed to that block's own edge rather than the card's.
+   * Both sides were flush right only when their content happened to saturate the line, which the
+   * long begin prompt does and the shorter cancel prompt does not. Measured in a real browser, at
+   * the width the reviewer's frame was taken at, because the broken element is OUTSIDE the
+   * `RunActionBar` the earlier pins mount.
+   */
+  it('keeps both the begin and the cancel decision on the card edge, at a real width', async () => {
+    const begun = await mountPrototypeState('stage-not-started');
+    const begin = await measureDetailLayout(begun.target);
+    assert.notEqual(begin.beginRight, null, 'the begin decision renders');
+    assert.ok(
+      Math.abs(begin.beginRight - begin.contentRight) <= 1,
+      `the begin decision ends on the card's content edge: ${begin.beginRight} vs ${begin.contentRight}`
+    );
+
+    await harness.remount();
+    const { target } = await mountState('cancel-confirmation');
+    target.querySelector('[data-run-action="cancel-arm"]').click();
+    flushSync();
+    const armed = await measureDetailLayout(target);
+    assert.notEqual(armed.cancelRight, null, 'the armed cancel decision renders');
+    assert.ok(
+      Math.abs(armed.cancelRight - armed.contentRight) <= 1,
+      `and so does the cancel decision: ${armed.cancelRight} vs ${armed.contentRight}`
+    );
+    assert.ok(
+      Math.abs(armed.actionsRight - armed.contentRight) <= 1,
+      'because the actions block reaches the edge rather than shrinking to its own content'
+    );
+  });
+
+  /**
+   * UX2-2. Whether a stage has BEGUN is a fact about the stage. Keying the TIME card on
+   * `actions.atStageStart` also required the viewer to be able to act, so a held claim, a
+   * non-owner viewer or a run awaiting recovery printed `Left: None` — the string a MATURED wait
+   * prints — against a stage whose clock had never started.
+   */
+  it('says a stage has not started even when the authority refuses every control', async () => {
+    const mounted = await mountPrototypeState('stage-not-started', {
+      authority: { available: false, reason: 'claim-held' },
+    });
+    const run = mounted.store.selectedRun;
+    assert.equal(run.actions.atStageStart, false, 'no control is offered while the claim is held');
+    assert.equal(run.stageStart.required, true, 'but the stage still has not begun');
+    const facts = [
+      ...mounted.target.querySelectorAll('[data-journal-summary-card="time"] [data-journal-fact]'),
+    ];
+    const left = facts.find((row) =>
+      row.textContent.includes(english.FABRICATE.App.Journal.Summary.Left)
+    );
+    assert.ok(left, 'the TIME card still reports a Left row');
+    assert.match(
+      left.textContent,
+      new RegExp(english.FABRICATE.App.Journal.Summary.NotStarted, 'u')
+    );
+    assert.doesNotMatch(
+      left.textContent,
+      new RegExp(`\\b${english.FABRICATE.App.Journal.Summary.None}\\b`, 'u'),
+      'never the matured-wait word'
+    );
+  });
+
+  it('combines timing and history advice with guidance for the actual run state', async () => {
+    for (const [state, expected] of [
+      ['ready-single', /finish crafting/i],
+      ['paused', /resume/i],
+      ['finished-success', /closed run/i],
+      ['finished-failure', /failed|closed run/i],
+      ['finished-cancelled', /cancelled/i],
+      ['recovery-required', /uncertain effect/i],
+    ]) {
+      const { target } = await mountState(state);
+      const guidance = target.querySelector('[data-journal-guidance]').textContent;
+      assert.match(guidance, expected, state);
+      assert.ok(
+        !target.querySelector('[data-journal-guidance] .manager-callout-title'),
+        'guidance is untitled'
+      );
+      if (state.startsWith('finished-') || state === 'recovery-required') {
+        assert.doesNotMatch(guidance, /finish crafting|trigger|use the available action/i, state);
+      }
+      await harness.remount();
+    }
+  });
+
+  // Issue 1648: the ledger is provisioned automatically, so the manual setup notice and its
+  // button are gone for EVERY viewer — including the active GM they existed for. The affordance
+  // described a state no world can now reach; the blocker's own REASON is what must survive on
+  // the very run that used to carry the button.
+  it('shows the blocker reason and no manual setup control, for a GM as well as a player', async () => {
+    for (const [isActiveGM, reason, key] of [
+      [true, 'ledger-missing', 'LedgerMissing'],
+      [false, 'ledger-missing', 'LedgerMissing'],
+      [true, 'ledger-ambiguous', 'LedgerAmbiguous'],
+      // The A1 code itself: minted at five `src/main.js` sites and one Svelte services bag,
+      // outside the drift guard's reach, and unmapped for as long as it existed.
+      [false, 'authority-unavailable', 'AuthorityUnavailable'],
+      // And an unwordable one, which must NOT fall through to the time-gate hint: that told a
+      // player to wait for world time while the authority was what was missing.
+      [false, 'a-reason-nobody-mapped', 'Unavailable'],
+    ]) {
+      let setupCalls = 0;
+      const { target, store, commands } = await mountState('authority-unavailable', {
+        builderOptions: { authority: { available: false, reason } },
+        prepare({ services }) {
+          services.isActiveGM = () => isActiveGM;
+          services.setupJournalRunAuthority = async () => {
+            setupCalls += 1;
+            return { success: true };
+          };
+        },
+      });
+      await settleAction();
+      const who = isActiveGM ? 'GM' : 'player';
+      assert.equal(setupCalls, 0, `the player app never provisions authority (${who})`);
+      assert.ok(
+        !target.querySelector(
+          '[data-journal-authority-setup], [data-journal-authority-setup-action], ' +
+            '[data-journal-authority-setup-error]'
+        ),
+        `no manual setup surface remains for ${reason} as ${who}`
+      );
+      assert.equal(store.selectedRun.actions.disabledReason, reason);
+      assert.equal(
+        target.querySelector('[data-run-action="primary"]').title,
+        english.FABRICATE.App.Journal.Actions[key],
+        `${reason} is worded rather than left blank for a ${who}`
+      );
+      assert.deepEqual(commands, [], 'and a blocked run executes nothing');
+      await harness.remount();
+    }
+  });
+
+  // The OTHER half of #1648 A1, and the half a ready gate cannot see. `RunJournalBuilder`
+  // passes an authority reason straight through as `actions.disabledReason`, and the panel used
+  // to fall through an unwordable one to its POSITIONAL fallbacks — so on a run still waiting on
+  // its world-time gate, an absent authority was reported as "wait for world time". The wait
+  // hint now applies only when the builder gave no code at all.
+  it('never words an unmappable refusal as the time-gate hint on a waiting run', async () => {
+    for (const [reason, key] of [
+      ['a-reason-nobody-mapped', 'Unavailable'],
+      ['authority-unavailable', 'AuthorityUnavailable'],
+    ]) {
+      const mounted = await mountState('waiting-auto-eligible', {
+        builderOptions: { authority: { available: false, reason } },
+      });
+      await settleAction();
+      assert.equal(
+        mounted.store.selectedRun.actions.disabledReason,
+        reason,
+        'the builder passes the authority reason through verbatim'
+      );
+      const primary = mounted.target.querySelector('[data-run-action="primary"]');
+      assert.equal(primary.title, english.FABRICATE.App.Journal.Actions[key]);
+      assert.notEqual(
+        primary.title,
+        english.FABRICATE.App.Journal.Actions.WaitingHint,
+        `${reason} is a refusal, not a reason to wait for world time`
+      );
+      await harness.remount();
+    }
+  });
+
+  it('changes the ingredient route through the real store and resets scoped intent and yields', async () => {
+    const first = ingredientSet('route-a', [
+      { id: 'a', options: [componentOption('iron', 'iron')] },
+    ]);
+    const second = ingredientSet('route-b', [
+      { id: 'b', options: [componentOption('copper', 'copper')] },
+    ]);
+    first.resultGroupId = 'a-results';
+    second.resultGroupId = 'b-results';
+    const mounted = await mountState(
+      'ready-single',
+      selectionFixture(
+        [first, second],
+        {
+          selectedIngredientSetId: first.id,
+          ingredientOptionOverrides: { a: { optionIndex: 0, heldItemId: 'Item.iron-a' } },
+          ingredientEssenceAllocation: {
+            stepId: 'old',
+            ingredientSetId: first.id,
+            allocation: { old: 2 },
+          },
+        },
+        { mode: 'routedByIngredients' }
+      )
+    );
+    assert.ok(mounted.target.querySelector('[data-slot-id="a"]'));
+    assert.match(mounted.target.querySelector('[data-stage-io="produced"]').textContent, /Iron/);
+    mounted.target.querySelector(`[data-journal-route] input[value="${second.id}"]`).click();
+    await settleAction();
+    assert.ok(mounted.target.querySelector('[data-slot-id="b"]'));
+    assert.ok(!mounted.target.querySelector('[data-slot-id="a"]'));
+    assert.match(mounted.target.querySelector('[data-stage-io="produced"]').textContent, /Copper/);
+    const saved =
+      mounted.containers.craftingRuns.active['lab-v1-ready-single'].steps[0].selectionPlan;
+    assert.deepEqual(saved.ingredientOptionOverrides, {});
+    assert.deepEqual(saved.ingredientEssenceAllocation.allocation, {});
+    assert.equal(saved.ingredientEssenceAllocation.ingredientSetId, second.id);
+  });
+
+  it('labels an unnamed ingredient route by its ordinal and never by its raw id', async () => {
+    const anonymous = (id, componentId) => {
+      const set = ingredientSet(id, [{ id: componentId, options: [componentOption(componentId, componentId)] }]);
+      set.name = '';
+      set.resultGroupId = `${id}-results`;
+      return set;
+    };
+    const first = anonymous('od78zBEt6Ymiff7D', 'iron');
+    const second = anonymous('Qk31zBEt6Ymiff7D', 'copper');
+    const mounted = await mountState(
+      'ready-single',
+      selectionFixture([first, second], { selectedIngredientSetId: first.id }, { mode: 'routedByIngredients' })
+    );
+    const labels = [...mounted.target.querySelectorAll('[data-journal-route] [data-radio-card-option]')]
+      .map((card) => card.querySelector('.manager-resolution-option-name').textContent);
+    assert.equal(labels.length, 2);
+    for (const [index, label] of labels.entries()) {
+      assert.equal(
+        label.trim(),
+        english.FABRICATE.App.Journal.Stage.RouteOrdinal.replace('{n}', String(index + 1)),
+        label
+      );
+    }
+    assert.doesNotMatch(
+      mounted.target.querySelector('[data-journal-route]').textContent,
+      /od78zBEt6Ymiff7D|Qk31zBEt6Ymiff7D/,
+      'no raw ingredient-set id reaches the route control'
+    );
+  });
+
+  it('offers the begin control, withholds the roll, and commits through the real store', async () => {
+    const mounted = await mountState(
+      'ready-single',
+      selectionFixture([FIXED_SET], { selectedIngredientSetId: FIXED_SET.id })
+    );
+    const begin = mounted.target.querySelector('[data-run-action="begin"]');
+    assert.ok(begin, 'an unstarted timed stage offers its own begin control');
+    assert.equal(begin.disabled, false);
+    assert.equal(begin.textContent.trim(), english.FABRICATE.App.Journal.Actions.BeginStep);
+    assert.ok(
+      mounted.target
+        .querySelector('[data-run-begin-prompt]')
+        ?.textContent.includes(english.FABRICATE.App.Journal.Actions.BeginStepPrompt),
+      // The sentence is a callout BENEATH the control rather than a span inside it (M16,
+      // reported twice), so this reads the callout. What it asserts is unchanged: the
+      // irreversible act says what it will do, in visible text, before it is clicked.
+      'the control states the irreversible thing it is about to do'
+    );
+    assert.ok(
+      !mounted.target.querySelector('[data-run-action="primary"]'),
+      'the roll is not offered at all while the stage has not started'
+    );
+    assert.equal(mounted.store.selectedRun.actions.disabledReason, 'stageNotStarted');
+    assert.ok(
+      !mounted.target.querySelector('[data-journal-action-blocker]'),
+      'an unbegun stage is an ordinary next step, not a refusal to warn about'
+    );
+    begin.click();
+    await settleAction();
+    assert.equal(mounted.commands.at(-1).action, 'beginStep');
+  });
+
+  // Issue 1648, M21. The rail this used to assert is a LIVE held/needed probe, and a started
+  // stage has already emptied the inventory it probes — the maintainer read `0/0 Drop essence`
+  // against an essence the stage had spent. The receipt below deliberately contradicts the
+  // authored requirement (`Iron` x1) in both name and quantity, so every assertion can only
+  // pass by rendering the record rather than the requirement.
+  it('reads a started stage from its consumption receipt, not from a live inventory probe', async () => {
+    // One route with a component requirement AND an essence requirement, which is the shape
+    // M21 was reported against. `selectedRequirementSnapshot` is what the start commit itself
+    // persists, so a started stage always carries it.
+    const startedSet = ingredientSet('started-set', [
+      { id: 'metal', name: 'Metal', options: [componentOption('iron', 'iron')] },
+      { id: 'earth-group', name: 'Earth essence',
+        options: [{ match: { type: 'essence', essenceId: 'earth', amount: 6 } }] },
+    ]);
+    const mounted = await mountState('ready-single', {
+      ...selectionFixture([startedSet], { selectedIngredientSetId: startedSet.id }),
+      prepare(runtime) {
+        selectionFixture([startedSet], { selectedIngredientSetId: startedSet.id }).prepare(runtime);
+        const step = runtime.containers.craftingRuns.active['lab-v1-ready-single'].steps[0];
+        step.status = 'waitingTime';
+        step.timeGate = { requiredSeconds: 3600, initiatedAt: 0, availableAt: 1 };
+        step.selectedRequirementSnapshot = startedSet.toJSON();
+        step.preparedConsumption = {
+          selectedIngredientSetId: startedSet.id,
+          currencySpends: [],
+          resolvedEssences: {},
+          essenceEnabled: {},
+          consumedSummary: [
+            { itemUuid: 'Actor.actor-1.Item.star', actorUuid: ACTOR_UUID,
+              quantity: 3, name: 'Star Iron', img: null, componentId: 'iron' },
+            { itemUuid: 'Actor.actor-1.Item.dust', actorUuid: ACTOR_UUID,
+              name: 'Ash Dust', img: null, componentId: 'iron' },
+          ],
+          essenceSpend: { labels: { earth: 'Earth' }, carriers: [{ actorUuid: ACTOR_UUID,
+            itemUuid: 'Actor.actor-1.Item.ember', name: 'Ember', img: null, quantity: 2,
+            contributions: [{ essenceId: 'earth', amount: 5 }] }] },
+        };
+      },
+    });
+    assert.equal(mounted.store.selectedRun.actions.setSelection, false);
+    assert.ok(!mounted.target.querySelector('[data-run-action="begin"]'), 'a started stage cannot begin again');
+    assert.ok(
+      !mounted.target.querySelector('[data-slot-row]'),
+      'the held/needed rail is gone: it probes an inventory this stage already emptied'
+    );
+    const consumed = mounted.target.querySelector('[data-journal-stage-consumed]');
+    assert.ok(consumed, 'the stage shows its consumption record instead');
+    assert.ok(
+      consumed.textContent.includes(english.FABRICATE.App.Journal.Stage.Consumed),
+      'the surface says it was consumed, not that it will be'
+    );
+    assert.ok(consumed.textContent.includes(english.FABRICATE.App.Journal.Stage.SpentAtStart));
+    assert.ok(
+      !consumed.textContent.includes(english.FABRICATE.App.Journal.Stage.Requirements),
+      'and never the pre-start "this run consumes" heading'
+    );
+    const rows = [...consumed.querySelectorAll('[data-list-row]')].map((row) => row.textContent);
+    assert.equal(rows.length, 2, 'one row per recorded item');
+    assert.ok(rows[0].includes('Star Iron'), `the recorded item, not the authored one: ${rows[0]}`);
+    assert.ok(rows[0].includes('3'), `the recorded quantity, not the authored one: ${rows[0]}`);
+    // The honest gap: a row whose quantity was never captured says so rather than borrowing
+    // the requirement's number.
+    assert.ok(rows[1].includes('Ash Dust'));
+    assert.ok(
+      rows[1].includes(english.FABRICATE.App.Journal.History.NotRecorded),
+      `an uncaptured quantity is stated, never invented: ${rows[1]}`
+    );
+    // The essence contribution REMAINS, as the recorded contribution it is.
+    const essence = mounted.target.querySelector('[data-essence-history]');
+    assert.ok(essence, 'the recorded essence spend renders on the same stage');
+    assert.equal(
+      essence.querySelector('[data-essence-history-total="earth"]').textContent.trim(),
+      '5 / 6',
+      'contributed against authored, spaced either side of the slash'
+    );
+    assert.ok(
+      mounted.target.querySelector('[data-essence-history-carrier]').textContent.includes('Ember'),
+      'and names the carrier that gave it'
+    );
+    assert.ok(!mounted.target.querySelector('[data-essence-history] button'), 'nothing here is editable');
+  });
+
+  /**
+   * QE2-3 and UX2-4, one defect on two inputs. The receipt dropped `currencySpends` entirely,
+   * and both inner blocks being empty made the whole `{#if started}` branch render NOTHING —
+   * the requirement rail is its `{:else}`. A currency-only or zero-requirement stage therefore
+   * showed a started stage as a blank region. Every fixture in the repo used `currencySpends: []`,
+   * so nothing could see it.
+   */
+  it('reports a started stage that spent only currency, instead of rendering nothing', async () => {
+    const paid = ingredientSet('paid', [
+      { id: 'fee', name: 'Fee', options: [{ id: 'gp', quantity: 1, match: { type: 'currency', unit: 'gp', amount: 50 } }] },
+    ]);
+    const mounted = await mountState('ready-single', {
+      ...selectionFixture([paid], { selectedIngredientSetId: paid.id }),
+      prepare(runtime) {
+        selectionFixture([paid], { selectedIngredientSetId: paid.id }).prepare(runtime);
+        const step = runtime.containers.craftingRuns.active['lab-v1-ready-single'].steps[0];
+        step.status = 'waitingTime';
+        step.timeGate = { requiredSeconds: 3600, initiatedAt: 0, availableAt: 1 };
+        step.selectedRequirementSnapshot = paid.toJSON();
+        step.preparedConsumption = {
+          selectedIngredientSetId: paid.id,
+          currencySpends: [{ unit: 'gp', amount: 50 }],
+          resolvedEssences: {},
+          essenceEnabled: {},
+          consumedSummary: [],
+          // The envelope EVERY stage with a resolution snapshot persists. It has no carriers,
+          // so it is not a band to draw (M20's defect, back on the new surface).
+          essenceSpend: { labels: {}, carriers: [] },
+        };
+      },
+    });
+
+    const record = mounted.store.selectedRun.currentStep.consumptionRecord;
+    assert.deepEqual(record.currencySpends, [{ unit: 'gp', amount: 50 }], 'the receipt carries it');
+    const consumed = mounted.target.querySelector('[data-journal-stage-consumed]');
+    assert.ok(consumed, 'and the started stage renders a region rather than nothing');
+    assert.ok(
+      consumed.textContent.includes(english.FABRICATE.App.Journal.Stage.SpentAtStart),
+      'saying what it spent at start'
+    );
+    assert.match(consumed.textContent, /50 gp/u, `and naming the price: ${consumed.textContent}`);
+    assert.ok(
+      !mounted.target.querySelector('[data-slot-row]'),
+      'never the live held/needed rail, which this stage has already paid'
+    );
+    assert.ok(
+      !mounted.target.querySelector('[data-essence-history]'),
+      'and never an essence band with no carriers in it'
+    );
+  });
+
+  // The same rule on the OTHER started-stage path. A started stage whose authored route was
+  // since deleted reports a stale route rather than a locked selection, and it has still spent
+  // its materials — so reading the locked flag alone sent it to the requirement fallback, which
+  // restates the authored snapshot as though it were the receipt (issue 1648, M21).
+  it('shows the receipt of a started stage whose authored route has since been deleted', async () => {
+    const remaining = ingredientSet('remaining', [
+      { id: 'metal', name: 'Metal', options: [componentOption('iron', 'iron')] },
+    ]);
+    const mounted = await mountState('ready-single', {
+      ...selectionFixture([remaining], { selectedIngredientSetId: 'deleted' }),
+      prepare(runtime) {
+        selectionFixture([remaining], { selectedIngredientSetId: 'deleted' }).prepare(runtime);
+        const step = runtime.containers.craftingRuns.active['lab-v1-ready-single'].steps[0];
+        step.status = 'waitingTime';
+        step.timeGate = { requiredSeconds: 3600, initiatedAt: 0, availableAt: 1 };
+        step.selectedRequirementSnapshot = { id: 'deleted', name: 'Deleted route',
+          ingredientGroups: [{ id: 'metal', name: 'Metal',
+            options: [{ id: 'iron', quantity: 1, match: { type: 'component', componentId: 'iron' } }] }] };
+        step.preparedConsumption = {
+          selectedIngredientSetId: 'deleted',
+          currencySpends: [], resolvedEssences: {}, essenceEnabled: {},
+          consumedSummary: [{ itemUuid: 'Actor.actor-1.Item.star', actorUuid: ACTOR_UUID,
+            quantity: 4, name: 'Star Iron', img: null, componentId: 'iron' }],
+        };
+      },
+    });
+    assert.notEqual(mounted.store.selectedRun.currentStep.selectionAvailability.locked, true,
+      'this stage is started but does NOT take the locked-selection path');
+    assert.equal(mounted.store.selectedRun.currentStep.selectionAvailability.staleRoute, true);
+    const consumed = mounted.target.querySelector('[data-journal-stage-consumed]');
+    assert.ok(consumed, 'it still shows what it spent');
+    assert.ok(consumed.textContent.includes('Star Iron'));
+    assert.ok(
+      !mounted.target.querySelector('[data-journal-stage-requirements]'),
+      'and never the authored requirement restated where the receipt belongs'
+    );
+  });
+
+  it('requires explicit repair when a removed ingredient route leaves only one route', async () => {
+    const remaining = ingredientSet('remaining', [
+      { id: 'metal', options: [componentOption('iron', 'iron')] },
+    ]);
+    const mounted = await mountState(
+      'ready-single',
+      selectionFixture(
+        [remaining],
+        { selectedIngredientSetId: 'removed' },
+        { mode: 'routedByIngredients' }
+      )
+    );
+    assert.equal(mounted.store.selectedRun.currentStep.selectionAvailability.success, false);
+    assert.equal(mounted.store.selectedRun.craftingYield, null);
+    assert.ok(!mounted.target.querySelector('[data-slot-id="metal"]'));
+    mounted.target.querySelector('[data-journal-route] input[value="remaining"]').click();
+    await settleAction();
+    assert.ok(mounted.target.querySelector('[data-slot-id="metal"]'));
+  });
+
+  // Issue 1648, M10. `staleRoute` covers two different facts and used to say only one of them.
+  // Arriving at a stage that has never been given a route is ordinary play; a route that
+  // VANISHED is the error sentence, and reading the second at the first is the failure the
+  // maintainer named.
+  it('tells a route nobody has chosen apart from one that vanished', async () => {
+    const routes = ['iron', 'copper'].map((metal) =>
+      ingredientSet(`${metal}-route`, [{ id: 'metal', options: [componentOption(metal, metal)] }]));
+    const copy = english.FABRICATE.App.Journal.Stage;
+    const unchosen = await mountState('ready-single', selectionFixture(routes, {}, { mode: 'routedByIngredients' }));
+    const details = () => unchosen.target.querySelector('[data-journal-stage-details]').textContent;
+    assert.equal(unchosen.store.selectedRun.currentStep.selectionAvailability.selectedIngredientSetId, null);
+    assert.ok(details().includes(copy.RouteUnchosen), 'the stage asks for a route');
+    assert.ok(!details().includes(copy.StaleSelection), 'nothing was selected, so nothing went stale');
+    assert.equal(unchosen.store.selectedRun.awaitingChoice, true);
+
+    const vanished = await mountState('ready-single',
+      selectionFixture(routes, { selectedIngredientSetId: 'deleted' }, { mode: 'routedByIngredients' }));
+    const gone = vanished.target.querySelector('[data-journal-stage-details]').textContent;
+    assert.ok(gone.includes(copy.StaleSelection), 'a chosen route that is gone keeps the repair sentence');
+    assert.ok(!gone.includes(copy.RouteUnchosen));
+  });
+
+  it('repairs two stale singleton choices one at a time and satisfies the stage only after both repairs', async () => {
+    const remaining = ingredientSet('remaining', [
+      { id: 'metal', options: [componentOption('iron', 'iron')] },
+      { id: 'other', options: [componentOption('copper', 'copper')] },
+    ]);
+    const mounted = await mountState(
+      'ready-single',
+      selectionFixture([remaining], {
+        selectedIngredientSetId: remaining.id,
+        ingredientOptionOverrides: {
+          metal: { optionIndex: 1 },
+          other: { optionIndex: 1 },
+        },
+      })
+    );
+    assert.match(mounted.target.textContent, /no longer available/i);
+    for (const groupId of ['metal', 'other']) {
+      assert.equal(mounted.store.selectedRun.currentStep.selectionAvailability.success, false);
+      mounted.target.querySelector(`[data-slot-id="${groupId}"] button`).click();
+      await settleAction();
+      const candidate = mounted.target.querySelector('[data-choice-id]');
+      assert.equal(candidate.disabled, false);
+      candidate.click();
+      await settleAction();
+      const overrides =
+        mounted.containers.craftingRuns.active['lab-v1-ready-single'].steps[0].selectionPlan
+          .ingredientOptionOverrides;
+      assert.equal(overrides[groupId].optionIndex, 0);
+      if (groupId === 'metal') {
+        assert.deepEqual(overrides.other, { optionIndex: 1 });
+        assert.equal(mounted.store.selectedRun.currentStep.selectionAvailability.success, false);
+        assert.match(mounted.target.textContent, /no longer available/i);
+      }
+    }
+    assert.equal(mounted.store.selectedRun.currentStep.selectionAvailability.success, true);
+  });
+
+  it('states each option quantity and disables candidates that conflict with shared fixed stock', async () => {
+    const set = ingredientSet('mixed', [
+      {
+        id: 'choice',
+        options: [componentOption('large', 'iron', 3), componentOption('small', 'copper', 1)],
+      },
+      { id: 'fixed', options: [componentOption('reserved', 'iron', 1)] },
+    ]);
+    const mounted = await mountState(
+      'ready-single',
+      selectionFixture([set], {
+        selectedIngredientSetId: set.id,
+        ingredientOptionOverrides: { choice: { optionIndex: 0 } },
+      })
+    );
+    mounted.target.querySelector('[data-slot-id="choice"] button').click();
+    await settleAction();
+    const options = [...mounted.target.querySelectorAll('[data-choice-id]')];
+    const large = options.find((option) => option.textContent.includes('iron stock'));
+    const small = options.find((option) => option.textContent.includes('copper stock'));
+    assert.match(large.textContent, /3 held · needs 3/);
+    assert.equal(large.disabled, true, 'the candidate would leave the fixed iron group short');
+    assert.match(small.textContent, /2 held · needs 1/);
+    assert.equal(small.disabled, false, 'the smaller alternate uses its own required amount');
+    small.click();
+    await settleAction();
+    assert.equal(mounted.store.selectedRun.currentStep.selectionAvailability.success, true);
+  });
+
+  it('keeps unsupported lifecycle controls disabled despite legacy-looking manual fields', async () => {
+    const mounted = await mountState('unsupported-version');
+    const primary = mounted.target.querySelector('[data-run-action="primary"]');
+    assert.equal(primary.disabled, true);
+    primary.click();
+    assert.equal(mounted.commands.length, 0);
+  });
+
+  it('tests a held candidate against the same stock reserved for the essence allocation', async () => {
+    const set = ingredientSet('shared', [
+      {
+        id: 'choice',
+        options: [componentOption('iron', 'iron', 3), componentOption('copper', 'copper', 1)],
+      },
+      { id: 'fire', options: [{ match: { type: 'essence', essenceId: 'fire', amount: 2 } }] },
+    ]);
+    const fixture = selectionFixture([set], {
+      selectedIngredientSetId: set.id,
+      ingredientOptionOverrides: { choice: { optionIndex: 1 } },
+      ingredientEssenceAllocation: {
+        stepId: 'sm-r-horseshoe-step-1',
+        ingredientSetId: set.id,
+        allocation: { 'Item.iron-a': 1 },
+      },
+    });
+    fixture.builderOptions.resolveItemEssences = ({ item }) =>
+      item.componentId === 'iron' ? { fire: 2 } : {};
+    const mounted = await mountState('ready-single', fixture);
+    mounted.target.querySelector('[data-slot-id="choice"] button').click();
+    await settleAction();
+    const options = [...mounted.target.querySelectorAll('[data-choice-id]')];
+    assert.equal(options.find((entry) => entry.textContent.includes('iron stock')).disabled, true);
+    assert.equal(
+      options.find((entry) => entry.textContent.includes('copper stock')).disabled,
+      false
+    );
+    assert.equal(mounted.store.selectedRun.currentStep.selectionAvailability.success, true);
+  });
+
+  it('states confirmed receipt rows, uncertainty and unstarted effects with strict redaction', async () => {
+    for (const visible of [true, false]) {
+      const mounted = await mountState('recovery-required', {
+        builderOptions: { visible },
+        prepare({ containers }) {
+          containers.craftingRuns.active['lab-v1-recovery-required'].executionJournal = {
+            status: 'recoveryRequired',
+            effects: [
+              {
+                kind: 'consumeIngredients',
+                phase: 'applied',
+                receipt: {
+                  items: [{ name: 'Recorded iron', quantity: 2 }],
+                  private: 'PRIVATE_CANARY',
+                },
+              },
+              {
+                kind: 'awardResults',
+                phase: 'applying',
+                receipt: { results: [{ name: 'UNCERTAIN_CANARY', quantity: 1 }] },
+              },
+              { kind: 'postCraftChat', phase: 'planned' },
+            ],
+          };
+        },
+      });
+      const evidence = mounted.target.querySelector('[data-journal-recovery-evidence]');
+      assert.ok(evidence);
+      assert.match(evidence.textContent, /Confirmed.*Uncertain.*Not started/s);
+      assert.equal(evidence.textContent.includes('Recorded iron'), visible);
+      assert.doesNotMatch(evidence.textContent, /PRIVATE_CANARY|UNCERTAIN_CANARY/);
+      harness.remount();
+    }
+  });
+
+  it('does not mark the unexecuted tail of a cancelled run completed', async () => {
+    const mounted = await mountState('finished-cancelled');
+    assert.ok(
+      !mounted.target.querySelector('[data-stage-state="unexecuted"]'),
+      'unattempted stages do not enter the account'
+    );
+    assert.ok(!mounted.target.querySelector('[data-stage-card] .is-complete'));
+    const tracks = [...mounted.target.querySelectorAll('[data-stage-progress-state]')];
+    assert.equal(tracks.length, 0, 'terminal history has no active progress');
+  });
+
+  for (const capture of VIEW_LAB_CASES.filter(
+    (entry) =>
+      entry.id.startsWith('fabricate-journal-lifecycle-') ||
+      entry.id.startsWith('fabricate-journal-history-batch-') ||
+      entry.id.startsWith('fabricate-journal-history-data-')
+  )) {
+    const suffix = capture.id.replace('fabricate-journal-lifecycle-', '');
+    it(`TP5 ${suffix}: operates its case walk against populated authoring/receipt data`, async () => {
+      const state = capture.query.journalCaseState;
+      const content = buildLabContent({ journalCaseState: state });
+      const actor = buildLabActors(content)[0];
+      await stockJournalPrototype(actor, content, state);
+      const recipes = labRecipes(content);
+      const delayed = ['loading', 'error-retry'].includes(state);
+      // `labWorld.js` reaches these by withholding the ledger and by seeding a retained claim
+      // page; this harness has no ledger, so it states the answer the real authority derives.
+      // The claim itself is the ONE exported fixture, so the two routes cannot drift.
+      const authority =
+        state === 'authority-unavailable'
+          ? { available: false, reason: 'active-gm-missing' }
+          : state === 'claim-retained'
+            ? { available: false, reason: 'recovery-required', retained: LAB_RETAINED_CLAIM }
+            : { available: true, reason: null };
+      const mounted = await mountState(state, {
+        initialLoad: !delayed,
+        builderOptions: {
+          content,
+          actor,
+          recipes,
+          authority,
+          visible: state !== 'history-redacted',
+          viewer: { id: 'user-lab-player', isGM: capture.query.viewer === 'gm' },
+        },
+        prepare({ services }) {
+          if (state === 'loading') services.listJournalForActor = () => new Promise(() => {});
+          if (state === 'error-retry')
+            services.listJournalForActor = async () => {
+              throw new Error('fixture load failure');
+            };
+          if (state === 'no-actor-empty') {
+            services.getSelectedActorId = () => null;
+            services.listJournalForActor = async () => ({
+              selectedActorId: null,
+              selectedActorUuid: null,
+              activeRuns: [],
+              history: [],
+            });
+          }
+        },
+      });
+      await settleAction();
+      // The committed producer walk owns selection as well as the defining action.
+      // No store.select shortcut may make a missing capture step pass here.
+      const selectedId = LAB_JOURNAL_CASE_STATE_RUN_IDS[state];
+      for (const action of capture.steps) {
+        const control =
+          mounted.target.querySelector(action.selector) ?? document.querySelector(action.selector);
+        assert.ok(control, `${suffix} emits ${action.selector}`);
+        assert.ok(!control.disabled, `${suffix} can operate ${action.selector}`);
+        if (Object.hasOwn(action, 'fill')) {
+          control.value = action.fill;
+          control.dispatchEvent(new window.Event('input', { bubbles: true }));
+        } else control.click();
+        await settleAction();
+        if (state === 'command-timeout') {
+          await new Promise((resolve) => setTimeout(resolve, 35));
+          flushSync();
+        }
+      }
+      if (state === 'alchemy') {
+        const availability = mounted.store.selectedRun.steps[0].selectionAvailability;
+        assert.equal(availability.success, true, 'alchemy has every required reagent');
+        assert.equal(availability.knownMaterialShortfall, false);
+      }
+      if (capture.id.startsWith('fabricate-journal-history-batch-')) {
+        const count = ({ empty: 0, partial: 3 })[capture.id.split('-').at(-2)] ?? 4;
+        for (const list of ['journal-run-list', 'journal-history-list']) {
+          assert.equal(mounted.target.querySelectorAll(`.${list} > [role="listitem"]`).length, count, `${suffix} ${list}`);
+        }
+      }
+      assertCaseWitness(mounted.target, capture);
+      if (HISTORY_DATA_WITNESS[state]) {
+        HISTORY_DATA_WITNESS[state](mounted.target, {
+          // An alchemy attempt names no recipe: the whole roster is protected text, derived from
+          // the world rather than listed, so a renamed recipe cannot quietly leave the check.
+          protectedText: content.recipes
+            .filter((entry) => entry.craftingSystemId === LAB_SYSTEM_IDS.ALCHEMY)
+            .flatMap((entry) => [entry.id, entry.name]),
+        });
+      }
+      if (state === 'material-shortage') {
+        const requirements = mounted.store.selectedRun.currentStep.selectionAvailability.requirements;
+        for (const requirement of requirements) {
+          const tile = mounted.target.querySelector(`[data-slot-id="${requirement.groupId}"] .fab-slot-tile`);
+          assert.equal(tile.classList.contains('is-short'), requirement.option.available === false, requirement.option.name);
+        }
+        const cards = mounted.target.querySelectorAll('[data-journal-route] [data-radio-card-option]');
+        assert.equal(cards.length, 2);
+        assert.ok([...cards].every((card) => card.querySelector('[data-list-row]')));
+        assert.match(cards[1].textContent, /Missing requirements: 1/);
+      }
+      // D-031, and the same happy-dom caveat as M10 below: the capture's positive `:has()` reads
+      // the fact row through a DESCENDANT, which passes open here, so the payment is asserted
+      // with a plain query as well.
+      if (state === 'stage-paid') {
+        const receipt = mounted.target.querySelector('[data-journal-stage-consumed]');
+        assert.ok(receipt, 'a currency-only started stage renders its receipt');
+        const facts = [...receipt.querySelectorAll('[data-journal-fact]')].map(
+          (row) => row.textContent
+        );
+        assert.equal(facts.length, 1, `one row, the payment: ${JSON.stringify(facts)}`);
+        assert.match(facts[0], /50 gp/u);
+        assert.equal(
+          receipt.querySelectorAll('[data-list-row]').length,
+          0,
+          'and no item rows, because it consumed none'
+        );
+      }
+      // Issue 1648, M10. The capture selector reads the row chip through a DESCENDANT inside
+      // `:has()`, which happy-dom evaluates unfaithfully and passes open — so the row, the
+      // header and the notice are each asserted here with a plain query as well.
+      if (state === 'awaiting-choice') {
+        const row = mounted.target.querySelector('[data-run-id="lab-v1-awaiting-choice"]');
+        assert.equal(row.querySelector('[data-run-attention]')?.dataset.runAttention, 'choice');
+        const header = mounted.target.querySelector('.journal-detail-meta [data-run-attention]');
+        assert.equal(header?.dataset.runAttention, 'choice');
+        assert.ok(mounted.target.querySelector('[data-journal-awaiting-choice="true"]'), 'the one notice names the next move');
+        assert.ok(!mounted.target.querySelector('[data-journal-action-blocker]'), 'guidance, never a refusal');
+        // Issue 1648, M15: the begin control stays present (`atStageStart`) but is itself
+        // refused — pressing it while the route is unchosen would reach the engine and be
+        // told "The selected crafting requirements are unavailable."
+        // Issue 1648, F5: the ROUTE decision reports in its own words. `choiceRequired` now
+        // names only the option picks and the essence allocation made within a route already
+        // taken, which is not what this stage — advanced into two authored routes with no plan
+        // at all — is waiting for.
+        assert.equal(mounted.store.selectedRun.actions.disabledReason, 'routeRequired');
+        assert.equal(mounted.store.selectedRun.actions.atStageStart, true);
+        assert.equal(mounted.store.selectedRun.actions.beginStep, false);
+        const begin = mounted.target.querySelector('[data-run-action="begin"]');
+        assert.ok(begin, 'the begin control still renders instead of the primary');
+        assert.equal(begin.disabled, true);
+      }
+      if (state === 'authority-unavailable') {
+        assert.match(mounted.target.querySelector('[data-journal-action-blocker]').textContent, /GM must be online/i);
+        assert.doesNotMatch(mounted.target.querySelector('[data-journal-detail]').textContent, /Your move/);
+      }
+      if (state === 'empty-search') {
+        assert.match(mounted.target.textContent, /No matching active runs/);
+        assert.match(mounted.target.textContent, /No matching finished runs/);
+      }
+      // Issue 1648. `waiting-auto-eligible` is NOT here any more: it is a stage counting its
+      // clock down, so under D-026/D-028 its inputs are spent and its allocation is locked, and
+      // a locked stage publishes no essence pool at all. The carrier controls belong to the
+      // unbegun blocker, which is the one of the two the player can still act on.
+      if (state === 'automatic-blocker') {
+        assert.equal(
+          mounted.target.querySelectorAll('[data-essence-source]').length,
+          2,
+          'Poultice has the two reference carrier controls'
+        );
+      }
+      if (state === 'essence-shared' || state === 'essence-overshoot') {
+        assert.equal(
+          mounted.target.querySelectorAll('[data-essence-source]').length,
+          3,
+          'Sigil has the three reference shared carriers'
+        );
+      }
+      if (suffix === 'history-checked-choice') proveTerminalWitness(mounted.target, capture);
+      if (state === 'history-redacted') {
+        // Withheld: the protected set is derived from the record itself, so a fixture that stops
+        // carrying names or art cannot leave this passing on an empty comparison.
+        const record = mounted.containers.craftingRuns.history.find(
+          (entry) => entry.id === selectedId
+        );
+        const rows = record.steps.flatMap((step) => [
+          ...(step.consumedIngredients ?? []),
+          ...(step.createdResults ?? []),
+        ]);
+        assert.ok(rows.length > 0, 'the withheld record actually carries protected rows');
+        const detail = mounted.target.querySelector('[data-journal-detail]');
+        const art = [...detail.querySelectorAll('img')].map((node) => node.getAttribute('src'));
+        for (const row of rows) {
+          assert.ok(!detail.textContent.includes(row.name), `${row.name} stays withheld`);
+          assert.ok(!art.includes(row.img), `${row.name} art stays withheld`);
+        }
+        assert.ok(!detail.textContent.includes(record.recipeId), 'the recipe id stays withheld');
+        assert.ok(
+          detail.textContent.includes(
+            globalThis.game.i18n.localize('FABRICATE.App.Journal.Redacted.Title')
+          ),
+          'the title is the protected one, not the record’s own'
+        );
+      }
+      if (state === 'history-missing-material')
+        assert.match(
+          mounted.target.querySelector('[data-history-items="consumed"]').textContent,
+          /Unknown material.*Not recorded/i
+        );
+      if (state === 'automatic-blocker') {
+        const run = mounted.containers.craftingRuns.active[selectedId];
+        assert.equal(run.completionMode, 'worldTime');
+        assert.deepEqual(run.steps[run.currentStepIndex].consumedIngredients, []);
+        assert.deepEqual(run.steps[run.currentStepIndex].createdResults, []);
+      }
+      if (
+        suffix.includes('d100') &&
+        (suffix.includes('finished') || suffix.startsWith('history-'))
+      ) {
+        assert.equal(
+          mounted.target.querySelectorAll('[data-yield-cut]').length,
+          1,
+          'one recorded roll owns exactly one cut'
+        );
+        const entries = mounted.store.selectedRun.gatheringYield.entries;
+        assert.ok(
+          entries.every((entry) => typeof entry.cleared === 'boolean' && entry.qty != null)
+        );
+        if (suffix.endsWith('all-hit'))
+          assert.ok(entries.every((entry) => entry.cleared && entry.qty > 0));
+        if (suffix.endsWith('all-miss'))
+          assert.ok(entries.every((entry) => !entry.cleared && entry.qty === 0));
+      }
+      if (state === 'history-just-resolved') {
+        mounted.target.querySelector(`[data-history-run-id="${selectedId}"]`).click();
+        await settleAction();
+        assert.ok(!mounted.target.querySelector('[data-journal-verdict]'));
+        assert.ok(mounted.target.querySelector('[data-history-summary="none"]'));
+      }
+    });
+  }
+
+  it('pins every committed View Lab state to a persisted run identity', () => {
+    assert.equal(LAB_JOURNAL_CASE_STATE_RUN_IDS['ready-single'], 'lab-v1-ready-single');
+    assert.equal(LAB_JOURNAL_CASE_STATE_RUN_IDS['gathering-check'], 'lab-v1-gathering-check');
+    assert.ok(Object.keys(LAB_JOURNAL_CASE_STATE_RUN_IDS).length >= 39);
+    assert.equal(typeof buildLabRunStates, 'function');
+    for (const [state, runId] of Object.entries(LAB_JOURNAL_CASE_STATE_RUN_IDS)) {
+      if (!runId || ['legacy', 'redacted-owner'].includes(state)) continue;
+      // The history-data states need the seeded world for the same reason the prototype states
+      // do: their records name a real mining task and real recipes, and a substitute would
+      // resolve a different account's evidence under this state's name.
+      const fixtureContent =
+        Object.hasOwn(JOURNAL_PROTOTYPE_BINDINGS, state) || LAB_HISTORY_DATA_STATES.includes(state)
+          ? buildLabContent({ journalCaseState: state })
+          : null;
+      const containers = buildLabRunStates({
+        actor: ACTOR,
+        userId: 'user-1',
+        recipes: fixtureContent ? labRecipes(fixtureContent) : RECIPES,
+        environments: fixtureContent?.environments ?? ENVIRONMENTS,
+        tasks: fixtureContent?.gatheringConfig.tasks ?? TASKS,
+        journalCaseState: state,
+      });
+      const runs = Object.values(containers).flatMap((container) => [
+        ...Object.values(container.active),
+        ...container.history,
+      ]);
+      assert.ok(
+        runs.some((run) => run.id === runId),
+        `${state} resolves ${runId}`
+      );
+    }
+
+    const automatic = buildLabRunStates({
+      actor: ACTOR,
+      userId: 'user-1',
+      recipes: RECIPES,
+      environments: ENVIRONMENTS,
+      tasks: TASKS,
+      journalCaseState: 'automatic-completion',
+    });
+    assert.equal(Object.keys(automatic.craftingRuns.active).length, 0);
+    assert.equal(automatic.craftingRuns.history[0].completionMode, 'worldTime');
+    const gathering = buildLabRunStates({
+      actor: ACTOR,
+      userId: 'user-1',
+      recipes: RECIPES,
+      environments: ENVIRONMENTS,
+      tasks: TASKS,
+      journalCaseState: 'gathering-d100',
+    });
+    assert.equal(gathering.gatheringRuns.history.length, 0);
+    assert.equal(gathering.gatheringRuns.active['lab-v1-gathering-d100'].status, 'waitingTime');
+  });
+
+  it('authors ready-single as a real formula-less simple craft', async () => {
+    const content = buildLabContent();
+    const smithing = content.systems.find((entry) => entry.id === LAB_SYSTEM_IDS.SMITHING);
+    assert.match(smithing.craftingCheck.simple.rollFormula, /1d20/);
+
+    seedJournalNoCheckFixture(content);
+    assert.equal(smithing.craftingCheck.enabled, false);
+    assert.equal(smithing.craftingCheck.simple.rollFormula, '');
+    assert.ok(content.recipes.some((entry) => entry.id === 'sm-r-horseshoe'));
+
+    const { target, store } = await mountState('ready-single');
+    assert.equal(store.selectedRun.recipeId, 'sm-r-horseshoe');
+    assert.equal(store.selectedRun.currentStep.detail.checkLabel, null);
+    assert.doesNotMatch(target.textContent, /1d20/);
+  });
+
+  it('renders stage-owned current and future previews while past stages keep actual awards', async () => {
+    for (const [mode, checkMode, presentation] of [
+      ['simple', 'none', 'entries'],
+      ['simple', 'simple', 'entries'],
+      ['routedByIngredients', 'none', 'entries'],
+      ['routedByCheck', 'none', 'tiers'],
+      ['progressive', 'none', 'progressive'],
+      ['alchemy', 'none', 'entries'],
+      ['alchemy', 'tiered', 'tiers'],
+    ]) {
+      const mounted = await mountState('ready-single', craftingPreviewFixture(mode, checkMode));
+      assert.equal(mounted.store.selectedRun.craftingYield.presentation, presentation);
+      const preview = mounted.target.querySelector(
+        presentation === 'entries'
+          ? '[data-stage-state="current"] [data-stage-io="produced"]'
+          : '[data-journal-crafting-yield]'
+      );
+      assert.ok(preview, `${mode}/${checkMode} has a visible preview`);
+      assert.match(preview.textContent, /Iron/);
+      assert.doesNotMatch(preview.textContent, /Received|Awarded|100%|Horseshoe/);
+      assert.equal(preview.querySelectorAll('[data-yield-cut]').length, 0);
+      if (presentation === 'tiers') {
+        assert.match(preview.textContent, /Setback/);
+        assert.match(preview.textContent, /No items/);
+        assert.ok(preview.querySelector('[data-outcome-ladder]'));
+      } else if (presentation === 'progressive') {
+        assert.ok(!preview.querySelector('[data-outcome-ladder], [data-yield-scale]'));
+        assert.match(preview.textContent, /budget/i);
+        assert.match(preview.textContent, /2/);
+        assert.match(preview.textContent, /5/);
+        assert.ok(preview.textContent.indexOf('Iron') < preview.textContent.indexOf('Copper'));
+      }
+      assert.ok(!preview.querySelector('button, input'), 'previews are read-only');
+      for (const index of [0, 2]) {
+        mounted.target.querySelector(`[data-stage-nav-index="${index}"]`).click();
+        flushSync();
+        if (index === 0) {
+          assert.ok(
+            !mounted.target.querySelector('[data-journal-crafting-yield]'),
+            'past uses only actual awards'
+          );
+        } else {
+          const future = mounted.target.querySelector('[data-stage-state="future"]');
+          assert.ok(!future.querySelector('button, input, select'));
+          const futurePreview = future.querySelector(
+            presentation === 'entries' && mode !== 'routedByIngredients'
+              ? '[data-stage-io="produced"]'
+              : '[data-journal-crafting-yield]'
+          );
+          assert.ok(futurePreview, `${mode} future stage has its own preview`);
+          assert.match(futurePreview.textContent, /Iron/);
+          if (presentation !== 'progressive')
+            assert.match(
+              futurePreview.textContent,
+              /7/,
+              'future authored output differs from current output'
+            );
+          assert.ok(
+            !mounted.target.querySelector('[data-journal-summary], [data-journal-time-remaining]')
+          );
+          assert.equal(mounted.store.selectedRun.steps[2].yieldPreview.stageIndex, 2);
+        }
+      }
+      mounted.target.querySelector('[data-stage-nav-return]').click();
+      flushSync();
+      assert.ok(
+        mounted.target.querySelector(
+          '[data-stage-state="current"] [data-stage-io="produced"], [data-stage-state="current"] [data-journal-crafting-yield]'
+        )
+      );
+      harness.remount();
+    }
+  });
+
+  it('keeps terminal awards immutable and suppresses previews when recipe access is redacted', async () => {
+    const fixture = craftingPreviewFixture('simple');
+    const mounted = await mountState('ready-single', fixture);
+    const run = mounted.containers.craftingRuns.active['lab-v1-ready-single'];
+    run.status = 'succeeded';
+    run.currentStepIndex = null;
+    run.steps[2].createdResults = [
+      { componentId: 'horseshoe', name: 'Recorded Horseshoe', quantity: 1 },
+      { componentId: 'iron', name: 'Refused award', quantity: 0 },
+    ];
+    mounted.containers.craftingRuns.history.push(run);
+    delete mounted.containers.craftingRuns.active[run.id];
+    await mounted.store.load(true);
+    flushSync();
+    assert.ok(!mounted.target.querySelector('[data-journal-crafting-yield]'));
+    assert.ok(!mounted.target.querySelector('[data-stage-nav]'));
+    assert.ok(!mounted.target.querySelector('[data-stage-nav-return]'));
+    assert.ok(mounted.target.querySelector('[data-journal-history-detail]'));
+    assert.equal(run.currentStepIndex, null, 'browsing history never changes execution state');
+    const awards = mounted.target.querySelector('[data-journal-history-detail]');
+    assert.match(awards.textContent, /Recorded Horseshoe/);
+    assert.match(awards.textContent, /×0/);
+    fixture.builderOptions.system.components[2].name = 'Changed live component';
+    fixture.builderOptions.recipes[0].steps[2].resultGroups[0].results[0].quantity = 99;
+    await mounted.store.load(true);
+    flushSync();
+    assert.doesNotMatch(awards.textContent, /Changed live component|99/);
+    assert.equal(run.steps[2].createdResults[0].quantity, 1);
+    harness.remount();
+
+    const hidden = await mountState('ready-single', {
+      ...fixture,
+      builderOptions: { ...fixture.builderOptions, visible: false },
+    });
+    assert.equal(hidden.store.selectedRun.redacted, true);
+    assert.ok(
+      !hidden.target.querySelector(
+        '[data-journal-crafting-yield], [data-yield-scale], [data-outcome-ladder]'
+      )
+    );
+    assert.doesNotMatch(hidden.target.textContent, /Yield trial|Iron|Copper/);
+  });
+
+  it('uses actual authority refusal reasons even while a time gate is pending', async () => {
+    for (const [reason, key] of [
+      ['ledger-missing', 'LedgerMissing'],
+      ['ledger-ambiguous', 'LedgerAmbiguous'],
+      ['active-gm-missing', 'AuthorityUnavailable'],
+      ['active-gm-required', 'ActiveGmRequired'],
+      ['recovery-required', 'RecoveryRequired'],
+      ['claim-held', 'ClaimHeld'],
+      ['claim-release-failed', 'ClaimReleaseFailed'],
+      ['secure-random-unavailable', 'SecureRandomUnavailable'],
+    ]) {
+      const mounted = await mountState('waiting-auto-eligible', {
+        builderOptions: { authority: { available: false, reason } },
+      });
+      assert.equal(mounted.store.selectedRun.actions.disabledReason, reason);
+      assert.equal(
+        mounted.target.querySelector('[data-run-action="primary"]').title,
+        english.FABRICATE.App.Journal.Actions[key]
+      );
+      assert.doesNotMatch(
+        mounted.target.querySelector('[data-journal-actions]').textContent,
+        /must own/
+      );
+      harness.remount();
+    }
+  });
+
+  it('labels an executing run as in progress rather than blaming ownership', async () => {
+    const mounted = await mountState('ready-single', {
+      prepare({ containers }) {
+        containers.craftingRuns.active['lab-v1-ready-single'].executionJournal = {
+          status: 'planned',
+          effects: [],
+        };
+      },
+    });
+    assert.equal(mounted.store.selectedRun.actions.disabledReason, 'executionInProgress');
+    assert.equal(
+      mounted.target.querySelector('[data-run-action="primary"]').title,
+      english.FABRICATE.App.Journal.Actions.ExecutionInProgress
+    );
+  });
+
+  it('persists completion preference and completion through a rebuild of raw records', async () => {
+    const { target, store, containers, advanceWorldTime } =
+      await mountState('waiting-auto-eligible');
+    const manual = target.querySelector(
+      ':scope [data-run-completion-switch] input[value="manual"]'
+    );
+    assert.ok(manual, 'completion preference is actionable');
+    manual.click();
+    await new Promise((resolve) => setImmediate(resolve));
+    flushSync();
+    const persisted = containers.craftingRuns.active['lab-v1-waiting-auto-eligible'];
+    assert.equal(persisted.completionMode, 'manual');
+    assert.equal(store.selectedRun.completionMode, 'manual');
+
+    advanceWorldTime(4 * 3600);
+    await store.load(true);
+    flushSync();
+    target.querySelector('[data-run-action="primary"]').click();
+    await new Promise((resolve) => setImmediate(resolve));
+    flushSync();
+    assert.ok(!containers.craftingRuns.active[persisted.id], 'active record moved to history');
+    assert.ok(target.querySelector(`[data-history-run-id="${persisted.id}"]`));
+  });
+
+  it('persists an exact held-item choice through the versioned command envelope and reload', async () => {
+    const { target, containers, commands } = await mountState('waiting-open-choice');
+    target.querySelector(':scope [data-slot-id="metal"] button').click();
+    flushSync();
+    const copper = [...target.querySelectorAll('[data-choice-id]')].find((button) =>
+      button.textContent.includes('copper stock')
+    );
+    assert.ok(copper, 'real held copper candidate is visible');
+    copper.click();
+    await new Promise((resolve) => setImmediate(resolve));
+    flushSync();
+
+    const persisted = containers.craftingRuns.active['lab-v1-waiting-open-choice'];
+    assert.equal(persisted.steps[0].selectionPlan.ingredientOptionOverrides.metal.optionIndex, 1);
+    assert.equal(
+      persisted.steps[0].selectionPlan.ingredientOptionOverrides.metal.heldItemId,
+      'Item.copper-a'
+    );
+    assert.equal(commands.at(-1).payload.stepIndex, 0);
+    assert.match(target.querySelector('[data-slot-id="metal"]').textContent, /copper stock/);
+  });
+
+  it('marks the effective initial selection and the fallback after its actual removal', async () => {
+    const mounted = await mountState('filter-paused');
+    const selectedId = mounted.store.selectedRun.id;
+    assert.equal(
+      mounted.target.querySelector(`[data-run-id="${selectedId}"]`).getAttribute('aria-pressed'),
+      'true'
+    );
+    mounted.store.select(mounted.store.selectedRun);
+    delete mounted.containers.craftingRuns.active[selectedId];
+    await mounted.store.load(true);
+    flushSync();
+    assert.notEqual(mounted.store.selectedRun.id, selectedId);
+    assert.equal(
+      mounted.target
+        .querySelector(`[data-run-id="${mounted.store.selectedRun.id}"]`)
+        .getAttribute('aria-pressed'),
+      'true'
+    );
+  });
+
+  it('keeps a missing selected held item unfilled until an explicit replacement is chosen', async () => {
+    const mounted = await mountState('waiting-open-choice', {
+      prepare({ containers }) {
+        containers.craftingRuns.active[
+          'lab-v1-waiting-open-choice'
+        ].steps[0].selectionPlan.ingredientOptionOverrides = {
+          metal: { optionIndex: 0, heldItemId: 'Item.removed-stock' },
+        };
+      },
+    });
+    const slot = mounted.target.querySelector('[data-slot-id="metal"]');
+    assert.equal(mounted.store.selectedRun.currentStep.selectionAvailability.success, false);
+    assert.doesNotMatch(slot.textContent, /iron stock/);
+    slot.querySelector('button').click();
+    flushSync();
+    assert.ok(!mounted.target.querySelector('[data-choice-id][aria-pressed="true"]'));
+    const iron = [...mounted.target.querySelectorAll('[data-choice-id]')].find((entry) =>
+      entry.textContent.includes('iron stock')
+    );
+    iron.click();
+    await settleAction();
+    assert.match(mounted.target.querySelector('[data-slot-id="metal"]').textContent, /iron stock/);
+    assert.equal(
+      mounted.commands.at(-1).payload.selectionPlan.ingredientOptionOverrides.metal.heldItemId,
+      'Item.iron-a'
+    );
+  });
+
+  it('disables choices and essence while a selection command is pending and discards refused optimism', async () => {
+    for (const [state, accepted] of [
+      ['waiting-open-choice', true],
+      ['essence-shared', true],
+      ['essence-shared', false],
+    ]) {
+      let finish;
+      let submitted;
+      let submissions = 0;
+      const mounted = await mountState(state, {
+        prepare({ services }) {
+          const execute = services.executeJournalRunCommand;
+          services.executeJournalRunCommand = (command) => {
+            submitted = command;
+            submissions += 1;
+            return new Promise((resolve) => {
+              finish = resolve;
+            }).then(() =>
+              accepted ? execute(command) : { success: false, message: 'selection refused' }
+            );
+          };
+        },
+      });
+      let control;
+      if (state === 'waiting-open-choice') {
+        mounted.target.querySelector('[data-slot-id="metal"] button').click();
+        flushSync();
+        control = mounted.target.querySelector('[data-choice-id]');
+      } else control = mounted.target.querySelector('[data-stepper-increment]');
+      control.click();
+      control.click();
+      flushSync();
+      assert.ok(mounted.store.busyRunKey);
+      const controls = mounted.target.querySelectorAll(
+        '[data-journal-stage-details] button, [data-journal-stage-details] input'
+      );
+      assert.ok(controls.length > 0);
+      assert.ok(
+        [...controls].every((control) => control.disabled),
+        'all visible material controls are disabled'
+      );
+      for (const control of controls) control.click();
+      assert.equal(submitted.action, 'setSelection');
+      assert.equal(submissions, 1, 'rapid input submits exactly one plan');
+      finish();
+      await settleAction();
+      assert.equal(mounted.store.busyRunKey, '');
+      if (accepted) {
+        assert.deepEqual(
+          mounted.containers.craftingRuns.active[submitted.runId].steps[0].selectionPlan,
+          submitted.payload.selectionPlan,
+          'the visible plan is the accepted persisted command'
+        );
+      }
+      if (state === 'essence-shared') {
+        assert.match(
+          mounted.target.querySelector('[data-essence-total="earth"]').textContent,
+          accepted ? /6 \/ 6/ : /0 \/ 6/
+        );
+        assert.equal(
+          mounted.target.querySelector('[data-essence-source] input').value,
+          accepted ? '1' : '0'
+        );
+      }
+      harness.remount();
+    }
+  });
+
+  it('keeps future stages inert and proves the lock assertion detects a control intrusion', async () => {
+    const { target, commands } = await mountState('future-stage');
+    target.querySelector('[data-stage-nav-index="2"]').click();
+    flushSync();
+    assertLockedStage(target);
+    assert.equal(commands.length, 0);
+
+    const card = target.querySelector('[data-stage-card][data-stage-state="future"]');
+    const intrusion = document.createElement('button');
+    card.appendChild(intrusion);
+    assert.throws(() => assertLockedStage(target));
+    intrusion.remove();
+    assertLockedStage(target);
+  });
+
+  it('cancels and dismisses through persisted state rather than fixture-only labels', async () => {
+    const cancelled = await mountState('cancel-confirmation');
+    cancelled.target.querySelector('[data-run-action="cancel-arm"]').click();
+    flushSync();
+    assert.ok(cancelled.target.querySelector('[data-run-cancel-decision]'));
+    cancelled.target.querySelector('[data-run-action="cancel-confirm"]').click();
+    await new Promise((resolve) => setImmediate(resolve));
+    flushSync();
+    assert.ok(cancelled.target.querySelector('[data-history-run-id="lab-v1-cancel-confirmation"]'));
+
+    harness.remount();
+    const dismissed = await mountState('dismissal');
+    dismissed.target.querySelector('[data-journal-dismiss]').click();
+    await new Promise((resolve) => setImmediate(resolve));
+    flushSync();
+    assert.equal(dismissed.containers.craftingRuns.history.length, 1, 'history record remains');
+    assert.ok(!dismissed.target.querySelector('[data-history-run-id="lab-v1-dismissal"]'));
+  });
+
+  it('pauses, advances world time, and resumes with a re-anchored persisted gate', async () => {
+    const paused = await mountState('waiting-auto-eligible');
+    const run = paused.containers.craftingRuns.active['lab-v1-waiting-auto-eligible'];
+    paused.target.querySelector('[data-run-action="pause"]').click();
+    await settleAction();
+    assert.equal(run.pauseState.remainingSeconds, 3 * 3600);
+    assert.ok(paused.target.querySelector('[data-journal-paused="true"]'));
+
+    paused.advanceWorldTime(2 * 3600);
+    paused.target.querySelector('[data-run-action="resume"]').click();
+    await settleAction();
+    assert.equal(run.pauseState, undefined);
+    assert.equal(run.pausedDurationSeconds, 2 * 3600);
+    assert.equal(run.steps[0].timeGate.availableAt, 1_209_600 + 5 * 3600);
+    assert.equal(paused.store.selectedRun.derivedStatus, 'waiting');
+  });
+
+  it('draws both resumed progress bars from the re-anchored gate, not elapsed wall time', async () => {
+    // Issue 1648, reported from manual testing: pause, advance world time past the original
+    // deadline, resume — and BOTH bars painted full while the TIME card and the list row still
+    // read hours to wait. `applyResume` re-anchors `availableAt` past the paused span and
+    // `initiatedAt` never moves, so a bar measuring `now - initiatedAt` banks the pause as work.
+    const paused = await mountState('waiting-auto-eligible');
+    const run = paused.containers.craftingRuns.active['lab-v1-waiting-auto-eligible'];
+    const required = run.steps[0].timeGate.requiredSeconds;
+
+    paused.target.querySelector('[data-run-action="pause"]').click();
+    await settleAction();
+    paused.advanceWorldTime(6 * 3600);
+    paused.store.tickWorldTime();
+    flushSync();
+    paused.target.querySelector('[data-run-action="resume"]').click();
+    await settleAction();
+
+    const remaining = run.steps[0].timeGate.availableAt - paused.store.worldTime;
+    assert.equal(remaining, 3 * 3600, 'the resumed gate still owes the whole frozen remainder');
+    const expected = ((required - remaining) / required) * 100;
+    assert.equal(expected, 25, 'a four-hour gate with three hours left is a quarter served');
+
+    const left = [
+      ...paused.target.querySelectorAll('[data-journal-summary-card="time"] [data-journal-fact]'),
+    ].find((row) => row.textContent.includes(english.FABRICATE.App.Journal.Summary.Left));
+    assert.match(left.textContent, /3h 0m 0s/u, 'the TIME card still reports three hours left');
+
+    const fill = paused.target.querySelector(
+      '[data-journal-stages] [data-run-progress-track="0"] .fab-fill-bar-fill'
+    );
+    assert.equal(
+      fill.getAttribute('style'),
+      `width: ${expected}%;`,
+      'the detail bar agrees with the label beside it rather than pegging full'
+    );
+    const row = paused.target.querySelector(
+      '[data-journal-list="active"] [data-run-id="lab-v1-waiting-auto-eligible"] [data-run-progress]'
+    );
+    assert.equal(
+      row.getAttribute('data-run-progress'),
+      String(expected),
+      'and so does the list row, which read the same unmoved initiatedAt'
+    );
+  });
+
+  // Issue 1648, U3 and M18, on the two surfaces a player reads a clock from. Both defects are
+  // the same predicate: an unstarted stage holds no `timeGate`, so the detail's `availableAt`
+  // was NaN and the Active row's whole timing block was suppressed.
+  it('tells an unstarted stage its clock has not started, on the card that answers the clock question', async () => {
+    const mounted = await mountPrototypeState('stage-not-started');
+    const run = mounted.store.selectedRun;
+    assert.equal(run.actions.atStageStart, true, 'the fixture really is at a stage start');
+    assert.equal(run.timeGate, null, 'which is to say it holds no gate at all');
+    assert.ok(run.currentStep.detail.requiredSeconds > 0, 'and the stage does need time');
+
+    const facts = [...mounted.target.querySelectorAll('[data-journal-summary-card="time"] [data-journal-fact]')];
+    const left = facts.find((row) => row.textContent.includes(english.FABRICATE.App.Journal.Summary.Left));
+    assert.ok(left, 'the TIME card still reports a Left row');
+    // `None` is the string a MATURED wait prints. Printing it here made an unstarted stage
+    // indistinguishable from one whose clock has run out, beside a button offering to start it.
+    assert.match(left.textContent, new RegExp(english.FABRICATE.App.Journal.Summary.NotStarted, 'u'));
+    assert.doesNotMatch(
+      left.textContent,
+      new RegExp(`\\b${english.FABRICATE.App.Journal.Summary.None}\\b`, 'u'),
+      'never the matured-wait word'
+    );
+    // The row above it is untouched: D-025 governs the FORMAT of the authored duration, and
+    // what the stage NEEDS is still stated in full.
+    const needs = facts.find((row) => row.textContent.includes(english.FABRICATE.App.Journal.Summary.Needs));
+    assert.doesNotMatch(needs.textContent, new RegExp(english.FABRICATE.App.Journal.Summary.NotStarted, 'u'));
+
+    // M18 on the Active row: the bar survives the missing gate, and the countdown does not
+    // pretend to one.
+    const row = mounted.target.querySelector(
+      '[data-journal-list="active"] [data-run-id="lab-v1-stage-not-started"]'
+    );
+    assert.ok(row.querySelector('[data-run-progress]'), 'the row keeps its progress reading');
+    assert.ok(!row.querySelector('[data-run-countdown]'), 'and states no remaining time');
+    // D-029 on the same row: the merged badge, not the retired word.
+    assert.equal(
+      row.querySelector('.journal-run-status').textContent.trim(),
+      english.FABRICATE.App.Journal.Status.inProgress
+    );
+  });
+
+  it('keeps paging independent, retains off-page detail, and filters through real controls', async () => {
+    const paging = await mountState('active-page-two');
+    const firstCard = paging.target.querySelector(
+      ':scope [data-journal-list="active"] [data-run-id]'
+    );
+    firstCard.click();
+    flushSync();
+    const selectedKey = paging.store.selectedRun.key;
+    const selectedId = paging.store.selectedRun.id;
+
+    paging.target
+      .querySelector(':scope [data-journal-list="active"] [data-pagination-next]')
+      .click();
+    flushSync();
+    assert.equal(paging.store.activePage, 1);
+    assert.equal(paging.store.historyPage, 0);
+    assert.equal(paging.store.selectedRun.key, selectedKey);
+    assert.equal(paging.target.querySelector('[data-journal-detail]').dataset.runKey, selectedKey);
+    assert.ok(
+      !paging.target.querySelector(
+        `:scope [data-journal-list="active"] [data-run-id="${selectedId}"]`
+      )
+    );
+
+    paging.target
+      .querySelector(':scope [data-journal-list="finished"] [data-pagination-next]')
+      .click();
+    flushSync();
+    assert.equal(paging.store.activePage, 1);
+    assert.equal(paging.store.historyPage, 1);
+
+    harness.remount();
+    const filtered = await mountState('filter-paused');
+    filtered.target
+      .querySelector(':scope [data-journal-status-filter] input[value="paused"]')
+      .click();
+    flushSync();
+    assert.deepEqual(filtered.store.activeCounts, { all: 2, ready: 1, inProgress: 0, paused: 1 });
+    assert.equal(filtered.target.querySelectorAll('[data-run-id]').length, 1);
+    assert.equal(filtered.target.querySelector('[data-run-id]').dataset.runStatus, 'paused');
+
+    const retainedKey = filtered.store.selectedRun.key;
+    const search = filtered.target.querySelector(':scope [data-journal-search] input');
+    search.value = 'no journal run has this name';
+    search.dispatchEvent(new Event('input', { bubbles: true }));
+    flushSync();
+    assert.equal(filtered.target.querySelectorAll('[data-run-id]').length, 0);
+    assert.equal(filtered.store.selectedRun.key, retainedKey);
+    assert.equal(
+      filtered.target.querySelector('[data-journal-detail]').dataset.runKey,
+      retainedKey
+    );
+
+    harness.remount();
+    const salvage = await mountState('salvage');
+    chooseSelectOption(salvage.target, '[data-journal-kind-filter]', 'salvage');
+    assert.equal(salvage.store.kindFilter, 'salvage');
+    assert.ok(salvage.target.querySelector('[data-history-run-id="lab-v1-salvage"]'));
+  });
+
+  it('persists one shared essence carrier and redraws both requirement totals', async () => {
+    const essence = await mountState('essence-shared');
+    const source = essence.target.querySelector('[data-essence-source="Item.iron-a"]');
+    assert.ok(source, 'the authored dual-essence carrier is visible');
+    source.querySelector('[data-stepper-increment]').click();
+    await settleAction();
+
+    const run = essence.containers.craftingRuns.active['lab-v1-essence-shared'];
+    assert.equal(
+      run.steps[0].selectionPlan.ingredientEssenceAllocation.allocation['Item.iron-a'],
+      1
+    );
+    assert.match(
+      essence.target.querySelector('[data-essence-total="earth"]').textContent,
+      /6 \/ 6/
+    );
+    assert.match(essence.target.querySelector('[data-essence-total="fire"]').textContent, /3 \/ 3/);
+  });
+
+  it('collects all three gathering modes but never treats fixture plans without receipts as awards', async () => {
+    const cases = [
+      ['gathering-straight', 'straight'],
+      ['gathering-d100', 'd100'],
+      ['gathering-check', 'routed'],
+    ];
+    for (const [state, mode] of cases) {
+      const mounted = await mountState(state);
+      const runId = LAB_JOURNAL_CASE_STATE_RUN_IDS[state];
+      assert.equal(mounted.store.selectedRun.gatheringYield.mode, mode);
+      if (mode === 'routed') assert.ok(mounted.target.querySelector('[data-outcome-ladder]'));
+      else assert.ok(mounted.target.querySelector('[data-yield-scale]'));
+      assert.equal(mounted.target.querySelectorAll('[data-yield-cut]').length, 0);
+
+      mounted.target.querySelector('[data-run-action="primary"]').click();
+      await settleAction();
+      assert.ok(!mounted.containers.gatheringRuns.active[runId]);
+      assert.ok(mounted.target.querySelector(`[data-history-run-id="${runId}"]`));
+      assert.equal(
+        mounted.store.selectedRun.createdResults.length,
+        1,
+        'the fixture command records its applied award receipt'
+      );
+      if (mode === 'straight') assert.equal(mounted.store.selectedRun.gatheringYield.roll, null);
+      if (mode === 'd100') {
+        assert.equal(mounted.store.selectedRun.gatheringYield.roll, 75);
+        assert.equal(
+          mounted.target.querySelectorAll('[data-yield-cut]').length,
+          1,
+          'recorded high-roll evidence owns one historical cut'
+        );
+      }
+      if (mode === 'routed') {
+        assert.equal(
+          mounted.store.selectedRun.gatheringYield.tiers.length,
+          0,
+          'history never projects live outcome bands'
+        );
+        assert.ok(mounted.target.querySelector('[data-history-items="transient-produced"]'));
+      }
+      harness.remount();
+    }
+  });
+
+  it('retries a failed load and clears busy state for each named command refusal', async () => {
+    let attempts = 0;
+    const retry = await mountState('error-retry', {
+      initialLoad: false,
+      prepare(runtime) {
+        const list = runtime.services.listJournalForActor;
+        runtime.services.listJournalForActor = (...args) => {
+          attempts += 1;
+          if (attempts === 1) return Promise.reject(new Error('fixture load failure'));
+          return list(...args);
+        };
+      },
+    });
+    await settleAction();
+    assert.ok(retry.target.querySelector('[data-journal-state="error"]'));
+    retry.target.querySelector('[data-notice-action]').click();
+    await settleAction();
+    assert.ok(retry.target.querySelector('[data-journal-state="populated"]'));
+    assert.equal(attempts, 2);
+
+    for (const [state, reason] of [
+      ['stale-action', 'stale-run'],
+      ['command-timeout', 'command-timeout'],
+    ]) {
+      harness.remount();
+      const content = buildLabContent({ journalCaseState: state });
+      const actor = buildLabActors(content)[0];
+      await stockJournalPrototype(actor, content, state);
+      const refused = await mountState(state, {
+        builderOptions: {
+          content,
+          actor,
+          recipes: labRecipes(content),
+          viewer: { id: 'user-lab-player', isGM: false },
+        },
+      });
+      const runId = LAB_JOURNAL_CASE_STATE_RUN_IDS[state];
+      const rawRun = refused.containers.craftingRuns.active[runId];
+      const search = refused.target.querySelector('[data-journal-search] input');
+      search.value = content.recipes.find((entry) => entry.id === rawRun.recipeId).name;
+      search.dispatchEvent(new window.Event('input', { bubbles: true }));
+      await settleAction();
+      refused.target.querySelector(`[data-run-id="${runId}"]`).click();
+      await settleAction();
+      assert.equal(refused.store.selectedRun.id, runId);
+      const primary = refused.target.querySelector('[data-run-action="primary"]');
+      assert.ok(primary && !primary.disabled, `${state} reaches its command refusal`);
+      primary.click();
+      flushSync();
+      if (state === 'command-timeout') {
+        assert.equal(
+          refused.target.querySelector('[data-run-action-bar]').getAttribute('aria-busy'),
+          'true'
+        );
+        await new Promise((resolve) => setTimeout(resolve, 35));
+        flushSync();
+      } else await settleAction();
+      assert.ok(refused.containers.craftingRuns.active[runId]);
+      assert.equal(refused.store.busyRunKey, '');
+      assert.match(refused.notifications.at(-1), new RegExp(reason));
+      assert.equal(refused.commands.at(-1).action, 'execute');
+      assert.equal(refused.commands.at(-1).runId, runId);
+    }
+
+    harness.remount();
+    const cancelled = await mountState('roll-cancelled');
+    const runId = LAB_JOURNAL_CASE_STATE_RUN_IDS['roll-cancelled'];
+    cancelled.target.querySelector('[data-run-action="primary"]').click();
+    await settleAction();
+    assert.ok(cancelled.containers.craftingRuns.active[runId]);
+    assert.equal(cancelled.store.busyRunKey, '');
+    assert.equal(cancelled.notifications.length, 0);
+  });
+
+  // Issue 1648, M15. `automatic-blocker` used to belong in the loop above: it has available
+  // essence carriers but no allocation — not a physical shortage — so a manual press used to
+  // reach the command's own "selection-required" refusal. The primary must now refuse it
+  // BEFORE that: no command is ever issued.
+  it('refuses the begin control for an unmade-but-coverable essence choice before any command is issued', async () => {
+    const state = 'automatic-blocker';
+    const content = buildLabContent({ journalCaseState: state });
+    const actor = buildLabActors(content)[0];
+    await stockJournalPrototype(actor, content, state);
+    const refused = await mountState(state, {
+      builderOptions: {
+        content,
+        actor,
+        recipes: labRecipes(content),
+        viewer: { id: 'user-lab-player', isGM: false },
+      },
+    });
+    const runId = LAB_JOURNAL_CASE_STATE_RUN_IDS[state];
+    const rawRun = refused.containers.craftingRuns.active[runId];
+    const search = refused.target.querySelector('[data-journal-search] input');
+    search.value = content.recipes.find((entry) => entry.id === rawRun.recipeId).name;
+    search.dispatchEvent(new window.Event('input', { bubbles: true }));
+    await settleAction();
+    refused.target.querySelector(`[data-run-id="${runId}"]`).click();
+    await settleAction();
+    assert.equal(refused.store.selectedRun.id, runId);
+    const availability = refused.store.selectedRun.currentStep.selectionAvailability;
+    assert.equal(availability.success, false, 'essence allocation is still required');
+    assert.equal(availability.knownMaterialShortfall, false, 'the carrier ledger can cover it');
+    assert.ok(availability.essencePool.carriers.length > 0);
+    assert.equal(refused.store.selectedRun.actions.disabledReason, 'choiceRequired');
+    // The stage has NOT begun — starting is what would spend the essences — so the control on
+    // screen is the begin decision, and it is what must be refused (issue 1648).
+    assert.ok(
+      !refused.target.querySelector('[data-run-action="primary"]'),
+      'an unbegun stage offers no primary to refuse'
+    );
+    const begin = refused.target.querySelector('[data-run-action="begin"]');
+    assert.ok(begin && begin.disabled, 'the begin control is refused before any command is issued');
+    begin.click();
+    await settleAction();
+    assert.deepEqual(refused.commands, [], 'a disabled control issues nothing to click');
+    assert.equal(refused.notifications.length, 0);
+  });
+
+  it('guards independent scroll containment and detail action alignment with negative controls', async () => {
+    const { target } = await mountState('active-page-two');
+    assertScrollContract(target);
+    assertActionAlignment(target);
+
+    const active = target.querySelector('[data-journal-list="active"]');
+    const activeScroller = active.querySelector('[data-journal-list-scroll]');
+    const activePager = active.querySelector('.manager-pagination');
+    activeScroller.appendChild(activePager);
+    assert.throws(() => assertScrollContract(target));
+    active.appendChild(activePager);
+    assertScrollContract(target);
+
+    const actions = target.querySelector('[data-journal-actions]');
+    const detail = target.querySelector('[data-journal-detail]');
+    detail.appendChild(actions);
+    assert.throws(() => assertActionAlignment(target));
+  });
+});

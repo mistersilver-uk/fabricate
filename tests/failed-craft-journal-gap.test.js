@@ -110,12 +110,13 @@ function makeActor({ id = 'actor-1', items = [] } = {}) {
       // Foundry setFlag deep-merges the value into flags[ns] under the (dotted) key.
       const expanded = expandObject({ [`${ns}.${key}`]: value });
       mergeInto(data.flags, expanded);
-      return value;
+      return this;
     },
     async update(payload) {
       // Foundry update: expand dotted paths (incl. -= deletions) then deep-merge.
       const expanded = expandObject(payload);
       mergeInto(data, expanded);
+      return this;
     },
     async createEmbeddedDocuments(_type, itemDatas) {
       const stubs = (itemDatas || []).map((d, i) => ({
@@ -143,10 +144,12 @@ function makeItem({ id, name = `Item ${id}`, quantity = 1 } = {}) {
     async delete() {
       this.deleteCalled = true;
       this.system.quantity = 0;
+      return this;
     },
     async update(payload) {
       this.updateCalled = true;
       if (payload['system.quantity'] !== undefined) this.system.quantity = payload['system.quantity'];
+      return this;
     },
   };
 }

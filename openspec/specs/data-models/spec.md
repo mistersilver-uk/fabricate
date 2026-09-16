@@ -447,6 +447,10 @@ CraftingSystem = {
    The per-system gathering economy block (`gatheringConfig.systems[systemId].economy`, defined in `gathering-and-harvesting`) carries a normalized `resolutionMode: "d100" | "progressive" | "routed"` (default `"d100"`).
    An absent, invalid, or wrong-shape value (including a stray `"simple"`) normalizes to `"d100"` on both the read and persist paths.
    It is GM configuration and is not part of the player gathering listing payload.
+   The economy mode is inert compatibility data and never overrides task-level `resolutionMode`.
+   Gathering task library normalization and composition preserve task-owned `resolutionMode` and canonical `resultGroups` across save, reload, export and import.
+   An absent task mode selects `d100`; straight and routed retain authored result groups, and progressive keeps its separate legacy budget contract.
+   This preservation introduces no lifecycle migration or run restamping.
 10. `recipeItemDefinitions` are distinct from `components`; a recipe item definition must not be treated as a crafting ingredient/result component unless it is also intentionally imported as a component.
 11. `RecipeItemDefinition.id` values must be unique within a crafting system.
 12. `RecipeItemDefinition.originItemUuid` values should be unique within a crafting system so one system recipe item can be reused across multiple recipes.
@@ -2981,6 +2985,125 @@ Result = {
 2. `quantity` must be positive.
 3. `propertyMacroUuid` is only valid when `features.propertyMacros` is true.
 
+## Versioned Run Lifecycle
+
+Applicable crafting runs, including alchemy, and gathering runs share these optional persisted fields.
+Salvage retains its existing contract.
+
+```js
+RunLifecycle = {
+  lifecycleVersion: 1,
+  runRevision: number, // non-negative integer; starts at zero
+  completionMode: "manual" | "worldTime", // new runs default to manual
+  pauseState?: { pausedAt: number, remainingSeconds: number },
+  pausedDurationSeconds: number, // starts at zero
+  executionJournal?: {
+    operationId: string,
+    requestId: string,
+    baseRunRevision: number,
+    status: "planned" | "committed" | "recoveryRequired",
+    intent: object | null,
+    effects: Array<{
+      effectId: string,
+      kind: string,
+      planned: object | null,
+      phase: "planned" | "applying" | "applied",
+      receipt?: object | null,
+    }>,
+    outcome?: object | null,
+  },
+}
+```
+
+### Requirements
+
+1. Only an absent `lifecycleVersion` selects legacy behavior, preserving existing consumption, refunds and automatic progression without migration or restamping.
+A present unsupported version remains readable and preserved, but mutation entrypoints refuse it before effects.
+2. New applicable runs explicitly request version 1; ordinary legacy manager callers remain unstamped.
+Accepted versioned mutations advance `runRevision`, and a stale expected revision is refused.
+Revision validation is not a cross-client lock; authoritative command arbitration owns that boundary.
+3. Pause records the current world time and remaining gate seconds, including zero.
+Paused runs retain their selections and completion preference and never mature through world-time processing.
+Resume reanchors readiness at the new world time plus the frozen remainder and accumulates paused duration.
+4. Manual and automatic execution refuse paused runs; cancellation remains available while paused.
+Recovery-required and unsupported-version runs refuse ordinary execution, cancellation and replay.
+5. The shared execution-journal transition implementation persists the complete plan before effects, one effect as `applying` before invoking its seam, and its actual receipt as `applied` afterward.
+Applied effects form a prefix; at most one effect is applying, and later effects remain planned.
+6. Resuming execution after reload with an applying effect, failure after its invocation begins, or inability to persist its receipt requires recovery and never replays the uncertain effect.
+A normal observing-client refresh during live execution does not itself trigger recovery.
+Committed requests return their recorded outcome.
+7. Gathering persists its terminal record with the planned execution journal before effects and updates receipts in that same history record by run ID.
+It does not delay terminal history until effects finish.
+8. Intent, effect plans, receipts and outcomes retain existing secret and blind-run redaction.
+Authority request deduplication and prepare tokens live in the private authority ledger; the run record retains effect evidence.
+9. Stage browsing is transient UI state and never changes the persisted executable stage index.
+
+### Authority Ledger and Recovery Boundary
+
+Every version-1 start or mutation MUST pass through the active-GM command authority, including an immediately executable public craft.
+The authority MUST re-resolve the actor, sender ownership, source actors, run revision and executable stage under its execution claim before applying the operation.
+The actor UUID identifies the command target; ownership MUST be checked against the attested sender rather than the executing GM's ambient `isOwner`.
+A local queue or revision comparison alone MUST NOT be treated as a cross-browser lock.
+
+The authority requires exactly one private JournalEntry ledger.
+The active GM MUST provision it automatically when the world holds none, during boot recovery and at the start of the command path, and MUST then run boot reconstruction against it.
+A non-GM realm MUST NOT provision a ledger and keeps its active-GM refusal.
+Provisioning MUST use a server-assigned top-level `_id`, never a fixed one: only the embedded duplicate-`_id` check is enforced, so a fixed top-level `_id` silently overwrites the existing ledger and its durable request state.
+A refused create — `JOURNAL_CREATE` is a revocable user permission — MUST surface its own availability reason rather than an unlabelled failure.
+
+Duplicate ledgers MUST be resolved without a human wherever that is provably safe.
+The active GM MUST rank candidates with a deterministic total order every session computes from the same stored values — a ledger holding durable evidence before a pristine one, then the server-assigned `_stats.createdTime`, then the lowest `_id` — where a pristine ledger is one with no recorded requests, no active prepare tokens and no claim page.
+`_stats.createdTime` is a server wall clock and MUST NOT be read as "first created"; it is a shared value the order converges on.
+Only a pristine non-winner may be deleted, and two or more ledgers holding durable evidence MUST remain `ledger-ambiguous` for a person to resolve.
+Because the client world collection is broadcast-fed, arbitration MUST resolve candidates through an authoritative server read, issued GM-side only because that read is not permission-filtered, ranking its detached documents and acting by ID against the live collection.
+A read that did not ANSWER — it rejected, or the client could not issue it — MUST yield an unsettled result and MUST NOT be collapsed to "the server reports none", because that answer is what authorises a create and two sessions reading through the same failure would each provision their own ledger.
+Exhausting the retry passes without settling MUST also report unsettled rather than ambiguous, which asserts a second ledger nothing has observed.
+A ledger deleted by a racing session mid-operation MUST be treated as replaced rather than failed: claim creation, receipt writes and prepare-token persistence MUST retry against the surviving ledger after relisting.
+Because the claim page lives inside the ledger it was created on, a retry that lands on a replacement has lost the lock, so the command MUST re-acquire its claim there.
+A command MUST NOT run on holding no claim on the ledger it is writing to: a re-acquisition that fails before the handler MUST refuse, and one that fails after it MUST settle as recovery-required.
+Explicit setup remains available as an idempotent ensure that returns the existing ledger rather than refusing it.
+
+The ledger holds durable request outcomes and one-use prepare tokens; an embedded JournalEntryPage with a fixed ID and `keepId` arbitrates the global execution claim.
+`keepId` is load-bearing: without it the server discards the fixed ID silently, and the cross-browser lock stops existing rather than failing.
+A claim MUST NOT expire on age alone, because an interrupted operation may already have produced irreversible effects.
+Its standing is judged from the REQUEST it guards, read from the ledger's own durable request state, within a bounded live window derived from the command timeout a caller itself waits before treating a reply as unknown.
+Inside that window the claim is live and `claim-held` is the correct, honest refusal.
+Past it the active GM MUST release a claim whose request is `settled`, `abandoned` or `reconciled`, or whose request was never recorded at all, because the operation it guarded provably finished or never began and the claim only leaked; that release is automatic, requires no console call, and MUST happen during boot recovery so a world already holding a leaked claim heals itself.
+Every other case MUST retain the claim and MUST keep requiring `reconcileJournalRunAuthority` — an uncertain effect, an unreadable acquisition stamp, an unknown status, and in particular a still-`processing` request whose holding session can no longer be running it, whose effect may be half applied.
+Only the elected GM releases; another realm judges the same claim for its own availability and writes nothing.
+An automatic release MUST be confined to the provably-leaked case, because releasing a claim that should have been kept is a data-integrity failure and is worse than the block it removes.
+
+Releasing a claim MUST confirm it server-side before dispatching the delete, through the same authoritative read the ledger arbitration uses, scoped to the one ledger.
+The embedded page collection is broadcast-fed and can still show a claim the server has already removed, and a delete naming an absent ID raises a user-visible Foundry notification that no caller can suppress, because the socket layer reports the error before it rejects the promise.
+A claim the server no longer holds MUST be reported as released rather than refused, which is what reconciliation already reports for that same state, while a claim that survived its delete MUST still report failure and a page another claim ID holds MUST NOT be deleted by any caller.
+The acquire keeps the duplicate embedded-`_id` rejection, which alone resolves the simultaneous-acquire race atomically, because ordinary contention never reaches it: a live claim is refused as `claim-held` before any create is dispatched.
+This arbitration and the execution journal are not a transaction across Foundry document writes, macros and publications, and MUST NOT be described as atomic execution or automatic rollback.
+
+Boot reconstruction MAY scan orphaned execution journals only under an exclusively acquired claim when no prior claim exists.
+An ordinary observing-client refresh MUST NOT reconstruct a potentially live execution.
+For a retained claim, `reconcileJournalRunAuthority({ claimId, disposition })` requires the active GM, the exact claim ID and a disposition of `reconciled` or `abandoned`.
+It MUST reconstruct that claim's matching execution evidence and durably record the disposition before releasing the claim.
+Reconciliation releases the authority claim only; the prior request remains non-replayable and any uncertain run effect remains recovery-required.
+A retained claim can block other versioned runs, and its availability reason MUST remain visible.
+The GM affordance that clears a retained claim MUST be offered wherever a GM views a live run while a claim is RETAINED, whichever run that is and whatever reason that run itself reports — the run holding the uncertain effect included, whose own evidence names its block.
+A LIVE claim offers no such affordance, because a command is still running and waiting is the only answer, and no viewer who may not reconcile is ever offered one.
+
+A published availability answer is a cached derivation, not a fact a surface may hold indefinitely.
+A refusal is true while it holds and MAY be published freely, but when it LIFTS the authority MUST announce the lift, because that is the moment every reading taken of it became false.
+A surface that captured a refusal MUST re-derive on that announcement, so a refusal naming a claim can never outlive the claim it names.
+This MUST NOT be implemented by polling or by re-deriving on every read.
+
+A refusal raised by an in-memory lifecycle guard before any document write MUST be reported as a refusal and MUST release its claim, even when the operation had already redeemed a mutating execution grant: redemption records intent, not an applied effect.
+An operation that fails by throwing remains uncertain, MUST retain its claim, and MUST stay recovery-required until reconciliation.
+The recovery rule MUST NOT be widened beyond the provable pre-write case, because releasing a genuinely half-applied effect is worse than the block it removes.
+
+Command replies MUST use transport-level recipient routing as well as attested-GM and recipient/session/request/run/revision correlation.
+The private ledger MUST NOT be copied into actor flags or reply payloads.
+Initial prompt redaction MUST use the initiating viewer's current entitlement before returning protected identity, image, formula, DC or modifier information.
+Post-commit evaluated-roll handoff MUST independently recheck entitlement against the current actor, viewer and run; that later check cannot protect an already-disclosed initial prompt.
+Secret checks MUST use generic local prompts, GM private posting and sanitized transition replies without serialized roll data.
+Non-secret entitled handoffs carry already-evaluated roll data for initiating-client posting, never client-supplied authoritative totals or awards.
+
 ## CraftingRun
 
 ### Purpose
@@ -3047,8 +3170,34 @@ CraftingRunStepState = {
 
   selectedIngredientSetId?: string,
 
-  // START-phase consumption snapshot for a time-gated step, written when the gate is ARMED
-  // and read at FINISH (source items are already deleted) and by the cancel reversal.
+  // Versioned current-stage intent; validated again against live requirements before spending.
+  selectionPlan?: {
+    selectedIngredientSetId: string | null,
+    ingredientOptionOverrides: Record<string, { optionIndex: number, heldItemId?: string }>,
+    ingredientEssenceAllocation?: {
+      stepId: string,
+      ingredientSetId: string,
+      allocation: Record<string, number>, // physical item key -> units
+    },
+  },
+  selectedRequirementSnapshot?: object, // full selected authored set, including route/currency/tag/essence
+
+  // Optional permitted historical meaning and purpose; never a live narrative lookup.
+  resolutionSnapshot?: { kind: "check" | "ingredients" | "none", mode: string },
+  presentationSnapshot?: { name: string, description: string },
+  currencySpends?: Array<{ unit: string, amount: number }>, // applied settledSpends only
+  essenceSpend?: {
+    labels: Record<string, string>, // essenceId -> captured label
+    carriers: Array<{
+      actorUuid: string | null, itemUuid: string, quantity: number,
+      name: string | null, img: string | null,
+      contributions: Array<{ essenceId: string, amount: number }>,
+    }>,
+  },
+
+  // START-phase consumption snapshot for a time-gated step, written when the stage STARTS
+  // and read at resolution (source items are already deleted) and by the cancel reversal.
+  // Its presence is what makes a versioned stage STARTED, and therefore locked.
   // Absent for instant / non-timed steps and on pre-snapshot historical records.
   preparedConsumption?: {
     selectedIngredientSetId: string | null,
@@ -3059,9 +3208,13 @@ CraftingRunStepState = {
       itemUuid: string | null, actorUuid: string | null, quantity: number,
       name: string | null, img: string | null, componentId: string | null,
     }>,
+    // Versioned only: the rehydratable consumed-item snapshots the resolution rebuilds
+    // its essence transfer, awards and history from, and the captured carrier spending.
+    consumedSnapshots?: Array<object>,
+    essenceSpend?: { labels: object, carriers: Array<object> },
   },
 
-  // Authored ingredient requirements snapshot, captured at run creation (`_buildStepStates`).
+  // Legacy authored ingredient requirements snapshot, captured at run creation (`_buildStepStates`).
   // Component-backed ingredients of the step's primary (first) ingredient set only; tag /
   // essence requirements carry no component id and are omitted. Persisting the stable ids
   // keeps a history entry's requirements intact after the recipe is later edited or deleted.
@@ -3097,6 +3250,7 @@ CraftingRunStepState = {
     itemUuid: string | null,
     quantity: number,
     componentId: string | null,
+    toolId?: string | null, // recorded library reference, not physical Item identity
     broken: boolean,
     // checkDriven-only evidence:
     authority?: string,
@@ -3135,6 +3289,31 @@ CraftingRunStepState = {
    It is a **complete** map over every key in `resolvedEssences`, not only the disabled ones, because run persistence is a flag merge that cannot delete a key inside a surviving run and an omitted key would resurrect with its old value.
    An ABSENT map — a run armed before the field existed — reads as all-enabled.
    A collapsed multi-step chain has no such snapshot at all, because it consumes nothing when its single gate is armed and executes every step live at maturity; it therefore evaluates enabled-ness at maturity, consistent with its already-live essence resolution.
+
+#### Optional historical evidence
+
+Versioned stage arming captures `presentationSnapshot` from the authoritative execution step when the initiating viewer may see the recipe.
+For an implicit single stage whose wrapper has no description, the permitted recipe description supplies that captured purpose.
+Its first permitted name and description remain unchanged through execution and completion; later narrative edits do not rewrite history or require whole-Journal invalidation.
+`resolutionSnapshot` captures effective resolution meaning, with the executed meaning retained at completion and across an applied-prefix reload.
+The canonical active-check resolver determines `kind: "check"`; an unchecked ingredient-routed stage records `"ingredients"`, and another confirmed unchecked stage records `"none"`.
+Actual rolls remain in `lastCheckResult` and selected route identity and authored thresholds remain in `selectedRequirementSnapshot`.
+Neither snapshot duplicates check formula, DC or modifier configuration.
+
+The consumption receipt captures each actor-qualified carrier's source contributions before source deletion can prevent later reads.
+`essenceSpend` retains one row per physical `(actorUuid, itemUuid)` carrier, its actual consumed quantity and every recorded essence contribution; spent totals are derived from those contributions rather than stored again.
+Applied-prefix reconstruction hydrates this evidence, and both successful and failed stage finalization retain it through the manager's persistence allowlist.
+`currencySpends` copies applied `settledSpends` only; prepared intent and an Item Piles deducted boolean are not itemized spend evidence.
+Legacy timed `preparedConsumption.currencySpends` remains a valid settled receipt.
+Missing optional evidence stays absent in persistence and projects as `null` (Not recorded), while an explicitly recorded empty array or empty carrier list establishes zero.
+Legacy records gain no retrospective mode, presentation or contribution data from the current catalogue.
+
+New evidence is allowlisted before actor-flag or receipt persistence and independently gated by viewer entitlement before projection.
+New historical enrichments require an affirmative current-viewer access evaluation or an explicit GM viewer; absent, throwing or indeterminate evaluators MUST withhold them, and actor ownership is not disclosure authority.
+Versioned consumption MUST receive an object whose UUID matches the consumed Item from the actual delete/update operation before recording positive consumption/contribution receipts or allowing subsequent awards.
+A veto or unconfirmed write, including after a successful prefix, leaves the invoked batch uncertain and recovery-required without replay or automatic rollback.
+Arming uses the attested initiating viewer and later GM execution resolves the run's recorded initiator, never ambient GM access as permission to expose protected identity.
+Opaque records omit these new snapshots and contribution evidence; arbitrary document flags, private formula/DC, modifier configuration and GM-only component configuration do not enter the allowlist.
 
 ## Actor Flags
 
@@ -3274,13 +3453,15 @@ Define the unified, UI-safe projection the player-facing Journal screen reads (s
 It is a **derived, computed view**, not a persisted entity: there is no new actor flag or `CraftingSystem` field, mirroring the System Validation Report's derived-view contract.
 `RunJournalBuilder` recomputes it on demand from the selected actor's three native run sources — `craftingRuns` (see _CraftingRun_ / _CraftingRunStepState_), `salvageRuns`, and `gatheringRuns` — projecting each native run into a single superset `RunModel`.
 Crafting runs populate the step fields; gathering and salvage carry no steps.
-Like the gathering listing it never returns raw Foundry documents: every model is built from cloned primitives, so the Journal monitors and (crafting only) advances _existing_ runs without creating them.
+Like the gathering listing it never returns raw Foundry documents: every model is built from cloned primitives, so the Journal monitors existing runs without creating them.
+The action projection supports versioned crafting and gathering commands while preserving legacy crafting advance, legacy gathering automatic completion and salvage behavior.
 
 ### JournalListing
 
 ```js
 JournalListing = {
   selectedActorId: string | null,
+  selectedActorUuid: string | null,
   actor: object | null,                 // UI-safe actor option (image, name, id)
   worldTime: number,                    // current world time used for readiness derivation
   activeRuns: RunModel[],               // projected non-terminal runs
@@ -3294,9 +3475,21 @@ JournalListing = {
 ```js
 RunModel = {
   id: string,
+  key: string,                          // JSON-encoded actor UUID / native run type / run ID
+  actorUuid: string | null,
   runType: "crafting" | "salvage" | "gathering",
+  activityKind: "crafting" | "alchemy" | "salvage" | "gathering",
+  lifecycleContract: "legacy" | "current" | "unsupported",
+  lifecycleVersion: number | string | boolean | null,
+  runRevision: number,
+  completionMode: "manual" | "worldTime",
+  pauseState: { pausedAt: number, remainingSeconds: number } | null,
+  pausedDurationSeconds: number,
+  actions: { execute, pause, resume, setCompletionMode, beginStep, atStageStart, setSelection, cancel, dismiss, disabledReason },
+  awaitingChoice: boolean,               // the stage cannot proceed until this viewer chooses
+  recoveryEvidence: { status, required?, appliedEffectCount, effectCount, effects, uncertainEffectIndex } | null,
   status: string,                        // the native persisted status, passed through verbatim
-  derivedStatus: "waiting" | "ready" | "inProgress" | "succeeded" | "failed" | "cancelled",
+  derivedStatus: "paused" | "waiting" | "ready" | "inProgress" | "succeeded" | "failed" | "cancelled",
   craftingSystemId: string | null,
   craftingSystemName: string,
   names: { title: string, subtitle: string },
@@ -3304,7 +3497,7 @@ RunModel = {
   img: string,
   stepIndex: number | null,
   stepCount: number,
-  multiStep: boolean,                    // crafting only: the recipe has more than one step (false for single-step and non-crafting)
+  multiStep: boolean,                    // active crafting: enabled recipe structure; terminal crafting: more than one recorded attempt
   isFinalStep: boolean,                  // crafting only: the run is on its last step (single-step, or the last step of a multi-step recipe)
   stepLabel: string,                     // "" for single-step, gathering/salvage, and redacted crafting runs
   steps: StepModel[],                    // [] for gathering/salvage and for redacted crafting runs
@@ -3314,24 +3507,28 @@ RunModel = {
   updatedAt: number | null,
   finishedAt: number | null,
   structureLabel: string,                // localized single-step vs multi-step label (crafting only)
-  resolutionModeLabel: string,           // localized player-facing mode label (crafting only)
+  resolutionModeLabel: string,           // crafting: active mode or recorded terminal mode; unknown terminal mode is empty
   recipeId: string | null,               // null for non-crafting and redacted runs
   taskId: string | null,                 // gathering/salvage task reference
   flavor: string,
   failureReason: string | null,
-  createdResults: Array<{ componentId, itemUuid, quantity, name, img }>,
+  createdResults: Array<{ actorUuid, componentId, itemUuid, quantity, name, img }>,
+  createdResultsRecorded?: boolean,      // gathering/salvage receipt presence; crafting keeps this per stage
   createdResultCount: number,
+  craftingYield: object | null,          // current-stage authored preview, never an actual award
+  gatheringYield: object | null,         // permitted mode-specific preview and recorded roll evidence
   manualAdvance: boolean,                // true for every crafting run (the Trigger Next Step gate); redaction does not suppress it
-  canCancel: boolean,                    // crafting only: true when the run is live (non-terminal) and the viewer OWNS the actor — a player may self-cancel only their own in-progress craft, redacted or not
-  refundOnCancel: boolean,               // mirrors the system's features.refundOnPlayerCancel (default true), so the cancel affordance can tell the player whether inputs will be returned
+  canCancel: boolean,                    // crafting compatibility alias of actions.cancel, including lifecycle refusals
+  refundOnCancel: boolean,               // legacy refund policy; versioned cancel retains completed spending
 }
 ```
 
-A **player self-cancel** removes an in-progress crafting run (archived to history as `cancelled`), produces nothing, and discards any rolled check outcome so the recipe becomes craftable again.
+A **legacy player self-cancel** removes an in-progress crafting run (archived to history as `cancelled`), produces nothing, and discards any rolled check outcome so the recipe becomes craftable again.
 It is owner-scoped with no GM relay (the engine writes items directly), so the cancel edge blocks a non-owner exactly as the advance edge does.
 When the system's `features.refundOnPlayerCancel` policy is on (default), the reversal restores each consumed ingredient onto its recorded source actor and refunds the spent currency (the shared "un-consume" primitive, reused by the GM cancel/reverse); when off, the inputs are forfeit.
 The reversal is best-effort and reports the actual outcome — a partial or failed restore does not falsely report the inputs as returned, and the run is still archived so it can never be re-cancelled (which would double-restore).
 The currency refund is attempted for EVERY recorded group even when one fails, and its result distinguishes a full refund, a partial refund, and a total failure, because "one terminal base unit returned, another failed" and "nothing returned" require different operator responses.
+Versioned cancellation instead preserves completed-stage spending, awards and check evidence, forfeits elapsed time, and leaves unconsumed materials alone through the authoritative command boundary.
 
 ### StepModel
 
@@ -3344,9 +3541,9 @@ StepModel = {
   timeGate: object | null,
   detail: {
     requiredSeconds: number | null,
-    primaryToolName: string | null,
-    toolNames: string[],
+    tools: Array<{ id: string | null, name: string, img: string | null }>, // every REQUIRED tool; a step has no "primary" one
     checkLabel: string | null,           // rollFormula + resolved DC; no skill name (none is stored)
+    checkKind?: "check" | "none" | "unknown", // active disclosed configuration; omitted from terminal detail
     failureText: string | null,
   },
   lastCheckResult: {
@@ -3360,8 +3557,34 @@ StepModel = {
   } | null,
   // The step's authored required ingredients (persisted snapshot) and the items it
   // actually consumed, each a UI-safe result row. `[]` when absent or for a redacted run.
-  requirements: Array<{ componentId, itemUuid, quantity, name, img }>,
-  consumedIngredients: Array<{ componentId, itemUuid, quantity, name, img }>,
+  requirements: Array<{ actorUuid, componentId, itemUuid, quantity, name, img }>,
+  consumedIngredients: Array<{ actorUuid, componentId, itemUuid, quantity, name, img }>,
+  attempted: boolean, // completed/failed state or actual effects/checks, not startedAt alone
+  completedAt: number | null,
+  createdResults: Array<{ actorUuid, componentId, itemUuid, quantity, name, img }>,
+  createdResultsRecorded: boolean,
+  usedTools: Array<{ actorUuid, componentId, itemUuid, toolId, quantity, name, img, broken?, virtual?, spared?, skippedImmune? }>,
+  resolutionSnapshot: object | null, // allowlisted CraftingRunStepState shape above
+  presentationSnapshot: object | null,
+  essenceSpend: object | null,
+  currencySpends: Array<{ unit: string, amount: number }> | null,
+  selectionPlan: object | null,
+  selectedRequirementSnapshot: object | null,
+  requirementSnapshot: object | object[], // full selected-set snapshot, else legacy requirements
+  selectionAvailability: object | null,  // current-stage live solver projection only
+  craftingYield: object | null,          // current-stage authored output only
+  yieldPreview: object | null,           // entitled future-stage authored output, never historical awards
+  inputPreview: {                        // entitled future-stage authored inputs, never selection intent
+    source: "preview",
+    stageIndex: number,
+    routes: Array<{
+      id: string | null, name: string,
+      groups: Array<{
+        id: string | null, name: string,
+        options: Array<{ id, kind, name, img, icon, colorToken, need }>,
+      }>,
+    }>,
+  } | null,
 }
 ```
 
@@ -3369,14 +3592,79 @@ StepModel = {
 
 1. **`derivedStatus` is computed, never the persisted status.**
    A terminal `status` (`succeeded`, `failed`, `cancelled`) passes through to `derivedStatus` unchanged.
-   For a non-terminal run, readiness is derived from the active readiness gate's `availableAt`: `ready` when `availableAt <= worldTime`, otherwise `waiting`.
+   For a non-terminal run, a persisted pause takes precedence and projects `paused`; remaining time and progress use its frozen remainder even after the former gate deadline.
+   Otherwise readiness is derived from the active readiness gate's `availableAt`: `ready` when `availableAt <= worldTime`, otherwise `waiting`.
+   Progress on an unpaused gate is `requiredSeconds - (availableAt - worldTime)` over `requiredSeconds`, never elapsed wall time from `initiatedAt`.
+   Resuming re-anchors `availableAt` alone and leaves `requiredSeconds` and `initiatedAt` as authored, so only the deadline form carries the paused span; measuring from `initiatedAt` banks every paused second as work and reports a full bar beside a remaining-time label still counting down.
    A non-terminal run with no armed gate is `inProgress`.
-   The persisted `status` (e.g. a `waitingTime` that `processWorldTime` flips to `inProgress` asynchronously off the same world-time hook) is NEVER consulted for the active-run derivation — only the gate's `availableAt` against `worldTime` — so the readiness read is race-free.
+   Apart from terminal and pause precedence, the persisted `status` (e.g. a `waitingTime` that `processWorldTime` flips asynchronously) does not override the active gate's readiness.
    The `processWorldTime` write side (the salvage/crafting timed resume and its `_persist`/`setFlag` broadcast write) is **primary-GM-gated** (`game.users.activeGM?.id === game.user?.id`) so it fires exactly once even though `updateWorldTime` is a synced hook on every client — mirroring the gathering matured-run publication gate; a resume deferred while no GM is connected is caught up by the primary GM's startup `processWorldTime` pass.
+
+2. **Selection intent and live feasibility stay distinct from history.**
+   Current-stage availability MUST name the selected ingredient set and available routes, preserve stale set/option/item references as blocked, and never silently substitute a surviving route or option.
+   Explicit route changes replace scoped option overrides and essence allocation.
+   Each candidate MUST carry its own required amount and canonical solver feasibility against the whole stage's shared physical stock, including other fixed, choice and essence claims.
+   A stale selection MUST remain explicitly repairable even when only one option survives.
+   Waiting on a CHOICE and waiting on STOCK are separate states and MUST NOT be collapsed: a plan that does not resolve while nothing it names is short is waiting on a pick, and a finite `have < need` is waiting on an acquisition.
+   An essence requirement the carrier ledger can cover is an allocation the player may still redistribute and therefore a choice; one it cannot cover is a shortfall.
+   `awaitingChoice` reports the first of those, and only for a viewer who may act on it: an unpaused, unstarted current stage of their own live current-contract crafting run.
+   A started stage holds the choice it locked and a paused run holds the choices it already made, so neither is waiting on one.
+   **No control may be offered in a state where the command behind it refuses.**
+   The projection and the stage commands MUST answer readiness from ONE shared predicate rather than classify it independently, so an enabled control and the command's disposition cannot disagree.
+   That predicate names an unmade choice, a physical material shortfall, an essence gap the carrier ledger cannot cover, a price the actor cannot pay, and a required tool the actor does not hold, and both `actions.beginStep` and `actions.execute` MUST stay refused while any of them holds.
+   Affordability MUST be asked of the whole selection AGGREGATED onto the common base unit, as the engine's own gate asks it, not option by option: two currency ingredients each affordable alone but not together are not affordable.
+   The tool probe MUST exclude the items the selection will spend, as the engine's tool validation does, because one physical Item cannot be both a consumed ingredient and a held tool.
+   Two causes are knowable only asynchronously and so remain the engine's alone: a `macro` spend strategy, whose affordability only the macro can answer, and an Item Piles currency cost read through that module's API.
+   The projection stays OPTIMISTIC on both rather than inventing a refusal it cannot substantiate.
+   A stage's inputs are spent and its choice is locked when it starts, so a started stage is re-judged only on what is still re-validated live: its tools, which are never consumed and which a sale during the wait can remove.
+   The player's own pick MUST be judged on the PERSISTED plan, not on the resolver's verdict: the resolver invents a greedy option and a suggested essence allocation when neither is persisted and then reports success, so a stage whose multi-option group or essence allocation is unrecorded is waiting on a choice however well its inputs resolve.
+   Which control renders — the begin decision in place of the resolve action, or the resolve action itself — is decided by `actions.atStageStart` alone, never by `actions.beginStep` being truthy nor by matching `actions.disabledReason`: a refused cause at a stage's start boundary MUST keep the (disabled) begin control on screen rather than silently fall back to an enabled resolve action the command would refuse.
+   An untimed stage has no separate start boundary to withhold the begin control instead, so `actions.execute` MUST itself stay refused for the same causes.
+   `actions.disabledReason` reports the cause in its own words — `routeRequired`, `choiceRequired`, `selectionRequired`, `essenceRequired`, `currencyRequired`, `toolRequired` or `sourcesUnavailable` — and they MUST NOT be conflated, because an essence gap, a price and a missing tool are different problems with different fixes and none of them is "choose a route".
+   `sourcesUnavailable` is the run whose recorded component source actors no longer resolve: the engine refuses it outright, so the projection MUST report that rather than judging the stage against the crafting actor's inventory alone and naming whatever shortfall THAT inventory shows.
+   The two PICK causes are themselves distinct: `routeRequired` is the one decision a stage with more than one authored ingredient set opens, and `choiceRequired` names the option picks and essence allocation made WITHIN the route already taken, so a player on a single-route stage is never told to choose a route that has one value while the real gap is an allocation.
+   Both report `awaitingChoice`, because either way what the run is waiting on is the player's own decision, and both read as guidance rather than as a refusal.
+   A live stage's tool rows MUST state whether each tool is held, because a tool the stage lacks is a cause it is refused for.
+   A started stage whose locked route no longer resolves has no pick left to make and MUST NOT be reported as waiting on a choice it has no control to make; it reports the recipe edit (`routeUnavailable`) and keeps cancellation as its way out.
+   Alchemy check labels and completion-mode eligibility MUST use the canonical active-check resolver: none has no check, simple reads the simple slot, and tiered reads the routed slot.
+
+3. **Versioned actions are explicit capabilities.**
+   Unsupported versions MUST remain readable without inheriting legacy mutation fallbacks.
+   Authority, owner, pause, execution/recovery and check eligibility MUST govern the exposed capabilities; raw manual-advance flags cannot override a refusal.
+   User-specific terminal dismissals filter the composite key before counts without deleting native history.
+
+4. **Stage browsing is not execution.**
+   Browsing MUST NOT mutate the persisted step index or selections.
+   Inactive stages retain selected-set requirements or legacy array requirements alongside actual consumption, rolls and failures.
+   An unexecuted stage in a cancelled or failed run MUST NOT be presented as completed merely because it is before the browse anchor.
+   Terminal historical evidence retains every attempted stage's consumed inputs, created results, used tools and completion timestamp separately.
+   A future stage's entitled authored input preview MUST retain all requirement kinds, every option and all routes separately from selectedRequirementSnapshot; projecting it MUST NOT select, consume or persist future intent.
+   Confirmed empty arrays and recorded zero quantities MUST remain distinct from absent evidence or unknown quantities.
+   `attempted` requires an explicit succeeded/failed state, actual check or actual effect evidence; a manager-initialized next step's `startedAt` does not establish an attempt.
+   Terminal `multiStep` counts recorded attempts rather than consulting later recipe structure or system feature edits.
+   Terminal mode labels use captured resolution only, and terminal check/time detail does not consult live check configuration.
+   Captured material names take precedence over synchronous item-UUID resolution, then real component-ID resolution for a permitted reference.
+   Result rows retain `actorUuid`; absent names and quantities remain `null`, never the string `"null"`, a fabricated unit quantity or a zero roll.
+   A legacy timed consumed summary remains historical input evidence before and after finalization.
+   Historical tool enrichment MUST require affirmative current-viewer entitlement, with explicit GM access permitted.
+   The projection MUST preserve recorded actor and Item UUIDs, tool id, nullable quantity and the presence of recorded boolean state fields; absence MUST remain unknown rather than an inferred intact state.
+   Captured name and image MUST win over fallback metadata.
+   After the existing recorded-Item and actual component-reference lookups, the tool lookup MAY fill only missing name or image from the recorded tool id; unavailable or deleted tool definitions MUST retain unknown/default presentation.
+   Current tool metadata MUST NOT invent physical identity, quantities or historical state.
+   Presentation MAY group occurrences only by a recorded actor-qualified Item address whose optional actor qualifier agrees, retaining all stage-associated quantities and affirmative states in first-occurrence order without summing repeated uses.
+   Virtual tools and missing or contradictory identities MUST remain separate occurrences.
+
+5. **Recovery evidence is allowlisted, not a raw execution journal.**
+   The projection MUST retain ordered effect phases, known receipt presence, safe actual item/currency receipt rows for entitled viewers, and the index of the applying effect as an uncertain boundary.
+   Planned effects MUST be distinguished from confirmed and uncertain effects; unconfirmed receipt payloads MUST NOT be displayed as awards.
+   Raw intent, plans, document snapshots, arbitrary receipt properties, chat, formula and protected identity data MUST NOT pass through this projection.
+   Redacted crafting and opaque blind gathering retain generic recovery progress without receipt identities; recovery does not grant additional disclosure or replay permission.
 
 ### Startup Maintenance Passes
 
-The housekeeping passes `Fabricate#initialize` runs — `CraftingRunManager.cleanupInvalidRuns`, `CraftingRunManager.pruneInstantaneousActiveRuns`, `SalvageRunManager.cleanupInvalidRuns`, and `RecipeVisibilityService.cleanupLearnedRecipes` — drop run and learned-knowledge entries that name deleted content.
+The housekeeping passes `Fabricate#initialize` runs remove invalid references and legacy instantaneous phantom runs through their respective cleanup methods.
+`CraftingRunManager.pruneInstantaneousActiveRuns` MUST inspect legacy records only: valid version-1 instant runs can await manual execution, and unsupported present versions are preserved rather than treated as legacy phantoms.
+Removing an authored time requirement likewise MUST NOT cause this legacy pruning pass to delete a versioned run.
 They are governed by two rules that are deliberately DIFFERENT from the `processWorldTime` gate above (issue 970).
 
 **Write scoping.** Each pass walks only the actors the CURRENT client may update (`selectWritableActors`, keyed on `Actor#isOwner`), not all of `game.actors`.
@@ -3400,20 +3688,35 @@ The GM-only cascade walkers (`removeRunsForSystem`, `removeRunsForComponent`, an
    Gathering re-maps its native `*WorldTime` fields (`startedAtWorldTime` / `updatedAtWorldTime` / `completedAtWorldTime`) onto the common `startedAt` / `updatedAt` / `finishedAt`; salvage already uses the crafting `startedAt` / `updatedAt` / `finishedAt` names.
 3. **Viewer redaction (`redacted`).**
    For a non-GM viewer, a crafting or alchemy run whose recipe the viewer cannot see — a recipe that no longer resolves, or an undiscovered alchemy / knowledge-gated crafting recipe — is redacted: `redacted: true`, `names.title` becomes the generic localized label (`FABRICATE.App.Journal.Redacted.Title`), `recipeId` is `null`, `steps` / `createdResults` / `failureReason` / `stepLabel` are blanked, and `img` falls back to the default run image.
-   Redaction hides IDENTITY ONLY and is NOT an authorization gate (issue 966): `manualAdvance` and `canCancel` are unaffected by it, so an owner can still finish and abandon a redacted run.
+   Redaction is NOT an authorization gate (issue 966): an owner retains actions permitted by the lifecycle, while authority, pause, unsupported-version and execution/recovery refusals still apply.
    The GM bypass precedes the missing-recipe guard: a GM viewer is never redacted, even for a run whose recipe no longer resolves, so the GM still sees the run's persisted step snapshots (requirements, roll, consumed items) rather than a redacted empty card.
    Globally-visible recipes are likewise never redacted; with no recipe-visibility service available no redaction occurs.
    This mirrors the gathering blind-run redaction (the gathering listing builder), so the Journal never leaks a hidden crafting/alchemy recipe identity to a non-GM viewer.
    Gathering and salvage runs are not redacted by this projection (`redacted: false`); gathering's own blind-task redaction is applied upstream by its listing builder.
 4. **Step projection is crafting-only.**
-   `steps`, `currentStep`, `structureLabel`, `resolutionModeLabel`, `multiStep`, `isFinalStep`, each step's `detail.checkLabel`, and each step's `requirements` / `consumedIngredients` are populated for crafting runs only; gathering and salvage project `steps: []`, `currentStep: null`, empty structure/mode labels, and `multiStep: false` / `isFinalStep: false`.
-   A step's `requirements` come from its persisted snapshot and `consumedIngredients` from the persisted consumed refs; both resolve name/img via the same shared result mapper (consume-time capture, then the item-uuid and component-id fallbacks), so a deleted consumed item still labels from its captured or component name.
+   `steps`, `currentStep`, `structureLabel`, `multiStep`, `isFinalStep`, each step's `detail.checkLabel`, and each step's `requirements` / `consumedIngredients` are populated for crafting runs only; gathering and salvage project `steps: []`, `currentStep: null`, empty structure labels, and `multiStep: false` / `isFinalStep: false`.
+   Gathering's permitted mode-specific yield projection supplies its Direct, d100 or Check label independently of crafting step fields.
+   A step's `requirements` come from its persisted snapshot and `consumedIngredients` from the persisted consumed refs.
+   Historical consumption enrichment MUST clone rows and preserve captured nonempty name/image, physical identity, quantity, order and stage association.
+   Missing metadata MUST use consistent same-stage prepared summaries by exact actor-qualified Item UUID, then permitted exact live Item metadata, then consistent earlier entitled historical Item metadata, then scoped-component metadata only where a genuine component reference exists.
+   Conflicting nonempty candidates at a fallback level MUST leave that field unknown rather than proceed to weaker evidence.
+   A contradictory actor qualifier, bare id, UUID tail, name, image, requirement or array position MUST NOT establish physical identity.
+   Historical metadata sources MUST be currently entitled, earlier terminal legacy reported receipts or applied versioned receipts; planned versioned effects MUST NOT qualify.
+   Equal world-time timestamps MAY use the native newest-first terminal ledger's earlier suffix to establish chronology, but MUST NOT use display sorting or an unrelated collection's order.
+   Historical metadata fallback MUST NOT copy quantities or operational state, write actor flags, or claim new consume-time capture.
+   Recorded gathering yield MUST expose `rollModel: shared | perRow | unknown`, `roll: number | null`, per-row `rawRoll`, `effectiveRoll`, `threshold`, `cleared` and `qty`, and `unattributedAwardIndexes` into its actual receipt list.
+   Quantity attribution MUST prefer explicit row linkage, then exact scoped component identity, then proven full source identity through retained registered, origin or alias Item UUIDs.
+   Only equivalent simple Item compendium addresses with and without the explicit `Item` segment MAY normalize together within history matching; pack, document type and embedded ancestry MUST remain distinct.
+   Conflicting explicit linkage MUST NOT fall back to a weaker match, and an award MUST contribute to exactly one selected row or remain unattributed.
+   Multiple uniquely linked receipts MAY sum for one row; missing or invalid receipt quantities MUST remain unknown, and authored quantities or proportional division MUST NOT replace them.
    A redacted crafting run also projects `steps: []` (its requirements / consumed items never leak).
-   `multiStep` is `recipe.steps.length > 1`; `isFinalStep` is `stepCount <= 1 || currentStepIndex >= stepCount - 1` (true on a single-step recipe or the last step of a multi-step recipe, and — harmlessly, since a terminal run drives no action — on any terminal run whose `currentStepIndex` is null).
+   Active `multiStep` follows the enabled multi-step feature and `recipe.steps.length > 1`; terminal `multiStep` follows recorded attempts as specified above.
+   `isFinalStep` is `stepCount <= 1 || currentStepIndex >= stepCount - 1` for an active run; terminal records drive no execution action.
    `stepLabel` is a localized "Step X of Y" string only for a non-redacted multi-step crafting run; it is `""` for a single-step recipe (the structure label already conveys the single-step shape) and for a redacted run (so a hidden multi-step recipe never leaks its step count or active step name).
-5. **`manualAdvance` states what the run TYPE needs, not what the viewer may do.**
-   It is `true` for every crafting run — including a redacted one (issue 966) — and `false` for gathering, salvage, and recipe-less alchemy fizzle history entries, which resolve off the world-time hook or are terminal.
-   Authorization belongs to the advance seam (`resolveAdvanceSources`), not the projection; the player-facing advance contract is defined in `recipes-and-steps/spec.md` (_Run Progression — Player-Initiated Advance_).
+5. **`manualAdvance` is a legacy compatibility signal, not a versioned capability.**
+   It is `true` for crafting runs — including redacted ones (issue 966) — and `false` for gathering, salvage and recipe-less alchemy fizzle history entries.
+   Versioned gathering can nevertheless expose manual collection through `actions.execute`; every versioned mutation obeys the authoritative capability/refusal contract rather than this flag.
+   Legacy authorization belongs to the advance seam (`resolveAdvanceSources`); versioned authorization belongs to the active-GM command boundary.
 6. **`resolutionModeLabel` uses the player-facing label map.**
    It resolves through the localized mode-label map defined in `resolution-modes/spec.md` (_Player-Facing Mode Labels_) and never emits the raw `resolutionMode` token.
 7. **`counts.active` feeds the nav badge.**
@@ -3850,7 +4153,7 @@ A step failure is handled entirely by the engine's failure-consumption policy; t
 
 ## Foundry Multi-Write Invariants
 
-When one Fabricate operation uses multiple separate sequential Foundry settings, flag, or document API calls to establish one invariant, it MUST treat the calls as a compensating transaction.
+When one Fabricate operation uses multiple separate sequential Foundry settings, flag, or document API calls to establish one invariant, it MUST treat the calls as a compensating transaction, except for the versioned execution-journal operations specified below.
 Equality of the primary setting, flag, or document value MUST NOT short-circuit the operation when an ancillary invariant may still require repair.
 
 Before the first write, the operation MUST snapshot the complete pre-state needed to restore every affected key or document, including whether each key existed separately from its stored value.
@@ -3862,6 +4165,10 @@ Tests MUST cover a same-primary-value call that repairs an unsatisfied ancillary
 
 This requirement applies only when the application composes separate sequential API calls into one invariant.
 A single Foundry atomic or batched document operation does not require application-level compensation merely because its one API call writes several documents or fields.
+
+Versioned execution-journal operations deliberately use durable intent, ordered effect phases and actual receipts instead of compensating rollback.
+An ambiguous effect requires manual recovery and must never be replayed automatically.
+The journal records the known applied prefix and uncertain boundary; the preceding compensation requirements continue to apply outside this versioned exception.
 
 **Reverse-compensating a delete cannot restore document identity.**
 Value and key presence are restorable; a document's `_id` and its `_stats` are not.
@@ -4053,9 +4360,10 @@ Closing the five stores over those four gates moves exactly one of them.
 `journal` already consumes every domain feeding all four gates — the recipe-access evaluation it reads for redaction is `access-and-knowledge` plus `held-inventory` for the owned-copy branch, both of which it consumes.
 `gathering` gains `resolution-config` and `materials-and-yield` from the system-validity gate, taking it from three domains to five.
 
-`journal`'s exclusion from `narrative` survives the closure, and is structurally robust rather than incidental: the run journal's redaction reads a single boolean off the access result, and the builder has NO prose-bearing output field at all — its three flavour fields are hardcoded empty literals and every other value it emits is a name, an image, a structural count or a boolean, so prose returned by a collaborator would have nowhere to land.
+`journal`'s exclusion from `narrative` survives the closure: its recipe-access evaluation consumes access facts, while its permitted stage-purpose prose comes from the run's captured `presentationSnapshot`, not the live authored description.
+The snapshot changes through run persistence, whose refresh path is independent of authored narrative invalidation.
 
-The single routing decision this taxonomy exists to make observable is that the run journal does NOT consume `narrative`: it reads no authored description anywhere.
+The single routing decision this taxonomy exists to make observable is that the run journal does NOT consume `narrative`: later authored description changes do not change captured purpose.
 A description-only edit therefore MUST NOT rebuild it, and that assertion MUST be made from a WARMED counter — a "did not rebuild" assertion against a cold fixture compares zero with zero and observes nothing.
 
 ## Summary Projections

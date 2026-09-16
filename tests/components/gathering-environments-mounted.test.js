@@ -102,6 +102,12 @@ describe('GatheringView mounted behavior', () => {
     tempRoot = mkdtempSync(join(tmpdir(), 'fabricate-gathering-'));
     symlinkSync(resolve(repoRoot, 'node_modules'), join(tempRoot, 'node_modules'), 'junction');
 
+    // Issue 1648: the authority-refusal wording GatheringView reads. A module the
+    // compiled tree imports but the temp tree lacks CANCELS this suite.
+    const reasonsDestination = join(tempRoot, 'src/ui/svelte/util/journalRunReasons.js');
+    mkdirSync(dirname(reasonsDestination), { recursive: true });
+    writeFileSync(reasonsDestination, readFileSync(resolve(repoRoot, 'src/ui/svelte/util/journalRunReasons.js'), 'utf8'));
+
     const utilDestination = join(tempRoot, 'src/ui/svelte/util/foundryBridge.js');
     mkdirSync(dirname(utilDestination), { recursive: true });
     writeFileSync(utilDestination, readFileSync(resolve(repoRoot, 'src/ui/svelte/util/foundryBridge.js'), 'utf8'));

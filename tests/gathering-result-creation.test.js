@@ -89,9 +89,9 @@ function capturingActor(items = []) {
     captured,
     uuid: 'Actor.a',
     items,
-    createEmbeddedDocuments: async (_type, dataArray) => {
+    async createEmbeddedDocuments(_type, dataArray) {
       captured.push(...dataArray);
-      return dataArray.map((data, i) => ({ ...data, uuid: `Actor.a.Item.new-${i}` }));
+      return dataArray.map((data, i) => ({ ...data, _source: structuredClone(data), parent: this, uuid: `Actor.a.Item.new-${i}` }));
     },
   };
 }
@@ -102,8 +102,11 @@ test('780: a registered-source award stamps the AUTHORED component id (not sourc
     uuid === REGISTERED_COMPONENT.registeredItemUuid ? REGISTERED_SOURCE_ITEM : null;
 
   const actor = capturingActor();
-  const resultGroups = [{ results: [{ componentId: REGISTERED_COMPONENT.id, quantity: 2 }] }];
-  await createGatheringResultCreator(managerWith(system)).create({ actor, system, resultGroups });
+  const resultGroups = [{ results: [{ componentId: REGISTERED_COMPONENT.id, quantity: 2, resultRowId: 'registered-row' }] }];
+  const [receipt] = await createGatheringResultCreator(managerWith(system)).create({ actor, system, resultGroups });
+  assert.equal(receipt.sourceItemUuid, REGISTERED_SOURCE_ITEM.uuid);
+  assert.notEqual(receipt.itemUuid, receipt.sourceItemUuid);
+  assert.equal(receipt.resultRowId, 'registered-row');
 
   assert.equal(actor.captured.length, 1, 'exactly one award item is created');
   const itemData = actor.captured[0];
@@ -197,6 +200,8 @@ test('780: the stack/existing.update branch stamps NO roles leaf (create-only)',
     system: { quantity: 3 },
     update: async (payload) => {
       updatePayload = payload;
+      existing.system.quantity = payload['system.quantity'];
+      return existing;
     },
   };
   const actor = capturingActor([existing]);
@@ -211,6 +216,38 @@ test('780: the stack/existing.update branch stamps NO roles leaf (create-only)',
   );
   assert.equal(existing.flags, undefined, 'the stacked item is never stamped with a roles map');
 });
+
+test('the real gathering creator retains per-row and per-run deltas on one reused stack', async () => {
+  const system = { id: SYSTEM_ID, components: COMPONENTS };
+  globalThis.fromUuidSync = (uuid) => uuid === REGISTERED_SOURCE_ITEM.uuid ? REGISTERED_SOURCE_ITEM : null;
+  const existing = { uuid: 'Actor.a.Item.stack', name: 'Owned Hide', _stats: { duplicateSource: REGISTERED_SOURCE_ITEM.uuid },
+    system: { quantity: 999 }, _source: { system: { quantity: 5 } },
+    async update(payload) { this._source.system.quantity = payload['system.quantity']; return this; },
+  };
+  const actor = capturingActor([existing]);
+  existing.parent = actor;
+  const creator = createGatheringResultCreator(managerWith(system));
+  const resultGroups = [{ results: [2, 3].map((quantity, index) => ({ componentId: REGISTERED_COMPONENT.id, quantity, resultRowId: `row-${index}` })) }];
+  const first = await creator.create({ actor, system, resultGroups });
+  const second = await creator.create({ actor, system, resultGroups });
+  assert.deepEqual(first.map((entry) => entry.quantity), [2, 3]);
+  assert.deepEqual(second.map((entry) => entry.quantity), [2, 3]);
+  assert.equal(existing._source.system.quantity, 15);
+  assert.equal(existing.system.quantity, 999, 'prepared data does not determine the delta');
+  assert.equal(actor.captured.length, 0);
+});
+
+for (const result of [[], undefined, [{ uuid: 'Actor.other.Item.wrong', quantity: 1 }]]) {
+  test(`the gathering creator refuses an unacknowledged create shape ${JSON.stringify(result)}`, async () => {
+    const actor = capturingActor();
+    actor.createEmbeddedDocuments = async () => result;
+    const system = { id: SYSTEM_ID, components: COMPONENTS };
+    globalThis.fromUuidSync = () => null;
+    await assert.rejects(createGatheringResultCreator(managerWith(system)).create({ actor, system,
+      resultGroups: [{ results: [{ componentId: SOURCELESS_COMPONENT.id, quantity: 1 }] }],
+    }), (error) => error.code === 'HISTORY_EFFECT_UNCERTAIN' && error.receipts.length === 0);
+  });
+}
 
 // ---------------------------------------------------------------------------
 // The award seam must never drop a result in silence.
