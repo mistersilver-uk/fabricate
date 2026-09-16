@@ -23,6 +23,26 @@ export const JOURNAL_RUN_CLAIM_PAGE_ID = 'FabRunAuthority1';
  */
 export const JOURNAL_RUN_CLAIM_LIVE_WINDOW_MS = 60_000;
 
+/**
+ * How long a task may WAIT FOR ITS TURN in the local queue before it refuses.
+ *
+ * Every authority command serialises through one promise chain, and nothing on it had a bound of
+ * its own: `sendCommand` times out, the queue did not. So a single task that never settled
+ * stopped every later command on that client forever, with no error and nothing on screen -- a
+ * Foundry that had simply stopped responding (issue 1759).
+ *
+ * Deliberately the same 15s as `JOURNAL_RUN_COMMAND_TIMEOUT_MS`, not the 60s claim window. A
+ * remote caller has already given up by then and been told `timeout`, so a task still queued
+ * behind the holder is waiting for a reply nobody wants; and the GM's OWN command takes no
+ * socket round trip, so this is the only bound it has. At 60s that is a minute of frozen
+ * Journal. The number is restated rather than imported so the ledger layer does not pull in the
+ * whole socket layer for one value; `tests/journal-run-authority.test.js` imports both and pins
+ * them equal, so they cannot drift apart silently.
+ *
+ * Refusing names the wait instead of hiding it, and the reason says which command holds the line.
+ */
+export const JOURNAL_RUN_QUEUE_WAIT_MS = 15_000;
+
 /** Statuses whose request is finished, so the claim guarding it can only have leaked. */
 const FINISHED_REQUEST_STATUSES = new Set(['settled', 'abandoned', 'reconciled']);
 
@@ -192,10 +212,13 @@ export function createJournalRunAuthority({
   reconstructExecutions,
   randomId,
   now = () => Date.now(),
+  queueWaitMs = JOURNAL_RUN_QUEUE_WAIT_MS,
   onAvailabilityRestored = null,
 }) {
   let localQueue = Promise.resolve();
   let cachedAvailability = { available: false, reason: 'ledger-missing' };
+  /** What currently holds the local chain, named in a `queue-timeout` so the wait is diagnosable. */
+  let queueHolder = 'idle';
   let recoveryReady = false;
 
   /**
@@ -334,10 +357,46 @@ export function createJournalRunAuthority({
     return structuredClone(record.binding.trustedContext ?? {});
   }
 
-  function queue(task) {
-    const scheduled = localQueue.then(task, task);
+  /**
+   * Serialise a task on this client's one authority chain, with a bound on WAITING for a turn.
+   *
+   * The bound covers the WAIT, never the task: a command that has started keeps running to its
+   * own settlement, because abandoning it mid-write is exactly the uncertainty the claim exists
+   * to record. A task that never gets to start refuses instead, so a wedged predecessor becomes
+   * a named reason on screen rather than a silent stall (issue 1759).
+   *
+   * One clock does both halves -- the timer that answers the caller is the same one that stops
+   * the task from starting afterwards. Two sources could disagree, and the disagreement would
+   * run a write after telling the player nothing had been changed.
+   *
+   * Every queued task names itself, and the name is taken at the moment it STARTS, so the
+   * `blockedBy` a refusal carries is the task actually holding the line. It needs no reset when
+   * the chain drains: a task reaching a free line starts on the next microtask, always ahead of
+   * a timer measured in seconds, so a `queue-timeout` can only ever be raised while something
+   * genuinely holds the line.
+   */
+  function queue(holder, task) {
+    const held = queueHolder;
+    const refuse = () => unavailable('queue-timeout', { blockedBy: held });
+    let abandoned = false;
+    let timer = null;
+    const waited = new Promise((resolve) => {
+      timer = setTimeout(() => {
+        abandoned = true;
+        resolve(refuse());
+      }, queueWaitMs);
+    });
+    const guarded = async () => {
+      // Its caller has already been answered "nothing was changed", so starting now would make
+      // that answer a lie. The turn is forfeit, not deferred.
+      if (abandoned) return refuse();
+      clearTimeout(timer);
+      queueHolder = holder;
+      return task();
+    };
+    const scheduled = localQueue.then(guarded, guarded);
     localQueue = scheduled.catch(() => {});
-    return scheduled;
+    return Promise.race([scheduled, waited]);
   }
 
   async function reconstruct(scope) {
@@ -451,7 +510,7 @@ export function createJournalRunAuthority({
   }
 
   function bootstrapRecovery() {
-    return queue(performBootstrapRecovery);
+    return queue('bootstrap-recovery', performBootstrapRecovery);
   }
 
   /**
@@ -531,7 +590,7 @@ export function createJournalRunAuthority({
   }
 
   function run(request, handler) {
-    return queue(async () => {
+    return queue(`command:${request?.requestId ?? 'unknown'}`, async () => {
       if (!activeGmMatches(currentUser?.(), activeGM?.())) {
         recoveryReady = false;
         await refreshAvailability();
@@ -661,7 +720,7 @@ export function createJournalRunAuthority({
   }
 
   function reconcile({ claimId, disposition }) {
-    return queue(async () => {
+    return queue(`reconcile:${claimId ?? 'unknown'}`, async () => {
       if (!activeGmMatches(currentUser?.(), activeGM?.())) {
         return unavailable('active-gm-required');
       }

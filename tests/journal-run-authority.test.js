@@ -5,6 +5,7 @@ import { describe, it } from 'node:test';
 import {
   JOURNAL_RUN_CLAIM_LIVE_WINDOW_MS,
   JOURNAL_RUN_CLAIM_PAGE_ID,
+  JOURNAL_RUN_QUEUE_WAIT_MS,
   createFoundryJournalRunAuthority,
   createJournalRunAuthority,
 } from '../src/systems/journalRunAuthority.js';
@@ -213,6 +214,7 @@ function sharedAuthorityWorld() {
       beforeCreate = null,
       beforeClaim = null,
       beforeWrite = null,
+      queueWaitMs = undefined,
     } = {}
   ) =>
     createJournalRunAuthority({
@@ -254,6 +256,7 @@ function sharedAuthorityWorld() {
       },
       randomId: () => `id-${++nextId}`,
       now: () => currentTime,
+      queueWaitMs,
       reconstructExecutions,
       onAvailabilityRestored,
     });
@@ -1172,6 +1175,20 @@ describe('journal run authority ledger', () => {
     );
   });
 
+  it('bounds the queue wait at the command timeout, not at the claim window', () => {
+    // Issue 1759. The two numbers answer different questions and must not be confused: the
+    // claim window asks how long a command may still be RUNNING, and is four times the command
+    // timeout so a slow command is never misjudged. The queue wait asks how long a command that
+    // has not started may go on WAITING, and past the point its caller gave up the answer is
+    // "no longer". A GM's own command takes no socket round trip, so this is its only bound --
+    // at the claim window it would be a minute of frozen Journal.
+    assert.equal(JOURNAL_RUN_QUEUE_WAIT_MS, JOURNAL_RUN_COMMAND_TIMEOUT_MS);
+    assert.ok(
+      JOURNAL_RUN_QUEUE_WAIT_MS < JOURNAL_RUN_CLAIM_LIVE_WINDOW_MS,
+      'waiting for a turn must give up sooner than a claim is judged dead'
+    );
+  });
+
   it('reaps a leaked claim and retains an uncertain one, at any age', async () => {
     const world = sharedAuthorityWorld();
     const authority = world.realm();
@@ -1573,5 +1590,65 @@ describe('journal run authority ledger', () => {
     assert.deepEqual(observed.byDocument, {}, 'the matching binding still redeems');
     assert.deepEqual(observed.first, {}, 'the exact binding redeems');
     assert.equal(observed.replay, null, 'and a consumed grant is never redeemable again');
+  });
+
+  it('refuses a command that never gets its turn, instead of waiting for one forever', async () => {
+    // Issue 1759. Every authority command serialises through ONE promise chain, and nothing on
+    // it had a bound of its own: `sendCommand` times out, the queue did not. So one task that
+    // never settled stopped every later command on that client permanently, with no error and
+    // nothing on screen. The maintainer met that as a Foundry that had simply stopped
+    // responding, and the Foundry smoke met it as a 28-minute timeout with no diagnosis.
+    const world = sharedAuthorityWorld();
+    const authority = world.realm('gm', { queueWaitMs: 25 });
+    let releaseWedge = null;
+    const wedged = authority.run(
+      { requestId: 'wedge', senderId: 'player', sessionId: 'one' },
+      () =>
+        new Promise((resolve) => {
+          releaseWedge = () => resolve({ success: true, ran: 'wedge' });
+        })
+    );
+    // Let the wedged command reach its handler, so it is genuinely HOLDING the line rather than
+    // merely queued ahead. Without this the refusal below could be the first task refusing
+    // itself, which would pass while proving nothing.
+    await Promise.resolve();
+
+    let blockedReachedHandler = false;
+    const blocked = await authority.run(
+      { requestId: 'blocked', senderId: 'player', sessionId: 'two' },
+      async () => {
+        blockedReachedHandler = true;
+        return { success: true };
+      }
+    );
+
+    assert.deepEqual(blocked, {
+      success: false,
+      reason: 'queue-timeout',
+      blockedBy: 'command:wedge',
+    });
+    assert.equal(blockedReachedHandler, false, 'a refused command writes nothing');
+
+    // The bound covers the WAIT, never the task: the command that had already started is left
+    // to settle on its own terms, because abandoning it mid-write is the exact uncertainty the
+    // claim exists to record.
+    releaseWedge();
+    assert.deepEqual(await wedged, { success: true, ran: 'wedge' });
+
+    // The refusal does not poison the client: once the line is free, commands run again. This
+    // also DRAINS the chain -- `after` is queued behind `blocked`, so its completion is proof
+    // that `blocked`'s turn has been and gone, which is what makes the next assertion real
+    // rather than a race the test happens to win.
+    assert.deepEqual(
+      await authority.run(
+        { requestId: 'after', senderId: 'player', sessionId: 'three' },
+        async () => ({ success: true, ran: 'after' })
+      ),
+      { success: true, ran: 'after' }
+    );
+
+    // And the refused turn is FORFEIT, not deferred. Its caller has already been told nothing
+    // was changed, so a handler that ran once the line freed would make that answer a lie.
+    assert.equal(blockedReachedHandler, false, 'the forfeited turn never runs late');
   });
 });
