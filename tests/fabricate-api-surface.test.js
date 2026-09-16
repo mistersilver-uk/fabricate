@@ -303,7 +303,11 @@ test('Fabricate hydrates the crafting recipe detail phase through the crafting l
 
 test('Fabricate exposes the versioned Journal command and per-user dismissal seams', () => {
   for (const method of [
-    'executeJournalRunCommand(command)',
+    'executeJournalRunCommand(command, options)',
+    // Two arguments, load-bearing. This pin used to read the one-argument form, and sat twelve
+    // lines above another pin whose comment claimed the options were forwarded. Both passed while
+    // the facade dropped them (issue 1759); tests/facade-delegation-arity.test.js now gates the
+    // relationship rather than either line.
     'dismissJournalRun(options)',
     'getDismissedJournalRunKeys(options)',
     'getJournalRunAuthorityAvailability()',
@@ -387,7 +391,10 @@ test('player-facing starts explicitly select the current journal lifecycle', () 
   );
   assert.match(
     mainSource,
-    /executeCommand: \(command\) => this\.executeJournalRunCommand\(command\),\s*resolveUuid: \(uuid\) => globalThis\.fromUuid\?\.\(uuid\),/,
+    // The options are FORWARDED, not dropped: `executePublicCraft` asks for the
+    // non-interactive route, because the public API has no user to answer a roll dialog
+    // and `promptCheck` waits for one without a timeout (issue 1683).
+    /executeCommand: \(command, options\) => this\.executeJournalRunCommand\(command, options\),\s*resolveUuid: \(uuid\) => globalThis\.fromUuid\?\.\(uuid\),/,
     'a ready public craft should execute through the command service and hydrate result UUIDs locally'
   );
   assert.match(
