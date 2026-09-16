@@ -137,17 +137,10 @@ const RENUMBERED = [
 const RENUMBERED_COUNT = 3;
 
 /**
- * Sentences a deliberate RENAME forced to change, where the only edit is an identifier.
- *
- * Issue #1761 renamed the early-access tester group's path secret so one Patreon tier resolves to
- * one URL prefix across both publishing repositories. A frozen sentence naming the old secret has
- * to change, and it is not a retarget, a renumbering or a duplicate.
- *
- * The proof is RETARGETED's shape made narrower: each entry pins the replacement AND the exact
- * identifier pair, and substituting the old identifier back into the surviving sentence must
- * reproduce the frozen one CHARACTER FOR CHARACTER. Every other word is therefore still compared,
- * so a reworded rule wearing a rename's clothes fails here. The substitution is asserted to have
- * applied, because a pair that matched nothing would make the equality a tautology.
+ * Sentences a deliberate rename forced to change, where the only edit is an identifier (issue
+ * #1761). Each entry pins the replacement and the exact identifier pair, and substituting the old
+ * identifier back into the surviving sentence must reproduce the frozen one character for
+ * character, so a reworded rule wearing a rename's clothes fails here.
  */
 const RENAMED = [
   {
@@ -326,8 +319,10 @@ test('every rename claim really is a rename and nothing more', () => {
       `RENAMED still lists this sentence, which is present after all — remove the entry:
   ${before}`
     );
-    // 3. THE ONLY DIFFERENCE MAY BE THE NAMED IDENTIFIERS, and each substitution must really fire:
-    //    a pair matching nothing would leave the equality below comparing the sentence to itself.
+    // 3. The only difference may be the one named identifier, and the substitution must really
+    //    fire: a pair matching nothing would leave the equality below comparing a sentence to
+    //    itself, and five pairs under one entry would excuse a rewrite as a rename.
+    assert.equal(identifiers.length, 1, `RENAMED entry names ${identifiers.length} pairs, not one`);
     let restored = after;
     for (const [renamed, original] of identifiers) {
       assert.ok(restored.includes(renamed), `RENAMED entry does not contain ${renamed}`);

@@ -1,20 +1,14 @@
 /**
- * Rotate every tester path segment in one pass, across both repositories that publish into the
- * Fabricate S3 bucket.
+ * Rotate every tester path segment in one pass, across both repositories publishing into the
+ * Fabricate S3 bucket (issue #1761).
  *
  * A tester group is one cohort holding one URL prefix, so its segment is one value shared by every
- * repository publishing into it. Rotation writes that value as a repository secret; it deletes
- * nothing and republishes nothing, so a superseded prefix keeps serving its last manifest and the
- * cohort on it silently stops receiving updates until it is handed the new URL.
+ * repository publishing into it. Rotation deletes nothing and republishes nothing: a superseded
+ * prefix keeps serving its last manifest, so pair each run with the announcement carrying the new
+ * URLs. Local-only and deliberately absent from `package.json`.
  *
- * Local-only and deliberately absent from `package.json`: it mutates repository secrets in two
- * repositories and must stay a deliberate act, paired with a patron announcement.
- *
- * Usage:
- *   node scripts/rotate-tester-secrets.mjs                              # dry run, writes nothing
- *   node scripts/rotate-tester-secrets.mjs --apply
- *   node scripts/rotate-tester-secrets.mjs --group closed-beta-2026 --apply
- *   node scripts/rotate-tester-secrets.mjs --premium-config <path> | --no-premium
+ * Usage: node scripts/rotate-tester-secrets.mjs [--apply] [--group <name>] [--config <path>]
+ *        [--premium-config <path> | --no-premium]
  */
 import { execFile } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
@@ -22,6 +16,8 @@ import { access, readFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { argv, exit } from 'node:process';
 import { fileURLToPath } from 'node:url';
+
+import { deriveS3Layout } from './release-s3.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DEFAULT_FABRICATE_CONFIG = join(ROOT, 'release.s3.config.json');
@@ -36,16 +32,11 @@ const HELP = `Rotate every tester path segment across both publishing repositori
   --group <name>            Rotate only this tester group's secret
   --config <path>           This repository's release config
   --premium-config <path>   The premium repository's release config
-  --no-premium              Ignore the premium repository entirely
+  --no-premium              Inspect this repository alone (dry run only)
   -h, --help                Print this help
 `;
 
-/**
- * Parse the command line. Default is a dry run; only the exact token `--apply` writes.
- * @param {string[]} args The arguments after the script name.
- * @returns {{apply: boolean, group: string|null, premium: boolean, config: string,
- *   premiumConfig: string, help?: boolean}} The options.
- */
+/** Parse the command line. Default is a dry run; only the exact token `--apply` writes. */
 export function parseArgs(args) {
   const options = {
     apply: false,
@@ -96,6 +87,16 @@ export function parseArgs(args) {
     }
   }
 
+  // Without the premium config every secret looks single-repository, which suppresses the collapse
+  // warning and blinds the ambiguous-narrowing refusal exactly when they matter.
+  if (options.apply && !options.premium) {
+    throw new Error(
+      '--no-premium cannot be combined with --apply: rotating this repository alone splits every ' +
+        'shared cohort across two prefixes. Pass --premium-config <path> to apply; --no-premium ' +
+        'is for dry-run inspection only.'
+    );
+  }
+
   return options;
 }
 
@@ -111,10 +112,8 @@ const byName = (a, b) => (a < b ? -1 : Number(a > b));
 
 /**
  * Every `(group, secret, repository)` declaration in this repository's config, whose schema is one
- * `testerSecretEnv` per CHANNEL against an array of groups.
- * @param {object|null} config The config.
- * @param {string} repository The repository slug it belongs to.
- * @returns {{group: string, secretEnv: string, repository: string}[]} The declarations.
+ * `testerSecretEnv` per channel against an array of groups.
+ * @returns {{group: string, secretEnv: string, repository: string, where: string}[]}
  */
 function fabricateDeclarations(config, repository) {
   const declarations = [];
@@ -132,12 +131,8 @@ function fabricateDeclarations(config, repository) {
 }
 
 /**
- * The same, for the premium repository's schema: one `testerSecretEnv` per GROUP. The asymmetry is
- * load-bearing and stays — this repository publishes into exactly one early-access group, so it
- * never needs per-group secrets.
- * @param {object|null} config The config.
- * @param {string} repository The repository slug it belongs to.
- * @returns {{group: string, secretEnv: string, repository: string}[]} The declarations.
+ * The same, for the premium repository's schema: one `testerSecretEnv` per group. The asymmetry is
+ * load-bearing — this repository publishes into exactly one early-access group.
  */
 function premiumDeclarations(config, repository) {
   const declarations = [];
@@ -154,12 +149,7 @@ function premiumDeclarations(config, repository) {
   return declarations;
 }
 
-/**
- * Refuse a declaration with no secret name. An empty string is the arm that matters: it survives
- * `?? null` and would otherwise plan a write to a secret called "".
- * @param {{group: string, secretEnv: string, where: string}[]} declarations The declarations.
- * @returns {void}
- */
+/** Refuse a declaration with no secret name. `''` matters: it survives `?? null`. */
 function assertEverySecretIsNamed(declarations) {
   for (const declaration of declarations) {
     if (declaration.secretEnv) continue;
@@ -174,8 +164,6 @@ function assertEverySecretIsNamed(declarations) {
 /**
  * Refuse a group whose declarations disagree about the secret name. This is the enforcement point
  * for the cross-repository naming rule: one group, one secret name, everywhere.
- * @param {{group: string, secretEnv: string, where: string}[]} declarations The declarations.
- * @returns {void}
  */
 function assertGroupsAgree(declarations) {
   const byGroup = new Map();
@@ -196,11 +184,8 @@ function assertGroupsAgree(declarations) {
 }
 
 /**
- * Narrow the plan to one group, refusing when that group's secret also serves groups the caller did
- * not name — rotating it would silently migrate an unannounced cohort.
- * @param {{name: string, groups: string[], repositories: string[]}[]} secrets The whole plan.
- * @param {string} group The requested group.
- * @returns {{name: string, groups: string[], repositories: string[]}[]} The narrowed plan.
+ * Narrow to one group, refusing when its secret also serves groups the caller did not name —
+ * rotating it would silently migrate an unannounced cohort.
  */
 function narrowToGroup(secrets, group) {
   const match = secrets.find((secret) => secret.groups.includes(group));
@@ -225,15 +210,9 @@ function narrowToGroup(secrets, group) {
 
 /**
  * Derive the secret-to-writes mapping from both committed configs. Pure: no filesystem, no `gh`.
- *
- * The rotation unit is the SECRET, not the group. This repository's schema resolves one segment per
+ * The rotation unit is the secret, not the group: this repository's schema resolves one segment per
  * channel and applies it to every group in the array, so a channel with two groups is a shared
- * secret by construction rather than a mistake; rotating per distinct secret name is correct either
- * way and collapses to one segment per group whenever the mapping is one-to-one.
- *
- * @param {{fabricateConfig: object|null, premiumConfig: object|null, group?: string|null,
- *   fabricateRepo?: string, premiumRepo?: string}} opts The configs, the optional narrowing, and
- *   the repository slugs each config belongs to.
+ * secret by construction.
  * @returns {{secrets: {name: string, groups: string[], repositories: string[]}[],
  *   warnings: string[]}} The ordered plan.
  */
@@ -276,7 +255,7 @@ export function planRotation({
     .map(
       (secret) =>
         `${secret.name} is written to ${secret.repositories.length} repositories. If they hold ` +
-        'different segments today, this rotation COLLAPSES those prefixes into one and orphans ' +
+        'different segments today, this rotation collapses those prefixes into one and orphans ' +
         'whichever is not re-announced.'
     );
 
@@ -296,17 +275,27 @@ const plannedWrites = (plan) =>
 const describeLanded = (landed) =>
   landed.length === 0
     ? 'No secret was written before this failure.'
-    : `Already written, so these cohorts have MOVED:\n${landed
+    : `Already written, so these cohorts have moved:\n${landed
         .map((write) => `  - ${write.secret} -> ${write.repository}`)
         .join('\n')}`;
 
+/** `testers/<group>/<segment>/<moduleId>/module.json`, via the publisher's own layout so it cannot drift. */
+function testerPrefix(group, segment) {
+  const { testerTargets } = deriveS3Layout({
+    moduleId: '<moduleId>',
+    channel: 'tester',
+    version: '<version>',
+    baseUrl: '',
+    testerGroups: [group],
+    testerSegment: segment,
+  });
+  return testerTargets[0].manifestKey;
+}
+
 /**
- * Report the plan and, under `--apply`, write it. One segment is generated per SECRET, never per
- * write: generating inside the repository loop gives each repository a different prefix and splits
- * one cohort across two URLs, which every mapping-only assertion would still call correct.
- *
- * @param {{plan: object, apply?: boolean, deps?: {runGh?: Function, newSegment?: Function,
- *   log?: Function}}} opts The plan, the mode, and the injected collaborators.
+ * Report the plan and, under `--apply`, write it. One segment is generated per secret, never per
+ * write: generating inside the repository loop would give each repository a different prefix and
+ * split one cohort across two URLs, which every mapping-only assertion still calls correct.
  * @returns {Promise<{applied: boolean, writes: object[]}>} What was planned, or what landed.
  */
 export async function runRotation({ plan, apply = false, deps = {} }) {
@@ -333,11 +322,13 @@ export async function runRotation({ plan, apply = false, deps = {} }) {
   await assertGhIsReady(runGh);
 
   const landed = [];
+  const prefixes = [];
   for (const secret of plan.secrets) {
     const segment = nextSegment();
     for (const repository of secret.repositories) {
       try {
-        await runGh(['secret', 'set', secret.name, '--repo', repository, '--body', segment]);
+        // Over stdin, never the argument list, which any process on the host can read.
+        await runGh(['secret', 'set', secret.name, '--repo', repository], { input: segment });
       } catch (error) {
         throw new Error(
           `failed to write ${secret.name} to ${repository}: ${error.message}\n` +
@@ -348,17 +339,17 @@ export async function runRotation({ plan, apply = false, deps = {} }) {
       landed.push({ secret: secret.name, repository, groups: secret.groups });
       log(`  wrote ${secret.name} -> ${repository}`);
     }
+    for (const group of secret.groups) prefixes.push(`  ${group}: ${testerPrefix(group, segment)}`);
   }
+
+  // `gh` cannot read a secret's value back, so this is the only record of where each cohort lives.
+  log("New tester prefixes, beneath the bucket's base URL — announce these:");
+  for (const prefix of prefixes) log(prefix);
 
   return { applied: true, writes: landed };
 }
 
-/**
- * Refuse before the first write when `gh` is absent or unauthenticated, so a missing credential
- * cannot leave one cohort rotated and the next not.
- * @param {Function|undefined} runGh The `gh` runner.
- * @returns {Promise<void>}
- */
+/** Refuse before the first write, so a missing credential cannot rotate one cohort and not the next. */
 async function assertGhIsReady(runGh) {
   if (!runGh) throw new Error('--apply needs a `gh` runner');
   try {
@@ -374,18 +365,16 @@ async function assertGhIsReady(runGh) {
 
 /** The real `gh`, invoked without a shell so no argument is re-interpreted. */
 function ghRunner() {
-  return (args) =>
+  return (args, { input } = {}) =>
     new Promise((resolvePromise, rejectPromise) => {
-      execFile('gh', args, (error, stdout) =>
+      const child = execFile('gh', args, (error, stdout) =>
         error ? rejectPromise(error) : resolvePromise(stdout)
       );
+      child.stdin.end(input ?? '');
     });
 }
 
-/**
- * @param {string} path A config path.
- * @returns {Promise<object|null>} Its parsed contents, or null when it is not there.
- */
+/** @returns {Promise<object|null>} The parsed config, or null when the path is not there. */
 async function readJsonIfExists(path) {
   if (!path) return null;
   try {
@@ -396,10 +385,7 @@ async function readJsonIfExists(path) {
   return JSON.parse(await readFile(path, 'utf8'));
 }
 
-/**
- * @param {{argv?: string[], deps?: object}} opts The arguments and the injected collaborators.
- * @returns {Promise<{applied: boolean, writes: object[]}|null>} The outcome, or null for `--help`.
- */
+/** @returns {Promise<{applied: boolean, writes: object[]}|null>} The outcome, or null for `--help`. */
 export async function main({ argv: args = argv.slice(2), deps = {} } = {}) {
   const options = parseArgs(args);
   const log = deps.log ?? console.log;
@@ -413,8 +399,10 @@ export async function main({ argv: args = argv.slice(2), deps = {} } = {}) {
   const premiumConfig = options.premium ? await readJsonIfExists(options.premiumConfig) : null;
   if (options.premium && !premiumConfig) {
     throw new Error(
-      `could not read ${options.premiumConfig}. Check out the premium repository beside this one, ` +
-        'pass --premium-config <path>, or pass --no-premium to rotate this repository alone.'
+      `could not read ${options.premiumConfig}. Check out the premium repository beside this one ` +
+        'or pass --premium-config <path>: an apply needs both configs, because rotating one ' +
+        'repository alone splits every shared cohort across two prefixes. --no-premium inspects ' +
+        'this repository alone and is dry-run only.'
     );
   }
 
