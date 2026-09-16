@@ -63,6 +63,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/listboxNavigation.js',
     'src/ui/svelte/util/overlayHost.js',
     'src/gatheringImageDefaults.js',
+    'src/utils/complicationSummary.js',
+    'src/systems/characterPrerequisites.js',
   ],
   // A component missing here does not fail this suite — it HANGS it, reported as `# cancelled`.
   compiledModules: [
@@ -73,6 +75,13 @@ const harness = createMountedComponentHarness({
     // ONE labelled push-button (issue 1118), which the stamina Add modifier and both Add drop
     // rule controls render, and the three availability add menus' shared primitive (issue 1458).
     ...SELECT_COMPILED_MODULES,
+    'src/ui/svelte/components/RadioCardGroup.svelte',
+    'src/ui/svelte/components/RowDisclosure.svelte',
+    'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
+    'src/ui/svelte/apps/manager/recipe/RecipeResultsSection.svelte',
+    'src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte',
+    'src/ui/svelte/apps/manager/recipe/RecipeResultItemRow.svelte',
+    'src/ui/svelte/apps/manager/recipe/RecipeRoutingAssignment.svelte',
     // The SHARED subject check-modifier picker (issue 1095) and the two primitives it
     // renders. Omitting a `.svelte` the tree reaches HANGS the suite (# cancelled).
     'src/ui/svelte/apps/manager/SubjectModifierPicker.svelte',
@@ -119,7 +128,7 @@ function taskFixture() {
 }
 
 /** Mount the editor and return its recorded `onUpdateTask` payloads plus a field lookup. */
-async function mountEditor() {
+async function mountEditor(resolutionMode = 'routed') {
   const updates = [];
   let task = taskFixture();
   const root = await harness.mount({
@@ -129,7 +138,7 @@ async function mountEditor() {
     // `routed`, because the DC override card renders only under a routed gathering check
     // (`dcOverrideEnabled`) — under `d100` the field this suite's headline case drives does not
     // exist at all.
-    resolutionMode: 'routed',
+    resolutionMode,
     characterModifierLibrary: [{ id: 'mod-a', label: 'Herbalism' }],
     onUpdateTask: (patch) => {
       updates.push(patch);
@@ -249,7 +258,7 @@ describe('Gathering task editor steppers (issue 1050)', () => {
   // either role onto the other control reds this, where "the editor contains a dashed button"
   // and "the editor contains a primary button" would both still pass.
   it('paints Add modifier as a dashed append and Add drop rule as the toolbar primary', async () => {
-    const { root } = await mountEditor();
+    const { root } = await mountEditor('d100');
 
     const addModifier = root.querySelector('[data-gathering-add-stamina-modifier]');
     assert.ok(Boolean(addModifier), 'the stamina card renders its Add modifier control');

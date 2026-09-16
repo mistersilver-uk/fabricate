@@ -97,6 +97,7 @@ describe('1286 EmptyState — variant contract', () => {
       ['inline', 'is-inline'],
       ['note', 'is-note'],
       ['field', 'is-field'],
+      ['fill', 'is-fill'],
     ]) {
       const target = await harness.mount({ [prop]: true });
       assert.deepEqual(
@@ -135,6 +136,16 @@ describe('1286 EmptyState — variant contract', () => {
     assert.match(geometry, /height:\s*34px/);
     assert.match(geometry, /padding:\s*var\(--fab-space-1\) var\(--fab-space-2\)/);
     assert.match(ruleBody('.manager-empty'), /box-sizing:\s*border-box/);
+    harness.remount();
+  });
+
+  it('fills a bounded list body without changing default compact appearance', async () => {
+    const target = await harness.mount({ compact: true, hint: 'No matching runs' });
+    assert.ok(!panelOf(target).classList.contains('is-fill'));
+    await harness.setProps({ compact: true, fill: true, hint: 'No matching runs' });
+    assert.ok(panelOf(target).classList.contains('is-fill'));
+    assert.equal(panelOf(target).textContent.trim(), 'No matching runs');
+    for (const declaration of [/width:\s*100%/, /height:\s*100%/, /min-height:\s*0/]) assert.match(ruleBody('.manager-empty.is-fill'), declaration);
     harness.remount();
   });
 

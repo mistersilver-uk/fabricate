@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { withFabricateLifecycleReplay } from '../helpers/extension-composition-harness.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootSource = readFileSync(
@@ -293,6 +294,34 @@ describe('FabricateAppRoot shell', () => {
 });
 
 describe('SvelteFabricateApp shell window', () => {
+  // Issue 1648: manual authority setup is gone from the player app. The affordance existed only
+  // because a world could boot with no ledger, and this replay proves the premise itself is gone —
+  // boot provisions one. With it gone the services bag must carry neither the setup seam nor the
+  // active-GM check that existed solely to guard it, and no setup dialog copy may survive.
+  it('boots with a provisioned ledger and exposes no manual authority setup seam', async () => {
+    await withFabricateLifecycleReplay(async ({ world, loadModule }) => {
+      const { SvelteFabricateApp } = await loadModule('/src/ui/SvelteFabricateApp.svelte.js');
+      const app = Object.create(SvelteFabricateApp.prototype);
+      const services = app._buildServices();
+      const ledgers = globalThis.game.journal.contents.filter(
+        (entry) => entry.flags?.fabricate?.journalRunAuthorityLedger
+      );
+      assert.equal(ledgers.length, 1, 'boot provisions exactly one authority ledger, unprompted');
+      assert.notEqual(
+        world.fabricate.getJournalRunAuthorityAvailability().reason,
+        'ledger-missing',
+        'so the refusal the setup button answered is never the booted state'
+      );
+      for (const seam of ['setupJournalRunAuthority', 'isActiveGM']) {
+        assert.equal(seam in services, false, `${seam} existed only to drive manual setup`);
+      }
+      assert.doesNotMatch(
+        appSource,
+        /AuthoritySetup/,
+        'and no setup confirmation copy is left addressing a dialog nothing opens'
+      );
+    });
+  });
   it('is a single shared window keyed by a stable id', () => {
     assert.ok(appSource.includes("id: 'fabricate-app'"), 'window id should be fabricate-app');
     assert.ok(appSource.includes('static _instance'), 'a single shared instance should be tracked');

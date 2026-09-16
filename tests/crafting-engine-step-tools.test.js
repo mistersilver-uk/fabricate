@@ -53,6 +53,7 @@ globalThis.ui = { notifications: { info: () => {}, warn: () => {}, error: () => 
 const { Recipe } = await import('../src/models/Recipe.js');
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
 const { CraftingEngine } = await import('../src/systems/CraftingEngine.js');
+const { nativeCraftRunManager } = await import('./helpers/native-run-manager.js');
 
 // ---------------------------------------------------------------------------
 // Fakes
@@ -77,9 +78,12 @@ class FakeItem {
     setPath(this._flags[scope], key, value);
     return value;
   }
-  async delete() { this.deleted = true; }
+  // Foundry resolves the deleted/updated DOCUMENT from both writes, which is what
+  // the acknowledged-receipt contract reads before recording an actual effect.
+  async delete() { this.deleted = true; return this; }
   async update(changes = {}) {
     for (const [k, v] of Object.entries(changes)) setPath(this, k, v);
+    return this;
   }
 }
 
@@ -317,14 +321,5 @@ test('(c) failure-path: a failed check breaks the step-tier tool when breakTools
 
 // A run manager that drives a specific step index and captures the success payload.
 function makeRunManager(stepIndex, onSuccess) {
-  return {
-    findActiveRunForRecipe: () => null,
-    getActiveRun: () => null,
-    async createRun() { return { id: 'run-1', status: 'inProgress', currentStepIndex: stepIndex }; },
-    canProceedTimeGate: () => true,
-    async markStepInProgress(_actor, run) { return run; },
-    async markStepWaitingForTime(_actor, run) { return run; },
-    async completeStepSuccess(_actor, run, _idx, payload) { onSuccess(payload); return { ...run, status: 'succeeded' }; },
-    async completeStepFailure() { return {}; }
-  };
+  return nativeCraftRunManager({ stepCount: 2, stepIndex, onSuccess });
 }

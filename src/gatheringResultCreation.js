@@ -22,10 +22,9 @@ import { stampItemDataRoleIdentity } from './config/flags.js';
 // merging them is its own change.
 import {
   hasStackQuantity,
-  readStoredStackQuantity,
   setStackQuantity,
-  updateStackQuantity,
 } from './systems/itemStackQuantity.js';
+import { createItemReceiptCollector, receiptQuantity, writeItemAward, unconfirmedHistoryError } from './systems/runHistoryEvidence.js';
 import { resolvedComponentsFor } from './systems/scopedEntityReads.js';
 import { findStackableMatch } from './utils/sourceUuid.js';
 
@@ -145,11 +144,11 @@ export function normalizeFoundryCollection(collection) {
  * planned award was discarded downstream, emptying the chat card and run journal for
  * a gather that really did award items.
  */
-export function gatheringRunItemRef(actor, item, quantity = 1, componentId = null) {
+export function gatheringRunItemRef(actor, item, quantity = null, componentId = null) {
   const ref = {
     actorUuid: actor?.uuid ?? null,
     itemUuid: item?.uuid ?? item?.registeredItemUuid ?? null,
-    quantity: Number.isFinite(Number(quantity)) && Number(quantity) > 0 ? Number(quantity) : 1,
+    quantity: receiptQuantity(quantity),
   };
   // ONLY the resolved award may supply this. A created Foundry Item's `id` is a
   // document id, not a component id, so falling back to it would stamp a bogus identity.
@@ -180,9 +179,10 @@ export function createGatheringResultCreator(craftingSystemManager) {
           })),
         };
       }
-      return awards.map((award) =>
-        gatheringRunItemRef(actor, award.source, award.result.quantity, award.componentId)
-      );
+      return awards.map((award) => ({
+        ...gatheringRunItemRef(actor, award.source, award.result.quantity ?? 1, award.componentId),
+        resultRowId: award.result.resultRowId ?? null, sourceItemUuid: award.source.uuid ?? null,
+      }));
     },
 
     async create({ actor, system, resultGroups = [] } = {}) {
@@ -198,9 +198,15 @@ export function createGatheringResultCreator(craftingSystemManager) {
         throw error;
       }
 
-      const created = [];
+      const receipts = createItemReceiptCollector();
+      try {
       for (const award of awards) {
         const { result, source, componentId } = award;
+        const quantity = receiptQuantity(result.quantity ?? 1);
+        if (quantity === null) throw unconfirmedHistoryError('Invalid gathering award quantity');
+        if (quantity === 0) continue;
+        const identity = { actorUuid: actor.uuid, componentId, resultRowId: result.resultRowId ?? null,
+          sourceItemUuid: source.uuid ?? null };
 
         const itemData = source.toObject?.() ?? {
           name: source.name ?? 'Gathered Item',
@@ -212,7 +218,7 @@ export function createGatheringResultCreator(craftingSystemManager) {
         };
         itemData.system ??= {};
         if (hasStackQuantity(itemData) || result.quantity) {
-          setStackQuantity(itemData, Number(result.quantity || 1));
+          setStackQuantity(itemData, quantity);
         }
         if (source.uuid) {
           globalThis.foundry?.utils?.setProperty?.(itemData, 'flags.core.sourceId', source.uuid);
@@ -246,22 +252,11 @@ export function createGatheringResultCreator(craftingSystemManager) {
           stackComponents,
           system?.id
         );
-        if (existing) {
-          // absentDefault 0, not 1: this site treated a missing stack quantity as zero
-          // before the routing change (an award onto a field-less item authors exactly
-          // the awarded amount), unlike every other stacking site.
-          const next =
-            readStoredStackQuantity(existing, { absentDefault: 0 }) +
-            Number(result.quantity || 1);
-          await updateStackQuantity(existing, next);
-          created.push(gatheringRunItemRef(actor, existing, result.quantity, componentId));
-          continue;
-        }
-
-        const [item] = await actor.createEmbeddedDocuments('Item', [itemData]);
-        if (item) created.push(gatheringRunItemRef(actor, item, result.quantity, componentId));
+        await writeItemAward({ actor, itemData, existing, quantity, absentDefault: 0,
+          receiptCollector: receipts, receiptIdentity: identity });
       }
-      return created;
+      } catch (error) { throw receipts.failure(error); }
+      return receipts.snapshot();
     },
   };
 }

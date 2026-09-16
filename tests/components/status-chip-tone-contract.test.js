@@ -77,7 +77,11 @@ const MAP_READERS = COMPONENTS.filter(({ source }) => source.includes(MAP_MODULE
  * this corpus binds a tone the map never sees" is satisfied by a corpus with no dynamic chips in
  * it at all, which is exactly what a regression that reverted the conversion would produce.
  */
-const MAPPED_TONE_SITES = 24;
+// #1648 replaces HistoryRow's mapped status chip with a labeled outcome glyph, and adds the
+// run-attention chip (M10) beside the status chip in BOTH journal run surfaces — the Active
+// list row and the run header. Both route through the map, so the floor rises by two rather
+// than the negative clause above quantifying over a corpus that quietly lost them.
+const MAPPED_TONE_SITES = 25;
 
 /** The one shipped chip that asks for the flat plate. */
 const OUTLINED_CHIP = 'src/ui/svelte/apps/manager/component/ComponentIdentityStrip.svelte';
@@ -108,13 +112,13 @@ function dynamicToneOf(tag) {
 }
 
 describe('1506 the tone map — its landed domain', () => {
-  it('is read by the nineteen files the conversion routed through it', () => {
+  it('is read by the eighteen files retaining mapped status chips', () => {
     assert.equal(
       MAP_READERS.length,
-      19,
+      18,
       'the number of files importing the tone map moved. A file JOINING it is a later phase ' +
         'converting more sites and this pin moves with it; a file LEAVING it is a converted ' +
-        'site that has gone back to binding a projected tone straight onto a chip, which ' +
+        'site that must be checked for retired chips or a projected tone bound directly, which ' +
         'renders untoned and fails nothing else. Found: ' +
         MAP_READERS.map(({ path }) => path).join(', ')
     );
@@ -180,28 +184,44 @@ describe('1506 the outlined emphasis — an exact census', () => {
 });
 
 /**
- * The class the four journal rows pass to their status chip. It is the caller's own name rather
+ * The class the journal rows pass to their status chip. It is the caller's own name rather
  * than the chip's, so the rule below cannot be answered by a rule about chips in general.
  */
 const RUN_CHIP_CLASS = 'journal-run-status';
+
+// Read RULE BLOCKS rather than matching the class immediately before a brace. A caller that
+// groups the row's two chips into one selector list — `:global(.a), :global(.b) {` — satisfies
+// this requirement exactly, and a regex anchored on `)` `{` would call that a missing
+// declaration. The block's selector list is what has to name the chip; its body is what has to
+// carry the property. Comments are stripped first and the selector is required to precede the
+// block's own `{`, so a comment mentioning the selector immediately above an UNRELATED rule that
+// happens to carry `flex: 0 0 auto;` cannot satisfy this — only the selector list belonging to
+// that rule's own opening brace can.
+const stripComments = (text) => text.replace(/\/\*[\s\S]*?\*\//g, '');
+const declaresShrinkProtection = (source) =>
+  stripComments(source)
+    .split('}')
+    .some((block) => {
+      const braceIndex = block.indexOf('{');
+      if (braceIndex === -1) return false;
+      return (
+        block.slice(0, braceIndex).includes(`:global(.${RUN_CHIP_CLASS})`) &&
+        /flex:\s*0 0 auto;/.test(block.slice(braceIndex + 1))
+      );
+    });
 
 describe('1506 the journal run chip — its shrink protection is restated per caller', () => {
   it('is declared by every file that renders it, and by no other', () => {
     const callers = COMPONENTS.filter(({ source }) => source.includes(`class="${RUN_CHIP_CLASS}"`));
     assert.equal(
       callers.length,
-      4,
-      'the run status chip is rendered by the four journal rows that rendered the retired pill. ' +
-        `Found: ${callers.map(({ path }) => path).join(', ')}`
+      2,
+      'RunCard owns the Active list row chip and RecentResults the Finished list row chip; two ' +
+        `row chip callers remain. Found: ${callers.map(({ path }) => path).join(', ')}`
     );
 
     const missing = callers
-      .filter(
-        ({ source }) =>
-          !new RegExp(
-            String.raw`:global\(\.${RUN_CHIP_CLASS}\)\s*\{[^}]*flex:\s*0 0 auto;`
-          ).test(source)
-      )
+      .filter(({ source }) => !declaresShrinkProtection(source))
       .map(({ path }) => path);
     assert.deepEqual(
       missing,
@@ -211,6 +231,36 @@ describe('1506 the journal run chip — its shrink protection is restated per ca
         'chip gives up width to a name beside it that was meant to absorb the squeeze. Position ' +
         'stays with the caller, which is exactly why each caller has to say it'
     );
+  });
+
+  it('is not satisfied by a comment mentioning the selector above an unrelated rule', () => {
+    // The defect this guards against: a comment mentioning `:global(.journal-run-status)`
+    // immediately above an unrelated rule that happens to carry `flex: 0 0 auto;` used to pass,
+    // because the old check searched the whole block rather than only the text before `{`.
+    const trap = `
+      /* :global(.${RUN_CHIP_CLASS}) is mentioned here but this rule is unrelated */
+      .something-else {
+        flex: 0 0 auto;
+      }
+    `;
+    assert.equal(declaresShrinkProtection(trap), false, 'a comment mention must not satisfy the guard');
+
+    // The guard must still accept a real grouped selector list, which is a correct declaration.
+    const grouped = `
+      .journal-run-card-heading :global(.${RUN_CHIP_CLASS}),
+      .journal-run-card-heading :global(.journal-run-attention) {
+        flex: 0 0 auto;
+      }
+    `;
+    assert.equal(declaresShrinkProtection(grouped), true, 'a grouped selector list must still pass');
+
+    // And it must fail outright when the declaration is simply absent.
+    const absent = `
+      .journal-run-card-heading :global(.${RUN_CHIP_CLASS}) {
+        color: red;
+      }
+    `;
+    assert.equal(declaresShrinkProtection(absent), false, 'no flex declaration must fail');
   });
 });
 

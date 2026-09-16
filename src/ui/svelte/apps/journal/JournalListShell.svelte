@@ -15,6 +15,7 @@
   let {
     titleId = '',
     kind = '',
+    listName = kind,
     title = '',
     count = null,
     sortLabel = '',
@@ -25,6 +26,7 @@
     emptyIcon = 'fa-inbox',
     emptyText = '',
     children,
+    footer = undefined,
   } = $props();
 
   // MANDATORY HERE, not defensive. This component renders TWICE on one screen - Active Runs above
@@ -67,7 +69,7 @@
   const SORT_PANEL_MIN_WIDTH = 135;
 </script>
 
-<section class="journal-list-section" aria-labelledby={titleId}>
+<section class="journal-list-section" aria-labelledby={titleId} data-journal-list={listName}>
   <header class="journal-list-header">
     <h3 id={titleId} class="journal-list-title">
       {title}{#if count !== null}<span class="journal-list-count">{count}</span>{/if}
@@ -100,14 +102,13 @@
     </span>
   </header>
 
-  <div class="journal-list-body" class:is-empty={isEmpty}>
+  <div class="journal-list-body" class:is-empty={isEmpty} data-journal-list-scroll>
     {#if isEmpty}
       <!--
         `compact`, because this panel shares a half-height column with a sibling list: the
         base variant's 44px hero inset would make an empty half taller than the rows it
-        stands in for. The wrapper survives carrying the ONE property the deleted rule had
-        that is the column's layout rather than the panel's box — `flex: 0 0 auto`, without
-        which `.journal-list-body`'s column flex could shrink the panel and clip it.
+        stands in for. The wrapper fills the allocated body and opts the panel into `fill`,
+        so the dashed empty box reaches the same footer regardless of the previous count.
 
         The hook value is DYNAMIC (`kind` is `active` or `history`) and `EmptyState` renders
         `dataValue || true`, so it is forwarded as written rather than left bare.
@@ -115,6 +116,7 @@
       <div class="journal-list-empty">
         <EmptyState
           compact
+          fill
           icon={`fas ${emptyIcon}`}
           hint={emptyText}
           dataAttr="data-journal-empty"
@@ -125,18 +127,18 @@
       {@render children?.()}
     {/if}
   </div>
+  {#if footer}
+    <footer class="journal-list-footer">{@render footer()}</footer>
+  {/if}
 </section>
 
 <style>
-  /* Each list region takes an equal half of the left column (flex: 1 1 0) so the
-     Active Runs and History sections are always the same height regardless of
-     content, and the empty state stays vertically centered in its half rather
-     than collapsing the section to the top third. */
+  /* The host allocates stable rows independently of either list's item count. */
   .journal-list-section {
     flex: 1 1 0;
     display: flex;
     flex-direction: column;
-    gap: var(--fab-space-2);
+    gap: var(--fab-space-1);
     min-height: 0;
   }
 
@@ -145,12 +147,18 @@
     min-height: 0;
     display: flex;
     flex-direction: column;
+    gap: var(--fab-space-2);
     overflow-y: auto;
   }
 
   .journal-list-body.is-empty {
     justify-content: center;
     overflow: hidden;
+  }
+
+  .journal-list-footer {
+    flex: 0 0 auto;
+    min-width: 0;
   }
 
   .journal-list-header {
@@ -207,8 +215,10 @@
     min-width: 113px;
   }
 
-  /* THE WRAPPER ONLY: the one property that is the column's layout. See the markup. */
+  /* The wrapper fills the list body's allocation; EmptyState owns its stretched panel. */
   .journal-list-empty {
-    flex: 0 0 auto;
+    flex: 1 1 0;
+    min-height: 0;
+    display: grid;
   }
 </style>
