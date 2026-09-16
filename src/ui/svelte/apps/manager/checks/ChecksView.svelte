@@ -73,10 +73,8 @@
     parsePreviewDifficulties,
   } from '../../../../../systems/progressiveCheckSandbox.js';
 
-  // `resolutionMode` selects which crafting check editor renders — routed → the outcome-tier
-  // editor, simple/alchemy → the pass/fail editor, progressive → the formula + crit editor — and
-  // `craftingCheck` / `craftingCheckSimple` / `craftingCheckProgressive` are the three drafts the
-  // manager root owns, each with a matching update callback. Salvage drives the same editors.
+  // `resolutionMode` selects which crafting check editor renders, and the three `craftingCheck*`
+  // props are the drafts the manager root owns. Salvage drives the same editors.
   let {
     // Which activity route is open. Owned by the router, never by this component.
     activity = 'crafting',
@@ -85,30 +83,26 @@
     craftingCheck = null,
     craftingCheckSimple = null,
     craftingCheckProgressive = null,
-    // The system-level `craftingCheck.consumption` block, edited by two live-persisting toggles
-    // in the non-alchemy crafting route. Alchemy resolves consumption through its own
-    // `consumeOnFail` flag, so these toggles are hidden there.
+    // The system-level `craftingCheck.consumption` block. Alchemy resolves consumption through
+    // its own `consumeOnFail` flag, so these toggles are hidden there.
     craftingConsumption = null,
-    // Salvage's OWN failure consumption. Both defaults are traps — `consumeComponentOnFail`
-    // defaults ON, `breakToolsOnFail` defaults OFF — so the store projects them explicitly
-    // rather than letting this component re-derive them.
+    // Salvage's OWN failure consumption. Both defaults are traps, so the store projects them
+    // explicitly rather than letting this component re-derive them.
     salvageConsumption = null,
     // The FAILURE-RESULT POLICY per activity, the orthogonal produce axis to the consumption
-    // toggles beside it. Read from the PERSISTED system, because it live-persists on select.
+    // toggles, read from the PERSISTED system because it live-persists on select.
     craftingFailureResultPolicy = 'perRecord',
     salvageFailureResultPolicy = 'perRecord',
     gatheringFailureResultPolicy = 'perRecord',
-    // The gathering row the rail's `PREVIEW AS` record selector has chosen, or `null`. The
-    // On-failure section cross-references THAT row's `task.failureOutcome` read-only, because
-    // this screen is system-level and a cross-reference with no subject would pick one row
-    // arbitrarily. With no selection it renders its stated no-record state.
+    // The gathering row the rail's `PREVIEW AS` selector has chosen, or `null`. The On-failure
+    // section cross-references THAT row's `task.failureOutcome` read-only, this screen being
+    // system-level; with no selection it renders its stated no-record state.
     previewedGatheringTask = null,
     onOpenGatheringTask = () => {},
     // The ONE system-level modifier library, rendered READ-ONLY for every activity and linked to
     // the one surface that authors it, System settings > Modifiers. Checks owns the SELECTION.
     modifiers = [],
-    // Crafting's own SELECTION over that catalogue — which entries apply, how they combine and
-    // how many a selecting rule may pick — persisted live. Rendered for every crafting mode,
+    // Crafting's own SELECTION over that catalogue, persisted live and rendered for every mode
     // including the ones where the catalogue reaches no roll, which `inertCause` reports.
     craftingDefaultModifierPolicy = 'addAll',
     craftingDefaultModifierIds = [],
@@ -162,13 +156,11 @@
     onUpdateSalvageCheckModifiers = () => {},
     onUpdateGatheringCheckModifiers = () => {},
     onUpdateAlchemyFlags = () => {},
-    // A section the ROUTER wants opened, which is how a Validation deep link survives the route
-    // change it triggers: the section has to travel WITH the route rather than be set on a
-    // component instance the router is about to hand a different `activity`.
+    // A section the ROUTER wants opened: it has to travel WITH the route rather than be set on
+    // a component instance the router is about to hand a different `activity`.
     requestedSection = '',
     // The IDENTITY of that request. A router request is an EVENT and needs a serial number:
-    // latching on the section VALUE swallows a repeat — deep-link to `roll`, click Triggers,
-    // deep-link to `roll` again, and the GM stays on Triggers. The router bumps this every time.
+    // latching on the section VALUE swallows a repeat of it.
     requestedSectionNonce = 0,
     // Route to another activity, for the catalogue link and the Validation deep links.
     foundrySystemId = '',
@@ -189,14 +181,11 @@
     return interpolate(text(copy.key, copy.fallback, data), data);
   }
 
-  // The system-level alchemy check-mode selector, at the TOP of the crafting route's roll
-  // section: simple (the pass/fail editor) or tiered (the routed outcome-tier editor). Selecting
+  // The alchemy check-mode selector, at the TOP of the crafting route's roll section. Selecting
   // a mode STAGES it on the root's draft and swaps the editor below.
   //
-  // "NO CHECK" IS NOT A MODE HERE. The persisted enum still carries `none` — the engine
-  // dispatches on it and the rail's Active switch writes it — but offering it as a third radio
-  // made the on/off decision and the shape decision one control. Off is the switch; this
-  // selector answers only what SHAPE the check is.
+  // "NO CHECK" IS NOT A MODE HERE: the persisted enum still carries `none`, but offering it as a
+  // third radio made the on/off decision and the shape decision one control. Off is the switch.
   const ALCHEMY_CHECK_MODE_OPTIONS = [
     {
       value: 'simple',
@@ -230,11 +219,10 @@
   const consumeComponentOnFail = $derived(salvageConsumption?.consumeComponentOnFail !== false);
   const salvageBreakToolsOnFail = $derived(salvageConsumption?.breakToolsOnFail === true);
 
-  // Only `routedByCheck` uses the tier-routing editor; `routedByIngredients` authors its
-  // optional pass/fail check via the shared simple editor. Alchemy has a dedicated FIRST branch
-  // in the crafting render, so `craftingAlchemy` wins before the other two can match — but they
-  // still INCLUDE the alchemy cases, so `validationSections` selects the right draft. Do not
-  // tighten them without re-checking that.
+  // Only `routedByCheck` uses the tier-routing editor. Alchemy has a dedicated FIRST branch in
+  // the crafting render, so `craftingAlchemy` wins before these two can match — but they still
+  // INCLUDE the alchemy cases, so `validationSections` picks the right draft. Do not tighten
+  // them without re-checking that.
   const craftingAlchemy = $derived(resolutionMode === 'alchemy');
   const craftingRouted = $derived(
     resolutionMode === 'routedByCheck' || (craftingAlchemy && alchemyCheckMode === 'tiered')
@@ -262,11 +250,9 @@
     })
   );
 
-  // The TWO reasons a check-modifier catalogue reaches no roll, in the order they become
-  // answerable: no check at all, then no formula. A guard chain rather than nested ternaries,
-  // and the ORDER is the point. It reads the DRAFT; the store's separate projection reads the
-  // PERSISTED system for the recipe editor, and both must exist because the store cannot see
-  // an unsaved draft and this card must reflect one immediately.
+  // The TWO reasons a catalogue reaches no roll, in the order they become answerable: no check,
+  // then no formula. A guard chain rather than nested ternaries, and the ORDER is the point. It
+  // reads the DRAFT; the store's projection reads the PERSISTED system, and both must exist.
   function inertCauseFor(active) {
     if (!active.slot) return 'noCheck';
     if (!active.checkUsable) return 'noFormula';
@@ -275,8 +261,7 @@
 
   const craftingModifierInertCause = $derived(inertCauseFor(activeCraftingCheck));
 
-  // The same derivation for the other two activities, through their own resolvers: all three
-  // return one shape, so `inertCauseFor` answers for any of them.
+  // The same derivation for the other two activities: all three return one shape.
   const activeSalvageCheck = $derived(
     resolveActiveSalvageCheckFormula({
       salvageResolutionMode,
@@ -300,16 +285,14 @@
       gatheringResolutionMode
     )
   );
-  // Gathering's d100 mode is NOT a `noCheck`: the d100 rolled against each drop's chance IS that
-  // mode's check, with no seam to add modifiers to, so it gets its own cause rather than the
-  // generic sentence telling the GM to switch to a mode that rolls.
+  // Gathering's d100 mode is NOT a `noCheck`: the d100 against each drop's chance IS that mode's
+  // check, with no seam to add modifiers to, so it gets its own cause.
   const gatheringModifierInertCause = $derived(
     gatheringResolutionMode === 'd100' ? 'noModifierSupport' : inertCauseFor(activeGatheringCheck)
   );
 
   // The one bag the readiness evaluator resolves eligibility through, from the SAME builder the
-  // engine threads to its check runners. The subject is `null`: this route validates the
-  // SYSTEM's selection, and no individual record is in scope.
+  // engine uses. The subject is `null`: this route validates the SYSTEM's selection.
   const draftSystem = $derived({
     modifiers,
     craftingCheck: {
@@ -340,8 +323,8 @@
   const gatheringProgressive = $derived(gatheringResolutionMode === 'progressive');
   const gatheringRouted = $derived(gatheringResolutionMode === 'routed');
 
-  // Salvage and gathering are optional features, and the rail already drops their children, so
-  // this route answers only for the Validation summary. Salvage defaults on, gathering off.
+  // Optional features, and the rail already drops their children, so this route answers only
+  // for the Validation summary. Salvage defaults on, gathering off.
   const salvageEnabled = $derived(features?.salvage !== false);
   const gatheringEnabled = $derived(features?.gathering === true);
 
@@ -389,16 +372,13 @@
     },
   };
 
-  // The AUTHORED mode, for the "{section} does not apply in {mode} mode" copy and the Validation
-  // rail's rows — deliberately NOT the readiness mode, which collapses every no-check mode to
-  // `none` and would tell a GM on the gathering route that Triggers "does not apply in none
-  // mode" when the mode they picked is called d100.
+  // The AUTHORED mode, for the "does not apply in {mode} mode" copy and the Validation rail's
+  // rows — deliberately NOT the readiness mode, which collapses every no-check mode to `none`
+  // and would name a mode no economy editor offers.
   //
-  // IT IS LOCALIZED, through the SAME strings the rest of the manager uses. The authored token
+  // IT IS LOCALIZED, through the SAME strings the rest of the manager uses: the authored token
   // is an internal identifier and the three subsystems spell one concept three ways, so printing
-  // it raw put `Clean routedByCheck` above `Clean routed` in one rail card while the window's own
-  // badge said "Routed by check". Reusing the mode pickers' labels makes the three one
-  // vocabulary.
+  // it raw put two camelCase tokens for one mode in one rail card.
   const SUBSYSTEM_MODE_LABELS = {
     crafting: {
       simple: ['FABRICATE.Admin.SystemSettings.ResolutionSimple', 'Simple'],
@@ -435,10 +415,9 @@
     return entry ? text(entry[0], entry[1]) : String(mode || '');
   }
 
-  // The Validation route aggregates per-check validation, one group per in-play subsystem
-  // against its own draft and mode. Salvage is omitted when its feature is off; GATHERING IS NOT
-  // OMITTED UNDER d100, because a selection authored there reaches no roll and validating it is
-  // the one owned path for reporting that.
+  // One group per in-play subsystem, against its own draft and mode. Salvage is omitted when its
+  // feature is off; GATHERING IS NOT OMITTED UNDER d100, validating a selection that reaches no
+  // roll being the one owned path for reporting that.
   const validationSections = $derived.by(() => {
     const list = [
       {
@@ -527,21 +506,16 @@
       (activity === 'salvage' && salvageRouted) ||
       (activity === 'gathering' && gatheringRouted)
   );
-  // GATHERING `d100` IS THE ONLY INERT ROUTE. Alchemy `none` is the OFF state of an optional
-  // check rather than a mode of its own, so it belongs to `routeIsOff` below, which offers the
-  // way back; counting it inert would suppress the trigger count for a check the GM can switch
-  // on from this very panel.
+  // GATHERING `d100` IS THE ONLY INERT ROUTE: alchemy `none` is the OFF state of an optional
+  // check rather than a mode, so it belongs to `routeIsOff` below, which offers the way back.
   const routeIsInert = $derived(activity === 'gathering' && gatheringD100);
-  // The check-OFF state, distinct from INERT: inert is what the MODE does and cannot be undone
-  // here, off is what the GM chose and the panel's job is to offer the way back. The predicate
-  // is "this route has a LIVE Active toggle and it is not on", stated per activity rather than
-  // inferred from `optional` alone — see `openspec/specs/ui-integration/spec.md` →
-  // "GM Checks Studio", which states why `optional && !enabled` is the wrong reading.
+  // The check-OFF state, distinct from INERT: inert is what the MODE does, off is what the GM
+  // chose. The predicate is stated per activity rather than inferred from `optional` alone —
+  // `openspec/specs/ui-integration/spec.md` → "GM Checks Studio" says why.
   const routeIsOff = $derived.by(() => {
-    // ALCHEMY ANSWERS FROM ITS OWN MODE, BEFORE THE ACTIVATION BAG, which it can, because
-    // `alchemyCheckMode` is already here. `activation` defaults to `{}`, and with no crafting
-    // state the checks below return false — which dropped an alchemy `none` mount into the mode
-    // branch, rendering the selector with no option selected and no editor at all.
+    // ALCHEMY ANSWERS FROM ITS OWN MODE, BEFORE THE ACTIVATION BAG: `activation` defaults to
+    // `{}`, and with no crafting state the checks below return false, which dropped an alchemy
+    // `none` mount into the mode branch with no option selected and no editor at all.
     if (activity === 'crafting' && craftingAlchemy && alchemyCheckMode === 'none') return true;
     const state = activation?.[activity];
     if (!state || state.enabled === true) return false;
@@ -585,11 +559,9 @@
   });
 
   let activeSection = $state('roll');
-  // The last router request this component has honoured, latched by its NONCE. Some latch is
-  // required, or the effect below re-applies the standing `requestedSection` on every
-  // recomputation and drags the strip back the instant the GM clicks anything else; latching on
-  // the VALUE is the mirror defect, swallowing a repeat. `-1` rather than `0`, so a first
-  // request legitimately carrying nonce 0 is still one this component has not honoured.
+  // The last router request honoured, latched by NONCE. Some latch is required or the effect
+  // below drags the strip back the instant the GM clicks anything else; latching on the VALUE is
+  // the mirror defect. `-1` rather than `0`, so a first request carrying nonce 0 still lands.
   let adoptedSectionNonce = $state(-1);
   // A section the current route does not render must not stay selected. A NEW router request
   // wins where the route offers it, which carries a Validation deep link across its own route
@@ -672,14 +644,12 @@
    * and the SECTION owning the gap, THEN move focus to the offending control.
    *
    * THE ORDER IS THE MECHANISM. `onOpenActivity` is the router's own synchronous state write, so
-   * Svelte has flushed the route change and the destination panel exists by the time the focus
-   * helper's `queueMicrotask` runs its query. Everything after that belongs to
-   * `validationAnnouncement.js`, which owns it for all five hosts.
+   * the destination panel exists by the time the focus helper's `queueMicrotask` runs its query.
+   * Everything after that belongs to `validationAnnouncement.js`, for all five hosts.
    *
-   * A ROUTE-ONLY ROW IS NORMAL HERE — see the table in `ChecksValidationTab.svelte` — so the
-   * focus helper resolves `null` and the SECTION PANEL takes the keyboard instead. Leaving focus
-   * where it was is not the alternative: the row's button is unmounted by the route change, so
-   * focus would fall to `<body>` and every Foundry keybinding would go live.
+   * A ROUTE-ONLY ROW IS NORMAL HERE, so the helper resolves `null` and the SECTION PANEL takes
+   * the keyboard. Leaving focus where it was is not the alternative: the row's button is
+   * unmounted by the route change, so focus would fall to `<body>`.
    *
    * @param {{activity?: string, section?: string}} target the ROUTE the row carries.
    * @param {string} [focusTarget] the CONTROL's `data-validation-target` value, if it named one.
@@ -714,17 +684,11 @@
   const modeLabel = $derived(routeModeLabel || subsystemModeLabel('crafting', resolutionMode));
 
   // THE SECTION-LEVEL CALLOUT and THE PANE HEADING, both required by
-  // `openspec/specs/ui-integration/spec.md` → "GM Checks Studio".
-  //
-  // The callout is the SAME `activeReadiness` pass the strip's dot is counted from, bucketed by
-  // the same `sectionForIssue`, rendering the SAME exported copy the Validation route renders,
-  // so the two surfaces cannot describe one issue differently.
-  //
-  // The pane heading is keyed on the SECTION rather than the activity, because the section is
-  // what the pane shows and the activity is already named by the rail, the breadcrumb and the
-  // route title. The Outcomes sentence varies with the mode, which is the one place the two
-  // meet: routed routes result groups to tiers, simple has two outcomes, progressive spends a
-  // value down a list.
+  // `openspec/specs/ui-integration/spec.md` → "GM Checks Studio". The callout reads the SAME
+  // `activeReadiness` pass the strip's dot is counted from and renders the SAME exported copy
+  // the Validation route renders, so the two cannot describe one issue differently. The pane
+  // heading is keyed on the SECTION, the activity already being named by the rail, the
+  // breadcrumb and the route title; the Outcomes sentence varies with the mode.
   const outcomesLead = $derived.by(() => {
     if (routeIsRouted)
       return text(
@@ -831,10 +795,9 @@
     return text(entry[0], entry[1]);
   });
 
-  // WHERE THE POLICY HAS NO REACH, and why. "Applies to every resolution mode" is not true of
-  // this data model — neither `routedByIngredients` nor `progressive` has an outcome tier or a
-  // reserved failure group to mark — so a stated reason renders in its place rather than a
-  // control that silently does nothing.
+  // WHERE THE POLICY HAS NO REACH, and why: neither `routedByIngredients` nor `progressive` has
+  // an outcome tier or a reserved failure group to mark, so a stated reason renders rather than
+  // a control that silently does nothing.
   const failurePolicyInertNote = $derived.by(() => {
     if (activity === 'gathering') {
       return gatheringD100
@@ -861,9 +824,8 @@
       : '';
   });
 
-  // THE ROLL SECTION'S MODE CALLOUT: the AUTHORED mode for whichever activity is open, in that
-  // activity's own vocabulary, for the reason `routeModeLabel` gives. It renders on `roll`
-  // alone, because it explains what the mode does with A ROLL.
+  // THE ROLL SECTION'S MODE CALLOUT: the AUTHORED mode in that activity's own vocabulary, for
+  // the reason `routeModeLabel` gives, and on `roll` alone, because it is about A ROLL.
   const calloutMode = $derived.by(() => {
     if (activity === 'salvage') return salvageResolutionMode;
     if (activity === 'gathering') return gatheringResolutionMode;
@@ -881,9 +843,8 @@
   );
 
   // THE SIMULATOR, THE ODDS HISTOGRAM AND THE PREVIEWED RECORD — ONE selection, three readers,
-  // so it lives HERE rather than in any of them. Two components holding their own copy is how
-  // two surfaces come to disagree about which record is being previewed, and the band strip's
-  // dual `aria-valuetext` is a claim about the record the simulator is actually using.
+  // so it lives HERE. Two components holding their own copy is how two surfaces come to
+  // disagree about which record is being previewed.
   let previewActorId = $state(NO_ACTOR_ID);
   let previewRecordId = $state(DEFAULT_RECORD_ID);
   let previewResult = $state(null);
@@ -895,12 +856,10 @@
   const previewActors = $derived(activity === 'validation' ? [] : listPreviewActors());
   const previewActor = $derived(resolvePreviewActor(previewActorId));
 
-  // THE PROGRESSIVE PREVIEW SANDBOX. A progressive check awards by spending its rolled value
-  // down an ORDERED list of result difficulties, so its histogram cannot be drawn without one.
-  // That list is SANDBOX STATE ON THE CHECK rather than a record's, because this screen previews
-  // what a CHECK does and a Preview-as record supplies a DC rather than an outcome. It is read
-  // from the live DRAFT and written back through the SAME per-activity update callback every
-  // other progressive edit uses; nothing else reads it and the exporter strips it.
+  // THE PROGRESSIVE PREVIEW SANDBOX: a progressive histogram cannot be drawn without an ORDERED
+  // list of result difficulties, and that list is SANDBOX STATE ON THE CHECK rather than a
+  // record's, this screen previewing what a CHECK does. Read from the live DRAFT and written
+  // back through the usual update callback; nothing else reads it and the exporter strips it.
   const isProgressive = $derived(activeMode === 'progressive');
   const previewDifficulties = $derived(
     isProgressive && Array.isArray(activeCheck?.preview?.difficulties)
@@ -952,9 +911,8 @@
     })
   );
   const previewFormula = $derived(String(previewPlan.formula ?? '').trim());
-  // THE SAME CONTEXT THE RUNNER IS HANDED, threaded to the two derivations that DESCRIBE the
-  // roll rather than perform it: the runner appends the resolved scalar itself, so a histogram
-  // computed without this context describes a formula nothing rolls.
+  // THE SAME CONTEXT THE RUNNER IS HANDED: it appends the resolved scalar itself, so a
+  // histogram computed without this context describes a formula nothing rolls.
   const previewModifier = $derived(previewPlan.args?.craftingModifier ?? null);
 
   const enumeration = $derived(
@@ -968,13 +926,12 @@
   // the enumerability check reads first, so the two can never disagree.
   const previewResolved = $derived(enumeration.reason !== 'unresolved-roll-data');
 
-  // The reachable total range the simple check's two-band strip is drawn across. Null when the
-  // formula is not enumerable, the editor then falling back to a window around the DC.
+  // The reachable total range the simple check's two-band strip is drawn across; null when the
+  // formula is not enumerable, the editor falling back to a window around the DC.
   const previewTrack = $derived.by(() => {
     if (!enumeration.enumerable) return { min: null, max: null };
-    // THE REACHABLE TOTALS, read off the enumeration rather than recomputed from a remainder:
-    // a bounded rolling check modifier contributes a clamped die, so there is no single
-    // remainder and the extremes are those of the joint space.
+    // THE REACHABLE TOTALS, off the enumeration rather than recomputed from a remainder: a
+    // bounded rolling modifier contributes a clamped die, so there is no single remainder.
     const totals = enumeration.outcomes.map((outcome) => outcome.total);
     return { min: Math.min(...totals), max: Math.max(...totals) };
   });
@@ -1021,8 +978,7 @@
 
   /**
    * Progressive bucketing, by AWARD COUNT rather than by tier. An empty sandbox is a stated
-   * absence with the control named, never an invented sample — see
-   * `src/systems/progressiveCheckSandbox.js`.
+   * absence with the control named, never an invented sample.
    *
    * @param {Array<object>} outcomes The enumerated outcome space.
    * @param {?number} faces The die's face count, for a single-die formula.
@@ -1102,8 +1058,7 @@
   }
 
   /**
-   * The "What happens" rows, each read off the SAME result object the engine would act on and
-   * never inferred from the draft.
+   * The "What happens" rows, each read off the SAME result object the engine would act on.
    *
    * @param {object|null} result The runner result.
    * @returns {Array<object>} `IconFactRow` inputs.
@@ -1201,8 +1156,8 @@
     };
   });
 
-  // A rolled result describes ONE (formula, actor, record) tuple, so its identity is latched
-  // and the readout dropped when any of the three moves.
+  // A rolled result describes ONE (formula, actor, record) tuple, so it is dropped when any
+  // of the three moves.
   const previewSignature = $derived(
     [
       activity,
@@ -1219,8 +1174,7 @@
     adoptedPreviewSignature = previewSignature;
     previewResult = null;
   });
-  // A record the current check no longer offers must not stay selected, or the `<select>` shows
-  // a value none of its options carries.
+  // A record the check no longer offers must not stay selected.
   $effect(() => {
     if (previewRecords.length === 0) return;
     if (previewRecords.some((record) => record.id === previewRecordId)) return;
@@ -1241,8 +1195,7 @@
     previewRecordId = id;
   }
 
-  // Spread rather than restated at each of the ten editor call sites: the prop list IS the
-  // contract, and ten copies of it drift.
+  // Spread rather than restated at ten call sites: the prop list IS the contract.
   const routedPreviewProps = $derived({
     previewRecords,
     previewRecordId: previewRecord?.id ?? '',
@@ -1268,9 +1221,8 @@
   );
 </script>
 
-<!-- Rendered in BOTH crafting branches from one definition, including the two states where the
-     library reaches no roll: a library that reaches no roll is the defect, and a card that
-     disappears reports nothing. A snippet, because the prop list is the contract. -->
+<!-- Rendered in BOTH crafting branches from one definition, including the two states where
+     the library reaches no roll: a card that disappears reports nothing. -->
 {#snippet craftingModifierCard()}
   <CraftingModifierCatalogueCard
     activity="crafting"
@@ -1285,8 +1237,7 @@
 {/snippet}
 
 <!-- Salvage and gathering render the SAME card against their own selection. All three render
-     the library READ-ONLY — one surface authors the entries — while the eligibility control and
-     the combination-rule grid stay editable, which is what each activity owns. -->
+     the library READ-ONLY while the eligibility control and the rule grid stay editable. -->
 {#snippet salvageModifierCard()}
   <CraftingModifierCatalogueCard
     activity="salvage"
@@ -1315,8 +1266,8 @@
 {/snippet}
 
 <!-- The failure-RESULT policy card, rendered by all three activity routes AND the alchemy
-     branch from ONE definition. Which activity's policy and which saver it reaches are resolved
-     HERE from `activity`, so no call site can pair crafting's value with salvage's saver. -->
+     branch from ONE definition. Which policy and which saver it reaches are resolved HERE from
+     `activity`, so no call site can pair crafting's value with salvage's saver. -->
 {#snippet failurePolicyCard()}
   <CheckFailurePolicy
     {activity}
@@ -1336,12 +1287,10 @@
   />
 {/snippet}
 
-<!-- GATHERING'S On-failure SECTION, from ONE definition for both gathering branches, only the
-     inert note inside the policy card differing.
-
-     IT RENDERS NO CONSUMPTION TOGGLES, which is a data fact rather than an omission: gathering
-     has no `consumption` block at all. What it has instead is `task.failureOutcome`, authored on
-     the task and cross-referenced here read-only. -->
+<!-- GATHERING'S On-failure SECTION, from ONE definition for both gathering branches. IT
+     RENDERS NO CONSUMPTION TOGGLES, which is a data fact rather than an omission: gathering has
+     no `consumption` block at all, and what it has is `task.failureOutcome`, authored on the
+     task and cross-referenced here read-only. -->
 {#snippet gatheringOnFailureSection()}
   {@render failurePolicyCard()}
   <!-- NEUTRAL, not info: the info tint is reserved for a note about LIVE state, and this
@@ -1423,16 +1372,13 @@
   bind:this={checksRoot}
 >
   <!--
-    THE ROW ACTION'S LIVE REGION, HOSTED HERE rather than in the validation surface: activating a
-    row action routes to another ACTIVITY, which unmounts the whole validation panel — live
-    region included — in the same update that was supposed to announce. So the element carrying
-    `aria-live` is ALWAYS in the DOM, outside the `{#if activity === 'validation'}` chain, with
-    its own `{#if}` inside it.
-
-    A THIRD CHILD OF THIS TWO-ROW GRID IS SAFE because `.visually-hidden` is `position: absolute`
-    and so is not a grid item at all. It wears that shipped utility, rooted at the MODULE, and is
-    addressed by a `data-` hook rather than a class, so it joins no pinned class family.
-  -->
+      THE ROW ACTION'S LIVE REGION, HOSTED HERE rather than in the validation surface: a row action
+      routes to another ACTIVITY, unmounting the whole validation panel — live region included — in
+      the same update that was supposed to announce. So the element carrying `aria-live` is ALWAYS
+      in the DOM, outside the validation branch, with its own `{#if}` inside it. A THIRD CHILD OF
+      THIS TWO-ROW GRID IS SAFE because `.visually-hidden` is `position: absolute` and so is not a
+      grid item; it is addressed by a `data-` hook, so it joins no pinned class family.
+    -->
   <div class="visually-hidden" role="status" aria-live="polite" data-checks-issue-announcement>
     {#if issueAnnouncement}{issueAnnouncement}{/if}
   </div>
@@ -1448,9 +1394,9 @@
 
   <div class="manager-environment-workspace">
     <!-- `tabindex="-1"` and `data-keyboard-focus="true"` are the ROUTE-ONLY row's focus
-         destination: the button it was activated from is unmounted by the route change, so
-         without this focus falls to `<body>` and every Foundry keybinding goes live. `-1`
-         rather than `0`, the panel being a programmatic destination and not a tab stop. -->
+         destination: the button it was activated from is unmounted by the route change, so without
+         this focus falls to `<body>`. `-1` rather than `0`, the panel being a programmatic
+         destination and not a tab stop. -->
     <div
       class="manager-environment-tab-panel"
       role="tabpanel"

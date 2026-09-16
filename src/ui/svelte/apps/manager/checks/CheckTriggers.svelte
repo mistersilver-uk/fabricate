@@ -1,36 +1,25 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  Unified per-check trigger editor (issue 419 recombine).
+  Unified per-check trigger editor. One trigger list per check, ALWAYS rendered, each trigger
+  pairing an expressive dice-matching CONDITION with three effects:
 
-  One trigger list per check, ALWAYS rendered. Each trigger pairs an expressive
-  dice-matching CONDITION with three effects:
-    - `outcome` — force the check to an Automatic success / Automatic failure, or
-      leave it (No effect). For a progressive check the success/failure labels read
-      Award all / Award none. Forcing applies under BOTH tool-breakage authorities.
-    - `breakTools` — break every required tool for the attempt. Authored (and applied)
-      ONLY under `checkDriven` authority: the per-trigger break pill is shown/enabled
-      only when `showBreakTools` is true, and under `toolSpecific` a check never breaks
-      tools.
-    - `tierStep` (issue 975) — move the rolled outcome tier: target a named tier, or
-      step it up/down by N. Routed only (there are no tiers to step otherwise), and
-      deliberately NOT gated on `showBreakTools`: stepping is not a breakage concept
-      and does not belong to the tool-breakage authority.
+    - `outcome` — force the check to an automatic success or failure, or leave it. A progressive
+      check reads those as Award all / Award none. Forcing applies under BOTH breakage
+      authorities.
+    - `breakTools` — break every required tool for the attempt. Authored and applied ONLY under
+      `checkDriven` authority; under `toolSpecific` a check never breaks tools.
+    - `tierStep` — move the rolled outcome tier, by target or by N steps. Routed only, there
+      being no tiers to step otherwise, and deliberately NOT gated on `showBreakTools`: stepping
+      is not a breakage concept.
 
-  An `outcomeTier` condition (routed only) cannot force an outcome — the routed tier
-  is resolved AFTER the forced outcome would run, so the outcome segments are pinned to
-  No effect and disabled for it (such a trigger may still break tools, evaluated at
-  the engine seam where the tier is known). It CAN step, though: a step reads the
-  rolled tier and produces the final one, so there is no circularity to prevent.
+  An `outcomeTier` condition cannot force an outcome — the routed tier is resolved AFTER the
+  forced outcome would run — so the outcome segments are pinned to No effect and disabled for
+  it. It CAN step, a step reading the rolled tier and producing the final one.
 
-  Controlled component mirroring the prior editors' `{ value, rollFormula, onChange }`
-  pattern: reads the `{ triggers[] }` block + the roll formula and emits the next
-  block via onChange. Dice groups are enumerated from the formula via parseDiceGroups
-  so a `diceGroup` trigger targets a group by its evaluated-term index (groupId);
-  duplicate `NdS` groups are disambiguated `#1`/`#2`.
-
-  `kind` selects which condition types are offered: `progressive` adds the
-  progressiveValue condition; `routed` adds the outcomeTier condition (which reads
-  `outcomeOptions`).
+  Controlled: reads the `{ triggers[] }` block plus the roll formula and emits the next block
+  via `onChange`. Dice groups are enumerated from the formula by `parseDiceGroups`, so a
+  `diceGroup` trigger targets a group by its evaluated-term index. `kind` selects which
+  condition types are offered.
 -->
 <script>
   import Field from '../../../components/Field.svelte';
@@ -68,9 +57,8 @@
 
   const triggers = $derived(Array.isArray(value?.triggers) ? value.triggers : []);
 
-  // Dice groups in evaluated-term order. groupId is the index (matching the engine's
-  // roll.dice term index); duplicate NdS labels are disambiguated by an occurrence
-  // counter so `1d20 + 1d20` reads `1d20 #1` / `1d20 #2`.
+  // Dice groups in evaluated-term order, `groupId` matching the engine's `roll.dice` term
+  // index; a duplicate label is disambiguated by an occurrence counter.
   const diceGroups = $derived(
     (() => {
       const parsed = parseDiceGroups(rollFormula);
@@ -96,10 +84,9 @@
 
   const firstD20GroupId = $derived(diceGroups.find((group) => group.sides === 20)?.groupId ?? null);
 
-  // The comparison a GM reads, not the symbol the model stores. `==` in a sentence-shaped row
-  // (`WHEN dice group IS ==`) is the operator restated as code; the prototype spells all six of
-  // its own in words, and five of them are the five this model persists. Ordered as the
-  // prototype orders them rather than as the stored values happen to sort.
+  // The comparison a GM reads, not the symbol the model stores: `==` in a sentence-shaped row
+  // is the operator restated as code. Ordered as the design orders them rather than as the
+  // stored values happen to sort.
   const OPERATORS = [
     {
       value: '==',
@@ -155,8 +142,7 @@
     },
   ];
 
-  // Condition types offered for this editor kind. progressiveValue is meaningful
-  // only on progressive checks; outcomeTier only on routed checks.
+  // Condition types offered for this editor kind.
   const conditionTypes = $derived(
     [
       {
@@ -186,10 +172,8 @@
     ].filter(Boolean)
   );
 
-  // Outcome toggle segments, ordered as a good→neutral→bad spectrum
-  // (success | no effect | failure) so the neutral default sits in the middle.
-  // Progressive checks relabel success/failure to award all/none (they have no
-  // pass/fail, only a numeric value), reusing the existing AwardAll/AwardNone keys.
+  // Outcome toggle segments, ordered good→neutral→bad so the neutral default sits in the
+  // middle. A progressive check has no pass/fail, only a numeric value, so it relabels.
   const outcomeChoices = $derived(
     kind === 'progressive'
       ? [
@@ -234,8 +218,8 @@
         ]
   );
 
-  // The forcing segments are DISABLED (on the radio itself, not merely dimmed) for an
-  // outcomeTier condition — that pin is what keeps forcing non-circular.
+  // DISABLED on the radio itself, not merely dimmed, for an outcomeTier condition: that pin is
+  // what keeps forcing non-circular.
   function outcomeSegments(isOutcomeTier) {
     return outcomeChoices.map((option) => ({
       ...option,
@@ -243,9 +227,7 @@
     }));
   }
 
-  // The tier-step effect's four modes. `none` is inert; `up`/`down` take a count;
-  // `target` names a tier. Rendered for routed checks only — there is nothing to
-  // step on a simple or progressive check.
+  // The tier-step effect's four modes, for routed checks only.
   const TIER_STEP_MODES = [
     {
       value: 'none',
@@ -276,20 +258,18 @@
     text('FABRICATE.Admin.Manager.Checks.Breakage.TierStepMode', 'Tier step mode')
   );
 
-  // The tier-step operand's ONLY name is "Steps up" / "Steps down", so parametrizing the
-  // shared adjunct strings with it reads as "Decrease Steps up". Its adjuncts take the
-  // row's own label — "Tier step" — instead, which is both grammatical and the name this
-  // surface already gives the control the operand belongs to. So the shared derivation is
-  // spread from `tierStepLabel` and only `ariaLabel` is overridden after it, at the tag.
+  // The tier-step operand's only name is "Steps up"/"Steps down", so the shared adjunct strings
+  // parametrized with it read as "Decrease Steps up". Its adjuncts take the ROW's label
+  // instead, so the shared derivation is spread from `tierStepLabel` and only `ariaLabel` is
+  // overridden after it.
   const tierStepAdjunctLabels = $derived(stepperLabels(tierStepLabel));
   const conditionValueLabel = $derived(
     text('FABRICATE.Admin.Manager.Checks.Breakage.Value', 'Value')
   );
 
   // The expanded body's micro-labels. `TierStep`/`OutcomeColumn` stay the CONTROL's own
-  // accessible names — "Tier step", "Outcome" — because a radiogroup announced as "And the
-  // tier moves" reads as a fragment; these are the visible headings the prototype writes over
-  // each group, which is a different job from naming the control.
+  // accessible names, because a radiogroup announced as "And the tier moves" reads as a
+  // fragment; these are the visible headings over each group, which is a different job.
   const conditionLegend = $derived(
     text('FABRICATE.Admin.Manager.Checks.Breakage.ConditionLegend', 'Condition')
   );
@@ -303,25 +283,21 @@
     text('FABRICATE.Admin.Manager.Checks.Breakage.TierStepAmount', 'By how many')
   );
 
-  // ── THE LIST COLLAPSES (issue 1096) ─────────────────────────────────────────────────
-  //
-  // At most ONE trigger is open, and none is open on arrival: a check with three triggers
-  // used to draw three full editors, which is taller than the pane and is why authoring a
-  // preset looked like it did nothing — the new card landed below the fold of a list the GM
-  // could not see the end of. So a new trigger OPENS and is SCROLLED TO, which is the other
-  // half of that fix; without the scroll the accordion just moves the invisible card.
+  // THE LIST COLLAPSES: at most ONE trigger is open and none on arrival, three full editors
+  // being taller than the pane — which is why authoring a preset looked inert, the new card
+  // landing below the fold. So a new trigger OPENS and is SCROLLED TO, the other half of that
+  // fix; without the scroll the accordion just moves the invisible card.
   let expandedId = $state(null);
-  // Element per trigger, for the scroll. `$state` rather than a plain object: `bind:this` into
-  // a plain object's member warns `binding_property_non_reactive` at runtime, and the warning is
-  // the truth — the effect below has to notice the node arriving.
+  // Element per trigger, for the scroll. `$state` rather than a plain object, because
+  // `bind:this` into a plain member warns `binding_property_non_reactive` and the warning is
+  // the truth: the effect below has to notice the node arriving.
   const triggerNodes = $state({});
-  // The id this component has already scrolled to, so re-rendering a still-expanded trigger
-  // (every keystroke in its value field re-renders it) does not yank the pane back.
+  // The id already scrolled to, so re-rendering a still-expanded trigger does not yank back.
   let scrolledTo = null;
 
   $effect(() => {
-    // Read the list as well as the node map: `expandedId` is set BEFORE the parent has emitted
-    // the longer list back down, so the effect has to re-run once the card actually exists.
+    // Read the list as well as the node map: `expandedId` is set BEFORE the parent emits the
+    // longer list back down, so the effect must re-run once the card exists.
     void triggers.length;
     const id = expandedId;
     if (!id || scrolledTo === id) return;
@@ -366,9 +342,8 @@
         outcome: 'none',
         // Default a new trigger to breaking tools only where that effect is reachable.
         breakTools: showBreakTools === true,
-        // Authored here rather than left to the normalizer so a freshly added trigger
-        // and a saved-then-reloaded one are the same object — no round trip needed for
-        // the editor and the normalizer to agree.
+        // Authored here rather than left to the normalizer, so a freshly added trigger and
+        // a saved-then-reloaded one are the same object.
         tierStep: { mode: 'none', steps: 1, tierId: null },
       },
     ]);
@@ -409,9 +384,9 @@
     return Array.isArray(condition?.tierIds) && condition.tierIds.includes(id);
   }
 
-  // The trigger's tierStep effect, read defensively: a trigger authored before issue
-  // 975 (or hand-edited) may carry none at all. Flat rather than a discriminated
-  // union so switching mode never destroys the other mode's operand.
+  // The trigger's tierStep effect, read defensively because an older or hand-edited trigger may
+  // carry none. FLAT rather than a discriminated union, so switching mode never destroys the
+  // other mode's operand.
   function tierStepFor(trigger) {
     const source =
       trigger?.tierStep && typeof trigger.tierStep === 'object' ? trigger.tierStep : {};
@@ -429,9 +404,8 @@
     updateTrigger(id, { tierStep: { ...tierStepFor(trigger), ...patch } });
   }
 
-  // A target naming no tier on the ACTIVE list. Reachable by design and not only by
-  // import: the relative↔fixed type switch swaps the whole tier list, dangling every
-  // authored tierId at once.
+  // A target naming no tier on the ACTIVE list, reachable by ordinary authoring: the
+  // relative↔fixed switch swaps the whole tier list and dangles every `tierId` at once.
   function isDanglingTarget(step) {
     return Boolean(step.tierId) && !outcomeOptions.some((option) => option.id === step.tierId);
   }
@@ -445,11 +419,8 @@
     updateCondition(id, { tierIds: next });
   }
 
-  // ── What each trigger says about itself (issue 1096) ─────────────────────────────
-  //
-  // The card used to be headed by the word `When` — the label of its first `<select>` — so a
-  // list of three triggers read `When`, `When`, `When`. The sentence is composed by the pure
-  // `checkTriggerSummary` module; this is only the localization bridge, which is why a
+  // What each trigger says about itself. The sentence is composed by the pure
+  // `checkTriggerSummary` module and this is only the localization bridge, which is why a
   // fragment arrives as `{ key, fallback }` and is resolved here.
   const tierNames = $derived(
     Object.fromEntries((outcomeOptions ?? []).map((option) => [option.id, option.name || '']))
@@ -497,11 +468,9 @@
     );
   }
 
-  // ── The preset row (issue 1096) ──────────────────────────────────────────────────
-  //
-  // Withheld entirely when the formula rolls no dice: a `Natural 20 on 1d20` preset offered
-  // against a formula with no die would author a condition pointing at a group that does not
-  // exist. `checkTriggerPresets` decides that, not this component.
+  // The preset row, withheld entirely when the formula rolls no dice: a preset offered against
+  // a formula with no die would author a condition pointing at a group that does not exist.
+  // `checkTriggerPresets` decides that, not this component.
   const presets = $derived(checkTriggerPresets({ kind, diceGroups }));
 
   function addPreset(presetId) {
@@ -513,18 +482,17 @@
       newId,
     });
     if (!trigger) return;
-    // Open and scroll to it for the same reason `addTrigger` does, and MORE so: a preset is
-    // one click from the top of the pane, and the card it authors lands at the foot of a list
-    // that is routinely taller than the pane. Before this, clicking a preset looked inert.
+    // Open and scroll to it for the same reason `addTrigger` does, and MORE so: the card a
+    // preset authors lands at the foot of a list routinely taller than the pane.
     expandedId = trigger.id;
     emit([...triggers, trigger]);
   }
 </script>
 
-<!-- ADD A COMMON TRIGGER. Its own card above the list, as the prototype has it: it is not
-     part of the trigger editor, it is the shortcut past having to learn the editor first.
-     A preset authors an ORDINARY trigger — no marker field, nothing downstream treats it
-     differently — which is what keeps it a shortcut rather than a second kind of trigger. -->
+<!-- ADD A COMMON TRIGGER, in its own card above the list: it is not part of the trigger
+     editor, it is the shortcut past having to learn the editor first. A preset authors an
+     ORDINARY trigger, with no marker field and nothing downstream treating it differently,
+     which is what keeps it a shortcut rather than a second kind of trigger. -->
 {#if presets.length > 0}
   <InspectorCard class="manager-checks-card" data-check-trigger-presets="">
     <div class="manager-checks-card-head">
@@ -558,20 +526,15 @@
 {/if}
 
 <!-- THE TRIGGER LIST IS NOT A CARD. Its members are, one per trigger, sitting directly in the
-     pane exactly as the prototype draws them — this wrapper carries the route's hooks and the
-     stacking gutter and paints nothing. The `Check triggers` card that used to sit around the
-     whole list was invented here: it gave the screen a title and a description the design never
-     wrote, and the structural parity pass reported it as an EXTRA CARD for that reason. The
-     section head above the pane already names the section and leads it. -->
-<!-- THE CONTROL HALF of the Validation route's row action, and it is SET-LEVEL (issue 1517).
-     Both trigger issues — a tier-step target that names no tier, and several triggers claiming
-     the same one — are about the tier targets across the WHOLE list rather than about one
-     control: the row carries no trigger id to single one out with, and each trigger's own tier
-     `<select>` sits inside a collapsed disclosure that is not in the DOM until the GM opens it.
-     So the list itself is the destination, addressed as `checks-triggers`. A `<div>` is not
-     natively focusable, so it declares BOTH the tabindex that makes the focus real and the
-     attribute that tells Foundry the window is focused; without the second, Space pauses the
-     game and the arrows pan the canvas behind the open application. -->
+     pane; this wrapper carries the route's hooks and the stacking gutter and paints nothing.
+     The section head above the pane already names the section and leads it. -->
+<!-- THE CONTROL HALF of the Validation route's row action, and it is SET-LEVEL. Both trigger
+     issues are about the tier targets across the WHOLE list rather than about one control: the
+     row carries no trigger id, and each trigger's own tier `<select>` sits inside a collapsed
+     disclosure that is not in the DOM until the GM opens it. So the LIST is the destination,
+     addressed as `checks-triggers`. A `<div>` is not natively focusable, so it declares both
+     the tabindex and the attribute telling Foundry the window is focused; without the second,
+     Space pauses the game and the arrows pan the canvas. -->
 <div
   class="manager-checks-trigger-route"
   data-check-triggers
@@ -602,16 +565,10 @@
           bind:this={triggerNodes[trigger.id]}
         >
           <div class="manager-checks-trigger-head">
-            <!-- The WHOLE head is the disclosure, glyph tile to chevron, because the chevron
-                 alone is a 10px target for the commonest action on this screen. The delete
-                 button is its SIBLING, never its child: a `<button>` inside a `<button>` is
-                 invalid, and the DOM the browser builds from it is not the one written here.
-
-                 The title is a `<span>`, not the `<h4>` it was, for the same reason: a heading
-                 is not phrasing content and may not sit inside a button. It is still read as a
-                 title by the structural parity pass, which classifies presentationally at
-                 12.5px/600 — which is exactly what the prototype's own card title measures,
-                 since the prototype has no heading elements at all. -->
+            <!-- The WHOLE head is the disclosure, glyph tile to chevron, because the chevron alone is a
+                 10px target for the commonest action on this screen. The delete button is its SIBLING,
+                 never its child: a `<button>` inside a `<button>` is invalid. The title is a `<span>` for
+                 the same reason — a heading is not phrasing content and may not sit inside a button. -->
             <button
               type="button"
               class="manager-checks-trigger-disclosure"
@@ -643,8 +600,8 @@
                 class={`fas ${expanded ? 'fa-chevron-up' : 'fa-chevron-down'} manager-checks-trigger-chevron`}
                 aria-hidden="true"
               ></i>
-              <!-- The accessible name of the disclosure, which its visible content does not
-                   supply: the title reads as a condition and the chevron is decorative. -->
+              <!-- The accessible name of the disclosure, which its visible content does not supply: the
+                   title reads as a condition and the chevron is decorative. -->
               <span class="visually-hidden">
                 {expanded
                   ? text(
@@ -778,10 +735,9 @@
                       {/each}
                     </select>
                   </Field>
-                  <!-- A PLAIN NUMBER FIELD, not the stepper it was. A threshold is typed, not
-                       walked to: reaching 20 from 1 is nineteen clicks, and the prototype draws
-                       one input here. `Stepper` still owns the tier-step operand below, which is
-                       a magnitude of one or two and is genuinely stepped. -->
+                  <!-- A PLAIN NUMBER FIELD, not a stepper: a threshold is typed rather than walked to, and
+                       reaching 20 from 1 is nineteen clicks. `Stepper` still owns the tier-step operand below,
+                       which is a magnitude of one or two and is genuinely stepped. -->
                   <Field as="label" class="manager-checks-trigger-value">
                     <span>{conditionValueLabel}</span>
                     <input
@@ -797,10 +753,8 @@
                 {/if}
               </div>
 
-              <!-- THE FORCED OUTCOME. The prototype never modelled it — its mockup check has no
-                   such control at all — so it is styled as its neighbours are and placed where
-                   the prototype's own effect groups read as a sequence: the condition, then what
-                   it does to the outcome, then what it does to the tier. -->
+              <!-- THE FORCED OUTCOME, placed where the effect groups read as a sequence: the condition,
+                   then what it does to the outcome, then what it does to the tier. -->
               <div class="manager-checks-trigger-effect-row">
                 <Field as="div" class="manager-checks-trigger-outcome">
                   <span>{outcomeLegend}</span>
@@ -822,10 +776,8 @@
               {#if kind === 'routed'}
                 {@const step = tierStepFor(trigger)}
                 {@const dangling = isDanglingTarget(step)}
-                <!-- Its OWN row, not a third field in the bottom row: at the pinned 1280
-               manager geometry the outcome toggle plus the break pill already spend
-               most of the trigger card's width, and a four-segment control plus an
-               operand does not fit what is left. -->
+                <!-- Its OWN row, not a third field in the bottom row: at the pinned manager geometry the
+                     outcome toggle plus the break pill already spend most of the card's width. -->
                 <div class="manager-checks-trigger-effect-row" data-trigger-tier-step>
                   <Field as="div" class="manager-checks-trigger-step-mode">
                     <span>{tierStepLegend}</span>
@@ -840,28 +792,21 @@
                     />
                   </Field>
 
-                  <!-- The operand slot is ALWAYS present at one pinned width and only its
-                 contents swap, so changing mode never moves the control out from
-                 under the pointer in this wrapping row. -->
+                  <!-- The operand slot is ALWAYS present at one pinned width and only its contents swap, so
+                       changing mode never moves the control out from under the pointer. -->
                   <Field
                     as="div"
                     class={`manager-checks-trigger-step-operand ${dangling ? 'is-invalid' : ''}`}
                   >
                     <span>{tierStepAmountLabel}</span>
                     {#if step.mode === 'up' || step.mode === 'down'}
-                      <!-- `fill` is what keeps the canonical no-movement guarantee (ui-integration
-                     spec, "a stable operand slot at one pinned width"): the slot stays
-                     pinned at 160px and the primitive stretches into it, so swapping mode
-                     between this stepper, the tier `<select>` and the inert placeholder
-                     leaves the control's POSITION and BOX SIZE unchanged — which is the
-                     guarantee the spec actually makes, and all the no-movement rule needs.
-                     Radius and fill still differ (the stepper paints 8px /
-                     `--fab-surface-soft`, a `.manager-field` control 6px / `--fab-bg-1`);
-                     claiming otherwise was an overclaim corrected alongside the spec text.
-                     `data-trigger-tier-step-steps` rides `inputProps` onto the real
-                     `<input>` — the smoke harness calls Playwright's `fill()` and
-                     `inputValue()` on it, and neither resolves against a wrapper `<div>`.
-                     `Math.trunc` stays: `Stepper` clamps but does not truncate. -->
+                      <!-- `fill` is what keeps the canonical no-movement guarantee (`openspec/specs/ui-integration/
+                           spec.md`, "a stable operand slot at one pinned width"): the slot stays pinned and the
+                           primitive stretches into it, so swapping mode leaves the control's POSITION and BOX SIZE
+                           unchanged. Radius and fill still differ between the primitives.
+                           `data-trigger-tier-step-steps` rides `inputProps` onto the real `<input>`, neither
+                           Playwright's `fill()` nor `inputValue()` resolving against a wrapper `<div>`. `Math.trunc`
+                           stays: `Stepper` clamps but does not truncate. -->
                       <Stepper
                         fill
                         value={step.steps}
@@ -881,10 +826,9 @@
                           updateTierStep(trigger.id, { steps: Math.max(1, Math.trunc(next)) })}
                       />
                     {:else if step.mode === 'target' && outcomeOptions.length > 0}
-                      <!-- A <select> whose value matches no option renders its FIRST option as
-                     selected, so a null tierId would show a real tier the check has not
-                     persisted. The disabled placeholder is what makes "nothing chosen"
-                     read as nothing chosen. -->
+                      <!-- A <select> whose value matches no option renders its FIRST option as selected, so a null
+                           `tierId` would show a real tier the check has not persisted. The disabled placeholder is
+                           what makes "nothing chosen" read as nothing chosen. -->
                       <select
                         data-trigger-tier-step-target
                         aria-label={text(
@@ -925,9 +869,9 @@
                   </Field>
 
                   {#if step.mode === 'target' && outcomeOptions.length === 0}
-                    <!-- Its own hook, distinct from the outcomeTier condition's: a trigger that
-                   is both outcomeTier-conditioned and target-stepping on a tier-less check
-                   would otherwise carry two identically-hooked nodes in one card. -->
+                    <!-- Its own hook, distinct from the outcomeTier condition's: a trigger that is both
+                         outcomeTier-conditioned and target-stepping on a tier-less check would otherwise carry
+                         two identically-hooked nodes in one card. -->
                     <p
                       class="manager-muted manager-checks-trigger-step-hint"
                       data-trigger-step-no-tiers
@@ -941,11 +885,9 @@
                 </div>
               {/if}
 
-              <!-- BREAKING THE TOOLS IS ITS OWN CARD, as the prototype draws it: a hazard with a
-                   glyph, a title and a sentence, not a two-word pill in a row of toggles. It
-                   renders the manager's shared `ToggleCard`, which is this exact shape — icon,
-                   title, sub-line, switch — and which the On failure screen's own two flags
-                   already use. -->
+              <!-- BREAKING THE TOOLS IS ITS OWN CARD: a hazard with a glyph, a title and a sentence, not a
+                   two-word pill in a row of toggles. It renders the shared `ToggleCard`, which is that exact
+                   shape and which the On failure screen's own two flags already use. -->
               {#if showBreakTools}
                 <ToggleCard
                   icon="fas fa-hammer"
@@ -967,9 +909,8 @@
                   onToggle={(next) => updateTrigger(trigger.id, { breakTools: next })}
                 />
               {:else}
-                <!-- WHY THERE IS NO BREAK CARD. This sentence used to head the whole list, on a
-                     card the prototype does not have; it belongs where the missing control is,
-                     which is the only place a GM asks the question. -->
+                <!-- WHY THERE IS NO BREAK CARD, stated where the missing control would be, which is the only
+                     place a GM asks the question. -->
                 <p class="manager-muted manager-checks-trigger-hint" data-trigger-break-unavailable>
                   {text(
                     'FABRICATE.Admin.Manager.Checks.Breakage.LeadOutcomeOnly',

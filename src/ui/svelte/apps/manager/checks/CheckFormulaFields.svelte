@@ -1,38 +1,23 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  FORMULA — what is rolled, and what a roll actually resolves to (issue 1096).
+  FORMULA — what is rolled, and what a roll actually resolves to. Three parts, in order: the
+  INPUT with its leading dice glyph and right-aligned `avg N` reading; `WHAT ACTUALLY GETS
+  ROLLED`, an inset restating the formula with each applied check modifier as a chip plus one
+  sentence naming the rule that combines them; and the suggestion chips derived from the active
+  world. The DC and comparison are the `Difficulty` card's: this answers "what is rolled" and it
+  answers "what is it measured against".
 
-  Three parts, in the prototype's order:
+  Part 2 is why a bare input was not enough. Check modifiers are added to the roll AUTOMATICALLY
+  and deliberately never appear in the formula text, so the field a GM types into is not the
+  expression the engine rolls; this says so IN the expression, the only place a GM can check it
+  against what they meant.
 
-  1. THE INPUT, with a leading dice glyph and a right-aligned `avg N` reading.
-  2. `WHAT ACTUALLY GETS ROLLED` — an inset restating the formula with each applied check
-     modifier as a chip, plus one sentence naming the rule that combines them.
-  3. The suggestion chips, derived from the active world.
-
-  This used to be a bare labelled input beside a DC stepper and a comparison select. Those
-  two are the `Difficulty` card's now (`CheckDifficultyCard.svelte`): this answers "what is
-  rolled" and they answer "what is it measured against".
-
-  Part 2 is why a bare input was not enough. Check modifiers are added to the roll
-  AUTOMATICALLY and deliberately never appear in the formula text, so the field a GM types
-  into is not the expression the engine rolls. The pane lead says so in prose; this says it in
-  the expression, which is the only place a GM can check it against what they meant.
-
-  ## `avg` takes roll-data terms as ZERO, and says so
-
-  A roll-data path (`@abilities.int.mod`) has no value on this screen: there is no actor in
-  scope, and the rail's own "Preview as" says an actor arrives with the outcome preview. So
-  the average is of the DICE, with every `@` term taken as zero, and the reading carries a
-  title stating exactly that. Showing nothing at all was the alternative and it is worse:
-  almost every real formula carries an `@` term, so the affordance would be invisible in
-  practice. An expression that cannot be reduced withholds the reading rather than guessing.
-
-  ## The rule sentence stops at the RULE
-
-  The prototype's sentence continues "…For Sera Vane that is Dexterity +3, Intelligence +4,
-  Strength +0". That half needs a previewed actor, which this screen does not have. Naming the
-  rule is the part that is true without one; inventing the second half would be a claim about
-  a character nobody has chosen.
+  `avg` TAKES ROLL-DATA TERMS AS ZERO, AND SAYS SO. A roll-data path has no value on this
+  screen, so the average is of the DICE with every `@` term taken as zero and the reading carries
+  a title stating exactly that. Showing nothing was the alternative and is worse, almost every
+  real formula carrying an `@` term; an expression that cannot be reduced withholds the reading
+  rather than guessing. For the same reason THE RULE SENTENCE STOPS AT THE RULE: naming it is
+  the part that is true with no previewed actor.
 
   Controlled: reads the formula and emits a partial patch through `onChange`.
 -->
@@ -46,9 +31,8 @@
     placeholder = '1d20+@abilities.int.mod',
     foundrySystemId = '',
     // The check modifiers this check APPLIES, already resolved against the catalogue by the
-    // caller — `[{ id, name, icon }]`. This component does not resolve them: eligibility
-    // depends on the activity's whole modifier context (rule, default set, pick cap), which
-    // lives one level up and is the same derivation the Modifiers section counts from.
+    // caller as `[{ id, name, icon }]`. Eligibility depends on the activity's whole modifier
+    // context, which lives one level up and is what the Modifiers section counts from.
     appliedModifiers = [],
     // Which rule combines them: `addAll` | `highest` | `bySubject` | `playerPicks`.
     modifierPolicy = 'addAll',
@@ -62,21 +46,15 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  // The formula token quick-add row (issue 1096). DERIVED FROM THE ACTIVE WORLD, never a
-  // literal list.
+  // The formula token quick-add row, DERIVED FROM THE ACTIVE WORLD and never a literal list. A
+  // literal list shipped a term that resolves against nothing, so one click wrote it into the
+  // formula and BROKE the check — a one-click path to a broken check being worse than no chip —
+  // and the rest were system-shaped guesses in a system-agnostic module.
   //
-  // It WAS a literal list, and it shipped `@ingredients` — a term that resolves against
-  // nothing, so one click on the chip wrote it into the formula and BROKE the check. A
-  // one-click path to a broken check is worse than no chip at all, and the other four were
-  // no better evidenced: `@prof` and `@level` are dnd5e-shaped guesses in a system-agnostic
-  // module, and nothing anywhere proved any of the five against a real actor's roll data.
-  //
-  // `getModifierExpressionSuggestions` is the derivation the modifier chips already use: its
-  // system-specific half comes from the shipped preset bundles
-  // (`getCharacterModifierPresetsForFoundrySystem`), so a chip can only ever offer a path the
-  // product would itself author for this world, and an UNSUPPORTED world degrades to the
-  // system-agnostic terms rather than offering a dnd5e path it does not have. That removes
-  // the whole class of defect rather than the one instance of it.
+  // `getModifierExpressionSuggestions` is the derivation the modifier chips already use, and its
+  // system-specific half comes from the shipped preset bundles, so a chip can only offer a path
+  // the product would itself author for this world and an UNSUPPORTED world degrades to the
+  // system-agnostic terms. That removes the class of defect rather than the instance.
   const quickTokens = $derived(
     getModifierExpressionSuggestions(foundrySystemId).map((suggestion) => suggestion.expression)
   );
@@ -91,9 +69,8 @@
   );
 
   // Every `@`-path taken as ZERO. `reduceRollExpression` needs the substitution to have
-  // happened already, and it REFUSES an expression it cannot fully consume — so a formula
-  // with a stray token reduces to NaN and the reading is withheld rather than taken from a
-  // prefix of it.
+  // happened already and REFUSES an expression it cannot fully consume, so a formula with a
+  // stray token reduces to NaN and the reading is withheld rather than read off a prefix.
   const average = $derived.by(() => {
     const source = String(rollFormula || '').trim();
     if (source === '') return null;
@@ -105,8 +82,8 @@
   const DEFAULT_MODIFIER_ICON = 'fas fa-wand-magic-sparkles';
   const applied = $derived(Array.isArray(appliedModifiers) ? appliedModifiers : []);
 
-  // ONE sentence naming the rule in force. It restates the rule the Modifiers section
-  // authors rather than re-deciding it: `modifierPolicy` is that section's own value.
+  // ONE sentence naming the rule in force, restating what the Modifiers section authors rather
+  // than re-deciding it: `modifierPolicy` is that section's own value.
   const ruleSentence = $derived.by(() => {
     if (applied.length === 0) {
       return text(
@@ -144,11 +121,10 @@
        visible label repeating it. -->
   <div class="manager-checks-formula-input">
     <i class="fas fa-dice-d20" aria-hidden="true"></i>
-    <!-- THE CONTROL HALF of the Validation route's row action (issue 1517). All three roll
-         issues — no formula, and the two retired-placeholder ones — are about THIS field, and
-         it is the roll section's first control in every editor that renders the section, so
-         `ChecksValidationTab` addresses it as `checks-roll-formula`. An `<input>` is natively
-         focusable, so it needs no `tabindex` and no keyboard-focus declaration. -->
+    <!-- THE CONTROL HALF of the Validation route's row action. All three roll issues are about
+         THIS field, and it is the roll section's first control in every editor rendering the
+         section, so `ChecksValidationTab` addresses it as `checks-roll-formula`. An `<input>` is
+         natively focusable, so it needs no `tabindex` and no keyboard-focus declaration. -->
     <input
       data-check-roll-formula
       data-validation-target="checks-roll-formula"
@@ -181,9 +157,9 @@
       <p class="manager-checks-formula-expression">
         <span class="manager-checks-formula-base">{rollFormula || placeholder}</span>
         {#if applied.length > 0}
-          <!-- The join between the FORMULA and the modifier list carries the accent; the
-               separators inside the list are subtle, so the expression reads as one written
-               term plus a set of automatic ones rather than as a flat sum. -->
+          <!-- The join between the FORMULA and the modifier list carries the accent and the separators
+               inside the list are subtle, so the expression reads as one written term plus a set of
+               automatic ones rather than as a flat sum. -->
           <span class="manager-checks-formula-join" aria-hidden="true">+</span>
         {/if}
         {#each applied as modifier, index (modifier.id)}
@@ -202,9 +178,8 @@
     </div>
   </div>
 
-  <!-- Real `<button>`s, never the prototype's click-handled bare spans: this row is five
-       controls a GM operates, and a span with an `onclick` is reachable by neither the
-       keyboard nor a screen reader. -->
+  <!-- Real `<button>`s: this row is five controls a GM operates, and a span with an `onclick`
+       is reachable by neither the keyboard nor a screen reader. -->
   <span class="manager-checks-formula-tokens" data-check-formula-tokens>
     {#each quickTokens as token (token)}
       <button
@@ -213,9 +188,8 @@
         data-check-formula-token={token}
         onclick={() => appendToken(token)}
       >
-        <!-- The verb as a GLYPH, which is what the prototype draws: the chip APPENDS the
-             term to the formula, and a literal `+` character in the label reads as part of
-             the expression rather than as the thing the button does. -->
+        <!-- The verb as a GLYPH: the chip APPENDS the term to the formula, and a literal `+`
+             character in the label reads as part of the expression rather than as the action. -->
         <i class="fas fa-plus" aria-hidden="true"></i>
         <span>{token}</span>
       </button>

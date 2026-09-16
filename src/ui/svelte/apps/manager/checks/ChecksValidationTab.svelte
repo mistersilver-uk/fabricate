@@ -1,26 +1,20 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  The Checks Studio's Validation ROUTE (issue 1096; it was a tab).
+  The Checks Studio's Validation ROUTE.
 
   It renders through the shared `EditorValidationSurface` rather than its own markup: that
   primitive's props are already exactly this surface's needs — a summary medallion, three
-  counters, and severity-tagged rows grouped by owner — and the recipe editor's validation
-  tab has been on it since issue 883. Selecting an issue deep-links to the owning ACTIVITY
-  route AND the section that owns the control, through the one
+  counters, and severity-tagged rows grouped by owner. Selecting an issue deep-links to the
+  owning ACTIVITY route AND the section owning the control, through the one
   `CHECK_ISSUE_SECTIONS` map the section dots and the rail badge also read.
 
-  ## The hero states the unsaved condition (DN4)
+  THE HERO STATES THE UNSAVED CONDITION. The badges, dots and counters here are a DRAFT
+  PREVIEW, computed on the live draft so a GM sees the consequence of an edit before saving;
+  the ENABLE gate reads COMMITTED state. So a draft that clears every blocking issue must NOT
+  be reported as "Ready to enable", because enabling would act on the old, unsaved state.
 
-  The badges, dots and counters on this screen are a DRAFT PREVIEW: they are computed on
-  the live draft so a GM sees the consequence of an edit before saving. The ENABLE gate is
-  not — it reads committed state. So a draft that clears every blocking issue must NOT be
-  reported as "Ready to enable", because enabling would act on a system that still carries
-  the old, unsaved state. The hero says so explicitly instead of claiming readiness for
-  state that is not persisted.
-
-  `sections` is the list of in-play subsystem checks resolved by ChecksView:
-  `[{ subsystem, mode, check, modifierContext }]`. A subsystem that is switched off is
-  omitted upstream.
+  `sections` is the list of in-play subsystem checks resolved by `ChecksView`; a subsystem that
+  is switched off is omitted upstream.
 -->
 <script>
   import EditorValidationSurface from '../../../components/EditorValidationSurface.svelte';
@@ -54,9 +48,8 @@
     return text(copy.key, copy.fallback);
   }
   // `data` is the optional interpolation payload an issue carries when its sentence names
-  // something (issue 1117). `localize` formats only when data is supplied, and the English
-  // fallback is interpolated by hand so a world with no localization still reads the names
-  // rather than a literal `{names}`.
+  // something. The English fallback is interpolated by hand, so a world with no localization
+  // still reads the names rather than a literal `{names}`.
   function issueTitle(id, data) {
     const copy = checkIssueCopy(id);
     return interpolate(text(copy.key, copy.fallback, data), data);
@@ -74,20 +67,15 @@
   );
 
   /**
-   * WHICH CONTROL EACH ISSUE NAMES — the `data-validation-target` half of a row's address
-   * (issue 1517), keyed by ISSUE ID rather than by section.
+   * WHICH CONTROL EACH ISSUE NAMES — the `data-validation-target` half of a row's address,
+   * keyed by ISSUE ID rather than by section, because a section is not one control: `roll`
+   * renders the formula field and the Difficulty card, and only the field is ever the offender.
+   * A row's `target` is the ROUTE, resolved through `CHECK_ISSUE_SECTIONS`.
    *
-   * A row's `target` is the ROUTE (`{ activity, section }`, resolved through the one
-   * `CHECK_ISSUE_SECTIONS` map the section dots and the rail badge also read) and this is the
-   * CONTROL the GM has to reach once that route has opened. Keyed by issue id because a
-   * section is not one control: `roll` renders the formula field and the Difficulty card, and
-   * only the formula field is ever the offender.
-   *
-   * ROUTE-ONLY IS A STATED OUTCOME, NEVER A SILENT ONE. A row with no entry here still renders
-   * a View button and still changes route; it simply focuses nothing, and the mounted suite
-   * asserts which of the two shapes a given row is, so an address going missing reds rather
-   * than degrading into a tab switch nobody notices. Every one of the sixteen registered issue
-   * ids is accounted for below, with the reason where there is no control to name:
+   * ROUTE-ONLY IS A STATED OUTCOME, NEVER A SILENT ONE: a row with no entry here still renders
+   * a View button and changes route, simply focusing nothing, and the mounted suite asserts
+   * which of the two shapes a given row is. Every registered issue id is accounted for below,
+   * with the reason where there is no control to name:
    *
    *  | issue id                        | section   | address              |
    *  |---------------------------------|-----------|----------------------|
@@ -136,24 +124,18 @@
   });
 
   // ONE row per check tick and per issue, BUILT in that order, so a group reads as "what holds"
-  // followed by "what does not". An issue's row carries the deep-link target; a satisfied
-  // tick has nowhere to go.
+  // then "what does not". An issue's row carries the deep-link target; a satisfied tick has
+  // nowhere to go.
   //
-  // BUILT IS NOT RENDERED, as of issue 1517, and this is the qualification a reader chasing a
-  // "the blocker jumped above my ticks" report needs. `EditorValidationSurface` sorts each
-  // group's rows with `block` first, and two blocks down a `critical` issue maps to `block` —
-  // so a critical issue RISES ABOVE EVERY TICK in its subsystem group. That is the requirement
-  // being met, not a defect to repair. Everything else is one rank there, including an
-  // unsatisfied tick and a non-critical issue, which are both `warn`; so below the criticals the
-  // order this function authors is exactly the order the tab draws.
+  // BUILT IS NOT RENDERED: `EditorValidationSurface` sorts each group's rows with `block` first
+  // and a `critical` issue maps to `block`, so a critical issue RISES ABOVE EVERY TICK in its
+  // group — the requirement being met, not a defect. Everything else is one rank there, so
+  // below the criticals the order this function authors is the order the tab draws.
   //
-  // A group with NEITHER still states its result (issue 1096). That is a reachable state, not
-  // a hypothetical: a gathering check in `d100` mode with no eligible check modifiers reports
-  // no tick and no issue, and an unfiltered map then drew a `GATHERING CHECK` heading with a
-  // rule under it and nothing else — a heading over emptiness, where the surface it replaced
-  // said "No issues detected." in so many words. The group is kept rather than dropped
-  // because its ABSENCE would read as "gathering was not evaluated", which is a different and
-  // equally wrong claim.
+  // A group with NEITHER still states its result, which is a reachable state: a gathering check
+  // in `d100` mode with no eligible modifiers reports no tick and no issue, and an unfiltered
+  // map drew a heading over emptiness. Dropping the group instead would read as "gathering was
+  // not evaluated", a different and equally wrong claim.
   function rowsFor(subsystem, readiness) {
     const rows = [
       ...readiness.checks.map((check) => ({
@@ -167,10 +149,9 @@
         title: issueTitle(issue.id, issue.data),
         status: issue.severity === 'critical' ? 'block' : 'warn',
         target: { activity: subsystem, section: sectionForIssue(issue.id) },
-        // NO KEY rather than an empty one for a route-only row: the host treats any non-empty
-        // string as a control it must resolve, so a `focusTarget: ''` would ask it to query
-        // for something that cannot exist and the row would report as focus-wired while
-        // focusing nothing.
+        // NO KEY rather than an empty one for a route-only row: the host resolves any
+        // non-empty string, so `focusTarget: ''` would report as focus-wired while focusing
+        // nothing.
         ...(CHECK_ISSUE_CONTROLS[issue.id] ? { focusTarget: CHECK_ISSUE_CONTROLS[issue.id] } : {}),
         dataAttrs: {
           'data-subsystem': subsystem,
@@ -200,18 +181,11 @@
     }))
   );
 
-  // THE RAIL IS A TALLY OF THE ROWS ABOVE IT, and it is declared after them for that reason
-  // (issue 1517, docs round). It used to count the readiness objects instead — passing =
-  // satisfied checks, warnings = non-critical ISSUES, blocking = critical ones — and the rows
-  // are not the issues, so two states the tab can reach were drawn and not counted:
-  //
-  //  - an unsatisfied check whose subsystem raised no matching issue paints an amber row that
-  //    nothing tallied, which is the same divergence the environment and recipe rails carried;
-  //  - a subsystem with no tick and no issue at all — a gathering check in `d100` mode with no
-  //    eligible modifiers — draws the "No issues detected." PASS row `rowsFor` synthesises for
-  //    exactly that case, and the old count could not see it either.
-  //
-  // Counting what is rendered closes both without either half having to know about the other.
+  // THE RAIL IS A TALLY OF THE ROWS ABOVE IT, and is declared after them for that reason.
+  // Counting the readiness objects instead misses two states the tab can reach: an unsatisfied
+  // check whose subsystem raised no matching issue paints an amber row nothing tallied, and a
+  // subsystem with no tick and no issue draws the synthesised "No issues detected." PASS row.
+  // Counting what is RENDERED closes both without either half knowing about the other.
   const counts = $derived.by(() => {
     const tally = { passing: 0, warnings: 0, blocking: 0 };
     for (const group of groups) {
@@ -224,9 +198,8 @@
     return tally;
   });
 
-  // The hero. Three states, and the UNSAVED one is not a decoration: `evaluateCheckReadiness`
-  // above ran against the live DRAFT, while enabling the system reads what is committed, so
-  // a clean draft is not evidence that the system may be enabled.
+  // The hero. Three states, and the UNSAVED one is not decoration: readiness ran against the
+  // live DRAFT while enabling reads what is COMMITTED, so a clean draft is not evidence.
   const summary = $derived.by(() => {
     if (counts.blocking > 0) {
       return {
@@ -263,11 +236,9 @@
   });
 </script>
 
-<!-- THE COUNT AND PILL WORDS ARE NOT PASSED (issue 1517, docs round). This route wrote
-     `Passing / Warnings / Blocking` and `Pass / Warning / Blocks enable` into its own namespace,
-     byte for byte identical to the vocabulary `EditorValidationSurface` already defaults to —
-     the second home the design-system requirement's "lives once" sentence forbids. Both props
-     are gone and the six keys with them. -->
+<!-- THE COUNT AND PILL WORDS ARE NOT PASSED: they are the vocabulary
+     `EditorValidationSurface` already defaults to, and a second home for them is what the
+     design-system requirement's "lives once" sentence forbids. -->
 <div class="manager-checks-validation-route" data-checks-panel="validation">
   <EditorValidationSurface
     title={text('FABRICATE.Admin.Manager.Checks.Validation.Title', 'Validation')}

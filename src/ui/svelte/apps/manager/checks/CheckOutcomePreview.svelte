@@ -1,30 +1,18 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  The Checks Studio's OUTCOME PREVIEW readout (issue 1097).
+  The Checks Studio's OUTCOME PREVIEW readout. It renders values already on the runner's own
+  result object and nothing else: the simulator drove the engine's runners and this panel reads
+  what came back, so a readout that disagreed with a real craft would need the engine to
+  disagree with itself. It shows a `Medallion` die face, the TERSE breakdown line, the total
+  against the DC with its margin, the matched band card and a "What happens" list.
 
-  It renders values that are already on the runner's own result object and it renders
-  nothing else. There is no parallel model of what a tier means here: the simulator drove
-  `runFormulaPassFail` / `runFormulaProgressive` / `runFormulaRouted` and this panel reads
-  what came back, so a readout that disagreed with a real craft would require the engine
-  to disagree with itself.
-
-  The frame this reproduces is `crafting-roll--simulator-rolled.png`: a `Medallion` die
-  face, the TERSE breakdown line (`d20 9 +10 · Sera Vane` — not the full resolved formula,
-  which is the `THIS CHECK` digest's row), the total against the DC with its margin, the
-  matched band card with its success/failure disposition, and a "What happens" list of
-  `IconFactRow`s.
-
-  ## Four states that are not the readout, and each says why
-
-  - **No formula.** Nothing to roll.
-  - **Dynamic DC.** The engine resolves that DC by RUNNING the linked macro; a preview
-    must not, so it previews against the static fallback and states that it did. See
-    `checkPreview.js` for why this is a safety property rather than a limitation.
-  - **Unresolved roll data.** `Roll.parse`'s own `missing: "0"` turns an `@` key the
-    previewed actor lacks into a plausible WRONG total, and "renders only values present
-    on the result" does not catch that, because the wrong number IS on the result. The
-    signal is `resolveCheckFormulaDisplay`'s `resolved === false`.
-  - **No check.** The mode rolls nothing at all.
+  FOUR STATES THAT ARE NOT THE READOUT, each saying why: NO FORMULA (nothing to roll); DYNAMIC
+  DC (the engine resolves that DC by RUNNING the linked macro and a preview must not, so it
+  previews against the static fallback and states so — see `checkPreview.js` for why that is a
+  safety property); UNRESOLVED ROLL DATA (`Roll.parse`'s own `missing: "0"` turns an `@` key the
+  actor lacks into a plausible WRONG total, which "renders only values present on the result"
+  cannot catch because the wrong number IS on the result, so the signal is
+  `resolveCheckFormulaDisplay`'s `resolved === false`); and NO CHECK.
 -->
 <script>
   import IconFactRow from '../IconFactRow.svelte';
@@ -46,9 +34,8 @@
   const result = $derived(preview?.result ?? null);
   const rolled = $derived(Boolean(result));
   const facts = $derived(Array.isArray(preview?.facts) ? preview.facts : []);
-  // The FIRST rolled face, which is what the medallion shows. A preview formula is one
-  // die group by the time it reaches here in every enumerable case, and a multi-group
-  // formula still has a first group — the breakdown line beside it carries the rest.
+  // The FIRST rolled face, which is what the medallion shows; the breakdown line beside it
+  // carries the rest of a multi-group formula.
   const face = $derived(result?.data?.diceGroups?.[0]?.results?.[0] ?? null);
   const marginLabel = $derived.by(() => {
     if (!Number.isFinite(preview?.margin)) return '';
@@ -76,18 +63,15 @@
       )}
     </p>
   {:else}
-    <!-- THE STUDIO'S BUTTON PRIMITIVE, not a hand-written class string (issue 1097
-         follow-up). The bare `manager-button is-primary` this shipped as matched no rule
-         that states a type size, so the label landed on Foundry's INHERITED 14px app base
-         while every other button in the Checks Studio read at the primitive's 11.52px —
-         which is exactly the drift `ManagerButton` exists to end, and exactly the drift a
-         remembered class string cannot be checked for.
+    <!-- THE STUDIO'S BUTTON PRIMITIVE, not a hand-written class string: a bare
+         `manager-button is-primary` matches no rule stating a type size, so the label lands on
+         Foundry's inherited app base while every other button in the studio reads at the
+         primitive's own size — exactly the drift `ManagerButton` exists to end and exactly the
+         drift a remembered class string cannot be checked for.
 
-         It is a CONVERSION, not a wrapper: the element below is already the button, so
-         nothing here nests one inside another. Its Foundry `<button>` reset (full width,
-         released height) moved to the sheet's Checks Studio block with it — a scoped rule
-         naming a class this component no longer emits would match nothing and fail the
-         Svelte compiler-warning sweep. -->
+         It is a CONVERSION, not a wrapper: the element below is already the button. Its Foundry
+         `<button>` reset moved to the sheet's Checks Studio block with it, a scoped rule naming a
+         class this component no longer emits matching nothing. -->
     <ManagerButton
       role="primary"
       class="manager-checks-simulator-roll"
@@ -123,11 +107,10 @@
 
     {#if rolled}
       <div class="manager-checks-simulator-readout" data-checks-simulator-readout>
-        <!-- The rolled face, ON the medallion. The digit is the subject and the die glyph
-             behind it is the tile's own art, so the number is layered over the tile rather
-             than placed beside it — an absolutely-positioned child with no offsets would
-             sit at its STATIC position, which is to the RIGHT of the tile and underneath
-             the breakdown line. `inset: 0` is what makes "on the medallion" true. -->
+        <!-- The rolled face, ON the medallion: the digit is the subject and the die glyph behind it
+             is the tile's own art, so the number is LAYERED over the tile. An absolutely-positioned
+             child with no offsets would sit at its STATIC position, to the right of the tile and
+             under the breakdown line, so `inset: 0` is what makes "on the medallion" true. -->
         <span class="manager-checks-simulator-face" data-checks-simulator-face>
           <Medallion icon="" size={44} />
           <small data-checks-simulator-face-value>
@@ -210,10 +193,9 @@
     justify-content: center;
   }
 
-  /* The digit is the SUBJECT of this tile, so the medallion renders no competing glyph:
-     a 14px die icon and a 15px numeral centred on the same 44px square overlapped into an
-     unreadable blob in the rendered frame, which is the whole reason the caption below the
-     number exists rather than an icon beside it. */
+  /* The digit is the SUBJECT of this tile, so the medallion renders no competing glyph: an
+     icon and a numeral centred on the same square overlap into an unreadable blob, which is
+     why the caption sits below the number rather than an icon beside it. */
   .manager-checks-simulator-face small {
     position: absolute;
     inset: 0;
@@ -260,9 +242,9 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* The matched band card. It mixes into an OPAQUE base for the reason the band ramp
-     records: `--fab-surface-raised` is translucent in every theme, so a mix into it
-     behaves as an OPACITY ramp and drops the label below WCAG AA. */
+  /* The matched band card mixes into an OPAQUE base for the reason the band ramp records: a
+     translucent surface token makes the mix behave as an OPACITY ramp and drops the label
+     below WCAG AA. */
   .manager-checks-simulator-band {
     display: flex;
     gap: var(--fab-space-2);

@@ -1,17 +1,12 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  Progressive crafting check editor (progressive resolution mode).
+  Progressive crafting check editor. A progressive check rolls a FORMULA for a numeric value,
+  and progressive awarding spends that value against each result's difficulty in order until it
+  can no longer cover the next; the award mode decides exactly how the spend stops. There is no
+  DC, comparison or recipe tier — just the formula, the award mode and the unified
+  `CheckTriggers` editor, whose outcome select is relabelled for this numeric context.
 
-  A progressive check rolls a FORMULA for a numeric value. Progressive awarding
-  spends that value against each result's difficulty, in order, until the value can
-  no longer cover the next result; the award mode (equal / partial / exceed) decides
-  exactly how the spend stops. There is no DC, comparison, or recipe tier — just the
-  formula, the award mode, and the unified CheckTriggers editor. A matching trigger
-  can force the award (its outcome select is relabelled Award all / Award none for
-  this numeric context) and, under `checkDriven` authority, break tools.
-
-  Controlled component: renders `value` and emits the next value via `onChange`.
-  `value` carries `{ awardMode, rollFormula, checkBreakage }`.
+  Controlled: renders `value` (`{ awardMode, rollFormula, checkBreakage }`) and emits the next.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
@@ -20,17 +15,14 @@
   import CheckTriggers from './CheckTriggers.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';
 
-  // `section` (issue 1096) selects which of this editor's cards render, so the Checks
-  // Studio's five-section strip can host the SAME editor rather than a per-section fork.
-  // Empty renders every card, which is what the characterization suites and any caller
-  // outside the studio still get.
+  // `section` selects which cards render, so the studio's five-section strip hosts the SAME
+  // editor rather than a per-section fork; empty renders every card.
   let {
     value = null,
     breakageAuthority = 'toolSpecific',
     section = '',
     foundrySystemId = '',
-    // See the note on the other two editors: the resolved applied-modifier set and its
-    // rule, for the formula card's `WHAT ACTUALLY GETS ROLLED` inset.
+    // The resolved applied-modifier set and its rule, for the formula card's inset.
     appliedModifiers = [],
     modifierPolicy = 'addAll',
     recordNoun = 'recipe',
@@ -89,10 +81,9 @@
     />
   {/if}
 
-  <!-- Award mode is a progressive check's OUTCOME model, and it is the only authoring
-       control a progressive check has beyond the formula. That is why the studio renders
-       Outcomes in every mode: hiding it here would remove this control from the UI
-       entirely, which no test would have seen. -->
+  <!-- Award mode is a progressive check's OUTCOME model and the only authoring control it has
+       beyond the formula, which is why the studio renders Outcomes in every mode: hiding it
+       here would remove this control from the UI entirely. -->
   {#if shows('outcomes')}
     <InspectorCard class="manager-checks-card" data-award-mode="">
       <div class="manager-checks-card-head">

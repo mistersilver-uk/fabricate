@@ -1,26 +1,18 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  WHAT THIS MODE DOES — the roll section's opening callout (issue 1096).
+  WHAT THIS MODE DOES — the roll section's opening callout: a dice glyph in a rounded tile, the
+  mode's name, one paragraph explaining what that mode does with a roll, and a facts row under
+  it. MODE-AWARE for every mode the product renders, the copy and the three facts coming from
+  the pure `checkModeCallout.js`, which is proven exhaustive against the reachable pairs.
 
-  A dice glyph in a rounded tile, the mode's name as the title, one paragraph explaining what
-  the mode does with a roll, and a facts row under it: `Check · Required`, `Outcomes · 5
-  tiers`, `Results · Bound to tiers`. The studio used to open straight onto a formula field,
-  so nothing on the screen said what the mode chosen elsewhere actually does.
+  Not the shared `Callout`, and what still separates the two is the FACT ROW: a run of
+  label/value facts is an `InfoStrip`, deferred while it has one qualifying caller in the tree,
+  and a paragraph plus a fact list under one title is two shapes wearing one name. When the
+  strip ships, this block is a `Callout` composing one.
 
-  It is MODE-AWARE for every mode the product renders, not just `routedByCheck`: the copy and
-  the three facts come from `checkModeCallout.js`, which is pure and is proven exhaustive
-  against the reachable (activity, mode) pairs.
-
-  Not the shared `Callout`, and the reason has narrowed rather than gone (issue 1505). That
-  primitive now carries a title and an actions slot, so "one glyph plus one sentence" is no
-  longer what separates the two. What still does is the FACT ROW: a run of label/value facts
-  is an `InfoStrip`, which is deferred to issue 1521 because it has only one qualifying
-  caller in the tree — and a paragraph plus a fact list under one title is still two shapes
-  wearing one name. When the strip ships, this block is a `Callout` composing one.
-
-  DORMANT modes (gathering's routed and progressive, disabled pending issue 683) render the
-  same shape with the shipped dormancy sentence and a clock glyph, so a GM whose world already
-  carries one of those modes is told it is not in use rather than shown a live configuration.
+  DORMANT modes render the same shape with the shipped dormancy sentence and a clock glyph, so a
+  GM whose world already carries one is told it is not in use rather than shown a live
+  configuration.
 
   Props:
    - activity / mode / alchemyCheckMode: what to describe.

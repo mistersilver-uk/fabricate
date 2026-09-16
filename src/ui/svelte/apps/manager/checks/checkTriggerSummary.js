@@ -1,28 +1,16 @@
 /**
- * WHAT A TRIGGER SAYS ABOUT ITSELF (issue 1096).
+ * WHAT A TRIGGER SAYS ABOUT ITSELF: the summary heading each collapsed trigger card, plus the
+ * one sentence under it stating its effect. A card headed by the label of its first `<select>`
+ * made a list of three triggers read `When`, `When`, `When`.
  *
- * A trigger card used to be headed by the word `When` — the label of its first `<select>` —
- * so a list of three triggers read `When`, `When`, `When` and a GM had to re-read every
- * control on every card to find the one they meant. The prototype heads each card with a
- * SUMMARY of its own condition ("Group total of 1d20 is exactly 20") and states its effect in
- * one sentence under it.
+ * COMPOSED FROM FRAGMENTS, NOT WRITTEN PER SHAPE. Five condition types, five aggregates, five
+ * operators and three independent effects is hundreds of strings as a sentence per combination,
+ * so both readings are composed from a small fragment set — and the composition is PURE, so
+ * `tests/check-trigger-summary.test.js` pins every shape without mounting anything. Each
+ * function returns `{ key, fallback, data }` for the caller's own `text()` bridge to resolve.
  *
- * ## Composed from fragments, not written per shape
- *
- * There are five condition types, five aggregates, five operators and three independent
- * effects; a sentence per combination is hundreds of strings. So both readings are composed
- * from a small set of fragments, and the composition is PURE — no Svelte, no Foundry — so
- * `tests/check-trigger-summary.test.js` can pin every shape without mounting anything.
- *
- * Each function returns `{ key, fallback, data }`. The caller resolves the key through its own
- * `text()` bridge and interpolates `data` with `interpolate` from `checksCopy.js`: the
- * localization seam belongs to the Svelte layer and this module stays pure.
- *
- * ## It DESCRIBES; it never decides
- *
- * Nothing here reads or writes a trigger. A summary that disagreed with the controls under it
- * would be worse than no summary, so every value it states is read straight off the same
- * `condition` object those controls bind to.
+ * IT DESCRIBES; IT NEVER DECIDES. Nothing here reads or writes a trigger, and every value it
+ * states is read straight off the same `condition` object the controls under it bind to.
  */
 
 const NAMESPACE = 'FABRICATE.Admin.Manager.Checks.Breakage.';
@@ -50,8 +38,8 @@ function copy(pair) {
 }
 
 /**
- * The comparison word for an operator, defaulting to `exactly` rather than to the raw symbol:
- * a summary reading "Roll total is >= 15" is the control restated, not a sentence.
+ * The comparison word for an operator, defaulting to `exactly` rather than the raw symbol: a
+ * summary reading "Roll total is >= 15" is the control restated, not a sentence.
  *
  * @param {string} operator The stored operator.
  * @returns {{key: string, fallback: string}}
@@ -109,8 +97,7 @@ export function summariseCondition(condition = {}, context = {}) {
     const ids = Array.isArray(condition?.tierIds) ? condition.tierIds : [];
     const named = ids.map((id) => tierNames[id]).filter(Boolean);
     // A trigger whose tier list is empty matches NOTHING, and saying so is the whole value of
-    // a summary: the readiness pass raises `danglingTierStepTarget` for the same state, and a
-    // card that read "Outcome tier is " would leave a GM hunting for the missing word.
+    // a summary; readiness raises `danglingTierStepTarget` for the same state.
     return named.length === 0
       ? { ...copy(['SummaryOutcomeTierNone', 'No outcome tier chosen']), data: {} }
       : {
@@ -125,11 +112,9 @@ export function summariseCondition(condition = {}, context = {}) {
 }
 
 /**
- * The sentence under the title: what happens when the condition matches.
- *
- * The three effects are INDEPENDENT and a trigger may carry any combination, so the clauses
- * are collected and joined rather than selected: a trigger that steps a tier AND breaks tools
- * must say both, and the earlier per-effect pills said neither in prose.
+ * The sentence under the title: what happens when the condition matches. The three effects are
+ * INDEPENDENT and a trigger may carry any combination, so the clauses are collected and joined
+ * rather than selected — one that steps a tier AND breaks tools must say both.
  *
  * @param {object} trigger The whole trigger.
  * @param {object} [context]
@@ -184,8 +169,7 @@ export function summariseEffect(trigger = {}, context = {}) {
   }
 
   // `showBreakTools` is the AUTHORITY gate, not the flag: under `toolSpecific` a check never
-  // breaks tools whatever a persisted `breakTools` says, so a summary claiming otherwise
-  // would describe an effect the engine will not run.
+  // breaks tools whatever a persisted `breakTools` says.
   if (showBreakTools && trigger?.breakTools === true) {
     clauses.push(copy(['SummaryBreakTools', 'the required tools break']));
   }
@@ -194,23 +178,14 @@ export function summariseEffect(trigger = {}, context = {}) {
 }
 
 /**
- * WHAT THE COLLAPSED HEAD SHOWS (issue 1096).
+ * WHAT THE COLLAPSED HEAD SHOWS. A trigger list collapses, so the head carries the effect at a
+ * glance: a glyph tile and a short result chip beside the condition sentence. Every effect shape
+ * gets that treatment, each taking the glyph and semantic family its own vocabulary already uses
+ * elsewhere in this manager.
  *
- * A trigger list collapses, so the head has to carry the effect at a glance: a glyph tile and a
- * short result chip beside the condition sentence. The prototype models exactly two of these —
- * a step-up (`fa-arrow-up`, the info family) and a step-down (`fa-arrow-down`, the warning
- * family) — and nothing else, because its mockup world authors nothing else.
- *
- * The other effect shapes are REAL and shipped, so they are given the same treatment rather than
- * being left blank: the prototype's rule is "the tile and the chip name the effect", and a
- * forced outcome or a tool break is an effect. Each takes the glyph and the semantic family its
- * own vocabulary already uses elsewhere in this manager.
- *
- * ONE effect wins the head even when a trigger carries several, and the order is the prototype's
- * own reading: its second card both steps down AND breaks tools, and its chip says `Step down 1`.
- * A tier step is the most specific statement about the result, a forced outcome is the next, and
- * a bare tool break is the last. The full combination is still stated in prose by
- * `summariseEffect` under the title.
+ * ONE effect wins the head even when a trigger carries several, in this order: a tier step is
+ * the most specific statement about the result, a forced outcome the next, a bare tool break the
+ * last. The full combination is still stated in prose by `summariseEffect` under the title.
  *
  * @param {object} trigger The whole trigger.
  * @param {object} [context]
@@ -243,9 +218,8 @@ export function summariseHeadline(trigger = {}, context = {}) {
       tone: 'info',
       chip: {
         ...copy(['ChipStepTarget', 'Becomes {tier}']),
-        // A nested fragment rather than a bare fallback string: the caller's `phrase()` resolves
-        // an object-valued datum through its own localization bridge, so the unset reading is
-        // translated instead of being pinned to English.
+        // A nested fragment rather than a bare fallback string, so the caller's `phrase()`
+        // translates the unset reading instead of pinning it to English.
         data: {
           tier: tierNames[step.tierId] ?? copy(['SummaryStepTargetUnset', 'a tier that is not set']),
         },
@@ -267,8 +241,7 @@ export function summariseHeadline(trigger = {}, context = {}) {
       },
     };
   }
-  // Same authority gate `summariseEffect` applies: under `toolSpecific` a check never breaks
-  // tools, so a chip claiming it would name an effect the engine will not run.
+  // The same authority gate `summariseEffect` applies.
   if (showBreakTools && trigger?.breakTools === true) {
     return {
       glyph: 'fas fa-hammer',

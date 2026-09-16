@@ -2,25 +2,18 @@
 <!--
   Simple pass/fail crafting check editor (simple and alchemy resolution modes).
 
-  A simple check rolls a FORMULA and succeeds when the total reaches the DC
-  (meet-or-exceed or exceed). The DC value is polymorphic:
-    - static:  the DC is the default, with optional named recipe TIERS (each its
-               own DC) the recipe editor can pick from.
-    - dynamic: a dropped macro is handed the ingredient set, recipe, and actor
-               and returns the DC. Both sides persist so switching the DC mode is
-               non-destructive.
-  The unified CheckTriggers editor lets each trigger force success or failure and
-  (under `checkDriven` authority) break tools. The formula row, trigger editor, and
-  recipe-tier table are shared with the routed editor.
+  A simple check rolls a FORMULA and succeeds when the total reaches the DC. The DC value is
+  polymorphic — `static` takes the default DC with optional named recipe TIERS, `dynamic` hands
+  a dropped macro the ingredient set, recipe and actor and takes the DC it returns — and both
+  sides persist, so switching the DC mode is non-destructive. The unified `CheckTriggers` editor
+  lets each trigger force success or failure and, under `checkDriven` authority, break tools.
 
-  `showDcSource` (default true) renders the DC-SOURCE half of this check: the
-  static/dynamic chooser inside the Difficulty card, plus the recipe-tier table or the
-  dynamic-DC macro card below it. Salvage and gathering reuse this editor with
-  `showDcSource={false}`: they have no records to pick a tier from and no dynamic-DC
-  macro, so they author the base DC and the comparison alone and take a per-entity DC
-  override elsewhere.
+  `showDcSource` (default true) renders the DC-SOURCE half: the static/dynamic chooser inside
+  the Difficulty card plus the recipe-tier table or the dynamic-DC macro card. Salvage and
+  gathering reuse this editor with `showDcSource={false}`, having no records to pick a tier from
+  and no dynamic-DC macro, and take a per-entity DC override elsewhere.
 
-  Controlled component: renders `value` and emits the next value via `onChange`.
+  Controlled: renders `value` and emits the next value via `onChange`.
 -->
 <script>
   import Field from '../../../components/Field.svelte';
@@ -34,11 +27,9 @@
   import CheckTriggers from './CheckTriggers.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';
 
-  // `breakageAuthority` (issue 419): the unified CheckTriggers editor is always
-  // rendered; under `checkDriven` it also exposes the per-trigger break-tools toggle.
-  // `section` (issue 1096) selects which of this editor's cards render, so the Checks
-  // Studio's five-section strip hosts the SAME editor rather than a per-section fork.
-  // Empty renders every card.
+  // `breakageAuthority` gates the per-trigger break-tools toggle on `checkDriven`, the trigger
+  // editor itself always rendering. `section` selects which cards render, so the studio's
+  // five-section strip hosts the SAME editor rather than a per-section fork.
   let {
     value = null,
     showDcSource = true,
@@ -47,17 +38,13 @@
     foundrySystemId = '',
     // The activity's own word for the thing a check is rolled for; see CheckDifficultyCard.
     recordNoun = 'recipe',
-    // The check modifiers this check APPLIES and the rule that combines them, for the
-    // formula card's `WHAT ACTUALLY GETS ROLLED` inset. Resolved by the caller from the
-    // activity's whole modifier context, which is the same derivation the Modifiers
-    // section counts from — an editor re-deriving it would be a second opinion.
+    // The check modifiers this check APPLIES and the rule combining them, from the same
+    // derivation the Modifiers section counts from rather than a second opinion.
     appliedModifiers = [],
     modifierPolicy = 'addAll',
-    // The PREVIEW AGAINST binding (issue 1097), and the third `ThresholdBandStrip` binding.
-    // A simple check's single boundary IS the DC, so the handle writes `dc` — the same field
-    // the Difficulty card's stepper writes — and `trackMin`/`trackMax` scale the track to the
-    // reachable total range the route computes from the formula, which is what
-    // `simple-outcomes.png`'s "scaled to the dice plus the modifier bounds you set" reads.
+    // The PREVIEW AGAINST binding, and the third `ThresholdBandStrip` binding. A simple check's
+    // single boundary IS the DC, so the handle writes the same field the Difficulty card's
+    // stepper writes, and the track bounds scale it to the reachable total range.
     previewRecords = [],
     previewRecordId = '',
     previewLabel = '',
@@ -90,17 +77,14 @@
     text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeSuccess', 'Success')
   );
 
-  // The strip's domain. It defaults to a symmetric window around the DC when the route
-  // supplies nothing — a track with no width cannot be dragged, and an editor rendered
-  // outside the studio (the characterization suites, any future caller) supplies neither
-  // bound. `min` is additionally clamped BELOW the DC so a DC at or under the reachable
-  // floor still leaves the failure band a band rather than collapsing the strip into its
-  // non-contiguous fallback.
-  // `null` and `''` are ABSENT, not zero — the same guard `ThresholdBandStrip` records for
-  // its own `to` edge, and for the same reason: `Number(null)` is 0 and `Number.isFinite(0)`
-  // is true, so a bare coercion read "no track supplied" as a track ending at zero and
-  // collapsed the domain to `[0, dc + 1]`. The handle then had nowhere to move to and the
-  // strip silently stopped being draggable.
+  // The strip's domain, defaulting to a symmetric window around the DC when the route supplies
+  // nothing, a track with no width being undraggable. `min` is additionally clamped BELOW the DC
+  // so a DC at the reachable floor still leaves the failure band a band.
+  //
+  // `null` and `''` are ABSENT, not zero — the same guard `ThresholdBandStrip` records for its
+  // own `to` edge: `Number(null)` is 0 and `Number.isFinite(0)` is true, so a bare coercion read
+  // "no track supplied" as a track ending at zero and silently stopped the strip being
+  // draggable.
   const suppliedBound = (bound) => {
     if (bound === null || bound === undefined || bound === '') return null;
     const parsed = Number(bound);
@@ -110,8 +94,7 @@
   const stripMin = $derived(Math.min(suppliedBound(trackMin) ?? dc - 10, dc - 1));
   const stripMax = $derived(Math.max(suppliedBound(trackMax) ?? dc + 10, dc + 1));
 
-  // TWO bands and therefore ONE handle, which is the whole outcome model of a simple
-  // check: it either clears the difficulty or it does not.
+  // TWO bands and therefore ONE handle, the whole outcome model of a simple check.
   const bandStripBands = $derived([
     {
       id: 'failure',
@@ -130,10 +113,9 @@
   ]);
 
   /**
-   * Apply the single boundary move. The strip has already clamped the value inside the
-   * track, so this only persists the DC — the same field the Difficulty card's stepper
-   * writes, which is what makes the strip a visualisation of that number rather than a
-   * second authority over it.
+   * Apply the single boundary move. The strip has already clamped the value inside the track, so
+   * this only persists the DC — the same field the Difficulty card's stepper writes, which makes
+   * the strip a visualisation of that number rather than a second authority over it.
    *
    * @param {{binding: string, dc: number}} patch The strip's own patch.
    */
@@ -171,9 +153,9 @@
       </div>
     </InspectorCard>
 
-    <!-- DIFFICULTY, in its own card (issue 1096): the DC, the meet/exceed comparison and —
-         on this slot alone — where the number comes from. The simple check is the one that
-         carries `dcMode`/`macroUuid`, so it is the one that shows the chooser. -->
+    <!-- DIFFICULTY, in its own card: the DC, the meet/exceed comparison and — on this slot
+         alone — where the number comes from. The simple check is the one carrying
+         `dcMode`/`macroUuid`, so it is the one that shows the chooser. -->
     <CheckDifficultyCard
       dc={value?.dc ?? 15}
       thresholdMode={value?.thresholdMode || 'meet'}
@@ -184,11 +166,10 @@
     />
   {/if}
 
-  <!-- A simple check's OUTCOME model: exactly two, and neither is authored. It is a
-       statement rather than an editor, which is why it renders through the shared icon
-       fact row instead of a bespoke pair of cards — and why the section carries no count
-       badge. It renders in every mode precisely because it is the mode's outcome model;
-       hiding it would leave the section blank on the one mode that has nothing else. -->
+  <!-- A simple check's OUTCOME model: exactly two, and neither is authored. It is a statement
+       rather than an editor, which is why it renders through the shared icon fact row and why
+       the section carries no count badge. It renders in every mode precisely because it IS the
+       mode's outcome model. -->
   {#if shows('outcomes')}
     <InspectorCard class="manager-checks-card" data-simple-outcomes="">
       <div class="manager-checks-card-head">
@@ -205,9 +186,8 @@
         </div>
       </div>
       <div class="manager-checks-card-body">
-        <!-- PREVIEW AGAINST: the SAME selection the rail's "Preview as" card offers, reported
-             upward rather than held here, so the simulator and the strip can never be reading
-             different records. -->
+        <!-- PREVIEW AGAINST: the SAME selection the rail's "Preview as" card offers, reported upward
+             rather than held here, so the simulator and the strip cannot read different records. -->
         {#if previewRecords.length > 1}
           <Field as="label" class="manager-checks-band-record">
             <span
@@ -291,9 +271,9 @@
   {/if}
 
   {#if showDcSource && shows('roll')}
-    <!-- THE TIER LIST RENDERS UNDER BOTH MODES (issue 1096). The macro is handed the tier's
-         DC as its anchor and returns the final number, so the two COMPOSE rather than
-         compete; hiding the tiers under dynamic would hide half of what the engine reads. -->
+    <!-- THE TIER LIST RENDERS UNDER BOTH MODES: the macro is handed the tier's DC as its anchor
+         and returns the final number, so the two COMPOSE rather than compete, and hiding the tiers
+         under dynamic would hide half of what the engine reads. -->
     <InspectorCard class="manager-checks-card" data-static-dc="">
       <CheckRecipeTiers
         tiers={value?.tiers || []}

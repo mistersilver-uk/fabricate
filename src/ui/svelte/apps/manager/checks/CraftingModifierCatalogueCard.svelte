@@ -2,34 +2,21 @@
 <!--
   Per-activity modifier SELECTION editor.
 
-  A crafting system defines ONE named modifier library — each entry an authored roll-data
-  expression with optional bounds — and that library is authored in ONE place, which this card
-  deep-links to. THIS CARD AUTHORS NO ENTRY, ON ANY ACTIVITY: crafting used to, which made the
-  Checks screen a second editor for a system-level library and made salvage and gathering
-  second-class states of that asymmetry. What stays here is the SELECTION, which is genuinely
-  per-activity.
+  A crafting system defines ONE named modifier library, authored in ONE place, which this card
+  deep-links to. THIS CARD AUTHORS NO ENTRY, ON ANY ACTIVITY: two editors for one array is how
+  two screens come to disagree about which wrote last. What stays here is the SELECTION, which is
+  genuinely per-activity — the COMBINATION RULE (`defaultModifierPolicy`), the PICK CAP
+  (`maxModifierPicks`, where ABSENT is a real value meaning unlimited) and the DEFAULT ELIGIBLE
+  SET (`defaultModifierIds`). `MODIFIER_POLICIES` and `policyDefersSelection` in the resolver are
+  the sources for the rule list, its order and which two rules defer.
 
-  It renders TWO studio cards — `Named modifiers` (the read-only library plus the per-row
-  eligibility control) and `How they combine` (the rule grid plus the pick cap) — and authors
-  three things, none of them an entry:
-
-    1. The COMBINATION RULE (`defaultModifierPolicy`) — who selects the eligible modifiers and
-       how they reduce to the one number appended to the check roll. `MODIFIER_POLICIES` in the
-       resolver is the source of that list and its order, and `policyDefersSelection` of which
-       two rules defer the selection.
-    2. The PICK CAP (`maxModifierPicks`) — how many modifiers the deferred-to party may pick. It
-       bounds the two selecting rules only, and ABSENT means unlimited, which is why the
-       control's empty state is a real value rather than a blank to be defaulted.
-    3. The DEFAULT ELIGIBLE SET (`defaultModifierIds`), toggled per row by the eligibility pill.
-
-  The card anatomy, the six-label eligibility vocabulary, where the rule-keyed description sits,
-  the 2x2-to-1x4 reflow and the single empty-library sentence are all required by
+  The two cards, the six-label eligibility vocabulary, where the rule-keyed description sits, the
+  2x2-to-1x4 reflow and the single empty-library sentence are all required by
   `openspec/specs/ui-integration/spec.md` → "Checks studio — combination rule and pick cap".
 
   Rendered for every sub-tab, INCLUDING the ones where the library cannot reach a roll, because a
-  library that silently does nothing is the defect this card must report rather than hide;
-  `inertCause` names which reason applies. Controlled: it emits a partial SELECTION patch via
-  `onChange`, and cannot emit a library patch at all — the store's saver no longer accepts one.
+  library that silently does nothing is the defect this card must report rather than hide.
+  Controlled: it emits a partial SELECTION patch and cannot emit a library patch at all.
 -->
 <script>
   import Field from '../../../components/Field.svelte';
@@ -55,27 +42,23 @@
   const MAX_PICKS_HINT_ID = 'manager-crafting-modifier-max-picks-hint';
 
   let {
-    // Which activity's SELECTION this card edits. It decides the `bySubject` label vocabulary
-    // and whether the gathering notices render, and NOTHING about editability: the rows are
-    // read-only and the eligibility control and rule grid editable, on all three.
+    // Which activity's SELECTION this card edits: the `bySubject` label vocabulary and whether
+    // the gathering notices render, and NOTHING about editability.
     activity = 'crafting',
     modifiers = [],
     defaultModifierPolicy = 'addAll',
     defaultModifierIds = [],
-    // The cap on how many modifiers a SELECTING rule may pick. ABSENT is a real value —
-    // "unlimited" — so this defaults to `null` and no call site may coerce it:
-    // `resolveMaxModifierPicks` decides what absence means, here and in the engine alike.
+    // The cap on how many modifiers a SELECTING rule may pick. ABSENT is a real value, so no
+    // call site may coerce it: `resolveMaxModifierPicks` decides what absence means.
     maxModifierPicks = null,
-    // Why the catalogue reaches no roll, or '' when it does: 'noCheck', 'noFormula' or
-    // 'noModifierSupport' (the mode rolls but takes no modifiers — gathering d100). Each needs a
-    // different remedy, so the cause is passed rather than derived from one boolean.
+    // Why the catalogue reaches no roll, or '' when it does. Each cause needs a different
+    // remedy, so it is passed rather than derived from one boolean.
     inertCause = '',
-    // Whether this activity's whole check-modifier seam is DORMANT: gathering's formula-rolled
-    // modes are disabled, so no GM-selectable configuration reaches them. Its own notice,
-    // ALONGSIDE `inertCause` — the two are different facts with different fixes.
+    // Whether this activity's whole check-modifier seam is DORMANT. Its own notice, ALONGSIDE
+    // `inertCause`: the two are different facts with different fixes.
     dormant = false,
-    // Navigate to the surface where the library is authored, on every activity now the rows are
-    // read-only everywhere. A null default keeps the card mountable in isolation.
+    // Navigate to the surface where the library is authored; a null default keeps the card
+    // mountable in isolation.
     onEditLibrary = null,
     onChange = () => {},
   } = $props();
@@ -122,15 +105,12 @@
 
   const subjectCopy = $derived(SUBJECT_COPY[activity] || SUBJECT_COPY.crafting);
 
-  // Icon vocabulary for the four combination rules. THE GLYPH TEST IS WHETHER FOUNDRY CAN RENDER
-  // IT, not whether the name is in Font Awesome's free release: a module IS licensed to write a
-  // configuration Foundry resolves to a premium icon and is NOT licensed to bundle the icon, and
-  // Fabricate ships no font — `foundryIconCatalogue.js` measures what the shipped bundle carries.
-  //
-  // The ORDER mirrors `MODIFIER_POLICIES`, which is in authoring-surface order, so the two
-  // selecting rules sit adjacent and the 2x2 grid below reads them as a pair. Each description
-  // names the eligibility word the rule puts on the rows above, which ties the two cards
-  // together.
+  // Icon vocabulary for the four combination rules. THE GLYPH TEST IS WHETHER FOUNDRY CAN
+  // RENDER IT, not whether the name is free: a module is licensed to write a configuration
+  // Foundry resolves to a premium icon and not to bundle the icon, and Fabricate ships no font.
+  // The ORDER mirrors `MODIFIER_POLICIES`, so the two selecting rules sit adjacent and the 2x2
+  // grid reads them as a pair, and each description names the eligibility word the rule puts on
+  // the rows above.
   const policyOptions = $derived([
     {
       value: 'addAll',
@@ -169,10 +149,9 @@
     },
   ]);
 
-  // The ELIGIBILITY vocabulary: THREE words, one per KIND of rule, because the rule decides what
-  // "on" MEANS for an entry, and `bySubject` SHARES `playerPicks`'s word rather than owning a
-  // fourth. Both are required by `openspec/specs/ui-integration/spec.md` → "Checks studio —
-  // combination rule and pick cap".
+  // The ELIGIBILITY vocabulary: THREE words, one per KIND of rule, and `bySubject` SHARES
+  // `playerPicks`'s rather than owning a fourth. Both are required by the spec section the
+  // header names.
   const ELIGIBILITY_COPY = {
     addAll: {
       key: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierEligibilityApplied',
@@ -221,9 +200,8 @@
     },
   };
 
-  // Why the catalogue reaches no roll. Each cause has its own remedy, so each has its own
-  // sentence, and neither names a placeholder: modifiers are added to the check roll
-  // automatically, so a GM told to reference one would be told to do nothing useful.
+  // Why the catalogue reaches no roll: each cause has its own remedy and so its own sentence,
+  // and none names a placeholder, modifiers being added to the roll automatically.
   const INERT_COPY = {
     noCheck: {
       key: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierInertNoCheck',
@@ -235,9 +213,8 @@
       fallback:
         'The check for this resolution mode has no roll formula yet, so nothing here is rolled. Author one on The roll section and these modifiers are added to it automatically.',
     },
-    // GATHERING d100 ONLY, and it exists because `noCheck` is FALSE here: the d100 rolled
-    // against each drop's chance IS this mode's check, and what it lacks is a seam to add
-    // modifiers to.
+    // GATHERING d100 ONLY, and it exists because `noCheck` is FALSE here: the d100 against
+    // each drop's chance IS this mode's check, lacking only a seam for modifiers.
     noModifierSupport: {
       key: 'FABRICATE.Admin.Manager.Checks.Gathering.ModifierInertNoModifierSupport',
       fallback:
@@ -253,9 +230,8 @@
   // all. Asked of the resolver rather than re-derived from a local membership test.
   const defersSelection = $derived(policyDefersSelection(selectedPolicy));
   const eligibility = $derived(ELIGIBILITY_COPY[selectedPolicy] || ELIGIBILITY_COPY.addAll);
-  // The cap means a different thing under each selecting rule — a bound on the SUBJECT author
-  // at edit time, or on the PLAYER at roll time — so the hint is keyed by rule. Only the two
-  // rules `policyDefersSelection` admits can appear, hence no third entry.
+  // The cap means a different thing under each selecting rule, so the hint is keyed by rule;
+  // only the two `policyDefersSelection` admits can appear, hence no third entry.
   const maxPicksCopy = $derived(
     selectedPolicy === 'bySubject'
       ? { key: subjectCopy.capKey, fallback: subjectCopy.cap }
@@ -267,36 +243,32 @@
           }
         : null
   );
-  // Routed through the resolver so the field shows the bound the ENGINE would apply: a stored
-  // `0`, `-2` or `"three"` all read as unlimited there. `Infinity` → `null` is the Stepper's
-  // unset value, which makes "unlimited" a blank field rather than a magic number.
+  // Routed through the resolver so the field shows the bound the ENGINE would apply, where a
+  // stored `0`, `-2` or `"three"` all read as unlimited. `Infinity` → `null` is the Stepper's
+  // unset value, which makes "unlimited" a blank field.
   const maxPicksLimit = $derived(resolveMaxModifierPicks({ maxModifierPicks }));
   const maxPicksValue = $derived(Number.isFinite(maxPicksLimit) ? maxPicksLimit : null);
   const maxPicksLabel = $derived(
     text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierMaxPicks', 'Maximum picks')
   );
-  // THE CARD'S DESCRIPTION, keyed by RULE because what marking an entry MEANS is the whole
-  // subject of this card, and additionally by ACTIVITY under `bySubject`, the record doing the
-  // picking being a recipe, a component or a task.
+  // THE CARD'S DESCRIPTION, keyed by RULE — what marking an entry MEANS is this card's whole
+  // subject — and additionally by ACTIVITY under `bySubject`.
   const cardLead = $derived(
     selectedPolicy === 'bySubject'
       ? { key: subjectCopy.leadKey, fallback: subjectCopy.lead }
       : { key: eligibility.leadKey, fallback: eligibility.lead }
   );
   // KEYED BY ACTIVITY, not a module-level literal: this component is instantiated three times,
-  // and a duplicate DOM id silently sends every `aria-describedby` to whichever copy rendered
-  // first — a screen-reader-only defect no frame would show.
+  // and a duplicate DOM id silently re-points every `aria-describedby` on the page.
   const ELIGIBILITY_INTRO_ID = $derived(`manager-${activity}-modifier-eligibility-intro`);
   // Gated on the catalogue being NON-EMPTY as well as on the cause: the notice reports a
-  // CATALOGUE that reaches no roll, and an empty one is not that. A fresh crafting system has no
-  // formula, so an ungated notice warned about nothing on first contact with the tab.
-  // `RecipeOverviewTab` gates its equivalent banner the same way.
+  // CATALOGUE that reaches no roll, and an empty one is not that, so an ungated notice warned
+  // about nothing on first contact with the tab.
   const inert = $derived(library.length > 0 ? INERT_COPY[inertCause] || null : null);
   const defaultIds = $derived(Array.isArray(defaultModifierIds) ? defaultModifierIds : []);
 
-  // The three SELECTION writes, and the whole of what this card persists: each emits a partial
-  // patch the store merges into THIS activity's check block, and none can touch the library —
-  // the store's check-modifier saver accepts no library key at all.
+  // The three SELECTION writes, the whole of what this card persists. None can touch the
+  // library: the store's check-modifier saver accepts no library key at all.
   function selectPolicy(policy) {
     onChange({ defaultModifierPolicy: policy });
   }
@@ -313,8 +285,8 @@
   }
 
   // The read-only bounds chip, signed on BOTH ends because a modifier is a signed contribution.
-  // The two half-bounded readings are separate sentences, and an unbounded entry renders no chip
-  // rather than the word "unbounded" on every row of a catalogue that mostly is.
+  // An unbounded entry renders no chip rather than the word on every row of a catalogue that
+  // mostly is.
   function boundsChipLabel(modifier) {
     const { min, max } = resolveModifierBounds(modifier);
     if (min === null && max === null) return '';
@@ -326,9 +298,8 @@
     return `${text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierBoundsAtLeast', 'At least')} ${signed(min)}`;
   }
 
-  // Which BLOCKING bounds fault this entry has, or `''`. Both make the entry contribute 0 until
-  // repaired, and the Validation route reports the same two as `modifierBoundsInverted` /
-  // `modifierBoundsUnsafe`. TWO CAUSES, TWO SENTENCES: they need different repairs.
+  // Which BLOCKING bounds fault this entry has, or `''`. Both make it contribute 0 until
+  // repaired, and the Validation route reports the same two. TWO CAUSES, TWO SENTENCES.
   function boundsFault(modifier) {
     const bounds = resolveModifierBounds(modifier);
     if (bounds.inverted) return 'inverted';
@@ -354,15 +325,13 @@
   data-check-modifier-activity={activity}
 >
   <!-- The head carries the deep link at its top right. A full-width button under the rows sits
-       in the slot every other list in this studio fills with its "add a row" control — a shape
-       promising exactly the thing this card cannot do. -->
+       in the slot every other list in this studio fills with its "add a row" control. -->
   <div class="manager-checks-card-head">
     <div class="manager-checks-card-head-body">
       <div class="manager-checks-card-heading">
-        <!-- `Named modifiers`, a DIFFERENT key from `ModifierCatalogueHeading`, which the
-             gathering task editor renders to disambiguate a task's check-modifier pick from
-             its drop rows' character modifiers. One key serving two meanings is how a rename
-             breaks a screen nobody looked at. -->
+        <!-- `Named modifiers`, a DIFFERENT key from `ModifierCatalogueHeading`, which the gathering
+             task editor renders to disambiguate a task's check-modifier pick from its drop rows'
+             character modifiers. One key serving two meanings is how a rename breaks a screen. -->
         <h3 class="manager-checks-card-title">
           {text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierNamedHeading', 'Named modifiers')}
         </h3>
@@ -382,8 +351,7 @@
       </div>
       <!-- The RULE'S OWN SENTENCE, above the rows that do the marking rather than under the grid
            that sets the rule, where it read as a footnote about the pick cap. It keeps the
-           `aria-describedby` target id, which is what makes the pill's state word mean
-           something to a reader who never sees the rule grid. -->
+           `aria-describedby` target id, which makes the pill's state word mean something. -->
       <p
         class="manager-checks-card-description"
         id={ELIGIBILITY_INTRO_ID}
@@ -452,12 +420,11 @@
 
     {#each library as modifier (modifier.id)}
       <!-- ONE ROW, ONE LINE, a DIRECT child of the rows list so the list's own rhythm separates
-           entries rather than a wrapper's, and READ-ONLY on EVERY activity. The eligibility pill
-           at the end is NOT part of that: which entries an activity applies is exactly what this
-           screen owns. -->
+           entries, and READ-ONLY on EVERY activity. The eligibility pill at the end is NOT part of
+           that: which entries an activity applies is what this screen owns. -->
       <!-- THE ROW IS `ModifierLibraryRow`. The Tool Studio's check-bonus picker draws the same
-           world modifier library and calls the same row, which is what stops two screens
-           presenting one concept from two copies. -->
+           world modifier library and calls the same row, which stops two screens presenting one
+           concept from two copies. -->
       <ModifierLibraryRow
         as="div"
         icon={modifier.icon || DEFAULT_MODIFIER_ICON}
@@ -481,10 +448,10 @@
           >
         {/if}
 
-        <!-- THE ELIGIBILITY CONTROL, and it IS the pill: a real `aria-pressed` toggle button
-             carrying the row's accessible name, pointed at the rule's sentence above, last on
-             the row, with nothing interactive nested inside it. The off state changes the word
-             AND unlights the dot, so it is never carried by colour alone. -->
+        <!-- THE ELIGIBILITY CONTROL, and it IS the pill: a real `aria-pressed` toggle button carrying
+             the row's accessible name, pointed at the rule's sentence above, last on the row, with
+             nothing interactive nested inside it. The off state changes the word AND unlights the dot,
+             so it is never carried by colour alone. -->
         <button
           type="button"
           class="manager-modifier-eligibility"
@@ -557,12 +524,10 @@
   <div class="manager-checks-card-body">
     <!-- TWO columns, so the group is a 2x2: at this much copy per card, three columns packs too
          much text into each. `--manager-radio-card-columns` is a FIXED track count, never
-         `auto-fit`, so the count IS the layout — four options at 2 columns is a clean 2x2 with
-         no orphan row, and it puts the two non-selecting rules on the top row and the two
-         selecting ones on the bottom, which is the distinction the pick cap applies to.
-
-         It REFLOWS to 1x4 rather than overflowing at a narrow pane, because the card declares
-         itself a container in the style block below. -->
+         `auto-fit`, so the count IS the layout — four options at 2 columns is a clean 2x2 with no
+         orphan row, and it puts the two selecting rules together, which is the distinction the pick
+         cap applies to. It REFLOWS to 1x4 rather than overflowing at a narrow pane, the card
+         declaring itself a container in the style block below. -->
     <RadioCardGroup
       legendKey="FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyHeading"
       legend="How they combine"

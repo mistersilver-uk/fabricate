@@ -1,32 +1,26 @@
 /**
- * The Checks Studio's per-outcome odds enumerator.
- *
- * There is nothing random here. A check whose formula is ONE unmodified single die plus a
- * deterministic remainder has a finite, fully knowable outcome space, so the histogram
- * ENUMERATES that die's faces and buckets each one through the SAME classifier the engine
- * resolves a real roll with ({@link classifyCheckTotal}, {@link resolveForcedOutcome} plus the
- * comparison, or {@link resolveProgressiveAward}). No `Math.random`, no sampling, no second
+ * The Checks Studio's per-outcome odds enumerator. There is nothing random here: a check whose
+ * formula is ONE unmodified single die plus a deterministic remainder has a finite outcome
+ * space, so the histogram ENUMERATES that die's faces and buckets each one through the SAME
+ * classifier the engine resolves a real roll with. No `Math.random`, no sampling, no second
  * model of what a tier means.
  *
  * The POSITIVE WHITELIST over `Roll.parse` that decides enumerability, the formulas a string
  * scan would wrongly admit, and the three properties of `Roll.parse` handled below rather than
- * assumed are all stated in `openspec/specs/ui-integration/spec.md` → "Per-outcome odds
- * histogram"; the numbered references in this file are to that list:
+ * assumed are stated in `openspec/specs/ui-integration/spec.md` → "Per-outcome odds histogram";
+ * the numbered references in this file are to that list:
  *
- *   1. `Roll.parse` THROWS on a mid-edit formula, so the call is wrapped and a thrown parse is
- *      a not-enumerable OUTCOME.
+ *   1. `Roll.parse` THROWS on a mid-edit formula, so the call is wrapped and a thrown parse is a
+ *      not-enumerable OUTCOME.
  *   2. Its `missing: "0"` turns an unresolved `@` key into a literal `0` that parses cleanly, so
- *      the unresolved-roll-data refusal reads {@link resolveCheckFormulaDisplay}'s
- *      `resolved === false` and never the parse.
- *   3. Determinism must RECURSE, because `flattenTree` pushes a parenthetical, function or pool
- *      term WHOLE — and `StringTerm#isDeterministic` LIES, answering `true` for a string
- *      Foundry then throws on at evaluate, so it is refused explicitly.
+ *      the refusal reads {@link resolveCheckFormulaDisplay}'s `resolved === false`, not the parse.
+ *   3. Determinism must RECURSE, `flattenTree` pushing a parenthetical, function or pool term
+ *      WHOLE — and `StringTerm#isDeterministic` LIES, so it is refused explicitly.
  *
  * Every refusal carries a discriminated REASON CODE, so a predicate implemented as
- * `return false` is distinguishable from a correct one and the panel can say WHY. The module
- * holds no Foundry global of its own: `Roll` is a parameter defaulting to `globalThis.Roll`, and
- * a missing or throwing `parse` yields the not-enumerable result rather than an escaped
- * exception, which is what keeps a View Lab capture run from failing whole on this one panel.
+ * `return false` is distinguishable from a correct one. `Roll` is a parameter defaulting to
+ * `globalThis.Roll`, and a missing or throwing `parse` yields the not-enumerable result rather
+ * than an escaped exception, which keeps a View Lab capture run from failing on this panel.
  */
 
 import {
@@ -40,13 +34,10 @@ import { resolveProgressiveAward } from '../../../../../utils/progressiveAward.j
 import { reduceRollExpression } from '../../../../../utils/rollExpressionAverage.js';
 
 /**
- * Why a formula is not enumerable. Discriminated so each refusal is testable on its own terms
- * rather than on a shared "not enumerable" observable.
- *
- * `nonNumericDenomination` is separate from `nonIntegerFaces` because `FateDie` reports
- * `faces: 3` and `Coin` reports `2` — both perfectly integral, distinguished ONLY by
- * denomination — so "the faces are not an integer" would be a false statement in the panel.
- *
+ * Why a formula is not enumerable, discriminated so each refusal is testable on its own terms.
+ * `nonNumericDenomination` is separate from `nonIntegerFaces` because `FateDie` and `Coin` both
+ * report integral faces and are distinguished ONLY by denomination, so "the faces are not an
+ * integer" would be false in the panel.
  * @type {Readonly<Record<string, string>>}
  */
 export const ODDS_REASONS = Object.freeze({
@@ -64,18 +55,14 @@ export const ODDS_REASONS = Object.freeze({
 
 /**
  * Why a PROGRESSIVE histogram has nothing to draw even though the formula is enumerable.
- * Deliberately NOT an {@link ODDS_REASONS} member: those all say the formula cannot be
- * enumerated, and this says the opposite — the missing input is the GM's own sandbox order.
- *
+ * Deliberately NOT an {@link ODDS_REASONS} member: those say the formula cannot be enumerated,
+ * where this says the opposite — the missing input is the GM's own sandbox order.
  * @type {string}
  */
 export const SANDBOX_ABSENT = 'no-sandbox-order';
 
-/**
- * The largest joint outcome space this will walk. The enumeration is a cartesian product, so it
- * grows multiplicatively, and the cap REFUSES with a stated reason rather than sampling — a
- * sampled histogram being the approximation this whole module exists to avoid.
- */
+/** The largest joint outcome space this will walk. The enumeration is a cartesian product, so
+ *  the cap REFUSES with a stated reason rather than sampling. */
 const MAX_ENUMERATED_OUTCOMES = 50_000;
 
 /** Foundry's non-numeric denominations, whose faces are not values (`1df`, `1dc`). */
@@ -85,8 +72,8 @@ const refuse = (reason) => ({ enumerable: false, reason });
 
 /**
  * A term that carries a dice term's shape, whatever class it is. Deliberately STRUCTURAL: the
- * View Lab has no `foundry.dice.*` namespace at all, so an `instanceof` test would make this
- * predicate untestable outside a live client.
+ * View Lab has no `foundry.dice.*` namespace, so an `instanceof` test would make this predicate
+ * untestable outside a live client.
  *
  * @param {object} term A parsed roll term.
  * @returns {boolean} True when the term looks like a `DiceTerm`.
@@ -98,12 +85,9 @@ function isDiceTermLike(term) {
 
 /**
  * A `StringTerm`, which reports `isDeterministic: true` for an unresolvable string and then
- * throws at evaluate.
- *
- * `typeof term.term === 'string'` ALONE is not this test: `ParentheticalTerm` also declares a
- * string `term`, so `1d20 + (2d6)` would refuse as `string-term` rather than as the
- * `non-deterministic-remainder` it is. A parenthetical is told apart by the two fields only it
- * carries — an own `roll` slot and `isIntermediate = true`.
+ * throws at evaluate. `typeof term.term === 'string'` ALONE is not this test: `ParentheticalTerm`
+ * also declares a string `term`, so `1d20 + (2d6)` would refuse as `string-term` rather than as
+ * the `non-deterministic-remainder` it is, and is told apart by the two fields only it carries.
  *
  * @param {object} term A parsed roll term.
  * @returns {boolean} True when the term is a string term.
@@ -116,13 +100,11 @@ function isStringTermLike(term) {
 }
 
 /**
- * Refuse the non-die remainder for a STRING TERM only, and NOT for every non-deterministic term.
+ * Refuse the non-die remainder for a STRING TERM only, and NOT for every non-deterministic term:
  * `flattenTree` pushes a parenthetical, function or pool term WHOLE, so a blanket determinism
- * test refused every formula with a die inside brackets — which, a bounded rolling check
- * modifier being expressed as `min(max((1d8), -1), 6)`, is every system carrying one. Those
- * formulas are perfectly enumerable; they are simply not "one die plus a flat number".
- *
- * What survives is the `StringTerm` refusal, the one shape whose `isDeterministic` LIES.
+ * test refuses every formula with a die inside brackets — which, a bounded rolling modifier
+ * being expressed as `min(max((1d8), -1), 6)`, is every system carrying one. What survives is
+ * the `StringTerm` refusal, the one shape whose `isDeterministic` LIES.
  *
  * @param {Array<object>} terms Every parsed term except the dice.
  * @returns {?{enumerable: false, reason: string}} A refusal, or null when it passes.
@@ -136,15 +118,11 @@ function refuseRemainder(terms) {
  * The dice this formula rolls, in READING ORDER, or the reason it cannot be enumerated.
  *
  * IT DOES NOT SCAN THE STRING FOR `NdS`, and that is the whole point: such a scan hands back a
- * clamp's BOUND ARGUMENTS as though they were flat addends, so the enumerated domain comes out
- * shifted and too wide, and the histogram it draws is monotone, correctly shaped, plausibly
- * labelled and wrong — the worst thing this surface can do, because nothing about it looks
- * broken.
- *
- * So the dice are found by the SAME recursive-descent reader that reduces the expression,
- * which knows a function argument from a top-level addend because it parsed both. One reader,
- * two questions — and it asserts END OF INPUT, so a shape it does not understand cannot quietly
- * reduce through a prefix of itself.
+ * clamp's BOUND ARGUMENTS as though they were flat addends, and the histogram it draws is
+ * monotone, correctly shaped, plausibly labelled and wrong — the worst thing this surface can
+ * do, because nothing about it looks broken. So the dice are found by the SAME
+ * recursive-descent reader that reduces the expression, which knows a function argument from a
+ * top-level addend because it parsed both, and which asserts END OF INPUT.
  *
  * @param {string} display The `@`-resolved formula, flavour and all.
  * @returns {{dice: Array<{faces: number}>} | {enumerable: false, reason: string}} The plan.
@@ -154,9 +132,8 @@ function planDice(display) {
   let refusal = null;
   const probe = reduceRollExpression(display, {
     dieValue: ({ count, faces, modifiers }) => {
-      // ONE unmodified numeric die per group, the only shape whose faces are uniform and
-      // equally likely: every Foundry die modifier reweights, unbounds or changes what `total`
-      // means, so a modified pool is refused rather than charted as though it were flat.
+      // ONE unmodified numeric die per group, the only shape whose faces are uniform: every
+      // Foundry die modifier reweights, unbounds or changes what `total` means.
       if (modifiers !== '') refusal ??= ODDS_REASONS.dieModifiers;
       else if (count !== 1) refusal ??= ODDS_REASONS.nonUnitCount;
       else if (NON_NUMERIC_DENOMINATION.test(faces)) {
@@ -182,9 +159,8 @@ function planDice(display) {
 
 /**
  * Walk the joint face space, reducing the expression once per assignment. EXACT, never sampled:
- * every assignment is equally likely, so the bucket counts are the real distribution —
- * including through a clamp, which is what makes a bounded `1d8` modifier chart as the `1..6`
- * it contributes rather than the `1..8` its die names.
+ * every assignment is equally likely, so the bucket counts are the real distribution, including
+ * through a clamp — which is what charts a bounded `1d8` modifier as the `1..6` it contributes.
  *
  * @param {string} display The `@`-resolved formula.
  * @param {Array<{faces: number}>} dice The dice, in reading order.
@@ -212,18 +188,14 @@ function enumerateOutcomes(display, dice) {
 }
 
 /**
- * Decide whether a formula's outcome space can be enumerated for a previewed actor, and with
- * what remainder.
+ * Decide whether a formula's outcome space can be enumerated for a previewed actor.
  *
- * IT ENUMERATES THE FORMULA THE RUNNER WILL ACTUALLY ROLL, not the one the GM authored, and the
- * difference is a whole check-modifier scalar: `evaluateCheckRoll` appends that scalar itself,
- * so a histogram built on the authored string spans `1..20` while the readout beside it rolls
- * `5..24`, on the same screen for the same check.
- *
- * So the context IS a parameter, and the append is {@link resolveRolledFormula} — the SAME
- * derivation `evaluateCheckRoll` composes its rolled formula from. There is no double
- * application: the appended string is resolved for DISPLAY with the context omitted, exactly as
- * `evaluateCheckRoll` does, so the scalar lands once.
+ * IT ENUMERATES THE FORMULA THE RUNNER WILL ACTUALLY ROLL, not the one the GM authored:
+ * `evaluateCheckRoll` appends the check-modifier scalar itself, so a histogram built on the
+ * authored string spans `1..20` while the readout beside it rolls `5..24`. So the context IS a
+ * parameter and the append is {@link resolveRolledFormula}, the SAME derivation
+ * `evaluateCheckRoll` composes its rolled formula from. There is no double application: the
+ * appended string is resolved for DISPLAY with the context omitted, so the scalar lands once.
  *
  * @param {string} formula The AUTHORED preview formula.
  * @param {object|null} actor The previewed actor, or null for "No actor".
@@ -264,9 +236,8 @@ export function describeFormulaEnumerability(
   if (stringRefusal) return stringRefusal;
 
   // The ONE fact the reader cannot state: `1d(1d4)` puts an EXPRESSION where the faces go, so
-  // Foundry answers with a die whose `faces` is `undefined` until evaluated and the reader does
-  // not recognise the token as a die at all — reporting it as an expression that does not
-  // reduce, which is true and unhelpful. Nothing else is checked here.
+  // the reader does not recognise the token as a die at all and would report it as an expression
+  // that does not reduce, which is true and unhelpful.
   const nonIntegerFaces = terms
     .filter((term) => isDiceTermLike(term))
     .some((die) => !Number.isInteger(die.faces));
@@ -298,14 +269,11 @@ export function describeFormulaEnumerability(
 }
 
 /**
- * The per-assignment dice bag, built through the PRODUCTION code path. `resolveForcedOutcome`
- * and `applyTierStepTriggers` both read `data.diceGroups`, and a bag that omits `results` or
- * spells `group` differently makes every natural-20 trigger silently invisible to the histogram
- * while STILL matching a hand-computed distribution for a trigger-free check.
- *
- * EVERY die is in the bag, a rolling check modifier's included, because that is what the
- * engine's own bag holds: modifier terms are APPENDED, so the authored dice keep their group
- * ids and a trigger keyed on group 0 still means the same die.
+ * The per-assignment dice bag, built through the PRODUCTION code path: a bag that omits
+ * `results` or spells `group` differently makes every natural-20 trigger silently invisible to
+ * the histogram while STILL matching a hand-computed distribution for a trigger-free check.
+ * EVERY die is in it, a rolling modifier's included, because that is what the engine's own bag
+ * holds — modifier terms are APPENDED, so the authored dice keep their group ids.
  *
  * @param {Array<{faces: number}>} dice The dice, in reading order.
  * @param {Array<number>} assignment The face each die shows.

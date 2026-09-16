@@ -1,34 +1,23 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  The Checks Studio's CHANCE PER OUTCOME histogram (issue 1097).
+  The Checks Studio's CHANCE PER OUTCOME histogram. It renders the enumeration `checkOdds.js`
+  computed, computes nothing itself and rolls nothing, so every bar is a real share of a fully
+  enumerated outcome space.
 
-  It renders the enumeration `checkOdds.js` computed; it computes nothing itself and it
-  rolls nothing. Every bar is a real share of a fully enumerated outcome space.
+  THE `all N faces` CAPTION IS NOT DRAWN HERE: the rail section's heading row carries a
+  right-aligned adjunct and that is where the domain reads. A second copy inside the card would
+  put one sentence on screen twice and — the head's own fallback being a regex over the AUTHORED
+  formula — the two could disagree.
 
-  THE `all N faces` CAPTION IS NOT DRAWN HERE. Issue 1096 gives every rail section a heading
-  row with a right-aligned adjunct, and that adjunct is where the domain reads; a second copy
-  inside the card would put the same sentence on screen twice and — because the head's own
-  fallback is a regex over the AUTHORED formula — the two could disagree. `ChecksRightMenu`
-  therefore takes the number off THIS panel's view-model, which is the enumerator's own
-  answer, and says nothing at all when the formula is not enumerable.
+  IT ABSTAINS LOUDLY. A formula outside the enumerable shape renders a STATED note naming the
+  reason and never an approximation: a histogram that lies is worse than one that abstains, and
+  each reason has its own sentence so "why is there no chart" is answerable from the panel.
 
-  ## It abstains loudly
-
-  A formula outside the enumerable shape renders a STATED note naming the reason, never
-  an approximation: a histogram that lies is worse than one that abstains. Each reason
-  has its own sentence, so "why is there no chart" is answerable from the panel instead
-  of from the source.
-
-  ## Bars are `FillBar`, flat
-
-  `ui-integration/spec.md` §Shared product UI primitives records the hand-rolled fill bars
-  as a live non-conformance and names `FillBar` as the fix; a sixth hand-rolled bar here
-  would move that count the wrong way. `FillBar` is a LEAF — no `role`, no `aria-*` — so
-  this row is announced as an ordinary label/value pair with the bar decorative, which is
-  the correct semantics for a percentage listed beside its own number.
-
-  No gradient. The band strip's full-track semantic scale is the only exemption
-  `ui-integration/spec.md` grants, and a value-width fill is not one.
+  BARS ARE `FillBar`, FLAT. `openspec/specs/ui-integration/spec.md` → "Shared product UI
+  primitives" records the hand-rolled fill bars as a live non-conformance and names `FillBar` as
+  the fix. It is a LEAF with no `role` and no `aria-*`, so the row is announced as an ordinary
+  label/value pair with the bar decorative. No gradient: the band strip's full-track semantic
+  scale is the only exemption that requirement grants.
 -->
 <script>
   import FillBar from '../../../components/FillBar.svelte';
@@ -48,9 +37,8 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  // One sentence per reason code. A shared "not enumerable" line would make a
-  // refuse-everything predicate indistinguishable from a correct one on the surface a GM
-  // actually reads, which is the whole point of the codes being discriminated.
+  // One sentence per reason code: a shared line would make a refuse-everything predicate
+  // indistinguishable from a correct one on the surface a GM actually reads.
   const REASON_COPY = {
     [ODDS_REASONS.parseThrew]: [
       'FABRICATE.Admin.Manager.Checks.Odds.ReasonParseThrew',
@@ -92,10 +80,9 @@
       'FABRICATE.Admin.Manager.Checks.Odds.ReasonUnresolvedRollData',
       'This formula does not reduce to a number for the selected actor.',
     ],
-    // NOT an enumerability refusal: the formula is perfectly enumerable and the missing
-    // input is the EXPERIMENT. It shares this branch because the observable is the same —
-    // no chart, one stated sentence — and it names the control that fills it, because an
-    // abstention whose remedy is one field away should say which field.
+    // NOT an enumerability refusal: the formula is enumerable and the missing input is the
+    // EXPERIMENT. It shares this branch because the observable is the same, and it names the
+    // control that fills it.
     [SANDBOX_ABSENT]: [
       'FABRICATE.Admin.Manager.Checks.Odds.ReasonNoSandboxOrder',
       'A progressive check is counted in results awarded. Type an order of result difficulties under “Preview as” to see how often each count comes up.',
@@ -169,9 +156,8 @@
     list-style: none;
   }
 
-  /* A three-track row: a truncating name, the bar, and a right-aligned mono percentage.
-     The name column is bounded so a long localized tier name cannot squeeze the bar to
-     nothing, and the percentage column is pinned so the numbers align down the list. */
+  /* A three-track row. The name column is bounded so a long localized tier name cannot
+     squeeze the bar to nothing, and the percentage column is pinned so the numbers align. */
   .manager-checks-odds-row {
     display: grid;
     grid-template-columns: minmax(0, 5.5rem) 1fr 2.6rem;

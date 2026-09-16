@@ -1,32 +1,20 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  DIFFICULTY — the number the roll is measured against, and where it comes from (issue 1096).
+  DIFFICULTY — the number the roll is measured against, and where it comes from.
 
-  ## Why it is its own card
+  IT IS ITS OWN CARD because the formula card answers "what is rolled" and this one answers
+  "what is it measured against"; a control answering the second inside the card that answers the
+  first reads as part of the formula, which is how a GM comes to think the DC is a term in it.
 
-  The DC and the meet/exceed comparison used to sit INSIDE the roll-formula card, beside the
-  formula input, and the DC SOURCE chooser was a third card below it. The prototype puts all
-  three in one card called `Difficulty`, and the reason is not tidiness: the formula card
-  answers "what is rolled" and this one answers "what is it measured against". A control that
-  answers the second question inside the card that answers the first reads as part of the
-  formula, which is exactly how a GM comes to think the DC is a term in it.
+  `showDcSource` IS A MODEL FACT, NOT A PREFERENCE. The static/dynamic chooser writes `dcMode`
+  and `macroUuid`, and only the SIMPLE check slot carries those fields — `CraftingSystemManager`
+  normalizes them on `simple` and `CraftingEngine` runs the macro for `simple.dcMode ===
+  'dynamic'`, where the routed slot has neither. So the chooser renders where the model can
+  honour it, and a routed check gets the same card with `BASE DC` and `COMPARISON` alone; the
+  pair on a routed check would be a chooser that does not choose.
 
-  ## `showDcSource` is a MODEL fact, not a preference
-
-  The static/dynamic chooser writes `dcMode` (and, dynamically, `macroUuid`), and only the
-  SIMPLE check slot carries those fields — `CraftingSystemManager` normalizes them on
-  `simple`, `CraftingEngine` runs the macro for `simple.dcMode === 'dynamic'`, and the routed
-  slot has neither (see the note on `migrateMoveRoutedByIngredientsCheck`: "routed has none").
-
-  So the chooser renders where the model can honour it, and a routed check gets the same card
-  with `BASE DC` and `COMPARISON` alone. Rendering the pair on a routed check would put a
-  control on screen that writes a field nothing reads — a chooser that does not choose.
-
-  ## The record noun is parameterised
-
-  "A fixed DC for every {record}" is `recipe` on the crafting route and something else on
-  salvage and gathering, so the noun is a prop. Hard-coding one activity's word is how a
-  gathering screen comes to talk about recipes.
+  The record noun is a PROP, because hard-coding one activity's word is how a gathering screen
+  comes to talk about recipes.
 
   Props:
    - dc / thresholdMode: the authored values.
@@ -58,13 +46,10 @@
   }
 
   /**
-   * A sentence with `{record}` filled in, resolved BEFORE it reaches `RadioCardGroup`.
-   *
-   * That primitive resolves a key against `localize` and takes no interpolation data, so a
-   * `{record}` placeholder handed to it as a KEY would render the literal braces to a GM in
-   * every world that has the key — the fallback path would look right and the localized path
-   * would not. Resolving here and passing the finished sentence as `description` keeps one
-   * string, localized, with the noun in it.
+   * A sentence with `{record}` filled in, resolved BEFORE it reaches `RadioCardGroup`: that
+   * primitive takes no interpolation data, so a placeholder handed to it as a KEY renders the
+   * literal braces in every world that HAS the key — the fallback path looking right and the
+   * localized path not.
    */
   function sentence(key, fallback) {
     return interpolate(text(key, fallback), { record: recordNoun });
@@ -73,9 +58,8 @@
   const comparison = $derived(thresholdMode === 'exceed' ? 'exceed' : 'meet');
   const resolvedDcMode = $derived(dcMode === 'dynamic' ? 'dynamic' : 'static');
 
-  // The two icons are literally what the DC is: an authored number, or a script file that
-  // returns one. `fa-file-code` rather than the bare `fa-code` this replaces, because the
-  // thing dropped on the card below is a Macro DOCUMENT and the prototype draws a file.
+  // The two icons are literally what the DC is: an authored number, or a script FILE that
+  // returns one — the thing dropped on the card below being a Macro document.
   const DC_MODE_OPTIONS = $derived([
     {
       value: 'static',
@@ -145,15 +129,15 @@
       />
     {/if}
 
-    <!-- The two number fields the prototype draws under the chooser. `<div>`s rather than
-         `<label>`s: see the NAMING contract in `Stepper.svelte` — both controls carry their
-         own accessible name, and a wrapping label would give the stepper two. -->
+    <!-- The two number fields under the chooser. `<div>`s rather than `<label>`s: see the NAMING
+         contract in `Stepper.svelte` — both controls carry their own accessible name, and a
+         wrapping label would give the stepper two. -->
     <div class="manager-checks-difficulty-fields">
       <div class="manager-checks-difficulty-field is-dc">
         <span class="manager-checks-difficulty-label">{dcLabel}</span>
-        <!-- `fill` so the stepper takes the field's 118px track and the shared 36px height
-             rather than sitting in it as a narrower inline island. `min={0}`: a check DC
-             below zero is not a DC, and the live `−` adjunct would otherwise reach -1. -->
+        <!-- `fill` so the stepper takes the field's track and the shared height rather than sitting
+             in it as a narrower inline island. `min={0}`: a check DC below zero is not a DC, and the
+             live `−` adjunct would otherwise reach -1. -->
         <Stepper
           fill
           min={0}
@@ -167,9 +151,8 @@
         <span class="manager-checks-difficulty-label">
           {text('FABRICATE.Admin.Manager.Checks.Crafting.ThresholdComparison', 'Comparison')}
         </span>
-        <!-- A SEGMENTED CONTROL, not the `<select>` this replaces. Two options is not a
-             list to open: both readings are on screen at once, and the one in force is lit.
-             `density="field"` is the primitive's own field-scale track. -->
+        <!-- A SEGMENTED CONTROL rather than a `<select>`: two options is not a list to open, both
+             readings are on screen at once, and the one in force is lit. -->
         <SegmentedControl
           fill
           density="field"

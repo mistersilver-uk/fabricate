@@ -1,59 +1,38 @@
 /**
- * WHAT THIS MODE DOES: the Checks Studio's per-mode explanation, as data (issue 1096).
+ * WHAT THIS MODE DOES: the Checks Studio's per-mode explanation, as data.
  *
- * The roll section opens with a callout naming the resolution mode, explaining in one
- * paragraph what that mode does with a roll, and stating three facts under it — whether the
- * check is rolled at all, what shape its outcomes take, and how results are reached. Without
- * it the studio opened straight onto a formula field, and nothing on the screen said what the
- * mode the GM had chosen elsewhere actually does.
+ * The roll section opens with a callout naming the resolution mode, explaining in one paragraph
+ * what that mode does with a roll, and stating three facts under it — whether the check is
+ * rolled at all, what shape its outcomes take, and how results are reached.
  *
- * ## It is a pure module, and it covers EVERY mode
+ * IT IS PURE, AND IT COVERS EVERY MODE. No Svelte and no Foundry, so
+ * `tests/check-mode-callout.test.js` proves exhaustiveness in BOTH directions: a mode with no
+ * entry would render its raw token to a GM, and an entry for a mode nothing can select is copy
+ * nobody will ever see.
  *
- * No Svelte and no Foundry, so `tests/check-mode-callout.test.js` can prove exhaustiveness in
- * both directions: every (activity, mode) pair the product can render has an entry, and every
- * entry names a pair the product can reach. A mode with no entry would render its raw token to
- * a GM, and an entry for a mode nothing can select is copy nobody will ever see.
+ * ALCHEMY HAS TWO ENTRIES, NOT THREE, AND ITS SIMPLE CHECK IS OPTIONAL. There is no
+ * `crafting:none`, because alchemy at `checkMode: 'none'` is the OFF state of an optional check
+ * rather than a mode of its own, so its route renders the shared switched-off panel and this
+ * callout never renders; `checkModeKey` returns `''` and the caller renders nothing.
+ * `crafting:alchemySimple` states `check:optional` unlike its tiered sibling: a system wanting
+ * the reserved failure result set has to roll the check, and one that does not is served by
+ * switching it off. Tiered stays required, routing result groups by outcome tier.
  *
- * ## Alchemy has TWO entries, not three, and its Simple check is OPTIONAL
+ * THE `MODES` TABLE IS ONE COPY-PASTE BLOCK, so keep edits inside it SMALL. Thirteen entries of
+ * one `{ icon, title, body, facts }` shape read as duplication to SonarCloud's CPD and the
+ * whole table sits inside the flagged region, where new-code density is measured over the lines
+ * a PR touches — so ANY edit there lands at 100% duplicated and can fail the gate on its own.
+ * That is why this rationale lives in the header, which is outside the block; restructuring the
+ * table to satisfy CPD would cost the declarative shape that makes it checkable.
  *
- * There is no `crafting:none`. Alchemy at `checkMode: 'none'` is the OFF state of an optional
- * check rather than a mode of its own, so its route renders the shared switched-off panel and
- * the roll section — this callout with it — never renders. An entry for it would be copy
- * nobody can reach, which is what the exhaustiveness gate exists to prevent; `checkModeKey`
- * returns `''` for it and the caller renders nothing, the safe direction documented below.
- *
- * `crafting:alchemySimple` states `check:optional`, unlike its tiered sibling. The engine can
- * only reach the reserved failure result set through this check, so a system that wants one
- * has to roll it — but a system that does not is served by switching the check off, which is
- * what the rail's Active switch writes. `Required` was the fact that sent a GM looking for an
- * off switch the studio would not show them. Tiered stays required: it routes result groups by
- * outcome tier and cannot resolve without a roll.
- *
- * ## THE `MODES` TABLE IS ONE COPY-PASTE BLOCK, so keep edits inside it SMALL
- *
- * Thirteen entries of the same `{ icon, title, body, facts }` shape read as duplication to
- * SonarCloud's CPD, and the whole table sits inside the flagged region. New-code duplication
- * density is measured over the lines a PR touches, so ANY edit here — a reworded sentence, an
- * explanatory comment — lands at 100% duplicated and can fail the quality gate on its own.
- * That is why the rationale above lives in this header rather than beside the entry it
- * explains: the header is outside the block. Restructuring the table to satisfy CPD would cost
- * the declarative shape that makes it checkable, which is a worse trade.
- *
- * ## Gathering's routed and progressive modes are DORMANT, not configurable
- *
- * They are rendered disabled in the GM UI pending issue 683, so no gathering configuration a
- * GM can choose today rolls a formula (`d100` bypasses the formula runner entirely). A callout
- * presenting either as a live configuration would be a promise the product does not keep.
- *
- * They are still REACHABLE — a world whose economy already carries one of those modes renders
- * this screen — so the answer is dormancy framing rather than absence, and the framing is the
- * one the Modifiers section already ships (`Checks.Gathering.ModifierDormant*`), reused
- * VERBATIM rather than re-worded. Two sentences for one fact on two sections of one screen is
- * exactly the drift the shared `checksCopy.js` exists to prevent.
+ * GATHERING'S ROUTED AND PROGRESSIVE MODES ARE DORMANT, not configurable: they are rendered
+ * disabled in the GM UI, so no gathering configuration a GM can choose today rolls a formula.
+ * They are still REACHABLE by a world already carrying one, so the answer is dormancy framing
+ * rather than absence — and the framing is the Modifiers section's own, reused VERBATIM, two
+ * sentences for one fact being exactly the drift `checksCopy.js` exists to prevent.
  *
  * Each entry is `{ icon, title, body, facts }` with `[key, fallback]` pairs, resolved by the
- * component's own `text()` bridge: the localization seam belongs to the Svelte layer and this
- * module stays pure.
+ * component's own `text()` bridge, so the localization seam stays in the Svelte layer.
  */
 
 const NAMESPACE = 'FABRICATE.Admin.Manager.Checks.Mode.';
@@ -85,11 +64,9 @@ const FACT_LABELS = Object.freeze({
 });
 
 /**
- * Resolve a `[key, fallback]` pair to a localization key.
- *
- * A key already containing a `.` is ABSOLUTE and is used verbatim: that is how a sentence the
- * product already ships under another namespace — gathering's dormancy notice — is reused
- * rather than re-authored under a second key that would then drift from it.
+ * Resolve a `[key, fallback]` pair to a localization key. One already containing a `.` is
+ * ABSOLUTE and used verbatim, which is how a sentence shipped under another namespace is reused
+ * rather than re-authored under a second key that would drift from it.
  */
 function copy(pair) {
   return { key: pair[0].includes('.') ? pair[0] : `${NAMESPACE}${pair[0]}`, fallback: pair[1] };
@@ -110,11 +87,8 @@ const OPTIONAL = ['StateOptional', 'Optional'];
 const FIXED_D100 = ['StateFixedD100', 'Fixed d100'];
 
 /**
- * Every mode, keyed `<activity>:<mode>`.
- *
- * `crafting:alchemy` is keyed by the ALCHEMY CHECK MODE rather than by `alchemy`, because
- * that is the choice which decides what alchemy rolls — the same reason
- * `SUBSYSTEM_MODE_LABELS` in `ChecksView.svelte` names the alchemy check mode in its rail row.
+ * Every mode, keyed `<activity>:<mode>`. `crafting:alchemy` is keyed by the ALCHEMY CHECK MODE,
+ * because that is the choice deciding what alchemy rolls.
  */
 const MODES = Object.freeze({
   'crafting:routedByCheck': {
@@ -256,10 +230,8 @@ const FACT_VALUES = Object.freeze({
 export const CHECK_MODE_KEYS = Object.freeze(Object.keys(MODES));
 
 /**
- * The key for one (activity, mode) pair.
- *
- * Alchemy is folded onto its CHECK MODE here rather than at every call site, so the one place
- * that knows `alchemy` is not itself a check mode is this module.
+ * The key for one (activity, mode) pair. Alchemy is folded onto its CHECK MODE here rather than
+ * at every call site, so the one place knowing `alchemy` is not itself a check mode is this one.
  *
  * @param {object} args
  * @param {string} args.activity `crafting` | `salvage` | `gathering`.
@@ -271,9 +243,8 @@ export function checkModeKey({ activity, mode, alchemyCheckMode = '' } = {}) {
   if (activity === 'crafting' && mode === 'alchemy') {
     if (alchemyCheckMode === 'simple') return 'crafting:alchemySimple';
     if (alchemyCheckMode === 'tiered') return 'crafting:alchemyTiered';
-    // `none` is the OFF state, whose route renders no roll section at all — so there is no
-    // callout to key, and `''` makes the caller render nothing rather than a description of
-    // a mode the GM did not choose.
+    // `none` is the OFF state, whose route renders no roll section, so `''` makes the caller
+    // render nothing rather than a description of a mode the GM did not choose.
     return '';
   }
   const key = `${activity}:${mode}`;
@@ -281,11 +252,9 @@ export function checkModeKey({ activity, mode, alchemyCheckMode = '' } = {}) {
 }
 
 /**
- * Describe one resolution mode.
- *
- * Returns `null` for a pair this studio does not render, so a caller renders NOTHING rather
- * than a callout describing some other mode. That is the safe direction: a missing explanation
- * is a gap, and a confident wrong one is a lie.
+ * Describe one resolution mode. Returns `null` for a pair this studio does not render, so a
+ * caller renders NOTHING rather than a callout about some other mode: a missing explanation is
+ * a gap, and a confident wrong one is a lie.
  *
  * @param {object} args
  * @param {string} args.activity `crafting` | `salvage` | `gathering`.
@@ -312,9 +281,8 @@ export function describeCheckMode({
     body: copy(entry.body),
     facts: entry.facts.map((token) => ({
       ...fact(token.slice(0, token.indexOf(':')), FACT_VALUES[token]),
-      // Interpolated by the component through the same `{count}` syntax Foundry's own
-      // `i18n.format` uses, so the fallback path renders a number rather than a literal
-      // `{count}` in a world with no `lang/` entry for a new key.
+      // Interpolated through the same `{count}` syntax Foundry's `i18n.format` uses, so the
+      // fallback path renders a number rather than a literal `{count}`.
       data: { count: String(Number(outcomeCount) || 0) },
     })),
   };

@@ -1,24 +1,18 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  THE DC MACRO — the card a check shows when its difficulty is computed rather than authored.
+  THE DC MACRO — the card a check shows when its difficulty is computed rather than authored,
+  shared because the ROUTED check carries `dcMode`/`macroUuid` too: a routed relative check is
+  defined as bands offset from a DC, so it has one by construction. Two copies of a drop-zone
+  card would be two chances to drift on the one sentence telling a GM what their macro receives.
 
-  Extracted from `SimpleCraftingCheckEditor` (issue 1096) because the ROUTED check now carries
-  `dcMode`/`macroUuid` too: a routed relative check is defined as bands offset from a DC, so it
-  has a DC by construction, and the engine already resolved it through the same
-  `_resolveSimpleCheckDc` path. Two copies of a drop-zone card would be two chances to drift on
-  the one sentence that tells a GM what their macro receives.
+  The macro receives the ANCHOR DC — the record's selected difficulty tier, or the static default
+  — alongside the ingredients, the record, the system and the actor, and returns the final
+  number. Tiers and the macro therefore COMPOSE, which is why the difficulty tier list is NOT
+  hidden under dynamic.
 
-  ## What the macro is handed, and what it must return
-
-  The macro receives the ANCHOR DC — the record's selected difficulty tier, or the static
-  default when no tier applies — alongside the ingredients, the record, the system and the
-  actor, and returns the final number. Tiers and the macro therefore COMPOSE: a GM can author
-  "Legendary Craft is 21" and still have a macro shift it for ingredient quality. That is why
-  the difficulty tier list is NOT hidden under dynamic.
-
-  A macro that throws, returns a non-number, or is missing falls back to the anchor and never
+  A macro that throws, returns a non-number or is missing falls back to the anchor and never
   throws mid-craft. That posture is not a nicety: a throw inside the engine is a CONSUMING
-  failure — ingredients already spent, tools already broken — so the card's copy promises what
+  failure, ingredients already spent and tools already broken, so this card's copy promises what
   `CraftingEngine._resolveSimpleCheckDc` actually guarantees.
 
   Props:
@@ -28,8 +22,7 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import { resolveDropData } from '../../../util/dropUtils.js';
-  // The shared macro-name resolver (issue 1036), which owns the `globalThis.fromUuid`
-  // indirection and the stale-resolution latch.
+  // The shared macro-name resolver, which owns the `fromUuid` indirection and the latch.
   import { resolveMacroName } from '../../../../../utils/macroReference.js';
   import ItemDropZone from '../../../components/ItemDropZone.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';
@@ -52,9 +45,8 @@
     });
   });
 
-  // `ItemDropZone` has already refused anything that is not a Macro naming a document, so
-  // this only has to resolve the uuid out of whichever drag shape arrived. It keeps calling
-  // `resolveDropData` because the zone hands `onDrop` the RAW payload by contract.
+  // `ItemDropZone` has already refused anything that is not a Macro, so this only resolves the
+  // uuid out of whichever drag shape arrived — the zone hands `onDrop` the RAW payload.
   function handleMacroDrop(data) {
     const { uuid } = resolveDropData(data);
     if (!uuid) return;
@@ -91,13 +83,11 @@
     </div>
   </div>
   <div class="manager-checks-card-body">
-    <!-- The shared drop primitive (issue 1036), which brings the compendium-drag acceptance
-         and the MISSING treatment a hand-rolled zone had neither of.
-         `data-check-macro-dropzone` and `data-unlink-macro` are this site's own hooks, stated
-         here rather than switched on by a `kind ===` branch inside the primitive (issue 1509).
-         Both are load-bearing selectors: `manager-mounted`, this studio's characterization suite
-         and the View Lab's `manager-checks-crafting-dynamic-dc` case all select on them. `kind`
-         stays because it still ids the zone through `data-item-drop-zone`. -->
+    <!-- The shared drop primitive, which brings the compendium-drag acceptance and the MISSING
+         treatment a hand-rolled zone had neither of. `data-check-macro-dropzone` and
+         `data-unlink-macro` are this site's own hooks, stated here rather than switched on by a
+         branch inside the primitive, and both are load-bearing selectors. `kind` stays because it
+         still ids the zone through `data-item-drop-zone`. -->
     <ItemDropZone
       kind="check-macro"
       hookAttrs={{
