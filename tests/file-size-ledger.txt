@@ -12,10 +12,8 @@ src/migration/MigrationRunner.js::run	321
 src/migration/mergeEquivalentWorldEssences.js::mergeEquivalentWorldEssences	123
 src/migration/migrateUnifyGatheringRegions.js::migrateUnifyGatheringRegions	117
 src/migration/migrateWorldScopeEntities.js::migrateWorldScopeEntities	247
-src/models/IngredientSet.js	1905
-src/models/Recipe.js	1039
-src/models/Recipe.js::_validate	126
-src/models/Recipe.js::constructor	107
+src/models/IngredientSet.js	1231
+src/models/Recipe.js::_validate	122
 src/systems/AlchemyListingBuilder.js::buildListing	120
 src/systems/BulkSalvageService.js	816
 src/systems/CompendiumImporter.js	1542
@@ -242,5 +240,5 @@ src/ui/svelte/util/foundryBridge.js	933
 src/ui/svelte/util/foundryIconCatalogue.js	1553
 src/ui/svelte/util/recipeGraphBuilder.js	936
 src/ui/svelte/util/shoppingListAggregator.js::aggregateShoppingList	179
-src/utils/rollExpressionAverage.js::createReader	201
-src/utils/scopedEntityListModel.js::createScopedEntityListModel	157
+src/utils/rollExpressionAverage.js::createReader	181
+src/utils/scopedEntityListModel.js::createScopedEntityListModel	118

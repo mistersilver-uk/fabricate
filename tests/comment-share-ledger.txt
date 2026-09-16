@@ -7,11 +7,11 @@ src	1248
 src/canvas	385
 src/canvas/linkedVisuals	64
 src/canvas/regions	332
-src/config	1550
+src/config	435
 src/integrations	20
 src/migration	1797
-src/models	1655
-src/models/match	144
+src/models	467
+src/models/match	66
 src/systems	33367
 src/ui	2519
 src/ui/svelte	52
@@ -47,9 +47,9 @@ src/ui/svelte/apps/manager/world	352
 src/ui/svelte/components	1245
 src/ui/svelte/stores	6973
 src/ui/svelte/util	3463
-src/utils	7546
+src/utils	1367
 styles	7499
-tests	40809
+tests	40816
 tests/actions	155
 tests/canvas	622
 tests/canvas/regions	292

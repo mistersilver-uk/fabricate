@@ -1772,6 +1772,16 @@ RecipeItemMatchContext = {
 };
 ```
 
+### Definition Index Invalidation
+
+Identity resolution reads retained `Map` indexes derived from one crafting system's definition arrays, so those indexes carry a staleness rule every in-place mutator must honour.
+An index derived from array `A` stays valid while `A` is the same object, has the same `length`, and carries the same revision.
+Any in-place mutation of `A` — replacing or reordering an element, or rewriting an INDEXED FIELD of an element (`id`, `name`, `registeredItemUuid`, `originItemUuid`, `aliasItemUuids`, `recipeIds`) — MUST advance that array's revision.
+The element-field half is the load-bearing one: rewriting a field of an element in place changes neither the array's identity nor its length, so nothing but the revision can detect it.
+A path that rebuilds a definition array produces a new object and therefore a fresh index for free; a reload may reuse a retained array only because reuse requires whole-record equality, which makes every indexed field byte-equivalent.
+An index is keyed on the candidate ARRAY itself and never on a crafting system id, because definition ids are unique within one system only.
+Index lookups reproduce `Array.prototype.find`'s array-order precedence exactly, including the minimum-position rule that resolves a source reference to the earliest candidate matching ANY of the item's references.
+
 ## Step
 
 ### Purpose
