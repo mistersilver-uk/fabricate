@@ -369,15 +369,18 @@ export function createJournalRunAuthority({
    * the task from starting afterwards. Two sources could disagree, and the disagreement would
    * run a write after telling the player nothing had been changed.
    *
-   * Every queued task names itself, and the name is taken at the moment it STARTS, so the
-   * `blockedBy` a refusal carries is the task actually holding the line. It needs no reset when
-   * the chain drains: a task reaching a free line starts on the next microtask, always ahead of
-   * a timer measured in seconds, so a `queue-timeout` can only ever be raised while something
-   * genuinely holds the line.
+   * Every queued task names itself, taken at the moment it STARTS, and a refusal reads that name
+   * WHEN IT REFUSES rather than when it enqueued. Capturing at enqueue named the wrong command:
+   * two calls landing in one synchronous tick -- which is ordinary, a socket message handler can
+   * deliver both -- each captured whatever had last run, so a refusal blamed a command that had
+   * already finished before the real holder even started.
+   *
+   * Read late, the name is right by construction: a task reaching a free line starts on the next
+   * microtask, always ahead of a timer measured in seconds, so by the time any timer fires the
+   * holder it names is genuinely holding the line.
    */
   function queue(holder, task) {
-    const held = queueHolder;
-    const refuse = () => unavailable('queue-timeout', { blockedBy: held });
+    const refuse = () => unavailable('queue-timeout', { blockedBy: queueHolder });
     let abandoned = false;
     let timer = null;
     const waited = new Promise((resolve) => {
