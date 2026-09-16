@@ -1,46 +1,7 @@
 /**
- * Uninstall-safe world cleanup for `fabricate.interactable` region behaviours and
- * Fabricate's own linked-visual markers (issue 535).
- *
- * THE CORE CAVEAT this module exists to work around.
- * `fabricate.interactable` is a MODULE-DEFINED Region Behaviour sub-type (declared
- * in `module.json`'s `documentTypes.RegionBehavior.interactable`, auto-namespaced to
- * `fabricate.interactable`, and registered at runtime on `CONFIG.RegionBehavior`).
- * When Fabricate is DISABLED or UNINSTALLED, Foundry can no longer construct the
- * sub-type, so every such behaviour becomes an unregistered-sub-type document that
- * logs `"fabricate.interactable" is not a valid type` on EVERY load of the scene it
- * sits on — and there is no core UI to view or remove it (foundryvtt#11234). On
- * Foundry < 14.360 the invalid behaviour cascade-invalidates its parent Region and
- * the whole Scene; on ≥ 14.360 it is merely quarantined and logged. Foundry does NOT
- * remove module sub-typed documents on disable, and Fabricate cannot change core —
- * so the only safe fix is to let a GM STRIP Fabricate's behaviours + markers from the
- * world BEFORE uninstalling.
- *
- * WHAT THIS REMOVES (only what Fabricate owns):
- *   - every `fabricate.interactable` Region Behaviour ({@link isInteractableRegionBehavior}),
- *     via `region.deleteEmbeddedDocuments('RegionBehavior', …)` — the behaviour only,
- *     NEVER the parent Region and NEVER any foreign (non-Fabricate) behaviour on it;
- *   - Fabricate's own linked-visual MARKERS — Tiles and Drawings carrying the reverse
- *     flag `flags.fabricate.isInteractableVisual` ({@link isInteractableVisual}) —
- *     which Fabricate created as presentation for its interactables;
- *   - the region-level ownership stamp `flags.fabricate.interactableRegion`
- *     ({@link REGION_OWNERSHIP_FLAG}), unset on any region that still carries it.
- *
- * WHAT THIS NEVER TOUCHES (user data):
- *   - a parent Region is NEVER deleted (unlike single-interactable deletion, which may
- *     delete a Fabricate-CREATED region wholesale). Cleanup leaves every Region in
- *     place — an empty leftover region is a harmless artefact a GM can delete by hand,
- *     which is the deliberately conservative, can-never-destroy-user-data choice;
- *   - a foreign behaviour on a promoted region is never removed;
- *   - a TOKEN marker is NEVER deleted. A Token marker is an EXISTING GM-owned token the
- *     GM relinked (e.g. a merchant NPC); Fabricate only stamped a reverse flag on it.
- *     Cleanup CLEARS that reverse flag ({@link buildClearLinkedVisualFlags}) and leaves
- *     the token itself intact.
- *
- * The decision is PURE — {@link decideWorldInteractableCleanup} takes scene documents
- * (or plain fakes) and returns the EXACT id-keyed set to remove, so it is unit-testable
- * without Foundry. {@link executeWorldInteractableCleanup} is the thin Foundry edge that
- * re-resolves each live document by id and applies the plan (no-throw per item).
+ * Uninstall-safe world cleanup (issue 535). `data-models/spec.md` § Uninstall-safe world cleanup
+ * owns why it exists and all three requirements, the Tile/Drawing-versus-Token asymmetry included.
+ * The decision is PURE; {@link executeWorldInteractableCleanup} is the thin edge, no-throw per item.
  */
 
 import { buildClearLinkedVisualFlags } from '../linkedVisuals/linkedInteractableVisual.js';
@@ -52,10 +13,7 @@ import { isInteractableRegionBehavior, isInteractableVisual } from './interactab
 /** The Foundry flag scope Fabricate writes under. */
 const FLAG_SCOPE = 'fabricate';
 
-/**
- * The visual kinds Fabricate CREATED and may therefore DELETE on cleanup. A `Token`
- * marker is deliberately excluded — it is the GM's own token and is only de-flagged.
- */
+/** The visual kinds Fabricate CREATED and may DELETE. A `Token` is the GM's own and is de-flagged only. */
 const DELETABLE_VISUAL_KINDS = Object.freeze(['Tile', 'Drawing']);
 
 /** The three scene-embedded collections a linked visual can live in. */
@@ -71,15 +29,7 @@ function docId(doc) {
   return id == null ? null : String(id);
 }
 
-/**
- * Decide the cleanup plan for ONE scene. PURE: reads the scene's regions +
- * behaviours + linked-visual documents and returns the id-keyed removal set, or
- * `null` when the scene has nothing Fabricate owns (so the world aggregate can skip
- * no-op scenes).
- *
- * @param {object} scene  A Scene document (or a plain `{ id, name, regions, tiles, drawings, tokens }`).
- * @returns {object|null}
- */
+/** PURE. One scene's removal set, or null when it holds nothing Fabricate owns. */
 export function decideSceneInteractableCleanup(scene) {
   if (!scene || typeof scene !== 'object') return null;
 
@@ -127,24 +77,7 @@ export function decideSceneInteractableCleanup(scene) {
   };
 }
 
-/**
- * Decide the cleanup plan for the WHOLE world. PURE: maps every scene through
- * {@link decideSceneInteractableCleanup}, drops no-op scenes, and rolls up a
- * summary. An empty world (no scenes, or no Fabricate-owned documents) yields an
- * empty plan with an all-zero summary — the caller treats that as a no-op.
- *
- * @param {Iterable<object>} scenes  The world's scenes (`game.scenes`, or a plain array).
- * @returns {{
- *   scenes: object[],
- *   summary: {
- *     scenesTouched: number,
- *     behaviorsRemoved: number,
- *     visualsDeleted: number,
- *     visualFlagsCleared: number,
- *     regionFlagsCleared: number,
- *   },
- * }}
- */
+/** PURE. The whole-world plan plus a summary; an empty world yields an all-zero no-op. */
 export function decideWorldInteractableCleanup(scenes) {
   const plans = [];
   const summary = {
@@ -170,13 +103,7 @@ export function decideWorldInteractableCleanup(scenes) {
   return { scenes: plans, summary };
 }
 
-/**
- * Whether a cleanup plan has anything to do. A convenience for the GM entry point so
- * it can report "nothing to clean up" without re-deriving the summary.
- *
- * @param {{ summary?: object }} plan  A {@link decideWorldInteractableCleanup} result.
- * @returns {boolean}
- */
+/** Has this plan anything to do? Lets the GM entry point report "nothing to clean up". */
 export function planHasWork(plan) {
   const summary = plan?.summary;
   if (!summary) return false;
@@ -210,21 +137,8 @@ function groupVisualIds(entries) {
 }
 
 /**
- * Apply a world cleanup plan to the live scene documents. THIN Foundry EDGE: it
- * re-resolves each region / visual by id from the passed scenes and performs the
- * `deleteEmbeddedDocuments` / `unsetFlag` / `update` writes. No-throw PER ITEM — a
- * single failed delete never aborts the rest of the sweep — and it only ever touches
- * the documents the pure plan named, so it can never delete a Region, a foreign
- * behaviour, or a Token marker.
- *
- * @param {Iterable<object>} scenes  The same live scenes the plan was derived from.
- * @param {object} plan  A {@link decideWorldInteractableCleanup} result.
- * @returns {Promise<{
- *   behaviorsRemoved: number,
- *   visualsDeleted: number,
- *   visualFlagsCleared: number,
- *   regionFlagsCleared: number,
- * }>} The counts actually applied.
+ * THIN EDGE. Re-resolves by id and applies the writes, no-throw PER ITEM. It touches only what the
+ * plan named, so it can never reach a Region, a foreign behaviour or a Token marker.
  */
 export async function executeWorldInteractableCleanup(scenes, plan) {
   const applied = {
