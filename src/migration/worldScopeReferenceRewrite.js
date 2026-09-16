@@ -1,84 +1,17 @@
 /**
- * The shared component-, tool- and essence-reference walk (issue 1363, issue 1654).
- *
- * One enumeration of every position in the persisted corpus that names a component id, a tool id
- * or an essence id, used by both the `1.30.0` world-scope migration and copy-mode import
- * (`rebindCopyComponentIds`). It is EXTRACTED rather than re-derived so the two callers cannot
- * drift: the shipped copy-mode walk had accumulated THREE real gaps by the time this was
- * written, and every one of them would have shipped a dangling reference in a migrated world.
- *
- * THE REWRITE IS KEY-AWARE. It rewrites a value only when it sits at one of the enumerated
- * reference positions AND the supplied remapper recognises it. A value at a non-reference
- * position — a `recipeIds[]` entry, an outcome or salvage-group id, a scene or macro UUID — is
- * never touched even if it coincidentally equals a component id. Recipe ids, outcome ids and
- * salvage-group ids are NEVER rewritten.
- *
- * IT IS IDEMPOTENT BY CONSTRUCTION, given a map whose image is disjoint from its key set: every
- * site performs ONE simultaneous lookup, so an already-rewritten value is not a key and is left
- * verbatim. That disjointness is enforced by `worldScopeEntityGrouping.js`, which REFUSES a
- * `(system, entityType)` pair it cannot hold it for.
- *
- * ## The three gaps this closes, all found by re-verification of the shipped copy walk
- *
- * - `tool.onBreak.replacementTarget.componentId`, which `Tool` treats as canonical, was not
- *   rewritten — only the legacy flat `replacementComponentId` was.
- * - Essence `sourceItemUuid`, which `## EssenceDefinition` requirement 3 permits to hold a
- *   legacy component id, was not rewritten.
- * - `tool.repairRequirements` appeared NOWHERE in the shipped walk, while `Tool.toJSON`
- *   persists it and `_normalizeTool` emits it on every load.
- *
- * The essence leg (issue 1654) is threaded as a third remapper, `remapEssence`, defaulting to
- * `identity` exactly as `remapComponent` and `remapTool` do, so a caller passing two remappers and
- * no third behaves as it did before.
- *
- * Key-position rewriting is the one thing this walk does for an essence id and for no other id
- * class: an essence id is also spelled as an object key, in the `Record<essenceId, number>`
- * quantity maps a component and a (legacy) ingredient set carry, and
- * {@link rewriteEssenceQuantityMap} is the only part of the walk that rewrites one. Two
- * consequences follow that a value rewrite never has:
- *
- * - a collision sums, because after a merge the survivor is the single carrier of both
- *   contributions (`{a: 2, b: 3} -> {merged: 5}`); last-writer-wins would delete an authored
- *   quantity.
- * - the map is rebuilt rather than mutated key by key, so key order follows the original and a
- *   merged key sits where its first contributor sat.
- *
- * `components[].essences` is the site that makes this not optional:
- * `CraftingSystemManager#_normalizeEssenceQuantities` prunes a key outside the Valid Id Basis, so a
- * merged-away id left standing in a component's map is silently deleted on the next save.
- *
- * ## Site D is DEAD CODE for every normalized tool, and is RETAINED anyway
- *
- * `_normalizeTool` returns `model.toJSON()`, and `Tool.toJSON` emits `onBreak` as
- * `{ mode, replacementTarget? }` and NEVER `replacementComponentId`. So the legacy branch is
- * not a gap beside a working rewrite — it is the only tool-replacement rewrite the shipped walk
- * had, and it never fires on production data. It is RETAINED because `normalizeOnBreak` still
- * reads the legacy key from an IMPORTED or HAND-EDITED payload, and it is marked here so no
- * later reader mistakes it for a live production site.
+ * The shared component-, tool- and essence-reference walk (issues 1363, 1654): ONE enumeration of
+ * every position in the persisted corpus naming such an id, shared by the `1.30.0` migration and
+ * copy-mode import. KEY-AWARE and IDEMPOTENT given the disjoint-image map
+ * `worldScopeEntityGrouping.js` enforces; KEY-POSITION rewriting is for an essence id alone.
  */
 
 import { isPlainObject } from '../utils/scalars.js';
 
 /**
- * Every leaf position the walk rewrites, as a normalized path with array indices collapsed to
- * `[]`, rooted at the three persisted payloads plus the world scope payloads.
- *
- * A HAND-MAINTAINED MIRROR, and it is guarded mechanically rather than trusted:
- * `tests/world-scope-reference-walk.test.js` derives the ACTUALLY-touched set from a
- * maximally-populated corpus built by the REAL producers and asserts set-equality in both
- * directions, plus a key-name closure over every leaf key the producers emit. A site added to
- * the walk and not listed here fails that test, and so does the reverse.
- *
- * SITES THE PRODUCERS NEVER EMIT ARE DELIBERATELY ABSENT and are enumerated separately in
- * {@link WORLD_SCOPE_DEFENSIVE_SITES}, with the reason each is unproducible. The walk still
- * covers every one of them, because an imported or hand-edited payload can carry them.
- *
- * It is the component-and-tool list only. The essence leg lives in
- * {@link WORLD_SCOPE_ESSENCE_REFERENCE_SITES} and {@link WORLD_SCOPE_ESSENCE_DEFENSIVE_SITES}
- * because each list is derived with one leg's remapper live and the others at `identity`, and a
- * merged list would weaken each derivation from set-equality to a subset comparison.
- *
- * @type {readonly string[]}
+ * Every leaf position the walk rewrites, with array indices collapsed to `[]`. A HAND-MAINTAINED
+ * MIRROR, guarded both ways by `tests/world-scope-reference-walk.test.js` against a corpus built by
+ * the REAL producers. Component-and-tool only; the essence leg keeps its own two lists, because a
+ * merged one would weaken every derivation to a subset comparison.
  */
 export const WORLD_SCOPE_REFERENCE_SITES = Object.freeze([
   // --- systems[] ---
@@ -125,38 +58,9 @@ export const WORLD_SCOPE_REFERENCE_SITES = Object.freeze([
 ]);
 
 /**
- * The reference positions the walk ALSO covers and NO SHIPPED PRODUCER EMITS.
- *
- * They are listed separately rather than folded into the list above because the completeness
- * guard is DERIVED from real producer output: a site production never produces cannot appear in
- * the derived corpus, so including it there would make the set-equality permanently false and the
- * only way to restore it would be to hand-author the shape — which is precisely what `#### D9`'s
- * dead-site finding forbids.
- *
- * IT IS A LEAF-PATH LIST, exactly as {@link WORLD_SCOPE_REFERENCE_SITES} is, and it is complete
- * rather than indicative: an earlier form listed `catalysts[]` as a bare array path and omitted
- * every `systemItemId` alias the walk does rewrite, which made the stated invariant false.
- * `tests/world-scope-reference-walk.test.js` now pins it in both directions - every entry must be
- * one the producers do NOT emit, and every unproducible leaf the walk touches must be here.
- *
- * FIVE FAMILIES, each unproducible for a stated reason, and each retained because an IMPORTED or
- * HAND-EDITED payload can still carry it:
- *
- * - `onBreak.replacementComponentId` — `Tool.toJSON` emits `onBreak` as `{mode, replacementTarget?}`
- *   and never this key; `normalizeOnBreak` still reads it as construction input.
- * - the flat `ingredientSets[].ingredients[]` alias — `IngredientSet.toJSON` stopped emitting it
- *   at issue 1135, but it is the ONLY ingredient data an older export carries.
- * - the flat `recipes[].results[]` alias — omitted when it holds the value the constructor
- *   rebuilds from absence.
- * - every `catalysts[]` array — the `1.7.0` migration deletes them everywhere it can reach.
- * - gathering drop-row `systemItemId` — the drop-row normalizer folds it into `componentId`.
- * - **gathering EVENT `dropRows` and `toolIds`** — the shipped event normalizers
- *   (`adminStore._normalizeGatheringEvent` and `GatheringRichStateService`'s mirror) are
- *   whitelist rebuilds that emit NEITHER key, so an event carries no component or tool reference
- *   at all. The walk covers them anyway, because both are legitimate keys on an imported payload
- *   and because an event acquiring drop rows later must not silently become a missed site.
- *
- * @type {readonly string[]}
+ * The positions the walk covers that NO SHIPPED PRODUCER EMITS, listed separately because the
+ * completeness guard is DERIVED from real producer output. Complete rather than indicative and
+ * pinned both ways; each family is retained because an IMPORTED or HAND-EDITED payload can carry it.
  */
 export const WORLD_SCOPE_DEFENSIVE_SITES = Object.freeze([
   'gatheringConfig.systems.*.events[].dropRows[].componentId',
@@ -242,19 +146,9 @@ export const WORLD_SCOPE_DEFENSIVE_SITES = Object.freeze([
 ]);
 
 /**
- * Every position the walk rewrites when it is given an essence remapper (issue 1654), in the same
- * hand-maintained, mechanically-guarded style as {@link WORLD_SCOPE_REFERENCE_SITES}.
- *
- * Two spellings, because an essence id is the one id class this walk rewrites in key position:
- *
- * - `…match.essenceId` is a leaf path, read as the two lists above are: array indices collapsed to
- *   `[]`, map keys collapsed to `*`, the final segment the leaf key holding the id.
- * - `…essences{}` is a key-position path. The trailing `{}` means every own key of the object at
- *   that path is an essence id, so the path names the container and never the key — naming a key
- *   would pin one world's authored id. `tests/world-scope-reference-walk.test.js` derives these by
- *   diffing key sets rather than leaf values, which is why they need their own spelling.
- *
- * @type {readonly string[]}
+ * Every position the walk rewrites given an essence remapper (issue 1654), in the same
+ * mechanically-guarded style. Two spellings, because an essence id is the one class rewritten in KEY
+ * position: `…essences{}` names the CONTAINER, since naming a key would pin one world's authored id.
  */
 export const WORLD_SCOPE_ESSENCE_REFERENCE_SITES = Object.freeze([
   // --- leaf-value sites: `{ quantity, match: { type: 'essence', essenceId, amount } }` ---
@@ -273,27 +167,8 @@ export const WORLD_SCOPE_ESSENCE_REFERENCE_SITES = Object.freeze([
 ]);
 
 /**
- * The essence positions the walk also covers and the derived marker fixture cannot produce.
- *
- * Same escape-hatch rule as {@link WORLD_SCOPE_DEFENSIVE_SITES}, guarded in both directions, so an
- * entry here that the producers do emit fails the suite rather than hiding a missed site. Three
- * families, each unproducible for a reason:
- *
- * - every `catalysts[]` essence match: the `1.7.0` migration deletes `catalysts` everywhere it can
- *   reach, so no shipped producer emits the array. The walk still reaches these, because an essence
- *   match is folded into the shared {@link rewriteIngredientRef} a catalyst entry is walked with.
- * - the flat `ingredientSets[].ingredients[]` alias: `IngredientSet.toJSON` stopped emitting it at
- *   issue 1135, but it is the only ingredient data an older export carries.
- * - the two `componentScope` key maps: the fixture is derived from the producers of
- *   `craftingSystems`, `recipes` and `gatheringConfig`, and the scope payload is a fourth setting.
- *   They are covered by direct tests over {@link rewriteEssenceQuantityMap} and
- *   {@link rewriteMembershipReferences} instead, and listed here so the enumeration stays complete.
- *
- * The two `componentScope` entries are a deliberate exception to the scoping the other three lists
- * keep, because the component `essences` map is the site `_normalizeEssenceQuantities` silently
- * prunes, and leaving its scope-payload halves unenumerated reads as "the in-system map is the job".
- *
- * @type {readonly string[]}
+ * The essence positions the derived fixture cannot produce, on the same escape-hatch rule. The two
+ * `componentScope` key maps are a deliberate scoping exception, tested directly instead.
  */
 export const WORLD_SCOPE_ESSENCE_DEFENSIVE_SITES = Object.freeze([
   'componentScope.defaults.*.essences{}',
@@ -320,28 +195,16 @@ function arrayOf(value) {
 
 const identity = (value) => value;
 
-/**
- * Rewrite a `toolIds[]` array in place.
- *
- * @param {object} container
- * @param {(value: unknown) => unknown} remapTool
- */
+/** Rewrite a `toolIds[]` array in place. */
 function rewriteToolIds(container, remapTool) {
   if (!isPlainObject(container) || !Array.isArray(container.toolIds)) return;
   container.toolIds = container.toolIds.map((id) => remapTool(id));
 }
 
 /**
- * Rewrite one ingredient / catalyst / repair option reference in place, recursing through
- * `alternatives`.
- *
- * The essence match is folded in here rather than given its own traversal, which is what keeps the
- * two legs from drifting. `matchTypes.js`'s `essenceHandler` normalizes the match to
- * `{ type: 'essence', essenceId, amount }`, so `essenceId` is the only id-bearing key and `amount`
- * is a quantity the rewrite must never touch.
- *
- * @param {unknown} ref
- * @param {{remapComponent: Function, remapEssence: Function}} remappers
+ * Rewrite one ingredient, catalyst or repair-option reference in place, recursing through
+ * `alternatives`. The essence match folds in here so the two legs cannot drift; `amount` is a
+ * quantity the rewrite must never touch.
  */
 function rewriteIngredientRef(ref, { remapComponent = identity, remapEssence = identity } = {}) {
   if (!isPlainObject(ref)) return;
@@ -360,18 +223,8 @@ function rewriteIngredientRef(ref, { remapComponent = identity, remapEssence = i
 }
 
 /**
- * The quantity a merged essence key carries: the sum of the contributions that landed on it. After
- * `1.34.0` merges two equivalent world essences the survivor is the one carrier of what both
- * contributed, so `{fire: 2, flame: 3}` under `flame -> fire` is `{fire: 5}`; last-writer-wins
- * would delete an authored quantity.
- *
- * A non-numeric side is answered rather than thrown or propagated as `NaN`, so a malformed map
- * cannot abort the pass: a numeric side always wins, and two non-numeric sides resolve to the later
- * contribution.
- *
- * @param {unknown} kept The quantity already accumulated on the surviving key.
- * @param {unknown} added The quantity arriving from a key that merged into it.
- * @returns {unknown}
+ * The quantity a merged essence key carries: the SUM, last-writer-wins deleting an authored
+ * quantity. A non-numeric side is answered rather than thrown.
  */
 function mergedEssenceQuantity(kept, added) {
   const keptNumber = Number(kept);
@@ -382,49 +235,24 @@ function mergedEssenceQuantity(kept, added) {
 }
 
 /**
- * Rewrite one `Record<essenceId, number>` quantity map in place — the walk's only key-position
- * rewrite (issue 1654).
- *
- * It takes the container rather than the map: re-keying rebuilds the map, so `container.essences`
- * is reassigned. The `essences` key is hard-coded because all five key-position sites spell it that
- * way — the in-system component, the legacy per-set map on a recipe set and on a step's set, and
- * the `componentScope.defaults.*` and `componentScope.membership.*` rows.
- *
- * Colliding keys sum, through {@link mergedEssenceQuantity}. The accumulator is a `Map` rebuilt
- * through `Object.fromEntries`, so a key spelled `__proto__` lands as an own property instead of
- * reassigning the prototype, and a merged key keeps the position of its first contributor.
- *
- * It rewrites `essences` and nothing named like it: a membership record's `inherit.essences` is a
- * boolean section switch keyed by a section name, a sibling of this map and never a member of it.
- *
- * Total and non-throwing, like the rest of the walk: a missing, `null`, array-valued or otherwise
- * non-object `essences` is left as it was found. Idempotent on a map whose image is disjoint from
- * its key set, by the module's one rule of a single simultaneous lookup per key.
- *
- * @param {unknown} container The record carrying the map — a component, an ingredient set, a
- *   world-default row or a membership row.
- * @param {{remapEssence: Function}} [remappers]
- * @returns {void}
+ * Rewrite one `Record<essenceId, number>` map — the walk's only key-position rewrite. It takes the
+ * CONTAINER, hard-codes `essences`, sums colliding keys, and accumulates through a `Map` so
+ * `__proto__` lands as an own property. `inherit.essences` is a section-name switch, not this.
  */
 export function rewriteEssenceQuantityMap(container, { remapEssence = identity } = {}) {
   if (!isPlainObject(container) || !isPlainObject(container.essences)) return;
   const merged = new Map();
   for (const [essenceId, quantity] of Object.entries(container.essences)) {
     const mapped = remapEssence(essenceId);
-    // A remapper that answers a non-string or an empty string has not named a surviving essence,
-    // so the key stays exactly as authored rather than collapsing several ids onto `''`.
+    // A remapper answering a non-string or empty string has not named a surviving essence, so the
+    // key stays as authored rather than collapsing several ids onto `''`.
     const key = typeof mapped === 'string' && mapped.trim() ? mapped : essenceId;
     merged.set(key, merged.has(key) ? mergedEssenceQuantity(merged.get(key), quantity) : quantity);
   }
   container.essences = Object.fromEntries(merged);
 }
 
-/**
- * Rewrite one result reference in place.
- *
- * @param {unknown} result
- * @param {(value: unknown) => unknown} remapComponent
- */
+/** Rewrite one result reference in place. */
 function rewriteResultRef(result, remapComponent) {
   if (!isPlainObject(result)) return;
   if ('componentId' in result) result.componentId = remapComponent(result.componentId);
@@ -446,26 +274,19 @@ function rewriteIngredientSet(
   for (const group of arrayOf(set.ingredientGroups)) {
     for (const option of arrayOf(group?.options)) rewriteIngredientRef(option, refRemappers);
   }
-  // Flat `ingredients[]` alias: `IngredientSet.toJSON` stopped emitting it at issue 1135, but
-  // older exports and legacy flat-authored sets still carry it, and for those it is the set's
-  // ONLY ingredient data.
+  // Flat `ingredients[]` alias: dropped by `IngredientSet.toJSON` at issue 1135, but for an older
+  // export or a legacy flat-authored set it is the set's ONLY ingredient data.
   for (const ingredient of arrayOf(set.ingredients)) {
     rewriteIngredientRef(ingredient, refRemappers);
   }
   for (const catalyst of arrayOf(set.catalysts)) rewriteIngredientRef(catalyst, refRemappers);
   rewriteToolIds(set, remapTool);
-  // The legacy per-set `essences` quantity map, still live-read (`recipeEssenceReferences.js`,
-  // `RecipeManager`, `InventoryListingBuilder`), so a set predating
+  // The legacy per-set `essences` quantity map, still live-read, so a set predating
   // `migrateEssencesToIngredientGroups` states its whole essence requirement here and nowhere else.
   rewriteEssenceQuantityMap(set, { remapEssence });
 }
 
-/**
- * Rewrite every reference one RECIPE carries, in place.
- *
- * @param {unknown} recipe
- * @param {{remapComponent: Function, remapTool: Function, remapEssence: Function}} remappers
- */
+/** Rewrite every reference one RECIPE carries, in place. */
 export function rewriteRecipeReferences(
   recipe,
   { remapComponent = identity, remapTool = identity, remapEssence = identity } = {}
@@ -477,10 +298,9 @@ export function rewriteRecipeReferences(
     rewriteIngredientSet(set, remappers);
   }
   rewriteResultGroups(recipe.resultGroups, remapComponent);
-  // Flat `results[]` alias. `Recipe.toJSON` OMITS it when it holds the value the constructor
-  // rebuilds from absence, so it is unproducible in practice and sits on
-  // `WORLD_SCOPE_DEFENSIVE_SITES`. The read stays permanently: an older export or a legacy
-  // flat-authored recipe carries it, and for those it is the only result data there is.
+  // Flat `results[]` alias, omitted by `Recipe.toJSON` when it holds the rebuilt value, so it sits
+  // on `WORLD_SCOPE_DEFENSIVE_SITES`. The read stays permanently: for an older export or a legacy
+  // flat-authored recipe it is the only result data there is.
   for (const result of arrayOf(recipe.results)) rewriteResultRef(result, remapComponent);
   for (const catalyst of arrayOf(recipe.catalysts)) rewriteIngredientRef(catalyst, refRemappers);
   rewriteToolIds(recipe, remapTool);
@@ -496,15 +316,8 @@ export function rewriteRecipeReferences(
 }
 
 /**
- * Rewrite every reference one in-system COMPONENT carries (its salvage block), in place.
- *
- * The component's OWN id is not touched here — re-keying the definition itself is the caller's
- * decision, and copy-mode and the migration make it differently. Its essence quantity map IS
- * rewritten — those keys name other entities — and it is rewritten before the salvage early return,
- * because a component with no salvage block is the common case and its essences still have to move.
- *
- * @param {unknown} component
- * @param {{remapComponent: Function, remapTool: Function, remapEssence: Function}} remappers
+ * Rewrite every reference one in-system COMPONENT carries; its OWN id is the caller's decision. The
+ * essence map is rewritten BEFORE the salvage early return, the no-salvage case being the common one.
  */
 export function rewriteComponentReferences(
   component,
@@ -521,14 +334,8 @@ export function rewriteComponentReferences(
 }
 
 /**
- * Rewrite the component references one ESSENCE DEFINITION carries, in place.
- *
- * All THREE spellings, including the legacy `sourceItemUuid`, which `## EssenceDefinition`
- * requirement 3 permits to hold a legacy component id. The rewrite is a keyed lookup, so a
- * `sourceItemUuid` holding a real document UUID is not a key and is left verbatim.
- *
- * @param {unknown} definition
- * @param {{remapComponent: Function}} remappers
+ * Rewrite an ESSENCE DEFINITION's component references — all THREE spellings, the legacy
+ * `sourceItemUuid` included (requirement 3); a keyed lookup leaves a real UUID verbatim.
  */
 export function rewriteEssenceReferences(definition, { remapComponent = identity } = {}) {
   if (!isPlainObject(definition)) return;
@@ -544,17 +351,8 @@ export function rewriteEssenceReferences(definition, { remapComponent = identity
 }
 
 /**
- * Rewrite every reference one TOOL carries, in place.
- *
- * Both id families, because `repairRequirements` is an `IngredientGroup[]` whose options may be
- * essence-typed as readily as component-typed (issue 1654); they go through
- * {@link rewriteIngredientRef} so the essence leg cannot drift from the recipe leg.
- *
- * Both halves of the tool scope reach through here — `toolScope.membership[]` and
- * `toolScope.defaults[]` — so a retired id left in either would be read as live by `resolveTool`.
- *
- * @param {unknown} tool
- * @param {{remapComponent: Function, remapEssence: Function}} remappers
+ * Rewrite every reference one TOOL carries — both id families, `repairRequirements` options being
+ * essence-typed, through {@link rewriteIngredientRef}. Both halves of the tool scope reach here.
  */
 export function rewriteToolReferences(
   tool,
@@ -563,9 +361,8 @@ export function rewriteToolReferences(
   if (!isPlainObject(tool)) return;
   if ('componentId' in tool) tool.componentId = remapComponent(tool.componentId);
   if (isPlainObject(tool.onBreak)) {
-    // IMPORT-ONLY. `Tool.toJSON` never emits this key, so it is unreachable for any
-    // normalized tool; `normalizeOnBreak` still reads it from an imported or hand-edited
-    // payload, which is the only reason it is retained.
+    // IMPORT-ONLY: `Tool.toJSON` never emits this key, so it is unreachable for a normalized tool.
+    // `normalizeOnBreak` still reads it from an imported or hand-edited payload.
     if ('replacementComponentId' in tool.onBreak) {
       tool.onBreak.replacementComponentId = remapComponent(tool.onBreak.replacementComponentId);
     }
@@ -579,9 +376,8 @@ export function rewriteToolReferences(
       );
     }
   }
-  // `repairRequirements` is an `IngredientGroup[]` whose options name the OWNING SYSTEM's
-  // components — or, for an essence-typed option, its essences. It appeared nowhere in the
-  // shipped walk.
+  // `repairRequirements` is an `IngredientGroup[]` naming the OWNING SYSTEM's components, or its
+  // essences for an essence-typed option. It appeared nowhere in the shipped walk.
   for (const group of arrayOf(tool.repairRequirements)) {
     for (const option of arrayOf(group?.options)) {
       rewriteIngredientRef(option, { remapComponent, remapEssence });
@@ -589,12 +385,7 @@ export function rewriteToolReferences(
   }
 }
 
-/**
- * Rewrite every reference one gathering TASK or EVENT carries, in place.
- *
- * @param {unknown} record
- * @param {{remapComponent: Function, remapTool: Function}} remappers
- */
+/** Rewrite every reference one gathering TASK or EVENT carries, in place. */
 export function rewriteGatheringRecordReferences(
   record,
   { remapComponent = identity, remapTool = identity } = {}
@@ -609,12 +400,7 @@ export function rewriteGatheringRecordReferences(
   rewriteToolIds(record, remapTool);
 }
 
-/**
- * Rewrite every reference one CRAFTING SYSTEM record carries, in place.
- *
- * @param {unknown} system
- * @param {{remapComponent: Function, remapTool: Function, remapEssence: Function}} remappers
- */
+/** Rewrite every reference one CRAFTING SYSTEM record carries, in place. */
 export function rewriteSystemReferences(
   system,
   { remapComponent = identity, remapTool = identity, remapEssence = identity } = {}
@@ -623,9 +409,8 @@ export function rewriteSystemReferences(
   for (const component of arrayOf(system.components)) {
     rewriteComponentReferences(component, { remapComponent, remapTool, remapEssence });
   }
-  // The essence definition's own id is not touched here, for the same reason the component's is
-  // not: re-keying a definition is the caller's decision. Only the component references it carries
-  // are rewritten.
+  // The essence definition's own id is not touched, for the reason the component's is not: re-keying
+  // a definition is the caller's decision.
   for (const definition of arrayOf(system.essenceDefinitions)) {
     rewriteEssenceReferences(definition, { remapComponent });
   }
@@ -635,11 +420,8 @@ export function rewriteSystemReferences(
 }
 
 /**
- * Rewrite every reference ONE system's `gatheringConfig.systems[systemId]` block carries, in
- * place — including the LEGACY tools copy the `0.7.0` migration consumes.
- *
- * @param {unknown} slice
- * @param {{remapComponent: Function, remapTool: Function, remapEssence: Function}} remappers
+ * Rewrite every reference one system's `gatheringConfig.systems[systemId]` block carries, in place
+ * — including the LEGACY tools copy the `0.7.0` migration consumes.
  */
 export function rewriteGatheringSliceReferences(
   slice,
@@ -655,24 +437,10 @@ export function rewriteGatheringSliceReferences(
 }
 
 /**
- * Rewrite every reference one WORLD SCOPE MEMBERSHIP record carries, in place.
- *
- * The essence membership's `effectSource` section carries the three shipped source spellings,
- * and the tool membership's `onBreak` section and seeded `repairRequirements` carry component
- * ids exactly as the in-system tool does. On a correctly ordered pass this finds NOTHING to
- * change, because the payloads are built from already-rewritten records — it is the
- * belt-and-braces arm `#### D6` requires. The migration COUNTS what this repairs and reports it
- * as `payloadRewriteRepairs`, and an acceptance test pins that count at ZERO — because an
- * unconditional repair arm would otherwise silently fix, and therefore hide, the very
- * payload-before-rewrite ordering regression it exists to back up.
- *
- * The component arm rewrites the record's `essences` section and nothing else (issue 1654): it is
- * spelled over `Component.essences`, so it is a `Record<essenceId, number>` naming world essences.
- * Its sibling `inherit.essences` is a section-name switch, not an id, and is left alone.
- *
- * @param {unknown} record
- * @param {string} entityType `'components' | 'essences' | 'tools'`
- * @param {{remapComponent: Function, remapEssence: Function}} remappers
+ * Rewrite every reference one WORLD SCOPE MEMBERSHIP record carries. On a correctly ordered pass
+ * this finds NOTHING: it is the belt-and-braces arm, and the migration COUNTS what it repairs with
+ * an acceptance test pinning that at ZERO, or it would hide the regression it backs up. The
+ * component arm rewrites `essences` alone; `inherit.essences` is a section-name switch.
  */
 export function rewriteMembershipReferences(
   record,
@@ -697,13 +465,8 @@ export function rewriteMembershipReferences(
 }
 
 /**
- * A keyed remapper over a plain `{ [oldId]: newId }` map.
- *
- * ONE SIMULTANEOUS LOOKUP, never a fixed-point iteration, which is what makes the rewrite
- * idempotent on a map whose image is disjoint from its keys.
- *
- * @param {object|null|undefined} map
- * @returns {(value: unknown) => unknown}
+ * A keyed remapper over a plain `{ [oldId]: newId }` map. ONE SIMULTANEOUS LOOKUP, never a
+ * fixed-point iteration, which is what makes the rewrite idempotent on a disjoint-image map.
  */
 export function keyedRemapper(map) {
   const source = isPlainObject(map) ? map : {};

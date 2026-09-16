@@ -5,28 +5,12 @@ import { resolvedToolsFor } from './systems/scopedEntityReads.js';
 import { effectiveToolBreakageAuthority } from './systems/toolBreakageAuthority.js';
 
 /**
- * Stamp a broken-tool REPLACEMENT grant's durable identity onto its item-data payload
- * BEFORE creation (issue 780). ALWAYS stamps the replacement component id at
- * `flags.fabricate.roles[system.id].componentId` — the replacement IS that component — so
- * every downstream component consumer (inventory display, salvage, crafting ingredient
- * matching, the gathering stack-guard) resolves it by durable identity once #601 removes
- * the name-fallback tier.
- *
- * ADDITIONALLY co-stamps `roles[system.id].toolId` with the linking tool's id ONLY when
- * EXACTLY ONE first-class tool in `system.tools` links the replacement component
- * (`tool.componentId === componentId`) — the componentId-linked "whetstone" case the `Tool`
- * model documents. The tool matcher (`resolveToolForItem` / `itemIsToolByDurableIdentity`)
- * reads `roles[systemId].toolId`, NOT `componentId`, so a componentId-only stamp would not
- * keep a replacement that is itself a working tool matchable once the name tier is gone. On
- * ZERO or MULTIPLE linking tools the `toolId` co-stamp is skipped (ambiguous); when the
- * component does not resolve `componentId` is nullish and the shared writer stamps nothing.
- *
- * Shared by BOTH replacement creators — `CraftingEngine._makeToolReplacementCreator` and
- * {@link makeCreateReplacement} below — so their stamping logic cannot drift.
- *
- * @param {object} itemData - the plain replacement item-data about to be created
- * @param {{ id?: string, tools?: Array<object> }|null|undefined} system
- * @param {string|null|undefined} componentId - the resolved replacement component id
+ * Stamp a broken-tool REPLACEMENT grant's durable identity onto its item data BEFORE creation
+ * (issue 780), ALWAYS the replacement component id — the replacement IS that component.
+ * `roles[system.id].toolId` is co-stamped ONLY when EXACTLY ONE first-class tool links that
+ * component: the matcher reads `toolId`, so a componentId-only stamp would leave a replacement that
+ * is itself a working tool unmatchable, while zero or several linking tools is ambiguous.
+ * Shared by BOTH replacement creators, so their stamping cannot drift.
  */
 export function stampReplacementComponentIdentity(itemData, system, componentId) {
   const systemId = system?.id;
@@ -59,17 +43,7 @@ function replacementItemData(source) {
   return itemData;
 }
 
-/**
- * Build the single lossless Tool replacement creator used by crafting, salvage,
- * and gathering breakage consumers.
- *
- * @param {object} dependencies
- * @param {object|null} dependencies.system
- * @param {(args: {componentId: string, system: object}) => object|Promise<object|null>}
- *   [dependencies.resolveComponentSource]
- * @param {(uuid: string) => Promise<object|null>} [dependencies.resolveItemUuid]
- * @returns {(args: {actor: object, target: object}) => Promise<object|null>}
- */
+/** The single lossless Tool replacement creator crafting, salvage and gathering all share. */
 export function createToolReplacementCreator({
   system = null,
   resolveComponentSource,
@@ -109,36 +83,16 @@ export function createToolReplacementCreator({
 }
 
 /**
- * Shared Tool breakage PLAN/APPLY runtime.
- *
- * Both the gathering engine (`src/main.js` `createGatheringToolBreakage`) and the
- * crafting engine (`src/systems/CraftingEngine.js`) consume this single
- * implementation so the breakage decision and on-break side effects stay in
- * lockstep across surfaces.
- *
- * The runtime is deliberately matcher-agnostic: callers inject
- *   - `matchTools`      — resolves required tools to owned `{ tool, item }` pairs
- *   - `buildItemRef`    — builds a run-record `{ actorUuid, itemUuid, quantity }`
- *   - `resolveReplacementSource` — resolves a Component replacement target to a
- *     source item/component (optional; only needed for component replacement)
- *   - `resolveItemUuid` — resolves a direct Item replacement target (optional;
- *     only needed for direct-Item replacement)
- *   - `evaluateExpression` — async dice/expression evaluator (optional)
- *
- * Usage (`limitedUses`) semantics are preserved exactly: only `limitedUses`
- * tools write `flags.fabricate.toolUsage`; the other breakage modes never touch
- * item flags.
+ * The shared Tool breakage PLAN/APPLY runtime, consumed by the gathering engine and `CraftingEngine`
+ * alike so decision and side effects stay in lockstep. Deliberately matcher-agnostic — `matchTools`,
+ * `buildItemRef`, `resolveReplacementSource`, `resolveItemUuid` and `evaluateExpression` are all
+ * injected — and USAGE SEMANTICS ARE EXACT: only `limitedUses` tools write item flags.
  */
 
 /**
- * Read the persisted tool-usage flag, tolerant of the several historical flag
- * shapes (nested namespace, dotted path) and the absence of a Foundry runtime.
- *
- * Catalyst→Tool migration fallback: when no `toolUsage` flag exists, fall back to the
- * legacy `flags.fabricate.catalystItemUsage` written before the 0.6.0 migration, so an item
- * already degraded as a catalyst keeps its used count under the unified Tool runtime. This
- * is meaningful only for migrated `limitedUses` tools; presence-only tools never read usage.
- * Writes always go to `toolUsage` (authoritative); `catalystItemUsage` is never back-filled.
+ * Read the persisted tool-usage flag, tolerant of the historical shapes and of no Foundry. CATALYST
+ * FALLBACK: absent `toolUsage`, the pre-0.6.0 `catalystItemUsage` is read so an item already degraded
+ * as a catalyst keeps its count. Writes always go to the authoritative `toolUsage`.
  */
 export function readToolUsage(item) {
   const toolUsage =
@@ -159,16 +113,8 @@ export function readToolUsage(item) {
 }
 
 /**
- * Decide whether a tool breaks on this attempt WITHOUT mutating the item.
- *
- * For `limitedUses` this projects the post-increment `timesUsed` (so the plan
- * reflects the usage that {@link applyToolUsageAndBreakage} will record) by
- * reading the current usage and adding one. Other modes defer to
- * {@link Tool#evaluateBreakage}.
- *
- * @param {Tool} tool
- * @param {{ actor?: object, item?: object, evaluateExpression?: Function }} params
- * @returns {Promise<{ broken: boolean, mode: string, evidence: object }>}
+ * Decide whether a tool breaks on this attempt WITHOUT mutating the item: `limitedUses` projects the
+ * post-increment `timesUsed`, every other mode defers to `Tool#evaluateBreakage`.
  */
 export async function evaluateToolBreakagePlan(tool, { actor, item, evaluateExpression } = {}) {
   if (tool.breakage?.mode === 'limitedUses') {
@@ -181,9 +127,7 @@ export async function evaluateToolBreakagePlan(tool, { actor, item, evaluateExpr
   return tool.evaluateBreakage({ actor, item, evaluateExpression });
 }
 
-/**
- * Project the on-break outcome shape used in plan entries (no side effects).
- */
+/** Project the on-break outcome shape used in plan entries; no side effects. */
 export function plannedToolBreakageOutcome(tool) {
   if (tool.onBreak?.mode === 'destroy') return { action: 'destroyed' };
   if (tool.onBreak?.mode === 'flagBroken') return { action: 'flagged' };
@@ -202,10 +146,7 @@ function stringOrEmpty(value) {
   return value === null || value === undefined ? '' : String(value);
 }
 
-/**
- * Compare two numbers with one of the DSL operators.
- * @private
- */
+/** Compare two numbers with one of the DSL operators. */
 function compareNumeric(actual, operator, expected) {
   switch (operator) {
     case '==': {
@@ -230,11 +171,8 @@ function compareNumeric(actual, operator, expected) {
 }
 
 /**
- * Reduce a dice group's per-die `results[]` to the value an aggregate targets.
- * Returns `null` when the aggregate needs per-die faces but none are present
- * (fail-open: the trigger does not match), EXCEPT `total`, which uses the group
- * `sum` and is always available.
- * @private
+ * Reduce a dice group's per-die `results[]` to the value an aggregate targets, `null` when per-die
+ * faces are needed but absent so the trigger fails open — except `total`, read off the group `sum`.
  */
 function aggregateDiceGroup(group, aggregate) {
   if (aggregate === 'total') {
@@ -246,8 +184,7 @@ function aggregateDiceGroup(group, aggregate) {
   switch (aggregate) {
     case 'anyDie':
     case 'allDice': {
-      // any/all are evaluated per-die against the operator (handled by the caller);
-      // returning the array signals the per-die comparison path.
+      // any/all compare per-die against the operator; the array signals that path to the caller.
       return results;
     }
     case 'lowestDie': {
@@ -263,14 +200,9 @@ function aggregateDiceGroup(group, aggregate) {
 }
 
 /**
- * Evaluate one `checkBreakage` condition against a checkResult.
- *
- * Exported so the check-roll runners ({@link module:src/systems/checkRoll}) can
- * reuse the SAME condition-matching logic for forced-outcome resolution, instead
- * of duplicating it. The forced-outcome path passes a synthetic `checkResult`
- * carrying just `{ value, data: { total, diceGroups } }` and skips `outcomeTier`
- * conditions (the routed tier is not yet known when the outcome is being forced).
- * @returns {boolean}
+ * Evaluate one `checkBreakage` condition against a checkResult, exported so the check-roll runners
+ * reuse the SAME matching: that path passes a synthetic `{ value, data }` and skips `outcomeTier`
+ * conditions, the routed tier not yet being known.
  */
 export function evaluateCheckBreakageCondition(condition, checkResult) {
   if (!condition || typeof condition !== 'object') return false;
@@ -319,27 +251,11 @@ export function evaluateCheckBreakageCondition(condition, checkResult) {
 }
 
 /**
- * Decide whether the active check forces every required tool to break (issue 419).
- *
- * This is the single shared trigger-evaluator seam that crafting, salvage, and
- * gathering all route through, so the decision cannot drift between surfaces. It is
- * a PURE decision (no side effects); the side-effect point stays in the engine /
- * runtime `apply`.
- *
- * - Only engine-evaluated roll-formula check results (`engineEvaluated === true`) can
- *   force-break; any other result never force-breaks (the legacy guard formerly in
- *   `CraftingEngine._checkForcesToolBreak`).
- * - The legacy `data.breakTools` (the routed per-tier `outcome.breakTools` bridge) is
- *   honoured as an implicit always-on trigger, so existing tier flags keep working
- *   without separate persistence.
- * - Each configured trigger force-breaks all required tools (triggers are ORed) only
- *   when it both opts into breakage (`breakTools === true`) AND its condition matches
- *   the checkResult.
- *
- * @param {object} params
- * @param {{ triggers?: Array<object> }} [params.checkBreakage]
- * @param {object} [params.checkResult]
- * @returns {{ forceBreak: boolean, triggerId: string|null, reason: string|null }}
+ * Decide whether the active check forces every required tool to break (issue 419) — the one shared
+ * trigger evaluator all three activities route through, and PURE, the side effect staying in the
+ * engine's `apply`. Only an engine-evaluated result (`engineEvaluated === true`) can force-break,
+ * the legacy per-tier `data.breakTools` is an implicit always-on trigger, and a configured trigger
+ * fires only when it both opts in and matches.
  */
 export function evaluateCheckBreakage({ checkBreakage, checkResult } = {}) {
   const none = { forceBreak: false, triggerId: null, reason: null };
@@ -373,22 +289,8 @@ export function evaluateCheckBreakage({ checkBreakage, checkResult } = {}) {
 }
 
 /**
- * Apply usage and (if planned/decided broken) on-break side effects to a single
- * owned tool item. Returns the evidence entry recorded against the run.
- *
- * `applyUsage` is a no-op for non-`limitedUses` modes (see {@link Tool#applyUsage}),
- * so presence-only tools never stamp an item flag.
- *
- * @param {object} params
- * @param {Tool} params.tool
- * @param {object} params.actor
- * @param {object} params.item
- * @param {object} [params.planned]                - prior plan entry for this item, if any
- * @param {string} [params.authority=toolSpecific] - active system breakage authority
- * @param {Function} [params.evaluateExpression]
- * @param {Function} [params.buildItemRef]         - (actor, item) => itemRef
- * @param {Function} [params.createReplacement]    - async ({ actor, target }) => Item|{success: true}|true|null
- * @returns {Promise<object>} evidence entry
+ * Apply usage and, when broken, the on-break side effects to one owned tool item, answering the run's
+ * evidence entry. `applyUsage` is a no-op outside `limitedUses`, so presence-only stamps nothing.
  */
 export async function applyToolUsageAndBreakage({
   tool,
@@ -404,10 +306,8 @@ export async function applyToolUsageAndBreakage({
     await tool.applyUsage(item);
   }
   const itemRef = typeof buildItemRef === 'function' ? buildItemRef(actor, item) : null;
-  // Under tool-specific authority, `applyUsage` has already incremented the
-  // persisted `timesUsed`, so an unplanned decision must read the POST-increment
-  // count via `Tool#evaluateBreakage` (its documented contract). Check-driven
-  // callers provide a planned forced decision and disable retained usage tracking.
+  // Under tool-specific authority `applyUsage` has already incremented `timesUsed`, so an unplanned
+  // decision reads the POST-increment count; check-driven callers supply a planned decision instead.
   const breakageResult = planned
     ? { mode: planned.mode, broken: planned.broken, evidence: planned.evidence }
     : await tool.evaluateBreakage({ actor, item, evaluateExpression });
@@ -425,22 +325,7 @@ export async function applyToolUsageAndBreakage({
   return entry;
 }
 
-/**
- * Create a reusable tool breakage plan/apply pair.
- *
- * Mirrors the prior gathering-only implementation but with all surface-specific
- * resolution injected, so the crafting engine and the gathering engine share one
- * breakage runtime.
- *
- * @param {object} deps
- * @param {Function} deps.matchTools                  - ({ actor, system, task, tools }) => { items: [{ tool, item }], missing }
- * @param {Function} deps.buildItemRef                - (actor, item) => itemRef
- * @param {Function} [deps.resolveReplacementSource]  - ({ componentId, system }) => source|null
- * @param {Function} [deps.resolveItemUuid]            - async (uuid) => Item|null
- * @param {Function} [deps.evaluateExpression]
- * @param {Function} [deps.planKey]                   - ({ actor, task }) => string (defaults to actor:task)
- * @returns {{ plan: Function, apply: Function }}
- */
+/** A reusable breakage plan/apply pair, every surface-specific resolution injected. */
 export function createToolBreakageRuntime({
   matchTools,
   buildItemRef,
@@ -463,11 +348,8 @@ export function createToolBreakageRuntime({
     });
   }
 
-  // Resolve the system's EFFECTIVE breakage authority (issue 419; routed through the world
-  // scope at issue 1363). It used to re-default to `toolSpecific` here, which was harmless only
-  // while the crafting-system normalizer minted a concrete value on every save. Now that the
-  // normalizer is absence-preserving, a local re-default would silently ignore a world authority
-  // a GM has authored — the flip would be inert at this reader.
+  // The system's EFFECTIVE breakage authority (issue 419; world-scoped at 1363). It must NOT
+  // re-default to `toolSpecific`, which would make an authored world authority inert at this reader.
   function resolveAuthority(system) {
     return effectiveToolBreakageAuthority(system);
   }
@@ -484,9 +366,8 @@ export function createToolBreakageRuntime({
     } = {}) {
       const matched = matchTools({ actor, system, task, tools, presentTools });
       const authority = resolveAuthority(system);
-      // Under checkDriven authority, the active check decides whether required tools
-      // break. `checkBreakable === false` excludes a Tool. Legacy `breakage.mode:
-      // 'immune'` is read forward as that exclusion and is never written canonically.
+      // Under checkDriven authority the active check decides. `checkBreakable === false` excludes a
+      // Tool; legacy `breakage.mode: 'immune'` reads forward as that and is never written.
       const decision =
         authority === 'checkDriven'
           ? evaluateCheckBreakage({ checkBreakage, checkResult })
@@ -495,11 +376,10 @@ export function createToolBreakageRuntime({
       const planned = [];
       for (const { tool, item, virtual, breakable } of matched.items) {
         const model = tool instanceof Tool ? tool : Tool.fromJSON(tool);
-        // A presence-only match (durable-identity gate, issue 557) has an owned item
-        // but must NOT be consumed or destroyed; treat it like a virtual match.
+        // A presence-only match (durable-identity gate, issue 557) owns an item but must NOT be
+        // consumed or destroyed, so it is treated like a virtual match.
         const spared = breakable === false && !virtual && !!item;
-        // Virtual-present (canvas-tool) matches have no owned item to break/use.
-        // Under checkDriven both are still recorded as skipped evidence.
+        // A virtual match has no owned item; under checkDriven both are recorded as skipped.
         if (virtual || !item || spared) {
           if (authority === 'checkDriven') {
             planned.push({
@@ -588,11 +468,10 @@ export function createToolBreakageRuntime({
       const evidence = [];
       for (const { tool: toolData, item, virtual, breakable } of matched.items) {
         const tool = toolData instanceof Tool ? toolData : Tool.fromJSON(toolData);
-        // A presence-only match (durable-identity gate, issue 557) has an owned item
-        // but must NOT be consumed or destroyed; treat it like a virtual match.
+        // A presence-only match (durable-identity gate, issue 557) owns an item but must NOT be
+        // consumed or destroyed, so it is treated like a virtual match.
         const spared = breakable === false && !virtual && !!item;
-        // Virtual-present (canvas-tool) matches have no owned item to break/use;
-        // under checkDriven both are recorded as skipped evidence (not mutated).
+        // A virtual match has no owned item; under checkDriven both are recorded as skipped.
         if (virtual || !item || spared) {
           if (authority === 'checkDriven') {
             evidence.push({
@@ -609,8 +488,7 @@ export function createToolBreakageRuntime({
           continue;
         }
         const itemRef = typeof buildItemRef === 'function' ? buildItemRef(actor, item) : null;
-        // `checkBreakable === false` is the canonical exclusion. The legacy `immune`
-        // mode remains a read-forward compatibility input for unnormalized callers.
+        // `checkBreakable === false` is canonical; legacy `immune` is read-forward only.
         const isImmune = tool.checkBreakable === false || tool.breakage?.mode === 'immune';
         let planned = plannedByItem.get(stringOrEmpty(itemRef?.itemUuid));
         let extra = {};

@@ -1,37 +1,9 @@
 /**
- * 1.16.0 — Rename the registered-entry source-reference fields (issue 560; pure,
- * idempotent, version-gated).
- *
- * The three source-reference fields borne by every registered-entry kind are renamed so
- * their names say what they mean:
- *
- *   sourceUuid       -> registeredItemUuid   // the document actually registered; fromUuid spawns it
- *   sourceItemUuid   -> originItemUuid        // canonical origin (compendium pack uuid), else = registered
- *   fallbackItemIds  -> aliasItemUuids        // extra refs kept for matching after source repairs
- *
- * The rename is applied to every entry of the three stored entry-array kinds inside each
- * system of the `craftingSystems` settings payload — `system.components[]`,
- * `system.recipeItemDefinitions[]`, and `system.tools[]`. `MigrationRunner` reads/writes the
- * payload as pure DATA (no Item handles), so this is exactly what a data migration can do.
- *
- * Per entry, for each `[oldKey, newKey]` pair the value is mapped ONLY when the old key is
- * present and the new key is absent, then the old key is deleted:
- *
- *   - Old-only entry: value is copied to the new key, old key removed.
- *   - Both-present entry: the new key WINS (already-renamed value kept), old key removed.
- *   - New-only entry: untouched (no old key to migrate).
- *
- * Idempotent: after a run no old keys remain, so a second run is a no-op. Never throws. A
- * world that matched an item before the migration matches it identically after — the
- * semantics are frozen, only the field NAMES change.
- *
- * The essence definition's own `sourceItemUuid` pointer is a DIFFERENT field family (it names
- * the item an essence's source component points at, not a registered-entry match ref) and is
- * deliberately NOT touched here; likewise the canvas interactable RegionBehaviour
- * `sourceUuid` DataModel field lives outside the settings payload entirely.
- *
- * @param {Array<object>} systems - raw craftingSystems setting
- * @returns {{ systems: Array<object> }}
+ * `1.16.0` — rename the three registered-entry source-reference fields so their names say what they
+ * mean (issue 560), across every system's components, recipe-item definitions and tools. The
+ * semantics are frozen: a world that matched an item before matches it identically after.
+ * The essence definition's own `sourceItemUuid` and the canvas interactable `sourceUuid` are
+ * DIFFERENT field families and are deliberately not touched.
  */
 
 const FIELD_RENAMES = [

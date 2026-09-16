@@ -759,7 +759,10 @@ describe('src/main.js construction order', () => {
       // shipped ahead of it inside a gateway file this lane may not open.
       'getVocabularyScopeStore',
     ]) {
-      const body = MAIN_SOURCE.slice(at(`  ${accessor}() {`), at(`  ${accessor}() {`) + 200);
+      // To the accessor's OWN closing brace, not a fixed-length slice: a fixed window runs past
+      // a short body into the next member and reddens this guard about a different method.
+      const start = at(`  ${accessor}() {`);
+      const body = MAIN_SOURCE.slice(start, MAIN_SOURCE.indexOf('\n  }', start));
       assert.equal(
         body.includes('_requireReady()'),
         false,

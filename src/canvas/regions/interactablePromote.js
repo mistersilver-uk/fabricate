@@ -1,24 +1,9 @@
 /**
- * Pure promote-region decision for the GM Manage Interactables panel (issue 335).
- *
- * "Promote region to interactable" turns an EXISTING drawn region of any shape
- * into a working `fabricate.interactable` bound to a chosen Tool or Gathering Task
- * source. This module is the PURE decision: given a chosen source
- * `{ interactableType, systemId, referenceId }` plus the resolved env (for a
- * gathering task) and a chosen marker mode, it validates the selection and builds:
- *
- *   - the behaviour `system` via the SAME {@link buildInteractableBehaviorSystem}
- *     every placement path uses (NO second builder), and
- *   - an optional marker spawn request describing the Tile/Drawing the caller
- *     should create over the region (region-only when `visualMode === 'none'`).
- *
- * It never touches Foundry: the caller (the app shell) resolves the live region,
- * attaches the behaviour via `region.createEmbeddedDocuments('RegionBehavior', …)`,
- * and — for `visualMode: 'marker'` — creates the marker via the existing
- * recreate-tile / drawing seams in `linkedInteractableVisual.js`. A gathering-task
- * promotion runs the drop-time environment-resolution precedence
- * (`environmentResolution.js`) at the edge and passes the resolved `environmentId`
- * in here.
+ * PURE promote-region decision for the GM Manage Interactables panel (issue 335): a chosen source
+ * plus a marker mode to a behaviour `system` and an optional marker spawn request.
+ * It builds the system through the SAME {@link buildInteractableBehaviorSystem} every placement
+ * path uses — there is no second builder — and touches no Foundry: the app shell attaches the
+ * behaviour, creates any marker, and resolves the environment before calling in.
  */
 
 import { buildInteractableSourceUuid } from '../interactableResolution.js';
@@ -29,16 +14,8 @@ import { INTERACTABLE_TYPES } from './interactableRegionFlags.js';
 export const PROMOTE_MARKER_KINDS = Object.freeze(['Tile', 'Drawing']);
 
 /**
- * Validate a promote source pick. PURE: confirms the chosen interactable type,
- * system id, and reference id are all present + well-formed. Returns
- * `{ valid: true }` or `{ valid: false, reason }` so the picker can surface a
- * precise message and disable the confirm action.
- *
- * @param {object} pick
- * @param {'tool'|'gatheringTask'} [pick.interactableType]
- * @param {string} [pick.systemId]
- * @param {string} [pick.referenceId]
- * @returns {{ valid: true } | { valid: false, reason: string }}
+ * PURE. `{ valid: true }` or `{ valid: false, reason }` for a source pick, so the picker can name
+ * the problem and disable confirm.
  */
 export function validatePromoteSource({ interactableType, systemId, referenceId } = {}) {
   if (!INTERACTABLE_TYPES.includes(interactableType)) {
@@ -54,32 +31,10 @@ export function validatePromoteSource({ interactableType, systemId, referenceId 
 }
 
 /**
- * Decide the promotion: validate the source, build the behaviour `system`, and
- * shape an optional marker spawn request. PURE.
- *
- * Returns `{ ok: false, reason }` when the source pick is invalid (so the caller
- * does not attach a half-formed behaviour). Otherwise returns:
- *
- *   {
- *     ok: true,
- *     behaviorSystem,                  // ready to attach as a RegionBehavior system
- *     marker: { kind, center } | null  // a marker create request, or null (region-only)
- *   }
- *
- * The marker request is `null` for `visualMode: 'none'` (region-only). For a
- * marker, `kind` is 'Tile' (default) or 'Drawing', and `center` is the region's
- * shape centre (when the caller supplied one) so the marker overlays the region.
- *
- * @param {object} params
- * @param {object} params.source                  `{ interactableType, systemId, referenceId }`.
- * @param {string} [params.name]                  Explicit display name (defaults to the source label / id at the edge).
- * @param {string} [params.environmentId]         Resolved environment (gatheringTask only).
- * @param {'marker'|'none'} [params.visualMode]   'marker' (default) ⇒ create a marker; 'none' ⇒ region-only.
- * @param {'Tile'|'Drawing'} [params.markerKind]  Which marker to create (default 'Tile').
- * @param {{ x: number, y: number }|null} [params.center]  The region's shape centre, for marker placement.
- * @param {(spawn: object) => object} params.buildBehaviorSystem  The shared behaviour-system builder
- *   (`buildInteractableBehaviorSystem`); injected so this stays Foundry-free.
- * @returns {{ ok: false, reason: string } | { ok: true, behaviorSystem: object, marker: object|null }}
+ * PURE. `{ ok: false, reason }` for an invalid pick — so no half-formed behaviour is attached —
+ * else `{ ok: true, behaviorSystem, marker }`. `marker` is null under `visualMode: 'none'`,
+ * otherwise `{ kind, center }` at the region's shape centre so it overlays the region.
+ * `buildBehaviorSystem` is injected to keep this Foundry-free.
  */
 export function decidePromoteRegion({
   source,
@@ -119,7 +74,7 @@ export function decidePromoteRegion({
     taskId: interactableType === 'gatheringTask' ? referenceId : null,
     environmentId: resolvedEnvironmentId,
     name: resolvedName,
-    // Region-only ⇒ hidden + no marker; the builder leaves uuid/documentName null.
+    // Region-only ⇒ hidden and no marker; the builder leaves uuid/documentName null.
     presentation: regionOnly ? { hidden: true } : undefined,
     linkedVisual: regionOnly ? { mode: 'none' } : undefined,
   });

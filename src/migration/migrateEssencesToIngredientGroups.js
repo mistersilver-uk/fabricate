@@ -1,50 +1,9 @@
 /**
- * 1.17.0 — Supersede the per-set `IngredientSet.essences` map with first-class
- * essence ingredient GROUPS, then reconcile the alchemy signature collisions that
- * folding essences into signature-bearing groups can introduce (issue 649).
- *
- * Every positive `set.essences[essenceId]` entry is rewritten into an equivalent
- * SINGLE-OPTION essence group
- * (`{ options: [{ quantity: 1, match: { type: 'essence', essenceId, amount } }] }`)
- * appended to the set's `ingredientGroups`, then `set.essences` is deleted. Because
- * every group in a set is AND-required, one single-option essence group per essence
- * preserves the old "in addition to" AND semantics exactly.
- *
- * Pure, deep-clone, idempotent, one-way:
- *
- *  - **Payload is `data.recipes`** (NOT `data.systems`): ingredient sets are
- *    persisted under the recipes setting; `data.systems` carries ZERO ingredient
- *    sets and is read READ-ONLY here for each alchemy system's components (needed by
- *    the collision reconciliation). Mirrors {@link migrateAlchemyCheckMode}'s
- *    `_clone(data.recipes)` / `return { recipes }` precedent.
- *  - Walks recipe-level `recipe.ingredientSets[]` AND step-level
- *    `recipe.steps[].ingredientSets[]` (a step-level `set.essences` would orphan
- *    when the back-compat read is later removed).
- *  - Drops empty / non-positive essence entries (already runtime no-ops) —
- *    behavior-preserving.
- *  - Idempotency: guarded on a non-empty `essences` map, so a set already lacking
- *    one (re-run, or authored post-migration) is untouched.
- *  - IDs via `crypto.randomUUID()` (available in Node 22 and the Foundry browser
- *    context; keeps the migration pure/Foundry-free and satisfies the Sonar S2245
- *    "no `Math.random`" gate). `foundry.utils.randomID()` throws under `node --test`.
- *
- * ## Post-migration alchemy-collision reconciliation (issue 649 §3a)
- *
- * `set.essences` never contributed to `SignatureValidator` overlap detection.
- * Folding essences into groups makes them signature-bearing, so a required essence
- * group GROWS a set's transversal coverage and can SILENTLY introduce new
- * collisions. Because {@link SignatureValidator#validateSystem} is now enabled-scoped
- * and every migrated recipe starts enabled, ONE pass over the all-enabled migrated
- * set finds every collision; both participant recipes of each conflict are disabled
- * (mirroring the runtime `disableSignatureConflicts` policy at the data level — this
- * pure fn cannot call the runtime helper, which reads `game.fabricate`). The enabled
- * residual is then pairwise collision-free, so on load `computeSystemVisibility`
- * reports no `blocks:'system'`.
- *
- * @param {object} data Runner payload.
- * @param {Array<object>} [data.recipes] Raw recipes setting.
- * @param {Array<object>} [data.systems] Raw crafting systems setting (read-only).
- * @returns {{ recipes: Array<object>, _essenceCollisionDisabledRecipes?: string[] }}
+ * `1.17.0` — supersede the per-set `IngredientSet.essences` map with first-class essence ingredient
+ * GROUPS, then reconcile the alchemy signature collisions that introduces (issue 649). Pure,
+ * deep-clone, idempotent, one-way; spec § Essences → Ingredient Groups Migration owns the rules.
+ * THE PAYLOAD IS `data.recipes`, with `data.systems` read-only. Ids come from `crypto.randomUUID()`,
+ * which keeps this Foundry-free — `foundry.utils.randomID()` throws under `node --test`.
  */
 import { SignatureValidator } from '../systems/SignatureValidator.js';
 
@@ -70,9 +29,8 @@ export function migrateEssencesToIngredientGroups(data = {}) {
 }
 
 /**
- * Rewrite every set in an ingredient-set array: fold each positive `set.essences`
- * entry into a single-option essence group and delete the map.
- * @param {Array<object>} sets
+ * Rewrite every set in an array: fold each positive `essences` entry into a single-option essence
+ * group and delete the map. Empty or non-positive entries are dropped as the no-ops they were.
  */
 function _rewriteRecipeSets(sets) {
   if (!Array.isArray(sets)) return;
@@ -102,13 +60,8 @@ function _rewriteRecipeSets(sets) {
 }
 
 /**
- * Per alchemy system, build a data-backed `SignatureValidator` over the migrated
- * recipes (filtered by `craftingSystemId`) + that system's components, and disable
- * BOTH participants of every conflict. Returns the disabled recipe NAMES for the
- * post-load GM notice.
- * @param {Array<object>} recipes Migrated recipes (mutated in place).
- * @param {Array<object>} systems Raw crafting systems (read-only).
- * @returns {string[]}
+ * Per alchemy system, validate the migrated recipes against that system's components and disable
+ * BOTH participants of every conflict, answering the disabled names for the GM notice.
  */
 function _reconcileAlchemyCollisions(recipes, systems) {
   if (!Array.isArray(systems)) return [];

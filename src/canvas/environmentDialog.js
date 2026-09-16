@@ -1,26 +1,13 @@
 /**
- * Thin Foundry edge: the on-drop GM environment-pick dialog (Foundry `DialogV2`).
- *
- * The env-resolution precedence (`environmentResolution.js`) decides WHEN a dialog
- * is needed; this module presents it. The GM picks an environment from a select;
- * cancelling (or closing) the dialog ABORTS the spawn — the caller treats a null
- * return as "do not spawn".
- *
- * Pure aside from the `DialogV2` call: the option list + the localized copy are
- * passed in, and the dialog factory is read off `globalThis.foundry` so this
- * stays isolated and the caller's resolution logic remains unit-testable.
+ * The thin `DialogV2` edge for the on-drop GM environment pick. `environmentResolution.js` decides
+ * WHEN it is needed; cancelling or closing ABORTS the spawn, which the caller reads as a null.
+ * The options and copy are passed in and the dialog factory is read off `globalThis.foundry`, so
+ * the resolution logic stays unit-testable.
  */
 
 /**
- * Prompt the GM to pick a gathering environment for a dropped task tile.
- *
- * @param {object} args
- * @param {Array<{ id: string, name: string }>} args.environments  Selectable
- *   environments (same crafting system as the task).
- * @param {string} [args.defaultEnvironmentId]  Pre-selected option, if any.
- * @param {(key: string, fallback?: string) => string} [args.localize]  i18n seam.
- * @returns {Promise<string|null>}  The chosen environment id, or null when the GM
- *   cancels / closes the dialog (abort the spawn) or no environments exist.
+ * Prompt the GM for a gathering environment. Null when they cancel or close, or when the system
+ * has no environments to offer.
  */
 export async function promptDropEnvironment({
   environments = [],
