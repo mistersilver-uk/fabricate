@@ -5262,7 +5262,7 @@ class Fabricate {
       recipe,
       ingredientSetId,
       options,
-      executeCommand: (command) => this.executeJournalRunCommand(command),
+      executeCommand: (command, options) => this.executeJournalRunCommand(command, options),
       resolveUuid: (uuid) => globalThis.fromUuid?.(uuid),
     });
   }

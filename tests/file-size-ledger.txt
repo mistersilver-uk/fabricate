@@ -111,8 +111,8 @@ src/systems/journalRunAuthority.js::createFoundryJournalRunAuthority	171
 src/systems/journalRunAuthority.js::createJournalRunAuthority	555
 src/systems/journalRunAuthority.js::createJournalRunAuthority>run	129
 src/systems/journalRunAuthority.js::createJournalRunAuthority>run>queue	127
-src/systems/journalRunCommands.js	992
-src/systems/journalRunCommands.js::createJournalRunCommandService	396
+src/systems/journalRunCommands.js	1011
+src/systems/journalRunCommands.js::createJournalRunCommandService	411
 src/systems/journalRunCommands.js::createJournalRunCommandService>executeOperation	179
 src/systems/scopedDefinitionStore.js	888
 src/systems/systemValidation.js::collectSystemBlockers	180
