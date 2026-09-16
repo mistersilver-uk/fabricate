@@ -381,10 +381,7 @@ function _buildManagedItemOptions(managedItems = []) {
   }));
 }
 
-/**
- * Minimal `{ id, tags }` projection of the managed components, for the recipe Validation tab's
- * overlap detection.
- */
+/** Minimal `{ id, tags }` projection of the managed components, for the Validation tab's overlap. */
 function _buildComponentTagOptions(managedItems = []) {
   return managedItems.map((item) => ({
     id: item.id,
@@ -624,10 +621,7 @@ const GATHERING_CHARACTER_MODIFIER_OPERATORS = new Set(['+', '-']);
 // overridable per modifier.
 const GATHERING_DROP_MODIFIER_MODES = new Set(['additive', 'multiplicative']);
 
-/**
- * Normalize one entry of the system modifier library on the write path (issue 1117); the manager is
- * the authority and re-normalizes anyway.
- */
+/** Normalize one modifier-library entry on the write path; the manager is the authority (issue 1117). */
 function _normalizeSystemModifier(entry = {}) {
   if (!entry || typeof entry !== 'object') return null;
   const id = entry.id ? String(entry.id) : '';
@@ -2135,7 +2129,11 @@ export function createAdminStore(services) {
     );
   }
 
-  /** Move one world-default section between following the world Tool and this system's own. */
+  /**
+   * Move one world-default section between following the world Tool and this system's own. Turning
+   * inheritance on writes the switch alone; turning it off seeds the override from the value that
+   * was on screen. `ui-integration` `### Tools Tab`, requirement 15 clause 1a (issue 1373).
+   */
   async function setToolSectionInherited(toolId, section, inherit, systemId = get(selectedSystemId)) {
     const target = String(toolId || '').trim();
     const system = String(systemId || '').trim();
@@ -3067,7 +3065,11 @@ export function createAdminStore(services) {
     );
   }
 
-  /** The same library through the read union — what a craft will actually do. */
+  /**
+   * The same library through the read union — what a craft will actually do. A display read and
+   * never a write source; {@link _toolRecordForSave} keeps the two apart. `ui-integration`
+   * `### Tools Tab` states the rule, on requirement 15 clause 1a (issue 1373).
+   */
   function _resolvedSystemTools(systemId) {
     const id = String(systemId || get(selectedSystemId) || '');
     if (!id) return [];
@@ -3088,7 +3090,9 @@ export function createAdminStore(services) {
 
   /**
    * The record a save actually persists: the draft, with every inheriting section restored from the
-   * live in-system record.
+   * live in-system record. The save reads the SWITCH, not the draft, because persisting the draft
+   * whole would freeze one moment's world default onto this system with nothing going red.
+   * `ui-integration` `### Tools Tab` states it (issue 1373).
    */
   function _toolRecordForSave(systemId, draft) {
     const record = _clonePlain(draft);

@@ -200,8 +200,8 @@ src/ui/svelte/components/SearchablePopover.svelte	1052
 src/ui/svelte/stores/actorBarStore.svelte.js::createActorBarStore	205
 src/ui/svelte/stores/adminComponentRowProjection.js::_createItemCard	131
 src/ui/svelte/stores/adminRecipeRowProjection.js	889
-src/ui/svelte/stores/adminStore.js	9643
-src/ui/svelte/stores/adminStore.js::createAdminStore	8067
+src/ui/svelte/stores/adminStore.js	9647
+src/ui/svelte/stores/adminStore.js::createAdminStore	8077
 src/ui/svelte/stores/adminStore.js::createAdminStore>_createTravelSection	551
 src/ui/svelte/stores/adminStore.js::createAdminStore>_createTravelSection>buildState	204
 src/ui/svelte/stores/adminStore.js::createAdminStore>refresh	278
