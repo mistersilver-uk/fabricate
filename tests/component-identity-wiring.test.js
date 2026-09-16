@@ -162,8 +162,17 @@ test('A10 - award: a fresh award is NOT folded into an owned stack that resolves
   const actor = {
     uuid: 'Actor.a',
     items: [candidate],
+    // Foundry's created embedded documents are PARENTED to the actor and carry their
+    // own stored source; the acknowledged-award contract reads both before it records
+    // the award, so a bare data clone would model an unacknowledged create.
     async createEmbeddedDocuments(_type, data) {
-      const made = data.map((d, i) => ({ ...d, id: `new-${i}`, uuid: `Actor.a.Item.new-${i}` }));
+      const made = data.map((d, i) => ({
+        ...d,
+        id: `new-${i}`,
+        uuid: `Actor.a.Item.new-${i}`,
+        parent: actor,
+        _source: structuredClone(d),
+      }));
       createdDocs.push(...made);
       return made;
     },

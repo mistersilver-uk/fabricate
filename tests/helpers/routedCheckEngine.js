@@ -306,8 +306,9 @@ export async function salvageForChatCard(salvageCraftingCheck) {
     flags: {},
     async delete() {
       this.deleted = true;
+      return this;
     },
-    async update() {},
+    async update(payload) { if (payload['system.quantity'] !== undefined) this.system.quantity = payload['system.quantity']; return this; },
   };
   const actor = {
     id: 'a-salvager',

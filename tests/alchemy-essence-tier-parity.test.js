@@ -37,6 +37,7 @@ import { IngredientSet } from '../src/models/IngredientSet.js';
 import { accumulateItemEssences, findMatchingComponent } from '../src/utils/essenceResolver.js';
 import { resolveComponentForItem } from '../src/utils/sourceUuid.js';
 import { resolveAlchemySubmissions } from '../src/utils/alchemySubmissions.js';
+import { mergeHistoryFlag } from './helpers/journal-fixtures.js';
 
 // ---------------------------------------------------------------------------
 // Globals
@@ -110,9 +111,11 @@ class Tier4Item {
     if (this._deleted) throw new Error(`Item ${this.id} was already deleted`);
     this._deleted = true;
     if (this.parent) this.parent.items = this.parent.items.filter((i) => i !== this);
+    return this;
   }
   async update(payload) {
     if (payload['system.quantity'] !== undefined) this.system.quantity = payload['system.quantity'];
+    return this;
   }
 }
 
@@ -137,9 +140,26 @@ class FakeActor {
     this.items = items;
     for (const item of items) item.parent = this;
     this.created = [];
+    this._flags = {};
+  }
+  getFlag(namespace, key) {
+    return this._flags[namespace]?.[key];
+  }
+  async setFlag(namespace, key, value) {
+    this._flags[namespace] ??= {};
+    this._flags[namespace][key] = mergeHistoryFlag(this._flags[namespace][key], value);
+    return this;
   }
   async createEmbeddedDocuments(_type, data) {
-    const made = data.map((d) => new FakeResultItem(d.name, d.img));
+    const made = data.map((d, index) => {
+      const item = new FakeResultItem(d.name, d.img);
+      item.id = `result-${this.created.length + index}`;
+      item.uuid = `${this.uuid}.Item.${item.id}`;
+      item.parent = this;
+      item.system = structuredClone(d.system ?? {});
+      item._source = structuredClone(d);
+      return item;
+    });
     this.created.push(...made);
     return made;
   }

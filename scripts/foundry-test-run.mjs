@@ -13639,39 +13639,35 @@ async function main() {
 
           // Render the centre detail for a concrete run: prefer an active run card,
           // else the first terminal history row. The centre detail article carries
-          // both [data-journal-detail] and [data-run-id] only when a run is
+          // both [data-journal-detail] and [data-run-key] only when a run is
           // selected (the unselected placeholder is [data-journal-empty="detail"]).
           const journalActiveCard = appShell.locator('.journal-run-card[data-run-id]').first();
           if (await journalActiveCard.count() > 0) {
             await journalActiveCard.click();
           } else {
-            const journalHistoryRow = appShell.locator('.journal-history-row[data-history-run-id]').first();
+            const journalHistoryRow = appShell.locator('.journal-history-row [data-history-run-id]').first();
             if (await journalHistoryRow.count() > 0) {
               await journalHistoryRow.scrollIntoViewIfNeeded();
               await journalHistoryRow.click();
             }
           }
-          await appShell.locator('[data-journal-detail][data-run-id]')
+          await appShell.locator('[data-journal-detail][data-run-key]')
             .first().waitFor({ state: 'visible', timeout: 10_000 });
 
           await assertNoScreenshotOverlays(page);
           await screenshot(page, 'fabricate-journal');
 
-          // Journal craft-detail capture (issue #752 — evidence for #748, and
-          // future #738): select a CRAFTING history run so the run-detail
-          // requirements card (StepDetails) is visible. The Phase E "Brew Healing
-          // Potion" craft guarantees at least one terminal crafting run. Full
-          // profile only (the rc journal frame is untouched); this runs after the
-          // fabricate-journal capture so it never disturbs that frame's selection.
+          // Phase E guarantees a terminal craft; capture its historical account after the
+          // general Journal frame so selecting it cannot disturb that frame's selection.
           if (RUN_SCREENSHOT_PHASES) {
-            const historyRows = appShell.locator('.journal-history-row[data-history-run-id]');
+            const historyRows = appShell.locator('.journal-history-row [data-history-run-id]');
             const historyCount = await historyRows.count();
             let craftingRunSelected = false;
             for (let i = 0; i < historyCount; i += 1) {
               await historyRows.nth(i).scrollIntoViewIfNeeded().catch(() => {});
               await historyRows.nth(i).click().catch(() => {});
               const selectedCraftingRun = await appShell
-                .locator('[data-journal-detail][data-run-type="crafting"]')
+                .locator(String.raw`[data-journal-detail][data-run-key*="\"crafting\""]`)
                 .first()
                 .waitFor({ state: 'visible', timeout: 5_000 })
                 .then(() => true)
@@ -13682,13 +13678,11 @@ async function main() {
               }
             }
             if (!craftingRunSelected) {
-              throw new Error('Journal history had no crafting run to show the run-detail requirements card.');
+              throw new Error('Journal history had no crafting run to show its historical account.');
             }
-            // Best-effort: bring the requirements (StepDetails) card into the frame
-            // when the crafting step carries facts (the routed-by-check smoke craft
-            // does). The crafting run-detail article is the hard requirement above.
-            await appShell.locator('[data-journal-detail][data-run-type="crafting"] [data-journal-card="step-details"]')
-              .first().scrollIntoViewIfNeeded({ timeout: 5_000 }).catch(() => {});
+            // Every profile reaching this capture requires the selected run's historical account.
+            await appShell.locator('[data-journal-detail] [data-journal-history-detail]')
+              .first().waitFor({ state: 'visible', timeout: 5_000 });
             await assertNoScreenshotOverlays(page);
             await screenshot(page, 'fabricate-journal-craft-detail');
           }

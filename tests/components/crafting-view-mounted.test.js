@@ -118,6 +118,41 @@ describe('CraftingView mounted behavior', () => {
     assert.equal(target.querySelector('[data-crafting-shopping]'), null, 'shopping list hidden while the run summary is shown');
   });
 
+  // Issue 1648: a failed CHECK now records an outcome too, so the same swap happens and the
+  // box must paint the FAILURE tone rather than the success one. happy-dom cannot compute the
+  // cascade, so this reads the rendered hooks the CSS keys off directly.
+  it('paints the run summary as a failure when the recorded outcome is a failed check', async () => {
+    const built = recipe();
+    const store = fakeCraftingStore({
+      recipes: [built],
+      lastRollResult: {
+        'recipe-1': {
+          success: false,
+          status: 'failed',
+          disposition: 'failed',
+          message: 'Your crafting check failed. The chat card has the full outcome.'
+        }
+      }
+    });
+    const target = await harness.mount({ services: services(store) });
+    const box = target.querySelector('[data-recipe-section="roll-result"][data-roll-success="false"]');
+    assert.ok(Boolean(box), 'the roll box renders in its failure state');
+    assert.ok(
+      box.classList.contains('is-failure') && !box.classList.contains('is-success'),
+      'and takes the failure class, never the success one'
+    );
+    assert.match(
+      box.textContent,
+      /check failed/i,
+      'the box states the failed check rather than standing empty'
+    );
+    assert.equal(
+      /consumed/i.test(box.textContent),
+      false,
+      'and claims nothing about what the failure policy spent'
+    );
+  });
+
   it('disables the run summary "Craft another" when the selection is no longer craftable (non-progressive)', async () => {
     const built = recipe({
       ingredientSets: [{ id: 'set-a', label: 'Option A', craftability: craftability({ canCraft: false }) }]
@@ -222,6 +257,43 @@ describe('CraftingView mounted behavior', () => {
     assert.match(calls.pickForMe.at(-1), /Slots\.PickedForYou/, 'the view owns the i18n');
     assert.deepEqual(calls.allocate.at(-1), ['Item.dusk-1', 2]);
   });
+
+  // Issue 1648, the reported bug's own header. EVERY player-app craft routes through the
+  // versioned-run authority, so "Ready to craft" over a refused authority promised something
+  // the Craft button could only refuse. The header now drops the chip and leads its blocking
+  // callout with the refusal — worded by the SHARED `journalRunReasonMessage` vocabulary, not a
+  // second map — while an available authority leaves the ready state exactly as it was.
+  //
+  // AN UNMAPPED REASON BLOCKS TOO, and that is a reversal. It used to keep the chip, which for an
+  // AVAILABILITY answer is backwards and is exactly what hid `authority-unavailable` for as long
+  // as that code went unmapped: `available === false` means the craft WILL be refused whatever
+  // the code says, so an unwordable one falls back to the generic sentence rather than silence.
+  for (const [name, availability, ready] of [
+    ['an available authority', { available: true, reason: null }, true],
+    ['a refusal it can word', { available: false, reason: 'active-gm-missing' }, false],
+    ['a reason nobody mapped', { available: false, reason: 'a-reason-nobody-mapped' }, false],
+  ]) {
+    it(`renders the ready chip ${ready ? 'with' : 'without'} it, given ${name}`, async () => {
+      const store = fakeCraftingStore({ recipes: [recipe()] });
+      const target = await harness.mount({
+        services: services(store, { getJournalRunAuthorityAvailability: () => availability }),
+      });
+      const chip = target.querySelector('.crafting-detail-header-meta [data-crafting-status]');
+      assert.equal(Boolean(chip), ready, `the ready chip is ${ready ? 'kept' : 'withheld'}`);
+      const notice = target.querySelector('[data-recipe-blocking]');
+      assert.equal(
+        Boolean(notice),
+        !ready,
+        'a withheld chip is replaced by a stated reason, never by nothing'
+      );
+      if (ready) return;
+      assert.equal(notice.getAttribute('data-recipe-authority-blocked'), 'true');
+      assert.ok(
+        notice.textContent.includes('FABRICATE.App.Journal.Actions.AuthorityUnavailable'),
+        'and it is the shared vocabulary that words it'
+      );
+    });
+  }
 });
 
 /**

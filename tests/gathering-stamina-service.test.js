@@ -10,6 +10,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { GatheringStaminaService } from '../src/systems/GatheringStaminaService.js';
+import { FakeActor } from './helpers/run-manager-fakes.js';
 
 const HOUR = 3600;
 
@@ -217,4 +218,135 @@ test('regenerateActorStamina no-ops when regen is off or the pool is unmateriali
     economy: { stamina: { enabled: true, max: '40', regen: { policy: 'overTime', unit: 'hours', amount: '2' } } }
   });
   assert.equal(await noPool.service.regenerateActorStamina({ actor: makeFakeActor(), systemId: 'sys', worldTime: HOUR }), null);
+});
+
+// --- persistence: cleared keys must not resurrect (issue 1648) --------------
+//
+// `writeState` persists through `Actor#setFlag`
+// (`src/systems/gatheringRichStateInternals.js:70`), and Foundry's `setFlag`
+// writes via `Document#update`, whose recursive merge NEVER removes a key that
+// is merely absent from the written payload. `makeFakeActor` above REPLACES its
+// flag value, so it cannot observe that: these cases use the merge-faithful
+// `FakeActor` and a `-=`-aware `update`, which is what a real actor does.
+
+class MergingStaminaActor extends FakeActor {
+  /**
+   * Foundry's flattened-path `Document#update`, reduced to what the service
+   * uses: a dotted path below the `flags` root, with an optional `-=` deletion
+   * operator on the LAST segment. Deliberately does not delete an omitted key —
+   * that is the merge behaviour these cases exist to pin.
+   */
+  async update(patch) {
+    for (const [path, value] of Object.entries(patch)) {
+      const segments = path.split('.');
+      assert.equal(segments.shift(), 'flags', 'stamina deletions address the flags root');
+      const leaf = segments.pop();
+      let node = this._flags;
+      for (const segment of segments) node = node?.[segment];
+      if (!node || typeof node !== 'object') continue;
+      if (leaf.startsWith('-=')) delete node[leaf.slice(2)];
+      else node[leaf] = value;
+    }
+    return this;
+  }
+}
+
+// The RAW persisted entry, read straight off the merge-faithful flag store, so a
+// key's ABSENCE can be asserted rather than inferred from a projected `null`.
+function persistedEntry(actor, systemId = 'sys') {
+  return actor.getFlag('fabricate', 'gatheringState')?.stamina?.[systemId] || {};
+}
+
+test('setActorStamina deletes a cleared maxOverride instead of omitting it', async () => {
+  const actor = new MergingStaminaActor('Stamina');
+  await makeService().service.setActorStamina(actor, { systemId: 'sys', current: 30, max: 40, maxOverride: 20 });
+  assert.equal(persistedEntry(actor).maxOverride, 20, 'precondition: the override persisted');
+
+  await makeService().service.setActorStamina(actor, { systemId: 'sys', current: 12, maxOverride: null });
+
+  assert.ok(
+    !Object.hasOwn(persistedEntry(actor), 'maxOverride'),
+    'a cleared override must be DELETED from the flag; an omitted key survives the setFlag merge'
+  );
+  // Read back through a FRESH service, which holds no state of its own and so
+  // sees exactly what a reload would.
+  const reloaded = makeService().service.getActorStamina(actor, 'sys');
+  assert.equal(reloaded.maxOverride, null, 'the cleared override must not resurrect');
+  assert.equal(reloaded.max, 40, 'the effective cap falls back to the rolled max');
+});
+
+test('setActorStamina clearing an override leaves the rest of the entry intact', async () => {
+  const { service } = makeService({ now: () => 500 });
+  const actor = new MergingStaminaActor('Stamina');
+  await service.setActorStamina(actor, { systemId: 'sys', current: 30, max: 40, maxOverride: 20, maxReadOnly: true, regenerationMode: 'auto' });
+  await actor.update({ 'flags.fabricate.gatheringState.stamina.sys.lastRegenWorldTime': 120 });
+
+  await makeService().service.setActorStamina(actor, { systemId: 'sys', current: 12, maxOverride: '', regenerationMode: 'auto' });
+
+  const stored = persistedEntry(actor);
+  assert.ok(!Object.hasOwn(stored, 'maxOverride'), 'the override is gone');
+  assert.equal(stored.max, 40, 'the rolled max survives');
+  assert.equal(stored.current, 12);
+  assert.equal(stored.regenerationMode, 'auto');
+  assert.equal(stored.maxReadOnly, true);
+  assert.equal(stored.lastRegenWorldTime, 120, 'the regen anchor is preserved, not reset');
+});
+
+test('setActorStamina clearing an override that was never set writes no deletion', async () => {
+  const actor = new MergingStaminaActor('Stamina');
+  const updates = [];
+  const realUpdate = actor.update.bind(actor);
+  actor.update = async (patch) => { updates.push(patch); return realUpdate(patch); };
+
+  await makeService().service.setActorStamina(actor, { systemId: 'sys', current: 5, max: 20, maxOverride: null });
+
+  assert.equal(updates.length, 0, 'nothing was retired, so no deletion update is issued');
+  assert.equal(makeService().service.getActorStamina(actor, 'sys').maxOverride, null);
+  assert.equal(persistedEntry(actor).max, 20);
+});
+
+test('a forced reseed deletes the override the rerolled pool no longer carries', async () => {
+  const { service } = makeService({
+    economy: { stamina: { enabled: true, max: '50', start: '50', regen: { policy: 'none' } } },
+    evaluate: () => 50
+  });
+  const actor = new MergingStaminaActor('Stamina');
+  await service.seedActorStaminaIfNeeded({ actor, systemId: 'sys' });
+  await service.setActorStamina(actor, { systemId: 'sys', current: 10, maxOverride: 15 });
+  assert.equal(persistedEntry(actor).maxOverride, 15, 'precondition: the override persisted');
+
+  const rerolled = await service.seedActorStaminaIfNeeded({ actor, systemId: 'sys', force: true });
+
+  assert.equal(rerolled.current, 50);
+  assert.ok(!Object.hasOwn(persistedEntry(actor), 'maxOverride'), 'the reroll DELETES the override');
+  assert.equal(makeService().service.getActorStamina(actor, 'sys').maxOverride, null);
+  assert.equal(makeService().service.getActorStamina(actor, 'sys').max, 50);
+});
+
+test('rewriting a legacy provider:external pool deletes the retired provider key', async () => {
+  const actor = new MergingStaminaActor('Stamina');
+  await actor.setFlag('fabricate', 'gatheringState', {
+    stamina: { sys: { max: 12, current: 4, provider: 'external', regenerationMode: 'manual' } }
+  });
+
+  await makeService().service.setActorStamina(actor, { systemId: 'sys', current: 4, max: 12, maxReadOnly: false });
+
+  assert.ok(
+    !Object.hasOwn(persistedEntry(actor), 'provider'),
+    'the retired legacy key must be deleted, or the read-time compat clause re-asserts maxReadOnly'
+  );
+  assert.equal(makeService().service.getActorStamina(actor, 'sys').maxReadOnly, false);
+});
+
+test('an unsafe dotted system id is never addressed with a deletion key', async () => {
+  const actor = new MergingStaminaActor('Stamina');
+  const updates = [];
+  actor.update = async (patch) => { updates.push(patch); return actor; };
+  await actor.setFlag('fabricate', 'gatheringState', {
+    stamina: { 'dotted.id': { max: 12, current: 4, maxOverride: 6 } }
+  });
+
+  await makeService().service.setActorStamina(actor, { systemId: 'dotted.id', current: 4, maxOverride: null });
+
+  assert.equal(updates.length, 0, 'a dotted segment would re-split and delete the wrong node');
 });

@@ -55,6 +55,7 @@ function makeItem({ id, name = `Item ${id}`, quantity = 1, registeredItemUuid = 
     async delete() {
       this.deleteCalled = true;
       this.system.quantity = 0;
+      return this;
     },
     async update(payload) {
       this.updateCalled = true;
@@ -62,6 +63,7 @@ function makeItem({ id, name = `Item ${id}`, quantity = 1, registeredItemUuid = 
       if (payload['system.quantity'] !== undefined) {
         this.system.quantity = payload['system.quantity'];
       }
+      return this;
     }
   };
 }
@@ -98,7 +100,9 @@ function makeActor({ id = 'actor-1', items = [] } = {}) {
     async createEmbeddedDocuments(_type, itemDatas) {
       const stubs = (itemDatas || []).map((d, i) => ({
         id: `created-item-${createdItems.length + i}`,
-        uuid: `Item.created-item-${createdItems.length + i}`,
+        uuid: `${this.uuid}.Item.created-item-${createdItems.length + i}`,
+        parent: this,
+        _source: structuredClone(d),
         name: d.name || 'Created Item',
         system: { quantity: d.system?.quantity || 1 }
       }));
@@ -382,13 +386,15 @@ function makeRunManager(totalSteps = 2) {
         recipeId: recipe.id,
         status: 'inProgress',
         currentStepIndex: 0,
-        steps: [],
+        steps: recipe.getExecutionSteps().map((step) => ({ stepId: step.id, status: 'inProgress' })),
         startedAt: 1000,
         finishedAt: null
       };
       return runStore;
     },
     canProceedTimeGate() { return true; },
+    async updateRun(_actor, run) { return run; },
+    async discardRun() { runStore = null; },
     async markStepWaitingForTime(_actor, run) { return run; },
     async markStepInProgress(_actor, run) { return run; },
     async completeStepSuccess(_actor, run, stepIndex, _data) {

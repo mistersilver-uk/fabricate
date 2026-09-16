@@ -253,12 +253,16 @@ function buildFakeItem(id, quantity = 1) {
       return undefined;
     },
     async setFlag() {},
+    // Foundry resolves the DOCUMENT from both writes, and the acknowledged-receipt
+    // contract reads that return before recording an actual consumption.
     async delete() {
       this.deleteCalled = true;
+      return this;
     },
     async update(payload) {
       this.updateCalled = true;
       if (payload['system.quantity'] !== undefined) this.system.quantity = payload['system.quantity'];
+      return this;
     },
   };
 }

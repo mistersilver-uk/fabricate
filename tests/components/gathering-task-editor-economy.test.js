@@ -110,7 +110,7 @@ describe('Gathering task editor — economy sections are flag-gated and carded',
   it('gives both economy sections card chrome', () => {
     assert.match(
       editorSource,
-      /\.manager-task-stamina-card,\s*\.manager-task-nodes-card,\s*\.manager-task-dc-card\s*\{[^}]*border:[^}]*background:[^}]*\}/,
+      /\.manager-task-stamina-card,\s*\.manager-task-nodes-card,\s*\.manager-task-dc-card,\s*\.manager-task-resolution-card,\s*\.manager-task-results-card\s*\{[^}]*border:[^}]*background:[^}]*\}/,
       'stamina, node, and DC sections share card chrome (border + background)'
     );
   });
@@ -236,12 +236,10 @@ describe('Gathering task editor — economy sections are flag-gated and carded',
     assert.ok(typeof canvas.EnvironmentDialogConfirm === 'string');
   });
 
-  it('shows the per-task DC override field only for routed resolution (hidden for d100 and progressive)', () => {
-    // The DC override gate is the resolutionMode prop: routed has an editable DC,
-    // d100 has no DC at all, and progressive has no DC (value-driven). So the card
-    // is gated on `dcOverrideEnabled`, which is true only for routed.
-    assert.match(editorSource, /resolutionMode\s*=\s*'d100'/, 'editor declares a resolutionMode prop defaulting to d100');
-    assert.match(editorSource, /dcOverrideEnabled\s*=\s*\$derived\(resolutionMode === 'routed'\)/, 'the DC field is enabled only for routed resolution');
+  it('shows the per-task DC override only for the selected task routed mode', () => {
+    assert.match(editorSource, /resolutionMode\s*=\s*null/, 'an absent override lets the task own its mode');
+    assert.match(editorSource, /KNOWN_RESOLUTION_MODES\.has\(task\?\.resolutionMode\)/, 'the editor resolves the task mode');
+    assert.match(editorSource, /dcOverrideEnabled\s*=\s*\$derived\(taskResolutionMode === 'routed'\)/, 'the DC field is enabled only for routed resolution');
     const guardIdx = editorSource.indexOf('{#if dcOverrideEnabled}');
     const dcCardIdx = editorSource.indexOf('data-gathering-task-dc');
     const dcFieldIdx = editorSource.indexOf('data-gathering-task-dc-override');
@@ -254,8 +252,7 @@ describe('Gathering task editor — economy sections are flag-gated and carded',
     assert.match(editorSource, /function updateDcOverride/, 'has a DC override setter');
     assert.match(editorSource, /onUpdateTask\(\{ dcOverride: null \}\)/, 'a blank DC clears the override (null = system default)');
     assert.match(editorSource, /dcOverride:\s*Number\.isFinite\(next\)\s*\?\s*Math\.trunc\(next\)\s*:\s*null/, 'a numeric DC is truncated to an integer');
-    // The parent threads the gathering resolution mode into the editor.
-    assert.match(rootSource, /resolutionMode=\{gatheringResolutionMode\}/, 'parent passes the gathering resolution mode to the task editor');
+    assert.match(rootSource, /resolutionMode=\{gatheringTaskResolutionMode\}/, 'parent passes the selected task mode to the task editor');
   });
 
   it('adds the per-task DC override i18n keys', () => {

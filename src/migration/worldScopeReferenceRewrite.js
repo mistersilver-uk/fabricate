@@ -50,6 +50,8 @@ export const WORLD_SCOPE_REFERENCE_SITES = Object.freeze([
   // --- gatheringConfig ---
   'gatheringConfig.systems.*.tasks[].toolIds[]',
   'gatheringConfig.systems.*.tasks[].dropRows[].componentId',
+  'gatheringConfig.systems.*.tasks[].resultGroups[].results[].componentId',
+  'gatheringConfig.systems.*.tasks[].resultGroups[].results[].systemItemId',
   'gatheringConfig.systems.*.tools[].componentId',
   'gatheringConfig.systems.*.tools[].onBreak.replacementTarget.componentId',
   'gatheringConfig.systems.*.tools[].repairRequirements[].options[].componentId',
@@ -408,6 +410,7 @@ export function rewriteGatheringRecordReferences(
     if ('componentId' in row) row.componentId = remapComponent(row.componentId);
     if ('systemItemId' in row) row.systemItemId = remapComponent(row.systemItemId);
   }
+  rewriteResultGroups(record.resultGroups, remapComponent);
   rewriteToolIds(record, remapTool);
 }
 

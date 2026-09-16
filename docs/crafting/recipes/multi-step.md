@@ -113,9 +113,9 @@ Time gates are checked:
 ## Managing Runs
 
 Multi-step run state is saved on the character.
-Players continue a multi-step crafting run from the **Journal** tab, using **Trigger Next Step** to roll and advance each step in turn.
-See [Journal]({% link player-app/journal.md %}).
-Cancelling an active run from the UI is not yet available, though runs can still be managed through the API.
+Players continue a multi-step crafting run from the **Journal** tab, using its stage actions to lock in each step's choices, consume its materials, and complete it in turn.
+Cancelling an active run is available from the Journal too.
+See [Journal]({% link player-app/journal.md %}) for what each stage action does and how to pause or cancel a run.
 
 {: .note }
 > Disabling the Multi-Step Recipes feature is not destructive.

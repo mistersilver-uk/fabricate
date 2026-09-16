@@ -107,7 +107,9 @@ test('the lab seeds a world vocabulary carrying all three delete affordances', (
     content.components.map((component) => String(component.category ?? '').toLowerCase())
   );
   const componentTagNames = new Set(
-    content.components.flatMap((component) => (component.tags ?? []).map((tag) => tag.toLowerCase()))
+    content.components.flatMap((component) =>
+      (component.tags ?? []).map((tag) => tag.toLowerCase())
+    )
   );
   const recipeCategoryNames = new Set(
     content.recipes.map((entry) => String(entry.category ?? '').toLowerCase())
@@ -115,7 +117,9 @@ test('the lab seeds a world vocabulary carrying all three delete affordances', (
   const defaultCategories = new Set(
     defaults.map((record) => String(record.category ?? '').toLowerCase())
   );
-  const defaultTags = new Set(defaults.flatMap((record) => (record.tags ?? []).map((tag) => tag.toLowerCase())));
+  const defaultTags = new Set(
+    defaults.flatMap((record) => (record.tags ?? []).map((tag) => tag.toLowerCase()))
+  );
 
   assert.ok(
     vocabulary.componentCategories.some((entry) => categoryNames.has(entry.id)),
@@ -129,7 +133,9 @@ test('the lab seeds a world vocabulary carrying all three delete affordances', (
       'a confirm-gated row rendering `0 references` rather than `Unused`'
   );
   assert.ok(
-    vocabulary.componentTags.some((entry) => !componentTagNames.has(entry.id) && defaultTags.has(entry.id)),
+    vocabulary.componentTags.some(
+      (entry) => !componentTagNames.has(entry.id) && defaultTags.has(entry.id)
+    ),
     'a component tag whose ONLY reference is a world default, which is the count asymmetry'
   );
   assert.ok(
@@ -868,6 +874,8 @@ const LAYOUT_CASE_IDS = [
   ...RESPONSIVE_LAYOUT_CASE_IDS,
   ...FULL_WIDTH_LAYOUT_CASE_IDS,
   ...FRAME_STACK_LAYOUT_CASE_IDS,
+  'fabricate-journal-lifecycle-narrow',
+  'fabricate-journal-lifecycle-wide',
 ];
 const LAYOUT_ASSERTION_PATH = 'scripts/lib/viewLabLayoutAssertion.js';
 
@@ -875,6 +883,16 @@ test('exactly the declared 1024px cases carry complete layout expectations', () 
   const declared = VIEW_LAB_CASES.filter((viewCase) => viewCase.expectLayout);
   assert.deepEqual(declared.map((viewCase) => viewCase.id).sort(), [...LAYOUT_CASE_IDS].sort());
   for (const viewCase of declared) {
+    if (
+      viewCase.query?.journalCaseState === 'wide' ||
+      viewCase.query?.journalCaseState === 'narrow'
+    ) {
+      const narrow = viewCase.query.journalCaseState === 'narrow';
+      assert.deepEqual(viewCase.position, { width: narrow ? 1024 : 1240, height: 880 });
+      assert.equal(viewCase.expectLayout.expectedTracks, narrow ? 1 : 2);
+      assert.equal(viewCase.expectLayout.maxContentBoxInlineSize, narrow ? 960 : undefined);
+      continue;
+    }
     // THE WINDOW IS PER GROUP, because the breakpoint each group asserts is a different one and a
     // shared literal would be asserting one screen's threshold about another's. The shell's stack
     // is reached at 1024; the shared editor frame's own container query is at 1000 and the lab's
@@ -914,6 +932,204 @@ test('exactly the declared 1024px cases carry complete layout expectations', () 
     assert.equal(viewCase.expectLayout.expectedTracks, 2);
     assert.equal(viewCase.expectLayout.absentSelector, '.manager-inspector');
   }
+});
+
+test('compact Journal captures add full, short, empty, restored and tool witnesses at both widths', () => {
+  const cases = VIEW_LAB_CASES.filter((entry) => entry.id.startsWith('fabricate-journal-history-batch-'));
+  assert.equal(cases.length, 10);
+  for (const width of [1240, 1024]) {
+    for (const state of ['full', 'partial', 'empty', 'restored', 'tools']) {
+      const capture = getCaseById(`fabricate-journal-history-batch-${state}-${width}`);
+      assert.equal(capture.position.width, width);
+      assert.equal(capture.expectTab, 'journal');
+      assert.match(capture.expectSelector, /data-history-items="tools"/);
+      if (state === 'partial') assert.equal(capture.steps.filter((step) => step.selector.includes('data-pagination-next')).length, 4);
+      if (state === 'restored') assert.equal(capture.steps.at(-1).fill, '');
+      if (state === 'empty') assert.match(capture.expectSelector, /is-fill/);
+    }
+  }
+});
+
+// The evidence each history-data state exists to photograph, keyed by its own witness. Pinned
+// here rather than derived from the registry: the registry is what these strings guard, so
+// reading them back out of it would assert nothing about what the frame shows.
+const HISTORY_DATA_EVIDENCE = [
+  // The saved world's two independent rolls, and the global cut that must NOT be synthesised.
+  ['legacy-row-rolls', [/legacy-iron-ore-roll-12"\]\.is-cleared/, /legacy-copper-ore-roll-94"\]\.is-cleared/, /:not\(:has\(\[data-yield-cut\]\)\)/]],
+  ['shared-roll-control', [/:has\(\[data-yield-cut\]\)/, /shared-ruby:2"\]\.is-missed/]],
+  ['recovered-materials', [/title="Steel Billet"/, /title="Coal"/, /consumed"\] i\.fa-box/, /produced"\] \[title="Steel Ingot"\]/]],
+  ['unknown-material-resolution', [/data-yield-shared-roll/, /data-history-unattributed\] \+ \[data-history-items="produced"/, /:not\(:has\(\[data-yield-entry="unknown-ruby"\]\.is-cleared\)\)/]],
+  ['settled-zero', [/data-journal-verdict="failed"/, /barren-iron-ore"\]\.is-missed/, /:not\(:has\(\[data-yield-entry\]\.is-cleared\)\)/]],
+  ['uncertain-awards', [/data-effect-phase="applied"\] \[data-list-row\]/, /data-effect-phase="applying"\] \[data-list-row\]/, /data-journal-recovery-evidence\] ~ \[data-journal-history-detail\] \[data-journal-guidance\]/]],
+  ['fizzle', [/data-history-summary="none"/, /title="Quicksilver"/, /img\.fab-medallion-img/]],
+  ['salvage', [/data-history-items="produced"\] \+ \[data-journal-fact\]/, /produced"\] \[data-list-row\] ~ \[data-list-row\]/, /:not\(:has\(\[data-history-items="consumed"\]\)\)/]],
+];
+
+test('the history-data witnesses name their defining evidence on the selected record', () => {
+  const cases = VIEW_LAB_CASES.filter((entry) =>
+    entry.id.startsWith('fabricate-journal-history-data-')
+  );
+  assert.equal(cases.length, 16);
+  for (const width of [1240, 1024]) {
+    for (const [state, evidence] of HISTORY_DATA_EVIDENCE) {
+      const capture = getCaseById(`fabricate-journal-history-data-${state}-${width}`);
+      assert.deepEqual(capture.position, { width, height: 880 });
+      assert.equal(capture.expectTab, 'journal');
+      assert.equal(capture.reaches, 'beyond');
+      assert.equal(capture.query.journalCaseState, `history-data-${state}`);
+      // The walk selects its OWN record: a witness reached by whatever row happened to be first
+      // would photograph a different account's evidence under this case's name.
+      assert.deepEqual(capture.steps, [
+        { selector: `[data-history-run-id="lab-v1-history-data-${state}"]` },
+      ]);
+      for (const pattern of evidence) assert.match(capture.expectSelector, pattern, capture.id);
+      assert.ok(
+        capture.expectSelector.startsWith('[data-journal-detail]'),
+        `${capture.id} asserts against the open record, not the list`
+      );
+      assert.ok(
+        !capture.expectSelector.includes('data-journal-case-state'),
+        `${capture.id} checks product output`
+      );
+    }
+  }
+  // Only the alchemy attempt record is GM evidence; the other seven are the player's own.
+  assert.deepEqual(
+    cases.filter((entry) => entry.query.viewer === 'gm').map((entry) => entry.id),
+    ['fabricate-journal-history-data-fizzle-1240', 'fabricate-journal-history-data-fizzle-1024']
+  );
+  // The two families this one sits beside are unchanged by it.
+  assert.equal(
+    VIEW_LAB_CASES.filter((entry) => entry.id.startsWith('fabricate-journal-lifecycle-')).length,
+    73
+  );
+  assert.equal(
+    VIEW_LAB_CASES.filter((entry) => entry.id.startsWith('fabricate-journal-history-batch-')).length,
+    10
+  );
+});
+
+test('no expectSelector nests one :has() inside another', () => {
+  // `:has()` may not appear inside a relative selector of another `:has()`. A browser REJECTS the
+  // whole selector, and the capture driver evaluates `expectSelector` before it photographs, so
+  // one such selector fails the job whole and publishes nothing — including every unrelated frame.
+  const nests = (selector) => {
+    const stack = [];
+    let open = 0;
+    for (let index = 0; index < selector.length; index += 1) {
+      if (selector.startsWith(':has(', index)) {
+        if (open > 0) return true;
+        open += 1;
+        stack.push('has');
+        index += 4;
+      } else if (selector[index] === '(') stack.push('other');
+      else if (selector[index] === ')' && stack.pop() === 'has') open -= 1;
+    }
+    return false;
+  };
+  // The scan is proved to fail before it is trusted: the first is the shape it must reject.
+  assert.equal(nests('a:has(b:has(c))'), true);
+  assert.equal(nests('a:has(b):not(:has(c)) :has(d)'), false);
+
+  const nested = VIEW_LAB_CASES.filter(
+    (viewCase) => typeof viewCase.expectSelector === 'string' && nests(viewCase.expectSelector)
+  );
+  assert.deepEqual(
+    nested.map((viewCase) => viewCase.id),
+    []
+  );
+});
+
+test('all Journal lifecycle captures assert defining product state rather than a populated shell', () => {
+  const cases = VIEW_LAB_CASES.filter((entry) =>
+    entry.id.startsWith('fabricate-journal-lifecycle-')
+  );
+  assert.equal(cases.length, 73);
+  for (const entry of cases) {
+    assert.equal(entry.expectTab, 'journal', entry.id);
+    assert.ok(entry.expectSelector, `${entry.id} has an explicit assertion`);
+    assert.notEqual(entry.expectSelector, '[data-journal-state="populated"]', entry.id);
+    assert.ok(
+      !entry.expectSelector.includes('data-journal-case-state'),
+      `${entry.id} checks product output`
+    );
+  }
+  const byState = new Map(
+    cases.map((entry) => [entry.id.replace('fabricate-journal-lifecycle-', ''), entry])
+  );
+  // The manual setup frame is GONE, and its absence is asserted rather than merely not asserted:
+  // the ledger is provisioned automatically, so a GM blocked by `ledger-missing` is a state no
+  // world can reach and a frame of it would photograph a button that no longer exists.
+  assert.equal(byState.has('authority-setup'), false, 'manual authority setup was removed');
+  assert.equal(
+    byState.get('authority-unavailable').query.viewer,
+    undefined,
+    'the player refusal frame, which shows a blocker that still happens, is retained'
+  );
+  // Issue 1648: the retained-claim frame is GM-only BY CONSTRUCTION. Only the active GM may
+  // reconcile a claim, so the affordance it photographs exists for no other viewer, and a
+  // player frame of it would show a run blocked with no way out — the defect, not the fix.
+  assert.equal(byState.get('claim-retained').query.viewer, 'gm');
+  assert.match(byState.get('claim-retained').expectSelector, /data-notice-action/);
+  for (const state of ['stale-action', 'command-timeout']) {
+    assert.match(byState.get(state).expectSelector, /data-journal-command-error/);
+    assert.match(byState.get(state).expectSelector, /data-notice-action/);
+    assert.match(byState.get(state).expectSelector, /aria-busy/);
+  }
+  for (const state of [
+    'gathering-straight-finished',
+    'gathering-d100-finished',
+    'gathering-check-finished',
+    'finished-success',
+    'automatic-completion',
+    'salvage',
+  ]) {
+    assert.match(byState.get(state).expectSelector, /data-journal-history-detail/);
+    assert.match(byState.get(state).expectSelector, /:not\(:has\(\[data-stage-nav\]\)\)/);
+    assert.match(byState.get(state).expectSelector, /:not\(:has\(\[data-journal-summary\]\)\)/);
+    assert.doesNotMatch(byState.get(state).expectSelector, /data-journal-verdict="succeeded"/);
+  }
+  for (const state of [
+    'history-checked-choice',
+    'history-resolution-ingredients',
+    'history-resolution-simple',
+    'history-checked-ingredients',
+    'history-legacy-no-check-failure',
+    'history-multi-essence',
+    'history-multi-shared-essence',
+    'history-multi-success',
+    'history-multi-failure',
+    'history-cancelled-before',
+    'history-cancelled-multi',
+    'history-d100-all-hit',
+    'history-d100-all-miss',
+    'history-gathering-check-failure',
+    'history-just-resolved',
+    'history-redacted',
+    'history-missing-material',
+    'history-gm-deleted-recipe',
+    'history-failure-awards',
+    'current-choice-closed',
+    'essence-overshoot',
+    'past-routed-stage',
+    'future-routed-stage',
+    'kind-menu-open',
+    'history-settling',
+  ]) {
+    assert.ok(byState.has(state), `issue #1648 v4 explicitly requires ${state}`);
+  }
+  assert.match(byState.get('legacy').expectSelector, /data-run-action="pause"\]:disabled/);
+  assert.equal(
+    byState.get('filter-paused').steps.at(-1).selector,
+    '[data-journal-status-filter] label:has(input[value="paused"])'
+  );
+  assert.equal(
+    byState.get('filter-paused').expectCenterHit,
+    byState.get('filter-paused').steps.at(-1).selector
+  );
+  assert.match(byState.get('filter-paused').expectSelector, /:checked/);
+  assert.match(byState.get('empty-search').expectSelector, /data-journal-empty="active"/);
+  assert.match(byState.get('empty-search').expectSelector, /data-journal-empty="history"/);
 });
 
 test('layout expectation selectors name UI that still exists', () => {
@@ -982,7 +1198,10 @@ test('an undeclared console error is still fatal, and a declared one is not', ()
 
   // (2) A DECLARED ERROR PASSES, and only that one.
   assert.deepEqual(
-    partitionConsoleErrors(['Fabricate | Failed to toggle recipe enabled state: refused'], allowance),
+    partitionConsoleErrors(
+      ['Fabricate | Failed to toggle recipe enabled state: refused'],
+      allowance
+    ),
     { unmatched: [], unusedAllowances: [] }
   );
 
@@ -1122,7 +1341,10 @@ test('the two alert frames assert their alert is inside the box that clips it', 
 test('resource-node interval evidence reaches over-time controls at both required window sizes', () => {
   const editorPath = 'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte';
   const selected = mapChangedFilesToCases([editorPath]).map((viewCase) => viewCase.id);
-  for (const [suffix, width, height] of [['normal', 1280, 820], ['narrow', 1000, 720]]) {
+  for (const [suffix, width, height] of [
+    ['normal', 1280, 820],
+    ['narrow', 1000, 720],
+  ]) {
     const id = `manager-gathering-task-node-interval-${suffix}`;
     const viewCase = getCaseById(id);
     assert.ok(viewCase, `${id} must exercise the node-enabled system`);
@@ -1149,9 +1371,12 @@ test('resource-node interval evidence reaches over-time controls at both require
       '[data-gathering-task-node-interval]',
       '[data-gathering-task-node-interval-unit]',
     ]) {
-      assert.ok(viewCase.expectContained.some((entry) =>
-        entry.container === '[data-gathering-task-nodes]' && entry.target === target
-      ), `${id} must keep ${target} inside the node card`);
+      assert.ok(
+        viewCase.expectContained.some(
+          (entry) => entry.container === '[data-gathering-task-nodes]' && entry.target === target
+        ),
+        `${id} must keep ${target} inside the node card`
+      );
     }
   }
 });
@@ -1164,7 +1389,10 @@ test('gathering feedback evidence reaches selected tools and all-empty fields at
   const emptyStateCases = mapChangedFilesToCases([
     'src/ui/svelte/apps/manager/EmptyState.svelte',
   ]).map((entry) => entry.id);
-  for (const [suffix, width, height] of [['normal', 1280, 820], ['narrow', 1000, 720]]) {
+  for (const [suffix, width, height] of [
+    ['normal', 1280, 820],
+    ['narrow', 1000, 720],
+  ]) {
     for (const state of ['task-availability', 'task-tools', 'event-availability']) {
       const id = `manager-gathering-${state}-feedback-${suffix}`;
       const viewCase = getCaseById(id);
@@ -1175,20 +1403,35 @@ test('gathering feedback evidence reaches selected tools and all-empty fields at
       assert.deepEqual(viewCase.position, { width, height });
       assert.equal(viewCase.expectView, `gathering-${kind}-edit`);
       for (const field of ['biomes', 'timeOfDay', 'weather']) {
-        assert.ok(viewCase.expectSelector.includes(
-          `[data-gathering-${kind}-availability-pills="${field}"] .manager-empty.is-field`
-        ));
-        assert.ok(viewCase.steps.some((step) =>
-          step.selector === `[data-gathering-${kind}-availability-pill="${field}"] [data-chip-remove]` &&
-          step.press === 'Space'
-        ), `${id} must return ${field} to empty through keyboard removal`);
+        assert.ok(
+          viewCase.expectSelector.includes(
+            `[data-gathering-${kind}-availability-pills="${field}"] .manager-empty.is-field`
+          )
+        );
+        assert.ok(
+          viewCase.steps.some(
+            (step) =>
+              step.selector ===
+                `[data-gathering-${kind}-availability-pill="${field}"] [data-chip-remove]` &&
+              step.press === 'Space'
+          ),
+          `${id} must return ${field} to empty through keyboard removal`
+        );
       }
       if (kind === 'task') {
-        assert.ok(viewCase.steps.some((step) =>
-          step.selector === '[data-gathering-task-required-tools-card="hb-tool-mortar"]' &&
-          step.press === 'Enter'
-        ), `${id} must actually select its required tool`);
-        assert.ok(viewCase.expectSelector.includes('[data-gathering-task-required-tool-pill="hb-tool-mortar"] img'));
+        assert.ok(
+          viewCase.steps.some(
+            (step) =>
+              step.selector === '[data-gathering-task-required-tools-card="hb-tool-mortar"]' &&
+              step.press === 'Enter'
+          ),
+          `${id} must actually select its required tool`
+        );
+        assert.ok(
+          viewCase.expectSelector.includes(
+            '[data-gathering-task-required-tool-pill="hb-tool-mortar"] img'
+          )
+        );
       }
       assert.equal(viewCase.steps.at(-1).scroll, true);
       assert.ok(viewCase.expectContained.length >= 2);
@@ -1203,7 +1446,10 @@ test('environment empty membership evidence clears the actual fixture and is sel
   const grove = content.environments.find((entry) => entry.id === 'hb-env-grove');
   assert.deepEqual(grove.includedRealmIds, ['hb-realm-verdant']);
   assert.deepEqual(grove.biomes, ['forest']);
-  for (const [suffix, width, height] of [['normal', 1280, 820], ['narrow', 1000, 720]]) {
+  for (const [suffix, width, height] of [
+    ['normal', 1280, 820],
+    ['narrow', 1000, 720],
+  ]) {
     const id = `manager-environment-empty-membership-${suffix}`;
     const viewCase = getCaseById(id);
     assert.ok(selected.includes(id));
@@ -1211,18 +1457,31 @@ test('environment empty membership evidence clears the actual fixture and is sel
     assert.equal(viewCase.query.system, 'lab-herbalism');
     assert.equal(viewCase.expectView, 'environment-edit');
     assert.ok(viewCase.steps.some((step) => step.selector === '[data-gathering-realm-toggle]'));
-    for (const [kind, member] of [['realm', grove.includedRealmIds[0]], ['biome', grove.biomes[0]]]) {
-      assert.equal(viewCase.steps.filter((step) =>
-        step.selector === `[data-environment-${kind}-pill="${member}"] [data-chip-remove]` &&
-        step.press === 'Space'
-      ).length, 2, `${id} clears, adds, then removes the last ${kind}`);
+    for (const [kind, member] of [
+      ['realm', grove.includedRealmIds[0]],
+      ['biome', grove.biomes[0]],
+    ]) {
+      assert.equal(
+        viewCase.steps.filter(
+          (step) =>
+            step.selector === `[data-environment-${kind}-pill="${member}"] [data-chip-remove]` &&
+            step.press === 'Space'
+        ).length,
+        2,
+        `${id} clears, adds, then removes the last ${kind}`
+      );
       assert.ok(viewCase.steps.some((step) => step.select === member));
     }
     assert.equal(viewCase.expectContained.length, 4);
-    for (const entry of viewCase.expectContained.filter(({ target }) => target.includes('.manager-empty'))) {
+    for (const entry of viewCase.expectContained.filter(({ target }) =>
+      target.includes('.manager-empty')
+    )) {
       assert.ok(viewCase.expectSelector.includes(entry.target));
     }
-    assert.deepEqual(viewCase.steps.at(-1), { selector: '[data-overview-section="context"]', scroll: true });
+    assert.deepEqual(viewCase.steps.at(-1), {
+      selector: '[data-overview-section="context"]',
+      scroll: true,
+    });
   }
 });
 
@@ -2298,10 +2557,15 @@ test('every crafting case claims exactly the resolution-mode body it renders', (
   // 32 as of issue 1511. `player-crafting-category-filter-list` opens the browser's converted
   // category filter and stops there, so like the sources picker it renders no recipe detail and is
   // correct to claim no mode body.
+  //
+  // 33 as of issue 1648. `player-crafting-authority-blocked` photographs the header withholding
+  // "Ready to craft" while the run authority refuses, and names `RecipeDetailHeader.svelte`. Like
+  // `player-crafting-simple` it selects no recipe through a step, so by this scan's own rule it
+  // renders no mode body and correctly claims none.
   assert.equal(
     examined.length,
-    32,
-    `expected the 32 crafting-path cases to be examined, saw ${examined.length}`
+    33,
+    `expected the 33 crafting-path cases to be examined, saw ${examined.length}`
   );
   assert.ok(
     examined.filter((id) =>
@@ -2663,9 +2927,9 @@ test('the player top bar routes to the frame that opens its picker, not only to 
   // it is a broad signal no longer: the override went, and the two frames it actually appears in
   // name it themselves. `manager-components-normal` is deliberately NOT among them — it is the
   // MANAGER, and it drew this player bar only ever as a side effect of the broad-signal pair.
-  const selected = mapChangedFilesToCases([
-    'src/ui/svelte/apps/ActorSelectTopBar.svelte',
-  ]).map((viewCase) => viewCase.id);
+  const selected = mapChangedFilesToCases(['src/ui/svelte/apps/ActorSelectTopBar.svelte']).map(
+    (viewCase) => viewCase.id
+  );
 
   assert.deepEqual(
     selected.sort((a, b) => a.localeCompare(b)),
@@ -2888,7 +3152,9 @@ function balancedSlice(source, openIndex, open, close) {
  */
 function labelForwardingHelpers() {
   const names = [];
-  for (const match of smokeHarnessSource.matchAll(/(?:async\s+)?function\s+([A-Za-z0-9_]+)\s*\(/g)) {
+  for (const match of smokeHarnessSource.matchAll(
+    /(?:async\s+)?function\s+([A-Za-z0-9_]+)\s*\(/g
+  )) {
     const parenIndex = smokeHarnessSource.indexOf('(', match.index);
     const params = balancedSlice(smokeHarnessSource, parenIndex, '(', ')');
     if (!/\blabel\b/.test(params)) continue;
@@ -2988,7 +3254,7 @@ test('every declared smoke label is one the harness can actually emit', () => {
     [],
     'these cases claim a smoke counterpart the harness never captures, so "which smoke frame does ' +
       'this replace?" has no answer. Either the label is wrong, or the case reaches BEYOND the ' +
-      'smoke and must say so with `reaches: \'beyond\'` and an empty array:\n  ' +
+      "smoke and must say so with `reaches: 'beyond'` and an empty array:\n  " +
       unknown.join('\n  ')
   );
 });
@@ -3331,12 +3597,14 @@ test('the surface key falls back to the case id when a case declares neither rou
 });
 
 test('a surface is represented by a frame that shows it, not by a variant of it', () => {
-  // The app default geometry, derived here rather than imported: the modal position across an
-  // app's own cases. An independent derivation is the point — importing the constant the chooser
-  // uses would make this a restatement of the implementation instead of a check on it.
+  // Derive default geometry from the app's exact smoke counterparts, not from the number of
+  // prototype variants. Adding Journal states cannot redefine another screen's smoke geometry.
   const modalPosition = (app) => {
     const counts = new Map();
-    for (const viewCase of publishableCases()) {
+    const exact = publishableCases().filter(
+      (entry) => entry.app === app && entry.reaches === 'exact'
+    );
+    for (const viewCase of exact.length ? exact : publishableCases()) {
       if (viewCase.app !== app) continue;
       const size = `${viewCase.position.width}x${viewCase.position.height}`;
       counts.set(size, (counts.get(size) ?? 0) + 1);
@@ -3563,7 +3831,11 @@ test('the two Access roster frames are pinned to the crowded roster the shim see
   const paged = getCaseById('manager-access-recipe-roster-paged');
   const noMatch = getCaseById('manager-access-recipe-roster-no-match');
   for (const viewCase of [paged, noMatch]) {
-    assert.equal(viewCase.query?.manyPlayers, '1', `${viewCase.id} must ask for the crowded roster`);
+    assert.equal(
+      viewCase.query?.manyPlayers,
+      '1',
+      `${viewCase.id} must ask for the crowded roster`
+    );
     assert.equal(viewCase.query?.system, 'lab-alchemy', `${viewCase.id} needs a restricted system`);
     assert.deepEqual(viewCase.smokeLabels, [], `${viewCase.id} has no smoke counterpart`);
     assert.equal(viewCase.reaches, 'beyond', `${viewCase.id} is beyond the smoke walk`);
@@ -3586,9 +3858,7 @@ test('the two Access roster frames are pinned to the crowded roster the shim see
   // over the user's name, so this is the same predicate the screen runs.
   const needle = ACCESS_ROSTER_SEARCH_MISS_TERM.trim().toLowerCase();
   assert.ok(needle.length > 0, 'an empty term matches everything and the no-match frame is a lie');
-  const hits = ['Lab Player', ...seededNames].filter((name) =>
-    name.toLowerCase().includes(needle)
-  );
+  const hits = ['Lab Player', ...seededNames].filter((name) => name.toLowerCase().includes(needle));
   assert.deepEqual(
     hits,
     [],
@@ -6319,7 +6589,9 @@ test('the recipe-item picker frame claims the search field its call site now ren
       'in which case the frame must stop claiming the field — or the search is off by accident'
   );
 
-  const picker = VIEW_LAB_CASES.find((viewCase) => viewCase.id === 'manager-recipe-item-contents-picker');
+  const picker = VIEW_LAB_CASES.find(
+    (viewCase) => viewCase.id === 'manager-recipe-item-contents-picker'
+  );
   assert.ok(Boolean(picker), 'the case is registered');
   assert.match(
     picker.expectSelector,
@@ -6343,7 +6615,10 @@ test('the access inspector case clicks a recipe row on the Access list first pag
   // THE SCREEN'S OWN PAGE SIZE, read from its source rather than restated — a hard-coded 10 here
   // would go on passing the day the Access list changes, which is the drift this file exists to
   // stop.
-  const view = readFileSync(resolve(ROOT, 'src/ui/svelte/apps/manager/AccessTabView.svelte'), 'utf8');
+  const view = readFileSync(
+    resolve(ROOT, 'src/ui/svelte/apps/manager/AccessTabView.svelte'),
+    'utf8'
+  );
   const pageSize = Number(view.match(/let pageSize = \$state\((\d+)\);/)?.[1]);
   assert.ok(pageSize > 0, 'the Access list declares a default page size; the read is broken');
 

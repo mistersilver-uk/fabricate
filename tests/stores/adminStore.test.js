@@ -4788,7 +4788,12 @@ describe('createAdminStore', () => {
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
       const task = await store.addGatheringLibraryTask('sys1');
-      await store.updateGatheringLibraryTask('sys1', task.id, { name: 'Forage Roots' });
+      assert.equal(
+        await store.updateGatheringLibraryTask('sys1', task.id, { name: 'Forage Roots' }),
+        true,
+        'identity edits persist before a new task has drops'
+      );
+      assert.equal(services._store.gatheringConfig.systems.sys1.tasks[0].name, 'Forage Roots');
 
       await store.updateGatheringLibraryTask('sys1', task.id, {
         dropRows: [{ id: 'drop-a', componentId: 'ore', quantity: 1, dropRate: 50 }],
@@ -4932,10 +4937,14 @@ describe('createAdminStore', () => {
       const store = createAdminStore(services);
       await store.selectSystem('sys1');
       const task = await store.addGatheringLibraryTask('sys1');
-      await store.updateGatheringLibraryTask('sys1', task.id, {
-        name: 'Mining Run',
-        img: 'icons/pickaxe.png',
-      });
+      assert.equal(
+        await store.updateGatheringLibraryTask('sys1', task.id, {
+          name: 'Mining Run',
+          img: 'icons/pickaxe.png',
+        }),
+        true,
+        'the customized identity lands before either component drop'
+      );
       await store.updateGatheringLibraryTask('sys1', task.id, {
         dropRows: [{ id: 'drop-a', componentId: 'ore', quantity: 1, dropRate: 50 }],
       });

@@ -252,6 +252,10 @@ export const NON_TOKEN_PREDICATES = Object.freeze({
   // ROUTE + SUBSTATE: World owns the whole content column only on its Parties tab, so the
   // stylesheet matches a compound of two attributes and this predicate reads both.
   'world-parties': "(view, context) => view === 'world' && context.travelTab === 'parties'",
+  // ROUTE + EDITOR MODE: d100 keeps its drop inspector; Direct and Check author result groups
+  // in the main pane and release the unused inspector track.
+  'gathering-task-edit':
+    'isGatheringTaskFullWidth',
 });
 
 /**
@@ -333,9 +337,13 @@ export function assertAsideBuiltFromSet(rootSource) {
  * @returns {number|null}
  */
 export function releasedTrackCount(css, selector) {
+  const normalizedSelector = selector.replaceAll(WHITESPACE_RUN, ' ');
   for (const rule of topLevelRules(css)) {
     if (!namesManagerBody(rule.prelude)) continue;
-    if (!splitTopLevel(rule.prelude, ',').includes(selector)) continue;
+    const selectors = splitTopLevel(rule.prelude, ',').map((entry) =>
+      entry.replaceAll(WHITESPACE_RUN, ' ')
+    );
+    if (!selectors.includes(normalizedSelector)) continue;
     const columns = declaration(rule.declarations, 'grid-template-columns');
     if (columns) return trackCount(columns);
   }

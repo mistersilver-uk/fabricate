@@ -10,8 +10,10 @@
   let { steps = [], currentIndex = null } = $props();
 
   // Resolve each node's visual state. A step's own status wins; a time-gated
-  // step gets the warning tone (parity with the waiting run pill) even when it is
-  // the active step, and the active index is otherwise highlighted as "current".
+  // step gets the warning tone even when it is the active step, and the active index is
+  // otherwise highlighted as "current". This is a per-STEP vocabulary: it says which step is
+  // holding a clock, which is a different question from where the RUN stands, so D-029's merge
+  // of the run's `Waiting` badge into `In progress` (issue 1648) does not reach it.
   function nodeState(step, index) {
     const status = String(step?.status ?? 'pending');
     if (status === 'succeeded') return 'succeeded';
