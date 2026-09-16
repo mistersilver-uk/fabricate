@@ -1,60 +1,25 @@
 /**
- * Pure drop-classification + spawn-payload shaping for canvas Interactables.
- *
- * This module decides, from a `dropCanvasData` payload, whether a drop is a
- * Fabricate Tool or Gathering Task interactable, and shapes the data the manager
- * needs to spawn it. In the region-first model that shape is a Scene Region + a
- * nested `fabricate.interactable` behaviour + (optionally) a linked marker, built
- * by {@link buildRegionSpawnRequest}. It contains NO Foundry globals: every
- * lookup against the Fabricate libraries is injected, so the routing logic is
- * unit-testable with fakes.
- *
- * Fabricate Tools and Gathering Tasks are NOT Foundry documents — they are
- * library entries keyed by `id` under a crafting system (`systems[systemId].tools`
- * and `gatheringConfig.systems[systemId].tasks`). They therefore have no native
- * document uuid. We mint a stable synthetic identity string of the form:
- *
- *   Fabricate.<systemId>.tool.<toolId>
- *   Fabricate.<systemId>.gatheringTask.<taskId>
- *
- * stored as `flags.fabricate.sourceUuid`, which `parseInteractableSourceUuid`
- * reverses. The Phase-7 browser app emits a drag payload carrying
- * `{ fabricate: { interactableType, systemId, toolId | taskId } }`; this module
- * also accepts a bare/`uuid`-bearing payload for the future case where a dropped
- * world/compendium Item maps to a Fabricate component used by a Tool.
+ * PURE drop classification and spawn-payload shaping for canvas interactables; every library
+ * lookup is injected, so no Foundry global is reachable.
+ * Tools and Gathering Tasks are library entries, not documents, so they have no native uuid: a
+ * synthetic `Fabricate.<systemId>.<tool|gatheringTask>.<id>` is minted into `sourceUuid`.
  */
 
 const SOURCE_PREFIX = 'Fabricate';
 
-/**
- * Build the synthetic source-identity string for a library interactable.
- *
- * @param {object} params
- * @param {'tool'|'gatheringTask'} params.interactableType
- * @param {string} params.systemId
- * @param {string} params.referenceId   Tool id or Task id within the system library.
- * @returns {string}
- */
+/** The synthetic source-identity string for a library interactable. */
 export function buildInteractableSourceUuid({ interactableType, systemId, referenceId } = {}) {
   return `${SOURCE_PREFIX}.${systemId}.${interactableType}.${referenceId}`;
 }
 
-/**
- * Reverse {@link buildInteractableSourceUuid}.
- *
- * @param {string} sourceUuid
- * @returns {{ interactableType: 'tool'|'gatheringTask', systemId: string, referenceId: string } | null}
- */
+/** Reverse {@link buildInteractableSourceUuid}. */
 export function parseInteractableSourceUuid(sourceUuid) {
   if (typeof sourceUuid !== 'string') return null;
   const parts = sourceUuid.split('.');
   if (parts.length < 4 || parts[0] !== SOURCE_PREFIX) return null;
-  // NOTE: systemId is assumed dot-free — it sits at a fixed index (parts[1]) so
-  // the interactableType discriminator can be read at parts[2] and the
-  // (possibly dotted) referenceId rejoined from the tail. Crafting-system ids are
-  // dot-free slugs by construction, so a dotted systemId is not a real shape; were
-  // one ever introduced it would shift the type slot and be rejected by the
-  // interactableType guard below (parse returns null), which is the safe outcome.
+  // `systemId` sits at a fixed index so the type discriminator can be read at `parts[2]` and a
+  // dotted referenceId rejoined from the tail. System ids are dot-free slugs by construction, and
+  // a dotted one would shift the type slot and be rejected below — the safe outcome.
   const interactableType = parts[2];
   if (interactableType !== 'tool' && interactableType !== 'gatheringTask') return null;
   const systemId = parts[1];
@@ -70,26 +35,8 @@ function readFabricatePayload(data) {
 }
 
 /**
- * Classify a `dropCanvasData` payload into a Fabricate interactable, or `null`
- * when it is not one (so Foundry handles the drop normally).
- *
- * Resolution order:
- *  1. An explicit `data.fabricate` drag payload (the Phase-7 browser shape).
- *  2. A uuid (string `data` or `data.uuid`) resolved via the injected
- *     `resolveItemUuidToTool` adapter (the dropped-Item → Tool case).
- *
- * The injected adapters keep this function free of Foundry/library globals:
- *  - `getTool({ systemId, toolId })`        → library Tool entry or null
- *  - `getTask({ systemId, taskId })`        → library Gathering Task entry or null
- *  - `resolveItemUuidToTool(uuid)`          → { systemId, toolId } | null
- *
- * @param {object|string} data                       The dropCanvasData payload.
- * @param {object} deps
- * @param {(args: {systemId: string, toolId: string}) => object|null} [deps.getTool]
- * @param {(args: {systemId: string, taskId: string}) => object|null} [deps.getTask]
- * @param {(uuid: string) => ({systemId: string, toolId: string}|null)} [deps.resolveItemUuidToTool]
- * @returns {{ interactableType: 'tool'|'gatheringTask', systemId: string,
- *   referenceId: string, sourceUuid: string, entry: object } | null}
+ * Classify a `dropCanvasData` payload, or null so Foundry handles the drop. An explicit
+ * `data.fabricate` payload wins; otherwise a uuid resolves through `resolveItemUuidToTool`.
  */
 export function classifyInteractableDrop(data, { getTool, getTask, resolveItemUuidToTool } = {}) {
   const payload = readFabricatePayload(data);
@@ -165,33 +112,15 @@ export function classifyInteractableDrop(data, { getTool, getTask, resolveItemUu
 }
 
 /**
- * Build the normalized `activeCanvasTool` payload from a resolved library Tool.
- *
- * This is the session-scoped virtual-present Tool injected into the Fabricate
- * app when a Tool-station region activation is granted (the player walked their
- * token into the region and clicked Interact). The shape is deliberately
- * simple/serializable: `{ componentId, systemId, toolId, label }`.
- * The crafting/gathering prerequisite checks treat `componentId` as present
- * without an owned item and exclude it from breakage/usage.
- *
- * Returns `null` when the tool cannot be resolved to a `componentId` (so the
- * caller can decline to open a tool-scoped session).
- *
- * @param {object} params
- * @param {string} params.systemId   The crafting system id.
- * @param {string} params.toolId     The library Tool id.
- * @param {object|null} params.tool  The resolved library Tool entry
- *   (`{ componentId, label? }`).
- * @returns {{ componentId: string, systemId: string, toolId: string, label: string } | null}
+ * The session-scoped virtual-present tool injected on a granted station activation: prerequisite
+ * checks treat it as present without an owned item and exclude it from breakage and usage.
  */
 export function buildActiveCanvasTool({ systemId, toolId, tool } = {}) {
   const componentId = typeof tool?.componentId === 'string' ? tool.componentId.trim() : '';
   const resolvedToolId = typeof toolId === 'string' ? toolId.trim() : '';
-  // The station's identity is its LIBRARY TOOL ID (issue 1119). Requiring a componentId
-  // here returned null for every item-sourced Tool — which `upsertTool` force-nulls and
-  // the Tool Studio can only produce — and the caller answered that null with a silent
-  // activation denial. A componentId, when present, is still carried so a migrated
-  // component-linked station keeps satisfying componentId-keyed virtual presence.
+  // The station's identity is its LIBRARY TOOL ID (issue 1119). Requiring a componentId here
+  // returned null for every item-sourced Tool, which the caller answered with a silent denial.
+  // One is still carried when present, so a migrated component-linked station keeps working.
   if (!resolvedToolId && !componentId) return null;
   const label = typeof tool?.label === 'string' && tool.label.trim() ? tool.label.trim() : '';
   return {
@@ -203,43 +132,8 @@ export function buildActiveCanvasTool({ systemId, toolId, tool } = {}) {
 }
 
 /**
- * Shape the data needed to spawn a region-first interactable from a classified
- * drop. PURE: returns everything the manager needs to create (a) a Scene Region
- * (a small rectangle centered on the drop point), (b) the nested
- * `fabricate.interactable` behaviour `system` (built via the injected
- * `buildBehaviorSystem`, i.e. `buildInteractableBehaviorSystem` from 1a), and
- * (c) the linked Tile data (texture/x/y/width/height). No Foundry globals — the
- * caller resolves the icon `texture`, the grid size, and the behaviour-system
- * builder at the edge and injects them here.
- *
- * Region geometry: a rectangle sized `regionGrid` grid squares per side
- * (default 1), CENTERED on the drop point. A Region rectangle SHAPE renders
- * TOP-LEFT at its stored `x/y`, so we anchor the top-left at `center - size/2`.
- * The linked Tile is sized `width`/`height` (default one grid square) and stores
- * its CENTER as `x/y` (Foundry renders tiles centered on `x/y`), so the tile's
- * center and the region's center both land on the drop point and the marker sits
- * inside the region.
- *
- * @param {object} params
- * @param {ReturnType<typeof classifyInteractableDrop>} params.classification
- * @param {{x: number, y: number}} [params.point]   Drop point in scene coordinates.
- * @param {string} [params.environmentId]           Resolved environment (gatheringTask only).
- * @param {string} [params.texture]                 Linked Tile image path (`texture.src`).
- * @param {number} [params.width]                   Linked Tile width (scene units).
- * @param {number} [params.height]                  Linked Tile height (scene units).
- * @param {string} [params.name]                    Display name (defaults to the entry's name/label).
- * @param {number} [params.gridSize]                Scene grid square size (scene units). Default 100.
- * @param {number} [params.regionGrid]              Region size in grid squares per side. Default 1.
- * @param {'marker'|'none'} [params.visualMode]     Linked-visual mode. 'marker' (default)
- *   creates a visible linked Tile; 'none' makes a hidden, region-only interactable
- *   with NO marker (`presentation.hidden=true`, `linkedVisual.mode='none'`,
- *   uuid/documentName null) and `tile: null` (the caller skips Tile creation).
- * @param {(spawn: object) => object} [params.buildBehaviorSystem]  Behaviour-system builder
- *   (`buildInteractableBehaviorSystem`); injected so this stays Foundry-free.
- * @returns {{ region: { name: string, shape: object }, behaviorSystem: object,
- *   tile: ({ texture: { src: string }, x: number, y: number, width: number, height: number } | null),
- *   interactableType: string, sourceUuid: string, name: string,
- *   environmentId: string|null } | null}
+ * PURE. The Region rectangle, the behaviour `system` (through the injected builder) and the Tile
+ * data — or `tile: null` under `visualMode: 'none'`, a hidden region-only interactable.
  */
 export function buildRegionSpawnRequest({
   classification,
@@ -259,15 +153,14 @@ export function buildRegionSpawnRequest({
     throw new TypeError('buildRegionSpawnRequest requires a buildBehaviorSystem builder');
   }
 
-  // Region-only: a hidden/abstract interactable with NO visible marker. The
-  // behaviour carries `presentation.hidden=true` + `linkedVisual.mode='none'`,
+  // Region-only: the behaviour carries `presentation.hidden=true` and `linkedVisual.mode='none'`,
   // and the request omits the Tile so the caller never creates one.
   const regionOnly = visualMode === 'none';
 
   const grid = Number.isFinite(Number(gridSize)) && Number(gridSize) > 0 ? Number(gridSize) : 100;
   const span = Math.max(1, Math.floor(Number(regionGrid) || 1));
 
-  // The displayed name: an explicit name wins, else the entry's name/label.
+  // The displayed name: an explicit name wins, else the entry's name or label.
   const entry = classification.entry ?? null;
   const resolvedName =
     typeof name === 'string' && name.trim()
@@ -284,21 +177,15 @@ export function buildRegionSpawnRequest({
   const cx = Number(point?.x ?? 0);
   const cy = Number(point?.y ?? 0);
 
-  // Linked Tile: Foundry renders a Tile CENTERED on its stored `x/y` (empirically
-  // confirmed against live V13 bounds: `tile.object.bounds.x === doc.x - width/2`).
-  // So to put the tile's CENTER at the drop point we store the drop point itself
-  // as the tile's `x/y` — NOT `cx - width/2`. The previous code top-left-anchored
-  // the tile, which rendered the marker half a tile down-right of the drop point.
+  // A Tile renders CENTRED on its stored `x/y` (confirmed against live V13 bounds:
+  // `tile.object.bounds.x === doc.x - width/2`), so the drop point IS the tile's `x/y` — NOT
+  // `cx - width/2`, which renders the marker half a tile down-right of the drop.
   const tileX = cx;
   const tileY = cy;
 
-  // Region: a `span`-square rectangle whose CENTER sits on the drop point. Unlike
-  // a Tile, a Region rectangle SHAPE renders TOP-LEFT at its stored `x/y` (also
-  // confirmed live: a region doc x maps 1:1 to its rendered bounds x). So to
-  // center the rectangle on the drop point we anchor its top-left at
-  // `(cx - regionW/2, cy - regionH/2)`. Net effect: tile center == region center
-  // == drop point. The manager re-derives the region rect from the tile footprint
-  // when a tile exists; this shape is the source of truth for the region-only case.
+  // A Region rectangle, unlike a Tile, renders TOP-LEFT at its stored `x/y` (also confirmed live),
+  // so centring anchors the top-left at `(cx - w/2, cy - h/2)`: tile centre == region centre ==
+  // drop point. The manager re-derives the rect from the tile footprint when one exists.
   const regionW = grid * span;
   const regionH = grid * span;
   const regionX = cx - regionW / 2;
@@ -319,7 +206,7 @@ export function buildRegionSpawnRequest({
     taskId: classification.interactableType === 'gatheringTask' ? classification.referenceId : null,
     environmentId: resolvedEnvironmentId ?? undefined,
     name: resolvedName,
-    // Region-only ⇒ hidden + no marker; the builder leaves uuid/documentName null.
+    // Region-only ⇒ hidden and no marker; the builder leaves uuid/documentName null.
     presentation: regionOnly ? { hidden: true } : undefined,
     linkedVisual: regionOnly ? { mode: 'none' } : undefined,
   });

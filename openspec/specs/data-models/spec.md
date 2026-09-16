@@ -3980,6 +3980,15 @@ Requirements:
    - **Concealment (all interactables).** When the interactable is DISABLED (`state.enabled === false`) OR explicitly HIDDEN (`presentation.hidden === true`), the linked Tile marker is hidden from players (`tile.hidden = true`, GM-only), reconciled in the same active-GM pass (`resolveMarkerHidden`).
      A LOCKED interactable's marker stays visible.
 3. A missing linked visual resolves cleanly to null — the interactable still functions (the central advantage of the region-first model).
+   Recovery follows `linkedVisual.missingPolicy`, and `recreate` auto-recreates a **Tile only**: a missing Drawing or Token degrades to `warn`, because re-minting either would guess at authored geometry, a label, and colours the behaviour does not record.
+   The decision is pure (`planMissingPolicy` in `src/canvas/linkedVisuals/linkedInteractableVisual.js`); only the recreate is an edge.
+4. **The reverse flag alone never authorizes a write to the visual.** It is mintable over the socket, so a socket-routed UPDATE of a linked visual is permitted only when the patch is EXACTLY the provenance stamp — the `flags.fabricate` reverse block and nothing else, allowlisted leaf path by leaf path — or the link ROUND-TRIPS: the visual carries a well-formed reverse flag, the behaviour it names is a `fabricate.interactable`, and that behaviour's forward `system.linkedVisual.uuid` names this exact document.
+   A socket-routed DELETE requires the round-trip and never accepts the stamp, which closes the mint-then-delete escalation.
+   Both guards flatten nested and dot-notation keys alike before matching, so a flattened key cannot masquerade as a path it does not write, and both fail closed on a single foreign leaf.
+   The round-trip is defence in depth rather than closure: the forward link is itself writable over the socket, so it raises the cheapest escalation from one message to a forged pair (issue 593).
+5. **A non-GM socket sender may write only the interactable's own scoped node pool.** A behaviour update from a non-GM sender is rejected unless every leaf path it writes is `system.node` or a `system.node.*` subpath — the legitimate player-side scoped-pool decrement (issue 302).
+   `system.linkedVisual` (forward-link forge), `system.state`, `presentation` and every enable, lock or marker field are GM-only.
+   The guards are pure and live in `src/canvas/regions/interactableRegionFlags.js`.
 
 ### Gathering-Task Node State — linked to the task by default, optionally unlinked/independent (issue 302)
 
