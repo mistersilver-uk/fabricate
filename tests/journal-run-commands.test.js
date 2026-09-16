@@ -465,6 +465,62 @@ describe('journal run command protocol', () => {
     assert.equal(Object.hasOwn(calls[2][4], 'lifecycleVersion'), false);
   });
 
+  it('never opens a roll prompt for the public craft API, and settles the check itself', async () => {
+    // Issue 1683. `promptCheck` awaits a HUMAN and has no timeout of its own -- `sendCommand`
+    // has one, the prompt does not -- so a macro or script calling `game.fabricate.craft()` hung
+    // forever the moment the craft reached a stage with a check. It became reachable when run
+    // start began committing the first stage for a recipe with no time requirement, which made
+    // `canExecuteImmediately` true and took the public path through `execute`.
+    //
+    // Driven through the REAL `executeJournalRunCommand`, because the defect lived in the seam
+    // between it and `executePublicCraft`: every other case here stubs `executeCommand`, so
+    // nothing exercised the prompt branch at all.
+    let promptCalls = 0;
+    const executed = [];
+    const { service } = commandHarness({
+      currentUserId: 'gm',
+      promptCheck: async () => {
+        promptCalls += 1;
+        return new Promise(() => {});
+      },
+      operations: {
+        crafting: {
+          getRun: () => ({ id: 'run-1', lifecycleVersion: 1, runRevision: 3, status: 'waiting' }),
+          describeCheck: async () => ({ required: true, publicPrompt: {}, privateEvaluation: {} }),
+          evaluateCheck: async () => ({
+            success: true,
+            engineEvaluated: true,
+            outcome: null,
+            value: null,
+            data: {},
+          }),
+          execute: async (args) => (executed.push(args), { success: true, terminal: true }),
+        },
+      },
+    });
+
+    const settled = await executePublicCraft({
+      engine: {
+        craft: async () => ({
+          success: true,
+          runId: 'run-1',
+          runRevision: 3,
+          requiresExecution: true,
+          canExecuteImmediately: true,
+        }),
+      },
+      runManager: { getActiveRun: () => null },
+      actor: { uuid: 'Actor.a' },
+      sourceActors: [{ uuid: 'Actor.a' }],
+      recipe: { id: 'recipe' },
+      executeCommand: (command, options) => service.executeJournalRunCommand(command, options),
+    });
+
+    assert.equal(promptCalls, 0, 'the API never opens a dialog it has nobody to answer');
+    assert.equal(settled.success, true, JSON.stringify(settled));
+    assert.equal(executed.length, 1, 'the stage still executed, with the check settled for it');
+  });
+
   it('executes a ready fully-selected public craft under a second authority request', async () => {
     const commands = [];
     const resultItem = { uuid: 'Item.result' };

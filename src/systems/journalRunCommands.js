@@ -220,22 +220,26 @@ export async function executePublicCraft({
       reason: 'execute-command-unavailable',
     };
   }
-  const settled = await executeCommand({
-    actorUuid: actor?.uuid,
-    runType: 'crafting',
-    runId: started.runId,
-    expectedRevision: started.runRevision,
-    action: 'execute',
-    payload: {
-      selectionPlan: {
-        selectedIngredientSetId: ingredientSetId,
-        ingredientOptionOverrides: options?.ingredientOptionOverrides,
-        ingredientEssenceAllocation: options?.ingredientEssenceAllocation,
+  const settled = await executeCommand(
+    {
+      actorUuid: actor?.uuid,
+      runType: 'crafting',
+      runId: started.runId,
+      expectedRevision: started.runRevision,
+      action: 'execute',
+      payload: {
+        selectionPlan: {
+          selectedIngredientSetId: ingredientSetId,
+          ingredientOptionOverrides: options?.ingredientOptionOverrides,
+          ingredientEssenceAllocation: options?.ingredientEssenceAllocation,
+        },
+        trigger: 'manual',
+        sourceActorUuids: actorUuidList(sourceActors),
       },
-      trigger: 'manual',
-      sourceActorUuids: actorUuidList(sourceActors),
     },
-  });
+    // The public API never opens a roll dialog: it has no user to answer one.
+    { interactive: false }
+  );
   if (!Array.isArray(settled?.createdResultUuids) || typeof resolveUuid !== 'function') {
     return settled;
   }
@@ -921,9 +925,24 @@ export function createJournalRunCommandService({
     });
   }
 
-  async function executeJournalRunCommand(command) {
+  /**
+   * Run one Journal command, resolving a required check on the way.
+   *
+   * `interactive` is the CALLER'S, and it is false for the public API by contract: a macro or a
+   * script has no one to answer a dialog, and `promptCheck` awaits a human with no timeout of its
+   * own -- `sendCommand` has one, the prompt does not. A non-interactive caller therefore settles
+   * the check with the engine's own defaults instead of opening it, which is the same route a
+   * player takes after answering (issue 1683).
+   */
+  async function executeJournalRunCommand(command, { interactive = true } = {}) {
     const first = await sendCommand(command);
     if (!first?.checkRequired) return first;
+    if (!interactive) {
+      return sendCommand({
+        ...command,
+        payload: { ...command.payload, prepareToken: first.prepareToken, rollDecision: {} },
+      });
+    }
     if (typeof promptCheck !== 'function') return failure('check-prompt-unavailable');
     const decision = await promptCheck(first.promptDescriptor);
     if (!decision || decision.confirmed === false) {
