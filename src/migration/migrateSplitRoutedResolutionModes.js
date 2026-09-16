@@ -1,43 +1,9 @@
 /**
- * 1.9.0 — Split the single crafting `routed` resolution mode into the two
- * first-class modes `routedByIngredients` / `routedByCheck` (pure, idempotent,
- * version-gated). Per `destructive-changes-and-migrations/spec.md §Resolution-Model
- * Migration`, the routing basis is now a property of the system MODE rather than a
- * per-recipe `resultSelection.provider`, so this one-time migration must make the
- * system-level basis decision the read-time normalizer cannot.
- *
- * `resolutionMode` is system-wide, but a legacy `routed` system has no system-level
- * provider constraint and may contain a MIX of `ingredientSet`- and `check`-routed
- * recipes. Carrying each recipe to its own provider's mode would mix modes inside
- * one system and violate the one-mode-per-system invariant, so the migration picks
- * the SYSTEM's new mode and reconciles disagreeing recipes:
- *
- *  - **Majority provider wins.** A `routed` system becomes the mode matching the
- *    provider used by the majority of its recipes. Ties — including a system with
- *    NO routed recipes — break to `routedByIngredients` (the optional-check,
- *    lower-friction mode).
- *  - **Minority reconciliation.** Recipes whose old provider disagrees with the
- *    chosen system mode keep their result data but have their now-meaningless
- *    `resultSelection` dropped; the stale routing (group names under check routing,
- *    ingredient-set `resultGroupId` under ingredient routing) is surfaced by
- *    system validation as a re-authoring issue — never silently mis-routed.
- *  - **Provider drop.** The routed modes derive their basis from the system mode and
- *    carry no `resultSelection`, so EVERY recipe of a migrated system has its
- *    `resultSelection` cleared (agreeing recipes lose only a redundant field).
- *
- * The salvage `salvageResolutionMode: 'routed'` and the gathering economy
- * `resolutionMode: 'routed'` are unrelated routing concepts on separate enums and
- * are explicitly left untouched.
- *
- * Idempotent: once no crafting `resolutionMode === 'routed'` token remains, a re-run
- * finds nothing to transform and is a no-op.
- *
- * Pure: returns `{ systems, recipes }` and performs no I/O (logging excepted).
- *
- * @param {object} data Runner payload.
- * @param {Array<object>} [data.systems] Raw craftingSystems setting.
- * @param {Array<object>} [data.recipes] Raw recipes setting.
- * @returns {{ systems: Array<object>, recipes: Array<object> }}
+ * `1.9.0` — split the crafting `routed` mode into `routedByIngredients` and `routedByCheck`. Pure,
+ * idempotent, version-gated; spec § Resolution-Model Migration owns the rules. `resolutionMode` is
+ * system-wide while a legacy `routed` system may hold a MIX of providers, so the MAJORITY wins, ties
+ * break to `routedByIngredients`, and a disagreeing recipe keeps its result data while its stale
+ * routing surfaces as a validation issue. The salvage and gathering `routed` tokens are unrelated.
  */
 
 export function migrateSplitRoutedResolutionModes(data = {}) {
@@ -76,12 +42,8 @@ export function migrateSplitRoutedResolutionModes(data = {}) {
 }
 
 /**
- * Choose a routed system's new mode by majority provider across its recipes.
- * More `check` recipes than `ingredientSet` → `routedByCheck`; otherwise (a check
- * minority, a tie, or no routed recipes) → `routedByIngredients`.
- * @param {Array<object>} recipes
- * @param {string} systemId
- * @returns {'routedByIngredients'|'routedByCheck'}
+ * Choose a routed system's new mode by majority provider. More `check` recipes than `ingredientSet`
+ * gives `routedByCheck`; a minority, a tie or no routed recipes gives `routedByIngredients`.
  */
 function _chooseSystemMode(recipes, systemId) {
   let ingredientCount = 0;
@@ -96,11 +58,8 @@ function _chooseSystemMode(recipes, systemId) {
 }
 
 /**
- * Reconcile one recipe for its system's new routed mode: drop the now-meaningless
- * `resultSelection`, logging the recipe when its old provider disagrees with the
- * chosen mode (stale routing the GM must re-author; system validation surfaces it).
- * @param {object} recipe
- * @param {'routedByIngredients'|'routedByCheck'} target
+ * Reconcile one recipe for its system's new mode: drop the now-meaningless `resultSelection`,
+ * logging it when its old provider disagrees with the chosen mode.
  */
 function _reconcileRecipe(recipe, target) {
   const provider = recipe.resultSelection?.provider;
