@@ -1,65 +1,9 @@
 /**
- * @module remapWorldScopeIdentityFlags
- *
- * Issue 1363 (epic 1357, PR 3): the one-shot, active-GM pass that remaps every DURABLE IDENTITY
- * FLAG the `1.30.0` world-scope re-key invalidates, driven by the persisted
- * `fabricate.worldScopeRekeyMap`.
- *
- * ## Why the shipped restamp cannot serve
- *
- * `restampOwnedItemComponentIdentity`'s planner returns EARLY for any item that already carries a
- * durable identity flag — which is PRECISELY the population whose flag is now stale. It is a
- * name-only backfill and cannot be reused. `MigrationRunner` cannot do it either: it reads and
- * writes only settings payloads and has no Actor or Item handle.
- *
- * ## The complete site list, or the reason for exclusion
- *
- * - **`roles[<systemId>].componentId` and `roles[<systemId>].toolId`** on owned actor Items,
- *   remapped from that system's leg of the map.
- * - **The legacy flat scalar `flags.fabricate.fabricate.componentId`**, which is SYSTEM-LESS,
- *   while the same old id in two systems can name two different components. The rule is narrow
- *   and decidable: remap it IFF the old value is a key in exactly ONE system's component map
- *   across the whole corpus, or in several that all agree on the image; otherwise leave it. That
- *   is behaviour-preserving rather than lossy — a stale scalar makes tiers 1-2 miss and
- *   resolution falls through to the UNCHANGED source-reference tier, and
- *   `itemHasComponentIdentityFlag` goes on returning `true`, so the issue-538 cross-system
- *   name-fallback suppression is unchanged too.
- * - **`flags.fabricate.fabricate.craftingRuns` and `.salvageRuns`, and
- *   `flags.fabricate.gatheringRuns` AT ITS SINGLE-SCOPE DEPTH.** The two depths differ and a pass
- *   that assumes one silently misses the other.
- * - **`flags.fabricate.fabricate.alchemyDeadEnds`**, whose keys are ORDER-SENSITIVE:
- *   `canonicalSignatureKey` builds each key from component ids SORTED LEXICALLY and joined
- *   `` `${componentId}:${count}` `` with `|`, so a re-key changes the sort order and textual
- *   substitution yields a key that never matches. The remap PARSES, remaps, RE-SORTS and re-joins
- *   through that same shared helper. It is player-visible wherever `showAttemptHistoryToPlayers`
- *   is true: every discovered dead end would silently stop being recognised.
- * - **`flags.fabricate.fabricate.learnedRecipes` is EXCLUDED**: it holds recipe ids, and recipe
- *   ids are never re-keyed.
- *
- * ## The dotted-`systemId` guard
- *
- * `setFabricateFlag` writes a role leaf through `document.update({[path]: value})`, which Foundry
- * expands on every dot, so a dotted `systemId` nests one level deeper than any reader indexing
- * `roles[systemId]`. Every shipped writer guards it with `isSafeFlagKeySegment`; so does this
- * pass, which SKIPS an unsafe segment and counts it in the report.
- *
- * The `alchemyDeadEnds` `systemId` is a VALUE-side object key rather than a dotted update-path
- * segment, so the guard does not apply to it.
- *
- * ## No key is ever REMOVED by this pass
- *
- * `setFabricateFlag` writes through `Document#update`, whose recursive merge never removes keys
- * deleted from a nested object — the trap that makes a cleared run field resurrect. This pass
- * only ever CHANGES leaf values inside structures whose key sets it leaves alone (run ids are
- * not re-keyed; `alchemyDeadEnds` values are arrays, which the merge replaces wholesale), so the
- * merge cannot resurrect anything. That property is what makes a plain merge write correct here.
- *
- * That property is this half's alone: the `1.34.0` essence half at the foot of this file re-keys
- * object keys rather than leaf values, so it writes through a forced replacement instead.
- *
- * Between the settings write and this pass, resolution degrades to the SOURCE-REFERENCE tier,
- * which this change does not touch. A source Item in a LOCKED pack is skipped and stays in that
- * tier permanently — accepted, stated, and counted in the report.
+ * The one-shot, active-GM pass remapping every DURABLE IDENTITY FLAG the `1.30.0` re-key invalidates
+ * (issue 1363). Neither shipped pass can serve: the owned-item restamp returns early for an item
+ * already carrying a flag, and `MigrationRunner` holds no Actor or Item handle. Spec § World-Scope
+ * Entity Migration requirements 13 to 15 own the site list, the `learnedRecipes` exclusion and the
+ * dotted-`systemId` guard. NO KEY IS EVER REMOVED HERE, which is what makes a plain merge correct.
  */
 
 import { FABRICATE_FLAG_NAMESPACE, isSafeFlagKeySegment } from '../config/flags.js';
@@ -69,31 +13,15 @@ import { isPlainObject } from '../utils/scalars.js';
 import { composeFindingsNotice } from './migrationNoticeDetail.js';
 import { compareSemver } from './MigrationRunner.js';
 
-/**
- * The migration version that PRODUCES the re-key map this pass consumes.
- *
- * @type {string}
- */
+/** The migration version that PRODUCES the re-key map this pass consumes. */
 export const WORLD_SCOPE_MIGRATION_VERSION = '1.30.0';
 
 /**
- * Whether the remap finished CLEANLY, i.e. wrote everything it planned to.
- *
- * IT IS A SECOND, INDEPENDENT WITHHOLD, and it exists because the first one cannot see this
- * failure at all. `mayClearWorldScopeRekeyMap` asks whether the PRODUCING migration completed;
- * this asks whether the CONSUMING pass did. A transient rejection writing one actor's run
- * container is counted in `skippedErrors` and nothing else notices it: the pass returns normally,
- * the migration completed, so the map would be destroyed with that actor still naming retired
- * ids - and the startup prune, no longer withheld because the map is gone, deletes the run on the
- * next boot.
- *
- * `lockedSkips` is deliberately NOT part of this predicate. A locked compendium is a STANDING
- * state a re-run cannot improve, so withholding on it would retain the map forever; it is
- * reported to the GM instead. `skippedErrors` is a TRANSIENT failure a re-run genuinely can fix,
- * which is the whole distinction.
- *
- * @param {object|null} summary The pass summary, or `null` when the pass did not run.
- * @returns {boolean}
+ * Whether the remap wrote everything it planned to — a SECOND, INDEPENDENT WITHHOLD:
+ * {@link mayClearWorldScopeRekeyMap} asks whether the PRODUCING migration completed, this whether
+ * the CONSUMING pass did, and nothing else notices a transient rejection.
+ * `lockedSkips` is deliberately excluded: a STANDING state a re-run cannot improve would otherwise
+ * retain the map forever.
  */
 export function remapCompletedCleanly(summary) {
   if (!summary || typeof summary !== 'object') return true;
@@ -101,25 +29,11 @@ export function remapCompletedCleanly(summary) {
 }
 
 /**
- * Whether this pass may DESTROY the re-key map — i.e. whether the producing migration has
- * COMPLETED on this world.
- *
- * IT IS A SEPARATE GATE FROM THE ONE THAT DECIDES WHETHER THE PASS RUNS, and the separation is
- * what keeps a torn migration recoverable. `_runMigrations()`'s DEFERRED branch returns NORMALLY,
- * so this pass runs on the SAME BOOT as a torn migration: the three scope legs land before
- * `craftingSystems`, so a corpus-seededness predicate is already true while `gatheringConfig`
- * still holds the OLD ids that only the map can repair.
- *
- * **`compareSemver`, NEVER A BARE JS `>=`.** `migrationVersion` is a STRING setting, so
- * `migrationVersion >= '1.30.0'` is a LEXICOGRAPHIC compare and is TRUE for `'1.4.0'` through
- * `'1.9.0'` — all six are registered migration versions, and they are the worlds running the
- * longest multi-migration pass, i.e. the most tear-prone population there is. The gate would be
- * defeated exactly where it is needed. `foundry.utils.isNewerVersion` IS part-wise numeric on
- * v14 and would be correct, but it is strictly-greater, so the `>=` form is the easily-inverted
- * `!isNewerVersion('1.30.0', migrationVersion)`.
- *
- * @param {unknown} migrationVersion The stored `fabricate.migrationVersion`.
- * @returns {boolean}
+ * Whether this pass may DESTROY the re-key map — a SEPARATE GATE from the one deciding whether the
+ * pass RUNS, which is what keeps a torn migration recoverable: the runner's DEFERRED branch returns
+ * NORMALLY, so this runs on the SAME BOOT as a torn one.
+ * `compareSemver`, NEVER A BARE `>=`: `migrationVersion` is a STRING setting, so the bare form
+ * compares LEXICOGRAPHICALLY and is TRUE for `'1.4.0'` through `'1.9.0'`.
  */
 export function mayClearWorldScopeRekeyMap(migrationVersion) {
   return compareSemver(migrationVersion ?? '0.0.0', WORLD_SCOPE_MIGRATION_VERSION) >= 0;
@@ -147,12 +61,7 @@ function arrayOf(value) {
   return Array.isArray(value) ? value : [];
 }
 
-/**
- * A `(oldId) => newId` lookup over one leg of one system's map.
- *
- * @param {object|undefined} leg
- * @returns {(value: unknown) => unknown}
- */
+/** A `(oldId) => newId` lookup over one leg of one system's map. */
 function legLookup(leg) {
   const source = isPlainObject(leg) ? leg : {};
   return (value) =>
@@ -161,14 +70,7 @@ function legLookup(leg) {
       : value;
 }
 
-/**
- * The component ids that are UNAMBIGUOUS across the whole corpus: an old id every system that
- * re-keys it maps to the SAME new id. This is the tie-break the system-less legacy flat scalar
- * is remapped under; anything else is left untouched.
- *
- * @param {object} rekeyMap
- * @returns {Map<string, string>}
- */
+/** The component ids UNAMBIGUOUS corpus-wide — the tie-break the flat scalar is remapped under. */
 export function unambiguousComponentRemap(rekeyMap) {
   const candidates = new Map();
   const ambiguous = new Set();
@@ -182,17 +84,7 @@ export function unambiguousComponentRemap(rekeyMap) {
   return candidates;
 }
 
-/**
- * Remap every component and tool reference inside ONE run record, in place.
- *
- * KEY-AWARE AND SYSTEM-SCOPED: the record's own `craftingSystemId` selects the map, because the
- * same old id in two systems can name two different components. A record with no system id is
- * left alone rather than remapped under a guess.
- *
- * @param {unknown} run
- * @param {object} rekeyMap
- * @returns {boolean} whether anything changed.
- */
+/** Remap one run record in place. SYSTEM-SCOPED; a record with no system id is left alone. */
 function remapRunRecord(run, rekeyMap) {
   if (!isPlainObject(run)) return false;
   const systemId = typeof run.craftingSystemId === 'string' ? run.craftingSystemId : null;
@@ -235,13 +127,7 @@ function remapRunRecord(run, rekeyMap) {
   return changed;
 }
 
-/**
- * Remap a whole run container (`{ active: {...}, history: [...] }`), in place.
- *
- * @param {unknown} container
- * @param {object} rekeyMap
- * @returns {boolean} whether anything changed.
- */
+/** Remap a whole run container (`{ active, history }`), in place. */
 export function remapRunContainer(container, rekeyMap) {
   if (!isPlainObject(container)) return false;
   let changed = false;
@@ -254,29 +140,14 @@ export function remapRunContainer(container, rekeyMap) {
   return changed;
 }
 
-/**
- * Remap the per-system alchemy dead-end SIGNATURE KEYS.
- *
- * PARSE, REMAP, RE-SORT, RE-JOIN — never textual substitution. Each key is
- * `componentId:count|...` sorted lexically by component id, so a re-key changes the sort order
- * and a substituted key would never match again.
- *
- * @param {unknown} deadEnds `{ [systemId]: [signatureKey, ...] }`
- * @param {object} rekeyMap
- * @returns {{value: object, changed: boolean}}
- */
+/** PARSE, REMAP, RE-SORT, RE-JOIN the dead-end keys — a re-key changes their lexical order. */
 export function remapAlchemyDeadEnds(deadEnds, rekeyMap) {
   if (!isPlainObject(deadEnds)) return { value: deadEnds, changed: false };
   const next = {};
   let changed = false;
   for (const [systemId, keys] of Object.entries(deadEnds)) {
-    // DE-DUPLICATED, because a merge can collapse two distinct signatures onto one key: two dead
-    // ends that differed only in which of two now-merged components they used are the SAME dead
-    // end afterwards. The reader uses `includes`, so a duplicate is harmless to correctness — but
-    // this is a persisted actor flag that only ever grows, and the writer already refuses to
-    // append a key it already holds.
-    // The `systemId` here is a VALUE-side object key, never a dotted update-path segment, so
-    // `isSafeFlagKeySegment` deliberately does not apply.
+    // DE-DUPLICATED: a merge can collapse two signatures onto one key. `includes` makes a duplicate
+    // harmless, but this is a persisted flag that only ever grows.
     const remapComponent = legLookup(rekeyMap[systemId]?.components);
     next[systemId] = arrayOf(keys).map((signature) => {
       if (typeof signature !== 'string' || signature === '') return signature;
@@ -301,15 +172,7 @@ export function remapAlchemyDeadEnds(deadEnds, rekeyMap) {
   return { value: changed ? next : deadEnds, changed };
 }
 
-/**
- * Plan the durable-identity writes ONE owned Item needs.
- *
- * @param {object|null} item An owned actor Item (reads `getFlag`).
- * @param {object} rekeyMap The persisted re-key map.
- * @param {Map<string, string>} unambiguous The corpus-wide unambiguous component remap.
- * @param {(document: object, key: string, fallback?: unknown) => unknown} readFlag
- * @returns {{writes: Array<{flagKey: string, value: string}>, unsafeSystemIds: string[]}}
- */
+/** Plan the durable-identity writes ONE owned Item needs. */
 export function planItemIdentityFlagRemap(item, rekeyMap, unambiguous, readFlag) {
   const writes = [];
   const unsafeSystemIds = [];
@@ -320,9 +183,8 @@ export function planItemIdentityFlagRemap(item, rekeyMap, unambiguous, readFlag)
       if (!isPlainObject(perSystem)) continue;
       const legs = rekeyMap[systemId];
       if (!legs) continue;
-      // THE DOTTED-`systemId` GUARD. An unsafe segment can never have been written as a
-      // `roles` map key by any shipped writer, and writing one here would mis-nest the flag,
-      // so it is SKIPPED and counted.
+      // THE DOTTED-`systemId` GUARD. No shipped writer can have written an unsafe segment as a
+      // `roles` key, and writing one here would mis-nest the flag, so it is SKIPPED and counted.
       if (!isSafeFlagKeySegment(systemId)) {
         unsafeSystemIds.push(systemId);
         continue;
@@ -360,23 +222,7 @@ function actorOwnedItems(actor) {
   return [];
 }
 
-/**
- * Remap every durable identity flag the `1.30.0` re-key invalidated.
- *
- * NO-THROW-PER-DOCUMENT: a planning or write failure on one actor or item is counted and
- * skipped; one bad document can never abort the pass. A LOCKED source Item refuses its write,
- * which surfaces here as a `lockedSkips` count rather than as a failure.
- *
- * @param {object} params
- * @param {Iterable<object>|Array<object>} params.actors
- * @param {object} params.rekeyMap The persisted `fabricate.worldScopeRekeyMap`.
- * @param {(document: object, key: string, fallback?: unknown) => unknown} params.readFlag
- * @param {(document: object, key: string, value: unknown) => Promise<unknown>}
- *   params.writeFabricateFlag Writes the DOUBLY-nested `flags.fabricate.fabricate.<key>`.
- * @param {(document: object, key: string, value: unknown) => Promise<unknown>}
- *   params.writeBareFlag Writes the SINGLE-scope `flags.fabricate.<key>`.
- * @returns {Promise<object>} the pass summary.
- */
+/** Remap every flag the `1.30.0` re-key invalidated. NO-THROW-PER-DOCUMENT; a LOCKED Item counts. */
 export async function remapWorldScopeIdentityFlags({
   actors,
   rekeyMap,
@@ -447,9 +293,8 @@ export async function remapWorldScopeIdentityFlags({
       }
     }
     try {
-      // THE OTHER DEPTH. `gatheringRuns` is written with a bare `setFlag`, so it lives at the
-      // SINGLE-scope `flags.fabricate.gatheringRuns` and a pass that assumes the doubly-nested
-      // depth silently misses it.
+      // THE OTHER DEPTH. `gatheringRuns` is written with a bare `setFlag`, so a pass assuming the
+      // doubly-nested depth silently misses it.
       const container = readFlag(actor, BARE_RUN_CONTAINER, null, { bare: true });
       if (remapRunContainer(container, map)) {
         await bareWrite(actor, BARE_RUN_CONTAINER, container);
@@ -475,77 +320,35 @@ export async function remapWorldScopeIdentityFlags({
   return summary;
 }
 
-// ---------------------------------------------------------------------------
-// The `1.34.0` equivalent-essence merge half (issue 1654).
-//
-// A second, independent site list and decision record, `fabricate.worldEssenceMergeMap` rather
-// than `fabricate.worldScopeRekeyMap`. See § Equivalent World Essence Merge requirement 9 in
-// `openspec/specs/destructive-changes-and-migrations/spec.md`.
-//
-// The sites, and the reason for each exclusion:
-//
-// - `resolvedEssences` and `essenceEnabled`, at any depth inside
-//   `flags.fabricate.fabricate.craftingRuns`, `.salvageRuns` and the single-scope
-//   `flags.fabricate.gatheringRuns`. Only `craftingRuns` is populated today; all three are walked.
-// - the system-less item override at the doubly-nested `flags.fabricate.fabricate.essences`,
-//   remapped under a whole-corpus unambiguity tie-break.
-// - excluded: `alchemyDeadEnds`, whose signature keys hold component ids, and `learnedRecipes`,
-//   whose recipe ids no pass re-keys.
-//
-// Every write is a forced replacement — Foundry's `==` path prefix, spelled once in
-// {@link forcedReplacementFlagPath} — and never a plain merge write: re-keying changes a
-// container's key set and `Document#update` performs no deletions, so a merge write would leave the
-// retired key standing and a resumed run would transfer essences it never consumed.
-//
-// No startup prune withhold is added: no startup pass gates on an essence id, so
-// `hasPendingWorldEssenceMerge` lives here and not in `src/systems/worldScopeRekeyPending.js`.
-// `tests/world-scope-startup-prune-ordering.test.js` pins that absence negatively.
-// ---------------------------------------------------------------------------
+// --- The `1.34.0` equivalent-essence merge half (issue 1654) ----------------
+// A second, independent site list keyed on `fabricate.worldEssenceMergeMap`; spec § Equivalent World
+// Essence Merge requirement 9 owns the sites and the exclusions.
+// Every write is a FORCED REPLACEMENT: re-keying changes a container's key set and `Document#update`
+// performs no deletions, so a merge would leave the retired key standing and a resumed run would
+// transfer essences it never consumed.
+// No startup-prune withhold is added — no startup pass gates on an essence id — which
+// `tests/world-scope-startup-prune-ordering.test.js` pins negatively.
 
 /** The migration version that produces the merge map this half consumes. */
 export const WORLD_ESSENCE_MERGE_MIGRATION_VERSION = '1.34.0';
 
-/**
- * The transient leg of `fabricate.worldEssenceMergeMap`: the per-system re-key pairs this pass
- * consumes and the boot-time gating then clears.
- */
+/** The transient leg: the per-system re-key pairs this pass consumes and boot-time gating clears. */
 export const WORLD_ESSENCE_MERGE_SYSTEMS_LEG = 'systems';
 
-/**
- * The never-cleared tombstone leg of `fabricate.worldEssenceMergeMap`, recording what each retired
- * id carried. It survives the clear of {@link WORLD_ESSENCE_MERGE_SYSTEMS_LEG} because
- * `mintEssenceId` resolves a new id against the live roster alone and would otherwise reissue one.
- */
+/** The never-cleared tombstone leg: without it `mintEssenceId` would reissue a retired id. */
 export const WORLD_ESSENCE_MERGE_RETIRED_LEG = 'retired';
 
 /** The doubly-nested, system-less item essence override. */
 const ITEM_ESSENCE_OVERRIDE_KEY = 'essences';
 
-/**
- * Whether this half may destroy the per-system legs of the merge map — i.e. whether the producing
- * `1.34.0` migration has completed. The `retired` leg is outside this clear and survives it.
- *
- * `compareSemver` and never a bare `>=`: `migrationVersion` is a string setting, so
- * `migrationVersion >= '1.34.0'` is a lexicographic compare and is true for `'1.4.0'`.
- *
- * @param {unknown} migrationVersion The stored `fabricate.migrationVersion`.
- */
+/** Whether this half may destroy the per-system legs; the `retired` leg is outside the clear. */
 export function mayClearWorldEssenceMergeMap(migrationVersion) {
   return compareSemver(migrationVersion ?? '0.0.0', WORLD_ESSENCE_MERGE_MIGRATION_VERSION) >= 0;
 }
 
 /**
- * The per-system re-key legs of the merge map, read from its `systems` leg and nowhere else.
- *
- * The two legs are nested rather than flat siblings because a crafting system whose id is literally
- * `retired` would otherwise collide with the tombstone key, and nothing validates a system id
- * against that. There is deliberately no fallback to a flat layout.
- *
- * Self-mapping and empty pairs are dropped, so a map that re-keys nothing reads as no legs.
- *
- * @param {unknown} mergeMap The raw `fabricate.worldEssenceMergeMap` value,
- *   `{systems: {[systemId]: {essences: {[loserId]: survivorId}}}, retired: {...}}`.
- * @returns {{[systemId: string]: {[loserId: string]: string}}}
+ * The per-system legs, read from the `systems` leg alone. NESTED rather than flat siblings, because
+ * a system whose id is literally `retired` would collide with the tombstone key.
  */
 export function worldEssenceMergeLegs(mergeMap) {
   const systems = isPlainObject(mergeMap) ? mergeMap[WORLD_ESSENCE_MERGE_SYSTEMS_LEG] : null;
@@ -565,32 +368,16 @@ export function worldEssenceMergeLegs(mergeMap) {
 }
 
 /**
- * Whether the persisted merge map still holds re-key pairs nothing has consumed.
- *
- * It takes the value rather than an accessor and does not fail closed, unlike
- * `hasPendingWorldScopeRekey`, which gates a destructive startup prune. This only decides whether a
- * repair pass walks the corpus, and a fail-closed answer would walk every actor on every boot.
- *
- * @param {unknown} mergeMap The raw `fabricate.worldEssenceMergeMap` value.
+ * Whether the merge map still holds unconsumed pairs. It does NOT fail closed, unlike the predicate
+ * gating the destructive prune: failing closed here would walk every actor on every boot.
  */
 export function hasPendingWorldEssenceMerge(mergeMap) {
   return Object.keys(worldEssenceMergeLegs(mergeMap)).length > 0;
 }
 
 /**
- * Split one system's pairs into the groups it is safe to apply and the ids that refused.
- *
- * A group is a survivor and every loser that maps to it, and an unsafe id refuses the whole group
- * rather than the one pair: half a merge group would move some references to the survivor and leave
- * the rest on a loser, a state no later pass can distinguish from a partial tear.
- *
- * The map is derived from the raw settings corpus, so a hand-edited or imported essence id may be
- * any string at all, and one that is not a safe dotted-path segment (see
- * `FABRICATE_FLAG_KEY_SEGMENT_PATTERN`) cannot be addressed by any flag-path write.
- *
- * @param {{[loserId: string]: string}} pairs
- * @param {Set<string>} unsafe Collects every refused id, across every system.
- * @returns {{safe: {[loserId: string]: string}, refusedGroups: number}}
+ * Split one system's pairs into safe groups and refused ids. An unsafe id refuses THE WHOLE GROUP:
+ * half a merge leaves a state no later pass can distinguish from a partial tear.
  */
 function partitionSafeEssencePairs(pairs, unsafe) {
   const bySurvivor = new Map();
@@ -612,12 +399,7 @@ function partitionSafeEssencePairs(pairs, unsafe) {
   return { safe, refusedGroups };
 }
 
-/**
- * The merge map as this pass will actually apply it: safe legs only, with what it refused.
- *
- * @param {unknown} mergeMap The raw `fabricate.worldEssenceMergeMap` value.
- * @returns {{legs: object, unsafeEssenceIds: string[], refusedGroups: number}}
- */
+/** The merge map as this pass will apply it: safe legs only, with what it refused. */
 export function readWorldEssenceMergeMap(mergeMap) {
   const unsafe = new Set();
   const legs = {};
@@ -631,16 +413,8 @@ export function readWorldEssenceMergeMap(mergeMap) {
 }
 
 /**
- * The essence ids unambiguous across the whole corpus: a retired id every system that re-keys it
- * maps to the same survivor. This is the tie-break the system-less item override
- * (`flags.fabricate.fabricate.essences`) is remapped under; anything else is left untouched.
- *
- * Leaving an ambiguous key is safe only because a retired id is never reissued: a key naming no
- * live essence contributes nothing to `essenceResolver`'s override, which is what the never-cleared
- * `retired` tombstone protects.
- *
- * @param {unknown} mergeMap The raw `fabricate.worldEssenceMergeMap` value.
- * @returns {Map<string, string>}
+ * The essence ids unambiguous corpus-wide — the tie-break the item override is remapped under.
+ * Leaving an ambiguous key is safe only because a retired id is never reissued.
  */
 export function unambiguousEssenceRemap(mergeMap) {
   const candidates = new Map();
@@ -664,18 +438,16 @@ function sumEssenceQuantities(left, right) {
 }
 
 /**
- * Two re-keyed enabled-flags land on one key: the survivor takes the logical AND, not OR.
- * `essenceEnabled` snapshots a behaviour gate at run start, so OR would grant an effect the GM had
- * switched off for one of the contributing essences.
+ * Two re-keyed enabled-flags collide: the survivor takes the logical AND, not OR, because
+ * `essenceEnabled` snapshots a gate the GM may have switched off for one contributor.
  */
 function andEssenceEnabledFlags(left, right) {
   return Boolean(left) && Boolean(right);
 }
 
 /**
- * The key-position containers a run record holds, and how a collision on one key resolves. A `Map`
- * rather than an object literal, so a run record carrying a `constructor` or `__proto__` key cannot
- * reach an inherited member and be mistaken for a container.
+ * The key-position containers a run record holds, and how a collision resolves. A `Map`, so a record
+ * carrying `constructor` or `__proto__` cannot reach an inherited member.
  */
 const ESSENCE_KEY_POSITION_CONTAINERS = new Map([
   ['resolvedEssences', sumEssenceQuantities],
@@ -683,18 +455,8 @@ const ESSENCE_KEY_POSITION_CONTAINERS = new Map([
 ]);
 
 /**
- * Re-key one essence-keyed map, resolving a collision through `combine`. The essence id is the key
- * here, so the rewrite changes the map's key set — which is why the write side cannot use a merge.
- * Returns the original object when nothing changed, so an unchanged container is never rewritten.
- *
- * The accumulator is a `Map` rebuilt through `Object.fromEntries`, as its sibling
- * `rewriteEssenceQuantityMap` is, so a key spelled `__proto__` lands as an own property instead of
- * reaching the prototype setter; a raw flag-corpus id can be any string at all.
- *
- * @param {unknown} map `{[essenceId]: value}`
- * @param {(value: unknown) => unknown} lookup
- * @param {(left: unknown, right: unknown) => unknown} combine
- * @returns {{value: unknown, changed: boolean}}
+ * Re-key one essence-keyed map through `combine`. The essence id is the KEY, which is why the write
+ * side cannot use a merge; the accumulator is a `Map`, so `__proto__` lands as an own property.
  */
 export function remapEssenceKeyedMap(map, lookup, combine) {
   if (!isPlainObject(map)) return { value: map, changed: false };
@@ -709,15 +471,8 @@ export function remapEssenceKeyedMap(map, lookup, combine) {
 }
 
 /**
- * Walk one node, re-keying every essence-keyed container found at any depth, in place.
- *
- * The depth is not assumed: `CraftingRunManager.markStepPrepared` is the only writer of either
- * field today and nests them under a step's `preparedConsumption`, so walking to any depth covers
- * a later writer at another depth without a second edit here.
- *
- * @param {unknown} node
- * @param {(value: unknown) => unknown} lookup
- * @returns {boolean} whether anything changed.
+ * Re-key every essence-keyed container at ANY depth, in place. The depth is not assumed, so a later
+ * writer at another depth is covered without a second edit here.
  */
 function remapEssenceKeysInNode(node, lookup) {
   if (Array.isArray(node)) {
@@ -744,17 +499,7 @@ function remapEssenceKeysInNode(node, lookup) {
   return changed;
 }
 
-/**
- * Re-key every essence-keyed container inside a whole run container, in place.
- *
- * System-scoped, as {@link remapRunContainer} is: the record's own `craftingSystemId` selects the
- * leg, because the same retired id in two systems can name two different essences. A record with no
- * system id is left alone rather than remapped under a guess.
- *
- * @param {unknown} container `{active: {...}, history: [...]}`
- * @param {object} legs The safe per-system legs from {@link readWorldEssenceMergeMap}.
- * @returns {boolean} whether anything changed.
- */
+/** Re-key a whole run container in place. System-scoped; a record with no system id is left alone. */
 export function remapEssenceRunContainer(container, legs) {
   if (!isPlainObject(container)) return false;
   const remapRecord = (run) => {
@@ -775,17 +520,9 @@ export function remapEssenceRunContainer(container, legs) {
 }
 
 /**
- * The forced-replacement update path for one flag container, spelled here once.
- *
- * `==` on the last path segment is Foundry's replace-wholesale prefix, and the only spelling valid
- * across the declared `minimum: 13` / `verified: 14` band: V14 retains it as the deprecated form of
- * `foundry.data.operators.ForcedReplacement`. It is not the comparison operator of that spelling.
- *
- * @param {string} key The flag container key (`'craftingRuns'`, `'essences'`, …).
- * @param {object} [options]
- * @param {boolean} [options.bare] `true` for the single-scope `flags.fabricate.<key>` depth that
- *   `gatheringRuns` is written at; `false` (the default) for the doubly-nested
- *   `flags.fabricate.fabricate.<key>` depth everything else uses.
+ * The forced-replacement update path, spelled once. `==` on the last segment is Foundry's
+ * replace-wholesale prefix, valid across the declared `minimum: 13` / `verified: 14` band — not the
+ * comparison operator of that spelling.
  */
 export function forcedReplacementFlagPath(key, { bare = false } = {}) {
   const scope = bare
@@ -834,8 +571,7 @@ async function applyEssenceRemapToActor(actor, context) {
     }
   }
   try {
-    // The other depth: `gatheringRuns` is written with a bare `setFlag` and so lives at the
-    // single-scope `flags.fabricate.gatheringRuns`.
+    // The other depth: `gatheringRuns` is written with a bare `setFlag`.
     const container = readFlag(actor, BARE_RUN_CONTAINER, null, { bare: true });
     if (remapEssenceRunContainer(container, legs)) {
       await replaceBareFlag(actor, BARE_RUN_CONTAINER, container);
@@ -847,27 +583,8 @@ async function applyEssenceRemapToActor(actor, context) {
 }
 
 /**
- * Remap every durable essence reference the `1.34.0` equivalent-essence merge invalidated.
- *
- * No-throw per document, as {@link remapWorldScopeIdentityFlags} is: a read or write failure on one
- * actor or item is counted and skipped, and one bad document can never abort the pass.
- *
- * Every write is a forced replacement and never a merge write; see the section note above and
- * {@link forcedReplacementFlagPath}.
- *
- * It reaches owned actor Items only. The same override on a world Item, a compendium Item or an
- * unlinked synthetic token actor is never seen and stays stale permanently; the GM notice says so.
- *
- * @param {object} params
- * @param {Iterable<object>|Array<object>} params.actors
- * @param {unknown} params.mergeMap The persisted `fabricate.worldEssenceMergeMap`.
- * @param {(document: object, key: string, fallback?: unknown, options?: object) => unknown}
- *   params.readFlag
- * @param {(document: object, key: string, value: unknown) => Promise<unknown>}
- *   params.replaceFabricateFlag Forced-replaces `flags.fabricate.fabricate.<key>`.
- * @param {(document: object, key: string, value: unknown) => Promise<unknown>}
- *   params.replaceBareFlag Forced-replaces the single-scope `flags.fabricate.<key>`.
- * @returns {Promise<object>} the pass summary.
+ * Remap every essence reference the `1.34.0` merge invalidated. It reaches owned actor Items ONLY,
+ * so the same override on a world Item, a compendium Item or an unlinked token actor stays stale.
  */
 export async function remapWorldEssenceIdentityFlags({
   actors,
@@ -915,29 +632,9 @@ export async function remapWorldEssenceIdentityFlags({
 }
 
 /**
- * The one-time notice describing what the `1.34.0` essence flag remap could not repair.
- *
- * The state it reports is reachable: a hand-edited or imported essence id can fail
- * `isSafeFlagKeySegment`, {@link partitionSafeEssencePairs} then refuses its whole group, and the
- * world is merged in its settings and un-merged in its actor flags — which § Equivalent World
- * Essence Merge requirement 9 calls data corruption rather than untidiness.
- *
- * It lives here rather than beside its sibling in `worldScopeEntityNotice.js` because every fact it
- * reports is a decision made in this module: the safe-segment guard, the whole-group refusal and
- * the summary shape that carries them.
- *
- * Silent on a clean pass, as the sibling is; the merge's own migration-time notice already tells
- * the GM what merged.
- *
- * `lockedSkips` is reported but does not withhold, matching `remapCompletedCleanly`, which
- * excludes it: a locked compendium is a standing condition a re-run cannot fix, while
- * `skippedErrors` is transient and does withhold the map clear.
- *
- * @param {object|null} summary The pass summary from {@link remapWorldEssenceIdentityFlags}.
- * @param {(key: string, data?: object) => string|undefined} localize
- * The toast counts; the console `detail` names the offending ids and the remedies (issue 1737).
- *
- * @returns {{message: string, detail: string}} both `''` when there is nothing to say.
+ * The one-time notice describing what the `1.34.0` flag remap could not repair — a reachable state
+ * requirement 9 calls data corruption rather than untidiness, since the world is then merged in
+ * settings and un-merged in actor flags. Silent on a clean pass.
  */
 export function buildWorldEssenceMergeRemapNotice(summary, localize) {
   const unsafe = Array.isArray(summary?.unsafeEssenceIdSkips) ? summary.unsafeEssenceIdSkips : [];

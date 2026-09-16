@@ -1,104 +1,27 @@
 /**
- * Migration-first resolution-mode change (pure, no I/O).
- *
- * When a crafting system's `resolutionMode` changes, recipes are MIGRATED to fit
- * the new mode wherever possible instead of being deleted. A recipe is only
- * deleted when a per-recipe STRUCTURAL constraint of the target mode cannot be met
- * by clearing the routed `resultSelection` or collapsing to a single ingredient set:
- *
- *   - narrowing to `simple` or `progressive` (which require exactly one ingredient
- *     set AND one result group) from a recipe that carries more than one of either
- *     ("1×1" = exactly one of each), or
- *   - moving a multi-step recipe into `alchemy` (alchemy does not support
- *     multi-step recipes).
- *
- * SYSTEM-LEVEL gaps (e.g. switching to `progressive` without a progressive check,
- * or to `routed`/`check` without a routed roll formula) NEVER delete or disable a
- * recipe here — they are surfaced as `blocks:'system'` validation issues by the
- * system-validation aggregator (`src/systems/systemValidation.js`) and gate
- * visibility, not deletion.
- *
- * Migratability matrix (per the `resolution-modes/spec.md` normative 5×5). RI =
- * `routedByIngredients`, RC = `routedByCheck`:
- *
- *   | From \ To  | simple              | RI                       | RC                       | progressive         | alchemy                              |
- *   |------------|---------------------|--------------------------|--------------------------|---------------------|--------------------------------------|
- *   | simple     | —                   | clear                    | clear; reconcile         | clear               | clear+collapse                       |
- *   | RI         | clear if 1×1 else del| —                        | carry; reconcile         | clear if 1×1 else del| clear+collapse, single-step else del |
- *   | RC         | clear if 1×1 else del| carry; reconcile         | —                        | clear if 1×1 else del| clear+collapse, single-step else del |
- *   | progressive| clear               | clear                    | clear; reconcile         | —                   | clear+collapse                       |
- *   | alchemy    | clear if 1×1 else del| clear (drop), carry      | clear (drop), carry; recon| clear if 1×1 else del| —                                   |
- *
- *   - "clear+collapse": ALCHEMY no longer routes via a recipe-level provider
- *     (retired for the system-level `alchemy.checkMode`, issue 554) and requires
- *     exactly one ingredient set, so migrating in clears any stale `resultSelection`
- *     and collapses a multi-ingredient-set recipe to its first set. It NEVER seeds a
- *     provider; a multi-step recipe cannot migrate into alchemy and is deleted.
- *   - "clear": the target mode does not route via a recipe-level provider, so
- *     `resultSelection` is set to `null` (a no-op for routed modes, which never
- *     carry one).
- *   - "carry": the recipe is already structurally shaped for the target mode; it is
- *     carried verbatim.
- *   - "reconcile": the recipe survives (`carry`/`clear`) but its routing data is
- *     stale for the new basis (group names under check routing, or ingredient-set
- *     `resultGroupId` mappings under ingredient routing). It is FLAGGED via
- *     `reconcile: true` and surfaces as a re-authoring validation issue — never
- *     silently mis-routed. Re-running a `carry` with no reconcile pending is
- *     idempotent.
- *   - "delete": a structural constraint cannot be met (narrowing a >1×1 recipe into
- *     `simple`/`progressive`, or moving a multi-step recipe into `alchemy`).
- *
- * `RI↔RC` never deletes (`carry`); it reconciles stale routing.
- *
- * @module migrateRecipeForModeChange
+ * Migration-first resolution-mode change, pure and with no I/O: a recipe is MIGRATED to fit the new
+ * mode wherever possible and deleted only when a per-recipe STRUCTURAL constraint cannot be met.
+ * `resolution-modes/spec.md` § Mode Invariant owns the normative 5x5 migratability matrix, and
+ * `destructive-changes-and-migrations/spec.md` § Change Crafting System Resolution Mode the pass.
+ * SYSTEM-LEVEL gaps never delete or disable a recipe here; they surface as validation issues.
  */
 
-// Only ALCHEMY routes via a recipe-level `resultSelection.provider` now; the two
-// routed crafting modes derive their basis from the system mode.
+// Only ALCHEMY routes via a recipe-level `resultSelection.provider`; the two routed crafting modes
+// derive their basis from the system mode.
 const ROUTED_MODES = new Set(['routedByIngredients', 'routedByCheck']);
 const SINGLE_GROUP_MODES = new Set(['simple', 'progressive']);
 
 /**
- * @typedef {object} ModeChangeResult
- * @property {'lossless'|'cleared'|'carry'|'delete'} outcome
- *   Classification of what happened: `lossless` (no-op carry, already conforming),
- *   `cleared` (`resultSelection` cleared and/or ingredient sets collapsed for the
- *   new mode), `carry` (carried verbatim into a mode that keeps existing routing),
- *   or `delete` (a structural constraint cannot be met — caller must delete).
- * @property {boolean} [reconcile] When true, the recipe survives but its routing
- *   data is stale for the new basis and must be re-authored (surfaced as a
- *   validation issue, never silently mis-routed).
- * @property {object|null} recipe The migrated recipe JSON, or `null` when `delete`.
- * @property {string[]} reasons Human-readable notes describing the decision.
- */
-
-/**
- * Classify a resolution-mode change for one recipe WITHOUT mutating the input.
- * Used by the UI dry-run to report migrate/delete counts before committing.
- *
- * @param {object} recipeJSON Recipe JSON (as produced by `Recipe#toJSON`).
- * @param {string} fromMode The current system resolution mode.
- * @param {string} toMode The target system resolution mode.
- * @param {object} [system] The target system. Retained for call-site parity with
- *   `migrateRecipeForModeChange`; the per-recipe pass no longer seeds a provider.
- * @returns {ModeChangeResult}
+ * Classify a mode change for one recipe WITHOUT mutating it, for the UI dry run that reports
+ * migrate and delete counts before committing.
  */
 export function classifyModeChange(recipeJSON, fromMode, toMode, system = {}) {
   return migrateRecipeForModeChange(_clone(recipeJSON), fromMode, toMode, system);
 }
 
 /**
- * Migrate one recipe for a resolution-mode change. Pure: operates on the passed
- * `recipeJSON` (mutating it in place when a transform applies) and returns the
- * result; performs no I/O. For a no-mutation dry run use {@link classifyModeChange}.
- *
- * @param {object} recipeJSON Recipe JSON (as produced by `Recipe#toJSON`).
- * @param {string} fromMode The current system resolution mode.
- * @param {string} toMode The target system resolution mode.
- * @param {object} [_system] The target system. Retained for call-site parity with
- *   `classifyModeChange`; the per-recipe pass no longer seeds a provider (alchemy's
- *   routing basis moved to the system-level `alchemy.checkMode`), so it is unused.
- * @returns {ModeChangeResult}
+ * Migrate one recipe for a mode change, mutating `recipeJSON` in place when a transform applies.
+ * For a no-mutation dry run use {@link classifyModeChange}.
  */
 export function migrateRecipeForModeChange(recipeJSON, fromMode, toMode, _system = {}) {
   if (!_isPlainObject(recipeJSON)) {
@@ -108,9 +31,7 @@ export function migrateRecipeForModeChange(recipeJSON, fromMode, toMode, _system
     return { outcome: 'lossless', recipe: recipeJSON, reasons: ['mode unchanged'] };
   }
 
-  // Structural deletion: a multi-step recipe cannot move into alchemy (alchemy
-  // does not support multi-step recipes). This is a per-recipe structural
-  // constraint, not a system-level gap.
+  // Structural deletion: alchemy does not support multi-step recipes.
   if (toMode === 'alchemy' && _stepCount(recipeJSON) > 1) {
     return {
       outcome: 'delete',
@@ -119,9 +40,8 @@ export function migrateRecipeForModeChange(recipeJSON, fromMode, toMode, _system
     };
   }
 
-  // Structural deletion: narrowing into a single-group mode (simple/progressive)
-  // requires exactly one ingredient set AND one result group ("1×1"). A recipe
-  // carrying more than one of either cannot be reshaped by seed/clear alone.
+  // Structural deletion: narrowing into a single-group mode requires exactly one ingredient set AND
+  // one result group, which seed or clear alone cannot reshape.
   if (SINGLE_GROUP_MODES.has(toMode) && !_isOneByOne(recipeJSON)) {
     return {
       outcome: 'delete',
@@ -132,12 +52,9 @@ export function migrateRecipeForModeChange(recipeJSON, fromMode, toMode, _system
     };
   }
 
-  // Alchemy no longer routes via a per-recipe `resultSelection.provider` (retired for
-  // the system-level `alchemy.checkMode`) and requires EXACTLY ONE ingredient set.
-  // Migrating INTO alchemy therefore clears any stale `resultSelection` and collapses
-  // a multi-INGREDIENT-SET recipe to its first set (multi-STEP was already deleted
-  // above). The system-level `checkMode` is seeded separately (defaults to `none`
-  // when the system switches to alchemy); this per-recipe pass never seeds a provider.
+  // Migrating INTO alchemy clears any stale `resultSelection` and collapses a multi-INGREDIENT-SET
+  // recipe to its first set; multi-STEP was already deleted above. The system-level `checkMode` is
+  // seeded separately, and this per-recipe pass never seeds a provider (issue 554).
   if (toMode === 'alchemy') {
     const reasons = [];
     let changed = false;
@@ -158,11 +75,9 @@ export function migrateRecipeForModeChange(recipeJSON, fromMode, toMode, _system
     };
   }
 
-  // A routed crafting target derives its basis from the system mode and never
-  // carries a `resultSelection`. RI↔RC is carried verbatim; every other source has
-  // its `resultSelection` dropped. Stale routing data (group names for check
-  // routing, ingredient-set `resultGroupId` for ingredient routing) is surfaced as
-  // a re-authoring validation issue via `reconcile`, never silently mis-routed.
+  // A routed target derives its basis from the system mode and never carries a `resultSelection`.
+  // RI↔RC is carried verbatim; every other source has its selection dropped. Stale routing data is
+  // surfaced as a re-authoring validation issue via `reconcile`, never silently mis-routed.
   if (ROUTED_MODES.has(toMode)) {
     const reconcile =
       toMode === 'routedByCheck' ||
@@ -194,8 +109,7 @@ export function migrateRecipeForModeChange(recipeJSON, fromMode, toMode, _system
     };
   }
 
-  // Target mode does not route via a recipe-level provider (simple/progressive):
-  // clear any selection so the recipe conforms to the new mode.
+  // The target routes via no recipe-level provider: clear any selection so the recipe conforms.
   if (recipeJSON.resultSelection != null) {
     recipeJSON.resultSelection = null;
     return {
@@ -214,11 +128,8 @@ function _stepCount(recipe) {
 }
 
 /**
- * Whether the recipe is "1×1": exactly one ingredient set and exactly one result
- * group across every scope. A multi-step recipe is never 1×1 (each step is its own
- * scope and single-group modes do not support steps).
- * @param {object} recipe
- * @returns {boolean}
+ * Whether the recipe is "1×1" — exactly one ingredient set and one result group across every scope.
+ * A multi-step recipe is never 1×1: each step is its own scope and single-group modes have no steps.
  */
 function _isOneByOne(recipe) {
   if (_stepCount(recipe) > 0) return false;

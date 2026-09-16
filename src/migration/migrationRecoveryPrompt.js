@@ -1,40 +1,14 @@
 /**
- * Pure builder for the GM migration-abort recovery prompt.
- *
- * When a startup migration pass aborts (a `FatalMigrationError`), the runner has
- * already rolled the in-memory payload back, persisted nothing, and left
- * `migrationVersion` unchanged. This module turns the abort context
- * (`{ downgradeTo, documents, label }`) into a plain, Foundry-free configuration
- * object describing the GM decision prompt: a window title, content that mirrors
- * the console recovery guidance, and two buttons.
- *
- * The function is intentionally PURE — it never imports or calls Foundry's
- * `DialogV2`. The thin Foundry edge (`src/main.js` `_runMigrations`) feeds this
- * config to `foundry.applications.api.DialogV2`. Keeping the builder pure lets a
- * unit test assert the default choice (spec § "GM prompt defaults") and the
- * surfaced remediation without a Foundry runtime.
- *
- * Retry mechanism (spec § "Migration Abort Recovery Guidance" steps 5-7):
- * retry is EXPLICIT and user-initiated, never automatic within the aborted pass.
- * Because the runner leaves `migrationVersion` unchanged on abort, migrations
- * re-run on the next world reload. The fix/retry choice is therefore purely
- * INFORMATIONAL: it tells the GM to fix or delete the failed documents and then
- * reload Foundry, at which point the pending migrations run again automatically.
- * There is no same-pass auto-retry.
- *
- * See `openspec/specs/destructive-changes-and-migrations/spec.md`
- * (§ "Startup Migration Flow" step 10, § "Migration Abort Recovery Guidance").
+ * PURE builder for the GM migration-abort recovery prompt: the abort context to a Foundry-free
+ * config the `src/main.js` edge feeds to `DialogV2`. Keeping it pure is what lets a unit test assert
+ * the default choice and the surfaced remediation. Spec § Startup Migration Flow step 10 and
+ * § Migration Abort Recovery Guidance own the content and the explicit, user-initiated retry.
  */
 
 /**
- * The recommended downgrade action after an aborted migration pass.
- *
- * A complete sentence in each register rather than a template with a value interpolated into
- * it, so the console guidance and the GM dialog cannot drift apart and neither can leak an
- * internal token into a GM-facing string.
- *
- * @type {{promptKey: string, promptFallback: (version: string) => string,
- *   consoleSentence: (version: string) => string}}
+ * The recommended downgrade action. A complete sentence in each register rather than a template
+ * with a value interpolated in, so the console guidance and the GM dialog cannot drift apart and
+ * neither can leak an internal token into a GM-facing string.
  */
 export const DOWNGRADE_ADVICE = Object.freeze({
   promptKey: 'FABRICATE.Migration.Recovery.Downgrade',
@@ -44,41 +18,15 @@ export const DOWNGRADE_ADVICE = Object.freeze({
     `downgrade Fabricate to version ${version} to continue using your existing data without manual remediation.`,
 });
 
-/**
- * Stable action keys for the two prompt buttons. `KEEP` is the default choice.
- * @type {{ KEEP: string, FIX_AND_RETRY: string }}
- */
+/** Stable action keys for the two prompt buttons. `KEEP` is the default choice. */
 export const MIGRATION_RECOVERY_ACTIONS = Object.freeze({
   KEEP: 'keep',
   FIX_AND_RETRY: 'fixAndRetry',
 });
 
 /**
- * @typedef {object} MigrationRecoveryButton
- * @property {string} action stable action key (one of MIGRATION_RECOVERY_ACTIONS)
- * @property {string} label localized button label
- * @property {boolean} default true for the pre-selected button
- */
-
-/**
- * @typedef {object} MigrationRecoveryPromptConfig
- * @property {string} title localized window title
- * @property {string} content HTML content mirroring the console guidance
- * @property {string} default action key of the pre-selected button (always KEEP)
- * @property {MigrationRecoveryButton[]} buttons ordered button descriptors
- */
-
-/**
- * Build the GM migration-abort recovery prompt configuration.
- *
- * @param {object} context abort context passed to the `promptRecovery` seam
- * @param {string|null} [context.downgradeTo] recommended downgrade target version
- * @param {Array<object>} [context.documents] per-document remediation details
- * @param {string} [context.label] label of the aborted migration
- * @param {(key: string, data?: object) => string} [localize] i18n seam; receives
- *   a key and optional interpolation data and returns the localized string. When
- *   absent, English fallbacks are used so the helper is usable without Foundry.
- * @returns {MigrationRecoveryPromptConfig} a plain, Foundry-free config object.
+ * Build the recovery prompt configuration. `localize` is an i18n seam; without it the English
+ * fallbacks are used, so the helper is usable off a Foundry runtime.
  */
 export function buildMigrationRecoveryPrompt(
   { downgradeTo = null, documents = [], label = '' } = {},
@@ -93,8 +41,7 @@ export function buildMigrationRecoveryPrompt(
 
   const content = buildContent({ t, label: String(label ?? ''), downgradeTarget, failures });
 
-  // `Keep existing data` is always the default / pre-selected button and is
-  // ordered first (spec § "GM prompt defaults"). The fix/retry button is
+  // `Keep existing data` is always the default and is ordered first. The fix/retry button is
   // informational: it does NOT trigger a same-pass retry.
   const buttons = [
     {
@@ -121,22 +68,12 @@ export function buildMigrationRecoveryPrompt(
   };
 }
 
-/**
- * Build the HTML content mirroring the console recovery guidance.
- *
- * @param {object} args
- * @param {(key: string, data?: object, fallback?: string) => string} args.t
- * @param {string} args.label
- * @param {string} args.downgradeTarget
- * @param {Array<object>} args.failures
- * @returns {string}
- */
+/** Build the HTML content mirroring the console recovery guidance. */
 function buildContent({ t, label, downgradeTarget, failures }) {
-  // Scoped to THIS PASS, deliberately. "A failed migration leaves your data unchanged" is not
-  // true in general: a NON-FATAL migration error is logged and the pass continues, so the next
-  // migration's success advances the version past the failed one and the pass writes. What is
-  // true here is narrower and still worth saying — the aborted pass returns before the first
-  // write, so nothing was persisted.
+  // Scoped to THIS PASS, deliberately. "A failed migration leaves your data unchanged" is not true
+  // in general: a NON-FATAL error is logged and the pass continues, so the next migration's success
+  // advances the version and writes. What is true here is narrower — the aborted pass returns
+  // before the first write.
   const intro = `<p>${escapeHtml(
     t(
       'FABRICATE.Migration.Recovery.Intro',
@@ -172,8 +109,7 @@ function buildContent({ t, label, downgradeTarget, failures }) {
     documentsBlock = `${header}<ul class="fabricate-migration-recovery-documents">${items}</ul>`;
   }
 
-  // Retry guidance: reloading Foundry re-runs the pending migrations because the
-  // version was not advanced. There is no same-pass auto-retry (spec step 7).
+  // Reloading Foundry re-runs the pending migrations because the version was not advanced.
   const retryHint = `<p>${escapeHtml(
     t(
       'FABRICATE.Migration.Recovery.RetryHint',
@@ -185,13 +121,7 @@ function buildContent({ t, label, downgradeTarget, failures }) {
   return [intro, abortedDuring, downgrade, documentsBlock, retryHint].join('');
 }
 
-/**
- * Build a single per-document remediation list item.
- *
- * @param {(key: string, data?: object, fallback?: string) => string} t
- * @param {object} doc
- * @returns {string}
- */
+/** Build a single per-document remediation list item. */
 function buildDocumentLine(t, doc) {
   const type = doc?.type ?? 'unknown';
   const identity = doc?.id ?? doc?.name ?? 'unknown';
@@ -220,13 +150,8 @@ function buildDocumentLine(t, doc) {
 }
 
 /**
- * Wrap an optional Foundry-style localizer into a `(key, data, fallback)` helper.
- * Foundry's `game.i18n.format(key, data)` and `game.i18n.localize(key)` are
- * collapsed into one call shape; when no localizer is supplied (e.g. unit tests),
- * the English fallback string is returned.
- *
- * @param {((key: string, data?: object) => string) | undefined} localize
- * @returns {(key: string, data?: object, fallback?: string) => string}
+ * Wrap an optional Foundry-style localizer into a `(key, data, fallback)` helper, collapsing
+ * `format` and `localize` into one call shape. Without one, the English fallback is returned.
  */
 function makeLocalizer(localize) {
   if (typeof localize !== 'function') {
@@ -242,10 +167,6 @@ function makeLocalizer(localize) {
   };
 }
 
-/**
- * @param {unknown} value
- * @returns {string}
- */
 function escapeHtml(value) {
   return String(value ?? '')
     .replaceAll('&', '&amp;')

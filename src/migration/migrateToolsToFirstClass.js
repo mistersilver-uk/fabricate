@@ -1,32 +1,9 @@
 /**
- * 1.15.0 — Convert legacy componentId-referencing library Tools into first-class tools
- * carrying their OWN source references + display snapshot (issue 561; pure, idempotent,
- * version-gated).
- *
- * Before #561 a `system.tools[]` entry only held a `componentId` pointing at a managed
- * component, and every tool matcher resolved that component before matching an owned item.
- * #561 makes a Tool a first-class registered kind with its own `registeredItemUuid` /
- * `originItemUuid` / `aliasItemUuids` + a `name`/`img` display snapshot (renamed from
- * `sourceUuid` / `sourceItemUuid` / `fallbackItemIds` in issue 560). This migration COPIES
- * those fields from the referenced component onto each tool so a world that matched a tool
- * yesterday matches it today.
- *
- * `MigrationRunner` reads/writes the `craftingSystems` payload as pure DATA — it has no Item
- * handle, so it CANNOT stamp the durable `roles[systemId].toolId` flag. That is the separate
- * `ready`-body `autoStampToolSources` one-shot, which reads the source refs THIS migration
- * populates (ordering is structural: the migration persists at init, the restamp runs later
- * in the `ready` body).
- *
- * `componentId` is PRESERVED (issue 561, D1): a whetstone / migrated tool keeps it for
- * `onBreak.replaceWith` resolution and the UI's linked-component display, but it is no longer
- * the matching basis. `label` (a user-authored override) is NEVER written.
- *
- * Idempotent: a tool already carrying source refs, or one whose `componentId` no longer
- * resolves, is left as-is (the latter degrades to presence-by-name / componentId display,
- * exactly as a dangling component ref does today). Never throws.
- *
- * @param {Array<object>} systems - raw craftingSystems setting
- * @returns {{ systems: Array<object> }}
+ * `1.15.0` — convert legacy componentId-referencing library Tools into first-class tools carrying
+ * their OWN source references and display snapshot (issue 561; spec § Tools First-Class Migration).
+ * The runner has no Item handle, so it CANNOT stamp `roles[systemId].toolId` — that is the separate
+ * `ready`-body `autoStampToolSources` one-shot, which reads the refs this populates. `componentId`
+ * is PRESERVED but is no longer the matching basis; `label`, a user override, is NEVER written.
  */
 export function migrateToolsToFirstClass(systems) {
   const safeSystems = Array.isArray(systems) ? systems : [];
@@ -42,25 +19,14 @@ export function migrateToolsToFirstClass(systems) {
 }
 
 /**
- * Copy a referenced component's source references + `name`/`img` snapshot onto a legacy
- * componentId-tool IN PLACE, when the tool has a `componentId` but no own source refs and the
- * component still resolves. Shared by the settings-data migration and the export-payload
- * import upcast so both derive identical first-class fields. Idempotent and mutation-safe:
- * a tool already carrying source refs, or one whose `componentId` misses the component set,
- * is left untouched. Never writes `label` (a user-authored override, issue 561 R2-2).
- *
- * @param {object} tool - a single `system.tools[]` entry (mutated in place)
- * @param {Array<object>} components - the system's component set
- * @returns {boolean} true when the tool was upcast (fields written)
+ * Copy a component's source refs and display snapshot onto a legacy tool IN PLACE. Shared by the
+ * settings migration and the export upcast, so both derive identical fields. Never writes `label`.
  */
 export function deriveToolSourceFromComponents(tool, components) {
   if (!tool || typeof tool !== 'object') return false;
-  // Already first-class (carries its own source refs): nothing to derive. New-name-first,
-  // legacy-name-tolerant (issue 560): this guard MUST recognize the renamed
-  // `registeredItemUuid`/`originItemUuid` as well as the pre-#560 `sourceUuid`/`sourceItemUuid`.
-  // If it only checked the old names, a NEW-named (post-#560) tool round-tripping through
-  // `migrateExportPayload` would fail the guard, re-derive from its linked component, and
-  // OVERWRITE its authored refs — silent corruption whenever a tool's own refs differ.
+  // Already first-class. The guard MUST recognise the renamed spellings as well as the pre-#560
+  // ones, or a NEW-named tool round-tripping through `migrateExportPayload` would re-derive from its
+  // linked component and OVERWRITE its authored refs, silently (issue 560).
   if (tool.registeredItemUuid || tool.originItemUuid || tool.sourceUuid || tool.sourceItemUuid)
     return false;
   const componentId = typeof tool.componentId === 'string' ? tool.componentId.trim() : '';

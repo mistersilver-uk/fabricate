@@ -1,45 +1,9 @@
 /**
- * 1.3.0 — Remove the `dnd5e | pf2e | macro` provider model from the four
- * formula-only gathering surfaces (pure, idempotent, version-gated).
- *
- * Before this change, visibility gates, gathering checks, tool requirements, and
- * character modifiers each carried a `provider` discriminator (and, for the
- * `macro` provider, a `macroUuid`). Macro support is dropped from these surfaces
- * outright; the surfaces become formula-only. Result-selection providers
- * (`ingredientSet | macroOutcome | rollTableOutcome`) are real and untouched.
- * Currency provider compatibility is handled by currency-profile normalization,
- * not by this migration.
- *
- * Transforms (across the runner's `systems`, `gatheringConfig`, `environments`):
- *
- *  1. craftingSystems tool requirements — strip `provider`/`macroUuid`, keep
- *     `formula`. A macro-only requirement with no formula becomes `null` (the
- *     unusable gate is removed; the tool becomes usable).
- *  2. gatheringConfig character modifiers — delete every `provider === 'macro'`
- *     library entry, scrub references to the deleted ids across
- *     `tasks[].dropRows[].characterModifiers[]`, `tasks[].staminaCostModifiers[]`,
- *     and `events[].characterModifiers[]`, and strip `providerOverride`/
- *     `macroUuidOverride` from every surviving reference. Surviving library
- *     entries keep `{ id, label, icon, expression }`.
- *  3. gatheringEnvironments tasks — strip `provider`/`macroUuid` from
- *     `task.visibility` and `task.check`, keep `formula`/`threshold`. A macro
- *     visibility gate with no formula becomes `null` (fail open). A macro check
- *     with no formula is left as `{ formula: '' }` so the existing
- *     misconfigured-check diagnostic flags it.
- *
- * Stamina's legacy `provider` enum is handled by read-time normalization in the
- * rich-state service, not by this runner step.
- *
- * Idempotent: once `provider`/`macroUuid` and macro entries are gone, a re-run
- * finds nothing to transform and is a no-op.
- *
- * Pure: returns `{ systems, gatheringConfig, environments }` and performs no I/O.
- *
- * @param {object} data Runner payload.
- * @param {Array<object>} [data.systems] Raw craftingSystems setting.
- * @param {object} [data.gatheringConfig] Raw gatheringConfig setting.
- * @param {Array<object>} [data.environments] Raw gatheringEnvironments setting.
- * @returns {{ systems: Array<object>, gatheringConfig: object, environments: Array<object> }}
+ * `1.3.0` — remove the `dnd5e | pf2e | macro` provider model from the four formula-only gathering
+ * surfaces, which become formula-only outright. Pure, idempotent, version-gated.
+ * A macro-only TOOL REQUIREMENT with no formula becomes `null`, so the tool becomes usable; a macro
+ * VISIBILITY gate with no formula becomes `null` and fails open; every macro character-modifier
+ * entry is deleted with its references scrubbed. Result selection and currency are untouched.
  */
 export function migrateRemoveSystemProvider(data = {}) {
   const systems = _clone(data.systems);
@@ -169,9 +133,8 @@ function _stripVisibility(visibility) {
 function _stripCheck(check) {
   if (!_isPlainObject(check)) return check;
   const formula = typeof check.formula === 'string' ? check.formula : '';
-  // A macro check with no formula is left as `{ formula: '' }` so the existing
-  // misconfigured-check diagnostic flags it (silently dropping a resolution gate
-  // is worse than surfacing it).
+  // A macro check with no formula is left as `{ formula: '' }` so the existing misconfigured-check
+  // diagnostic flags it: silently dropping a resolution gate is worse than surfacing it.
   const next = { formula };
   if ('threshold' in check) next.threshold = check.threshold;
   return next;
