@@ -64,6 +64,7 @@ export const SETTING_KEYS = Object.freeze({
   MANAGER_RAIL_COLLAPSED: 'managerRailCollapsed',
   GATHERING_HIDE_UNAVAILABLE: 'gatheringHideUnavailableEnvironments',
   PROGRESSIVE_RESULT_ORDER: 'progressiveResultOrder',
+  JOURNAL_RUN_DISMISSALS: 'journalRunDismissals',
   MIGRATION_VERSION: 'migrationVersion',
   FAVOURITE_RECIPES: 'favouriteRecipes',
   LAST_ALCHEMY_SYSTEM: 'lastAlchemySystem',
@@ -301,6 +302,15 @@ const BASE_DEFINITIONS = Object.freeze({
     // `user` scope (issue 651), NOT `client`: a player's chosen stage order is a standing
     // preference that must reach them on any device they open this world from, rather than sit in
     // one browser's localStorage.
+    scope: 'user',
+    config: false,
+    type: Object,
+    default: {},
+  },
+  [SETTING_KEYS.JOURNAL_RUN_DISMISSALS]: {
+    name: 'Journal Run Dismissals',
+    // Terminal-run hiding follows this user across their clients in this world. The actor
+    // history remains untouched; this setting contains only bounded composite identity keys.
     scope: 'user',
     config: false,
     type: Object,

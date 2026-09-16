@@ -1,13 +1,13 @@
 <!-- Svelte 5 runes mode -->
 <!--
   RunCard renders one active run in the left column. It mirrors the gathering
-  EnvironmentCard idiom (64px thumb, ellipsised name) but adds a status pill, a
+  record-card idiom (30px icon, ellipsised name) with a status pill, a
   world-time countdown, and a progress bar.
 
   Countdown + progress are world-time driven (no wall-clock interval): `now` is
   the store's reactive world time, recomputed on the `updateWorldTime` tick, so
   `formatDurationHMS(availableAt - now)` and the progress fraction update when
-  game time advances. Selection is an accent border + success-soft background
+  game time advances. Selection is an accent border on the record's normal surface
   (NOT a box-shadow, which the .fabricate-app focus rule would clear on click) and
   aria-pressed. The card is a role=button with Enter/Space keyboard activation.
 -->
@@ -15,9 +15,9 @@
   import { localize } from '../../util/foundryBridge.js';
   import { statusChipTone } from '../../util/statusChipTone.js';
   import Chip from '../../components/Chip.svelte';
-  import FillBar from '../../components/FillBar.svelte';
+  import RunProgress from '../../components/RunProgress.svelte';
   import Medallion from '../../components/Medallion.svelte';
-  import { runStatusPresentation } from './journalRunStatus.js';
+  import { runAttentionPresentation, runStatusPresentation } from './journalRunStatus.js';
   import { formatDurationHMS } from '../../util/formatDuration.js';
 
   const DEFAULT_RUN_IMAGE = 'icons/svg/item-bag.svg';
@@ -30,6 +30,9 @@
   const img = $derived(String(run?.img ?? '') || DEFAULT_RUN_IMAGE);
   const status = $derived(String(run?.derivedStatus ?? 'inProgress'));
   const runStatus = $derived(runStatusPresentation(status));
+  // What the run needs from the PLAYER, which its status cannot say: an unstarted stage reads
+  // `inProgress` whether it is ready to begin or waiting on a choice nobody has made (M10).
+  const attention = $derived(runAttentionPresentation(run));
   const stepLabel = $derived(String(run?.stepLabel ?? ''));
   // On the final step the run finishes rather than continuing, so the matured
   // countdown mirrors the detail button's "finish" wording.
@@ -40,23 +43,62 @@
   const blindSecretPreview = $derived(run?.blindSecretPreview === true);
 
   const availableAt = $derived(Number(run?.timeGate?.availableAt));
-  const initiatedAt = $derived(Number(run?.timeGate?.initiatedAt));
   const requiredSeconds = $derived(Number(run?.timeGate?.requiredSeconds));
-  const hasGate = $derived(Number.isFinite(availableAt));
-  const isReady = $derived(hasGate && availableAt <= now);
-  const remaining = $derived(hasGate ? formatDurationHMS(availableAt - now) : '');
+  const hasGate = $derived(run?.timeGate?.availableAt != null && Number.isFinite(availableAt));
+  const paused = $derived(Boolean(run?.pauseState));
+  const remainingSeconds = $derived(
+    paused ? Math.max(0, Number(run.pauseState.remainingSeconds) || 0) : availableAt - now
+  );
+  const isReady = $derived(!paused && hasGate && availableAt <= now);
+  const remaining = $derived(hasGate ? formatDurationHMS(remainingSeconds) : '');
 
-  // Progress fraction across the current step's time gate, clamped 0..1. Only
-  // meaningful when the gate carries a positive required-seconds budget.
+  // Progress fraction across the current step's time gate, clamped 0..1. Only meaningful when
+  // the gate carries a positive required-seconds budget. It is derived from the SAME
+  // `remainingSeconds` the countdown beside it prints, so the two cannot disagree: a resume
+  // re-anchors `availableAt` past the paused span, while `initiatedAt` never moves, so reading
+  // elapsed wall time pegged the bar full on a run still counting down (issue 1648).
   const progress = $derived.by(() => {
-    if (!hasGate || !Number.isFinite(initiatedAt) || !(requiredSeconds > 0)) return null;
-    const elapsed = now - initiatedAt;
-    return Math.max(0, Math.min(1, elapsed / requiredSeconds));
+    if (!hasGate || !(requiredSeconds > 0)) return null;
+    return Math.max(0, Math.min(1, (requiredSeconds - remainingSeconds) / requiredSeconds));
   });
   const progressPercent = $derived(progress === null ? 0 : Math.round(progress * 100));
+  // THE RAIL SURVIVES A STAGE THAT HAS NOT BEGUN (issue 1648, M18). A multi-step run between
+  // its stages has no `timeGate`, and suppressing the whole timing block on that predicate took
+  // the bar away with the countdown — so the one thing on the card that says how far through
+  // the run is disappeared exactly when the badge stopped distinguishing it from a run counting
+  // down (D-029). The rail reads COMPLETED STAGES OVER TOTAL, which is the reading it already
+  // gives: `RunProgress` fills every track before `current`, and the current stage's own track
+  // is the fraction of its clock, which for an unbegun stage is honestly zero.
+  //
+  // Scoped to runs that have a stage SEQUENCE. Gathering and salvage project `steps: []`, and a
+  // single-stage craft is the same lone empty track asserting 0% where progress has no meaning —
+  // M18 asked for the multi-step rail only (issue 1648, UX2-6).
+  const stages = $derived(Array.isArray(run?.steps) ? run.steps : []);
+  const showsStageRail = $derived(!hasGate && stages.length > 1);
+  // WHAT THE TRACKS DRAW, in one number. With no gate `progress` is null, so the progressbar
+  // published 0 beside three filled tracks and told a screen-reader user "Progress, 0" (issue
+  // 1648, UX2-5). The stage rail reports COMPLETED STAGES OVER TOTAL — the reading `RunProgress`
+  // renders — and a gated run keeps its clock fraction.
+  const currentStageIndex = $derived(Math.max(0, Number(run?.stepIndex) || 0));
+  const filledStages = $derived(
+    stages.filter(
+      (stage, index) =>
+        index < currentStageIndex || ['done', 'succeeded'].includes(stage?.status ?? '')
+    ).length
+  );
+  const accessiblePercent = $derived(
+    showsStageRail && stages.length > 0
+      ? Math.round((filledStages / stages.length) * 100)
+      : progressPercent
+  );
+
+  // A countdown needs a deadline. An unbegun stage has none, and `Left: None` is the string a
+  // MATURED wait prints, so the row shows its rail and says nothing about time (U3's defect on
+  // the Active surface). What it is waiting for is the attention chip's job.
+  const showsTiming = $derived(hasGate || showsStageRail);
 
   function activate() {
-    if (id) onSelect?.(id);
+    if (id) onSelect?.(run);
   }
   function onKey(event) {
     if (event.key === 'Enter' || event.key === ' ' || event.key === 'Spacebar') {
@@ -80,13 +122,10 @@
   onkeydown={onKey}
 >
   <div class="journal-run-card-main">
-    <Medallion art={img} alt="" size={64} />
+    <Medallion art={img} alt="" size={30} />
     <div class="journal-run-card-copy">
-      <span class="journal-run-card-name" {title}>{title}</span>
-      {#if subtitle !== ''}
-        <span class="journal-run-card-subtitle">{subtitle}</span>
-      {/if}
-      <div class="journal-run-card-meta">
+      <div class="journal-run-card-heading">
+        <span class="journal-run-card-name" {title}>{title}</span>
         <Chip
           class="journal-run-status"
           density="list"
@@ -94,6 +133,15 @@
           icon={`fas ${runStatus.icon}`}
           data-run-status={status}>{localize(runStatus.labelKey)}</Chip
         >
+        {#if attention}
+          <Chip
+            class="journal-run-attention"
+            density="list"
+            tone={statusChipTone(attention.tone)}
+            icon={`fas ${attention.icon}`}
+            data-run-attention={attention.kind}>{localize(attention.labelKey)}</Chip
+          >
+        {/if}
         {#if blindSecretPreview}
           <span
             class="journal-run-card-secret"
@@ -104,55 +152,64 @@
             {localize('FABRICATE.App.Journal.BlindSecret.Badge')}
           </span>
         {/if}
-        {#if stepLabel !== ''}
-          <span class="journal-run-card-step">{stepLabel}</span>
-        {/if}
       </div>
-    </div>
-  </div>
-
-  {#if hasGate}
-    <div class="journal-run-card-countdown" data-run-countdown>
-      <i class="fas fa-clock" aria-hidden="true"></i>
-      {#if isReady}
-        <span
-          >{localize(
-            isFinalStep
-              ? 'FABRICATE.App.Journal.Countdown.ReadyToFinish'
-              : 'FABRICATE.App.Journal.Countdown.ReadyToContinue'
-          )}</span
-        >
-      {:else}
-        <span>{localize('FABRICATE.App.Journal.Countdown.Remaining', { time: remaining })}</span>
+      {#if subtitle !== '' || stepLabel !== ''}
+        <div class="journal-run-card-context">
+          {#if subtitle !== ''}<span class="journal-run-card-subtitle">{subtitle}</span>{/if}
+          {#if stepLabel !== ''}<span class="journal-run-card-step">{stepLabel}</span>{/if}
+        </div>
       {/if}
     </div>
-    {#if progress !== null}
-      <div
-        class="journal-run-card-progress"
-        role="progressbar"
-        aria-label={localize('FABRICATE.App.Journal.Progress.Label')}
-        aria-valuemin="0"
-        aria-valuemax="100"
-        aria-valuenow={progressPercent}
-        data-run-progress={progressPercent}
-      >
-        <FillBar value={progressPercent} tone="accent" size="sm" />
-      </div>
-    {/if}
+  </div>
+  {#if showsTiming}
+    <div class="journal-run-card-timing">
+      {#if progress !== null || showsStageRail}
+        <div
+          class="journal-run-card-progress"
+          role="progressbar"
+          aria-label={localize('FABRICATE.App.Journal.Progress.Label')}
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-valuenow={accessiblePercent}
+          data-run-progress={accessiblePercent}
+        >
+          <RunProgress
+            stages={stages.length > 0 ? stages : [{}]}
+            current={currentStageIndex}
+            progress={progressPercent}
+          />
+        </div>
+      {/if}
+      {#if hasGate}
+        <div class="journal-run-card-countdown" data-run-countdown>
+          <i class="fas fa-clock" aria-hidden="true"></i>
+          {#if isReady}
+            <span
+              >{localize(
+                isFinalStep
+                  ? 'FABRICATE.App.Journal.Countdown.ReadyToFinish'
+                  : 'FABRICATE.App.Journal.Countdown.ReadyToContinue'
+              )}</span
+            >
+          {:else}
+            <span>{localize('FABRICATE.App.Journal.Countdown.Remaining', { time: remaining })}</span
+            >
+          {/if}
+        </div>
+      {/if}
+    </div>
   {/if}
 </div>
 
 <style>
   .journal-run-card {
     box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
+    display: block;
     width: 100%;
-    padding: 10px;
+    padding: var(--fab-space-1) var(--fab-space-2);
     border: 1px solid var(--fab-border);
-    border-radius: 8px;
-    background: var(--fab-surface-soft);
+    border-radius: 9px;
+    background: var(--fab-bg-2);
     color: var(--fab-text);
     text-align: left;
     cursor: pointer;
@@ -162,17 +219,16 @@
     background: var(--fab-surface-raised);
   }
 
-  /* Selection is an accent border outline + success-soft fill (not a box-shadow,
+  /* Selection is an accent border outline (not a box-shadow,
      which the global .fabricate-app focus rule clears on mouse-click focus). */
   .journal-run-card.is-selected {
-    border-color: var(--fab-accent);
-    background: var(--fab-success-soft);
+    border-color: var(--fab-accent-border);
   }
 
   .journal-run-card-main {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--fab-space-2);
     min-width: 0;
   }
 
@@ -181,10 +237,21 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: var(--fab-space-chip);
+  }
+
+  .journal-run-card-heading,
+  .journal-run-card-context,
+  .journal-run-card-timing {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    gap: var(--fab-space-2);
   }
 
   .journal-run-card-name {
+    flex: 1 1 auto;
+    font-size: 12px;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -192,29 +259,32 @@
     font-weight: 600;
   }
 
-  .journal-run-card-subtitle {
-    font-size: 12px;
+  .journal-run-card-subtitle,
+  .journal-run-card-step {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 10.5px;
     color: var(--fab-text-muted);
   }
 
-  .journal-run-card-meta {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 6px;
+  .journal-run-card-context > :last-child:not(:first-child)::before {
+    content: '·';
+    margin-right: var(--fab-space-2);
   }
 
   /* THE ROW'S STATUS CHIP holds its width (issue 1506). The retired journal status pill declared
      `flex: 0 0 auto` on itself; the shared chip declares no flex at all, because POSITION is the
      caller's and geometry is the primitive's — the rule its own `density` note states. So the one
      property that was doing work here is restated here, where the row that squeezes it lives. */
-  .journal-run-card-meta :global(.journal-run-status) {
+  .journal-run-card-heading :global(.journal-run-status),
+  .journal-run-card-heading :global(.journal-run-attention) {
     flex: 0 0 auto;
   }
 
   .journal-run-card-step {
-    font-size: 11px;
-    color: var(--fab-text-muted);
+    font-size: 10.5px;
   }
 
   /* GM secret preview marker. Deliberately styled as a warning-toned chip rather
@@ -236,9 +306,11 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    font-size: 12px;
-    font-weight: 600;
+    font-family: var(--fab-font-mono);
+    font-size: 10px;
+    font-weight: 500;
     color: var(--fab-text);
+    white-space: nowrap;
   }
 
   .journal-run-card-countdown i {
@@ -253,6 +325,10 @@
      ground and the fill are all the primitive's now. Only the full width stays, because a
      `FillBar` is `flex: 1 1 auto` and this wrapper is a plain block. */
   .journal-run-card-progress {
-    width: 100%;
+    min-width: 56px;
+    flex: 1 1 auto;
+  }
+  .journal-run-card-timing {
+    margin-top: var(--fab-space-1);
   }
 </style>

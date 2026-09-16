@@ -52,6 +52,7 @@
     activeTab = 'crafting',
     onActorChange = null,
     activeCanvasTool = null,
+    sharedSurface = false,
   } = $props();
 
   const FALLBACK_PORTRAIT_ICON = 'fas fa-user';
@@ -198,7 +199,12 @@
   }
 </script>
 
-<div class="fabricate-app-actor-bar" data-actor-bar-state={barState}>
+<div
+  class="fabricate-app-actor-bar"
+  class:has-shared-surface={sharedSurface}
+  style:background={sharedSurface ? 'transparent' : undefined}
+  data-actor-bar-state={barState}
+>
   <!-- No wrapper element around the picker. The `.actor-bar-left` div this replaces existed
        to be the dismiss region, the `position: relative` anchor for the in-place panel, and
        the bar's left flex item. The primitive owns the first two now, and it is the flex item

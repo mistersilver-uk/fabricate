@@ -14,6 +14,10 @@ import { notifyWarn, localize, confirmDialog } from './svelte/util/foundryBridge
 // import beyond what it itself guards), reused rather than re-authored so the
 // bulk salvage/destroy progress toast cannot drift from the compendium import's.
 import { createDefaultProgressReporter } from '../systems/CompendiumImporter.js';
+import {
+  authorityUnavailableAvailability,
+  authorityUnavailableRefusal,
+} from '../systems/journalRunCommands.js';
 import { playerExtensions } from './playerExtensions.js';
 import {
   buildRouteKey,
@@ -121,6 +125,9 @@ function normalizeInteractableRef(ref) {
  * Alchemy tab). Each tab renders its implemented consumer surface; this class owns
  * the active tab and wires the crafting, inventory, salvage, alchemy, and gathering
  * service seams the tab views call.
+ * Journal services route versioned actions through active-GM commands and confirm the
+ * single-GM-session prerequisite before explicit authority setup.
+ * The shared Journal store supplies both the tab and the navigation badge.
  *
  * The Alchemy tab is conditional: it appears only when an enabled alchemy
  * crafting system has at least one recipe (see {@link isAlchemyTabAvailable}),
@@ -378,6 +385,9 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       // Localized generic craft-failure message for a thrown craft (the engine can
       // throw on the currency-payment macro path, producing no result message).
       craftErrorMessage: () => localize('FABRICATE.App.Crafting.Notify.CraftFailed'),
+      // The stores stay Foundry-free, so the i18n lookup an authority refusal needs
+      // (`{success:false, reason}` carries no `message`) arrives as a seam too.
+      localize: (key, data) => localize(key, data),
       listSelectableActors: () => game?.fabricate?.listSelectableActors?.() ?? [],
       getSelectedActorId: () => game?.fabricate?.getSelectedGatheringActorId?.() ?? '',
       setSelectedActorId: (id) => game?.fabricate?.setSelectedGatheringActorId?.(id),
@@ -394,6 +404,19 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       // Player-facing Journal seams. The store/components never touch Foundry
       // globals; these wrappers are the single Foundry-facing edge.
       listJournalForActor: (opts = {}) => game?.fabricate?.listJournalForActor?.(opts) ?? null,
+      executeJournalRunCommand: (opts = {}) =>
+        game?.fabricate?.executeJournalRunCommand?.(opts) ?? null,
+      dismissJournalRun: (opts = {}) => game?.fabricate?.dismissJournalRun?.(opts) ?? null,
+      getDismissedJournalRunKeys: (opts = {}) =>
+        game?.fabricate?.getDismissedJournalRunKeys?.(opts) ?? new Set(),
+      getJournalRunAuthorityAvailability: () =>
+        game?.fabricate?.getJournalRunAuthorityAvailability?.()
+        ?? authorityUnavailableAvailability(),
+      // Active-GM manual disposition of a retained execution claim (issue 1648). The
+      // authority itself refuses a non-active-GM caller, so this seam adds no authorization.
+      reconcileJournalRunAuthority: (opts = {}) =>
+        game?.fabricate?.reconcileJournalRunAuthority?.(opts)
+        ?? Promise.resolve(authorityUnavailableRefusal()),
       advanceCraftingRun: (opts = {}) => game?.fabricate?.advanceCraftingRun?.(opts) ?? null,
       cancelCraftingRun: (opts = {}) => game?.fabricate?.cancelCraftingRun?.(opts) ?? null,
       getWorldTime: () => game?.fabricate?.getWorldTime?.() ?? 0,

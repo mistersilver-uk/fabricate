@@ -1,4 +1,9 @@
 import { RunContainerManagerBase } from './runContainerStore.js';
+import {
+  assertNativeEffectsUninvoked,
+  historyEvidenceFields,
+  nativeHistoryRecord,
+} from './runHistoryEvidence.js';
 import { selectWritableActors } from './writableActors.js';
 
 const HISTORY_LIMIT = 50;
@@ -34,11 +39,21 @@ export class SalvageRunManager extends RunContainerManagerBase {
     );
   }
 
+  _normalizeContainer(raw) {
+    const container = super._normalizeContainer(raw);
+    return {
+      active: Object.fromEntries(
+        Object.entries(container.active).map(([id, run]) => [id, nativeHistoryRecord(run)])
+      ),
+      history: container.history.map(nativeHistoryRecord),
+    };
+  }
+
   async createRun(actor, runData = {}) {
     const container = this._getContainer(actor);
     const now = this._nowWorldTime();
     const runId = foundry.utils.randomID();
-    const run = {
+    const run = nativeHistoryRecord({
       // Defaults first; `...runData` lets the caller override; then the
       // authoritative fields below are re-asserted so they cannot be clobbered.
       craftingSystemId: null,
@@ -53,11 +68,12 @@ export class SalvageRunManager extends RunContainerManagerBase {
       createdResults: [],
       failureReason: undefined,
       ...runData,
+      ...historyEvidenceFields(runData),
       id: runId,
       actorUuid: runData.actorUuid || actor.uuid,
       userId: runData.userId ?? game.user?.id ?? null,
       updatedAt: now,
-    };
+    });
 
     if (run.status === 'waitingTime' || run.status === 'inProgress') {
       container.active[runId] = run;
@@ -77,7 +93,7 @@ export class SalvageRunManager extends RunContainerManagerBase {
     const container = this._getContainer(actor);
     if (!container.active?.[run.id]) return null;
     run.updatedAt = this._nowWorldTime();
-    container.active[run.id] = run;
+    container.active[run.id] = nativeHistoryRecord(run);
     await this._persist(actor, container);
     return run;
   }
@@ -108,6 +124,7 @@ export class SalvageRunManager extends RunContainerManagerBase {
 
   async markRunInProgress(actor, run) {
     if (!run) return null;
+    if (run.status === 'inProgress') return run;
     run.status = 'inProgress';
     run.updatedAt = this._nowWorldTime();
     return this.updateRun(actor, run);
@@ -154,13 +171,14 @@ export class SalvageRunManager extends RunContainerManagerBase {
     if (!container.active?.[run.id]) return run;
 
     const now = this._nowWorldTime();
-    const completed = {
+    const completed = nativeHistoryRecord({
       ...run,
       ...payload,
+      ...historyEvidenceFields(payload),
       status,
       updatedAt: now,
       finishedAt: payload.finishedAt ?? now,
-    };
+    });
 
     delete container.active[run.id];
     container.history.unshift(completed);
@@ -174,6 +192,7 @@ export class SalvageRunManager extends RunContainerManagerBase {
   async cancelRun(actor, runId, reason = 'Salvage cancelled') {
     const run = this.getActiveRun(actor, runId);
     if (!run) return null;
+    assertNativeEffectsUninvoked(run);
     return this.completeRun(actor, run, 'cancelled', {
       failureReason: run.failureReason || reason,
     });
@@ -209,24 +228,20 @@ export class SalvageRunManager extends RunContainerManagerBase {
     // connects and its startup pass catches up any matured run.
     if (this._isPrimaryGM() !== true) return;
     for (const actor of game.actors || []) {
-      const container = this._getContainer(actor);
-      let dirty = false;
-
-      for (const run of Object.values(container.active || {})) {
+      for (const run of this.getActiveRuns(actor)) {
         if (run.status !== 'waitingTime') continue;
         if (!run.timeGate) continue;
         if (Number(worldTime) < Number(run.timeGate.availableAt || 0)) continue;
-
+        assertNativeEffectsUninvoked(run);
+        const container = this._getContainer(actor);
+        if (!container.active[run.id]) continue;
         run.status = 'inProgress';
         run.updatedAt = Number(worldTime);
-        dirty = true;
+        container.active[run.id] = run;
+        await this._persist(actor, container);
         if (typeof onReadyRun === 'function') {
           await onReadyRun(actor, run);
         }
-      }
-
-      if (dirty) {
-        await this._persist(actor, container);
       }
     }
   }

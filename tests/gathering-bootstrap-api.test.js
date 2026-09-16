@@ -286,8 +286,8 @@ test('bootstrap constructs gathering collaborators after systems load with expli
 test('world-time hooks dispatch gathering without coupling failures to existing processors', () => {
   assert.match(
     mainSource,
-    /processWorldTimeCallbacksSafely\(\[\s*\{\s*label: 'Crafting',\s*callback: \(\) => game\.fabricate\?\.getCraftingRunManager\?\.\(\)\?\.processWorldTime\?\.\(worldTime\)\s*\}/s,
-    'crafting world-time processing should still run'
+    /processWorldTimeCallbacksSafely\(\[\s*\{\s*label: 'Crafting',\s*callback: async \(\) => \{\s*await game\.fabricate\?\.getCraftingRunManager\?\.\(\)\?\.processWorldTime\?\.\(worldTime\);\s*await game\.fabricate\?\.getCraftingEngine\?\.\(\)\?\.processVersionedWorldTime\?\.\(\{ worldTime \}\);\s*\}/s,
+    'crafting world-time processing should await legacy runs and the versioned authority path'
   );
   assert.match(
     mainSource,

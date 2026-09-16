@@ -291,8 +291,8 @@ function progressiveCraftWorld({
     name: 'Iron Ingot',
     parent: null,
     system: { quantity: 5 },
-    async delete() {},
-    async update() {},
+    async delete() { return this; },
+    async update(payload) { if (payload['system.quantity'] !== undefined) this.system.quantity = payload['system.quantity']; return this; },
   };
   const ingredientSet = {
     id: 'set-1',
@@ -553,6 +553,7 @@ test('_finishTimedStep(): the matured FINISH fires exactly once, after the run i
   const world = progressiveCraftWorld();
   const completed = [];
   const runManager = {
+    updateRun: async (_actor, run) => run,
     completeStepSuccess: async (actor, run, stepIndex, payload) => {
       completed.push({ stepIndex, payload });
       return { ...run, status: 'succeeded' };
@@ -643,8 +644,8 @@ function collapsedChainWorld({ stepCount = 3 } = {}) {
     name: 'Stock',
     parent: null,
     system: { quantity: 99 },
-    async delete() {},
-    async update() {},
+    async delete() { return this; },
+    async update(payload) { if (payload['system.quantity'] !== undefined) this.system.quantity = payload['system.quantity']; return this; },
   };
   const ingredientSet = {
     id: 'set-1',
@@ -732,7 +733,7 @@ function collapsedChainWorld({ stepCount = 3 } = {}) {
     async setFlag(scope, key, value) {
       this.flagStore[scope] ||= {};
       this.flagStore[scope][key] = value;
-      return value;
+      return this;
     },
     async unsetFlag(scope, key) {
       delete this.flagStore?.[scope]?.[key];

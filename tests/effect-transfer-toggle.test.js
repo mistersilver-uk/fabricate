@@ -126,12 +126,13 @@ function buildFakeIngredientItem(id, quantity = 2) {
     system: { quantity },
     deleteCalled: false,
     updateCalled: false,
-    async delete() { this.deleteCalled = true; },
+    async delete() { this.deleteCalled = true; return this; },
     async update(payload) {
       this.updateCalled = true;
       if (payload['system.quantity'] !== undefined) {
         this.system.quantity = payload['system.quantity'];
       }
+      return this;
     }
   };
 }
@@ -221,7 +222,10 @@ async function runCraftAndCheckTransfer(transferEffectsFlag, effectTransferValue
     name: 'Crafter',
     uuid: 'Actor.a1',
     items: { contents: [] },
-    createEmbeddedDocuments: async () => [fakeCreatedItem]
+    createEmbeddedDocuments: async (_type, [data]) => {
+      Object.assign(fakeCreatedItem, data, { uuid: 'Actor.a1.Item.created-1', parent: craftingActor, _source: structuredClone(data) });
+      return [fakeCreatedItem];
+    }
   };
 
   // Also inject the system with components so _createSingleResult can find it

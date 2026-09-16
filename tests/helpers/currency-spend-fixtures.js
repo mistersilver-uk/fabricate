@@ -210,7 +210,7 @@ export class CurrencyCraftingActorFake {
   async setFlag(namespace, key, value) {
     this._flags[namespace] = this._flags[namespace] || {};
     this._flags[namespace][key] = value;
-    return value;
+    return this;
   }
 
   async update(payload) {
