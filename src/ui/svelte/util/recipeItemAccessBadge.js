@@ -1,21 +1,7 @@
-// Shared, dependency-free derivation of a recipe item's "access" badge — the single
-// source of truth so the GM "How players see it" preview (RecipeItemEditor) and the
-// player Inventory book detail (InventoryDetail, via InventoryListingBuilder) show an
-// IDENTICAL badge under every mode/cap combination.
-//
-// Kept import-free so a mounted-component test harness can copy it as a raw module
-// without pulling a transitive dependency graph (which would hang the mounted tests).
-
-/**
- * @param {object} input
- * @param {'item'|'knowledge'} input.mode Visibility mode the book grants access under.
- * @param {object} [input.item] The definition's `caps.item` (`{ limitUses, maxUses }`).
- * @param {object} [input.learn] The definition's `caps.learn` (`{ limitLearning, learnsAllowed, learnScope, learningMode }`).
- * @param {(key: string, fallback: string, data?: {n?: number|string}) => string} t
- *   Translate seam — each caller localizes in its own idiom, so the SHAPE (which badge,
- *   which icon/tone) is shared while wording follows the caller's i18n.
- * @returns {{ label: string, icon: string, tone: 'warning'|'info'|'success' }}
- */
+// The ONE derivation of a recipe item's access badge, so the GM "How players see it" preview and
+// the player Inventory book detail cannot differ under any mode/cap combination. `t` is a seam, not
+// an import: the SHAPE is shared while each caller localizes in its own idiom. Import-free, so a
+// mounted harness can copy it as a raw module rather than pulling a graph that would hang.
 export function recipeItemAccessBadge({ mode, item = {}, learn = {} } = {}, t) {
   const N = 'FABRICATE.Admin.Manager.RecipeItem.Preview.';
 

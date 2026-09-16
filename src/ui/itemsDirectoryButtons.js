@@ -1,13 +1,5 @@
-/**
- * Locate or create the Items Directory header action container.
- *
- * Foundry themes and versions can expose different header class names, so the
- * lookup accepts the known V13 containers before creating a matching fallback.
- *
- * @param {object} itemsDirectory Foundry Items sidebar directory instance.
- * @param {Document} [documentRef=globalThis.document] DOM document adapter.
- * @returns {HTMLElement|null} Header actions container, or null when unavailable.
- */
+// Foundry themes and versions expose different header class names, so the known V13 containers are
+// tried in turn before a matching fallback is created.
 export function findItemsDirectoryActionsContainer(itemsDirectory, documentRef = globalThis.document) {
   const root = itemsDirectory?.element ?? null;
   if (!root) return null;
@@ -28,20 +20,9 @@ export function findItemsDirectoryActionsContainer(itemsDirectory, documentRef =
   return actionsContainer;
 }
 
-/**
- * Synchronize the player Gathering button in the Items Directory.
- *
- * The button is present only while at least one crafting system has the
- * gathering feature enabled. Repeated syncs remove stale/duplicate buttons so
- * system feature changes and directory rerenders converge on one visible action.
- *
- * @param {object} options Sync options.
- * @param {object} options.itemsDirectory Foundry Items sidebar directory.
- * @param {boolean} options.enabled Whether any system currently enables gathering.
- * @param {Function} options.createButton Factory for the Gathering button element.
- * @param {Document} [options.documentRef=globalThis.document] DOM document adapter.
- * @returns {{synced: boolean, visible: boolean}} Sync result.
- */
+// The button is present only while some crafting system enables gathering. This is IDEMPOTENT by
+// design: a repeated sync removes stale and duplicate buttons, so feature changes and directory
+// rerenders converge on one visible action.
 export function syncGatheringDirectoryButton({
   itemsDirectory,
   enabled,

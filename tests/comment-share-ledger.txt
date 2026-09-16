@@ -13,9 +13,9 @@ src/migration	6571
 src/models	467
 src/models/match	66
 src/systems	33367
-src/ui	2519
+src/ui	1109
 src/ui/svelte	52
-src/ui/svelte/actions	263
+src/ui/svelte/actions	73
 src/ui/svelte/apps	1178
 src/ui/svelte/apps/alchemy	250
 src/ui/svelte/apps/crafting	1086
@@ -46,10 +46,10 @@ src/ui/svelte/apps/manager/tools	1852
 src/ui/svelte/apps/manager/world	352
 src/ui/svelte/components	1245
 src/ui/svelte/stores	6973
-src/ui/svelte/util	3463
+src/ui/svelte/util	1273
 src/utils	1367
 styles	1044
-tests	40807
+tests	40812
 tests/actions	155
 tests/canvas	622
 tests/canvas/regions	292

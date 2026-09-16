@@ -1,14 +1,6 @@
-/**
- * craftingRecipeStatus — pure presentation map from a recipe's browse status to
- * its callout descriptor (`{ tone, icon, labelKey }`) for the player Crafting
- * list. No Foundry/DOM dependencies, so it is fully unit-testable.
- *
- * Keyed by the {@link CRAFTING_BROWSE_STATUS} vocabulary the
- * {@link CraftingListingBuilder} emits, so the UI never branches on a raw status
- * token. `tone` is a semantic token (resolved to a colour by CSS in a later UI
- * slice — never a colour literal here); `icon` is a Font Awesome class; and
- * `labelKey` is a localization key the caller passes through `localize`.
- */
+// The player Crafting list's callout descriptor per browse status. Keyed by the
+// `CRAFTING_BROWSE_STATUS` vocabulary `CraftingListingBuilder` emits, so the UI never branches on a
+// raw token, and `tone` is a semantic token CSS resolves — never a colour literal.
 
 import { CRAFTING_BROWSE_STATUS } from '../../../systems/CraftingListingBuilder.js';
 
@@ -47,14 +39,7 @@ const STATUS_PRESENTATION = Object.freeze({
 
 const FALLBACK_PRESENTATION = STATUS_PRESENTATION[CRAFTING_BROWSE_STATUS.UNKNOWN];
 
-/**
- * Resolve the `{ tone, icon, labelKey }` callout descriptor for a browse status.
- * An unrecognized status falls back to the neutral "unknown" descriptor so the
- * list never renders a bare/undefined callout.
- *
- * @param {string} status A {@link CRAFTING_BROWSE_STATUS} value.
- * @returns {{ tone: string, icon: string, labelKey: string }}
- */
+// An unrecognized status falls back to "unknown", so the list never renders a bare callout.
 export function craftingRecipeStatus(status) {
   return STATUS_PRESENTATION[status] ?? FALLBACK_PRESENTATION;
 }

@@ -1,40 +1,16 @@
-/**
- * The machinery every Fabricate companion-extension registry shares.
- *
- * Fabricate publishes two page-session provider registries — one for GM Manager surfaces
- * and one for player-window surfaces (issue 1198). They differ only in what a provider IS
- * (the validator), what the registration methods are CALLED, and which hooks they emit.
- * Everything else — the surface keying, the listener sets, the fault-contained notify
- * guard, the tokened idempotent unregister, the frozen surface-id broadcast and the public
- * API bind — is identical, so it lives here exactly once.
- *
- * This module imports no Foundry global and no Svelte runtime: it is a plain leaf both
- * registries and their unit suites can load directly.
- */
+// The machinery both page-session provider registries share (issue 1198). They differ only in what
+// a provider IS, what the registration methods are CALLED, and which hooks they emit; the surface
+// keying, listener sets, fault-contained notify guard, tokened idempotent unregister, frozen
+// surface-id broadcast and public-API bind are identical, so they live here exactly once.
+// A plain leaf: no Foundry global, no Svelte runtime.
 
-/**
- * Throw a `TypeError` with `message` unless `value` is a string with non-blank content.
- *
- * Exported because both validators need the same rule and a second copy of a three-line
- * guard is a duplication finding, not a convenience.
- *
- * @param {*} value Candidate value.
- * @param {string} message Message for the thrown `TypeError`.
- * @throws {TypeError} When `value` is not a non-empty string.
- */
+// Exported because both validators need this rule and a second copy is a duplication finding.
 export function requireNonEmptyString(value, message) {
   if (typeof value !== 'string' || value.trim() === '') throw new TypeError(message);
 }
 
-/**
- * Build the frozen payload the registration and unregistration hooks carry.
- *
- * Frozen because every listener receives the same object; a mutable payload would let one
- * listener rewrite what the next one reads.
- *
- * @param {{id: string, tabs: Array<{id: string}>}} provider Validated provider.
- * @returns {Readonly<{schemaVersion: 1, surfaceId: string, tabIds: readonly string[]}>} Payload.
- */
+// Frozen because every listener receives the SAME object; a mutable payload would let one listener
+// rewrite what the next one reads.
 export function providerHookPayload(provider) {
   return Object.freeze({
     schemaVersion: 1,
@@ -43,41 +19,12 @@ export function providerHookPayload(provider) {
   });
 }
 
-/**
- * Options that specialise one registry.
- *
- * The accessor names are parameters rather than a convention on purpose: the shipped
- * Manager registry returns `getWorldNavProvider` and `listWorldNavSurfaceIds`, and its unit
- * suite pins both, so a factory that imposed its own names would be a public behaviour
- * change wearing the costume of a refactor.
- *
- * @typedef {object} ExtensionRegistryOptions
- * @property {(provider: object) => void} validateProvider Throws on a malformed provider.
- * @property {string} registeredHook Hook name emitted on registration.
- * @property {string} unregisteredHook Hook name emitted on unregistration.
- * @property {string} apiPropertyName Property `bindPublicApi` assigns onto the API target.
- * @property {string} registerMethodName Name of the public registration method.
- * @property {string} getProviderMethodName Name of the provider getter on the registry.
- * @property {string} listSurfaceIdsMethodName Name of the surface-id lister on the registry.
- * @property {string} conflictNoun Noun used in the same-surface conflict error.
- * @property {string} errorNoun Lower-case noun used in the subscriber and bind errors.
- * @property {string} subscriberFailureMessage Prefix logged when a subscriber throws.
- * @property {(...args: unknown[]) => void} [reportError] Error sink for a throwing subscriber.
- * @property {(name: string, payload: object) => void} emitHook Hook edge.
- * @property {Record<string, Function>} [additionalPublicMethods] Further methods published on
- *   `publicApi` beside the registration one. This exists because a registry may own a
- *   page-session channel that is not a registration and must not die with a mount — the
- *   Manager's `setWorldNavTabBadge` (issue 1302) — while the OTHER registry publishes nothing
- *   of the kind. Omitting it leaves `publicApi`'s key set exactly as it was, which is what
- *   keeps the player seam unchanged by a Manager-only feature.
- */
-
-/**
- * Create one surface-keyed companion-extension registry.
- *
- * @param {ExtensionRegistryOptions} options Per-registry specialisation.
- * @returns {Readonly<object>} Frozen registry.
- */
+// The accessor NAMES are parameters rather than a convention on purpose: the shipped Manager
+// registry returns `getWorldNavProvider` and `listWorldNavSurfaceIds` and its suite pins both, so a
+// factory imposing its own names would be a public behaviour change dressed as a refactor.
+// `additionalPublicMethods` exists because one registry may own a page-session channel that is not
+// a registration and must not die with a mount (the Manager's `setWorldNavTabBadge`, issue 1302);
+// omitting it leaves `publicApi`'s key set exactly as it was, so the player seam is untouched.
 export function createExtensionRegistry({
   validateProvider,
   registeredHook,
@@ -93,16 +40,13 @@ export function createExtensionRegistry({
   emitHook,
   additionalPublicMethods,
 }) {
-  // One provider per surface id, not one provider full stop. The registry never
-  // enumerates the ids it will accept, so a companion may claim a surface Core has never
-  // heard of; Core simply renders the surfaces it knows how to host.
+  // One provider per surface id, not one provider full stop. The registry never enumerates the ids
+  // it will accept, so a companion may claim a surface Core has never heard of.
   const providers = new Map();
   const registrationTokens = new Map();
   const listeners = new Map();
-  // Subscribers to the SET of claimed surfaces rather than to one surface's provider.
-  // Core uses this to answer "is a companion module present at all", a question no
-  // per-surface subscription can answer: a companion that claims only a surface Core has
-  // never heard of publishes to nobody, and the shell would never learn it exists.
+  // The SET of claimed surfaces, not one surface's provider: no per-surface subscription can answer
+  // "is a companion present at all", because one claiming only an unknown surface publishes to nobody.
   const surfaceSetListeners = new Set();
 
   function notify(listener, value) {
@@ -117,19 +61,8 @@ export function createExtensionRegistry({
     return [...providers.keys()];
   }
 
-  /**
-   * Add one listener to a listener set, replay the current value into it, and return an
-   * idempotent unsubscribe.
-   *
-   * The immediate replay goes through the same guard as a later publication: a subscriber
-   * that throws on its first snapshot must not take the SUBSCRIBING caller down with it,
-   * and Core's own shells are among those callers.
-   *
-   * @param {Set<Function>} set Listener set to join.
-   * @param {Function} listener Subscriber.
-   * @param {*} initialValue Value replayed immediately.
-   * @returns {() => void} Idempotent unsubscribe.
-   */
+  // The immediate replay goes through the SAME guard as a later publication: a subscriber that
+  // throws on its first snapshot must not take the subscribing caller down with it.
   function addListener(set, listener, initialValue) {
     set.add(listener);
     notify(listener, initialValue);
@@ -146,8 +79,7 @@ export function createExtensionRegistry({
     for (const listener of listeners.get(surfaceId) ?? []) {
       notify(listener, provider);
     }
-    // Frozen because every surface-set subscriber receives the SAME array; a mutable
-    // broadcast would let one subscriber rewrite what the next one reads.
+    // Frozen for the same reason the hook payload is: every subscriber receives the SAME array.
     const surfaceIds = Object.freeze(currentSurfaceIds());
     for (const listener of surfaceSetListeners) {
       notify(listener, surfaceIds);
@@ -155,8 +87,8 @@ export function createExtensionRegistry({
   }
 
   function unregisterWith(provider, token) {
-    // The token, not the provider id, is what authorises the removal: a handle held over
-    // an unregister-then-re-register cycle must not evict the LATER provider.
+    // The token, not the provider id, authorises the removal: a handle held over an
+    // unregister-then-re-register cycle must not evict the LATER provider.
     if (registrationTokens.get(provider.id) !== token) return;
     registrationTokens.delete(provider.id);
     providers.delete(provider.id);
@@ -164,14 +96,6 @@ export function createExtensionRegistry({
     emitHook(unregisteredHook, providerHookPayload(provider));
   }
 
-  /**
-   * Register the page session's provider for one surface.
-   *
-   * @param {object} provider Companion-owned provider definition.
-   * @returns {() => void} Idempotent unregister function.
-   * @throws {TypeError} When the provider does not meet API-v1 requirements.
-   * @throws {Error} When another provider already holds that surface.
-   */
   function registerProvider(provider) {
     validateProvider(provider);
     if (providers.has(provider.id)) {
@@ -208,22 +132,10 @@ export function createExtensionRegistry({
     return addListener(surfaceListeners, listener, providers.get(surfaceId) ?? null);
   }
 
-  /**
-   * Subscribe to the set of surface ids a companion currently claims.
-   *
-   * Deliberately NOT keyed on a surface id, and it serves two different questions rather
-   * than one. The Manager's title bar asks "is any companion module registered at all":
-   * keying that report on one Core route would make it a claim about the route rather than
-   * about the companion module, and a companion-only surface would never light it. The
-   * player window asks "which surfaces are claimed right now", because this is that
-   * window's SOLE subscription and it re-derives its whole rail snapshot from each
-   * publication (issue 1198). Both are served by the same broadcast, so neither consumer
-   * needs a second listener set.
-   *
-   * @param {(surfaceIds: readonly string[]) => void} listener Receives the current ids
-   *   immediately and again on every registration and unregistration.
-   * @returns {() => void} Idempotent unsubscribe.
-   */
+  // Deliberately NOT keyed on a surface id, and it serves two questions: the Manager title bar's
+  // "is any companion registered at all", which keyed on one Core route would become a claim about
+  // that route, and the player window's "which surfaces are claimed now", its SOLE subscription and
+  // the input it re-derives its whole rail snapshot from (issue 1198).
   function subscribeSurfaceIds(listener) {
     if (typeof listener !== 'function') {
       throw new TypeError(`Fabricate ${errorNoun} subscriber must be a function`);
@@ -231,9 +143,8 @@ export function createExtensionRegistry({
     return addListener(surfaceSetListeners, listener, Object.freeze(currentSurfaceIds()));
   }
 
-  // Spread AFTER the registration method, so a specialisation cannot displace the one method
-  // every registry must publish — it would have to name it, and then it is a stated override
-  // rather than an accident of key order.
+  // Spread AFTER the registration method, so a specialisation cannot displace the one method every
+  // registry must publish by accident of key order; naming it makes the override stated.
   const publicApi = Object.freeze({
     [registerMethodName]: registerProvider,
     ...additionalPublicMethods,
@@ -250,8 +161,7 @@ export function createExtensionRegistry({
     },
     [getProviderMethodName]: (surfaceId) => providers.get(surfaceId) ?? null,
     [listSurfaceIdsMethodName]: currentSurfaceIds,
-    // Core's own hook edge, shared with the mount hosts so the surface/tab hooks travel
-    // through the same injectable seam the registry's own hooks do.
+    // Shared with the mount hosts, so surface and tab hooks travel the registry's own injectable seam.
     emitHook,
     subscribe,
     subscribeSurfaceIds,
