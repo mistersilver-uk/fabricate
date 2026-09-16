@@ -225,6 +225,6 @@ test('the ledger reports the two figures epic 1656 tracks', (t) => {
   if (gate.regenerated()) return t.skip('this run rewrote the ledger');
   const keys = Object.keys(gate.pinned());
   const files = keys.filter((key) => !key.includes('::')).length;
-  assert.equal(files, 120, 'oversized files');
-  assert.equal(keys.length - files, 107, 'oversized functions');
+  assert.equal(files, 119, 'oversized files');
+  assert.equal(keys.length - files, 103, 'oversized functions');
 });
