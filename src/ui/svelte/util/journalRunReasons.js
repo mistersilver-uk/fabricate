@@ -43,6 +43,7 @@ export const JOURNAL_RUN_REASON_KEYS = Object.freeze({
   'invalid-disposition': 'FABRICATE.App.Journal.Reason.InvalidDisposition',
   // ── Request transport and durability ──────────────────────────────────────
   'command-timeout': 'FABRICATE.App.Journal.Reason.CommandTimeout',
+  'queue-timeout': 'FABRICATE.App.Journal.Reason.QueueTimeout',
   'execute-command-unavailable': 'FABRICATE.App.Journal.Reason.ExecuteCommandUnavailable',
   'execution-grant-invalid': 'FABRICATE.App.Journal.Reason.ExecutionGrantInvalid',
   'invalid-command': 'FABRICATE.App.Journal.Reason.InvalidCommand',
