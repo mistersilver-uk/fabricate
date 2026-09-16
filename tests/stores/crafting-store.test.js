@@ -1,10 +1,22 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 
 import { createSvelteModuleCompiler } from '../helpers/compile-svelte-module.js';
 import { progressiveStageThresholds } from '../../src/utils/progressiveStageThresholds.js';
 import { resolveProgressiveAward } from '../../src/utils/progressiveAward.js';
+
+const EN = JSON.parse(
+  readFileSync(resolve(import.meta.dirname, '../../lang/en.json'), 'utf8')
+);
+
+/** Resolve a dotted `lang/en.json` path to its string leaf, or undefined. */
+function langLeaf(key) {
+  const leaf = key.split('.').reduce((node, segment) => node?.[segment], EN);
+  return typeof leaf === 'string' ? leaf : undefined;
+}
 
 function makeServices(overrides = {}) {
   const calls = {
@@ -45,6 +57,9 @@ function makeServices(overrides = {}) {
       }),
     notify: (message) => calls.notify.push(message),
     craftErrorMessage: () => 'Crafting failed.',
+    // The REAL shipped strings, not a stub: a fake that echoed its key would let a
+    // missing or shadowed `lang/en.json` leaf pass as a localized sentence.
+    localize: (key) => langLeaf(key) ?? key,
     evaluateSelectedSet:
       overrides.evaluateSelectedSet ??
       ((opts) => {
@@ -114,6 +129,9 @@ async function setupCraftingStoreCompiler(prefix) {
   compiler.copyPlain('src/utils/progressiveStageThresholds.js');
   // The requirement rail's slot projection (issue 917) — same rule again.
   compiler.copyPlain('src/ui/svelte/util/requirementSlots.js');
+  // The authority-refusal wording the store falls back to when a result carries a
+  // `reason` and no `message` (issue 1648) — same rule again.
+  compiler.copyPlain('src/ui/svelte/util/journalRunReasons.js');
   const { createCraftingStore } = await compiler.load('src/ui/svelte/stores/craftingStore.svelte.js');
   return { compiler, createCraftingStore };
 }
@@ -546,6 +564,57 @@ describe('craftingStore', () => {
     assert.equal(calls.listCraftingForActor.length, 0, 'failed craft does not refetch');
   });
 
+  // ── Issue 1648: the versioned-run authority refuses with `{success:false, reason}`
+  // and NO `message`, so `notify(result.message)` displayed the literal "undefined".
+  it('words a reason-only authority refusal instead of notifying undefined', async () => {
+    const craftRecipe = async () => ({ success: false, reason: 'ledger-missing' });
+    const { services, calls } = makeServices({ craftRecipe });
+    const store = createCraftingStore({ services });
+
+    const result = await store.craft({ id: 'r1' });
+    flushSync();
+
+    assert.equal(result.success, false);
+    assert.equal(calls.notify.length, 1, 'a refused craft raises exactly one notification');
+    assert.equal(calls.notify[0], langLeaf('FABRICATE.App.Journal.Actions.LedgerMissing'));
+    assert.equal(calls.listCraftingForActor.length, 0, 'a refused craft does not refetch');
+  });
+
+  it('falls back to the generic craft error when a failure carries neither message nor reason', async () => {
+    const craftRecipe = async () => ({ success: false });
+    const { services, calls } = makeServices({ craftRecipe });
+    const store = createCraftingStore({ services });
+
+    await store.craft({ id: 'r1' });
+    flushSync();
+
+    assert.deepEqual(calls.notify, ['Crafting failed.']);
+  });
+
+  it('never passes a non-string to notify, whatever shape the failure has', async () => {
+    const shapes = [
+      { success: false },
+      { success: false, message: undefined },
+      { success: false, message: null },
+      { success: false, message: 42 },
+      { success: false, message: '   ' },
+      { success: false, reason: 'command-timeout' },
+      { success: false, reason: 'a-reason-nobody-mapped' },
+      { success: false, reason: 7, message: {} },
+    ];
+    for (const shape of shapes) {
+      const { services, calls } = makeServices({ craftRecipe: async () => shape });
+      const store = createCraftingStore({ services });
+      await store.craft({ id: 'r1' });
+      flushSync();
+      const label = JSON.stringify(shape);
+      assert.equal(calls.notify.length, 1, `one notification for ${label}`);
+      assert.equal(typeof calls.notify[0], 'string', `a string for ${label}`);
+      assert.notEqual(calls.notify[0], 'undefined', `never the text "undefined" for ${label}`);
+      assert.notEqual(calls.notify[0].trim(), '', `never blank for ${label}`);
+    }
+  });
+
   it('surfaces a thrown craftRecipe as a notification and clears craftInFlight', async () => {
     const craftRecipe = async () => {
       throw new Error('macro exploded');
@@ -566,6 +635,145 @@ describe('craftingStore', () => {
       loadsAfterInitial,
       'a thrown craft does not refresh the listing'
     );
+  });
+
+  // ── Issue 1648: a failed CHECK is an OUTCOME, not a refusal ────────────────
+  //
+  // The maintainer's instant craft failed its check; the chat card correctly reported
+  // "Crafting Failed · ROLL 4 · CONSUMED ON FAILURE: Sand, Mason's Tools" while the toast
+  // said "Something went wrong while crafting. Nothing was consumed." Both halves of that
+  // sentence were false. The versioned result is what fell through the refusal chain: it
+  // carries `disposition: 'failed'` and NO `message`/`reason`
+  // (`CraftingEngine.js` `versionedTransitionResult` + the stage `outcome()`), so the
+  // generic error was the only text left. `disposition` is the discriminator because only
+  // a stage that RAN mints one.
+  describe('a resolved failed check', () => {
+    // The shape `executePublicCraft` -> `executeCommand` -> `serializedOperationResult`
+    // returns for a versioned stage whose check failed. Verbatim: no `message`, no `reason`.
+    const VERSIONED_FAILED = Object.freeze({
+      success: false,
+      runId: 'run-1',
+      status: 'failed',
+      runRevision: 3,
+      reason: null,
+      message: null,
+      disposition: 'failed',
+      waiting: false,
+      terminal: true,
+      createdResultUuids: [],
+    });
+
+    it('tells the truth about the versioned shape instead of the generic error', async () => {
+      const { services, calls } = makeServices({ craftRecipe: async () => VERSIONED_FAILED });
+      const store = createCraftingStore({ services });
+
+      await store.craft({ id: 'r1' });
+      flushSync();
+
+      assert.deepEqual(calls.notify, [langLeaf('FABRICATE.App.Crafting.Notify.CheckFailed')]);
+      assert.notEqual(
+        calls.notify[0],
+        langLeaf('FABRICATE.App.Crafting.Notify.CraftFailed'),
+        'never the generic error, which promises "Nothing was consumed"'
+      );
+      assert.equal(
+        calls.notify[0].toLowerCase().includes('consumed'),
+        false,
+        'the store cannot know what the failure policy spent, so it claims nothing'
+      );
+    });
+
+    it('refreshes the listing, because a failed check may have spent materials', async () => {
+      const { services, calls } = makeServices({ craftRecipe: async () => VERSIONED_FAILED });
+      const store = createCraftingStore({ services });
+      await store.load();
+      const loadsAfterInitial = calls.listCraftingForActor.length;
+
+      await store.craft({ id: 'r1' });
+      flushSync();
+
+      assert.equal(
+        calls.listCraftingForActor.length,
+        loadsAfterInitial + 1,
+        'the inventory and craftability on screen are stale until this reload'
+      );
+    });
+
+    it('records the outcome so the run summary can show it', async () => {
+      const { services } = makeServices({ craftRecipe: async () => VERSIONED_FAILED });
+      const store = createCraftingStore({ services });
+
+      await store.craft({ id: 'r1' });
+      flushSync();
+
+      const recorded = store.lastRollResult.r1;
+      assert.ok(Boolean(recorded), 'a failed check has an outcome the UI can render');
+      assert.equal(recorded.success, false, 'RollResultBox paints it as the failure tone');
+      assert.equal(
+        recorded.message,
+        langLeaf('FABRICATE.App.Crafting.Notify.CheckFailed'),
+        'and the box states the same sentence the toast did'
+      );
+    });
+
+    it('carries the legacy shape, whose own message is already truthful', async () => {
+      // `CraftingEngine.craft`'s legacy failure return, with an awarded failure result:
+      // `{ success:false, results, message, disposition:'produced-on-failure' }`.
+      const legacy = {
+        success: false,
+        results: [{ name: 'Slag' }],
+        message: 'Check failed: roll too low',
+        disposition: 'produced-on-failure',
+      };
+      const { services, calls } = makeServices({ craftRecipe: async () => legacy });
+      const store = createCraftingStore({ services });
+      await store.load();
+      const loadsAfterInitial = calls.listCraftingForActor.length;
+
+      await store.craft({ id: 'r1' });
+      flushSync();
+
+      assert.deepEqual(calls.notify, [langLeaf('FABRICATE.App.Crafting.Notify.CheckFailed')]);
+      assert.equal(
+        calls.listCraftingForActor.length,
+        loadsAfterInitial + 1,
+        'a legacy failure that AWARDED items must refresh the listing too'
+      );
+      assert.equal(store.lastRollResult.r1.success, false);
+    });
+
+    it('leaves a genuine authority refusal wording and blocking exactly as it was', async () => {
+      const { services, calls } = makeServices({
+        craftRecipe: async () => ({ success: false, reason: 'claim-held', status: 'failed' }),
+      });
+      const store = createCraftingStore({ services });
+
+      await store.craft({ id: 'r1' });
+      flushSync();
+
+      assert.deepEqual(calls.notify, [langLeaf('FABRICATE.App.Journal.Actions.ClaimHeld')]);
+      assert.equal(calls.listCraftingForActor.length, 0, 'a refusal still does not refetch');
+      assert.equal(store.lastRollResult.r1, undefined, 'and records no outcome');
+    });
+
+    it('never passes a non-string to notify on either failed-check shape', async () => {
+      for (const shape of [
+        VERSIONED_FAILED,
+        { success: false, disposition: 'failed' },
+        { success: false, disposition: 'produced-on-failure', message: 42 },
+        { success: false, disposition: 'produced-on-failure', message: null },
+      ]) {
+        const { services, calls } = makeServices({ craftRecipe: async () => shape });
+        const store = createCraftingStore({ services });
+        await store.craft({ id: 'r1' });
+        flushSync();
+        const label = JSON.stringify(shape);
+        assert.equal(calls.notify.length, 1, `one notification for ${label}`);
+        assert.equal(typeof calls.notify[0], 'string', `a string for ${label}`);
+        assert.notEqual(calls.notify[0], 'undefined', `never the text "undefined" for ${label}`);
+        assert.equal(typeof store.lastRollResult.r1.message, 'string', `a string message for ${label}`);
+      }
+    });
   });
 
   it('on success records the roll result and refreshes', async () => {

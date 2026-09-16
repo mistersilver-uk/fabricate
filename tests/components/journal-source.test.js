@@ -1,13 +1,17 @@
 // Source-pin contract for the player Journal screen (Slice B), mirroring
 // gathering-environments-source.test.js. These string assertions fail at test
 // time when load-bearing wiring drifts: the shell branch + nav badge + shell
-// refresh, the cloned container-query grid, the status vocabulary, and the global
+// refresh, the two-zone container-query grid, the status vocabulary, and the global
 // CSS treatments. Keep names stable or update these in lockstep.
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { importsModule, parseComponent } from '../helpers/svelteStructureContract.js';
+import { calledName, parseModule, walkNodes } from '../helpers/moduleAst.js';
+
+import { JOURNAL_RUN_REASON_KEYS } from '../../src/ui/svelte/util/journalRunReasons.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -17,9 +21,12 @@ function read(relPath) {
 
 const rootSource = read('../../src/ui/svelte/apps/FabricateAppRoot.svelte');
 const viewSource = read('../../src/ui/svelte/apps/journal/JournalView.svelte');
+const detailSource = read('../../src/ui/svelte/apps/journal/RunDetail.svelte');
 const statusSource = read('../../src/ui/svelte/apps/journal/journalRunStatus.js');
 const actionsSource = read('../../src/ui/svelte/apps/journal/ActionsPanel.svelte');
+const stepSource = read('../../src/ui/svelte/apps/journal/StepDetails.svelte');
 const builderSource = read('../../src/systems/RunJournalBuilder.js');
+const historySource = read('../../src/ui/svelte/apps/journal/HistoricalRunDetail.svelte');
 const cssSource = read('../../styles/fabricate.css');
 const enLang = JSON.parse(read('../../lang/en.json'));
 
@@ -29,7 +36,11 @@ function resolveLangKey(key) {
 
 describe('FabricateAppRoot Journal wiring', () => {
   it('renders JournalView on the journal tab (every tab now routes to a real view)', () => {
-    assert.ok(rootSource.includes("import JournalView from './journal/JournalView.svelte'"), 'imports JournalView');
+    // Structural rather than textual, so an import reorder cannot red it (issue 1658).
+    assert.ok(
+      importsModule(parseComponent(rootSource), './journal/JournalView.svelte'),
+      'imports JournalView'
+    );
     // `tab.tabId`, not `tab.id`: a rail entry is addressed by its ROUTE KEY since issue 1198
     // and carries the bare tab id separately, so a Core branch reads the bare id.
     assert.ok(rootSource.includes("tab.tabId === 'journal'"), 'branches on the journal tab');
@@ -49,18 +60,21 @@ describe('FabricateAppRoot Journal wiring', () => {
     assert.ok(rootSource.includes('services?.journal?.load?.(true)'), 'shell quietly re-loads on those events');
     assert.ok(rootSource.includes('!store.loadedOnce'), 'shell guards its one-time initial load via loadedOnce');
   });
+
+  it('places the read-only shared world clock in the Journal top bar', () => {
+    assert.ok(rootSource.includes("import WorldClockChip from '../components/WorldClockChip.svelte'"));
+    assert.ok(rootSource.includes("activeTab === 'journal' && journalWorldClock"));
+    assert.ok(rootSource.includes('<WorldClockChip'));
+    assert.ok(rootSource.includes('worldTimeLabel('), 'uses the existing calendar formatter');
+  });
 });
 
 describe('JournalView layout + effects', () => {
-  it('clones the GatheringView container-query 3-column grid', () => {
-    // Pin the reflow contract (container seam + narrow-width single-column
-    // breakpoint), not the exact fr/minmax track literal — the column ratios are
-    // tunable design details that should not break this wiring guard.
+  it('uses the prototype two-zone layout and stacks Active, Finished, then Detail', () => {
     const narrowBreakpoint = '@container fabricate-journal (max-width: 960px)';
 
-    assert.ok(viewSource.includes('grid-template-columns:'), 'declares an explicit column track');
-    assert.ok(viewSource.includes('container-type: inline-size;'), 'establishes a size container');
-    assert.ok(viewSource.includes('container-name: fabricate-journal;'), 'names the journal container');
+    assert.ok(viewSource.includes('grid-template-columns: 336px minmax(0, 1fr)'), 'declares the prototype browse width and flexible detail track');
+    assert.ok(viewSource.includes('container: fabricate-journal / inline-size;'), 'establishes the named size container');
     assert.ok(
       viewSource.includes(narrowBreakpoint),
       'uses the shared reachable 960px narrow breakpoint'
@@ -69,20 +83,52 @@ describe('JournalView layout + effects', () => {
       viewSource.slice(viewSource.indexOf(narrowBreakpoint)).includes('grid-template-columns: 1fr;'),
       'reflows to a single column at the narrow breakpoint'
     );
-    assert.match(
-      viewSource.slice(viewSource.indexOf(narrowBreakpoint)),
-      /\.journal-view-grid\s+\.journal-view-column-left\s*\{\s*overflow:\s*visible;/,
-      'the stacked grid does not clip the first list header beneath the player bar'
+    assert.ok(viewSource.includes('.journal-browse-lists {\n      display: contents;'), 'list sections become consecutive stacked regions');
+    assert.ok(viewSource.includes('.journal-detail-pane {\n      min-height: 220px;'), 'Detail remains reachable below both lists');
+  });
+
+  it('composes the required shared search, kind, status, and independent pager controls', () => {
+    assert.ok(viewSource.includes('<div class="journal-search-field">'));
+    assert.equal(
+      viewSource.includes('<Field as="div" class="journal-search-field">'),
+      false,
+      'the search primitive is not nested in Field, whose descendant input rules override its chrome'
     );
-    assert.match(
-      viewSource.slice(viewSource.indexOf(narrowBreakpoint)),
-      /\.journal-view-grid\s+\.journal-view-column\s*\{\s*min-height:\s*220px;/,
-      'the stacked grid retains the 220px minimum despite desktop flex defaults'
+    assert.ok(
+      viewSource.includes('.journal-search-field {\n    display: grid;'),
+      'the search wrapper uses grid so the primitive flex basis cannot grow the header'
     );
+    assert.ok(
+      viewSource.includes(
+        '.journal-search-field > :global(.journal-search-control) {\n    min-width: 0;'
+      ),
+      'the search primitive can fit the compact search/kind grid without overlapping the kind control'
+    );
+    assert.ok(viewSource.includes('<ManagerSearchField'));
+    assert.ok(viewSource.includes('class="journal-search-control"'));
+    assert.ok(viewSource.includes('size="30"'));
+    assert.ok(viewSource.includes('<div class="journal-kind-field">'));
+    assert.equal(viewSource.includes("import Field from '../../components/Field.svelte'"), false);
+    assert.equal(viewSource.includes('Filters.SearchKicker'), false, 'the accessible search name is not duplicated as a visible kicker');
+    assert.ok(
+      viewSource.includes('.journal-browse-controls {\n    display: grid;\n    grid-template-columns: minmax(0, 1fr);'),
+      'search and kind remain full-width stacked controls'
+    );
+    assert.ok(viewSource.includes('journal?.activePageItems'));
+    assert.ok(viewSource.includes('onPageChange={(value) => journal?.setActivePage?.(value)}'));
+    assert.ok(viewSource.includes('onPageChange={(value) => journal?.setHistoryPage?.(value)}'));
   });
 
   it('reads the shared store', () => {
     assert.ok(viewSource.includes('services?.journal'), 'reads the shared journal store');
+  });
+
+  it('reads only the authoritative gathering-yield projection', () => {
+    assert.ok(detailSource.includes('run?.gatheringYield'));
+    assert.equal(detailSource.includes('run?.yieldScale'), false);
+    assert.equal(detailSource.includes('run?.dropRows'), false);
+    assert.equal(detailSource.includes('run?.outcomeTiers'), false);
+    assert.equal(detailSource.includes('run?.routedTiers'), false);
   });
 
   it('hosts the re-fetch effects (actor change, scene, world-time tick)', () => {
@@ -94,9 +140,14 @@ describe('JournalView layout + effects', () => {
 });
 
 describe('Journal status vocabulary + actions', () => {
-  it('mirrors the RuntimeStatePill vocabulary (ready=green play, waiting=warning hourglass)', () => {
+  it('mirrors the RuntimeStatePill vocabulary (ready=green play, in progress=info gear)', () => {
     assert.ok(statusSource.includes('fa-circle-play'), 'ready uses the play icon');
-    assert.ok(statusSource.includes('fa-hourglass-half'), 'waiting uses the hourglass icon');
+    // Issue 1648, D-029: `waiting` no longer has a look of its own. It shares the `inProgress`
+    // descriptor object outright, so the warning hourglass it used to wear is gone from the map
+    // rather than merely unreferenced.
+    assert.ok(statusSource.includes('fa-gear'), 'the merged active badge uses the gear icon');
+    assert.equal(statusSource.includes('fa-hourglass-half'), false, 'the retired waiting icon is gone');
+    assert.ok(statusSource.includes('waiting: IN_PROGRESS_PRESENTATION'), 'and it is the SAME object, not a copy');
     assert.ok(statusSource.includes('fa-circle-check'), 'succeeded uses the check icon');
     assert.ok(statusSource.includes('fa-circle-xmark'), 'failed uses the xmark icon');
     assert.ok(statusSource.includes("tone: 'success'"), 'ready/succeeded are the success tone');
@@ -106,11 +157,108 @@ describe('Journal status vocabulary + actions', () => {
   it('derives Trigger readiness from the time gate, never from run.status', () => {
     assert.ok(actionsSource.includes('availableAt <= now'), 'readiness is availableAt <= now');
     assert.equal(actionsSource.includes('run.status'), false, 'never reads run.status for readiness');
-    assert.ok(actionsSource.includes('fabricate-app-primary-button'), 'uses the global primary button class');
+    assert.ok(actionsSource.includes("import RunActionBar from '../../components/RunActionBar.svelte'"));
+    assert.ok(actionsSource.includes('<RunActionBar'));
   });
 });
 
 describe('Journal label mirrors resolve in lang/en.json (drift guard)', () => {
+  it('resolves literal UI copy and every dynamic authority and progressive-mode label', () => {
+    const sources = [viewSource, detailSource, actionsSource, stepSource];
+    const literals = sources.flatMap((source) => [...source.matchAll(/'(FABRICATE\.App\.Journal\.[A-Za-z.]+)'/g)].map((match) => match[1]));
+    // Issue 1648 moved the authority vocabulary out of ActionsPanel into the UI-free
+    // `journalRunReasons.js` the player stores share. Imported rather than read as source
+    // text: the map is exported, so a pin would be strictly weaker and costs a ledger entry.
+    const reasons = Object.values(JOURNAL_RUN_REASON_KEYS);
+    const modes = ['equal', 'exceed', 'partial'].map((mode) => `FABRICATE.App.Journal.Yields.AwardModes.${mode}`);
+    assert.ok(reasons.length >= 40, 'authority label map was extracted');
+    for (const key of new Set([...literals, ...reasons, ...modes])) {
+      assert.equal(typeof resolveLangKey(key), 'string', `${key} resolves without an English fallback`);
+    }
+  });
+
+  // The historical branch spells no whole key: `tests/ui-lang-keys-resolve.test.js` sees only the
+  // interpolated prefix, resolves it to an object and checks nothing beneath it, so deleting
+  // `History.RollNotRecorded` passed every gate. Prefix and leaves both come from the AST.
+  // The same `text(leaf)` idiom now appears in three places, so the checker is shared. A
+  // module that composes its own prefix is invisible to `ui-lang-keys-resolve`, which can
+  // only check that the BASE exists — these assertions are what check the leaves.
+  const textHelperKeys = (ast) => {
+    const leaves = (node) => {
+      if (node?.type === 'Literal' && typeof node.value === 'string') return [node.value];
+      if (node?.type === 'ConditionalExpression')
+        return [...leaves(node.consequent), ...leaves(node.alternate)];
+      return [];
+    };
+    let prefix = null;
+    const keys = [];
+    for (const node of walkNodes(ast)) {
+      if (
+        node.type === 'VariableDeclarator' &&
+        node.id?.name === 'text' &&
+        calledName(node.init?.body) === 'localize'
+      ) {
+        prefix = node.init.body.arguments[0]?.quasis?.[0]?.value?.cooked ?? null;
+      }
+      if (calledName(node) === 'text') keys.push(...leaves(node.arguments?.[0]));
+    }
+    return { prefix, keys };
+  };
+
+  for (const [label, path, floor] of [
+    ['the run state notice', '../../src/ui/svelte/apps/journal/runStateNotice.js', 4],
+    ['the claim recovery dialog', '../../src/ui/svelte/apps/journal/runRecovery.js', 4],
+  ]) {
+    it(`resolves every prefixed label ${label} reads through its text helper`, () => {
+      // These two are plain .js modules, so they parse with parseModule; the historical
+      // branch below is a .svelte component and parses with parseComponent.
+      const { prefix, keys } = textHelperKeys(parseModule(read(path)));
+      assert.ok(prefix?.startsWith('FABRICATE.'), `the text helper localizes a prefix: ${prefix}`);
+      assert.ok(keys.length >= floor, `extracted the text() call sites: ${keys.length}`);
+      for (const key of new Set(keys)) {
+        assert.equal(
+          typeof resolveLangKey(prefix + key),
+          'string',
+          `${prefix}${key} must resolve to a string in lang/en.json`
+        );
+      }
+    });
+  }
+
+  it('resolves every prefixed History label the historical branch reads through its text helper', () => {
+    const ast = parseComponent(historySource);
+    const leaves = (node) => {
+      if (node?.type === 'Literal' && typeof node.value === 'string') return [node.value];
+      if (node?.type === 'ConditionalExpression')
+        return [...leaves(node.consequent), ...leaves(node.alternate)];
+      return [];
+    };
+    let prefix = null;
+    const keys = [];
+    for (const node of walkNodes(ast)) {
+      if (
+        node.type === 'VariableDeclarator' &&
+        node.id?.name === 'text' &&
+        calledName(node.init?.body) === 'localize'
+      ) {
+        prefix = node.init.body.arguments[0]?.quasis?.[0]?.value?.cooked ?? null;
+      }
+      if (calledName(node) === 'text') keys.push(...leaves(node.arguments?.[0]));
+    }
+    assert.ok(prefix?.startsWith('FABRICATE.'), `the text helper localizes a prefix: ${prefix}`);
+    assert.ok(
+      keys.length >= 45,
+      `extracted the text() call sites, not a stopped scan: ${keys.length}`
+    );
+    for (const key of new Set(keys)) {
+      assert.equal(
+        typeof resolveLangKey(prefix + key),
+        'string',
+        `${prefix}${key} must resolve to a string in lang/en.json`
+      );
+    }
+  });
+
   it('every journalRunStatus labelKey resolves to a real localized string', () => {
     const keys = [...statusSource.matchAll(/labelKey:\s*'([^']+)'/g)].map((match) => match[1]);
     assert.ok(keys.length >= 6, 'extracted the status labelKeys from the presentation map');
@@ -139,13 +287,9 @@ describe('Journal label mirrors resolve in lang/en.json (drift guard)', () => {
 });
 
 describe('Journal global CSS treatments', () => {
-  it('adds the player-scoped green primary button overriding Foundry button chrome', () => {
-    assert.ok(cssSource.includes('.fabricate-app .fabricate-app-primary-button'), 'primary button rule present');
-    assert.ok(
-      cssSource.includes('background: var(--fab-success);'),
-      'primary button uses the success token (no colour literal)'
-    );
-    assert.ok(cssSource.includes('height: auto;'), 'overrides Foundry button fixed height');
+  it('delegates primary controls to RunActionBar and retires the unused Journal button skin', () => {
+    assert.ok(actionsSource.includes('<RunActionBar'), 'the shared primitive owns action chrome');
+    assert.ok(!cssSource.includes('.fabricate-app-primary-button'), 'no dead primary skin remains');
   });
 
   it('adds the namespaced nav-count badge with no colour literals', () => {

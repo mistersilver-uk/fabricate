@@ -59,7 +59,7 @@ test('formatTimeRequirement falls back to the raw unit name without i18n', async
   globalThis.game = {};
   try {
     // Re-import with a cache-busting query so the stub-less branch is exercised.
-    const mod = await import('../src/ui/svelte/util/recipeDuration.js?nogame');
+    const mod = await import(new URL('../src/ui/svelte/util/recipeDuration.js?nogame', import.meta.url));
     assert.equal(mod.formatTimeRequirement({ hours: 1 }), '1 hour');
     assert.equal(mod.formatTimeRequirement({ hours: 2 }), '2 hours');
   } finally {

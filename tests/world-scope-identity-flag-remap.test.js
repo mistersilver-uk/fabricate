@@ -20,6 +20,9 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { canonicalSignatureKey } from '../src/utils/alchemySignatureKey.js';
+import { mergeEquivalentWorldEssences } from '../src/migration/mergeEquivalentWorldEssences.js';
+import { buildEssenceMergeCorpus } from './helpers/worldScopeCorpus.js';
+import { createPersistedCraftingHistory } from './helpers/journal-fixtures.js';
 import {
   forcedReplacementFlagPath,
   hasPendingWorldEssenceMerge,
@@ -37,6 +40,47 @@ import {
 } from '../src/migration/remapWorldScopeIdentityFlags.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
+
+test('actual equivalent-essence merge and flag remap preserve captured history through applied-prefix resume', async () => {
+  let afterRemap;
+  const fixture = await createPersistedCraftingHistory({ resumePrefix: true, stageCount: 1,
+    transformBeforeResume: async ({ actor, system, steps }) => {
+      const corpus = buildEssenceMergeCorpus({ systems: [{ id: system.id, essences: [
+        { id: 'sun', name: 'Sun' }, { id: 'moon', name: 'Light' },
+      ] }, { id: 'donor', essences: [{ id: 'light', name: 'Light' }] }] });
+      const migratedRecipe = { id: 'history-recipe', craftingSystemId: system.id, steps: JSON.parse(JSON.stringify(steps)) };
+      const merged = mergeEquivalentWorldEssences({ ...corpus, recipes: [migratedRecipe], gatheringConfig: {} });
+      assert.equal(merged.worldEssenceMergeMap.systems[system.id].essences.moon, 'light');
+      const container = actor.getFlag('fabricate', 'fabricate.craftingRuns');
+      const active = Object.values(container.active)[0];
+      // The stage spent its inputs at START (D-026), so the essence snapshot the resume reads
+      // is the step's `preparedConsumption` and it is that copy the merge has to re-key.
+      const captures = structuredClone({ selected: active.steps[0].selectedRequirementSnapshot,
+        essence: active.steps[0].preparedConsumption.essenceSpend });
+      const document = makeMergeDocument({ fabricate: { fabricate: { craftingRuns: container } } });
+      document.id = actor.id;
+      document.uuid = actor.uuid;
+      document.items = [];
+      const result = await runEssenceRemap([document], forcedReplacementWriters(), merged.worldEssenceMergeMap);
+      assert.equal(result.remappedRunContainers, 1);
+      afterRemap = document.getFlag('fabricate', 'fabricate.craftingRuns');
+      const remappedRun = Object.values(afterRemap.active)[0];
+      const receipt = remappedRun.steps[0].preparedConsumption;
+      assert.deepEqual(receipt.resolvedEssences, { sun: 4, light: 6 });
+      assert.deepEqual(receipt.essenceEnabled, { sun: true, light: true });
+      assert.deepEqual(remappedRun.steps[0].selectedRequirementSnapshot, captures.selected);
+      assert.deepEqual(receipt.essenceSpend, captures.essence);
+      actor.flags.fabricate['fabricate.craftingRuns'] = afterRemap;
+      system.essenceDefinitions = merged.systems[0].essenceDefinitions;
+      steps[0].ingredientSets[0].ingredientGroups = merged.recipes[0].steps[0].ingredientSets[0].ingredientGroups;
+    },
+  });
+  assert.ok(afterRemap);
+  assert.equal(fixture.record.status, 'succeeded');
+  assert.deepEqual(fixture.model.steps[0].essenceSpend.labels, { sun: 'Sun', moon: 'Moon' });
+  assert.equal(fixture.model.steps[0].consumedIngredients.length, 2);
+  assert.equal(fixture.model.createdResults[0].quantity, 1);
+});
 
 const MAP = Object.freeze({
   'sys-a': { components: { 'old-c': 'new-c' }, tools: { 'old-t': 'new-t' } },

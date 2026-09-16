@@ -196,6 +196,7 @@ export default [
       '.foundry-perf/',
       '.benchmarks/',
       'test-results/',
+      'tmp/',
       'ui-screenshot-artifact/',
       'content-packs/',
       '.air/',

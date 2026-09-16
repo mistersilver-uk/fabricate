@@ -256,6 +256,20 @@ export function stackQuantityUpdate(item, value, path = itemStackQuantityPath())
 }
 
 /**
+ * Thrown when the path guard refuses a write, so a caller judging acknowledgement can tell
+ * "nothing reached the database" from "the document did not acknowledge" — an UNCERTAIN write
+ * requiring GM reconciliation. Collapsing the two forced recovery for a write that never ran.
+ */
+export class StackQuantityPathRefusal extends Error {
+  constructor(path) {
+    super(`The configured item stack-quantity path "${path}" resolves an object`);
+    this.name = 'StackQuantityPathRefusal';
+    this.code = 'STACK_QUANTITY_PATH_REFUSED';
+    this.path = path;
+  }
+}
+
+/**
  * Write a stack quantity onto a live item document.
  *
  * Returns `null` without calling `update` when the write is refused, so the six routed
@@ -265,11 +279,22 @@ export function stackQuantityUpdate(item, value, path = itemStackQuantityPath())
  * @param {object} item Item document.
  * @param {number} value The new stack quantity.
  * @param {string} [path] Dotted stack-quantity path.
+ * @param {object} [options]
+ * @param {boolean} [options.throwOnRefusal] Throw {@link StackQuantityPathRefusal} instead of
+ *   answering `null`, for a caller whose `null` means "unacknowledged".
  * @returns {Promise<*>} The `update` result, or `null` when refused.
  */
-export async function updateStackQuantity(item, value, path = itemStackQuantityPath()) {
+export async function updateStackQuantity(
+  item,
+  value,
+  path = itemStackQuantityPath(),
+  { throwOnRefusal = false } = {}
+) {
   const payload = stackQuantityUpdate(item, value, path);
-  if (!payload) return null;
+  if (!payload) {
+    if (throwOnRefusal) throw new StackQuantityPathRefusal(path);
+    return null;
+  }
   return (await item?.update?.(payload)) ?? null;
 }
 

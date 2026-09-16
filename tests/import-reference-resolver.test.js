@@ -115,6 +115,32 @@ test('resolver: broken essence via legacy associatedSystemItemId is reported', a
   assert.equal(broken.ownerType, 'essence');
 });
 
+test('resolver: broken gathering result component aliases are reported', async () => {
+  const payload = payloadFromFixture();
+  const task = payload.gatheringConfig.system.tasks[0];
+  task.resultGroups = [
+    {
+      id: 'group-broken',
+      name: 'Broken yield',
+      results: [
+        { id: 'component-alias', componentId: 'ghost-component', quantity: 1 },
+        { id: 'system-alias', systemItemId: 'ghost-system-item', quantity: 1 }
+      ]
+    }
+  ];
+
+  const { unresolvedReferences } = await resolveImportReferences(payload);
+  const broken = unresolvedReferences.filter(
+    (reference) => reference.ownerType === 'task' && reference.ownerId === task.id
+  );
+
+  assert.deepEqual(
+    broken.map((reference) => reference.referenceValue).sort((a, b) => a.localeCompare(b)),
+    ['ghost-component', 'ghost-system-item']
+  );
+  assert.ok(broken.every((reference) => reference.kind === REFERENCE_KINDS.COMPONENT_LINK));
+});
+
 test('resolver: broken recipe recipeItemId is reported', async () => {
   const payload = payloadFromFixture();
   payload.recipes[0].recipeItemId = 'missing-def';

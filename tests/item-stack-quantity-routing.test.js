@@ -75,10 +75,12 @@ function ownedItem(id, qtd, extra = {}) {
     updates: [],
     async delete() {
       this.deleted = true;
+      return this;
     },
     async update(payload) {
       this.updates.push({ ...payload });
       for (const [key, value] of Object.entries(payload)) setByPath(this, key, value);
+      return this;
     },
     toObject() {
       return { name: this.name, img: this.img, type: 'loot', system: { ...this.system } };
@@ -100,7 +102,9 @@ function capturingActor(items = []) {
         ...payload,
         documentName: 'Item',
         id: `created-${index}`,
-        uuid: `Item.created-${index}`,
+        uuid: `${this.uuid}.Item.created-${index}`,
+        parent: this,
+        _source: structuredClone(payload),
       }));
     },
   };
@@ -161,7 +165,9 @@ describe('salvage consumption (_consumeComponentItems)', () => {
 
     assert.equal(item.deleted, false);
     assert.deepEqual(item.updates, [{ 'system.qtd': 19 }]);
-    assert.deepEqual(consumed, [{ item, quantity: 1 }]);
+    assert.equal(consumed[0].item, item);
+    assert.equal(consumed[0].quantity, 1);
+    assert.equal(consumed[0].receipt.quantity, 1);
     assertNoDefaultPathWrite(item);
   });
 });
@@ -181,7 +187,9 @@ describe('alchemy EXTRA consumption (_consumeAlchemyExtraItems)', () => {
 
     assert.equal(item.deleted, false);
     assert.deepEqual(item.updates, [{ 'system.qtd': 19 }]);
-    assert.deepEqual(consumedItems, [{ item, quantity: 1, ingredient: null }]);
+    assert.equal(consumedItems[0].item, item);
+    assert.equal(consumedItems[0].quantity, 1);
+    assert.equal(consumedItems[0].receipt.quantity, 1);
     assertNoDefaultPathWrite(item);
   });
 });

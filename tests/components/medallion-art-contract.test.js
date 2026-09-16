@@ -92,10 +92,14 @@ const ART_RESOLVER = 'resolveCraftingArt(';
  * component's `fa-scroll` default at `0.9rem` in the accent. The seven journal tiles pass none of
  * the three, because every one of them resolves an image unconditionally.
  */
-const MEDALLION_SITES = 77;
+// #1648: RunDetail -1, StepDetails -2, ChoiceOptionList +1, EssencePool +2,
+// SlotTile +1, YieldScale +1 = net +2; the artwork-bearing subset rises by one.
+// TP11 re-census: 84 sites / 66 artwork-bearing after historical composition and
+// dense ListRow adoption; EssencePool now has four sites, two artwork-bearing.
+const MEDALLION_SITES = 84;
 
 /** How many of them bind artwork at all. The rest are glyph-only and `alt` is moot for them. */
-const ART_BEARING_SITES = 64;
+const ART_BEARING_SITES = 66;
 
 /** `<Medallion …>` opening tags in `src/`, as `{ path, tag }`. */
 const TAGS = Object.entries(SOURCES).flatMap(([path, source]) =>

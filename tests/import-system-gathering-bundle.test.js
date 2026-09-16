@@ -50,6 +50,15 @@ function makeLazyEnvironmentStoreSeam(holder) {
 
 test('#699 API-path import persists gatheringEnvironments + gatheringConfig through the shared importer', async () => {
   const fixture = buildFullAuthoringFixture();
+  const sourceTask = fixture.gatheringConfig.systems[FIXTURE_SYSTEM_ID].tasks[0];
+  sourceTask.resolutionMode = 'straight';
+  sourceTask.resultGroups = [
+    {
+      id: 'straight-results',
+      name: 'Herbs',
+      results: [{ id: 'result-herb', componentId: 'comp-herb', quantity: 2 }]
+    }
+  ];
   const source = makeHarness(fixture);
   const exported = exportCurrent(source, FIXTURE_SYSTEM_ID);
 
@@ -95,6 +104,9 @@ test('#699 API-path import persists gatheringEnvironments + gatheringConfig thro
     persistedConfig.systems?.[FIXTURE_SYSTEM_ID],
     'gatheringConfig slice persisted under the imported system id'
   );
+  const persistedTask = persistedConfig.systems[FIXTURE_SYSTEM_ID].tasks[0];
+  assert.equal(persistedTask.resolutionMode, 'straight');
+  assert.deepEqual(persistedTask.resultGroups, sourceTask.resultGroups);
 
   // Report honesty: the gathering source-item references the report claims were
   // handled correspond to a run that actually persisted (no processed-looking

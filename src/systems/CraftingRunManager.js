@@ -1,4 +1,27 @@
+import { cloneJson } from '../utils/scalars.js';
+
+import { stringOrNull } from './gatheringEngineInternals.js';
 import { RunContainerManagerBase } from './runContainerStore.js';
+import {
+  observeExecutionJournal,
+  persistExecutionJournalTransition,
+  transitionExecutionJournal,
+} from './runExecutionJournal.js';
+import {
+  historyEvidenceFields,
+  itemReceipt,
+  retainUncertainReceipt,
+} from './runHistoryEvidence.js';
+import {
+  assertRunLifecycleMutation,
+  buildNewRunLifecycleFields,
+  getRunLifecycleContract,
+  incrementRunRevision,
+  persistCompletionMode,
+  persistPausedRun,
+  persistResumedRun,
+  RunLifecycleError,
+} from './runLifecycleState.js';
 import { selectWritableActors } from './writableActors.js';
 
 const HISTORY_LIMIT = 50;
@@ -99,10 +122,11 @@ export class CraftingRunManager extends RunContainerManagerBase {
     return runs.find((run) => run.recipeId === recipeId) || null;
   }
 
-  async createRun(actor, recipe, componentSourceActors = [], userId = null) {
+  async createRun(actor, recipe, componentSourceActors = [], userId = null, lifecycle = {}) {
     const container = this._getContainer(actor);
     const runId = foundry.utils.randomID();
     const stepStates = this._buildStepStates(recipe);
+    const lifecycleFields = buildNewRunLifecycleFields(lifecycle);
     const run = {
       id: runId,
       actorUuid: actor.uuid,
@@ -116,6 +140,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
       currentStepIndex: 0,
       steps: stepStates,
       componentSourceActorUuids: componentSourceActors.map((a) => a.uuid),
+      ...lifecycleFields,
     };
 
     container.active[runId] = run;
@@ -123,9 +148,23 @@ export class CraftingRunManager extends RunContainerManagerBase {
     return run;
   }
 
-  async updateRun(actor, run) {
+  async updateRun(actor, run, { expectedRevision, executionOperationId = null } = {}) {
+    const isCurrentLifecycle = getRunLifecycleContract(run) === 'current';
+    if (isCurrentLifecycle) this.invalidateCache(actor.id);
     const container = this._getContainer(actor);
-    if (!container.active[run.id]) return null;
+    const persistedRun = container.active[run.id];
+    if (!persistedRun) return null;
+    if (isCurrentLifecycle) {
+      this._assertRunMutation(persistedRun, {
+        expectedRevision: run.runRevision,
+        executionOperationId,
+      });
+      if (expectedRevision !== undefined) {
+        this._assertRunMutation(persistedRun, { expectedRevision, executionOperationId });
+      }
+    }
+    this._assertRunMutation(run, { expectedRevision, executionOperationId });
+    incrementRunRevision(run);
     run.updatedAt = this._nowWorldTime();
     container.active[run.id] = run;
     await this._persist(actor, container);
@@ -133,6 +172,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
   }
 
   async markStepWaitingForTime(actor, run, stepIndex, timeRequirement) {
+    this._assertRunMutation(run);
     const seconds = this._durationToSeconds(timeRequirement);
     if (seconds <= 0) return run;
 
@@ -182,10 +222,10 @@ export class CraftingRunManager extends RunContainerManagerBase {
    * consumed. It is `{}` — not absent — when nothing contributed, and the engine reads an
    * ABSENT map (a run armed before this change) as all-enabled.
    *
-   * **This literal is a whitelist REBUILD.** It emits exactly the keys named below and
-   * silently drops anything else the call site passes, so a new snapshot field must be
-   * added HERE as well as at the call site or the finish path falls back to live values
-   * and the defect ships green.
+   * **{@link buildPreparedConsumption} is a whitelist REBUILD.** It emits exactly the keys
+   * it names and silently drops anything else the call site passes, so a new snapshot field
+   * must be added THERE as well as at the call site or the finish path falls back to live
+   * values and the defect ships green.
    *
    * @param {Actor} actor
    * @param {object} run
@@ -197,22 +237,10 @@ export class CraftingRunManager extends RunContainerManagerBase {
    * @returns {Promise<object|null>} the updated run, or null if the step index is invalid
    */
   async markStepPrepared(actor, run, stepIndex, prepared = {}) {
+    this._assertRunMutation(run);
     const step = run.steps?.[stepIndex];
     if (!step) return null;
-    step.preparedConsumption = {
-      selectedIngredientSetId: prepared.selectedIngredientSetId ?? null,
-      // SETTLED spends only — see the note above.
-      currencySpends: Array.isArray(prepared.currencySpends) ? prepared.currencySpends : [],
-      resolvedEssences:
-        prepared.resolvedEssences && typeof prepared.resolvedEssences === 'object'
-          ? prepared.resolvedEssences
-          : {},
-      essenceEnabled:
-        prepared.essenceEnabled && typeof prepared.essenceEnabled === 'object'
-          ? prepared.essenceEnabled
-          : {},
-      consumedSummary: Array.isArray(prepared.consumedSummary) ? prepared.consumedSummary : [],
-    };
+    step.preparedConsumption = buildPreparedConsumption(prepared);
     step.selectedIngredientSetId = prepared.selectedIngredientSetId ?? step.selectedIngredientSetId;
     step.updatedAt = this._nowWorldTime();
     await this.updateRun(actor, run);
@@ -237,6 +265,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
    * @returns {Promise<object>} the updated run
    */
   async armCollapsedChainGate(actor, run, seconds) {
+    this._assertRunMutation(run);
     const total = Number(seconds);
     if (!Number.isFinite(total) || total <= 0) return run;
     const worldTime = this._nowWorldTime();
@@ -259,12 +288,20 @@ export class CraftingRunManager extends RunContainerManagerBase {
   }
 
   canProceedTimeGate(run, stepIndex, worldTime = this._nowWorldTime()) {
+    if (getRunLifecycleContract(run) === 'unsupported' || run?.pauseState) return false;
+    if (
+      run?.executionJournal?.status !== undefined &&
+      run.executionJournal.status !== 'committed'
+    ) {
+      return false;
+    }
     const step = run.steps?.[stepIndex];
     if (!step?.timeGate) return true;
     return Number(worldTime) >= Number(step.timeGate.availableAt || 0);
   }
 
-  async markStepInProgress(actor, run, stepIndex) {
+  async markStepInProgress(actor, run, stepIndex, options = {}) {
+    this._assertRunMutation(run, options);
     const worldTime = this._nowWorldTime();
     const step = run.steps?.[stepIndex];
     if (!step) return run;
@@ -273,11 +310,12 @@ export class CraftingRunManager extends RunContainerManagerBase {
     step.status = 'inProgress';
     step.startedAt ??= worldTime;
     step.updatedAt = worldTime;
-    await this.updateRun(actor, run);
+    await this.updateRun(actor, run, options);
     return run;
   }
 
-  async completeStepSuccess(actor, run, stepIndex, payload = {}) {
+  async completeStepSuccess(actor, run, stepIndex, payload = {}, options = {}) {
+    this._assertRunMutation(run, options);
     const worldTime = this._nowWorldTime();
     const step = run.steps?.[stepIndex];
     if (!step) return run;
@@ -290,10 +328,11 @@ export class CraftingRunManager extends RunContainerManagerBase {
     step.consumedIngredients = payload.consumedIngredients || step.consumedIngredients || [];
     step.usedTools = payload.usedTools || step.usedTools || [];
     step.createdResults = payload.createdResults || step.createdResults || [];
+    applyStepHistoryEvidence(step, payload);
 
     const nextIndex = stepIndex + 1;
     if (nextIndex >= (run.steps?.length || 0)) {
-      return this.completeRun(actor, run, 'succeeded');
+      return this.completeRun(actor, run, 'succeeded', options);
     }
 
     run.currentStepIndex = nextIndex;
@@ -304,11 +343,19 @@ export class CraftingRunManager extends RunContainerManagerBase {
       nextStep.startedAt ??= worldTime;
       nextStep.updatedAt = worldTime;
     }
-    await this.updateRun(actor, run);
+    await this.updateRun(actor, run, options);
     return run;
   }
 
-  async completeStepFailure(actor, run, stepIndex, reason = 'Crafting check failed', payload = {}) {
+  async completeStepFailure(
+    actor,
+    run,
+    stepIndex,
+    reason = 'Crafting check failed',
+    payload = {},
+    options = {}
+  ) {
+    this._assertRunMutation(run, options);
     const worldTime = this._nowWorldTime();
     const step = run.steps?.[stepIndex];
     if (!step) return run;
@@ -322,18 +369,32 @@ export class CraftingRunManager extends RunContainerManagerBase {
     step.consumedIngredients = payload.consumedIngredients || step.consumedIngredients || [];
     step.usedTools = payload.usedTools || step.usedTools || [];
     step.createdResults = payload.createdResults || step.createdResults || [];
+    applyStepHistoryEvidence(step, payload);
 
-    return this.completeRun(actor, run, 'failed');
+    return this.completeRun(actor, run, 'failed', options);
   }
 
-  async completeRun(actor, run, status = 'succeeded') {
+  async completeRun(actor, run, status = 'succeeded', options = {}) {
+    if (options.executionOperationId) this.invalidateCache(actor.id);
     const container = this._getContainer(actor);
-    if (!container.active?.[run.id]) return run;
+    const persistedRun = container.active?.[run.id];
+    if (!persistedRun) return run;
+    if (options.executionOperationId) {
+      this._assertRunMutation(persistedRun, {
+        ...options,
+        expectedRevision: options.expectedRevision ?? run.runRevision,
+      });
+    }
+    this._assertRunMutation(run, {
+      ...options,
+      allowPaused: status === 'cancelled',
+    });
 
     run.status = status;
     run.currentStepIndex = null;
     run.updatedAt = this._nowWorldTime();
     run.finishedAt = this._nowWorldTime();
+    incrementRunRevision(run);
 
     delete container.active[run.id];
     // Never archive a run that already has a history entry: a duplicate id would
@@ -375,6 +436,36 @@ export class CraftingRunManager extends RunContainerManagerBase {
     const container = this._getContainer(actor);
     const run = container.active?.[runId];
     if (!run) return null;
+    this._assertRunMutation(run);
+    delete container.active[runId];
+    await this._persist(actor, container);
+    return run;
+  }
+
+  /**
+   * Discard a run whose start left NO EVIDENCE: no applied effect and no retained receipt. Such a
+   * start changed nothing, so its journal records an uncertainty that does not exist — and the
+   * `recoveryRequired` that records it refuses every control the run has, cancel included, so a
+   * run left in that state can never be cleared by the player (issue 1648, F1).
+   *
+   * Separate from {@link discardRun}, which refuses a run under reconciliation, because the
+   * evidence test is exactly what makes this one safe.
+   *
+   * @param {Actor} actor
+   * @param {string} runId
+   * @returns {Promise<object|null>} the discarded run, or `null` when it is absent or HAS evidence.
+   */
+  async discardUnappliedRun(actor, runId) {
+    const container = this._getContainer(actor);
+    const run = container.active?.[runId];
+    if (!run) return null;
+    const effects = run.executionJournal?.effects;
+    if (
+      Array.isArray(effects) &&
+      effects.some((effect) => effect?.phase === 'applied' || effect?.receipt != null)
+    ) {
+      return null;
+    }
     delete container.active[runId];
     await this._persist(actor, container);
     return run;
@@ -396,7 +487,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
    * @param {string|null} [details.userId]
    * @returns {Promise<object>} the recorded fizzle history entry
    */
-  async recordFizzle(actor, { craftingSystemId = null, userId = null } = {}) {
+  async recordFizzle(actor, { craftingSystemId = null, userId = null, ...evidence } = {}) {
     const container = this._getContainer(actor);
     const now = this._nowWorldTime();
     const entry = {
@@ -412,11 +503,73 @@ export class CraftingRunManager extends RunContainerManagerBase {
       finishedAt: now,
       currentStepIndex: null,
       steps: [],
+      ...historyEvidenceFields(evidence),
+      ...(Array.isArray(evidence.consumedIngredients) && {
+        consumedIngredients: evidence.consumedIngredients.map(itemReceipt),
+      }),
+      ...(Array.isArray(evidence.createdResults) && {
+        createdResults: evidence.createdResults.map(itemReceipt),
+      }),
     };
     container.history.unshift(entry);
     if (container.history.length > HISTORY_LIMIT) {
       container.history = container.history.slice(0, HISTORY_LIMIT);
     }
+    await this._persist(actor, container);
+    return entry;
+  }
+
+  async planVersionedFizzle(
+    actor,
+    {
+      craftingSystemId = null,
+      userId = null,
+      componentSourceActorUuids = [],
+      operationId,
+      requestId,
+      effects = [],
+    } = {}
+  ) {
+    this.invalidateCache(actor.id);
+    const container = this._getContainer(actor);
+    const duplicate = (container.history || []).find(
+      (run) =>
+        getRunLifecycleContract(run) === 'current' &&
+        run?.isFizzle === true &&
+        run?.executionJournal?.requestId === String(requestId ?? '').trim()
+    );
+    if (duplicate) return duplicate;
+    const now = this._nowWorldTime();
+    const entry = {
+      id: foundry.utils.randomID(),
+      actorUuid: actor.uuid,
+      userId: userId || game.user?.id || null,
+      craftingSystemId: craftingSystemId ?? null,
+      recipeId: null,
+      isFizzle: true,
+      activityKind: 'alchemy',
+      resolutionSnapshot: { kind: 'none', mode: 'alchemy' },
+      status: 'failed',
+      startedAt: now,
+      updatedAt: now,
+      finishedAt: now,
+      currentStepIndex: null,
+      steps: [],
+      componentSourceActorUuids: [...componentSourceActorUuids],
+      ...buildNewRunLifecycleFields({ lifecycleVersion: 1, completionMode: 'manual' }),
+    };
+    entry.executionJournal = transitionExecutionJournal(undefined, {
+      type: 'plan',
+      plan: {
+        operationId,
+        requestId,
+        baseRunRevision: entry.runRevision,
+        intent: { activityKind: 'alchemy', craftingSystemId },
+        effects,
+      },
+    });
+    container.history.unshift(entry);
+    if (container.history.length > HISTORY_LIMIT) container.history.length = HISTORY_LIMIT;
     await this._persist(actor, container);
     return entry;
   }
@@ -432,23 +585,271 @@ export class CraftingRunManager extends RunContainerManagerBase {
       let dirty = false;
 
       for (const run of Object.values(container.active || {})) {
-        if (run.status !== 'waitingTime') continue;
-        const idx = Number(run.currentStepIndex);
-        if (!Number.isFinite(idx)) continue;
-        const step = run.steps?.[idx];
-        if (!step?.timeGate) continue;
-        if (Number(worldTime) < Number(step.timeGate.availableAt || 0)) continue;
+        const step = this._maturedWaitingStep(run, worldTime);
+        if (!step) continue;
 
         run.status = 'inProgress';
         step.status = 'inProgress';
         step.updatedAt = Number(worldTime);
         run.updatedAt = Number(worldTime);
+        incrementRunRevision(run);
         dirty = true;
       }
 
       if (dirty) {
         await this._persist(actor, container);
       }
+    }
+  }
+
+  _maturedWaitingStep(run, worldTime) {
+    if (run.status !== 'waitingTime') return null;
+    if (getRunLifecycleContract(run) !== 'legacy') return null;
+    if (run.pauseState) return null;
+    if (run.executionJournal && run.executionJournal.status !== 'committed') return null;
+    const index = Number(run.currentStepIndex);
+    if (!Number.isFinite(index)) return null;
+    const step = run.steps?.[index];
+    if (!step?.timeGate) return null;
+    if (Number(worldTime) < Number(step.timeGate.availableAt || 0)) return null;
+    return step;
+  }
+
+  listDueVersionedRuns(worldTime = this._nowWorldTime()) {
+    const due = [];
+    for (const actor of game.actors || []) {
+      this.invalidateCache(actor.id);
+      const container = this._getContainer(actor);
+      for (const run of Object.values(container.active || {})) {
+        if (!this._dueVersionedStep(run, worldTime)) continue;
+        const currentStepIndex = Number(run.currentStepIndex);
+        due.push({
+          actor,
+          runId: run.id,
+          expectedRevision: run.runRevision,
+          componentSourceActorUuids: [...(run.componentSourceActorUuids || [])],
+          maximumAttempts: Math.max(1, (run.steps?.length || 0) - currentStepIndex),
+        });
+      }
+    }
+    return due;
+  }
+
+  _dueVersionedStep(run, worldTime) {
+    if (getRunLifecycleContract(run) !== 'current') return null;
+    if (run.status !== 'waitingTime' || run.completionMode !== 'worldTime' || run.pauseState) {
+      return null;
+    }
+    if (run.executionJournal && run.executionJournal.status !== 'committed') return null;
+    const index = Number(run.currentStepIndex);
+    if (!Number.isSafeInteger(index)) return null;
+    const step = run.steps?.[index];
+    if (!step?.timeGate || Number(worldTime) < Number(step.timeGate.availableAt || 0)) return null;
+    return step;
+  }
+
+  async setCompletionMode(actor, runId, completionMode, { expectedRevision } = {}) {
+    return persistCompletionMode(this._locateRunPersistence(actor, runId), completionMode, {
+      expectedRevision,
+    });
+  }
+
+  async pauseRun(actor, runId, { expectedRevision } = {}) {
+    return persistPausedRun(this._locateRunPersistence(actor, runId), { expectedRevision });
+  }
+
+  async resumeRun(actor, runId, { expectedRevision } = {}) {
+    return persistResumedRun(this._locateRunPersistence(actor, runId), { expectedRevision });
+  }
+
+  async setStepSelectionPlan(actor, runId, stepIndex, selection = {}, { expectedRevision } = {}) {
+    const location = this._locateRunPersistence(actor, runId);
+    if (!location) return null;
+    const run = location.run;
+    this._assertRunMutation(run, { currentOnly: true, expectedRevision });
+    const index = Number(stepIndex);
+    const step = run.steps?.[index];
+    if (!step || index !== Number(run.currentStepIndex)) {
+      throw new RunLifecycleError(
+        'Selections may only change on the current crafting step',
+        'STALE_RUN_STAGE'
+      );
+    }
+    if (step.preparedConsumption) {
+      throw new RunLifecycleError(
+        'The crafting stage selection was locked when the stage started',
+        'SELECTION_LOCKED'
+      );
+    }
+    applyStepSelection(step, selection);
+    step.updatedAt = this._nowWorldTime();
+    incrementRunRevision(run);
+    return location.persist();
+  }
+
+  /**
+   * Commit a versioned stage START in ONE write: lock the selection, record what the
+   * stage actually consumed, and arm its time gate (D-026/D-028). After this the
+   * persisted plan is authoritative and the stage's inputs are already spent.
+   *
+   * @param {Actor} actor
+   * @param {object} run
+   * @param {number} stepIndex
+   * @param {{selection?: object, prepared?: object, requiredSeconds?: number}} started
+   *   `selection` as {@link setStepSelectionPlan}, `prepared` as {@link markStepPrepared}.
+   * @param {{expectedRevision?: number, executionOperationId?: string}} [options]
+   * @returns {Promise<object|null>} The updated run, or null for an invalid step index.
+   */
+  async markStepStarted(actor, run, stepIndex, started = {}, options = {}) {
+    this._assertRunMutation(run, options);
+    const step = run.steps?.[stepIndex];
+    if (!step) return null;
+    applyStepSelection(step, started.selection ?? {});
+    step.preparedConsumption = buildPreparedConsumption(started.prepared ?? {});
+    const worldTime = this._nowWorldTime();
+    const seconds = Math.max(0, Number(started.requiredSeconds) || 0);
+    if (seconds > 0) {
+      step.timeGate ??= {
+        requiredSeconds: seconds,
+        initiatedAt: worldTime,
+        availableAt: worldTime + seconds,
+      };
+      run.status = 'waitingTime';
+      step.status = 'waitingTime';
+    }
+    step.updatedAt = worldTime;
+    await this.updateRun(actor, run, options);
+    return run;
+  }
+
+  async updateExecutionJournal(actor, runId, transition, { expectedRevision } = {}) {
+    return persistExecutionJournalTransition(
+      this._locateRunPersistence(actor, runId, { activeOnly: false }),
+      transition,
+      { expectedRevision }
+    );
+  }
+
+  async retainUncertainReceipt(actor, runId, effectId, receipts, options) {
+    return retainUncertainReceipt(
+      this._locateRunPersistence(actor, runId, { activeOnly: false }),
+      effectId,
+      receipts,
+      options
+    );
+  }
+
+  async reconstructVersionedExecutions({ operationId = null, orphaned = false } = {}) {
+    const normalizedOperationId = String(operationId ?? '').trim();
+    const operationScope = normalizedOperationId.length > 0;
+    if (operationScope === (orphaned === true)) {
+      throw new RunLifecycleError(
+        'Execution reconstruction requires exactly one authority recovery scope',
+        'INVALID_RECOVERY_SCOPE'
+      );
+    }
+
+    const candidates = [];
+    for (const actor of selectWritableActors(game.actors)) {
+      this.invalidateCache(actor.id);
+      const container = this._getContainer(actor);
+      const runs = [
+        ...Object.values(container.active || {}),
+        ...(Array.isArray(container.history) ? container.history : []),
+      ];
+      for (const run of runs) {
+        if (getRunLifecycleContract(run) !== 'current' || !run?.executionJournal) continue;
+        const journal = observeExecutionJournal(run.executionJournal);
+        if (operationScope && journal.operationId !== normalizedOperationId) continue;
+        if (
+          journal.status !== 'planned' ||
+          journal.effects.every((effect) => effect.phase !== 'applying')
+        ) {
+          continue;
+        }
+        candidates.push({ actor, runId: run.id, expectedRevision: run.runRevision });
+      }
+    }
+
+    const runs = [];
+    for (const candidate of candidates) {
+      const reconstructed = await this.updateExecutionJournal(
+        candidate.actor,
+        candidate.runId,
+        { type: 'reconstructAfterReload' },
+        { expectedRevision: candidate.expectedRevision }
+      );
+      if (!reconstructed) {
+        throw new RunLifecycleError(
+          'An execution disappeared during recovery reconstruction',
+          'STALE_RUN_REVISION'
+        );
+      }
+      runs.push({
+        actorUuid: candidate.actor.uuid,
+        runId: reconstructed.id,
+        status: reconstructed.status,
+        runRevision: reconstructed.runRevision,
+        journalStatus: reconstructed.executionJournal.status,
+      });
+    }
+
+    return {
+      success: true,
+      scope: operationScope ? 'operation' : 'orphaned',
+      operationId: operationScope ? normalizedOperationId : null,
+      inspected: candidates.length,
+      reconstructed: runs.length,
+      runs,
+    };
+  }
+
+  _locateRunPersistence(actor, runId, { activeOnly = true } = {}) {
+    this.invalidateCache(actor.id);
+    const container = cloneJson(this._getContainer(actor));
+    const location = findRunLocation(container, runId);
+    if (!location || (activeOnly && location.terminal)) return null;
+    const run = location.run;
+    const currentStep = () => {
+      const index = Number(run.currentStepIndex);
+      return Number.isSafeInteger(index) ? run.steps?.[index] : null;
+    };
+    return {
+      run,
+      now: () => this._nowWorldTime(),
+      getTimeGate: () => currentStep()?.timeGate || null,
+      touchTimeGate: () => {
+        const step = currentStep();
+        if (step) step.updatedAt = this._nowWorldTime();
+      },
+      assertMutation: (options) => this._assertRunMutation(run, options),
+      persist: async () => {
+        run.updatedAt = this._nowWorldTime();
+        await this._persist(actor, container);
+        return run;
+      },
+    };
+  }
+
+  _assertRunMutation(
+    run,
+    { allowExecutionJournal = false, executionOperationId = null, ...options } = {}
+  ) {
+    assertRunLifecycleMutation(run, options);
+    if (!run?.executionJournal) return;
+    const journal = observeExecutionJournal(run.executionJournal);
+    if (!allowExecutionJournal && journal.status === 'planned') {
+      if (executionOperationId) {
+        if (journal.operationId === String(executionOperationId)) return;
+        throw new RunLifecycleError(
+          'The execution operation does not own this run',
+          'EXECUTION_OPERATION_MISMATCH'
+        );
+      }
+      throw new RunLifecycleError(
+        'The run already has an execution in progress',
+        'EXECUTION_IN_PROGRESS'
+      );
     }
   }
 
@@ -460,13 +861,14 @@ export class CraftingRunManager extends RunContainerManagerBase {
       let dirty = false;
 
       for (const [runId, run] of Object.entries(container.active || {})) {
+        if (getRunLifecycleContract(run) === 'unsupported') continue;
         if (run?.craftingSystemId !== target) continue;
         delete container.active[runId];
         dirty = true;
       }
 
       const nextHistory = (container.history || []).filter(
-        (run) => run?.craftingSystemId !== target
+        (run) => getRunLifecycleContract(run) === 'unsupported' || run?.craftingSystemId !== target
       );
       if (nextHistory.length !== (container.history || []).length) {
         container.history = nextHistory;
@@ -503,12 +905,15 @@ export class CraftingRunManager extends RunContainerManagerBase {
       let dirty = false;
 
       for (const [runId, run] of Object.entries(container.active || {})) {
+        if (getRunLifecycleContract(run) === 'unsupported') continue;
         if (!dropActiveRun(run)) continue;
         delete container.active[runId];
         dirty = true;
       }
 
-      const nextHistory = (container.history || []).filter((run) => keepHistoryEntry(run));
+      const nextHistory = (container.history || []).filter(
+        (run) => getRunLifecycleContract(run) === 'unsupported' || keepHistoryEntry(run)
+      );
       if (nextHistory.length !== (container.history || []).length) {
         container.history = nextHistory;
         dirty = true;
@@ -570,12 +975,14 @@ export class CraftingRunManager extends RunContainerManagerBase {
   }
 
   /**
-   * Prune legacy phantom active runs: a crafting run whose recipe is single-step
+   * Prune legacy phantom active runs: an unversioned run whose recipe is single-step
    * AND whose only step has no time requirement can never legitimately persist as
    * active (it only ever rejects, fails, or succeeds atomically), so any such run
    * left in the active container is a phantom stranded by an old pre-validation
    * early-return. Multi-step recipes (persist between "Trigger Next Step") and
    * single-step time-gated recipes (persist a waiting run) are excluded.
+   * Current-version runs can legitimately await manual completion without a time
+   * requirement, including after authored timing is removed, and are never pruned here.
    *
    * Unknown recipes are left alone here — {@link cleanupInvalidRuns} owns those.
    *
@@ -593,6 +1000,8 @@ export class CraftingRunManager extends RunContainerManagerBase {
       let dirty = false;
 
       for (const [runId, run] of Object.entries(container.active || {})) {
+        if (getRunLifecycleContract(run) !== 'legacy') continue;
+        if (run.steps?.some((step) => step.historySettlement)) continue;
         const recipe = run?.recipeId ? resolveRecipe(run.recipeId) : null;
         if (!recipe) continue;
         const steps =
@@ -610,4 +1019,177 @@ export class CraftingRunManager extends RunContainerManagerBase {
     }
     return pruned;
   }
+}
+
+/**
+ * Rebuild `preparedConsumption` from a caller snapshot. A WHITELIST: a new field must be
+ * added here as well as at the call site, or the resume falls back to live values.
+ * `consumedSnapshots` carries the versioned rehydration detail the reconstruction reads;
+ * `consumedSummary` stays the cancel reversal's restore input.
+ * @param {object} prepared
+ * @returns {object}
+ */
+function buildPreparedConsumption(prepared = {}) {
+  const value = {
+    selectedIngredientSetId: prepared.selectedIngredientSetId ?? null,
+    // SETTLED spends only — see the note on markStepPrepared.
+    currencySpends: Array.isArray(prepared.currencySpends) ? prepared.currencySpends : [],
+    resolvedEssences:
+      prepared.resolvedEssences && typeof prepared.resolvedEssences === 'object'
+        ? prepared.resolvedEssences
+        : {},
+    essenceEnabled:
+      prepared.essenceEnabled && typeof prepared.essenceEnabled === 'object'
+        ? prepared.essenceEnabled
+        : {},
+    consumedSummary: Array.isArray(prepared.consumedSummary) ? prepared.consumedSummary : [],
+  };
+  if (Array.isArray(prepared.consumedSnapshots)) {
+    value.consumedSnapshots = cloneJson(prepared.consumedSnapshots);
+  }
+  const evidence = craftingStepHistoryEvidence(prepared);
+  if (evidence.essenceSpend) value.essenceSpend = evidence.essenceSpend;
+  return value;
+}
+
+/**
+ * Apply an authored selection to a step, refusing a plan whose authored snapshot does not
+ * match the route it names. Shared by the pre-start edit and the stage-start lock.
+ * @param {object} step
+ * @param {object} selection
+ */
+function applyStepSelection(step, selection) {
+  // Authority callers supply authored evidence. Validate and clone both values
+  // before touching the live container so a refused edit cannot leak into it.
+  const plan = buildSelectionPlan(selection);
+  const snapshot = cloneJson(
+    selection.selectedRequirementSnapshot ?? step.selectedRequirementSnapshot
+  );
+  if (!snapshot || stringOrNull(snapshot.id) !== plan.selectedIngredientSetId) {
+    throw new RunLifecycleError(
+      'The selected crafting route requires its matching authored snapshot',
+      'INVALID_SELECTION_SNAPSHOT'
+    );
+  }
+  step.selectionPlan = plan;
+  step.selectedIngredientSetId = plan.selectedIngredientSetId;
+  step.selectedRequirementSnapshot = snapshot;
+  const evidence = craftingStepHistoryEvidence(selection);
+  if (!step.presentationSnapshot && evidence.presentationSnapshot) {
+    step.presentationSnapshot = evidence.presentationSnapshot;
+  }
+  if (evidence.resolutionSnapshot) step.resolutionSnapshot = evidence.resolutionSnapshot;
+}
+
+function buildSelectionPlan(selection) {
+  return {
+    selectedIngredientSetId: stringOrNull(selection.selectedIngredientSetId),
+    ingredientOptionOverrides: cloneObject(selection.ingredientOptionOverrides),
+    ingredientEssenceAllocation: cloneObject(selection.ingredientEssenceAllocation),
+  };
+}
+
+/**
+ * Allowlist optional historical stage evidence before it enters an actor flag or
+ * an execution receipt. Callers own initiating-viewer disclosure; absent evidence
+ * stays absent, and captured empty arrays remain an explicit zero.
+ * @param {object} input
+ * @returns {object}
+ */
+export function craftingStepHistoryEvidence(input = {}) {
+  const source = input ?? {};
+  const evidence = {};
+  const resolution = source.resolutionSnapshot;
+  if (
+    ['check', 'ingredients', 'none'].includes(resolution?.kind) &&
+    typeof resolution.mode === 'string'
+  ) {
+    evidence.resolutionSnapshot = { kind: resolution.kind, mode: resolution.mode };
+  }
+  const presentation = source.presentationSnapshot;
+  if (typeof presentation?.name === 'string' && typeof presentation.description === 'string') {
+    evidence.presentationSnapshot = {
+      name: presentation.name,
+      description: presentation.description,
+    };
+  }
+  if (Array.isArray(source.currencySpends) && source.currencySpends.every(validHistoricalSpend)) {
+    evidence.currencySpends = source.currencySpends.map(({ unit, amount }) => ({ unit, amount }));
+  }
+  if (
+    Array.isArray(source.essenceSpend?.carriers) &&
+    source.essenceSpend.carriers.every(validHistoricalCarrier)
+  ) {
+    evidence.essenceSpend = {
+      labels: Object.fromEntries(
+        Object.entries(source.essenceSpend.labels ?? {}).filter(
+          ([, label]) => typeof label === 'string'
+        )
+      ),
+      carriers: source.essenceSpend.carriers.map(historicalCarrier),
+    };
+  }
+  return evidence;
+}
+
+function validHistoricalCarrier(carrier) {
+  return (
+    typeof carrier?.itemUuid === 'string' &&
+    carrier.itemUuid.length > 0 &&
+    Number.isFinite(carrier.quantity) &&
+    carrier.quantity > 0 &&
+    Array.isArray(carrier.contributions) &&
+    carrier.contributions.every(validHistoricalContribution)
+  );
+}
+
+function validHistoricalSpend(entry) {
+  return typeof entry?.unit === 'string' && Number.isFinite(entry.amount) && entry.amount >= 0;
+}
+
+function validHistoricalContribution(entry) {
+  return typeof entry?.essenceId === 'string' && Number.isFinite(entry.amount) && entry.amount > 0;
+}
+
+function historicalCarrier(carrier) {
+  return {
+    actorUuid: historyText(carrier.actorUuid),
+    itemUuid: carrier.itemUuid,
+    quantity: carrier.quantity,
+    name: historyText(carrier.name),
+    img: historyText(carrier.img),
+    contributions: carrier.contributions.map(({ essenceId, amount }) => ({ essenceId, amount })),
+  };
+}
+
+function historyText(value) {
+  return typeof value === 'string' ? value.trim() || null : null;
+}
+
+function applyStepHistoryEvidence(step, payload) {
+  const evidence = craftingStepHistoryEvidence(payload);
+  if (step.presentationSnapshot) delete evidence.presentationSnapshot;
+  Object.assign(step, evidence);
+  Object.assign(step, historyEvidenceFields(payload));
+  for (const field of ['consumedIngredients', 'createdResults']) {
+    if (Array.isArray(step[field])) step[field] = step[field].map(itemReceipt);
+  }
+  if (step.historySettlement && ['succeeded', 'failed'].includes(step.status)) {
+    step.historySettlement = {
+      ...step.historySettlement,
+      awards: payload.historySettlement?.awards ?? 'complete',
+    };
+  }
+}
+
+function cloneObject(value) {
+  return value && typeof value === 'object' && !Array.isArray(value) ? cloneJson(value) : {};
+}
+
+function findRunLocation(container, runId) {
+  const id = String(runId ?? '').trim();
+  if (!id) return null;
+  if (container.active?.[id]) return { run: container.active[id], terminal: false };
+  const run = (container.history || []).find((entry) => entry?.id === id);
+  return run ? { run, terminal: true } : null;
 }
