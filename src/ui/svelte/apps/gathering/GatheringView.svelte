@@ -21,6 +21,7 @@
   } from '../../util/foundryBridge.js';
   import { INVALIDATION_STORES, STORE_DOMAINS } from '../../../../systems/invalidationDomains.js';
   import { describeBlockedReasons } from './gatheringBlockedReasons.js';
+  import { journalRefusalMessage } from '../../util/journalRunReasons.js';
   import GatheringEnvironmentList from './GatheringEnvironmentList.svelte';
   import GatheringDetail from './GatheringDetail.svelte';
   import GatheringTaskDetail from './GatheringTaskDetail.svelte';
@@ -269,6 +270,11 @@
       }
       if (result && result.accepted === false) {
         notifyWarn(describeBlockedReasons(result.blockedReasons, localize));
+      } else if (result && result.success === false) {
+        // A versioned start goes through the run authority, whose refusal shape is
+        // `{success:false, reason}` with NO `accepted` and no `message` — so it
+        // missed the branch above entirely and the attempt was a silent no-op.
+        notifyWarn(journalRefusalMessage(result, localize, describeBlockedReasons(null, localize)));
       }
       await load();
     } finally {

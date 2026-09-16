@@ -58,10 +58,12 @@ class FakeItem {
   }
   async delete() {
     this._deleted = true;
+    return this;
   }
   async update(payload) {
     this._updates.push({ ...payload });
     if (payload['system.quantity'] !== undefined) this.system.quantity = payload['system.quantity'];
+    return this;
   }
 }
 
@@ -93,6 +95,7 @@ class StrictFakeItem extends FakeItem {
       throw new Error(`Item ${this.id} does not exist in the EmbeddedCollection Actor.items`);
     }
     this._deleted = true;
+    return this;
   }
   async update(payload) {
     if (this._deleted) {
@@ -122,13 +125,16 @@ class FakeActor {
   async setFlag(ns, key, value) {
     this._flags[ns] = this._flags[ns] || {};
     this._flags[ns][key] = value;
-    return value;
+    return this;
   }
   async createEmbeddedDocuments(type, data) {
-    const created = data.map(
-      (d, i) =>
-        new FakeItem(`created-${this._createdDocs.length + i}`, d.name, d.system?.quantity || 1)
-    );
+    const created = data.map((d, i) => {
+      const item = new FakeItem(`created-${this._createdDocs.length + i}`, d.name, d.system?.quantity || 1);
+      item.parent = this;
+      item.uuid = `${this.uuid}.Item.${item.id}`;
+      item._source = structuredClone(d);
+      return item;
+    });
     this._createdDocs.push(...created);
     return created;
   }
@@ -570,7 +576,9 @@ test('_createSingleResult uses deterministic loot fallback type when managed sou
       );
       return itemDatas.map((itemData, index) => ({
         id: `created-${index}`,
-        uuid: `Item.created-${index}`,
+        uuid: `${this.uuid}.Item.created-${index}`,
+        parent: this,
+        _source: structuredClone(itemData),
         name: itemData.name,
         type: itemData.type,
         system: { ...(itemData.system || {}) },

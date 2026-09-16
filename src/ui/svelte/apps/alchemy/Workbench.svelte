@@ -107,22 +107,22 @@
   const showUnknown = $derived(mode === 'untried');
   const showMissing = $derived(mode === 'assembling' && missing.length > 0);
 
-  // Brew status enum → banner tone + icon. `produced-on-failure` is a distinct
-  // WARNING state (a failed Simple brew that still yielded the failure result set),
-  // never success-green; a discovery composes with it. `brewing` is INFORMATIONAL —
-  // a time-gated brew that started successfully and now waits on world time — and
-  // must never take the danger tone the fizzle branch would otherwise give it
-  // (issue 966).
+  // Brew status enum → banner tone + icon. `produced-on-failure` and `check-failed` are
+  // distinct WARNING states — a brew whose check FAILED, with or without a failure result
+  // set — never success-green and never the danger tone a fizzle takes; a discovery composes
+  // with either. `brewing` is INFORMATIONAL — a time-gated brew that started successfully and
+  // now waits on world time — and must never take the fizzle branch's danger tone (issue 966).
   const bannerStatus = $derived(lastBrew?.status ?? null);
   const bannerTone = $derived.by(() => {
     if (bannerStatus === 'success' || bannerStatus === 'tiered-tier') return 'success';
-    if (bannerStatus === 'produced-on-failure') return 'warning';
+    if (bannerStatus === 'produced-on-failure' || bannerStatus === 'check-failed') return 'warning';
     if (bannerStatus === 'brewing') return 'info';
     return 'danger';
   });
   const bannerIcon = $derived.by(() => {
     if (bannerStatus === 'success' || bannerStatus === 'tiered-tier') return 'fa-circle-check';
-    if (bannerStatus === 'produced-on-failure') return 'fa-triangle-exclamation';
+    if (bannerStatus === 'produced-on-failure' || bannerStatus === 'check-failed')
+      return 'fa-triangle-exclamation';
     if (bannerStatus === 'brewing') return 'fa-hourglass-half';
     return 'fa-circle-xmark';
   });
@@ -144,6 +144,13 @@
             name: lastBrew.discovered,
           })
         : localize('FABRICATE.App.Alchemy.Banner.ProducedOnFailure');
+    }
+    if (bannerStatus === 'check-failed') {
+      return lastBrew.discovered
+        ? localize('FABRICATE.App.Alchemy.Banner.DiscoveredCheckFailed', {
+            name: lastBrew.discovered,
+          })
+        : localize('FABRICATE.App.Alchemy.Banner.CheckFailed');
     }
     if (bannerStatus === 'success' || bannerStatus === 'tiered-tier') {
       if (lastBrew.discovered) {

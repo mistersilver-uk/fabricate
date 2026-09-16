@@ -14,18 +14,20 @@ import {
   matchGatheringTools
 } from '../src/gatheringToolRuntime.js';
 import { createToolBreakageRuntime } from '../src/toolBreakageRuntime.js';
-import { routedRoll, routedSystemCheck } from './helpers/gathering.js';
+import { routedRoll, routedSystemCheck, terminalHistoryRunManager } from './helpers/gathering.js';
 
 function makeRunManager() {
   let createdTerminal = null;
+  const settlements = [];
   return {
     findActiveRunForTask: () => null,
-    async createTerminalRun(actor, runData, status, payload) {
-      createdTerminal = { runData, status, payload };
-      return { id: 'run-1', status, ...runData, ...payload };
-    },
+    ...terminalHistoryRunManager({
+      onCreate: ({ runData, status, payload }) => { createdTerminal = { runData, status, payload }; },
+      onSettle: ({ runId, payload }) => settlements.push({ runId, payload })
+    }),
     async getMaturedWaitingRuns() { return []; },
-    inspectCreated() { return createdTerminal; }
+    inspectCreated() { return createdTerminal; },
+    inspectSettlements() { return settlements; }
   };
 }
 
@@ -247,6 +249,10 @@ test('library toolIds resolve through __libraryTools for gates, breakage, and pe
   assert.deepEqual(breakage.calls.planTools[0], [libraryTool]);
   assert.deepEqual(result.usedTools, plan);
   assert.deepEqual(runManager.inspectCreated().payload.usedTools, plan);
+  // Mutation control: the settlement must land on the record the writer created, so a
+  // dropped or misaimed settleHistory leaves the terminal evidence unsettled here.
+  assert.deepEqual(runManager.inspectSettlements().map((entry) => entry.runId), [result.runId]);
+  assert.equal(runManager.inspectSettlements()[0].payload.historySettlement.awards, 'complete');
 });
 
 test('missing library toolId blocks startAttempt before actor inventory checks', async () => {
@@ -325,9 +331,7 @@ test('timed completion resolves library toolIds for usedTools evidence', async (
         }
       }];
     },
-    async completeRun(_actor, run, status, payload, { terminalRunData } = {}) {
-      return { ...run, ...terminalRunData, status, ...payload };
-    }
+    ...terminalHistoryRunManager()
   };
   const engine = new GatheringEngine({
     environmentStore: { get: () => environment, list: () => [environment], listBySystem: () => [environment] },

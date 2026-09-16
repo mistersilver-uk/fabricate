@@ -71,9 +71,11 @@ class FakeItem {
     // throws rather than silently over-spending.
     if (this.deleted) throw new Error(`Item ${this.id} was already deleted`);
     this.deleted = true;
+    return this;
   }
   async update(payload) {
     if (payload['system.quantity'] !== undefined) this.system.quantity = payload['system.quantity'];
+    return this;
   }
   toObject() {
     return { name: this.name, img: this.img, type: 'loot', system: { ...this.system } };
@@ -96,13 +98,15 @@ class FakeActor {
   async setFlag(namespace, key, value) {
     this.flagStore[namespace] = this.flagStore[namespace] || {};
     this.flagStore[namespace][key] = value;
-    return value;
+    return this;
   }
   async createEmbeddedDocuments(type, data) {
     if (type === 'ActiveEffect') return data;
     const made = data.map((entry, index) => {
       const item = new FakeItem(`made-${this.created.length + index}`, entry.name, 1);
       item.parent = this;
+      item.uuid = `${this.uuid}.Item.${item.id}`;
+      item._source = structuredClone(entry);
       item.createEmbeddedDocuments = async (_t, effects) => effects;
       return item;
     });
@@ -232,7 +236,7 @@ function systemFor(overrides = {}) {
     resolutionMode: 'simple',
     features: { craftingChecks: false, essences: true, multiStepRecipes: true },
     craftingCheck: { enabled: false, consumption: {} },
-    components: [{ id: 'emberwood', name: 'Emberwood' }],
+    components: [{ id: 'emberwood', name: 'Emberwood' }, { id: 'plank', name: 'Plank' }],
     ...overrides,
   };
 }

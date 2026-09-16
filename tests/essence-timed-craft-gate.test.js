@@ -64,9 +64,11 @@ class FakeItem {
   async delete() {
     this.deleted = true;
     if (this.parent) this.parent.items = this.parent.items.filter((item) => item !== this);
+    return this;
   }
   async update(payload) {
     if (payload['system.quantity'] !== undefined) this.system.quantity = payload['system.quantity'];
+    return this;
   }
   toObject() {
     return { name: this.name, img: this.img, type: 'loot', system: { ...this.system }, flags: {} };
@@ -91,13 +93,15 @@ class FakeActor {
     // object reference between START and FINISH — persistence is the whole point here.
     this._flags[namespace] = this._flags[namespace] || {};
     this._flags[namespace][key] = JSON.parse(JSON.stringify(value));
-    return value;
+    return this;
   }
   async createEmbeddedDocuments(type, data) {
     if (type === 'ActiveEffect') return data;
     const created = data.map((entry, index) => {
       const item = new FakeItem(`created-${this.createdItems.length + index}`, entry.name, 1);
       item.parent = this;
+      item.uuid = `${this.uuid}.Item.${item.id}`;
+      item._source = structuredClone(entry);
       item.data = entry;
       item.effects = [];
       item.createEmbeddedDocuments = async (_type, effects) => {

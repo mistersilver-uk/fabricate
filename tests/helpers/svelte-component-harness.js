@@ -401,6 +401,10 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   // status vocabulary above emits `success` and `neutral`, neither of which is a chip tone under
   // that spelling — so the map is in this tree's closure wherever that vocabulary is read.
   ...STATUS_TONE_RAW_MODULES,
+  // Issue 1648: the authority-refusal wording `craftingStore` falls back to when a
+  // craft is refused with a `reason` and no `message`. Import-free, so one entry
+  // closes it; omitting it CANCELS every suite whose tree reaches the store.
+  'src/ui/svelte/util/journalRunReasons.js',
   'src/ui/svelte/util/ingredientOptionStatus.js',
   // The requirement rail's pure slot/consumption-plan projection (issue 917). IoTable
   // is already in the compiled graph and imports it, so omitting this HANGS every

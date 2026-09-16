@@ -49,6 +49,7 @@ import {
 } from './scopedEntityReads.js';
 import { SettingsCraftingDefinitionRepository } from './SettingsCraftingDefinitionRepository.js';
 import { SignatureValidator } from './SignatureValidator.js';
+import { selectedIngredientItems } from './stageReadiness.js';
 import { computeSystemVisibility } from './systemValidation.js';
 import { ingredientSetToolsAreActive, resolveToolPrerequisites } from './toolCheckBonus.js';
 
@@ -64,22 +65,6 @@ const FALLBACK_COMPONENT_IMG = 'icons/svg/item-bag.svg';
 const GENERIC_ITEM_IMG = 'icons/svg/item-bag.svg';
 // A currency match never resolves to an inventory item, so it always shows a coin icon.
 const FALLBACK_CURRENCY_IMG = 'icons/svg/coins.svg';
-
-/**
- * The concrete owned Item documents reserved by an ingredient selection.
- * A physical Item cannot simultaneously be consumed as an ingredient and
- * participate as a reusable Tool in the same attempt.
- *
- * @param {object|null} selection
- * @returns {Set<object>}
- */
-function selectedIngredientItems(selection) {
-  return new Set(
-    (Array.isArray(selection?.plan) ? selection.plan : [])
-      .map((entry) => entry?.item)
-      .filter(Boolean)
-  );
-}
 
 /**
  * Whether a retained alchemy signature report's guard still describes the world (issue
