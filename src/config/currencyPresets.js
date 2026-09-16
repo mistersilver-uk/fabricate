@@ -37,16 +37,11 @@ function makeCurrencyUnit({ id, label, abbreviation, icon, contains, actorPath, 
   return unit;
 }
 
-// dnd5e reads/spends coins from a flat `system.currency.<denom>` actor property; pf2e maps the
-// same denomination ladder onto inventory treasure read via `actor.inventory`. The two presets
-// therefore share the same labels/abbreviations/ladder and differ only by how a coin is located,
-// so a single builder fills in either an `actorPath` (dnd5e) or a `denomination` (pf2e).
+// dnd5e reads/spends coins from a flat `system.currency.<denom>` actor property; pf2e maps the same
+// denomination ladder onto inventory treasure read via `actor.inventory`.
 function buildCoinLadderPreset(strategy) {
   // Each coin breaks down into its PARENT denomination by the ratio to that parent, forming the
-  // natural denomination DAG rather than flattening every coin to copper. The recursive resolver
-  // multiplies these ratios back to the same base values (cp=1, sp=10, ep=50, gp=100, pp=1000),
-  // so affordability and change-making are unaffected while the tree stays meaningful. Electrum is
-  // dnd5e-only and is a leaf branch off silver; pf2e has no electrum at all.
+  // natural denomination DAG rather than flattening every coin to copper.
   const coins = [
     { id: 'cp', label: 'Copper', contains: [] },
     { id: 'sp', label: 'Silver', contains: [{ unitId: 'cp', amount: 10 }] },
@@ -71,13 +66,9 @@ function buildCoinLadderPreset(strategy) {
 }
 
 /**
- * dnd5e and pf2e share the same denomination ladder, so the only difference between
- * the two presets is how a coin balance is read and spent. dnd5e coins live at a flat
- * `system.currency.<denom>` numeric actor property and are spent via `actor.update` (the
- * `actorProperty` strategy). Modern pf2e stores coins as inventory treasure Items read via
- * `actor.inventory.coins` and mutated through `actor.inventory.removeCoins(...)`, so its
- * preset units carry a `denomination` instead of an `actorPath` and the system config
- * uses the `actorInventory` spend strategy.
+ * dnd5e and pf2e share the same denomination ladder, so the only difference between the two presets
+ * is how a coin balance is read and spent. dnd5e coins live at a flat `system.currency.<denom>`
+ * numeric actor property and are spent via `actor.update` (the `actorProperty` strategy).
  */
 
 export const DND5E_CURRENCY_PRESETS = buildCoinLadderPreset('actorPath');
@@ -87,9 +78,6 @@ export const PF2E_CURRENCY_PRESETS = buildCoinLadderPreset('denomination');
 /**
  * The frozen currency unit preset bundle for a Foundry system, or an empty frozen array for a
  * system with no bundle. dnd5e units carry `actorPath`; pf2e units carry `denomination`.
- *
- * @param {string} foundrySystemId
- * @returns {object[]}
  */
 export function getCurrencyPresetsForFoundrySystem(foundrySystemId) {
   const id = String(foundrySystemId || '').trim();
@@ -98,24 +86,12 @@ export function getCurrencyPresetsForFoundrySystem(foundrySystemId) {
   return Object.freeze([]);
 }
 
-/**
- * Preset bundle keyed by adapter id. Adapter ids currently match Foundry system ids, so this
- * delegates to {@link getCurrencyPresetsForFoundrySystem}.
- *
- * @param {string} adapterId
- * @returns {object[]}
- */
+/** Preset bundle keyed by adapter id. */
 export function getCurrencyPresetsForAdapter(adapterId) {
   return getCurrencyPresetsForFoundrySystem(adapterId);
 }
 
-/**
- * Idempotently merge preset units into a system's current unit list. Existing units (matched by id)
- * are left untouched and reported as `skipped`; presets with a new id are cloned and appended.
- *
- * @param {{ presets?: object[], currentUnits?: object[] }} [args]
- * @returns {{ added: object[], skipped: object[], next: object[] }}
- */
+/** Idempotently merge preset units into a system's current unit list. */
 export function seedCurrencyPresets({ presets = [], currentUnits = [] } = {}) {
   const safePresets = Array.isArray(presets) ? presets : [];
   const safeCurrent = Array.isArray(currentUnits) ? currentUnits : [];

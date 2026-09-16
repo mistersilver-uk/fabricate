@@ -1,38 +1,14 @@
-/**
- * Localize recipe ACTIVATION (enable) validation errors for the UI (issue 550).
- *
- * The model layer produces validation issues that carry a stable `code` plus
- * human-readable `params` (recipe/component NAMES, ingredient-set positions —
- * never internal ids) and a default English `message` for headless callers. This
- * module maps a `code` to a localized `lang/en.json` key and interpolates the
- * params, following the same issue-code pattern the system Validation overview
- * uses (`SystemOverviewView.svelte` `ISSUE_LABELS`).
- *
- * It is a PURE leaf module: no Foundry globals, no store reads. The caller passes
- * a `localizeFn(key, data)` (Foundry's `game.i18n.format`-style substitution) so
- * this stays unit-testable with a plain function.
- */
+/** Localize recipe ACTIVATION (enable) validation errors for the UI (issue 550). */
 
 const LANG_PREFIX = 'FABRICATE.Admin.Manager.RecipeActivation';
 
-/**
- * `code → [langKeySuffix, defaultEnglishTemplate]`. The default template is used
- * when the localize fn returns the key unchanged (Foundry's behavior for an
- * absent key), so a missing translation never surfaces a raw key to the user. New
- * coded activation issues are registered here.
- *
- * @type {Readonly<Record<string, [string, string]>>}
- */
+/** `code → [langKeySuffix, defaultEnglishTemplate]`. */
 export const RECIPE_ACTIVATION_ISSUE_LABELS = Object.freeze({
   signatureCollision: [
     'IssueSignatureCollision',
     'Recipe "{recipeA}" (ingredient set {setA}) and recipe "{recipeB}" (ingredient set {setB}) can both be crafted from the same components ({components}), so alchemy cannot tell which one you are making.',
   ],
-  // Structural / resolution-mode validation issues (issue 595). Each carries a
-  // human-readable STEP / INGREDIENT-SET / RESULT label — the author-given name
-  // when present, otherwise a 1-based POSITION — never an internal id. `{mode}` is
-  // the canonical resolution-mode token (not translated), matching the pre-fix
-  // English strings byte-for-byte for named entities.
+  // Structural / resolution-mode validation issues (issue 595).
   stepIngredientSetCountExact: [
     'IssueStepIngredientSetCountExact',
     'Step "{step}" must have exactly 1 ingredient set in {mode} mode',
@@ -69,11 +45,7 @@ export const RECIPE_ACTIVATION_ISSUE_LABELS = Object.freeze({
     'IssueRoutedGroupNameDuplicate',
     'Duplicate result group name "{groupName}" (case-insensitive) in step "{step}" — routed mode requires unique names',
   ],
-  // Base structural-integrity issues from the recipe MODEL (issue 595). These fire
-  // on an ordinary save (most are NOT requireComplete-gated) and previously leaked a
-  // step / ingredient-set / result-group / result / mapping id. `{location}` is a
-  // pre-composed, id-free context phrase (`Recipe` or `Step "<name-or-position>"`);
-  // `{group}` / `{result}` / `{set}` / `{step}` are name-or-1-based-position labels.
+  // Base structural-integrity issues from the recipe MODEL (issue 595).
   stepMissingIngredientSet: [
     'IssueStepMissingIngredientSet',
     'Step "{step}" must include at least one ingredient set',
@@ -105,9 +77,7 @@ export const RECIPE_ACTIVATION_ISSUE_LABELS = Object.freeze({
   ],
   resultDuplicate: ['IssueResultDuplicate', '{location} has a duplicate result "{result}"'],
   resultInvalid: ['IssueResultInvalid', '{location} result "{result}": {detail}'],
-  // Essence-reference issues from RecipeManager (issue 595). The set is named by
-  // name-or-position; the essence is named from the system's essence definitions
-  // when resolvable, else a name-free phrasing is used — never the raw essence id.
+  // Essence-reference issues from RecipeManager (issue 595).
   ingredientSetUnknownEssence: [
     'IssueIngredientSetUnknownEssence',
     'Ingredient set "{set}" references an essence that is not defined in this system',
@@ -120,17 +90,12 @@ export const RECIPE_ACTIVATION_ISSUE_LABELS = Object.freeze({
     'IssueIngredientSetEssenceQuantity',
     'Ingredient set "{set}" has an invalid essence quantity',
   ],
-  // ACTIVATION-only essence blocker (issue 1036). A disabled essence carries no behaviour
-  // onto a crafted result, so a recipe requiring one may still be SAVED but may not be
-  // ENABLED. Only a DEFINED essence can be disabled, and `_normalizeEssenceDefinition`
-  // guarantees every definition a non-empty `name`, so this always names the essence and
-  // needs no name-free twin.
+  // ACTIVATION-only essence blocker (issue 1036).
   ingredientSetDisabledEssence: [
     'IssueIngredientSetDisabledEssence',
     'Ingredient set "{set}" requires essence "{essence}", which is disabled in this system',
   ],
-  // Tag-placeholder issue from RecipeManager (issue 595). The group is named by
-  // name-or-position; the tag is an authored tag name, not an id.
+  // Tag-placeholder issue from RecipeManager (issue 595).
   ingredientGroupUnknownTag: [
     'IssueIngredientGroupUnknownTag',
     'Ingredient group "{group}" references unknown tag "{tag}"',
@@ -138,13 +103,7 @@ export const RECIPE_ACTIVATION_ISSUE_LABELS = Object.freeze({
 });
 
 /**
- * Substitute `{placeholder}` tokens in a template from `params`, leaving unknown
- * tokens untouched. Mirrors Foundry's `game.i18n.format` substitution so the
- * built-in fallback reads identically to a translated string.
- *
- * @param {string} template
- * @param {object} [params]
- * @returns {string}
+ * Substitute `{placeholder}` tokens in a template from `params`, leaving unknown tokens untouched.
  */
 function interpolate(template, params = {}) {
   return String(template).replaceAll(/\{(\w+)\}/g, (match, key) =>
@@ -153,16 +112,8 @@ function interpolate(template, params = {}) {
 }
 
 /**
- * Build a coded, id-free structured issue for a registered activation/persistence
- * `code` (issue 595). The headless English `message` is the code's built-in
- * template interpolated with `params`, so it stays the single source of template
- * truth (the UI localizes the same `code` + `params` through
- * {@link localizeActivationIssue}). Callers pass only human-readable params
- * (names or 1-based positions), never internal ids.
- *
- * @param {string} code - a key of {@link RECIPE_ACTIVATION_ISSUE_LABELS}
- * @param {object} [params]
- * @returns {{ code: string, params: object, message: string }}
+ * Build a coded, id-free structured issue for a registered activation/persistence `code` (issue
+ * 595).
  */
 export function buildRecipeActivationIssue(code, params = {}) {
   const meta = RECIPE_ACTIVATION_ISSUE_LABELS[code];
@@ -170,16 +121,7 @@ export function buildRecipeActivationIssue(code, params = {}) {
   return { code, params, message: interpolate(template, params) };
 }
 
-/**
- * Localize a single activation issue. A CODED issue is resolved to its lang key
- * (params interpolated); when the key is absent the built-in English template is
- * used. An UNCODED issue (a pre-existing structural validation string that has no
- * code yet) passes its already-English `message` through unchanged.
- *
- * @param {{ code?: string|null, params?: object, message?: string }} issue
- * @param {(key: string, data?: object) => string} [localizeFn]
- * @returns {string}
- */
+/** Localize a single activation issue. */
 export function localizeActivationIssue(issue, localizeFn) {
   const meta = issue?.code ? RECIPE_ACTIVATION_ISSUE_LABELS[issue.code] : null;
   if (!meta) return issue?.message || '';
@@ -193,14 +135,8 @@ export function localizeActivationIssue(issue, localizeFn) {
 }
 
 /**
- * Build the localized, id-free toast string for a
- * {@link module:systems/RecipeActivationError.RecipeActivationError}. Returns
- * `null` for any error that is not an activation error (no `activationIssues`), so
- * the caller can fall back to the error's own message.
- *
- * @param {unknown} error
- * @param {(key: string, data?: object) => string} [localizeFn]
- * @returns {string|null}
+ * Build the localized, id-free toast string for a {@link
+ * module:systems/RecipeActivationError.RecipeActivationError}.
  */
 export function localizeRecipeActivationError(error, localizeFn) {
   const issues = Array.isArray(error?.activationIssues) ? error.activationIssues : null;
@@ -217,24 +153,7 @@ export function localizeRecipeActivationError(error, localizeFn) {
   return interpolate('Cannot enable recipe "{name}": {errors}', params);
 }
 
-/**
- * The SAME refusal, as the two parts a `<Notice>` draws (issue 1515).
- *
- * The single string above is the right shape for a Foundry toast, which has one line and no
- * hierarchy. The recipe library's in-window refusal is a `<Notice>`, whose specimen states a
- * `title` naming what happened over a quieter `detail` saying why — so handing it the whole
- * sentence put the reasons in the title's ink and left the detail line empty.
- *
- * SPLIT AT THE PRODUCER, NOT AT THE CONSUMER. The alternative is for the view to cut the built
- * string at its first colon, which is a parse of localized copy: a translation free to move or
- * drop that punctuation would silently retitle the notice, and nothing would fail. Here both
- * halves are built from their own material — the name from the error, the reasons from the
- * issues — so no separator is ever inferred.
- *
- * @param {unknown} error
- * @param {(key: string, data?: object) => string} [localizeFn]
- * @returns {{ title: string, detail: string }|null} `null` for a non-activation error.
- */
+/** The SAME refusal, as the two parts a `<Notice>` draws (issue 1515). */
 export function localizeRecipeActivationParts(error, localizeFn) {
   const issues = Array.isArray(error?.activationIssues) ? error.activationIssues : null;
   if (!issues) return null;
@@ -254,17 +173,9 @@ export function localizeRecipeActivationParts(error, localizeFn) {
 }
 
 /**
- * Build the localized, id-free toast string for a
- * {@link module:systems/RecipePersistenceError.RecipePersistenceError} — a recipe
- * SAVE (create/update) that failed structural/reference validation (issue 595).
- * Reuses {@link localizeActivationIssue} per issue so a coded structural failure
- * (e.g. an ingredient set mapping to a missing result group) surfaces localized,
- * id-free copy. Returns `null` for any error that is not a persistence error (no
- * `persistenceIssues`), so the caller can fall back to the error's own message.
- *
- * @param {unknown} error
- * @param {(key: string, data?: object) => string} [localizeFn]
- * @returns {string|null}
+ * Build the localized, id-free toast string for a {@link
+ * module:systems/RecipePersistenceError.RecipePersistenceError} — a recipe SAVE (create/update)
+ * that failed structural/reference validation (issue 595).
  */
 export function localizeRecipePersistenceError(error, localizeFn) {
   const issues = Array.isArray(error?.persistenceIssues) ? error.persistenceIssues : null;

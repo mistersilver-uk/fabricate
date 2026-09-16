@@ -1,26 +1,21 @@
 <!--
   The product's ONE horizontal fill bar: a rounded track with a value-width fill. It is a LEAF and
   renders no caption, percent readout, `role` or `aria-*`, because the accessible semantics differ
-  per site — one caller is a `meter` with its own `aria-valuenow`, another a label/value pair whose
-  bar is decorative — and a leaf that guessed would duplicate or invent an announcement.
+  per site and a leaf that guessed would duplicate or invent an announcement.
 
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
   | `value` | 0–100 | `0` | Out-of-range and non-finite input is clamped, so a caller handing it a raw ratio cannot paint a 4000%-wide fill. |
   | `tone` | `'success'` \| `'warning'` \| `'danger'` \| `'info'` \| `'accent'` \| `'neutral'` | `'success'` | An unknown tone falls back to `neutral` rather than rendering an unpainted fill. |
-  | `color` | CSS colour | `''` | A colour the CALLER owns, applied inline and overriding `tone`, for a caller whose colour is authored DATA or whose scale is its own domain meaning. A `style=` binding rather than a class, because a scoped `<style>` in the caller cannot reach a child component's element at all; a source colour literal would fail `tests/components/theme-colour-contract.test.js`, so a caller passes a token reference or runtime data, never a hex. |
-  | `size` | `'sm'` \| `'md'` | `'md'` | 6px or 8px track height. |
-  | `dataAttr` / `dataValue` | strings | `''` | An optional test/screenshot hook. |
+  | `color` | CSS colour | `''` | A colour the CALLER owns, applied inline and overriding `tone`, for a caller whose colour is authored DATA. A `style=` binding rather than a class, because a scoped `<style>` in the caller cannot reach a child component's element; a source colour literal would fail `tests/components/theme-colour-contract.test.js`, so a caller passes a token reference or runtime data, never a hex. |
+  | `size` / `dataAttr` / `dataValue` | `'sm'` \| `'md'` / strings | `'md'` / `''` | A 6px or 8px track height, and an optional test/screenshot hook. |
 
   Invariants:
   - NO GRADIENT. `ui-integration/spec.md`'s semantic-slider geometry is deliberately NOT claimed:
-    this is a value-width fill ("progress to the current value"), never a full-track semantic
-    scale. The component that DOES paint a scale across a track, `ThresholdBandStrip`, renders
-    discrete solid bands rather than a gradient too.
-  - A component under `components/` may not reference `--fab-manager-*` or any other property
-    declared inside `.fabricate-manager`; every token below is declared in `:root` and in all
-    seven theme blocks.
+    this is a value-width fill, never a full-track semantic scale.
+  - Its scoped block reads theme-root tokens only, never an area-scoped `--fab-manager-*` property,
+    per `openspec/specs/design-system/spec.md`.
 -->
 <script>
   let {
@@ -36,8 +31,6 @@
 
   const pct = $derived.by(() => {
     const numeric = Number(value);
-    // Only NaN falls back to zero — an UNREADABLE value paints nothing, which is the honest
-    // reading of "I do not know". `Infinity` is readable and clamps to a full track.
     if (Number.isNaN(numeric)) return 0;
     return Math.min(100, Math.max(0, numeric));
   });

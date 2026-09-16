@@ -1,39 +1,10 @@
-/**
- * Pure list model for the GM component library (issue 676): filter → sort → paginate →
- * group.
- *
- * That order is deliberate and is what `ComponentsBrowserView` composes: the PAGE is
- * grouped, so the pager stays the unit of truth for how many rows are on screen. (This
- * header claimed `filter → group → sort → paginate` until issue 676's follow-up — the
- * opposite of what ships, which is how the group header's page-vs-category count
- * confusion went unnoticed.) The group header therefore reports both its rendered count
- * and the category's filtered total; `countByCategory` supplies the latter.
- *
- * A sibling of `recipeBrowserModel.js`, and here for the same reason it is: `src/ui/**`
- * is not covered by the ESLint/Prettier globs, so a module there can be lint-green and
- * Sonar-red. Everything here is a pure function over the component rows the admin store
- * already projects — it never touches Foundry globals, the store, or localization.
- * Callers localize.
- *
- * Search is deliberately NOT a filter here: the admin store's item-search term is
- * applied before projection, so re-applying it would double-filter. The search term
- * still contributes an active-filter chip.
- */
+/** Pure list model for the GM component library (issue 676): filter → sort → paginate → group. */
 
 import { categoryTotalOf, countByCategory } from './browserGroupCounts.js';
 import { paginateRows } from './browserPagination.js';
 import { GENERAL_COMPONENT_CATEGORY, normalizeComponentCategory } from './componentCategories.js';
 
-/** @typedef {'name' | 'category' | 'essences' | 'tags' | 'salvage'} ComponentSortKey */
-/** @typedef {'asc' | 'desc'} SortDirection */
-
-/**
- * Sort keys offered by the library toolbar, in menu order.
- *
- * The first four are the reference's own list in its order (`proto:5536`: Name, Category,
- * Essences, Tags — issue 1371 r12-list). `salvage` is a subject-only extra the reference does not
- * draw, kept LAST so the shared prefix reads the same on both sides.
- */
+/** Sort keys offered by the library toolbar, in menu order. */
 export const COMPONENT_SORT_KEYS = Object.freeze([
   'name',
   'category',
@@ -43,56 +14,17 @@ export const COMPONENT_SORT_KEYS = Object.freeze([
 ]);
 
 /**
- * The essence filter's two PREDICATE values (issue 1371 r12-list): the reference offers
- * `Carries any essence` and `No essences` ahead of the per-essence entries (`proto:5533`), and
- * `proto:5477-5479` is the predicate each applies. The per-essence values are NAMES, so these two
- * take a form no GM-authored essence can spell — `all` predates them, is the lifted view-state's
- * persisted default, and stays as it is.
+ * The essence filter's two PREDICATE values (issue 1371 r12-list): the reference offers `Carries
+ * any essence` and `No essences` ahead of the per-essence entries (`proto:5533`), and
+ * `proto:5477-5479` is the predicate each applies.
  */
 export const COMPONENT_ESSENCE_FILTER_ANY = '__any';
 export const COMPONENT_ESSENCE_FILTER_NONE = '__none';
 
-/**
- * Default page size. It must EXCEED the smoke fixture's component count: the harness
- * waits for a visible `.manager-component-row` and fails on zero, so a default that
- * pages the fixture components off page 1 breaks the smoke gate.
- */
+/** Default page size. */
 export const COMPONENT_DEFAULT_PAGE_SIZE = 25;
 
-/**
- * Build a fresh component-browser view-state object.
- *
- * Lifted to the manager root and bound in, so it SURVIVES the editor round-trip:
- * opening a component unmounts the browser, and remounting it with these reset to
- * defaults threw away the page, filters, sort and grouping the GM left. `ComponentsBrowserView`
- * kept all of this locally before issue 676, which is exactly the bug.
- *
- * A fresh call is used on FIRST arrival and by isolated mounted tests that don't lift
- * the state — so this must always return a NEW object with a NEW Set, never a shared
- * singleton. `collapsedCategories` is collapse-opt-IN: absent from the set = expanded.
- *
- * `systemId` is the PERSISTED system sentinel the view's reset effect compares against
- * `selectedSystemId`. It lives here — not as component-local `$state` — so a remount (the
- * editor round-trip) is not misread as a system switch and does not wipe the page/filters
- * this object otherwise preserves. See the reset effect in each browser view.
- *
- * `bulkSelectedComponentIds` (issue 772) is the bulk edit SELECTION, lifted for the same
- * reason everything else here is: it must survive the editor round-trip. It is
- * `bulkSelectedComponentIds`, NOT `selectedComponentIds` — `selectedComponentId`
- * (singular) already means *the row whose single-component inspector is open* and is
- * user-visible copy, and two meanings one character apart threaded into the same
- * component is a defect waiting to happen. Deliberately a bare `new Set()` literal and
- * NOT an import from `componentBulkEditModel.js`: a new import in this module would force
- * matching mount-harness allowlist edits in two suites, where an omission hangs the suite
- * as `# cancelled` rather than failing.
- *
- * @returns {{
- *   categoryFilter: string, essenceFilter: string, groupByCategory: boolean,
- *   sortKey: ComponentSortKey, sortDirection: SortDirection,
- *   pageIndex: number, pageSize: number, collapsedCategories: Set<string>, systemId: string,
- *   bulkSelectedComponentIds: Set<string>
- * }}
- */
+/** Build a fresh component-browser view-state object. */
 export function createComponentBrowserState() {
   return {
     categoryFilter: 'all',
@@ -121,19 +53,6 @@ export function componentCategoryOf(component) {
 /**
  * The essence run a card DRAWS — `essenceChips`, falling back to `essences` (issue 1371
  * r22-store4).
- *
- * The projection publishes two runs: `essences` is what the system RESOLVES, whole, because the
- * component editor is seeded from that card and a narrowed seed silently drops every essence
- * outside this system's roster on the next save; `essenceChips` is the same map through the one
- * shared chip model, which draws nothing for an id the roster does not list. `ui-integration`
- * requirement 2's rule is that ONE function answers the chips and the filter, so the filter reads
- * the drawn run — a row showing no chip can never pass `Carries any essence`.
- *
- * The fallback is not defensive style: a hand-built card (a fixture, or a caller that projects its
- * own rows) carries `essences` alone, and for such a card the two runs are the same thing.
- *
- * @param {object|null} component
- * @returns {object[]}
  */
 export function componentEssenceRun(component) {
   if (Array.isArray(component?.essenceChips)) return component.essenceChips;
@@ -145,8 +64,8 @@ function essenceNames(component) {
 }
 
 /**
- * The essence filter's predicate: the neutral `all`, the two reference predicates, or a
- * named essence (`proto:5477-5479`, issue 1371 r12-list).
+ * The essence filter's predicate: the neutral `all`, the two reference predicates, or a named
+ * essence (`proto:5477-5479`, issue 1371 r12-list).
  */
 function essenceMatches(component, essence) {
   if (essence === 'all') return true;
@@ -156,17 +75,7 @@ function essenceMatches(component, essence) {
   return names.includes(essence);
 }
 
-/**
- * Filter the projected rows by category and essence.
- *
- * Note there is deliberately no TAG filter: tags are a many-valued field that was
- * being asked to do a single-valued job, and `category` now does that job. Tags are
- * edited only in the component editor.
- *
- * @param {object[]} components
- * @param {{category?: string, essence?: string}} [filters]
- * @returns {object[]}
- */
+/** Filter the projected rows by category and essence. */
 export function filterComponents(components, filters = {}) {
   const category = filters.category || 'all';
   const essence = filters.essence || 'all';
@@ -177,10 +86,7 @@ export function filterComponents(components, filters = {}) {
   });
 }
 
-/**
- * Order two category names, pinning the reserved `general` catch-all LAST. Shared by
- * the category sort and the group ordering so the two can never disagree.
- */
+/** Order two category names, pinning the reserved `general` catch-all LAST. */
 function compareCategories(left, right) {
   if (left === right) return 0;
   if (left === GENERAL_COMPONENT_CATEGORY) return 1;
@@ -190,10 +96,7 @@ function compareCategories(left, right) {
 
 const SORT_VALUES = Object.freeze({
   essences: (component) => essenceNames(component).length,
-  // The reference's `Tags` key orders by the count of tags in effect (`proto:5485`). The row
-  // carries this system's OWN list — which IS the set in effect, because the world-tag merge is
-  // consumed by the resolver alone and the read union discards it — and the projection blanks the
-  // field where the system hides tags, so an absent array counts as zero (issue 1371 r12-list).
+  // The reference's `Tags` key orders by the count of tags in effect (`proto:5485`).
   tags: (component) => (Array.isArray(component?.tags) ? component.tags.length : 0),
   salvage: (component) => numeric(component?.salvageSummary?.resultGroupCount),
 });
@@ -204,19 +107,15 @@ function sortValue(component, key) {
 }
 
 /**
- * The per-key row comparator, factored out so both the flat sort and the category-major
- * sort compose the SAME within-row ordering (a bug injected here flips both). Name is the
- * stable tiebreak.
+ * The per-key row comparator, factored out so both the flat sort and the category-major sort
+ * compose the SAME within-row ordering (a bug injected here flips both).
  */
 function rowComparator(key, direction) {
   const byName = (a, b) => String(a?.name || '').localeCompare(String(b?.name || ''));
   return (a, b) => {
     if (key === 'name') return direction * byName(a, b);
     if (key === 'category') {
-      // `general` sorts LAST, matching groupComponentsByCategory's pinning. Plain
-      // localeCompare would float it to the front (g < H), so sorting by category with
-      // grouping OFF would order the rows differently from the same rows grouped —
-      // the catch-all bucket would jump from the bottom of the list to the top.
+      // `general` sorts LAST, matching groupComponentsByCategory's pinning.
       const delta = compareCategories(componentCategoryOf(a), componentCategoryOf(b));
       return delta === 0 ? byName(a, b) : direction * delta;
     }
@@ -226,24 +125,7 @@ function rowComparator(key, direction) {
   };
 }
 
-/**
- * Sort the rows by key + direction with an EXPLICIT comparator. `Array#sort()` with no
- * comparator is a SonarCloud finding (and lexicographic on numbers), so every path
- * through here passes one. Name is the stable tiebreak.
- *
- * With `categoryMajor` (set when grouping is ON), `compareCategories` is the
- * DIRECTION-INDEPENDENT primary key — `general` stays pinned LAST and groups render in a
- * fixed order regardless of `sortDirection` — and the active sort orders rows only WITHIN
- * a category, so each category is a contiguous run across page boundaries rather than an
- * interleaved slice per page. When the active key IS `category`, its direction would
- * otherwise re-sort the primary, so the secondary collapses to the name tiebreak: a
- * `desc` category sort still renders groups ascending (general last) with names ascending
- * inside each. Without the flag the comparator is byte-identical to the pre-flag flat sort.
- *
- * @param {object[]} components
- * @param {{key?: ComponentSortKey, direction?: SortDirection, categoryMajor?: boolean}} [options]
- * @returns {object[]} a new array; the input is not mutated.
- */
+/** Sort the rows by key + direction with an EXPLICIT comparator. */
 export function sortComponents(components, options = {}) {
   const key = COMPONENT_SORT_KEYS.includes(options.key) ? options.key : 'name';
   const direction = options.direction === 'desc' ? -1 : 1;
@@ -261,23 +143,7 @@ export function sortComponents(components, options = {}) {
   );
 }
 
-/**
- * Group the rows into category buckets, preserving the incoming row order inside each
- * bucket. `general` is pinned LAST as the catch-all, mirroring the Recipe Studio's
- * badge-vs-filter asymmetry; the remaining buckets are name-ordered so the group list
- * is stable across re-sorts of the rows themselves.
- *
- * The rows passed in are the PAGE, so each bucket also carries `total`: how many rows
- * the category holds across the whole FILTERED list. Without it the header reads
- * "General · 25 components" above page 1 of a 282-strong General bucket, which says the
- * bucket holds 25. Pass the map `countByCategory(filteredRows, componentCategoryOf)`
- * built from the same filters; omit it and `total` degrades to the bucket's own length.
- *
- * @param {object[]} components the page's rows.
- * @param {Map<string, number>} [categoryTotals] from `countByCategory`, over the
- *   FILTERED rows.
- * @returns {{category: string, components: object[], total: number}[]}
- */
+/** Group the rows into category buckets, preserving the incoming row order inside each bucket. */
 export function groupComponentsByCategory(components, categoryTotals) {
   const buckets = new Map();
 
@@ -299,15 +165,6 @@ export function groupComponentsByCategory(components, categoryTotals) {
 /**
  * The category filter's options: every category actually present on a row, plus any
  * authored-but-unused vocabulary entry, with `general` pinned LAST as the catch-all.
- *
- * Each option carries its own `count`, because the Recipe Studio's category select
- * reads "Reagent (4)": a bare option list makes the GM open the filter to discover it
- * matches nothing. An authored-but-unused vocabulary entry therefore reports `0`
- * rather than being hidden — the vocabulary is a real thing the GM authored.
- *
- * @param {object[]} components
- * @param {string[]} [vocabulary] the system's authored `componentCategories`
- * @returns {{name: string, count: number}[]}
  */
 export function componentCategoryOptions(components, vocabulary = []) {
   const counts = new Map();
@@ -333,19 +190,7 @@ export function componentCategoryOptions(components, vocabulary = []) {
   ];
 }
 
-/**
- * The active-filter chips, as data. Each chip names the filter it clears; the view
- * localizes and renders the dismissible run. The SIBLING of the recipe library's
- * `describeActiveFilters` — the component browser shipped with only a single
- * "Clear filters" button, which says that filters are on but never which ones.
- *
- * Search is included even though it is not applied here (the admin store filters
- * before projection): a search term is an active filter the GM must be able to see
- * and clear.
- *
- * @param {{category?: string, essence?: string, search?: string}} [filters]
- * @returns {{id: 'category' | 'essence' | 'search', value: string}[]}
- */
+/** The active-filter chips, as data. */
 export function describeActiveComponentFilters(filters = {}) {
   const chips = [];
   if (filters.category && filters.category !== 'all') {
@@ -360,16 +205,8 @@ export function describeActiveComponentFilters(filters = {}) {
 }
 
 /**
- * Slice one page out of the rows, clamping the page index into range so a filter change
- * that shrinks the list can never strand the pager on an empty page.
- *
- * The window is reported as a 1-based, inclusive RANGE, because the library's count
- * reads "1–5 of 12": a bare "5 of 12" never tells the GM WHICH page they are looking
- * at. An empty result reports `0..0`.
- *
- * @param {object[]} components
- * @param {{pageIndex?: number, pageSize?: number}} [options]
- * @returns {{components: object[], pageIndex: number, pageCount: number, totalCount: number, rangeStart: number, rangeEnd: number}}
+ * Slice one page out of the rows, clamping the page index into range so a filter change that
+ * shrinks the list can never strand the pager on an empty page.
  */
 export function paginateComponents(components, options = {}) {
   const { rows, ...window } = paginateRows(components, options, COMPONENT_DEFAULT_PAGE_SIZE);
@@ -377,33 +214,8 @@ export function paginateComponents(components, options = {}) {
 }
 
 /**
- * Run the whole pipeline in one call: filter → sort → paginate (→ group the page), the
- * SIBLING of `recipeBrowserModel.buildRecipeBrowserModel` (issue 1081).
- *
- * `ComponentsBrowserView` composed these four steps by hand, which was harmless while every
- * component row was richly projected up front. It stops being harmless once projection is
- * page-scoped: the counting step and the pagination step then read different arrays, and a
- * hand-composed pipeline is where "count whatever list is in scope" gets written. Composing
- * them here means the category totals are derived from `filtered` and the page from the same
- * `filtered`, in one place, for both studios.
- *
- * `groups` is `[]` — not a single unnamed bucket — when grouping is off, preserving what the
- * view already did with `ui.groupByCategory ? groupComponentsByCategory(...) : []`.
- *
- * @param {object[]} components the already search-filtered cohort the store projected.
- * @param {{
- *   category?: string, essence?: string, search?: string,
- *   sortKey?: ComponentSortKey, sortDirection?: SortDirection,
- *   pageIndex?: number, pageSize?: number, groupByCategory?: boolean
- * }} [options]
- * @returns {{
- *   filtered: object[], sorted: object[], page: object[],
- *   groups: {category: string, components: object[], total: number}[],
- *   categoryTotals: Map<string, number>,
- *   pageIndex: number, pageCount: number, totalCount: number,
- *   rangeStart: number, rangeEnd: number,
- *   chips: {id: string, value: string}[]
- * }}
+ * Run the whole pipeline in one call: filter → sort → paginate (→ group the page), the SIBLING of
+ * `recipeBrowserModel.buildRecipeBrowserModel` (issue 1081).
  */
 export function buildComponentBrowserModel(components, options = {}) {
   const filtered = filterComponents(components, options);

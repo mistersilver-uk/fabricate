@@ -1,29 +1,10 @@
 /**
- * Pure list model for the GM recipe library (issue 643): filter → sort → paginate →
- * group, plus the per-row derivations the rich row renders.
- *
- * That order is deliberate and is what `buildRecipeBrowserModel` composes: the PAGE is
- * grouped, so the pager stays the unit of truth for how many rows are on screen. (This
- * header claimed `filter → group → sort → paginate` until issue 676 — the opposite of
- * what ships.) The group header therefore reports both its rendered count and the
- * category's filtered total; `countByCategory` supplies the latter.
- *
- * It lives under `src/utils/` rather than `src/ui/` deliberately: `src/ui/**` is
- * not covered by the ESLint/Prettier globs today, so a module there can be
- * lint-green and Sonar-red. Everything here is a pure function over the
- * already-projected recipe rows the admin store publishes — it never touches
- * Foundry globals, the store, or localization. Callers localize.
- *
- * Search is deliberately NOT a filter here: the admin store's `_buildRecipeList`
- * already applies `recipeSearchTerm` before projecting, so re-applying it would
- * double-filter. The search term still contributes an active-filter chip.
+ * Pure list model for the GM recipe library (issue 643): filter → sort → paginate → group, plus the
+ * per-row derivations the rich row renders.
  */
 
 import { categoryTotalOf, countByCategory } from './browserGroupCounts.js';
 import { paginateRows } from './browserPagination.js';
-
-/** @typedef {'name' | 'attention' | 'dc' | 'ingredients' | 'results'} RecipeSortKey */
-/** @typedef {'asc' | 'desc'} SortDirection */
 
 /** Sort keys offered by the library toolbar, in menu order. */
 export const RECIPE_SORT_KEYS = Object.freeze([
@@ -34,54 +15,18 @@ export const RECIPE_SORT_KEYS = Object.freeze([
   'results',
 ]);
 
-/** Status filter values. `all` is the default — see the smoke-harness note below. */
+/** Status filter values. */
 export const RECIPE_STATUS_FILTERS = Object.freeze(['all', 'on', 'off']);
 
-/** Lock filter values. `all` is the default. */
+/** Lock filter values. */
 export const RECIPE_LOCK_FILTERS = Object.freeze(['all', 'unlocked', 'locked']);
 
-/**
- * Default page size. It must EXCEED the smoke fixture's recipe count: the harness
- * waits for a visible row and throws "Manager rendered no table rows" on zero, so
- * a default that pages the fixture recipes off page 1 breaks the smoke gate.
- */
+/** Default page size. */
 export const RECIPE_DEFAULT_PAGE_SIZE = 25;
 
 /**
- * Build a fresh recipe-browser view-state object: the filter / sort / group /
- * paginate controls that live above the pure list model (issue 643).
- *
- * The GM recipe library lifts this object up to the manager root so it SURVIVES the
- * edit round-trip — opening the editor unmounts the browser, and remounting it with
- * these reset to defaults threw away the page, filters, sort and grouping the GM left.
- * The root holds one `$state(createRecipeBrowserState())` and threads it back in, so
- * Save / Back return to the exact view. `collapsedCategories` is a `Set` (collapse is
- * opt-IN: a category absent from the set is expanded). A fresh call is used on FIRST
- * arrival (defaults) and by isolated mounted tests that don't lift the state — so this
- * must always return a NEW object with a NEW Set, never a shared singleton.
- *
- * `systemId` is the PERSISTED system sentinel the view's reset effect compares against
- * `selectedSystemId`. It lives here — not as component-local `$state` — so a remount (the
- * editor round-trip) is not misread as a system switch and does not wipe the page/filters
- * this object otherwise preserves. See the reset effect in each browser view.
- *
- * `bulkSelectedRecipeIds` (issue 1010) is the bulk edit SELECTION, lifted for the same
- * reason everything else here is: it must survive the editor round-trip. It is
- * `bulkSelectedRecipeIds`, NOT `selectedRecipeIds` — `selectedRecipeId` (singular) already
- * means *the row whose single-recipe inspector is open* and is user-visible copy, and two
- * meanings one character apart threaded into the same component is a defect waiting to
- * happen. Deliberately a bare `new Set()` literal and NOT an import from
- * `recipeBulkEditModel.js`, exactly as `componentBrowserModel.js` records for its own twin:
- * a new import in this module would force matching mount-harness allowlist edits in the
- * suites that mount this tree, where an omission HANGS the suite as `# cancelled` rather
- * than failing.
- *
- * @returns {{
- *   statusFilter: string, lockFilter: string, categoryFilter: string,
- *   groupByCategory: boolean, sortKey: RecipeSortKey, sortDirection: SortDirection,
- *   pageIndex: number, pageSize: number, collapsedCategories: Set<string>, systemId: string,
- *   bulkSelectedRecipeIds: Set<string>
- * }}
+ * Build a fresh recipe-browser view-state object: the filter / sort / group / paginate controls
+ * that live above the pure list model (issue 643).
  */
 export function createRecipeBrowserState() {
   return {
@@ -108,25 +53,15 @@ function numeric(value, fallback = 0) {
 }
 
 /**
- * The category bucket a row belongs to; an unauthored category falls back to the
- * reserved `general` catch-all. Exported so a caller can build the same category totals
- * this module groups by, rather than re-deriving the fallback and drifting.
- *
- * @param {object} recipe
- * @returns {string}
+ * The category bucket a row belongs to; an unauthored category falls back to the reserved `general`
+ * catch-all.
  */
 export function recipeCategoryOf(recipe) {
   const raw = typeof recipe?.category === 'string' ? recipe.category.trim() : '';
   return raw || GENERAL_CATEGORY;
 }
 
-/**
- * Filter the projected rows by status, lock state and category.
- *
- * @param {object[]} recipes
- * @param {{status?: string, lock?: string, category?: string}} [filters]
- * @returns {object[]}
- */
+/** Filter the projected rows by status, lock state and category. */
 export function filterRecipes(recipes, filters = {}) {
   const status = filters.status || 'all';
   const lock = filters.lock || 'all';
@@ -145,41 +80,14 @@ export function filterRecipes(recipes, filters = {}) {
   });
 }
 
-/**
- * The attention rank a row sorts on. It is `deriveRecipeStatuses`'s authoring-state
- * branch, expressed as a number, and is deliberately written as the SAME two tests in
- * the same order so the sort and the pill cannot name different sets:
- *
- *  - `2` — the row wears the red `Can't enable` pill: activation would refuse it AND it
- *    is currently off.
- *  - `1` — the row wears the amber `Incomplete` pill: the same activation blocker on a
- *    recipe that is already ON. It stays BELOW 2 rather than joining it, because that is
- *    what the two pills already say — nothing is being refused, since the activation gate
- *    fires only on a transition into the enabled state — and a "blocked and already on"
- *    fourth rank would be a state neither pill nor spec describes.
- *  - `0` — the row wears neither.
- *
- * Descending by default, so the rows needing work float up.
- *
- * This reads `enableBlocked`, not `incomplete` (issue 1010). `incomplete` is
- * `validate() === false && validateStructure() === true`, which does NOT capture
- * blocked-ness: a structurally broken recipe reads `incomplete: false` and still cannot
- * be enabled, and neither a dangling essence reference, a tag placeholder, an unmet
- * resolution-mode requirement nor an alchemy signature conflict moves it. Both pills were
- * repointed at `enableBlocked` for exactly that reason, so a rank left on `incomplete`
- * sorted the reddest rows in the browser at 0 — below rows painted amber — under a sort
- * key named "needs attention".
- *
- * @param {object} recipe a projected recipe row.
- * @returns {0 | 1 | 2}
- */
+/** The attention rank a row sorts on. */
 export function attentionRank(recipe) {
   if (recipe?.enableBlocked !== true) return 0;
   return recipe?.enabled === false ? 2 : 1;
 }
 
-// A recipe with no resolvable DC sorts below every recipe that has one, in both
-// directions, rather than colliding with DC 0.
+// A recipe with no resolvable DC sorts below every recipe that has one, in both directions, rather
+// than colliding with DC 0.
 const SORT_VALUES = Object.freeze({
   attention: (recipe) => attentionRank(recipe),
   dc: (recipe) => numeric(recipe?.checkSummary?.dc, -Infinity),
@@ -192,23 +100,14 @@ function sortValue(recipe, key) {
   return read ? read(recipe) : 0;
 }
 
-/**
- * Order two rows by their category. It reads `recipeCategoryOf`, so it works on a
- * projected recipe row AND on a `{category}` bucket alike — and it is byte-equal to the
- * `a.category.localeCompare(b.category)` that `groupRecipesByCategory` inlined before this
- * was extracted. Shared by the group ordering and the category-major sort so the two can
- * never disagree: "page order == rendered group order" becomes structural, not convention.
- * Recipes order the reserved `general` catch-all plain-alphabetically (unlike components,
- * which pin it last), so the scoped-out unification is a one-line change here.
- */
+/** Order two rows by their category. */
 function compareRecipeCategories(left, right) {
   return recipeCategoryOf(left).localeCompare(recipeCategoryOf(right));
 }
 
 /**
- * The per-key row comparator, factored out so both the flat sort and the category-major
- * sort compose the SAME within-row ordering (a bug injected here flips both). Name is the
- * stable tiebreak.
+ * The per-key row comparator, factored out so both the flat sort and the category-major sort
+ * compose the SAME within-row ordering (a bug injected here flips both).
  */
 function rowComparator(key, direction) {
   const byName = (a, b) => String(a?.name || '').localeCompare(String(b?.name || ''));
@@ -220,22 +119,7 @@ function rowComparator(key, direction) {
   };
 }
 
-/**
- * Sort the rows by key + direction with an EXPLICIT comparator. `Array#sort()`
- * with no comparator is a SonarCloud finding (and lexicographic on numbers), so
- * every path through here passes one. Name is the stable tiebreak.
- *
- * With `categoryMajor` (set when grouping is ON), the category comparator is the
- * DIRECTION-INDEPENDENT primary key — group headers render in a fixed order regardless of
- * `sortDirection` — and the active sort key + direction only order rows WITHIN a category.
- * Each category then occupies a contiguous run of rows, so a group that spans a page
- * boundary is shown contiguously across pages rather than interleaved. Without it the
- * comparator is byte-identical to the pre-flag flat sort.
- *
- * @param {object[]} recipes
- * @param {{key?: RecipeSortKey, direction?: SortDirection, categoryMajor?: boolean}} [options]
- * @returns {object[]} a new array; the input is not mutated.
- */
+/** Sort the rows by key + direction with an EXPLICIT comparator. */
 export function sortRecipes(recipes, options = {}) {
   const key = RECIPE_SORT_KEYS.includes(options.key) ? options.key : 'name';
   const direction = options.direction === 'desc' ? -1 : 1;
@@ -247,22 +131,7 @@ export function sortRecipes(recipes, options = {}) {
   return [...(Array.isArray(recipes) ? recipes : [])].sort(comparator);
 }
 
-/**
- * Group the rows into category buckets, preserving the incoming row order inside
- * each bucket. Buckets are name-ordered so the group list is stable across
- * re-sorts of the rows themselves.
- *
- * The rows passed in are the PAGE, so each bucket also carries `total`: how many rows
- * the category holds across the whole FILTERED list. Without it the header reads
- * "Alchemy · 25 recipes" above page 1 of a 282-strong Alchemy bucket, which says the
- * bucket holds 25. Pass the map `countByCategory(filteredRows, recipeCategoryOf)` built
- * from the same filters; omit it and `total` degrades to the bucket's own length.
- *
- * @param {object[]} recipes the page's rows.
- * @param {Map<string, number>} [categoryTotals] from `countByCategory`, over the
- *   FILTERED rows.
- * @returns {{category: string, recipes: object[], total: number}[]}
- */
+/** Group the rows into category buckets, preserving the incoming row order inside each bucket. */
 export function groupRecipesByCategory(recipes, categoryTotals) {
   const buckets = new Map();
 
@@ -282,29 +151,15 @@ export function groupRecipesByCategory(recipes, categoryTotals) {
 }
 
 /**
- * Slice one page out of the rows, clamping the page index into range so a filter
- * change that shrinks the list can never strand the pager on an empty page.
- *
- * The window is reported as a 1-based, inclusive RANGE (`rangeStart`..`rangeEnd`),
- * because the library's count reads "1–5 of 12": a bare "5 of 12" never tells the GM
- * WHICH page they are looking at. An empty result reports `0..0`.
- *
- * @param {object[]} recipes
- * @param {{pageIndex?: number, pageSize?: number}} [options]
- * @returns {{recipes: object[], pageIndex: number, pageCount: number, totalCount: number, rangeStart: number, rangeEnd: number}}
+ * Slice one page out of the rows, clamping the page index into range so a filter change that
+ * shrinks the list can never strand the pager on an empty page.
  */
 export function paginateRecipes(recipes, options = {}) {
   const { rows, ...window } = paginateRows(recipes, options, RECIPE_DEFAULT_PAGE_SIZE);
   return { recipes: rows, ...window };
 }
 
-/**
- * The active-filter chips, as data. Each chip names the filter it clears; the
- * caller localizes the label and supplies the clear handler.
- *
- * @param {{status?: string, lock?: string, category?: string, search?: string}} [filters]
- * @returns {{id: 'status' | 'lock' | 'category' | 'search', value: string}[]}
- */
+/** The active-filter chips, as data. */
 export function describeActiveFilters(filters = {}) {
   const chips = [];
   if (filters.status && filters.status !== 'all')
@@ -318,18 +173,7 @@ export function describeActiveFilters(filters = {}) {
   return chips;
 }
 
-/**
- * The row's I/O readout (issue 643 §9 — resolved there, do not re-derive).
- *
- * `N in` is always shown. `N out` is shown ONLY in `simple` and `progressive`;
- * once results are tier- or set-keyed there is no single "outputs" number, so
- * `routedByIngredients`, `routedByCheck` and `alchemy` surface the RESULT-GROUP
- * count instead, labelled as groups.
- *
- * @param {object} recipe a projected recipe row.
- * @param {string} resolutionMode the SYSTEM's resolution mode.
- * @returns {{inCount: number, outKind: 'items' | 'groups', outCount: number, empty: boolean}}
- */
+/** The row's I/O readout (issue 643 §9 — resolved there, do not re-derive). */
 export function deriveRecipeIo(recipe, resolutionMode) {
   const inCount = numeric(recipe?.ingredientCount);
   const showsItemCount = resolutionMode === 'simple' || resolutionMode === 'progressive';
@@ -346,35 +190,7 @@ export function deriveRecipeIo(recipe, resolutionMode) {
   };
 }
 
-/**
- * The row's status pills, in render order. At most one of the two authoring
- * states applies, and BOTH read the SAME predicate — `recipe.enableBlocked`, the
- * projected answer to "would activation refuse this recipe?" (issue 1010):
- *
- *  - `blocked` — activation would refuse it AND it is currently off: enabling would
- *    be REFUSED by `toggleRecipeEnabled` (RecipeActivationError), so the row says so
- *    up front.
- *  - `incomplete` — the same blocker on a recipe that is already ON: unfinished or
- *    conflicting work a GM should still resolve, but nothing is being refused,
- *    because the activation check runs only on a transition into the enabled state.
- *
- * Both branches used to read `recipe.incomplete`, which is
- * `validate() === false && validateStructure() === true` (`adminStore.js`). A
- * STRUCTURALLY BROKEN recipe therefore reads `incomplete: false` and wore NO pill at
- * all while still being un-enableable — and the bulk edit panel's pre-flight count and
- * the set-apply write both read the wider activation predicate. Two surfaces on one
- * screen would then disagree about one fact: "3 selected recipes will stay off" above
- * zero pilled rows. The row pill, the panel's count and the write now read ONE
- * predicate and cannot disagree by construction.
- *
- * The off/on split is tested STRICTLY (`enabled === false`), not as `!enabled`, to
- * match `countBlockedRecipeEnables` in `recipeBulkEditModel.js` — a row missing the
- * field would otherwise be counted by one surface and not pilled by the other, which
- * is precisely the drift this shared predicate exists to close.
- *
- * @param {object} recipe a projected recipe row.
- * @returns {{id: 'disabled' | 'locked' | 'blocked' | 'incomplete', tone: string, icon: string}[]}
- */
+/** The row's status pills, in render order. */
 export function deriveRecipeStatuses(recipe) {
   const pills = [];
   if (recipe?.enabled === false) {
@@ -393,25 +209,11 @@ export function deriveRecipeStatuses(recipe) {
   return pills;
 }
 
-// ---------------------------------------------------------------------------
-// The library inspector's Requires / Produces lists (issue 643 §3.3).
-//
-// The inspector must be able to tell a GM what a recipe consumes and what it makes.
-// Both answers live in the SAME nested shape — execution scope (the recipe itself, or
-// each of its steps) → ingredient sets / result groups → options / results — so the
-// walk is written once here, as pure data over the projected row, and both lists are
-// built from it. Names and images are resolved against the caller's component and
-// essence rosters; nothing here localizes.
-// ---------------------------------------------------------------------------
+// ── The library inspector's Requires / Produces lists (issue 643 §3.3) ──
 
 /**
- * The recipe's execution scopes: its explicit `steps[]` when it has any, otherwise the
- * recipe itself as a single implicit scope. Mirrors `Recipe.getExecutionSteps()` for
- * the projected (plain-object) row, which carries no methods.
- *
- * @param {object} recipe a projected recipe row.
- * @returns {{id: string, name: string, multi: boolean, ingredientSets: object[], resultGroups: object[]}[]}
- * @private
+ * The recipe's execution scopes: its explicit `steps[]` when it has any, otherwise the recipe
+ * itself as a single implicit scope.
  */
 function executionScopes(recipe) {
   const steps = Array.isArray(recipe?.steps) ? recipe.steps : [];
@@ -440,26 +242,8 @@ function findById(roster, id) {
 }
 
 /**
- * The Requires list, one entry per ingredient REQUIREMENT (an `ingredientGroup`), in
- * authoring order.
- *
- * A requirement's options are the three real match types — `component`, `tags` and
- * `currency` (`src/models/match/matchTypes.js`) — each reported as itself rather than
- * flattened into a component row it is not. Shape depends on how many options a
- * requirement has:
- *  - ONE option → a flat requirement entry (`type: 'requirement'`) carrying that
- *    option's fields directly.
- *  - TWO OR MORE → an `type: 'anyOf'` group whose `members[]` are ALL equal peers
- *    (any one satisfies it). No member is promoted above the others; the caller draws
- *    the whole group inside an "ANY ONE OF" container.
- *
- * Per-SET essences are AND requirements on the whole set, so they follow that set's
- * requirements as their own `type: 'essence'` entries.
- *
- * @param {object} recipe a projected recipe row.
- * @param {{componentOptions?: object[], essenceOptions?: object[]}} [rosters]
- * @returns {object[]} requirements: a flat entry `{ id, type: 'requirement'|'essence', kind, name, img, quantity, … }`
- *   or a group `{ id, type: 'anyOf', members: [{ id, kind, name, img, quantity, … }], setId, setName, scopeName }`
+ * The Requires list, one entry per ingredient REQUIREMENT (an `ingredientGroup`), in authoring
+ * order.
  */
 export function buildRecipeRequirementRows(recipe, rosters = {}) {
   const components = rosters.componentOptions;
@@ -558,17 +342,7 @@ function describeRequirementOption(option, components, essences) {
 }
 
 /**
- * One Produces row per result item, in authoring order, tagged with the result GROUP
- * it belongs to. A recipe produces ONE group's items (which group is chosen by outcome
- * routing at craft time), so the group name is carried on the row rather than the rows
- * being summed into a single output count — there is no such number in a routed mode.
- *
- * An EMPTY list is the danger state the caller renders as "a successful craft makes
- * nothing"; it is not an error here.
- *
- * @param {object} recipe a projected recipe row.
- * @param {{componentOptions?: object[]}} [rosters]
- * @returns {object[]} rows: `{ id, componentId, name, img, quantity, groupId, groupName, failure, scopeName }`
+ * One Produces row per result item, in authoring order, tagged with the result GROUP it belongs to.
  */
 export function buildRecipeProduceRows(recipe, rosters = {}) {
   const components = rosters.componentOptions;
@@ -587,19 +361,15 @@ export function buildRecipeProduceRows(recipe, rosters = {}) {
           name: component?.name || '',
           img: component?.img || '',
           quantity: Number(result?.quantity) > 0 ? Number(result.quantity) : 1,
-          // The component's authored difficulty (its progressive "cost"/DC). Progressive
-          // awards results in order, spending the check budget by each component's
-          // difficulty, so the inspector shows this instead of a quantity in that mode.
+          // The component's authored difficulty (its progressive "cost"/DC).
           difficulty: Number.isFinite(Number(component?.difficulty))
             ? Number(component.difficulty)
             : null,
           groupId,
           groupName: group?.name || '',
-          // The check-outcome tiers this result group is routed to (routed-by-check). The
-          // inspector resolves these ids to tier NAMES for its grouped headings.
+          // The check-outcome tiers this result group is routed to (routed-by-check).
           checkOutcomeIds: Array.isArray(group?.checkOutcomeIds) ? group.checkOutcomeIds : [],
-          // The reserved alchemy-Simple failure group: what a FAILED craft makes. It is
-          // not a success output and must never be shown as one.
+          // The reserved alchemy-Simple failure group: what a FAILED craft makes.
           failure: group?.role === 'failure',
           scopeName: scope.multi ? scope.name : '',
         });
@@ -610,20 +380,7 @@ export function buildRecipeProduceRows(recipe, rosters = {}) {
   return rows;
 }
 
-/**
- * Per-step Requires/Produces for a MULTI-step recipe's inspector (issue 643). A
- * multi-step recipe runs its steps in order, each with its own ingredient sets and result
- * groups, so the inspector paginates one step at a time rather than flattening every
- * step's requirements and results into two long lists. Each entry carries that step's
- * requirement rows and produce rows, built the same way the flat lists are.
- *
- * Returns `[]` for a single- (or zero-) step recipe: those use the flat Requires/Produces
- * lists, so there is nothing to paginate.
- *
- * @param {object} recipe a projected recipe row.
- * @param {{componentOptions?: object[], essenceOptions?: object[]}} [rosters]
- * @returns {{id: string, name: string, requirementRows: object[], produceRows: object[]}[]}
- */
+/** Per-step Requires/Produces for a MULTI-step recipe's inspector (issue 643). */
 export function buildRecipeStepModel(recipe, rosters = {}) {
   const steps = Array.isArray(recipe?.steps) ? recipe.steps : [];
   if (steps.length <= 1) return [];
@@ -641,15 +398,7 @@ export function buildRecipeStepModel(recipe, rosters = {}) {
   });
 }
 
-/**
- * Group produce rows by their result group, preserving first-seen order (issue 643). A
- * routed-by-check recipe routes each result group to a check-outcome tier, so its
- * inspector Produces list is grouped under each tier's group rather than dumped into one
- * flat list. Each bucket carries the group's name and its `failure` role for toning.
- *
- * @param {object[]} rows produce rows from {@link buildRecipeProduceRows}.
- * @returns {{groupId: string, groupName: string, failure: boolean, rows: object[]}[]}
- */
+/** Group produce rows by their result group, preserving first-seen order (issue 643). */
 export function groupProduceRowsByResultGroup(rows) {
   const order = [];
   const byGroup = new Map();
@@ -670,20 +419,9 @@ export function groupProduceRowsByResultGroup(rows) {
 }
 
 /**
- * The routed-by-ingredients pairing model for the library inspector (issue 643): the
- * recipe's ingredient sets and result groups, plus the set→group routing each set
- * carries (`IngredientSet.resultGroupId`). In this mode the chosen ingredient set
- * determines the produced result group, so the inspector pairs a set dropdown with a
- * result-set dropdown and keeps them in sync via this map.
- *
- * Ids match the ones `buildRecipeRequirementRows` (`setId`) and `buildRecipeProduceRows`
- * (`groupId`) stamp on their rows, so the inspector can filter those rows by the
- * selected set/group. Recipe-level only — a stepped recipe (uncommon for this mode)
- * yields empty lists and the inspector falls back to its flat all-rows view.
- *
- * @param {object} recipe a projected recipe row.
- * @returns {{ sets: {id: string, name: string, groupId: string|null}[],
- *   groups: {id: string, name: string}[] }}
+ * The routed-by-ingredients pairing model for the library inspector (issue 643): the recipe's
+ * ingredient sets and result groups, plus the set→group routing each set carries
+ * (`IngredientSet.resultGroupId`).
  */
 export function buildRecipeRoutingModel(recipe) {
   const sets = (Array.isArray(recipe?.ingredientSets) ? recipe.ingredientSets : []).map(
@@ -702,41 +440,16 @@ export function buildRecipeRoutingModel(recipe) {
   return { sets, groups };
 }
 
-/**
- * Run the whole pipeline in one call: filter → sort → paginate (→ group the page).
- * Grouping is applied to the PAGE, not the full list, so the pager stays the unit
- * of truth for how many rows are on screen. Each group therefore carries `total` —
- * the category's size across the whole FILTERED list — so its header can say both
- * ("3 of 12 recipes") instead of only the number that happens to be on screen.
- *
- * @param {object[]} recipes
- * @param {{
- *   status?: string, lock?: string, category?: string, search?: string,
- *   sortKey?: RecipeSortKey, sortDirection?: SortDirection,
- *   pageIndex?: number, pageSize?: number, groupByCategory?: boolean
- * }} [options]
- * @returns {{
- *   filtered: object[],
- *   page: object[],
- *   groups: {category: string, recipes: object[], total: number}[],
- *   categoryTotals: Map<string, number>,
- *   pageIndex: number, pageCount: number, totalCount: number,
- *   rangeStart: number, rangeEnd: number,
- *   chips: {id: string, value: string}[]
- * }}
- */
+/** Run the whole pipeline in one call: filter → sort → paginate (→ group the page). */
 export function buildRecipeBrowserModel(recipes, options = {}) {
   const filtered = sortRecipes(filterRecipes(recipes, options), {
     key: options.sortKey,
     direction: options.sortDirection,
-    // Grouping ON ⇒ order category-major BEFORE pagination, so each category is a
-    // contiguous run across page boundaries rather than an interleaved slice per page.
+    // Grouping ON ⇒ order category-major BEFORE pagination, so each category is a contiguous run
+    // across page boundaries rather than an interleaved slice per page.
     categoryMajor: !!options.groupByCategory,
   });
-  // COUNTED BEFORE PAGINATION, unconditionally (issue 1081). It is computed here rather
-  // than inside the `groupByCategory` branch so that counting is a step of this pipeline
-  // rather than a side effect of grouping: the row projection is page-scoped now, and a
-  // count derived downstream of `paginateRecipes` would silently describe the page.
+  // COUNTED BEFORE PAGINATION, unconditionally (issue 1081).
   const categoryTotals = countByCategory(filtered, recipeCategoryOf);
   const paged = paginateRecipes(filtered, options);
   const groups = options.groupByCategory
@@ -747,15 +460,15 @@ export function buildRecipeBrowserModel(recipes, options = {}) {
     filtered,
     page: paged.recipes,
     groups,
-    // The FILTERED-COHORT counts, exported so a caller that renders its own header (or a
-    // test that pins the scope) reads the same map the group headers do instead of
-    // recounting whatever array it happens to hold.
+    // The FILTERED-COHORT counts, exported so a caller that renders its own header (or a test that
+    // pins the scope) reads the same map the group headers do instead of recounting whatever array
+    // it happens to hold.
     categoryTotals,
     pageIndex: paged.pageIndex,
     pageCount: paged.pageCount,
     totalCount: paged.totalCount,
-    // The page WINDOW, so the count can read "1–5 of 12" rather than "5 of 12" — which
-    // never told the GM which page they were on.
+    // The page WINDOW, so the count can read "1–5 of 12" rather than "5 of 12" — which never told
+    // the GM which page they were on.
     rangeStart: paged.rangeStart,
     rangeEnd: paged.rangeEnd,
     chips: describeActiveFilters(options),

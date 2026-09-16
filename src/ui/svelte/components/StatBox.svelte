@@ -1,42 +1,32 @@
 <!--
   THE AT-A-GLANCE FIGURE: a bordered box holding one value over a `Kicker` label. The specimen
-  captions the routing rule — "Never for a number the GM can edit — that is a stepper." An
-  IMPORT-FREE leaf but for `Kicker`, which it composes rather than restates, making `Kicker` a leaf
-  TWO rungs down that a mount harness pulls in without naming a kicker anywhere.
+  captions the routing rule — "Never for a number the GM can edit — that is a stepper."
 
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
   | `value` | string | `''` | The figure, ALREADY FORMATTED by the caller: this component does no arithmetic and no localization. |
-  | `label` | already-localized string | `''` | The micro-label beneath it, rendered as a `Kicker` rather than a restatement of one. |
-  | `icon` | Font Awesome classes | `''` | An optional leading glyph, INSIDE the value line, which is where the shipped ones sit. |
-  | `tone` | `'default'` \| `'info'` \| `'danger'` | `'default'` | EVERY tone paints the value's ink; `danger` additionally paints the edge, the fill and the glyph. An unknown tone falls back to `default`. |
+  | `label` / `icon` | already-localized string / Font Awesome classes | `''` | The micro-label beneath the figure, rendered as a `Kicker`, and an optional leading glyph inside the value line. |
+  | `tone` | `'default'` \| `'info'` \| `'danger'` | `'default'` | Every tone paints the value's ink; `danger` additionally paints the edge, the fill and the glyph. An unknown tone falls back to `default`. |
   | `dataAttr` / `dataValue` / `valueDataAttr` / `labelDataAttr` | strings | `''` | Hooks on the box root, the value element and the label. Attribute-only, carrying no behaviour. |
 
   Invariants:
   - IT ACCEPTS NO HANDLER OF ANY KIND and emits no interactive element. `design-system/spec.md`
-    routes "a number a GM can change" to a stepper and never to a stat box, and
-    `tests/stat-box-source-contract.test.js` asserts that as a clause. The four hook props are what
-    keeps the clause exhaustive: the source contract enforces that every literal hook name at a
-    call site starts with `data-`, because the name is caller-supplied and SPREAD, so a
-    non-`data-` key would become a real handler.
-  - THERE IS NO `size`, NO `unit`, NO `warning` TONE AND NO `accent` TONE. The specimen states ONE
-    treatment, and a second is the drift this component exists to remove. `accent` in particular
-    has no caller, no test acting on it and no variant on the specimen — the specimen's own accent
-    modifier paints the LABEL's ink, not the value's — so shipping it would be unreachable
-    configuration.
-  - IT TAKES NO `class`, NO `style` AND NO REST SPREAD. A caller needing layout keeps its own
-    wrapper: the grid both callers already own, which this component never touches.
-  - A HOOK IS NOT LAYOUT, AND WHERE EACH ONE SITS IS WHAT DECIDES: the value and the label take a
-    hook prop each, the label's forwarded into the composed `Kicker`, because the specimen draws
-    the label AS the kicker and no wrapper element may carry a hook instead.
-  - EVERY HOOK IS RENDERED WITH AN EMPTY-STRING VALUE, not the `="true"` a bare attribute on a
-    component tag produces, because each is written bare on the element it replaces. Presence
-    selectors resolve either way, which is why the difference would not have been caught.
+    routes "a number a GM can change" to a stepper, and `tests/stat-box-source-contract.test.js`
+    asserts that as a clause. The four hook props keep the clause exhaustive: the source contract
+    requires every literal hook name at a call site to start with `data-`, because the name is
+    caller-supplied and SPREAD, so a non-`data-` key would become a real handler.
+  - THERE IS NO `size`, NO `unit`, NO `warning` TONE AND NO `accent` TONE. The specimen states one
+    treatment, and `accent` has no caller, no test and no specimen variant — its own accent modifier
+    paints the LABEL's ink, not the value's.
+  - IT TAKES NO `class`, NO `style` AND NO REST SPREAD; a caller needing layout keeps its own
+    wrapper. A hook is not layout, so the value and the label take a hook prop each, the label's
+    forwarded into the composed `Kicker`, and each is rendered with an empty-string value.
+  - Its scoped block reads THEME-ROOT TOKENS ONLY, never an area-scoped `--fab-manager-*` property;
+    that rule and the `data-*` spelling one are `openspec/specs/design-system/spec.md`'s.
 
   Four recorded deviations from the specimen: `icon`, `font-variant-numeric: tabular-nums` on the
-  value, the `tone` prop at all — its three values are derived from shipped caller states, each
-  mapped onto the token that caller already painted — and the four hook props above.
+  value, the `tone` prop at all, and the four hook props above.
 -->
 <script>
   import Kicker from './Kicker.svelte';
@@ -75,10 +65,6 @@
 </div>
 
 <style>
-  /* THEME-ROOT TOKENS ONLY. No scoped `<style>` may reference `--fab-manager-*`, or any other
-     property `styles/fabricate.css` declares inside `.fabricate-manager`, from ANY directory: a
-     component is placed in a directory, not in a DOM subtree, so its scoped CSS cannot guarantee
-     where its host renders. `tests/token-generation-gate.test.js` reds the reference. */
   .fab-stat-box {
     box-sizing: border-box;
     padding: var(--fab-space-3);
@@ -86,9 +72,6 @@
     border-radius: 9px;
     background: var(--fab-bg-1);
     text-align: center;
-    /* The STRUT the composed label rides on. `Kicker`'s own leading reaches a kicker that is
-       ITSELF the block; an inline one takes its line box from this host's strut instead, so the
-       figure is declared here. */
     line-height: 11px;
   }
 
