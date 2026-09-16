@@ -918,36 +918,10 @@
   --fab-cluster-gap: var(--fab-space-3);
 }
 
-/* Journal "Trigger Next Step" primary button. The player app has no .is-primary (that class is .fabricate-manager-only), so this is the player-scoped green primary treatment. */
-.fabricate-app .fabricate-app-primary-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--fab-space-2);
-  height: auto;
-  min-height: 36px;
-  padding: var(--fab-space-2) var(--fab-space-3);
-  border: 1px solid var(--fab-success-border);
-  border-radius: 6px;
-  font-weight: 700;
-  line-height: normal;
-  color: var(--fab-on-success);
-  background: var(--fab-success);
-  cursor: pointer;
-}
-
-.fabricate-app .fabricate-app-primary-button:not(:disabled):hover {
-  border-color: var(--fab-success-border);
-  color: var(--fab-on-success);
-  background: var(--fab-success-strong);
-}
-
-.fabricate-app .fabricate-app-primary-button:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-
-/* Active-run count badge on the Journal nav rail entry. The player nav rail is a fixed-width column of square icon buttons (no collapsible rail, unlike the manager's .manager-nav-count), so the badge floats in the button's top-right corner. */
+/* Active-run count badge on the Journal nav rail entry. The player nav rail is a
+   fixed-width column of square icon buttons (no collapsible rail, unlike the
+   manager's .manager-nav-count), so the badge floats in the button's top-right
+   corner. Tokenized green to match the run-ready/active semantics. */
 .fabricate-app .fabricate-app-nav-count {
   position: absolute;
   top: 4px;
@@ -968,7 +942,17 @@
   background: var(--fab-success);
 }
 
-/* ========================================== Image path picker (environment editor) ========================================== */
+/* Journal fact cards share header geometry across active and recorded accounts. */
+.fabricate-app .journal-summary-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  margin-bottom: var(--fab-space-2);
+}
+
+/* ==========================================
+   Image path picker (environment editor)
+   ========================================== */
 
 .fabricate-manager .image-path-picker-controls {
   display: flex;
@@ -4417,6 +4401,115 @@
   min-width: 64px;
 }
 
+/* Compact rails opt in; the default browse pager keeps its full three-part layout. */
+.fabricate-pagination.manager-pagination.is-compact {
+  flex-wrap: nowrap;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-2) 0 0;
+  background: transparent;
+  font-size: 9.5px;
+}
+
+.fabricate-pagination.is-compact .manager-pagination-summary {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fabricate-pagination.is-compact .manager-pagination-nav,
+.fabricate-pagination.is-compact .manager-pagination-size {
+  flex: 0 0 auto;
+}
+
+.fabricate-pagination.manager-pagination.is-compact .manager-icon-button {
+  width: 26px;
+  height: 26px;
+  min-height: 26px;
+  flex: 0 0 26px;
+  font-size: 10px;
+}
+
+.fabricate-pagination.is-compact .manager-pagination-size [data-pagination-size] {
+  min-width: 48px;
+  min-height: 26px;
+  height: 26px;
+  padding: 0 var(--fab-space-2);
+  font-size: 10.5px;
+}
+
+.fabricate-pagination .manager-pagination-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  min-width: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ListRow dense: the library's inline image / name / quantity form.
+   skin census (issue 1523): not a field-skin adopter; this read-only result row
+   takes its geometry from the ListRow dense specimen (issue 1648). */
+.fabricate-list-row {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-2) var(--fab-space-3);
+  border: 1px solid var(--fab-border);
+  border-radius: 9px;
+  background: var(--fab-bg-1);
+  color: var(--fab-text-subtle);
+  font-size: 10.5px;
+}
+
+.fabricate-list-row .fabricate-list-row-name {
+  min-width: 0;
+  flex: 1 1 auto;
+  color: var(--fab-text);
+  font-family: var(--font-primary, sans-serif);
+  font-size: 12px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.fabricate-list-row .fabricate-list-row-quantity {
+  flex: 0 0 auto;
+  font-family: var(--fab-font-mono);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.fabricate-list-row.is-truncated .fabricate-list-row-name,
+.fabricate-list-row.is-truncated .fabricate-list-row-detail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-list-row.is-truncated .fabricate-list-row-detail {
+  flex: 0 1 50%;
+}
+
+.fabricate-list-row .fabricate-list-row-detail {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.fabricate-list-row.is-positive {
+  border-color: var(--fab-success-border);
+  background: var(--fab-success-soft);
+}
+
+.fabricate-list-row.is-muted {
+  border-style: dashed;
+}
+
+.fabricate-list-row.is-muted .fabricate-list-row-name {
+  color: var(--fab-text-subtle);
+}
+
 .fabricate-manager .manager-table-scroll {
   min-height: 0;
   min-width: 0;
@@ -7194,7 +7287,9 @@
 .fabricate-manager[data-manager-view="recipe-edit"] .manager-body,
 .fabricate-manager[data-manager-view="crafting-settings"] .manager-body,
 .fabricate-manager[data-manager-view="recipe-item-edit"] .manager-body,
-.fabricate-manager[data-manager-view="system-edit"] .manager-body {
+.fabricate-manager[data-manager-view="system-edit"] .manager-body,
+.fabricate-manager[data-manager-view="gathering-task-edit"][data-gathering-task-layout="results"]
+  .manager-body {
   grid-template-columns: 220px minmax(0, 1fr);
 }
 
@@ -7214,7 +7309,9 @@
 .fabricate-manager[data-manager-view="recipe-edit"] .manager-body.is-rail-collapsed,
 .fabricate-manager[data-manager-view="crafting-settings"] .manager-body.is-rail-collapsed,
 .fabricate-manager[data-manager-view="recipe-item-edit"] .manager-body.is-rail-collapsed,
-.fabricate-manager[data-manager-view="system-edit"] .manager-body.is-rail-collapsed {
+.fabricate-manager[data-manager-view="system-edit"] .manager-body.is-rail-collapsed,
+.fabricate-manager[data-manager-view="gathering-task-edit"][data-gathering-task-layout="results"]
+  .manager-body.is-rail-collapsed {
   grid-template-columns: 56px minmax(0, 1fr);
 }
 
@@ -10677,7 +10774,21 @@
   flex: 0 0 34px;
 }
 
-/* The strip half, for the reason spelled out on `.fabricate-button:focus` above: core's orange `button:focus` outline and 4px glow survive in any host carrying no Fabricate root, so the repaint below would sit on top of them rather than replace them. */
+/* Opt-in compact dismiss: the owner sets the flex basis as well as the box. */
+.fabricate-icon-button.manager-icon-button.is-size-24 {
+  box-sizing: border-box;
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0;
+  flex: 0 0 24px;
+}
+
+/* The strip half, for the reason spelled out on `.fabricate-button:focus` above: core's orange
+   `button:focus` outline and 4px glow survive in any host carrying no Fabricate root, so the
+   repaint below would sit on top of them rather than replace them. Above the repaint because the
+   two tie at (0,2,0). */
 .fabricate-icon-button:focus {
   outline: none;
   box-shadow: none;

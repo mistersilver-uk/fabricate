@@ -138,6 +138,88 @@ A presence-only match is spared from usage/breakage and recorded as skipped, and
 
 ## Execution Lifecycle
 
+### Versioned Run Execution
+
+New applicable crafting and alchemy runs use lifecycle version 1, as defined in `data-models/spec.md`.
+Only an absent version selects the legacy contract; unsupported present versions are preserved and refuse mutation.
+The versioned rules in this section supersede legacy arming and cancellation behaviour for those new runs alone.
+
+Public `Fabricate.craft`, the global crafting helper and `/craft` MUST preserve one-call execution when the stage is ready and all choices are supplied.
+New public starts MUST select version 1 and use the same active-GM authority for start and execution; this convenience does not bypass ownership, validation, checks or execution receipts.
+A stage that has not started keeps its choices editable in the Journal and has spent nothing; only a later stage of a multi-step run can be in that state, because run start commits the first one.
+Journal start controls may create a run for later manual completion rather than promising immediate execution.
+
+- A stage with a positive honoured time requirement MUST be STARTED before it can resolve, and that start is a single irreversible commit.
+Starting it persists the scoped choices and the full selected authored-requirement snapshot, LOCKS them, consumes the stage's materials and settles its currency, and arms the gate.
+Run start is the first stage's start, so every versioned run spends its materials when it starts.
+A later stage of a multi-step run is started by its own explicit begin operation; a manual execute on an unstarted stage is refused rather than silently starting it.
+An automatic world-time advance MAY start an unstarted stage it is otherwise permitted to complete, after its conservative blocker has decided, so a blocked automatic stage still spends nothing.
+A stage armed by a release that consumed at execute carries a gate and no start-phase consumption record, and nothing backfills it.
+Every reader of "has this stage started" — the begin operation, the roll-readiness rule, the execute guard and the projection alike — MUST treat such a stage as STARTED, so a run already in flight resolves on the pre-consumption path instead of deadlocking between a begin that refuses it as already started and an execute that refuses it as unstarted.
+- Once a stage has started its selection is authoritative: a caller-supplied selection plan is IGNORED rather than refused, so a redundant resend can never fail a craft the player already committed to.
+A started stage's check, resolution and awards read the start snapshot rather than re-resolving inventory the consumption has emptied.
+- A stage check MUST NOT be describable or rollable until every other stage requirement is met, elapsed time included; the projected actions withhold the roll and the engine refuses it.
+- A stage with no honoured time requirement has no waiting window, so beginning and resolving it remain one act that still consumes as part of that act.
+This governs a LATER stage of a multi-step run, which is reached only by resolving the stage before it.
+Run start is different: it CREATES a run, so the first stage commits at run start whether or not it has an honoured time requirement.
+A first stage whose materials cannot be met refuses the start and leaves no run record, rather than creating an active run that has taken nothing and can be started again against the same stock.
+A start that THROWS is such a refusal: unless one of its effects applied, the run it created MUST be discarded too, because a run left active carrying uncertain evidence refuses every control it has — cancel included — and so cannot be cleared by the player at all.
+An effect that refused DEFINITELY, establishing that nothing reached the database, MUST NOT record uncertain evidence; its plan is discarded and the operation stays retryable.
+No versioned run may therefore be active with an unstarted first stage.
+- Execution re-resolves the current run, revision, source actors, selected ingredient set, inventory, Tools and requirements under the authoritative operation when the stage did not start separately.
+Fixed ingredients, alternatives and essence carriers share the canonical physical-item allocation, so one unit cannot fund two requirements.
+- A stale route, option or held-item reference MUST remain blocked instead of selecting a surviving alternative implicitly.
+Explicit route changes replace the previous route's option overrides and shared essence allocation.
+Several stale selections MAY be repaired incrementally, but execution MUST wait for the whole stage to validate.
+The selected authored-requirement snapshot MUST be resolved by the authority from the actual selected set, not accepted as client-supplied evidence.
+It includes route, component, tag, essence and currency requirements and remains distinct from actual spending receipts in history.
+- Each irreversible spending, award and publication operation persists its applying phase before invocation and its actual receipt before the next operation.
+Versioned physical-item consumption MUST receive the matching Item document from delete/update before recording confirmed spending or proceeding to awards; a non-throwing unconfirmed return is insufficient.
+Ambiguous writes preserve recovery evidence and cannot be replayed or automatically compensated.
+History distinguishes authored requirements, actual spending, actual rolls and actual awards.
+Successful and failed stage finalization MUST retain the optional permitted historical evidence defined in `data-models/spec.md`, including captured purpose, executed resolution meaning, carrier contributions and settled currency amounts.
+Future-stage previews remain authored possibilities rather than captured execution or selected intent.
+- New runs default to manual completion.
+An actively counting-down stage without a player check may retain a world-time completion preference even while editable requirements remain unresolved.
+Automatic execution uses the same guarded operation as manual execution and stops without spending when the stage requires material, choice, currency, essence, Tool or player-check input, or validation fails.
+Selecting materials in advance does not authorize automatic material spending; eligible no-input stages alone may complete automatically.
+The preference survives that blocker; world-time jumps cannot bypass a check or execute a stage twice.
+- Pausing freezes remaining world time and retains choices; resuming reanchors readiness.
+Paused runs cannot advance manually or through world-time processing, but may be cancelled.
+- Pausing never refunds: the run keeps both the time it has run and the choices it has made.
+- Versioned cancellation forfeits elapsed time and preserves completed-stage spending and awards.
+It reverses a started-but-unresolved stage's consumption through the same shared reversal the legacy cancel uses, honouring the system's `features.refundOnPlayerCancel` flag and reporting the ACTUAL outcome rather than the policy intent.
+A stage START is not an attempt, so a cancelled run's started-but-unresolved stage records no attempted stage.
+Legacy consumption and refund behavior and salvage remain unchanged.
+- A recipe-less alchemy fizzle persists its versioned terminal-history execution journal before recording a dead end or consuming submitted items.
+It honors the existing consume-on-failure policy and history visibility rules without revealing a recipe or replaying uncertain effects.
+
+### Captured Execution Evidence
+
+A completed managed write — a legacy or version-1 crafting stage, a recipe-less alchemy fizzle, or a native salvage run, each persisted through its own run manager — MUST capture the permitted evidence below.
+Capture is gated by initiating-viewer entitlement at write time and by current-viewer entitlement at projection time; an unknown or failing entitlement evaluation is never affirmative.
+The evidence records what that write actually did, so deleting the recipe, component, task or system configuration afterwards cannot change it.
+
+- **Executed resolution.** Every such write MUST record `resolutionSnapshot` as `{kind, mode}` for the resolution it executed, derived from the canonical active-check derivation at execution rather than from configuration read back later.
+A legacy timed crafting stage captures it on the finishing write rather than on the arming write, because the resolution is unknowable while the gate is still running.
+- **Physical effects.** Consumption and awards MUST be captured at the actual update or delete boundary: require the matching document's acknowledgment, derive each decrement from the captured source quantity, and capture name, image and actor-qualified identity before deletion.
+A requested plan, a swallowed failure, or a calculated after-value alone MUST NOT establish complete consumption.
+Native salvage `consumedComponents` additionally carry `actorUuid`, `name` and `img` while preserving their existing `itemUuid`, `quantity`, lifecycle and public signatures.
+A fizzle record MAY carry permitted `consumedIngredients` and `createdResults` and its explicit no-match, no-check meaning, without a synthetic crafting stage, recipe id or signature.
+- **Settlement state.** `historySettlement.consumption` and `historySettlement.awards` each take `pending`, `complete`, `uncertain` or `notApplicable`, as defined in `data-models/spec.md`.
+A genuinely unattempted fact — a consume-on-failure policy that consumes nothing, a stage armed and waiting — is `notApplicable`, which is neither unknown nor zero.
+A confirmed prefix is retained separately from an uncertain remainder; `pending` and `uncertain` prove no award and authorize no replay, rollback or automatic compensation.
+A further invocation on the same native run MUST refuse while an invoked effect is pending or uncertain or a settlement has failed, through the existing lifecycle and signatures; ordinary timed waiting is not an invoked pending effect.
+- **Five distinct states.** Unknown, withheld, not applicable, complete-empty and uncertain are five separate states, decided per row and per field.
+Missing evidence MUST NOT be rendered as a confirmed no-check resolution, as zero, or as an award.
+Withheld evidence MUST NOT be encoded as a complete empty receipt.
+- **No inference from success.** An older record carrying no captured `resolutionSnapshot` is unknown, whatever its recorded check result says.
+A `lastCheckResult` of `{success: true, reason: 'Success', data: {}}` carries no captured resolution strategy and MUST read as unknown, never as a confirmed no-check resolution.
+- **Identity fallbacks never supply a quantity.** A historical metadata fallback MAY supply a missing name or image under the precedence in `data-models/spec.md`, and MUST NOT supply, copy or scale a quantity, contribution or operational state.
+
+These fields are optional on older records and allowlisted before persistence.
+They change no existing contract: the crafting and gathering economies, legacy cancellation and refund behaviour, permitted failure awards, execution authority, the no-replay rule, and the native salvage lifecycle and public signatures all remain as specified elsewhere in this spec.
+
 ### Start or Resume
 
 1. Resolve recipe and active step.
@@ -207,9 +289,7 @@ A presence-only match is spared from usage/breakage and recorded as skipped, and
    for an instant (non-timed) step the craft aborts BEFORE any consumption (a zero-mutation
    abort — no ingredients, currency, or tools consumed or broken) and reports failure, never
    a player success with zero items.
-   Timed exception: a time-gated step consumes at START (the check outcome is unknowable
-   until the gate matures), so the same misconfiguration detected at FINISH records a step
-   FAILURE with no refund and still reports failure — never a false success with zero items.
+   Legacy timed exception: an unversioned time-gated step consumes at START (the check outcome is unknowable until the gate matures), so the same misconfiguration detected at FINISH records a step FAILURE with no refund and still reports failure — never a false success with zero items.
 
 3. **A FAILED check resolves an authored FAILURE result group when the policy permits it**
    (`craftingCheck.failureResultPolicy`, `data-models` requirement 35).
@@ -283,8 +363,8 @@ A progressive craft fires the component complications its committed award earned
 
 #### Player-Initiated Advance ("Trigger Next Step")
 
-Crafting is the only player-triggerable run type.
-A matured crafting step — one whose `timeGate.availableAt` has been reached, or that never carried a time gate — does NOT auto-advance: it requires a manual player trigger.
+This subsection describes legacy crafting advance; version-1 crafting and gathering use the authoritative execution contract above and in `gathering-and-harvesting/spec.md`.
+A matured legacy crafting step — one whose `timeGate.availableAt` has been reached, or that never carried a time gate — does NOT auto-advance: it requires a manual player trigger.
 The player-facing Journal screen exposes this as a "Trigger Next Step" action (see `ui-integration/spec.md` *Journal App*).
 
 - Triggering re-invokes the crafting flow for the run's id (`advanceCraftingRun({ actorId, runId, recipeId })` re-enters `craft(actor, recipe, { runId, componentSourceActors })`), so the same engine path that started the run advances it.
@@ -296,9 +376,9 @@ A non-owner is told to ask an owner or GM rather than the run advancing silently
 
 #### Maturity Asymmetry Between Run Types
 
-A matured crafting step waits for the manual trigger above.
-By contrast, matured gathering and salvage runs **auto-resolve** on world time: their timed-completion path resolves them without any player action (see *Salvage Execution* below and `gathering-and-harvesting/spec.md`).
-The Journal therefore presents gathering and salvage runs as auto-resolving and offers them no trigger button.
+A matured legacy crafting step waits for the manual trigger above.
+By contrast, matured legacy gathering and salvage runs **auto-resolve** on world time: their timed-completion path resolves them without any player action (see *Salvage Execution* below and `gathering-and-harvesting/spec.md`).
+The Journal therefore offers legacy gathering and salvage no trigger button, while version-1 crafting and gathering default to manual completion and expose their eligible actions explicitly.
 
 ## Alchemy Execution Lifecycle
 

@@ -349,6 +349,8 @@ const gatheringHarness = createMountedComponentHarness({
     'src/ui/svelte/util/listboxNavigation.js',
     'src/ui/svelte/util/overlayHost.js',
     'src/gatheringImageDefaults.js',
+    'src/utils/complicationSummary.js',
+    'src/systems/characterPrerequisites.js',
   ],
   compiledModules: [
     'src/ui/svelte/components/Stepper.svelte',
@@ -359,6 +361,13 @@ const gatheringHarness = createMountedComponentHarness({
     // ONE labelled push-button (issue 1118), which the stamina Add modifier and both Add drop
     // rule controls render, and the three availability add menus' shared primitive (issue 1458).
     ...SELECT_COMPILED_MODULES,
+    'src/ui/svelte/components/RadioCardGroup.svelte',
+    'src/ui/svelte/components/RowDisclosure.svelte',
+    'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
+    'src/ui/svelte/apps/manager/recipe/RecipeResultsSection.svelte',
+    'src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte',
+    'src/ui/svelte/apps/manager/recipe/RecipeResultItemRow.svelte',
+    'src/ui/svelte/apps/manager/recipe/RecipeRoutingAssignment.svelte',
     'src/ui/svelte/apps/manager/SubjectModifierPicker.svelte',
     'src/ui/svelte/components/SelectionCheckbox.svelte',
     'src/ui/svelte/components/IconButton.svelte',

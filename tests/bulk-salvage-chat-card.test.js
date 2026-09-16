@@ -28,6 +28,7 @@ import {
   bulkTarget,
   cardSubject,
   craftingSystemLookup,
+  recordedSalvageResults,
 } from './helpers/bulkSalvageFixtures.js';
 
 /** A localizer that renders each key as a readable, greppable token. */
@@ -340,7 +341,7 @@ describe('the per-system chatOutput gate reaches the card, not just the model', 
     const service = new BulkSalvageService({
       salvage: async (actorUuid, systemId, componentId) => ({
         success: true,
-        results: [{ name: `${componentId} ingot`, img: 'icons/ingot.webp' }],
+        results: recordedSalvageResults([{ name: `${componentId} ingot`, img: 'icons/ingot.webp' }]),
       }),
       getCraftingSystem: craftingSystemLookup([
         bulkSystem({
@@ -369,9 +370,15 @@ describe('the per-system chatOutput gate reaches the card, not just the model', 
   it('a subject appears iff ITS OWN system has chatOutput enabled', async () => {
     // Acceptance 9. Each system's GM decides independently whether Fabricate narrates,
     // and a run can span systems — so this is a per-subject filter, not a run-level one.
-    const { posted } = await runTwoSystems({ chatOutputA: true, chatOutputB: false });
+    const { posted, result } = await runTwoSystems({ chatOutputA: true, chatOutputB: false });
     assert.equal(posted.length, 1);
     assert.match(posted[0].content, /Iron Ore/);
+    // Mutation control: both rows must genuinely SUCCEED and the qualifying row's
+    // acknowledged award must reach the table. Without these the subject row still
+    // renders its component name when every row errored, so the filter reads as proved
+    // by a card built from two failures.
+    assert.equal(result.counts.succeeded, 2, 'every salvage row must genuinely succeed');
+    assert.match(posted[0].content, /comp-ore ingot/, 'and its recovered contribution');
     assert.doesNotMatch(posted[0].content, /Boar Hide/);
     assert.doesNotMatch(posted[0].content, /comp-hide ingot/, 'nor its recovered contribution');
   });

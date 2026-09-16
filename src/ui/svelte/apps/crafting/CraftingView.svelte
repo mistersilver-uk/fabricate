@@ -13,6 +13,7 @@
 -->
 <script>
   import { localize, subscribeSceneChange, subscribeWorldTime } from '../../util/foundryBridge.js';
+  import { journalRunReasonMessage } from '../../util/journalRunReasons.js';
   import RecipeBrowser from './RecipeBrowser.svelte';
   import RecipeDetail from './RecipeDetail.svelte';
   import ShoppingList from './ShoppingList.svelte';
@@ -89,6 +90,25 @@
   );
   const craftability = $derived(store?.selectedCraftability ?? null);
   const craftInFlight = $derived(Boolean(store?.craftInFlight));
+
+  // Why the header can refuse a recipe the listing calls available: the authority gates every
+  // versioned start, and its availability is a CACHE the boot/journal hooks refresh, so it is
+  // re-read whenever the listing reloads rather than subscribed to.
+  //
+  // It FAILS CLOSED on a code it cannot word. This used to answer '' and leave the green
+  // Ready-to-craft chip standing — for an AVAILABILITY answer that is backwards, and it is
+  // exactly what hid `authority-unavailable` while that code was unmapped. `available === false`
+  // means the craft WILL be refused whatever the code says, so an unwordable one falls back to
+  // the generic sentence rather than to silence.
+  const authorityRefusal = $derived.by(() => {
+    void listing;
+    const availability = services?.getJournalRunAuthorityAvailability?.();
+    if (availability?.available !== false) return '';
+    return (
+      journalRunReasonMessage(availability.reason, localize) ||
+      localize('FABRICATE.App.Journal.Actions.AuthorityUnavailable')
+    );
+  });
 
   // Progressive stage list (issue 651). The ORDER is applied in the store, not here —
   // this view only threads getters down and routes callbacks back.
@@ -279,6 +299,7 @@
           {rail}
           {activeStepId}
           {displayedStepId}
+          {authorityRefusal}
         />
       </section>
 

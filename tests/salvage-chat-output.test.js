@@ -18,6 +18,7 @@ import assert from 'node:assert/strict';
 
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { SalvageRunManager } from '../src/systems/SalvageRunManager.js';
+import { attachAwardReceipts } from '../src/systems/runHistoryEvidence.js';
 import { authoredComplications } from '../src/utils/componentComplications.js';
 
 let chatCreated = [];
@@ -78,7 +79,7 @@ test('_postSalvageChatMessage: success posts a salvage card with source, recover
     system: systemWithChat(true),
     component,
     consumedQuantity: 1,
-    results: [{ name: 'Iron Shard', img: 'icons/shard.png', system: { quantity: 2 } }],
+    results: attachAwardReceipts([{ name: 'Iron Shard' }], [{ name: 'Iron Shard', img: 'icons/shard.png', quantity: 2 }]),
     // Evidence records from _applyToolBreakage: only the broken one is shown, resolved
     // to its authored component name/img; a spared tool is skipped.
     usedTools: [
@@ -292,8 +293,8 @@ function stubItem(id, name) {
     system: { quantity: 1 },
     flags: {},
     toObject: () => ({ id, name, type: 'loot', system: { quantity: 1 } }),
-    async delete() {},
-    async update() {},
+    async delete() { return this; },
+    async update(payload) { if (payload['system.quantity'] !== undefined) this.system.quantity = payload['system.quantity']; return this; },
   };
 }
 
@@ -315,9 +316,12 @@ function stubActor(items) {
     async setFlag(ns, key, value) {
       flags[ns] ||= {};
       flags[ns][key] = value;
+      return this;
     },
-    createEmbeddedDocuments: async (_type, entries) =>
-      entries.map((entry, index) => stubItem(`made-${index}`, entry.name || 'Made')),
+    async createEmbeddedDocuments(_type, entries) {
+      return entries.map((entry, index) => Object.assign(stubItem(`made-${index}`, entry.name || 'Made'),
+        entry, { parent: this, uuid: `${this.uuid}.Item.made-${index}`, _source: structuredClone(entry) }));
+    },
   };
 }
 

@@ -1,6 +1,10 @@
 {
-  "pinnedTotal": 229,
+  "pinnedTotal": 231,
   "rows": [
+    {
+      "key": "(top level) | .fabricate-list-row.is-truncated .fabricate-list-row-detail",
+      "count": 2
+    },
     {
       "key": "(top level) | .fabricate-button.manager-button",
       "count": 2

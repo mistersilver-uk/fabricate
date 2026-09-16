@@ -60,6 +60,7 @@
     dataValue = '',
     stateDataAttr = '',
     stateDataValue = '',
+    evidence = null,
   } = $props();
 
   const TONES = new Set(['danger', 'warning', 'info', 'success', 'accent']);
@@ -117,6 +118,7 @@
         <i class="fas fa-xmark" aria-hidden="true"></i>
       </button>
     {/if}
+    {#if evidence}<div class="fab-notice-evidence">{@render evidence()}</div>{/if}
   </div>
 {/if}
 
@@ -129,7 +131,14 @@
     box-sizing: border-box;
     display: flex;
     align-items: flex-start;
+    /* Wrapping carries the evidence band only: the glyph is `flex: none`, the body is
+       `flex: 1` (basis 0) and the controls are `flex: none`, so line breaking sees a row
+       that fits until it genuinely cannot (issue 1648). */
+    flex-wrap: wrap;
     gap: var(--fab-space-3);
+    /* The specimen's gap is BETWEEN THE COLUMNS, so the band keeps the space-2 it
+       shipped with and this moves its left edge and nothing else. */
+    row-gap: var(--fab-space-2);
     min-width: 0;
     margin: 0;
     padding: var(--fab-space-3);
@@ -146,6 +155,21 @@
     font-size: 13px;
     line-height: 1;
     text-align: center;
+  }
+
+  /* A BAND, NOT A COLUMN (issue 1648). Evidence is a grid of rows, and inside
+     `.fab-notice-body` it began after the glyph column and its gap, so a "Run completed"
+     card indented its consumed/produced lists while the stage card beside it did not. It
+     is a flex sibling now, with a 100% basis that wraps it onto its own line at the
+     notice's own padding box. */
+  .fab-notice-evidence {
+    display: grid;
+    flex: 1 1 100%;
+    min-width: 0;
+    gap: var(--fab-space-2);
+    font-family: var(--fab-font-mono);
+    font-size: 11px;
+    color: var(--fab-text-secondary);
   }
 
   .fab-notice-body {

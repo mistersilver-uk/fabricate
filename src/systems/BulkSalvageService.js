@@ -42,7 +42,7 @@ import { applyPlayerResultOrder } from '../utils/progressiveResultOrder.js';
 import { checkTriggerIdsOf } from '../utils/progressiveStageComplications.js';
 
 import { buildBulkSalvageChatContent, sumChatEntriesByName } from './BulkSalvageChatCard.js';
-import { awardedQuantityOf } from './componentStacking.js';
+import { awardReceipts } from './runHistoryEvidence.js';
 import { resolveSalvageCheck } from './salvageCheckUsability.js';
 import { resolvedComponentsFor } from './scopedEntityReads.js';
 
@@ -637,10 +637,10 @@ export class BulkSalvageService {
         result?.value
       );
       item.tierStep = salvageRun?.checkResult?.data?.tierStepApplied ?? null;
-      item.results = (result?.results || []).map((created) => ({
+      item.results = awardReceipts(result?.results).map((created) => ({
         name: created?.name || '',
         img: created?.img || '',
-        quantity: awardedQuantityOf(created),
+        quantity: created.quantity,
       }));
       item.tools = brokenToolEntries(salvageRun, entry.system);
       // The addressing-only GM requests, held on the ENTRY rather than the item: they are

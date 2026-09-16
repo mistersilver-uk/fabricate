@@ -130,6 +130,9 @@ describe('GatheringView ↔ actor bar wiring', () => {
     copyModule('src/ui/svelte/util/gatheringFormat.js');
     copyModule('src/ui/svelte/util/gatheringConditionIcons.js');
     copyModule('src/ui/svelte/apps/gathering/gatheringBlockedReasons.js');
+    // Issue 1648: the authority-refusal wording GatheringView falls back to when a
+    // versioned start is refused. Omitting it HANGS this suite (# cancelled).
+    copyModule('src/ui/svelte/util/journalRunReasons.js');
     copyModule('src/ui/svelte/apps/gathering/selectionDefault.js');
     copyModule('src/ui/svelte/apps/gathering/scopedSelection.js');
     copyModule('src/ui/svelte/util/sceneImages.js');
@@ -536,6 +539,69 @@ describe('GatheringView ↔ actor bar wiring', () => {
       assert.match(warns[0], /CannotAttempt|NoRegion/, 'the notification names the blocked reason');
     } finally {
       delete globalThis.ui;
+    }
+  });
+
+  // Issue 1648: a versioned start goes through the run authority, which refuses with
+  // `{success:false, reason}` — no `accepted`, no `message`. That missed the
+  // `accepted === false` branch above entirely, so the attempt was a SILENT no-op.
+  it('warns with the worded reason when the run authority refuses a versioned start', async () => {
+    const warns = [];
+    globalThis.ui = { notifications: { warn: (msg) => warns.push(msg) } };
+    try {
+      const services = {
+        listGatheringForActor: () => Promise.resolve(listing([attemptableEnv()], 'a1')),
+        startGatheringAttempt: () => Promise.resolve({ success: false, reason: 'ledger-missing' })
+      };
+      const store = makeStore({ actors: [{ id: 'a1', uuid: 'Actor.a1', name: 'Bromm' }], seededId: 'a1' });
+      store.loadSelectableActors();
+      flushSync();
+      services.actorBar = store;
+      await mountView(services);
+
+      target.querySelector('[data-gathering-task-detail] [data-gathering-attempt]').click();
+      await settle();
+
+      assert.equal(warns.length, 1, 'a refused start is never a silent no-op');
+      assert.equal(warns[0], 'FABRICATE.App.Journal.Actions.LedgerMissing');
+      assert.notEqual(warns[0], undefined);
+    } finally {
+      delete globalThis.ui;
+    }
+  });
+
+  it('never warns with a non-string, whatever refusal shape the authority returns', async () => {
+    const shapes = [
+      { success: false },
+      { success: false, message: 42 },
+      { success: false, reason: 'command-timeout' },
+      { success: false, reason: 'a-reason-nobody-mapped' }
+    ];
+    for (const shape of shapes) {
+      const warns = [];
+      globalThis.ui = { notifications: { warn: (msg) => warns.push(msg) } };
+      try {
+        const services = {
+          listGatheringForActor: () => Promise.resolve(listing([attemptableEnv()], 'a1')),
+          startGatheringAttempt: () => Promise.resolve(shape)
+        };
+        const store = makeStore({ actors: [{ id: 'a1', uuid: 'Actor.a1', name: 'Bromm' }], seededId: 'a1' });
+        store.loadSelectableActors();
+        flushSync();
+        services.actorBar = store;
+        await mountView(services);
+
+        target.querySelector('[data-gathering-task-detail] [data-gathering-attempt]').click();
+        await settle();
+
+        const label = JSON.stringify(shape);
+        assert.equal(warns.length, 1, `one warning for ${label}`);
+        assert.equal(typeof warns[0], 'string', `a string for ${label}`);
+        assert.notEqual(warns[0], 'undefined', `never the text "undefined" for ${label}`);
+        assert.notEqual(warns[0].trim(), '', `never blank for ${label}`);
+      } finally {
+        delete globalThis.ui;
+      }
     }
   });
 });

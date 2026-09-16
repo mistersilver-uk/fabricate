@@ -23,6 +23,14 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {
+  GatheringDocumentActor,
+  compendiumSourceItem,
+  gatheringFixture,
+  resolvedCheck,
+  runRealGatheringAttempt,
+} from './helpers/real-gathering-attempt.js';
+
 
 globalThis.foundry = globalThis.foundry || {
   utils: { randomID: () => `rid-${Math.random().toString(36).slice(2)}` },
@@ -191,4 +199,136 @@ test('a MISCONFIGURED outcome never participates — ROUTED_TIER_UNROUTED (CF10)
   assert.equal(calls.planned, 0);
   assert.equal(calls.created, 0);
   assert.deepEqual(plan.createdResults, []);
+});
+
+/**
+ * ## The zero-award evidence half (issue 1648, TP14-B acceptance 5)
+ *
+ * The gate above decides whether anything is awarded; this decides how a run that awarded
+ * NOTHING says so. An omitted results effect is indistinguishable from evidence that was
+ * never captured, so a deliberate zero records an APPLIED EMPTY RECEIPT, and the two
+ * shapes that establish neither zero nor awards — an opaque record, and an effect still
+ * applying — must stay distinguishable from it. These drive the real engine, run manager
+ * and result creator; only Foundry documents and the check/roll inputs are doubled.
+ */
+
+const SOURCE_UUID = 'Compendium.fixture.materials.Item.scrap';
+const SCRAP = compendiumSourceItem({ uuid: SOURCE_UUID, name: 'Scrap', img: 'icons/scrap.webp' });
+const sources = { [SOURCE_UUID]: SCRAP };
+const components = [
+  { id: 'scrap', name: 'Scrap', img: 'icons/scrap.webp', registeredItemUuid: SOURCE_UUID, difficulty: 1 },
+];
+
+/** A routed task whose failure tier ('Ruined') and success tier ('Yield') both award. */
+function routedFixture(failureResultPolicy) {
+  return gatheringFixture({
+    mode: 'routed',
+    failureResultPolicy,
+    components,
+    resultGroups: [
+      { id: 'ruined', name: 'Ruined', results: [{ id: 'r-fail', componentId: 'scrap', quantity: 1 }] },
+      { id: 'yield', name: 'Yield', results: [{ id: 'r-win', componentId: 'scrap', quantity: 2 }] },
+    ],
+  });
+}
+
+const resultsEffect = (record) =>
+  record?.executionJournal?.effects?.find((effect) => effect.effectId === 'results') ?? null;
+
+test('a versioned failed run that awards nothing records an APPLIED EMPTY receipt, not an omission', async () => {
+  const versioned = await runRealGatheringAttempt({
+    ...routedFixture('never'),
+    sources,
+    versioned: true,
+    rollTotal: 3,
+    resolvedCheckResult: resolvedCheck(false, 'Ruined'),
+  });
+
+  assert.equal(versioned.error, null);
+  assert.equal(versioned.record.status, 'failed');
+  assert.equal(versioned.actor.items.length, 0, 'the policy refused the failure award');
+  const effect = resultsEffect(versioned.record);
+  // The DECISION, not its absence: the effect is present, applied, and its receipt is an
+  // explicitly empty list. An omitted effect would read as evidence that was never taken.
+  assert.equal(effect.phase, 'applied');
+  assert.deepEqual(effect.receipt, []);
+  assert.deepEqual(versioned.record.createdResults, []);
+
+  // The legacy contract for the same decision is the settled counterpart.
+  const legacy = await runRealGatheringAttempt({ ...routedFixture('never'), sources, rollTotal: 3 });
+  assert.equal(legacy.record.status, 'failed');
+  assert.equal(legacy.record.historySettlement.awards, 'complete');
+  assert.deepEqual(legacy.record.createdResults, []);
+});
+
+test('a successful all-miss records the same confirmed zero, and a permitted failure award keeps its receipt', async () => {
+  const allMiss = await runRealGatheringAttempt({
+    ...gatheringFixture({ components, dropRows: [{ id: 'row-scrap', componentId: 'scrap', quantity: 1, dropRate: 40, enabled: true }] }),
+    sources,
+    versioned: true,
+    rolls: [5],
+    resolvedCheckResult: resolvedCheck(true, null),
+  });
+
+  assert.equal(allMiss.record.status, 'succeeded', 'a native all-miss still succeeds');
+  assert.deepEqual(resultsEffect(allMiss.record).receipt, [], 'nothing dropped, and that is recorded');
+  assert.equal(allMiss.actor.items.length, 0);
+
+  const permitted = await runRealGatheringAttempt({
+    ...routedFixture('always'),
+    sources,
+    versioned: true,
+    rollTotal: 3,
+    resolvedCheckResult: resolvedCheck(false, 'Ruined'),
+  });
+  assert.equal(permitted.record.status, 'failed');
+  assert.deepEqual(
+    resultsEffect(permitted.record).receipt.map((entry) => [entry.quantity, entry.resultRowId]),
+    [[1, 'ruined:r-fail:0']],
+    'a permitted failure award keeps an actual receipt with its row link'
+  );
+  assert.equal(permitted.actor.items.length, 1);
+});
+
+test('an OPAQUE record reports an empty list without claiming zero, while the award really happened', async () => {
+  const blind = await runRealGatheringAttempt({
+    ...gatheringFixture({
+      selectionMode: 'blind',
+      components,
+      dropRows: [{ id: 'row-scrap', componentId: 'scrap', quantity: 2, dropRate: 90, enabled: true }],
+    }),
+    sources,
+    taskId: null,
+    rolls: [50],
+  });
+
+  assert.equal(blind.error, null);
+  assert.equal(blind.actor.items.length, 1, 'the blind gather really did award an item');
+  // Withheld evidence is never encoded as a complete empty: the list is empty because the
+  // viewer may not see it, so no settlement state is asserted alongside it.
+  assert.deepEqual(blind.record.createdResults, []);
+  assert.equal(blind.record.historySettlement, undefined);
+  assert.equal(blind.record.resolutionSnapshot, undefined);
+});
+
+test('an interrupted results effect stays APPLYING with no receipt, establishing neither zero nor awards', async () => {
+  const actor = new GatheringDocumentActor();
+  actor.createEmbeddedDocuments = async () => [];
+
+  const stuck = await runRealGatheringAttempt({
+    ...routedFixture('always'),
+    actor,
+    sources,
+    versioned: true,
+    rollTotal: 18,
+    resolvedCheckResult: resolvedCheck(true, 'Yield'),
+  });
+
+  assert.equal(stuck.error?.code, 'RECOVERY_REQUIRED');
+  const effect = resultsEffect(stuck.record);
+  assert.equal(effect.phase, 'applying');
+  assert.ok(!Object.hasOwn(effect, 'receipt'), 'an unapplied effect owns no receipt at all');
+  assert.deepEqual(effect.planned.map((entry) => entry.quantity), [2], 'the PLAN is not a receipt');
+  assert.deepEqual(stuck.record.createdResults, []);
+  assert.equal(stuck.publications.length, 0, 'nothing planned is published as actual');
 });

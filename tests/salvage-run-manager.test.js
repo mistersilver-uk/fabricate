@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { SalvageRunManager } from '../src/systems/SalvageRunManager.js';
+import { mergeHistoryFlag } from './helpers/journal-fixtures.js';
 import {
   insertTerminalRuns,
   assertCappedMostRecentFirst,
@@ -25,8 +26,8 @@ class FakeActor {
 
   async setFlag(namespace, key, value) {
     this._flags[namespace] = this._flags[namespace] || {};
-    this._flags[namespace][key] = value;
-    return value;
+    this._flags[namespace][key] = mergeHistoryFlag(this._flags[namespace][key], value);
+    return this;
   }
 }
 

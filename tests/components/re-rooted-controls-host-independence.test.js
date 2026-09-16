@@ -169,7 +169,9 @@ const read = (path) => readFileSync(resolve(repoRoot, path), 'utf8');
 function composedClasses(source, label) {
   const literal = source.match(/const classes = \$derived\(\s*\[([\s\S]*?)\]/);
   assert.ok(literal, `${label} must declare its emitted classes as one array literal`);
-  const tokens = [...literal[1].matchAll(/'([a-z][\w-]*)'/g)].map(([, token]) => token);
+  const tokens = [...literal[1].matchAll(/(?:^|,)\s*'([a-z][\w-]*)'\s*(?=,|$)/g)].map(
+    ([, token]) => token
+  );
   assert.ok(tokens.length > 0, `${label}'s class array holds no unconditional literal`);
   return tokens;
 }
@@ -197,22 +199,14 @@ const FIELD_CLASSES = composedClasses(
 ).join(' ');
 
 /**
- * `ManagerSearchField`'s array holds a THIRD literal, `is-compact`, behind `compact ? … : ''`, so
- * the reader above — which matches every quoted literal in the array text — sees one token more
- * than a default render emits. The fixture renders the DEFAULT control, so it writes the leading
- * two, and the pinning test below asserts that exact pair rather than leaving the slice implicit.
- *
- * The slice is taken from the HEAD deliberately, and that is the same constraint the area-scope
- * gate depends on: `composedClassRegion` truncates at the first `]` in the file after the array
- * opener, so a family root that is not the array's FIRST literal is a root that gate reports as
- * unemitted. Asserting `[0]` here says so out loud.
+ * `ManagerSearchField`'s `is-compact` literal belongs to a conditional expression, just like
+ * `IconButton`'s `is-size-24`. Neither is an unconditional array member, so the reader excludes
+ * both rather than applying opt-in geometry to a default-control fixture.
  */
 const SEARCH_CLASSES = composedClasses(
   read('src/ui/svelte/components/ManagerSearchField.svelte'),
   'ManagerSearchField'
-)
-  .slice(0, 2)
-  .join(' ');
+).join(' ');
 
 /**
  * `ManagerToolbar` and `InspectorCard` each compose exactly two unconditional literals — their
@@ -376,6 +370,16 @@ const PAGINATION_CLASSES = (() => {
 // NON-VACUITY ON THE READS THEMSELVES. Every assertion in this file is about what the sheet does
 // to these three strings, so a read that quietly returned the wrong thing would leave the whole
 // file measuring an element the product does not render — passing, and proving nothing.
+test('the class reader excludes conditional literals from default-control fixtures', () => {
+  assert.deepEqual(
+    composedClasses(
+      "const classes = $derived(['root', size === 24 ? 'is-size-24' : '', compact && 'is-compact', 'tail', extraClass])",
+      'conditional fixture'
+    ),
+    ['root', 'tail']
+  );
+});
+
 test('the fifteen class strings under measurement are the ones the primitives emit', () => {
   assert.equal(MANAGER_BUTTON_CLASSES, 'fabricate-button manager-button fab-manager-button');
   assert.equal(ICON_BUTTON_CLASSES, 'fabricate-icon-button manager-icon-button');

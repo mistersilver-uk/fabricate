@@ -18,6 +18,7 @@
   let {
     availableAt = null,
     services = null,
+    now = 0,
     hintKey = 'FABRICATE.App.Journal.TimeRemaining.WhenPassed',
   } = $props();
 
@@ -27,6 +28,7 @@
       : null
   );
   const whenLabel = $derived(worldTimeLabel(components, { localize }));
+  const waiting = $derived(Number.isFinite(Number(availableAt)) && Number(availableAt) > now);
 </script>
 
 <!--
@@ -45,13 +47,15 @@
   The one ADDITION is `role="note"`, which `Callout` emits whenever a title is set
   (`Callout.svelte:122,131`). This box carried no role before.
 -->
-<Callout
-  tone="warning"
-  icon="fas fa-hourglass-half"
-  title={whenLabel !== ''
-    ? localize('FABRICATE.App.Journal.TimeRemaining.AvailableAt', { when: whenLabel })
-    : ''}
-  text={localize(hintKey)}
-  dataAttr="data-journal-time-remaining"
-  dataValue=""
-/>
+{#if waiting}
+  <Callout
+    tone="warning"
+    icon="fas fa-hourglass-half"
+    title={whenLabel !== ''
+      ? localize('FABRICATE.App.Journal.TimeRemaining.AvailableAt', { when: whenLabel })
+      : ''}
+    text={localize(hintKey)}
+    dataAttr="data-journal-time-remaining"
+    dataValue=""
+  />
+{/if}

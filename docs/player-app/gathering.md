@@ -22,7 +22,7 @@ If your remembered character is missing from the list, the bar falls back to the
 
 The bar's right side carries gathering context.
 On the **Gathering** tab it shows the current **weather** and **time of day** (each an icon and label).
-On other tabs the right side is empty.
+On the **Journal** tab the header shows the read-only world clock using the world's calendar formatting.
 
 ## Environments Column
 
@@ -87,10 +87,48 @@ It is not the chance the whole attempt succeeds, so it can read high while an at
 Tasks that have no enabled drop rows carry no bar.
 The opaque blind action never shows per-task success chances.
 
-Attempting a routed or progressive task opens an interactive roll dialog before anything is gathered, and the roll posts to chat so a module like Dice So Nice can animate it.
-Cancelling the dialog aborts the attempt with no changes.
-The immediate d100 mode and timed tasks do not prompt.
-See [Rolling a check from the UI]({% link checks/crafting.md %}#rolling-a-check-from-the-ui) for the full behaviour.
+New gathering runs wait for manual collection by default.
+After starting a task, open the [Journal]({% link player-app/journal.md %}) and use its ready action.
+Depending on the task, this is **Collect**, **Roll a d100**, or **Roll check**.
+A timed run must first finish its world-time countdown.
+Eligible waiting runs can be paused and resumed, or use **When ready** to choose automatic completion where no player check is needed.
+Starting still applies the task's established stamina, node, and reservation rules.
+Cancelling later retains costs already incurred and results already delivered.
+
+The task's mode determines its yields.
+**Direct** gives its authored result set without a yield roll.
+**d100** compares one shared roll against the item chances.
+An item row clears when its effective roll reaches 101 minus its final drop chance or higher.
+For example, a final 30% chance needs an effective roll of 71 or higher.
+**Check** uses a check outcome to select its result set.
+Existing **Progressive** tasks keep their accumulated-budget behavior.
+The Journal separates **Possible yields** from actual **Brought back** awards.
+
+The d100 yield resolution can succeed even when every item row misses.
+Only selected events under a policy that makes events fail the attempt make that d100 resolution fail.
+Other task checks and failure rules still apply, so read the recorded run status rather than infer success or failure from the number of items.
+A failed run can also retain an award explicitly allowed by its outcome.
+
+Finished history shows the actual recorded outcome, rather than offering the active yield choices again.
+Direct gathering shows **Resolution** and **No roll** beside its actual awards.
+D100 history keeps the recorded roll, high-roll thresholds, and cleared or missed rows on one scale.
+Unknown per-row award quantities remain **Not recorded**, with any unattributed actual award shown once separately.
+Check-based history shows **How the check landed** and its recorded outcome instead of the full preview ladder.
+An absent receipt does not mean zero items, while an explicitly recorded empty or zero-only receipt confirms that no items were awarded.
+**This run** retains compact world-time facts, followed by guidance about the closed record.
+Blind history keeps protected details hidden and uses a generic pouch image, while entitled GM previews can show the task's own image.
+
+A required player check opens an interactive dialog when you execute the ready run.
+Cancelling that dialog leaves the stage unexecuted rather than cancelling the whole run or refunding its start-time costs.
+For non-secret checks you are entitled to see, the evaluated roll can post from your client so a module like Dice So Nice can animate it.
+Secret checks use a generic prompt and GM private posting without sending secret roll details back to the player.
+Foundry's private presentation does not guarantee confidentiality.
+See [Rolling a check from the UI]({% link checks/crafting.md %}#rolling-a-check-from-the-ui) for the check controls.
+
+Current-lifecycle starts and changes require active GM authority.
+The Journal explains missing authority and offers the active GM its setup action when the ledger is missing.
+If an interrupted operation needs recovery, ask the GM to inspect the recorded effects rather than repeating the attempt.
+Older timed gathering runs keep their automatic completion behavior.
 
 {% include screenshot.html case="player-gathering-task-ready" caption="A targeted environment, with one of its task rows selected." %}
 
