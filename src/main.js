@@ -77,6 +77,7 @@ import {
   createJournalRunCommandService,
   createManagerMutation,
   executePublicCraft,
+  executePublicGather,
   installCraftingJournalRunAuthority,
   installGatheringJournalRunAuthority,
 } from './systems/journalRunCommands.js';
@@ -4610,7 +4611,24 @@ class Fabricate {
     // `requestStart`, not `startAttempt`: a blind timed start this client may not
     // write is routed to the active GM before any task is drawn (issue 901). Every
     // other start delegates straight to `startAttempt` and is unchanged.
-    return callGatheringRuntimeWithCurrentViewer(gatheringEngine, 'requestStart', withRememberedActor, () => game.user);
+    //
+    // Wrapped in `executePublicGather` so a READY attempt still finishes in one call. The
+    // `lifecycleVersion: 1` stamped above routes a ready attempt into a started run awaiting
+    // execution instead of the engine's immediate resolution, so without this the public API
+    // answers `accepted: true` and awards nothing (issue 1759). A waiting or timed attempt is
+    // untouched and still matures at world time.
+    return executePublicGather({
+      requestStart: () =>
+        callGatheringRuntimeWithCurrentViewer(
+          gatheringEngine,
+          'requestStart',
+          withRememberedActor,
+          () => game.user
+        ),
+      actor: selectedActor,
+      executeCommand: (command, commandOptions) =>
+        this.executeJournalRunCommand(command, commandOptions),
+    });
   }
 
   /**
@@ -4813,14 +4831,23 @@ class Fabricate {
    * Actor UUIDs address this authenticated command boundary, whose GM handler rechecks the
    * attested sender's ownership. They do not replace actor IDs in the player crafting facades.
    * A timeout is an unknown response, not proof that execution failed or permission to replay.
+   *
+   * `options` MUST be forwarded. It carries `interactive`, which decides whether a required
+   * check opens the roll dialog or settles on the engine's own defaults, and the public
+   * crafting API passes `false` because it has no user to answer one. This signature took only
+   * `command` while its caller below passed both, so the flag was dropped here and reverted to
+   * its interactive default: `game.fabricate.craft()` on a recipe with a check opened a dialog
+   * nobody could answer and waited forever. The source pin covering that caller went on passing,
+   * because it pinned the CALL and nothing pinned this signature (issue 1759).
    * @param {{actorUuid: string, runType: 'crafting'|'gathering', runId: string,
    *   expectedRevision: number, action: string, payload?: object}} command
    *   Start uses an empty runId and revision zero. Alchemy uses runType `crafting`.
+   * @param {{interactive?: boolean}} [options] Forwarded verbatim to the command service.
    * @returns {Promise<object>} Authoritative result or explicit refusal.
    */
-  executeJournalRunCommand(command) {
+  executeJournalRunCommand(command, options) {
     this._requireReady();
-    return this.journalRunCommands?.executeJournalRunCommand(command)
+    return this.journalRunCommands?.executeJournalRunCommand(command, options)
       ?? Promise.resolve(authorityUnavailableRefusal());
   }
 
@@ -5262,7 +5289,7 @@ class Fabricate {
       recipe,
       ingredientSetId,
       options,
-      executeCommand: (command) => this.executeJournalRunCommand(command),
+      executeCommand: (command, options) => this.executeJournalRunCommand(command, options),
       resolveUuid: (uuid) => globalThis.fromUuid?.(uuid),
     });
   }
