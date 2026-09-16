@@ -1,9 +1,7 @@
 /**
  * `1.33.0` — record the mark that keeps every existing subject pick rolling (issue 1608; spec
- * § Subject Modifier Mark Seed). Pure, clone-first, idempotent, version-gated.
- * BOTH HALVES FIRE TOGETHER OR NOT AT ALL, and the second is the trap: an INHERITING record rolled
- * NOTHING while the mark was empty, so seeding without pinning those records would start them
- * rolling the whole union — a bigger change than the one this prevents.
+ * § Subject Modifier Mark Seed owns both halves and why they fire together or not at all).
+ * Pure, clone-first, idempotent, version-gated.
  */
 
 import { normalizeModifierPolicy } from '../systems/checkModifierResolver.js';

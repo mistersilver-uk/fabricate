@@ -1,9 +1,7 @@
 /**
  * `1.30.0` — THE WORLD-SCOPE ENTITY MIGRATION (issue 1363). PURE, NON-MUTATING AND IDEMPOTENT: it
- * answers the ORIGINAL object for any key it did not change, so the runner declines an unchanged leg.
- * Spec § World-Scope Entity Migration owns every rule — the load-bearing rewrite-before-payload
- * order, the two differently gated halves, the identity write-back's placement with the unguarded
- * half, and why `refusedDefaultSections` is a diagnostic absent from the notice.
+ * answers the ORIGINAL object for any key it did not change. Spec § World-Scope Entity Migration
+ * owns every rule, the load-bearing rewrite-before-payload order included.
  */
 
 import { cloneJson, isPlainObject } from '../utils/scalars.js';
@@ -99,10 +97,8 @@ function projectIdentity(record, entityType) {
 
 /**
  * Apply a merged identity onto one in-system record, IN PLACE. ABSENCE IS PART OF THE UNIT: a field
- * the world entity does not carry is DELETED rather than left, because the donor wins every identity
- * field AS A UNIT and the drift detector's zero case needs the two copies to agree on absence too.
- * THE THREE SOURCE-LINK FIELDS ARE THE EXCEPTION TO THE DONOR RULE, NOT TO THIS ONE: they are
- * UNIONED across the group, so writing that back is why no member loses a reference it had.
+ * the world entity does not carry is DELETED, the donor winning every identity field AS A UNIT. The
+ * three SOURCE-LINK fields are the exception to the donor rule, not to this one.
  */
 function applyIdentity(record, identity, entityType) {
   let changed = false;
@@ -203,8 +199,7 @@ export function buildMembershipRecord(record, entityType, entityId, systemId) {
 
 /**
  * The persisted scope payload for one entity type, normalized and fully cloned. Exported so the
- * `1.34.0` merge reads one through the same reader this pass writes one through — a second copy
- * would be a second decision about which sub-keys are the contract.
+ * `1.34.0` merge reads one through the same reader this pass writes one through.
  */
 export function readScopePayload(existing) {
   const source = isPlainObject(existing) ? existing : {};
@@ -222,18 +217,16 @@ export function readScopePayload(existing) {
 }
 
 /**
- * A component id plausibly a definition id rather than a document UUID. `sourceItemUuid` holds
- * EITHER and a UUID is not a dangling reference, so anything dotted is excluded: definition ids are
- * `randomID()` output, which never contains a dot.
+ * A component id plausibly a definition id rather than a document UUID: anything dotted is excluded,
+ * `randomID()` output never containing a dot.
  */
 function looksLikeDefinitionId(value) {
   return typeof value === 'string' && value.trim().length > 0 && !value.includes('.');
 }
 
 /**
- * Collect every component and tool reference one system reaches, THROUGH THE SHARED WALK — a second
- * hand-written traversal would be a mirror, and mirrors rot. This one cannot report a site the
- * rewrite does not visit, or the reverse.
+ * Collect every component and tool reference one system reaches, THROUGH THE SHARED WALK, so it
+ * cannot report a site the rewrite does not visit, or the reverse.
  */
 function collectSystemReferences(system, recipes, gatheringSlice) {
   const componentIds = new Set();
@@ -257,10 +250,8 @@ function collectSystemReferences(system, recipes, gatheringSlice) {
 }
 
 /**
- * The references that resolve to NOTHING, reported so a GM can review them.
- * A REPORT, NOT A PREDICTED DELETION, and measured rather than argued: across the acceptance set TEN
- * references resolve to nothing before the migration and ZERO disappear after. They become prunable
- * only at the CONSUMER SWEEP, so this release deletes none of them.
+ * The references that resolve to NOTHING, reported so a GM can review them. A REPORT, NOT A
+ * PREDICTED DELETION: they become prunable only at the CONSUMER SWEEP, so this release deletes none.
  */
 function computeFlaggedForReview(systems, recipes, gatheringConfig, worldRoster) {
   const flagged = [];
@@ -444,12 +435,9 @@ export function migrateWorldScopeEntities(data) {
     }
   }
 
-  // 3b. THE DONOR-ELECTED WORLD DEFAULTS. IT RUNS AFTER THE MEMBERSHIP LOOP, which is load-bearing:
-  // the `repairRequirements` constraint asks whether every referenced component is a world component
-  // every member system is a MEMBER of, and the records answering it are written above.
-  // THE CORPUS DIFFERENTIAL IS UNCHANGED BY TWO MECHANISMS: an OVERRIDE section's record carries its
-  // own value verbatim, so the default resolves for nobody; `essences` is EQUALITY, marked inheriting
-  // precisely where the two are equal (requirement 6's stated exception).
+  // 3b. THE DONOR-ELECTED WORLD DEFAULTS, AFTER THE MEMBERSHIP LOOP, which is load-bearing: the
+  // `repairRequirements` constraint reads the records written above. The corpus differential is
+  // unchanged by two mechanisms (requirement 6's stated exception).
   const worldComponentIds = new Set(payloads.components.entities.map((entity) => entity.id));
   const isMemberOf = (componentId, systemId) =>
     Boolean(payloads.components.membership[membershipKeyOf(componentId, systemId)]);

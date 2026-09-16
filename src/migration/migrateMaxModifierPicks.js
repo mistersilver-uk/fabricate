@@ -23,14 +23,9 @@ function _isPlainObject(value) {
 }
 
 /**
- * Apply the whole `1.20.0` transform to ONE system, mutated in place, so callers hand over a
- * structure they already own. Split out so the world-setting migration and `migrateExportPayload.js`
- * share ONE derivation: an export bundle carries exactly one system.
- * IT DELIBERATELY DOES NOT SEED A MISSING CHECK BLOCK, the same call two sibling migrations make: a
- * system with no check block has no catalogue, so no modifiers to pick and no cap to observe — and
- * it cannot be on `playerPicks`, since that rule is persisted in the very block that is missing.
- * Both reads go through the resolver rather than re-deriving its rules, so the migration and the
- * engine cannot disagree about what an absent cap means.
+ * Apply the whole `1.20.0` transform to ONE system, mutated in place, shared with
+ * `migrateExportPayload.js`. It DELIBERATELY DOES NOT SEED A MISSING CHECK BLOCK, the same call two
+ * sibling migrations make, and both reads go through the resolver rather than re-deriving its rules.
  */
 export function applyMaxModifierPicks(system) {
   if (!_isPlainObject(system)) return;

@@ -2,8 +2,7 @@
  * `1.4.0` — hard-migrate the legacy `mapped`/`tiered` crafting resolution modes to the canonical
  * routed modes. Pure, idempotent, version-gated; spec § Resolution-Model Migration (Pre-Release)
  * owns the mapping and its five edge cases. A TRUE one-time read-legacy, write-canonical migration,
- * so NO live `tiered` branch and no `outcomeRouting` read-shim is retained in the runtime. A former
- * `mapped` recipe is carried VERBATIM, mapped routing being byte-identical to ingredient-set.
+ * so NO live `tiered` branch and no `outcomeRouting` read-shim is retained in the runtime.
  */
 import { normalizeRoutedName, isReservedRoutedName } from '../utils/routedOutcomeKeywords.js';
 

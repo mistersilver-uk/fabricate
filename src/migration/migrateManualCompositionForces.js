@@ -1,8 +1,7 @@
 /**
  * `1.29.0` — force add belongs to AUTOMATIC composition mode (issue 1315; spec § Manual Composition
- * Force-List Fold owns the FOLD and the CLEAR). Pure, idempotent and copy-on-write.
- * A CLEARED LIST IS A DELETED KEY, NOT `[]`: the store emits `forced*Ids` only when non-empty, so
- * writing `[]` would rewrite the environment list of every world that has no force lists at all.
+ * Force-List Fold owns the FOLD, the CLEAR, and requirement 5's deleted-key rule). Pure, idempotent
+ * and copy-on-write.
  */
 
 import { isPlainObject } from './migrationHelpers.js';
@@ -19,10 +18,7 @@ function idEntries(value) {
   return value ? [value] : [];
 }
 
-/**
- * Coerce one entry as the store would: a number or stray object is NOT dropped, because discarding
- * an id the running engine honours would lose a composed record.
- */
+/** Coerce one entry as the store would; a number or stray object is NOT dropped. */
 function normalizeId(value) {
   if (value === null || value === undefined) return '';
   return String(value).trim();
@@ -50,21 +46,16 @@ function migrateEnvironment(environment, clearAutomaticForces) {
   );
   if (pending.length === 0) return environment;
 
-  // STRICT equality, matching the store's own gate: an absent, wrong-case or garbage mode is
-  // automatic everywhere else, and reading it as manual here would fold force entries into a list
-  // automatic mode ignores.
+  // STRICT equality, matching the store's own gate: every other mode value is automatic.
   const isManual = environment.compositionMode === 'manual';
   const next = { ...environment };
 
   for (const { forced, enabled } of pending) {
-    // An AUTOMATIC force list is residue only in a world predating this change. The world migration
-    // is version-gated, so clearing there repairs residue and meets nothing else; the IMPORT upcast
-    // has no version to gate on, so clearing there would destroy a legitimate list every round trip.
+    // The version-gated world pass clears an AUTOMATIC residue; the ungated import upcast must not.
     if (!isManual && !clearAutomaticForces) continue;
     if (isManual) {
       const merged = appendMissingIds(environment[enabled], idEntries(environment[forced]));
-      // Never CREATE an empty list: a force list holding nothing but `null` folds to no ids at all,
-      // and stamping `enabledTaskIds: []` would contradict the deleted-key ruling above.
+      // Never CREATE an empty list, on requirement 5's deleted-key rule.
       if (merged.length > 0) next[enabled] = merged;
     }
     delete next[forced];
@@ -75,8 +66,7 @@ function migrateEnvironment(environment, clearAutomaticForces) {
 
 /**
  * THE ONE IMPLEMENTATION of the fold and clear, called by the world migration and the export upcast
- * alike — `import-export/spec.md` requires the upcast to apply the same transform, and a bundle
- * exported before the upgrade is a second ingress for the records it exists to rescue.
+ * alike, as `import-export/spec.md` § Migration of older exports requires.
  */
 export function applyManualCompositionForceFold(environments, options = {}) {
   const { clearAutomaticForces = true } = options;
@@ -92,10 +82,7 @@ export function applyManualCompositionForceFold(environments, options = {}) {
   return { environments: migratedCount > 0 ? next : environments, migratedCount };
 }
 
-/**
- * Run the transform over the runner's payload, answering a SUBSET: the runner spread-merges the
- * return value, so returning the key with an `undefined` value would blank the setting.
- */
+/** Run it over the runner's payload, answering a SUBSET: a spread-merged `undefined` blanks. */
 export function migrateManualCompositionForces(data = {}) {
   if (!Array.isArray(data?.environments)) return {};
   return { environments: applyManualCompositionForceFold(data.environments).environments };

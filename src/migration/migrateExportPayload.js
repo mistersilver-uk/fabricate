@@ -1,8 +1,7 @@
 /**
  * Pure, Foundry-free, idempotent upcast of an export payload to the current schema, so it runs
  * before validation and in tests. `import-export/spec.md` § Migration of older exports owns the
- * ladder and every field-level rule. A payload ALREADY at the current schema is NOT a no-op: each
- * derivation below is written BRANCH-INDEPENDENTLY, and the one that is not says so and says why.
+ * ladder and every field-level rule, including why each derivation is BRANCH-INDEPENDENT.
  */
 
 import { FABRICATE_EXPORT_SCHEMA_VERSION } from '../systems/authoringExport.js';
@@ -31,10 +30,7 @@ import { buildWorldTravelConfig, stripSystemTravelConfig } from './migrateTravel
 import { applyUnifiedModifierLibrary } from './migrateUnifyModifierLibraries.js';
 import { migrateWorldScopeEntities, SCOPE_PAYLOAD_KEYS } from './migrateWorldScopeEntities.js';
 
-/**
- * Upcast legacy componentId-only Tools through the world-side `migrateToolsToFirstClass`. An
- * imported tool matches by raw source references until "Repair item data" stamps it (issue 561).
- */
+/** Upcast legacy componentId-only Tools through the world-side `1.15.0` transform (issue 561). */
 function upcastLegacyTools(migrated) {
   const system = migrated?.system;
   if (!system || typeof system !== 'object' || !Array.isArray(system.tools)) return;
@@ -49,33 +45,21 @@ function deriveMaxModifierPicks(migrated) {
   applyMaxModifierPicks(system);
 }
 
-/**
- * Strip the retired placeholder through the world-side `1.21.0` transform. Its counts are discarded:
- * the GM notice reports what a WORLD migration changed unasked, and an import is an act the GM
- * performed (issue 1094).
- */
+/** Strip the retired placeholder through `1.21.0`; its counts are discarded (issue 1094). */
 function retireCraftingModToken(migrated) {
   const system = migrated?.system;
   if (!system || typeof system !== 'object' || Array.isArray(system)) return;
   applyRetireCraftingModToken(system);
 }
 
-/**
- * Lift the catalogue and rename the rule through the world-side `1.22.0` transform. It runs AFTER
- * `retireCraftingModToken` for SYMMETRY with the world ladder rather than necessity (issue 1095).
- */
+/** Lift the catalogue through `1.22.0`; its order is SYMMETRY, not necessity (issue 1095). */
 function liftCheckModifierCatalogue(migrated) {
   const system = migrated?.system;
   if (!system || typeof system !== 'object' || Array.isArray(system)) return;
   applySystemCheckModifierCatalogue(system);
 }
 
-/**
- * Merge both modifier libraries through the world-side `1.23.0` transform. It runs AFTER
- * `liftCheckModifierCatalogue`, and here the ORDER IS OBSERVABLE: a pre-1.22.0 bundle holds its
- * catalogue at the old key and this reads only the new one, so running it first would merge an
- * empty catalogue and then retire it, dropping every check modifier in the bundle (issue 1117).
- */
+/** Merge both libraries through `1.23.0`, AFTER the lift — order is observable (issue 1117). */
 function unifyModifierLibraries(migrated) {
   const system = migrated?.system;
   if (!system || typeof system !== 'object' || Array.isArray(system)) return;
@@ -85,18 +69,13 @@ function unifyModifierLibraries(migrated) {
 }
 
 /** Seed the failure-result policy through `1.25.0`; a present key is never overwritten (issue 1098). */
-/**
- * Lift a pre-1278 export's currency block to the envelope through the SAME function the world path
- * uses, so the two cannot drift.
- */
+/** Lift a pre-1278 export's currency block through the SAME function the world path uses. */
 function liftCurrencyToWorldScope(migrated) {
   const system = migrated?.system;
   if (!system || typeof system !== 'object' || Array.isArray(system)) return;
 
   const existing = migrated.currencyConfig;
-  // Gate on the envelope carrying ANY world config, not UNITS: a schema-3 export whose world picked
-  // the macro spend strategy before authoring a ladder has scalars and an empty `units`, and a
-  // units-count guard would rebuild over it, discarding the strategy, provider and macro UUIDs.
+  // Gate on ANY world config, not UNITS: § Migration of older exports, already-lifted guard rule.
   const alreadyLifted =
     existing && typeof existing === 'object' && Object.keys(existing).length > 0;
 
@@ -112,9 +91,7 @@ function liftTravelToWorldScope(migrated) {
   if (!system || typeof system !== 'object' || Array.isArray(system)) return;
 
   const existing = migrated.travelConfig;
-  // Gate on ANY travel config, not on REALMS, for the currency lift's reason: a v4 export from a
-  // world that chose `alwaysVisible` before authoring a realm has scalars and an empty `realms`,
-  // and a realm-count guard would discard the reveal mode and modifier visibility the GM set.
+  // Gate on ANY travel config, not on REALMS, for the currency lift's reason.
   const alreadyLifted =
     existing &&
     typeof existing === 'object' &&
@@ -122,26 +99,20 @@ function liftTravelToWorldScope(migrated) {
     Object.keys(existing).length > 0;
 
   if (!alreadyLifted) {
-    // `_collisions` is diagnostic output for the WORLD notice, which unions many systems. One
-    // system cannot collide with another, so it is dropped rather than persisted.
+    // `_collisions` is the WORLD notice's diagnostic; one system cannot collide with itself.
     const { _collisions: _diagnostics, ...built } = buildWorldTravelConfig([system]);
     migrated.travelConfig = built;
   }
   migrated.system = stripSystemTravelConfig([system])[0];
 }
 
-/**
- * Lift a pre-1308 export's character libraries and drop the system's copies. Its guard is a TWO-LIST
- * DISJUNCTION for the world migration's reason: either populated library proves the lift ran.
- */
+/** Lift a pre-1308 export's character libraries and drop the system's copies. */
 function liftCharacterLibrariesToWorldScope(migrated) {
   const system = migrated?.system;
   if (!system || typeof system !== 'object' || Array.isArray(system)) return;
 
   const existing = migrated.characterLibraries;
-  // NON-EMPTY, not merely present: `buildExportPayload` always emits the slice with both keys, so a
-  // presence check would read every export as already lifted and then strip the system's copy.
-  // Keying on the lists is safe only because this slice has NO scalars.
+  // NON-EMPTY, not merely present, and a TWO-LIST DISJUNCTION: § Migration of older exports.
   const alreadyLifted =
     existing &&
     typeof existing === 'object' &&
@@ -158,17 +129,10 @@ function liftCharacterLibrariesToWorldScope(migrated) {
   migrated.system = stripSystemCharacterLibraries([system])[0];
 }
 
-/**
- * Fold a pre-1315 bundle's manual force lists through the world-side `1.29.0` function ITSELF rather
- * than a mirror — which `import-export` requires, and which matters because `importReferenceResolver`
- * carries the force lists through import untouched (issue 1315).
- */
+/** Fold manual force lists through `1.29.0` itself; the AUTOMATIC clear is legacy-only (1315). */
 function foldManualCompositionForces(migrated, { clearAutomaticForces }) {
   const environments = migrated?.gatheringEnvironments;
   if (!Array.isArray(environments)) return;
-  // The manual fold is unconditional: after 1315 a manual environment carrying a force list is
-  // pre-1315 by construction. Clearing an AUTOMATIC one is not — the CURRENT-SCHEMA branch runs on
-  // every payload forever, so clearing there would destroy a legitimate list on every round trip.
   migrated.gatheringEnvironments = applyManualCompositionForceFold(environments, {
     clearAutomaticForces,
   }).environments;
@@ -177,23 +141,14 @@ function foldManualCompositionForces(migrated, { clearAutomaticForces }) {
 /** The three entity types the world-scope entity slices carry, in the shipped order. */
 const SCOPE_ENTITY_TYPES = Object.freeze(['components', 'essences', 'tools']);
 
-/**
- * The transient diagnostics key `prepareForImport` reads. NOT PAYLOAD DATA: it carries one-time
- * facts about THIS upcast, so it is the one key on which `migrate(migrate(x))` may differ.
- */
+/** Transient diagnostics `prepareForImport` reads: the one key on which a re-migrate may differ. */
 export const WORLD_SCOPE_UPCAST_REPORT_KEY = '_worldScopeEntityReport';
 
 function trimmedString(value) {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
-/**
- * STEP 2: re-key ONE envelope slice into the PERSISTED MAP SHAPE the shared transform reads, because
- * the failure it prevents is a SILENT DISCARD — that reader accepts those sub-keys through
- * `isPlainObject` only, which EXCLUDES the array projection the envelope carries.
- * THE KEY IS DERIVED FROM THE RECORD, never carried: nothing validates a map key against the record
- * it addresses, so a doubled separator would leave two records for one pair.
- */
+/** STEP 2: re-key one envelope slice to the PERSISTED MAP SHAPE (§ map-shape rule). */
 function scopeSliceToPersistedShape(slice) {
   const source = isPlainObject(slice) ? slice : {};
   const { entities, defaults, membership, ...extras } = source;
@@ -235,20 +190,10 @@ function scopeSliceToEnvelopeShape(payload) {
 
 /**
  * Schema 5 to 6: DERIVE the three world-scope entity slices through the `1.30.0` migration itself
- * rather than a second implementation (issue 1364).
- * IT IS NOT A LIFT, and there is no strip half: the in-system record stays AUTHORITATIVE while
- * `## CraftingSystem` requirement 36 holds, so stripping identity off `system.components` would
- * perform, through the import door, the shed the migration deferred — which blanks every screen in
- * the destination on the first save. The invariant is ONE-DIRECTIONAL: no KEY is REMOVED from any
- * in-system record and no value of a present key changes.
- * BRANCH-INDEPENDENT, and LAST on each branch, because the grouping reads a tool's own source
- * references, which a schema-1 payload lacks until `upcastLegacyTools` has run.
- * The shared transform's rewritten `systems`, `recipes` and `gatheringConfig` are DISCARDED, and
- * that discard is LOAD-BEARING: `groupIdentity` folds the source keys into `aliasItemUuids` even for
- * a singleton group, so adopting them would rewrite in-system identity through the import door.
- * STEP 5 assigns a fresh deep copy, because the transform answers the ORIGINAL object for an
- * unchanged key. The WORLD TOOL-BREAKAGE AUTHORITY is dropped HERE rather than by the export
- * assembler, because a HAND-EDITED payload never reaches the assembler.
+ * (issue 1364). NOT a lift, branch-independent, LAST on each branch, and the transform's
+ * `systems`/`recipes`/`gatheringConfig` are DISCARDED — § Migration of older exports owns all four.
+ * The WORLD TOOL-BREAKAGE AUTHORITY is dropped here because a HAND-EDITED payload never reaches
+ * the export assembler.
  */
 function deriveWorldScopeEntitySlices(migrated) {
   const system = migrated?.system;
@@ -279,9 +224,8 @@ function deriveWorldScopeEntitySlices(migrated) {
     ...input,
   });
 
-  // STEP 3b — the `1.32.0` essence election over the same corpus, SHARED rather than reimplemented.
-  // A bundle exported between the two carries membership records the `1.30.0` per-pair guard leaves
-  // untouched, so without this they would arrive with no `inherit.essences` switch (issue 1371).
+  // STEP 3b — the `1.32.0` essence election over the same corpus, SHARED rather than
+  // reimplemented: without it a bundle exported between the two arrives unswitched (issue 1371).
   migrateComponentEssenceSections({
     systems: [system],
     componentScope: result?.[SCOPE_PAYLOAD_KEYS.components],
@@ -291,9 +235,8 @@ function deriveWorldScopeEntitySlices(migrated) {
   for (const entityType of SCOPE_ENTITY_TYPES) {
     const key = SCOPE_PAYLOAD_KEYS[entityType];
     const payload = isPlainObject(result?.[key]) ? result[key] : carried[key];
-    // STEP 5, first half — the DROP, of the whole extras spread rather than one named key, since
-    // the three sub-keys are the entire travelling contract. The authority is recorded so the
-    // import can report it rather than losing it silently.
+    // STEP 5, first half — the DROP, of the whole extras spread rather than one named key. The
+    // authority is recorded so the import can report it rather than losing it silently.
     if (entityType === 'tools' && isPlainObject(payload?.toolBreakage)) {
       droppedToolBreakage = cloneJson(payload.toolBreakage);
     }
@@ -313,13 +256,9 @@ function deriveWorldScopeEntitySlices(migrated) {
 
 /**
  * Schema 6, field level: merge the bundle's equivalent world essences through the shipped `1.34.0`
- * pass itself. Requirement 12 requires it branch-independently and AFTER
- * {@link deriveWorldScopeEntitySlices}, because the world essences its key compares do not exist
- * until that has run.
- * Unlike a `1.30.0` re-key map, whatever this map says is APPLIED — a destination already at
- * `1.34.0` never re-runs the migration, so refusing would leave the duplicate forever, which is why
- * the re-keyed slices are adopted back. On a one-system corpus it changes nothing today, so the
- * pass is an observer and the refusal report is the payload (issue 1654).
+ * pass itself, branch-independently and AFTER {@link deriveWorldScopeEntitySlices}. Unlike a
+ * `1.30.0` re-key map, whatever this map says is APPLIED — see § Migration of older exports,
+ * requirement 12 (issue 1654).
  */
 function mergeEquivalentBundleEssences(migrated) {
   const system = migrated?.system;
@@ -330,8 +269,7 @@ function mergeEquivalentBundleEssences(migrated) {
     ? migrated.gatheringConfig.system
     : {};
 
-  // The same map/array conversion, for the same reason: the shared pass reads `defaults` and
-  // `membership` as maps only and silently ignores an array.
+  // The same map/array conversion, for the same reason.
   const result = mergeEquivalentWorldEssences({
     systems: [system],
     recipes: Array.isArray(migrated.recipes) ? migrated.recipes : [],
@@ -344,9 +282,8 @@ function mergeEquivalentBundleEssences(migrated) {
     ),
   });
 
-  // Adopted, not discarded: the shared pass answers the original object for an unchanged key.
-  // Each assignment is gated on the key having been present, because the corpus handed in is
-  // synthesized — an ungated write-back would ADD a key the bundle never carried, a shape change.
+  // Adopted, not discarded, and each assignment is gated on the key having been present: the
+  // corpus is synthesized, so an ungated write-back would ADD a key the bundle never carried.
   const mergedSystem = Array.isArray(result?.systems) ? result.systems[0] : null;
   if (isPlainObject(mergedSystem)) migrated.system = mergedSystem;
   if (Array.isArray(migrated.recipes) && Array.isArray(result?.recipes)) {
@@ -356,8 +293,7 @@ function mergeEquivalentBundleEssences(migrated) {
   if (isPlainObject(migrated.gatheringConfig?.system) && isPlainObject(mergedSlice)) {
     migrated.gatheringConfig.system = mergedSlice;
   }
-  // Step 4's helper, reused rather than respelled, and gated the same way — inert on the shipped
-  // path, where the derivation above runs first and writes both keys unconditionally.
+  // Step 4's helper, reused rather than respelled, and gated the same way.
   for (const entityType of ['essences', 'components']) {
     const key = SCOPE_PAYLOAD_KEYS[entityType];
     if (!(key in migrated)) continue;
@@ -366,8 +302,7 @@ function mergeEquivalentBundleEssences(migrated) {
     );
   }
 
-  // Carried rather than dropped, on the derivation's rule: a refused group that produced no change
-  // is indistinguishable from a bundle with nothing to merge unless it is reported.
+  // Carried rather than dropped, on the derivation's rule: a refusal must be REPORTED.
   const report = isPlainObject(migrated[WORLD_SCOPE_UPCAST_REPORT_KEY])
     ? migrated[WORLD_SCOPE_UPCAST_REPORT_KEY]
     : {};
@@ -387,12 +322,9 @@ function seedFailureResultPolicy(migrated) {
 
 /**
  * Record the mark that keeps an imported bundle's subject modifier picks rolling, through the
- * world-side `1.33.0` transform. ORDERED AFTER `liftCharacterLibrariesToWorldScope`, load-bearing:
- * the transform intersects the seed with the world modifier catalogue, which on a pre-1308 bundle
- * exists only as the system's own copy until that lift has run.
- * LEGACY-BRANCH ONLY — the one divergence from every sibling, and deliberate. Its guard is a DATA
- * SHAPE issue 1608 turned into a legitimate ANSWER, so seeding on the current-schema branch would
- * re-seed a deliberately emptied mark on every round trip, breaking § Round-trip integrity.
+ * `1.33.0` transform. ORDERED AFTER `liftCharacterLibrariesToWorldScope`, and LEGACY-BRANCH ONLY —
+ * the one divergence from every sibling, and deliberate; § Migration of older exports owns both
+ * rules and why seeding on the current-schema branch would break § Round-trip integrity (1608).
  */
 function seedSubjectModifierMarks(migrated) {
   const system = migrated?.system;
@@ -442,8 +374,7 @@ export function migrateExportPayload(payload) {
   }
 
   if (!migrated.gatheringConfig || typeof migrated.gatheringConfig !== 'object') {
-    // Real schema-1 exports never carried gathering config. Lift a hand-authored
-    // `system.gatheringConfig` ONLY when it matches the envelope shape (`{ system, shared }`); a
+    // Lift a hand-authored `system.gatheringConfig` ONLY when it matches the envelope shape; a
     // world-setting-shaped object would persist as an empty slice, so it is ignored.
     const legacy = migrated.system?.gatheringConfig;
     const looksLikeExportShape =

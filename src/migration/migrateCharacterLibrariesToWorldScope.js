@@ -1,9 +1,7 @@
 /**
  * `1.28.0` — lift the character prerequisite and modifier libraries to world scope (issue 1308; spec
- * § Character Libraries World-Scope Migration). Pure, idempotent, version-gated. Unlike currency and
- * travel NOTHING stays on the system, an unreferenced entry costing nothing.
- * COLLISIONS ARE THE NORMAL CASE, preset ids being stable editable slugs, and that changes the HARM:
- * the reference still RESOLVES, to a DIFFERENT rule. They are REPORTED, never re-keyed.
+ * § Character Libraries World-Scope Migration owns the strip, and why COLLISIONS ARE THE NORMAL CASE
+ * and are REPORTED rather than re-keyed). Pure, idempotent, version-gated.
  */
 
 import { normalizeCharacterPrerequisiteList } from '../systems/characterPrerequisites.js';

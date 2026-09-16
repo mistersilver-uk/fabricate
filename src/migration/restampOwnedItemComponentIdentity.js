@@ -1,8 +1,7 @@
 /**
  * The one-shot, active-GM re-stamp back-filling `roles[systemId].componentId` onto OWNED ACTOR items
- * resolving to a component ONLY by name (issue 600). Deliberately NOT a `MigrationRunner` entry: the
- * runner holds settings payloads and no Item handle, so the edge lives in `src/main.js` and this
- * imports no Foundry global. IDEMPOTENT, NO FOREIGN CLOBBER, DOTTED-ID SAFE, NO-THROW-PER-ITEM.
+ * resolving to a component ONLY by name (issue 600). NOT a `MigrationRunner` entry, that runner
+ * holding no Item handle. IDEMPOTENT, NO FOREIGN CLOBBER, DOTTED-ID SAFE, NO-THROW-PER-ITEM.
  */
 
 import { isSafeFlagKeySegment } from '../config/flags.js';

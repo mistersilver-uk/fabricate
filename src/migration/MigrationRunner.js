@@ -693,11 +693,8 @@ const MIGRATIONS = [
       'untouched for a re-upgrade, so going back costs you nothing further — it simply does not ' +
       'undo the merge',
     downgradeTo: '1.33.0',
-    // Deliberately not marked `downgradeLosesData` (issue 1654, requirement 15): the retired world
-    // essences are a loss at migration time rather than one the downgrade causes, `1.33.0` reads
-    // every setting with unchanged normalizers, and `worldEssenceMergeMap` survives as an orphaned
-    // `Setting` a re-upgrade finds intact. The label still carries the irreversibility caveat —
-    // "no data is lost by downgrading" and "the merge can be undone" are different claims.
+    // Deliberately not marked `downgradeLosesData` (issue 1654, requirement 15): the loss happens at
+    // migration time, not on the downgrade. The label still carries the irreversibility caveat.
     downgradeLosesData: false,
     // Reports four legs through the transient `_worldEssenceMergeReport` field: groups merged,
     // groups refused with reasons, world essences whose members disagreed, and ones no system holds.
@@ -707,10 +704,9 @@ const MIGRATIONS = [
 ];
 
 /**
- * The highest version in the registry above. Derived by comparison rather than read off the last
- * element, so an entry appended out of order cannot silently lower the answer. Exported for issue
- * 1224's Valid Id Basis, which would otherwise hardcode a literal that falls behind the registry
- * and then reads as "migrations current" forever — fail-OPEN in the one gate that must fail closed.
+ * The highest version in the registry above, derived by comparison so an entry appended out of order
+ * cannot lower the answer. Exported for issue 1224's Valid Id Basis, which would otherwise hardcode
+ * a literal that falls behind and reads as "migrations current" forever.
  */
 export function getHighestRegisteredMigrationVersion() {
   let highest = '0.0.0';
@@ -723,9 +719,8 @@ export function getHighestRegisteredMigrationVersion() {
 
 /**
  * Why a pass persisted nothing and left `migrationVersion` where it found it (issue 1242). A
- * DEFERRAL is not an abort: an abort is a fatal migration error with per-document remediation and a
- * downgrade target, and gets the recovery dialog; a deferral is a storage fact whose remedy is a
- * reload, so it gets its own GM notice.
+ * DEFERRAL is not an abort: an abort is fatal and gets the recovery dialog, while a deferral is a
+ * storage fact whose remedy is a reload, so it gets its own GM notice.
  */
 export const MIGRATION_DEFERRAL_REASONS = Object.freeze({
   /** The recipe corpus could not be read. Distinct from an EMPTY corpus, deliberately. */
@@ -735,9 +730,8 @@ export const MIGRATION_DEFERRAL_REASONS = Object.freeze({
 });
 
 /**
- * The summary shape a pass returns when it persisted nothing. Written once rather than as a fourth
- * copy: the early return, the abort and the two deferrals all describe "this pass wrote nothing",
- * and four hand-maintained copies drift the moment a summary key is added.
+ * The summary shape a pass returns when it persisted nothing, written once for the early return, the
+ * abort and the two deferrals alike.
  */
 function emptyPassSummary(overrides = {}) {
   return {
@@ -763,12 +757,10 @@ function emptyPassSummary(overrides = {}) {
 
 export class MigrationRunner {
   /**
-   * `promptRecovery` is an optional seam invoked with the abort context so the caller can present a
-   * GM decision prompt; `migrations` overrides the default registry for tests.
-   * `recipeCorpus` and `craftingSystemCorpus` are the accessors this pass reads and writes through
-   * (issue 1242). Both DEFAULT to the whole-array setting accessors below, which is what production
-   * uses; they stay injectable so a fixture can observe or refuse a read or write without patching
-   * `game.settings`.
+   * `promptRecovery` is an optional seam invoked with the abort context; `migrations` overrides the
+   * default registry for tests. `recipeCorpus` and `craftingSystemCorpus` are the accessors this
+   * pass reads and writes through (issue 1242), defaulting to the whole-array setting accessors
+   * below and injectable so a fixture can refuse a read or write without patching `game.settings`.
    */
   constructor({
     getSetting,
@@ -800,8 +792,7 @@ export class MigrationRunner {
 
   /**
    * Run all pending migrations in order, persisting only what changed and advancing
-   * `migrationVersion` to the highest that ran. The summary lets the caller fire one-time GM
-   * notices or surface an aborted pass.
+   * `migrationVersion` to the highest that ran; the summary drives the one-time GM notices.
    */
   async run() {
     const lastRunVersion = this._getSetting(SETTING_KEYS.MIGRATION_VERSION) ?? '0.0.0';
@@ -1036,13 +1027,8 @@ export class MigrationRunner {
       JSON.stringify(data.worldEssenceMergeMap) !== originalWorldEssenceMergeMapJson;
 
     // WRITEBACK ORDER IS PINNED, not incidental: `destructive-changes-and-migrations/spec.md`
-    // § Startup Migration Flow items 13 to 15 own it — `worldScopeRekeyMap` first of all, then
-    // `worldEssenceMergeMap`, then `recipes`, every world-scope DESTINATION ahead of the
-    // `craftingSystems` SOURCE it was lifted from, and the version bump unconditionally last.
-    // Each rule's own failure mode is recorded there; the two map legs additionally sit OUTSIDE
-    // both shipped try/catch blocks and so carry their own containment, because an escaping
-    // rejection out of the async `ready` callback fires no error hook and no notification, leaves
-    // the readiness promise unsettled and the module with no managers.
+    // § Startup Migration Flow items 13 to 15 own the order and each rule's failure mode. The two
+    // map legs sit OUTSIDE both shipped try/catch blocks, so they carry their own containment.
     if (worldScopeRekeyMapChanged) {
       try {
         await this._setSetting(SETTING_KEYS.WORLD_SCOPE_REKEY_MAP, data.worldScopeRekeyMap);
@@ -1050,12 +1036,9 @@ export class MigrationRunner {
         return this._deferOnWriteFailure(error);
       }
     }
-    // `worldEssenceMergeMap` is a setting of its own rather than an essence leg on the `1.30.0`
-    // map: `normalizeRekeyMap` drops any leg outside `REKEYABLE_ENTITY_TYPES`, widening that list
-    // would newly refuse a `1.30.0` pair on a world carrying a native duplicate essence id, and
-    // `mayClearWorldScopeRekeyMap` is read by two `1.30.0` source-Item stamp gates.
-    // Its tombstone leg is why a tear that dropped it would let a later `+ New essence` reissue a
-    // retired id.
+    // A setting of its own rather than an essence leg on the `1.30.0` map, whose `REKEYABLE_ENTITY_
+    // TYPES` list cannot be widened without newly refusing a pair. Its tombstone leg is why a tear
+    // that dropped it would let a later `+ New essence` reissue a retired id.
     if (worldEssenceMergeMapChanged) {
       try {
         await this._setSetting(SETTING_KEYS.WORLD_ESSENCE_MERGE_MAP, data.worldEssenceMergeMap);
@@ -1134,9 +1117,8 @@ export class MigrationRunner {
   }
 
   /**
-   * Abandon the rest of the writeback and report the pass as deferred. `migrationVersion` is left
-   * where it was found so the next boot re-runs the whole pass, which is safe because every
-   * writeback leg is a plain whole-array replace.
+   * Abandon the rest of the writeback and report the pass as deferred, leaving `migrationVersion`
+   * where it was found: every writeback leg is a plain whole-array replace, so a re-run is safe.
    */
   _deferOnWriteFailure(error) {
     console.error(
@@ -1151,9 +1133,8 @@ export class MigrationRunner {
   }
 
   /**
-   * Emit GM-facing recovery guidance to the console after an aborted pass, per the spec's §
-   * Migration Abort Recovery Guidance: an abort header, a recommended downgrade, per-document fix
-   * instructions, and macro remediation hints when present.
+   * Emit GM-facing recovery guidance to the console after an aborted pass, per the spec's
+   * § Migration Abort Recovery Guidance.
    */
   _emitMigrationRecoveryGuidance(migration, error, downgradeTo) {
     // Scoped to THIS PASS. Not a claim that a failed migration leaves data unchanged: a non-fatal

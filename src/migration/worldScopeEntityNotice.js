@@ -1,7 +1,6 @@
 /**
- * THE GM NOTICES for the `1.30.0` world-scope entity migration (issue 1363).
- * PURE COMPOSITION, deliberately not inline in `src/main.js`: nothing in that file can be executed
- * by a unit test, and a source-text grep pins a DISPATCH but never a SUM. THREE notices, because
+ * THE GM NOTICES for the `1.30.0` world-scope entity migration (issue 1363). PURE COMPOSITION,
+ * deliberately not inline in `src/main.js`, which no unit test can execute. THREE notices, because
  * the facts arrive at different moments on different clients' timelines.
  */
 
@@ -15,10 +14,8 @@ function arrayOf(value) {
 
 /**
  * The one-time notice describing what the `1.30.0` migration did. SEVERITY IS DERIVED, not passed:
- * creating world entities is INFORMATIONAL, while a rename, a refusal or a reference that already
- * resolves to nothing is a PERMANENT warning. Those references are REPORTED, never pruned, so the
- * copy says so rather than implying a deletion the GM must race. A pass that changed nothing
- * produces NO message — a notice that always fires is a notice nobody reads.
+ * creation is INFORMATIONAL, a rename, refusal or already-dangling reference a PERMANENT warning.
+ * Those references are REPORTED, never pruned. A pass that changed nothing produces NO message.
  */
 export function buildWorldScopeEntityNotice(report, localize) {
   const created = report?.createdEntities ?? {};
@@ -120,9 +117,8 @@ export function buildWorldScopeEntityNotice(report, localize) {
 
 /**
  * The one-time notice describing what the identity-flag remap could not repair, silent on a clean
- * pass. THE THIRD FACT IS NOT COSMETIC: `skippedErrors` is a transient failure leaving that actor
- * still naming retired ids, and it WITHHOLDS the re-key map clear — so the GM needs to know both
- * that the repair is incomplete and that it will be retried, or a partial repair looks complete.
+ * pass. THE THIRD FACT IS NOT COSMETIC: `skippedErrors` WITHHOLDS the re-key map clear, so the GM
+ * must be told both that the repair is incomplete and that it will be retried.
  */
 export function buildWorldScopeIdentityRemapNotice(summary, localize) {
   const unsafe = arrayOf(summary?.unsafeSystemIdSkips);
@@ -160,17 +156,12 @@ export function buildWorldScopeIdentityRemapNotice(summary, localize) {
 }
 
 /**
- * How many drifted records the TOAST names before deferring to the console.
- * A NOTIFICATION IS NOT A REPORT SURFACE, and Foundry's own CSS is why: `.notification` has no
- * `max-height` and no `overflow` and carries `pointer-events: all`, at roughly 60% viewport width
- * for 5000ms (verified at V14.365), so an uncapped join over a bulk edit is about 18 KB in one
- * fixed-position block that swallows pointer events for five seconds.
- * NOTHING IS LOST BY CAPPING, BUT ONLY BECAUSE FABRICATE LOGS THE FULL LIST ITSELF, AT A LEVEL THE
- * CONSOLE SHOWS BY DEFAULT. Two earlier forms each stopped one step short: core's own logging emits
- * the CAPPED message, since the cap is applied before `notify` is called; and `console.debug` maps
- * to DevTools' VERBOSE level, which Chromium's default filter excludes. The call site therefore logs
- * at `console.info`, which `tests/world-scope-consumer-sweep.test.js` pins.
- * The cap is on the ENUMERATION only — the counts stay exact, and the notice still NAMES records.
+ * How many drifted records the TOAST names before deferring to the console. A NOTIFICATION IS NOT A
+ * REPORT SURFACE: `.notification` has no `max-height`, no `overflow` and `pointer-events: all` at
+ * roughly 60% viewport width for 5000ms (V14.365), so an uncapped join over a bulk edit swallows
+ * pointer events for five seconds. NOTHING IS LOST BY CAPPING, BUT ONLY BECAUSE FABRICATE LOGS THE
+ * FULL LIST ITSELF AT `console.info` — core logs the CAPPED message, and `console.debug` maps to a
+ * VERBOSE level Chromium filters out. The cap is on the ENUMERATION only; the counts stay exact.
  */
 const IDENTITY_DRIFT_NOTICE_RECORD_CAP = 5;
 
@@ -208,23 +199,19 @@ function describeDriftRecord(record) {
 }
 
 /**
- * EVERY drifted record, uncapped — the list the notice's own copy points the GM at, which the
- * NOTIFICATION CANNOT PROVIDE because core logs the CAPPED message it was handed. Logging it is
- * necessary but not sufficient: the LEVEL has to be one the console shows, so the call site uses
- * `console.info`. Verified against V14.365.0.
+ * EVERY drifted record, uncapped — the list the notice's copy points the GM at, which the
+ * NOTIFICATION CANNOT PROVIDE because core logs the CAPPED message it was handed (V14.365.0).
  */
 export function describeWorldIdentityDrift(driftEntries) {
   return groupWorldIdentityDrift(driftEntries).records.map(describeDriftRecord).join('; ');
 }
 
 /**
- * The per-session notice naming the entities whose world identity snapshot has gone stale.
- * A DISCLOSURE OBLIGATION, NOT A CORRECTION: the read union re-derives identity on every read, so
- * the divergence is already resolved safely by the time this runs. What the GM cannot see without
- * being told is WHICH of their own edits the snapshot no longer reflects. Nothing here changes data.
- * IT NAMES THE RECORDS AND THE FIELDS, never a bare count, which would give a GM no way to find it.
- * IDENTITY ONLY, AND IT SAYS SO: the detector is BLIND to `tags`, `category`, `breakage`, `onBreak`,
- * `repairRequirements` and `enabled`, so implying it had checked behaviour would overclaim.
+ * The per-session notice naming the entities whose world identity snapshot has gone stale. A
+ * DISCLOSURE OBLIGATION, NOT A CORRECTION: the read union re-derives identity on every read, and
+ * nothing here changes data. IT NAMES THE RECORDS AND THE FIELDS, never a bare count, and it says
+ * IDENTITY ONLY — the detector is BLIND to `tags`, `category`, `breakage`, `onBreak`,
+ * `repairRequirements` and `enabled`.
  */
 export function buildWorldIdentityDriftNotice(driftEntries, localize) {
   const { records, fieldCount } = groupWorldIdentityDrift(driftEntries);
@@ -258,10 +245,8 @@ const ESSENCE_MERGE_NOTICE_NAME_CAP = 5;
 
 /**
  * The readable name of one merged, refused or declined essence group. A NAME and never an id pair,
- * unlike the `Renames` clause this is modelled on: most ids `1.34.0` retires are UUIDs and the
- * channel is a corner toast. The entry's own `name` is the contract and is always present; the rest
- * of the chain is a GUARD, not a path, because the report arrives through a transient field no
- * schema validates and a malformed one must still produce a readable sentence.
+ * unlike the `Renames` clause this is modelled on: most ids `1.34.0` retires are UUIDs. The entry's
+ * own `name` is the contract; the rest of the chain is a GUARD against an unvalidated transient.
  */
 function essenceGroupName(entry, retired) {
   if (typeof entry?.name === 'string' && entry.name) return entry.name;
@@ -332,11 +317,9 @@ function essenceGroupFinding(entries, localize, spec) {
 }
 
 /**
- * The one-time notice describing what the `1.34.0` merge did. Severity is constant-`warn` by
- * construction, so this returns none. Silent when nothing happened — `orphaned` alone produces no
- * message, because a world essence with no live membership record is left exactly as it is.
- * The `detail` carries each group's remedy and the item-override scope bound: the remap walks owned
- * actor Items only, so a world Item, a compendium Item or an unlinked token actor keeps a stale one.
+ * The one-time notice describing what the `1.34.0` merge did. Severity is constant-`warn`, so this
+ * returns none, and `orphaned` alone produces no message. The `detail` carries each group's remedy
+ * and the item-override scope bound: the remap walks OWNED ACTOR ITEMS ONLY.
  */
 export function buildWorldEssenceMergeNotice(report, localize) {
   const merged = arrayOf(report?.mergedGroups);

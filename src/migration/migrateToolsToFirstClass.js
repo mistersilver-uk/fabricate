@@ -1,9 +1,8 @@
 /**
  * `1.15.0` — convert legacy componentId-referencing library Tools into first-class tools carrying
  * their OWN source references and display snapshot (issue 561; spec § Tools First-Class Migration).
- * The runner has no Item handle, so it CANNOT stamp `roles[systemId].toolId` — that is the separate
- * `ready`-body `autoStampToolSources` one-shot, which reads the refs this populates. `componentId`
- * is PRESERVED but is no longer the matching basis; `label`, a user override, is NEVER written.
+ * The runner has no Item handle, so `roles[systemId].toolId` is the separate `ready`-body
+ * `autoStampToolSources` one-shot instead.
  */
 export function migrateToolsToFirstClass(systems) {
   const safeSystems = Array.isArray(systems) ? systems : [];

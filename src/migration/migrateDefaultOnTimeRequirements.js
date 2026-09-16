@@ -1,9 +1,8 @@
 /**
  * `1.19.0` — delete a persisted `requirements.time.enabled === false` once, so issue 714's
- * default-on reader restores the pre-714 behaviour. Pure, idempotent, version-gated. The pre-714
- * normalizer coerced that field from an ABSENT flag and `save()` persists normalized systems, so the
- * stored `false` was never a deliberate opt-out. THE VERSION GATE IS LOAD-BEARING: the pass runs
- * once, before the GM can touch the new toggle, so a GM who later sets it OFF is never flipped back.
+ * default-on reader restores the pre-714 behaviour; the stored `false` was a normalizer coercion,
+ * never an opt-out. Pure, idempotent, and THE VERSION GATE IS LOAD-BEARING: it runs once, before the
+ * GM can touch the new toggle, so a GM who later sets it OFF is never flipped back.
  */
 
 function _clearPersistedTimeDisabled(system) {

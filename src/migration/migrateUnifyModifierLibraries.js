@@ -1,9 +1,8 @@
 /**
  * `1.23.0` — merge a crafting system's two modifier libraries into ONE `system.modifiers` (issue
- * 1117; spec § Unified Modifier Library Migration owns the rules and the lossy downgrade).
- * THE RUNNER'S ORDERING IS LOAD-BEARING: both normalizers are ALLOWLIST REBUILDS, so a save running
- * first would have DELETED both libraries rather than merging them. THE CHECK-CATALOGUE ENTRY KEEPS
- * THE ID, being the only side whose references this pass can rewrite EXHAUSTIVELY.
+ * 1117; spec § Unified Modifier Library Migration owns the rules, the lossy downgrade and why THE
+ * RUNNER'S ORDERING IS LOAD-BEARING). THE CHECK-CATALOGUE ENTRY KEEPS THE ID, being the only side
+ * whose references this pass can rewrite EXHAUSTIVELY.
  */
 
 /** Where the check-modifier catalogue lived between `1.22.0` and `1.23.0`. */

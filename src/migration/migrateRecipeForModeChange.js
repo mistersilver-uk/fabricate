@@ -1,9 +1,8 @@
 /**
- * Migration-first resolution-mode change, pure and with no I/O: a recipe is MIGRATED to fit the new
- * mode wherever possible and deleted only when a per-recipe STRUCTURAL constraint cannot be met.
- * `resolution-modes/spec.md` § Mode Invariant owns the normative 5x5 migratability matrix, and
+ * Migration-first resolution-mode change, pure and with no I/O: a recipe is MIGRATED wherever
+ * possible and deleted only when a per-recipe STRUCTURAL constraint cannot be met, SYSTEM-LEVEL gaps
+ * never deleting one. `resolution-modes/spec.md` § Mode Invariant owns the 5x5 matrix and
  * `destructive-changes-and-migrations/spec.md` § Change Crafting System Resolution Mode the pass.
- * SYSTEM-LEVEL gaps never delete or disable a recipe here; they surface as validation issues.
  */
 
 // Only ALCHEMY routes via a recipe-level `resultSelection.provider`; the two routed crafting modes

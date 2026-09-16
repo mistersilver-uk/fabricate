@@ -1,9 +1,8 @@
 /**
- * `1.30.0` — GROUPING, IDENTITY AND THE PER-SYSTEM RE-KEY MAP (issue 1363), so the migration reads
- * as an ordering of writes rather than an algorithm. Spec § World-Scope Entity Migration owns the
- * grouping rule, the oldest-wins identity exception, the id-claim ladder and the refusal fixed
- * point. TOTAL AND NON-THROWING, because a throw aborts the pass; the union-find partition is
- * permutation-invariant; AN UNLINKED DEFINITION IS ITS OWN ENTITY AND IS NEVER MERGED ON A NAME.
+ * `1.30.0` — GROUPING, IDENTITY AND THE PER-SYSTEM RE-KEY MAP (issue 1363). Spec § World-Scope
+ * Entity Migration owns the grouping rule, the oldest-wins identity exception, the id-claim ladder
+ * and the refusal fixed point. TOTAL AND NON-THROWING, permutation-invariant, and AN UNLINKED
+ * DEFINITION IS ITS OWN ENTITY AND IS NEVER MERGED ON A NAME.
  */
 
 import { isPlainObject } from '../utils/scalars.js';
@@ -18,9 +17,8 @@ export const ENTITY_TYPE_FIELDS = Object.freeze({
 });
 
 /**
- * The entity types whose ids this pass may re-key. Essences are absent because they group by id — not
- * a claim that an essence id is immutable, since the `1.34.0` merge re-keys them under its own map.
- * Widening THIS list would newly refuse a `1.30.0` pair on a world holding a native duplicate id.
+ * The entity types whose ids this pass may re-key; essences group by id instead, and `1.34.0` re-keys
+ * them under its own map. Widening THIS list would newly refuse a pair on a native duplicate id.
  */
 export const REKEYABLE_ENTITY_TYPES = Object.freeze(['components', 'tools']);
 
@@ -28,11 +26,9 @@ export const REKEYABLE_ENTITY_TYPES = Object.freeze(['components', 'tools']);
  * The SOURCE-LINK fields, UNIONED across the group rather than taken from the donor.
  * DONOR-WINS-AS-A-UNIT IS RIGHT FOR DISPLAY IDENTITY AND WRONG FOR THESE: union-find guarantees the
  * group is CONNECTED, not that every member shares a reference with the DONOR, so in a chain A-B-C
- * taking A's links as a unit DELETES the uuids only C claimed — and an owned Item sourced from one
- * stops resolving at the source-reference tier. Unioning is safe in the direction the deletion was
- * not: the resolvers intersect reference SETS, so a longer list resolves strictly more.
- * EXPORTED so the world-scope projection DERIVES `sourceLinked` from it rather than restating the
- * three names (issue 1380).
+ * taking A's links as a unit DELETES the uuids only C claimed. Unioning is safe in the direction the
+ * deletion was not, the resolvers intersecting reference SETS. EXPORTED so the world-scope
+ * projection DERIVES `sourceLinked` from it rather than restating the three names (issue 1380).
  */
 export const SOURCE_LINK_FIELDS = Object.freeze([
   'originItemUuid',
@@ -41,12 +37,9 @@ export const SOURCE_LINK_FIELDS = Object.freeze([
 ]);
 
 /**
- * The three `EssenceDefinition` fields the `effectSource` SECTION is spelled over.
- * ONE LIST, THREE DIRECTIONS OF TRAVEL, which is why it is exported rather than restated: a second
- * copy is how a lifted field starts being read at one scope and written at another.
- * It is a BLOCK over the three names rather than three sections, because a source is one choice — a
- * per-field switch could express one field from the world beside another from the system, naming two
- * different Items.
+ * The three `EssenceDefinition` fields the `effectSource` SECTION is spelled over. ONE LIST, THREE
+ * DIRECTIONS OF TRAVEL, exported rather than restated. It is a BLOCK over the three names rather
+ * than three sections, because a source is one choice: a per-field switch could name two Items.
  */
 export const ESSENCE_EFFECT_SOURCE_FIELDS = Object.freeze([
   'sourceComponentId',
@@ -106,9 +99,8 @@ export function sourceReferencesOf(record) {
 }
 
 /**
- * The references a TOOL groups by: its own, else those of the component its `componentId` names IN
- * THE SAME SYSTEM. Mirrors `deriveToolSourceFromComponents`'s guard exactly, so grouping raw settings
- * agrees with the derivation the manager performs on load.
+ * The references a TOOL groups by: its own, else the component its `componentId` names IN THE SAME
+ * SYSTEM, mirroring `deriveToolSourceFromComponents`'s guard exactly.
  */
 export function toolSourceReferences(tool, components) {
   const own = sourceReferencesOf(tool);
@@ -218,9 +210,8 @@ function byCorpusPosition(left, right) {
 }
 
 /**
- * The DISPLAY identity from one definition. ABSENCE-PRESERVING, and `aliasItemUuids` is copied fresh
- * so the world entity never aliases the in-system record. The SOURCE-LINK fields are unioned by
- * {@link groupIdentity} instead — see {@link SOURCE_LINK_FIELDS} for why donor-wins deletes data.
+ * The DISPLAY identity from one definition: ABSENCE-PRESERVING, with `aliasItemUuids` copied fresh.
+ * The SOURCE-LINK fields are unioned by {@link groupIdentity} instead.
  */
 export function identityOf(record, entityType) {
   const identity = {};
@@ -234,9 +225,8 @@ export function identityOf(record, entityType) {
 
 /**
  * The identity a whole GROUP produces: display identity from the DONOR as a unit, source links
- * UNIONED. The union is emitted in the SHIPPED SHAPE rather than one flat list, because that is what
- * every reader intersects against: the donor's primaries stay primary and every other reference lands
- * in `aliasItemUuids`, exactly as the normalizers emit them.
+ * UNIONED in the SHIPPED SHAPE — the donor's primaries stay primary and the rest land in
+ * `aliasItemUuids`, which is what every reader intersects against.
  */
 export function groupIdentity(group, entityType) {
   const donor = group[0]?.record;
@@ -263,12 +253,10 @@ export function groupIdentity(group, entityType) {
 }
 
 /**
- * Whether the union kept every source reference this member claimed.
- * IT IS A TAUTOLOGY UNDER {@link groupIdentity}, AND SAYING SO IS THE POINT: that function collects
- * EVERY member's references, so this cannot currently answer `false`. Measured — forcing it to `true`
- * leaves the acceptance corpus's rename report byte-identical. It is kept as a guard against a
- * regression to donor-wins NARROWING, the one change that would make it answer `false`.
- * The reachable direction is OVER-reporting, which `tests/world-scope-entity-grouping.test.js` pins.
+ * Whether the union kept every source reference this member claimed. IT IS A TAUTOLOGY UNDER
+ * {@link groupIdentity}, AND SAYING SO IS THE POINT: it cannot currently answer `false`, and is kept
+ * as a guard against a regression to donor-wins NARROWING. The reachable direction is
+ * OVER-reporting, which `tests/world-scope-entity-grouping.test.js` pins.
  */
 function unionAbsorbed(record, identity) {
   const kept = new Set([
@@ -390,13 +378,9 @@ function derive(systems, refusedPairs) {
 }
 
 /**
- * The `(system, entityType)` pairs whose map cannot be applied safely, on the two invariants the
- * spec section states — the second a POST-condition. Output uniqueness is the subtler one:
- * disjointness does not forbid an output id colliding with an id in the same pair that was NOT
- * re-keyed, and such a duplicate is silently last-wins in both index builders.
- * A REFUSAL IS NOT ALWAYS CAUSED BY THIS PASS: uniqueness is asserted over every pair, EMPTY map
- * included, so a system carrying a NATIVE duplicate fails on its own — deliberately, since it
- * already has an unreachable definition.
+ * The `(system, entityType)` pairs whose map cannot be applied safely, on the two invariants the spec
+ * section states — the second a POST-condition. A REFUSAL IS NOT ALWAYS CAUSED BY THIS PASS:
+ * uniqueness is asserted over every pair, EMPTY map included, so a NATIVE duplicate fails on its own.
  */
 function findRefusals(systems, rekeyMap) {
   const refusals = [];

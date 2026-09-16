@@ -1,9 +1,7 @@
 /**
  * `1.21.0` — retire the Fabricate-owned check-modifier placeholder from every stored roll formula
- * (issue 1094; spec § Check-Modifier Placeholder Retirement Migration). Pure, clone-first,
- * idempotent, version-gated. A TOKEN IT CANNOT LIFT OUT IS LEFT UNTOUCHED AND REPORTED, for an
- * ARITHMETIC reason: an appended term lands at the end of the WHOLE formula, so `(2 + <token> + 4)
- * * 3` would strip to a VALID `(2 + 4) * 3` totalling 21 where it totalled 27.
+ * (issue 1094; spec § Check-Modifier Placeholder Retirement Migration owns every rule below,
+ * including why a token it cannot lift out is left untouched and REPORTED).
  */
 
 import {
@@ -53,50 +51,37 @@ export function hasRetiredCraftingModFindings(counts) {
 }
 
 /**
- * Retire the token from ONE field, counting what it found: classify, count, then rewrite, so a
- * counted formula is described by its PRE-strip text. The strip is called with an explicitly NULL
- * dice engine, so the output cannot depend on a Foundry global — which the View Lab installs — and
- * the shim's STRUCTURAL residue check is therefore the only guard on what this writes.
+ * Retire the token from ONE field: classify, count, then rewrite, so a counted formula is described
+ * by its PRE-strip text. The NULL dice engine keeps the output free of any Foundry global, leaving
+ * the STRUCTURAL residue check as the only guard on what this writes (requirement 3).
  */
 function retireFormulaField(config, key, counts) {
   const authored = config?.[key];
   if (typeof authored !== 'string') return;
   const plan = planRetiredPlaceholderStrip(authored, null);
   if (plan.outcome === 'absent') return;
-  // REFUSED covers both a non-additive placement and a structurally incomplete residue. Both leave
-  // the field exactly as authored and are counted, so the GM is told about a check that will not
-  // roll until they rewrite it.
+  // REFUSED covers a non-additive placement and a structurally incomplete residue alike.
   if (plan.outcome === 'refused') {
     counts.untouched += 1;
     return;
   }
   if (plan.placement.subtractive) counts.subtractive += 1;
   if (plan.placement.occurrences > 1) counts.repeated += 1;
-  // `plan.formula` is `''` for a placeholder-only formula, which is the correct thing to persist:
-  // the readers report "no formula" rather than rolling `new Roll('')`.
+  // `''` for a placeholder-only formula: the readers then report "no formula".
   config[key] = plan.formula;
 }
 
 /**
- * Count the ONE formula whose modifiers are about to go live: the check the system's mode ACTUALLY
- * rolls, authored, never spending the token, on a system with a catalogue.
- * Gated on a non-empty RESOLVED ELIGIBLE SET rather than a non-empty catalogue, because a system
- * whose set already resolves to nothing has had nothing start applying — counting it would state a
- * change that did not happen. Must run BEFORE the strip, or a formula that DID spend the token
- * would count as never having.
+ * Count the ONE formula whose modifiers are about to go live, gated on a non-empty RESOLVED ELIGIBLE
+ * SET rather than a non-empty catalogue (requirement 5). Must run BEFORE the strip.
  */
 function countInertActiveCraftingCheck(system) {
   const check = _isPlainObject(system?.craftingCheck) ? system.craftingCheck : null;
   if (!check) return 0;
-  // The context is BUILT by the shared builder, not hand-mirrored, which is how this count would
-  // otherwise stop matching what the engine resolves. `null` for the subject is the point of the
-  // third argument: no migration can see a recipe's pick, so `bySubject` falls back to the system set.
-  //
-  // THE LIBRARY IS LIFTED FROM WHICHEVER OF ITS THREE LOCATIONS THIS WORLD IS AT (issues 1095, 1117):
-  // this is `1.21.0` and the runner walks in version order, so on a first pass the library still
-  // lives inside `craftingCheck` rather than where the shared builder reads it. THE `??` CHAIN MUST
-  // COVER ALL THREE — the spread is unconditional, so a system carrying no library key would write
-  // `modifiers: undefined` OVER a real one, and the failure is a silent count of 0.
+  // The context is BUILT by the shared builder, never hand-mirrored, and `null` for the subject
+  // because no migration can see a recipe's pick. THE `??` CHAIN MUST COVER ALL THREE LIBRARY
+  // LOCATIONS this world may be at (issues 1095, 1117): the spread is unconditional, so a missing
+  // key would write `modifiers: undefined` over a real one and the failure is a silent count of 0.
   const eligible = resolveEligibleModifierIds(
     buildCheckModifierContext(
       {
@@ -117,10 +102,8 @@ function countInertActiveCraftingCheck(system) {
 }
 
 /**
- * Apply the whole `1.21.0` transform to ONE system, mutated in place. Split out so the world-setting
- * migration and `migrateExportPayload.js` share ONE derivation. IT DELIBERATELY DOES NOT SEED A
- * MISSING CHECK BLOCK, the same call two siblings make: a block that does not exist carries no
- * formula, so there is no storage churn to spend.
+ * Apply the whole `1.21.0` transform to ONE system, mutated in place, shared with
+ * `migrateExportPayload.js`. It DELIBERATELY DOES NOT SEED A MISSING CHECK BLOCK (requirement 6).
  */
 export function applyRetireCraftingModToken(system) {
   const counts = emptyCounts();
@@ -141,17 +124,12 @@ export function applyRetireCraftingModToken(system) {
   return counts;
 }
 
-/**
- * The four count clauses of the GM notice, in the order a GM reads them, indexed by the SAME keys
- * {@link emptyCounts} declares, so a clause can never report a count it does not name.
- */
+/** The four notice clauses, in reading order, indexed by the keys {@link emptyCounts} declares. */
 const NOTICE_CLAUSES = Object.freeze([
   Object.freeze([
     'inert',
     'Inert',
-    // The remedy names CLEARING THE DEFAULT SET, and nothing else. An earlier draft offered "choose
-    // a combination rule whose set resolves to 0", which names no rule that does that: every rule
-    // reduces the same eligible set, so switching between them cannot zero it.
+    // The remedy names CLEARING THE DEFAULT SET and nothing else (requirement 5).
     '{count} check(s) had modifiers that never reached the roll and now apply — to keep the previous total, clear the Default modifiers set on those systems.',
   ]),
   Object.freeze([
@@ -182,21 +160,15 @@ const NOTICE_UNTOUCHED_FALLBACK =
 const NOTICE_KEY_PREFIX = 'FABRICATE.Migration.RetireCheckModifierPlaceholder.';
 
 /**
- * Compose the one-time GM notice: totals, affected systems, message and channel.
- * LIFTED OUT OF `src/main.js` DELIBERATELY, because this arithmetic IS the notice and that file
- * cannot be imported by a unit test — source-text greps pin a DISPATCH but not a sum, a clause
- * selection or a join, and three semantic mutations survived a green suite while it lived there.
- * THE CLAUSES ARE SEPARATE KEYS, JOINED ONLY WHEN NON-ZERO, and SEVERITY IS PER FINDING:
- * `untouched` is the only count that leaves a BROKEN world, so it is a PERMANENT warning while
- * everything else is `info`. That matters mechanically too — `installFoundryShim` routes `warn` to a
- * console error that FAILS a View Lab capture, and one failed case fails the whole job.
+ * Compose the one-time GM notice: totals, affected systems, message and channel. LIFTED OUT OF
+ * `src/main.js` deliberately, and SEVERITY IS PER FINDING — `untouched` is the only count that
+ * leaves a BROKEN world, so it alone is a PERMANENT warning (requirement 5).
  */
 export function buildRetiredCraftingModNotice(reported, format) {
   const entries = Array.isArray(reported) ? reported : [];
 
-  // `MigrationRunner` already coerces the transient report, so this is belt and braces — but a NaN
-  // would not be caught by the `count <= 0` gate below (every comparison against NaN is false), so
-  // it would render "NaN formula(s)" to the GM as the migration's one visible output.
+  // Belt and braces over the runner's own coercion: a NaN passes the `count <= 0` gate below and
+  // would render "NaN formula(s)" to the GM as this migration's one visible output.
   const totals = emptyCounts();
   for (const entry of entries) {
     for (const [countKey] of NOTICE_CLAUSES) {

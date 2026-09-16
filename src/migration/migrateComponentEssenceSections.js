@@ -1,9 +1,7 @@
 /**
  * `1.32.0` — ELECT each world component's `essences` map and MARK every membership record's
- * `inherit.essences` switch (issue 1371; spec § Component Essence Sections). Pure, idempotent,
- * version-gated. A THIRD PASS RATHER THAN A WIDER `1.30.0`: adding `essences` to
- * `COMPONENT_SECTIONS` makes an ABSENT key read as INHERITING, and that pass's per-pair guard never
- * rewrites a record it wrote. THE GUARD IS PER ENTITY, not per record.
+ * `inherit.essences` switch (issue 1371; spec § Component Essence Sections owns why it is a THIRD
+ * PASS and why THE GUARD IS PER ENTITY). Pure, idempotent, version-gated.
  */
 
 import {

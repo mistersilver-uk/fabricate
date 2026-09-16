@@ -1,9 +1,7 @@
 /**
  * `1.25.0` — seed `failureResultPolicy: 'never'` onto every check block that ALREADY EXISTS on disk
- * (issue 1098; spec § Failure-Result Policy Seed Migration). ITS ENTIRE PURPOSE IS THAT NO UPGRADED
- * WORLD CHANGES BEHAVIOUR: an absent value normalizes to the PERMITTING `perRecord`, and a salvage
- * component may legally persist a reserved failure group that has always awarded nothing.
- * THE RUNNER'S BEFORE-ANY-LOAD ORDERING IS LOAD-BEARING: a save first would emit that default.
+ * (issue 1098; spec § Failure-Result Policy Seed Migration owns every rule, its no-behaviour-change
+ * purpose and why the runner's before-any-load ordering is load-bearing).
  */
 
 import { SEEDED_FAILURE_RESULT_POLICY } from '../utils/failureResultPolicy.js';

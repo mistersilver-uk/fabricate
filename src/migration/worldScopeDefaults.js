@@ -1,9 +1,7 @@
 /**
  * DONOR-ELECTED WORLD DEFAULTS for the `1.30.0` migration (issue 1363). Spec § World-Scope Entity
- * Migration requirement 7 owns every rule. CONSTRAINT 0 is numbered from zero because it runs BEFORE
- * the four addressability rules and can decline a section every one of them would have accepted.
- * A DECLINED SECTION SIMPLY GETS NO WORLD DEFAULT and nothing is lost, every membership record still
- * overriding it verbatim, so refusing is always the safe answer.
+ * Migration requirement 7 owns every rule, CONSTRAINT 0's pre-ordering included. A DECLINED SECTION
+ * SIMPLY GETS NO WORLD DEFAULT, so refusing is always the safe answer.
  */
 
 import { normalizeComponentEssenceMap } from '../systems/componentScope.js';
@@ -29,10 +27,8 @@ export const FALLBACK_EXPOSED_SECTIONS = new Set(['category', 'breakage', 'onBre
 
 /**
  * Whether ONE member record authored a section, judged exactly as `buildMembershipRecord` judges it.
- * EXPORTED so the import-time re-check applies THIS predicate rather than a second one: the
- * reduction to a bare key-presence test is sound only for a record that function produced, while a
- * hand-authored payload is a first-class import input — a `category` of `''` carries the key but
- * coerces to ABSENCE on the way in, so key-presence would admit a world default no GM authored.
+ * EXPORTED so the import-time re-check applies THIS predicate rather than a bare key-presence test,
+ * which a hand-authored payload defeats: a `category` of `''` carries the key and coerces to ABSENCE.
  */
 export function sectionIsAuthoredBy(record, entityType, section) {
   // A component `essences` map can express emptiness, so it is never fallback-exposed.

@@ -1,9 +1,8 @@
 /**
  * The one-shot, active-GM pass remapping every DURABLE IDENTITY FLAG the `1.30.0` re-key invalidates
- * (issue 1363). Neither shipped pass can serve: the owned-item restamp returns early for an item
- * already carrying a flag, and `MigrationRunner` holds no Actor or Item handle. Spec § World-Scope
- * Entity Migration requirements 13 to 15 own the site list, the `learnedRecipes` exclusion and the
- * dotted-`systemId` guard. NO KEY IS EVER REMOVED HERE, which is what makes a plain merge correct.
+ * (issue 1363); no shipped pass can serve, `MigrationRunner` holding no Actor or Item handle. Spec
+ * § World-Scope Entity Migration requirements 13 to 15 own the site list, the `learnedRecipes`
+ * exclusion and the dotted-`systemId` guard. NO KEY IS EVER REMOVED HERE.
  */
 
 import { FABRICATE_FLAG_NAMESPACE, isSafeFlagKeySegment } from '../config/flags.js';
@@ -17,11 +16,9 @@ import { compareSemver } from './MigrationRunner.js';
 export const WORLD_SCOPE_MIGRATION_VERSION = '1.30.0';
 
 /**
- * Whether the remap wrote everything it planned to — a SECOND, INDEPENDENT WITHHOLD:
- * {@link mayClearWorldScopeRekeyMap} asks whether the PRODUCING migration completed, this whether
- * the CONSUMING pass did, and nothing else notices a transient rejection.
- * `lockedSkips` is deliberately excluded: a STANDING state a re-run cannot improve would otherwise
- * retain the map forever.
+ * Whether the remap wrote everything it planned to — a SECOND, INDEPENDENT WITHHOLD asking whether
+ * the CONSUMING pass completed, where {@link mayClearWorldScopeRekeyMap} asks about the PRODUCING
+ * one. `lockedSkips` is excluded: a STANDING state would otherwise retain the map forever.
  */
 export function remapCompletedCleanly(summary) {
   if (!summary || typeof summary !== 'object') return true;
@@ -322,11 +319,8 @@ export async function remapWorldScopeIdentityFlags({
 
 // --- The `1.34.0` equivalent-essence merge half (issue 1654) ----------------
 // A second, independent site list keyed on `fabricate.worldEssenceMergeMap`; spec § Equivalent World
-// Essence Merge requirement 9 owns the sites and the exclusions.
-// Every write is a FORCED REPLACEMENT: re-keying changes a container's key set and `Document#update`
-// performs no deletions, so a merge would leave the retired key standing and a resumed run would
-// transfer essences it never consumed.
-// No startup-prune withhold is added — no startup pass gates on an essence id — which
+// Essence Merge requirement 9 owns the sites and the exclusions. Every write is a FORCED
+// REPLACEMENT, `Document#update` performing no deletions. No startup-prune withhold is added, which
 // `tests/world-scope-startup-prune-ordering.test.js` pins negatively.
 
 /** The migration version that produces the merge map this half consumes. */
@@ -521,8 +515,7 @@ export function remapEssenceRunContainer(container, legs) {
 
 /**
  * The forced-replacement update path, spelled once. `==` on the last segment is Foundry's
- * replace-wholesale prefix, valid across the declared `minimum: 13` / `verified: 14` band — not the
- * comparison operator of that spelling.
+ * replace-wholesale prefix across the declared `minimum: 13` / `verified: 14` band, not an operator.
  */
 export function forcedReplacementFlagPath(key, { bare = false } = {}) {
   const scope = bare
@@ -632,9 +625,8 @@ export async function remapWorldEssenceIdentityFlags({
 }
 
 /**
- * The one-time notice describing what the `1.34.0` flag remap could not repair — a reachable state
- * requirement 9 calls data corruption rather than untidiness, since the world is then merged in
- * settings and un-merged in actor flags. Silent on a clean pass.
+ * The one-time notice describing what the `1.34.0` flag remap could not repair — data corruption by
+ * requirement 9, not untidiness. Silent on a clean pass.
  */
 export function buildWorldEssenceMergeRemapNotice(summary, localize) {
   const unsafe = Array.isArray(summary?.unsafeEssenceIdSkips) ? summary.unsafeEssenceIdSkips : [];
