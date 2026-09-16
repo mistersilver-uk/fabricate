@@ -10,40 +10,13 @@
  * part of this contract and may change without notice.
  */
 
-/**
- * Gathering lifecycle hooks.
- *
- * - `ATTEMPT_COMPLETED` fires exactly once for every terminal gathering attempt
- *   (success or failure, immediate or matured timed run), after all side effects
- *   (item creation, tool breakage, chat output) have been committed.
- * - `EVENT_TRIGGERED` fires once per encounter/event triggered by an attempt.
- *
- * @type {Readonly<{ATTEMPT_COMPLETED: string, EVENT_TRIGGERED: string}>}
- */
+/** Gathering lifecycle hooks. */
 export const GATHERING_HOOKS = Object.freeze({
   ATTEMPT_COMPLETED: 'fabricate.gathering.attemptCompleted',
   EVENT_TRIGGERED: 'fabricate.gathering.eventTriggered',
 });
 
-/**
- * GM Manager extension-surface hooks.
- *
- * These are purely OBSERVATIONAL: Fabricate publishes them after it has already acted,
- * a listener's return value is ignored, and nothing a listener does changes what the
- * Manager renders. A companion that wants to CHANGE the Manager registers a World
- * navigation provider (`game.fabricate.api.managerExtensions.registerWorldNavProvider`)
- * — these hooks exist so a companion can react to a surface it does not own.
- *
- * - `NAV_PROVIDER_REGISTERED` / `NAV_PROVIDER_UNREGISTERED` fire when a provider takes
- *   or releases a Manager surface, with `{ schemaVersion, surfaceId, tabIds }`.
- * - `SURFACE_MOUNTED` / `SURFACE_UNMOUNTED` fire when the Manager route hosting an
- *   extension surface is rendered and torn down, with
- *   `{ schemaVersion, surfaceId, route, tabId, providerId, coreFallback }`.
- * - `SURFACE_TAB_CHANGED` fires when the active tab of a hosted surface changes, with
- *   `{ schemaVersion, surfaceId, route, tabId, previousTabId, providerId, coreFallback }`.
- *
- * @type {Readonly<{NAV_PROVIDER_REGISTERED: string, NAV_PROVIDER_UNREGISTERED: string, SURFACE_MOUNTED: string, SURFACE_UNMOUNTED: string, SURFACE_TAB_CHANGED: string}>}
- */
+/** GM Manager extension-surface hooks. */
 export const MANAGER_HOOKS = Object.freeze({
   NAV_PROVIDER_REGISTERED: 'fabricate.manager.navProviderRegistered',
   NAV_PROVIDER_UNREGISTERED: 'fabricate.manager.navProviderUnregistered',
@@ -52,30 +25,7 @@ export const MANAGER_HOOKS = Object.freeze({
   SURFACE_TAB_CHANGED: 'fabricate.manager.surfaceTabChanged',
 });
 
-/**
- * Player-window extension-surface hooks.
- *
- * Like the Manager set these are purely OBSERVATIONAL: Fabricate publishes them after it
- * has already acted, a listener's return value is ignored, and nothing a listener does
- * changes what the player window renders. A companion that wants to ADD content to the
- * player window registers a player navigation provider
- * (`game.fabricate.api.playerExtensions.registerPlayerNavProvider`).
- *
- * - `NAV_PROVIDER_REGISTERED` / `NAV_PROVIDER_UNREGISTERED` fire when a provider takes or
- *   releases a player surface, with `{ schemaVersion, surfaceId, tabIds }`.
- * - `SURFACE_MOUNTED` / `SURFACE_UNMOUNTED` fire when a hosted player surface is rendered
- *   and torn down, with `{ schemaVersion, surface, surfaceId, tabId, providerId }`.
- * - `SURFACE_TAB_CHANGED` fires when the active tab of a hosted surface changes, with the
- *   same payload plus `previousTabId`.
- *
- * There is no `coreFallback` field: unlike the Manager's Downtime route the player window
- * renders no Core content in a provider's place, so a tab exists only while its provider
- * does. `surfaceId` and `providerId` are always equal here, because a player surface id IS
- * the registering provider's own id; both are carried so the payload shape matches the
- * Manager seam's.
- *
- * @type {Readonly<{NAV_PROVIDER_REGISTERED: string, NAV_PROVIDER_UNREGISTERED: string, SURFACE_MOUNTED: string, SURFACE_UNMOUNTED: string, SURFACE_TAB_CHANGED: string}>}
- */
+/** Player-window extension-surface hooks. */
 export const PLAYER_HOOKS = Object.freeze({
   NAV_PROVIDER_REGISTERED: 'fabricate.player.navProviderRegistered',
   NAV_PROVIDER_UNREGISTERED: 'fabricate.player.navProviderUnregistered',
@@ -84,12 +34,7 @@ export const PLAYER_HOOKS = Object.freeze({
   SURFACE_TAB_CHANGED: 'fabricate.player.surfaceTabChanged',
 });
 
-/**
- * Aggregate of every public Fabricate hook namespace, grouped by domain. Exposed on
- * `game.fabricate.api.HOOKS`.
- *
- * @type {Readonly<{gathering: typeof GATHERING_HOOKS, manager: typeof MANAGER_HOOKS, player: typeof PLAYER_HOOKS}>}
- */
+/** Aggregate of every public Fabricate hook namespace, grouped by domain. */
 export const FABRICATE_HOOKS = Object.freeze({
   gathering: GATHERING_HOOKS,
   manager: MANAGER_HOOKS,

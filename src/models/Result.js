@@ -19,10 +19,7 @@ export class Result {
     this.propertyMacroUuid = data.propertyMacroUuid || null;
   }
 
-  /**
-   * Validate that this result has all required data
-   * @returns {{valid: boolean, errors: string[]}}
-   */
+  /** Validate that this result has all required data */
   validate() {
     const errors = [];
 
@@ -44,10 +41,7 @@ export class Result {
     };
   }
 
-  /**
-   * Get a simple description of this result
-   * @returns {string}
-   */
+  /** Get a simple description of this result */
   getDescription() {
     return `${this.quantity}x item`;
   }

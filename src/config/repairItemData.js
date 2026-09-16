@@ -30,15 +30,7 @@ function localize(key, data = null) {
   return i18n?.localize?.(key) ?? key;
 }
 
-/**
- * Run the repair and toast the result. Returns the summary (or null when the
- * crafting system manager is unavailable).
- */
-/**
- * Toast the description leg's outcome. Silent only when nothing was attempted.
- *
- * @param {{refreshed:number, unchanged:number, skipped:number, skippedUnresolved:number, skippedEmpty:number}|undefined} descriptions
- */
+/** Toast the description leg's outcome. */
 function reportDescriptionOutcome(descriptions) {
   if (!descriptions) return;
   const { refreshed = 0, skipped = 0 } = descriptions;
@@ -55,6 +47,7 @@ function reportDescriptionOutcome(descriptions) {
   }
 }
 
+/** Run the repair and toast the result; `null` when the crafting system manager is unavailable. */
 export async function runItemDataRepair() {
   const manager = globalThis.game?.fabricate?.getCraftingSystemManager?.();
   if (!manager || typeof manager.repairItemData !== 'function') {
@@ -69,8 +62,7 @@ export async function runItemDataRepair() {
     globalThis.ui?.notifications?.info?.(
       localize('FABRICATE.Settings.RepairItemData.Success', summary)
     );
-    // Secondary notices for the name-assisted re-point outcomes (issue 555). The
-    // reversible audit records live on `summary.repointLog` and are logged for the GM.
+    // Secondary notices for the name-assisted re-point outcomes (issue 555).
     if (summary?.repointed > 0) {
       if (Array.isArray(summary.repointLog) && summary.repointLog.length > 0) {
         console.info('Fabricate | Repair item data re-point audit', summary.repointLog);
@@ -84,15 +76,7 @@ export async function runItemDataRepair() {
         localize('FABRICATE.Settings.RepairItemData.Ambiguous', summary)
       );
     }
-    // Description refresh outcome (issue 800), reported separately from the identity
-    // counts. The GM's consent for it is obtained up front in the Hint and the
-    // confirmation Body — this line reports what happened, it does not stand in for
-    // asking.
-    //
-    // Reported whenever ANYTHING was attempted, not only on success. A GM sent here by
-    // the startup notice whose definitions all land in `skipped` would otherwise learn
-    // nothing, run it again next login, and be told the same thing forever — a nag loop
-    // with no exit. The failure branch names the cause so the loop can actually end.
+    // Description refresh outcome (issue 800), reported separately from the identity counts.
     reportDescriptionOutcome(summary?.descriptions);
     return summary;
   } catch (error) {
@@ -102,10 +86,7 @@ export async function runItemDataRepair() {
   }
 }
 
-/**
- * Confirm with the GM (DialogV2) then run the repair. Falls back to running
- * directly when DialogV2 is unavailable.
- */
+/** Confirm with the GM (DialogV2) then run the repair. */
 export async function openRepairItemDataDialog() {
   if (!globalThis.game?.user?.isGM) return;
 
@@ -117,9 +98,9 @@ export async function openRepairItemDataDialog() {
 
   const confirmed = await DialogV2.wait({
     window: { title: localize('FABRICATE.Settings.RepairItemData.Title') },
-    // Two paragraphs, not one: the consent-bearing half ("REPLACES … will be
-    // overwritten") is its own visual unit rather than a clause buried at the end of a
-    // ninety-word block the GM has already stopped reading.
+    // Two paragraphs, not one: the consent-bearing half ("REPLACES … will be overwritten") is its
+    // own visual unit rather than a clause buried at the end of a ninety-word block the GM has
+    // already stopped reading.
     content:
       `<p>${localize('FABRICATE.Settings.RepairItemData.BodyIdentity')}</p>` +
       `<p>${localize('FABRICATE.Settings.RepairItemData.BodyDescriptions')}</p>`,
@@ -143,15 +124,8 @@ export async function openRepairItemDataDialog() {
 }
 
 /**
- * How many stored component / recipe-item descriptions still carry an unresolved
- * enricher directive.
- *
- * Pure and synchronous: it reads descriptions already in memory and resolves no
- * documents. Components and recipe-item definitions only — the same population the
- * repair's description leg covers.
- *
- * @param {Array<object>} systems
- * @returns {number}
+ * How many stored component / recipe-item descriptions still carry an unresolved enricher
+ * directive.
  */
 export function countUnresolvedDirectiveDescriptions(systems = []) {
   let count = 0;
@@ -165,19 +139,7 @@ export function countUnresolvedDirectiveDescriptions(systems = []) {
   return count;
 }
 
-/**
- * GM-only startup cue for a world whose descriptions predate write-time resolution.
- *
- * Without it the affected GM has zero signal: they see raw directive text and no
- * reason to connect it to a settings button. Emits ONE notification naming the path
- * verbatim, and carries no "already notified" flag — after a successful repair the
- * scan finds nothing and the notice self-clears.
- *
- * This is a DETECTOR, not a flattener. It never rewrites displayed text and is not on
- * the rendering path.
- *
- * @returns {number} the number of affected descriptions (0 when nothing was emitted)
- */
+/** GM-only startup cue for a world whose descriptions predate write-time resolution. */
 export function notifyUnresolvedItemDescriptions() {
   if (!globalThis.game?.user?.isGM) return 0;
   const manager = globalThis.game?.fabricate?.getCraftingSystemManager?.();
@@ -192,13 +154,8 @@ export function notifyUnresolvedItemDescriptions() {
 }
 
 /**
- * Register the "Repair Item Data" button into Fabricate's module settings
- * (the same panel as the theme selector). No-op when Foundry's settings/menu API is
- * unavailable (e.g. under the test harness).
- *
- * The registration shell lives in `settingsMenu.js` and is shared with the
- * player-character actor-types picker (issue 1024). The explicit `id` preserves this
- * menu's original DOM id, which predates the shared default.
+ * Register the "Repair Item Data" button into Fabricate's module settings (the same panel as the
+ * theme selector).
  */
 export function registerRepairItemDataMenu() {
   return registerDialogSettingsMenu({

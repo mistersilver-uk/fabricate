@@ -28,43 +28,21 @@ function hasEssences(essences) {
 export function findMatchingComponent(item, components = [], systemId) {
   if (!item || !Array.isArray(components)) return null;
 
-  // Deterministic precedence: the list-aware, system-scoped identity/source-ref
-  // resolver is authoritative; name is a compatibility fallback for components
-  // created before source refs existed (its closure is deferred to issue 557).
+  // Deterministic precedence: the list-aware, system-scoped identity/source-ref resolver is
+  // authoritative; name is a compatibility fallback for components created before source refs
+  // existed (its closure is deferred to issue 557).
   const resolved = resolveComponentForItem(item, components, systemId);
   if (resolved) return resolved;
 
-  // Suppress the cross-system NAME fallback for an item that already carries a durable
-  // component identity (issue 538). Its identity IS its component id, and the resolver
-  // above already tried this system's candidate set through the durable + raw-ref tiers.
-  // A same-named component in ANOTHER system is a DIFFERENT component, so name-matching
-  // it here would project the one owned item as a duplicate inventory row per system.
-  // Items with NO identity flag keep the name fallback (the pre-identity compatibility
-  // path, removal tracked by issue 540).
+  // Suppress the cross-system NAME fallback for an item that already carries a durable component
+  // identity (issue 538).
   if (itemHasComponentIdentityFlag(item)) return null;
 
   // Case-INSENSITIVE name fallback via the shared helper (warn-once telemetry, issue 540).
   return findComponentByName(item, components, { caseSensitive: false, systemId });
 }
 
-/**
- * Resolve the essences a submitted/available item contributes.
- *
- * The item's own `flags.fabricate.essences` take precedence; absent those, the
- * component the item resolves to (via `resolveComponent`) supplies its
- * component-defined essences.
- *
- * @param {Item|object|null} item
- * @param {Array<object>} [components] - The candidate component set of ONE system.
- * @param {string|null|undefined} [systemId] - That system's id (durable-flag scope).
- * @param {(item: object, components: Array<object>, systemId: string|null|undefined) => object|null} [resolveComponent] -
- *   The component resolver. Defaults to {@link findMatchingComponent} (tiers 1-3 +
- *   name), preserving today's behavior for gathering/inventory/standard-crafting
- *   callers. The alchemy craft path injects {@link resolveAlchemySubmissionComponent}
- *   (which adds the bare-`registeredItemUuid` tier) so essence attribution resolves
- *   to the same component the submission collector bucketed the item to.
- * @returns {object} The normalized essence map.
- */
+/** Resolve the essences a submitted/available item contributes. */
 export function resolveItemEssences(
   item,
   components = [],
@@ -102,21 +80,8 @@ export function accumulateItemEssences(
 }
 
 /**
- * Accumulate essences from PRE-BUCKETED alchemy submission records — the
- * true bucket-once essence path (issue 578). Each record already carries the
- * `componentId` the submission collector ({@link resolveAlchemySubmissions})
- * bucketed the item to, tier-4-aware, so essence attribution reads the exact same
- * id group counting reads and cannot diverge from the signature gate.
- *
- * The item's own `flags.fabricate.essences` still take precedence (mirroring
- * {@link resolveItemEssences}); absent those, the record's `componentId` looks up
- * the component in `components` and its component-defined essences are used. Each
- * record counts as one unit (the workbench expands a stack into one submission per
- * unit), matching the per-unit occurrence model of the signature matcher.
- *
- * @param {Array<{item: object, componentId: string|null}>} records
- * @param {{ components?: Array<object>, systemId?: string|null|undefined }} [options]
- * @returns {object} The normalized, accumulated essence map.
+ * Accumulate essences from PRE-BUCKETED alchemy submission records — the true bucket-once essence
+ * path (issue 578).
  */
 export function accumulateSubmissionEssences(records = [], { components = [] } = {}) {
   const accumulated = {};
