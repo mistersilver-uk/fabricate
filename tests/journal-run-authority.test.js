@@ -5,6 +5,7 @@ import { describe, it } from 'node:test';
 import {
   JOURNAL_RUN_CLAIM_LIVE_WINDOW_MS,
   JOURNAL_RUN_CLAIM_PAGE_ID,
+  JOURNAL_RUN_QUEUE_WAIT_MS,
   createFoundryJournalRunAuthority,
   createJournalRunAuthority,
 } from '../src/systems/journalRunAuthority.js';
@@ -213,12 +214,19 @@ function sharedAuthorityWorld() {
       beforeCreate = null,
       beforeClaim = null,
       beforeWrite = null,
+      // The ledger listing is the one adapter call no authority body wraps in a try/catch, so
+      // this is the seam that drives a genuine CHAIN rejection rather than a handled failure.
+      beforeList = null,
+      queueWaitMs = undefined,
     } = {}
   ) =>
     createJournalRunAuthority({
       currentUser: getCurrentUser,
       activeGM: getActiveGM,
-      listLedgers: async () => [...server.values()],
+      listLedgers: async () => {
+        await beforeList?.();
+        return [...server.values()];
+      },
       listLedgerRecords,
       canCreateLedger,
       createLedger: async (source) => {
@@ -254,6 +262,7 @@ function sharedAuthorityWorld() {
       },
       randomId: () => `id-${++nextId}`,
       now: () => currentTime,
+      queueWaitMs,
       reconstructExecutions,
       onAvailabilityRestored,
     });
@@ -1172,6 +1181,20 @@ describe('journal run authority ledger', () => {
     );
   });
 
+  it('bounds the queue wait at the command timeout, not at the claim window', () => {
+    // Issue 1759. The two numbers answer different questions and must not be confused: the
+    // claim window asks how long a command may still be RUNNING, and is four times the command
+    // timeout so a slow command is never misjudged. The queue wait asks how long a command that
+    // has not started may go on WAITING, and past the point its caller gave up the answer is
+    // "no longer". A GM's own command takes no socket round trip, so this is its only bound --
+    // at the claim window it would be a minute of frozen Journal.
+    assert.equal(JOURNAL_RUN_QUEUE_WAIT_MS, JOURNAL_RUN_COMMAND_TIMEOUT_MS);
+    assert.ok(
+      JOURNAL_RUN_QUEUE_WAIT_MS < JOURNAL_RUN_CLAIM_LIVE_WINDOW_MS,
+      'waiting for a turn must give up sooner than a claim is judged dead'
+    );
+  });
+
   it('reaps a leaked claim and retains an uncertain one, at any age', async () => {
     const world = sharedAuthorityWorld();
     const authority = world.realm();
@@ -1573,5 +1596,182 @@ describe('journal run authority ledger', () => {
     assert.deepEqual(observed.byDocument, {}, 'the matching binding still redeems');
     assert.deepEqual(observed.first, {}, 'the exact binding redeems');
     assert.equal(observed.replay, null, 'and a consumed grant is never redeemable again');
+  });
+
+  it('refuses a command that never gets its turn, instead of waiting for one forever', async () => {
+    // Issue 1759. Every authority command serialises through ONE promise chain, and nothing on
+    // it had a bound of its own: `sendCommand` times out, the queue did not. So one task that
+    // never settled stopped every later command on that client permanently, with no error and
+    // nothing on screen. The maintainer met that as a Foundry that had simply stopped
+    // responding, and the Foundry smoke met it as a 28-minute timeout with no diagnosis.
+    const world = sharedAuthorityWorld();
+    const authority = world.realm('gm', { queueWaitMs: 25 });
+    let releaseWedge = null;
+    const wedged = authority.run(
+      { requestId: 'wedge', senderId: 'player', sessionId: 'one' },
+      () =>
+        new Promise((resolve) => {
+          releaseWedge = () => resolve({ success: true, ran: 'wedge' });
+        })
+    );
+    // Let the wedged command reach its handler, so it is genuinely HOLDING the line rather than
+    // merely queued ahead. Without this the refusal below could be the first task refusing
+    // itself, which would pass while proving nothing.
+    await Promise.resolve();
+
+    let blockedReachedHandler = false;
+    const blocked = await authority.run(
+      { requestId: 'blocked', senderId: 'player', sessionId: 'two' },
+      async () => {
+        blockedReachedHandler = true;
+        return { success: true };
+      }
+    );
+
+    assert.deepEqual(blocked, {
+      success: false,
+      reason: 'queue-timeout',
+      blockedBy: 'command:wedge',
+    });
+    assert.equal(blockedReachedHandler, false, 'a refused command writes nothing');
+
+    // The bound covers the WAIT, never the task: the command that had already started is left
+    // to settle on its own terms, because abandoning it mid-write is the exact uncertainty the
+    // claim exists to record.
+    releaseWedge();
+    assert.deepEqual(await wedged, { success: true, ran: 'wedge' });
+
+    // The refusal does not poison the client: once the line is free, commands run again. This
+    // also DRAINS the chain -- `after` is queued behind `blocked`, so its completion is proof
+    // that `blocked`'s turn has been and gone, which is what makes the next assertion real
+    // rather than a race the test happens to win.
+    assert.deepEqual(
+      await authority.run(
+        { requestId: 'after', senderId: 'player', sessionId: 'three' },
+        async () => ({ success: true, ran: 'after' })
+      ),
+      { success: true, ran: 'after' }
+    );
+
+    // And the refused turn is FORFEIT, not deferred. Its caller has already been told nothing
+    // was changed, so a handler that ran once the line freed would make that answer a lie.
+    assert.equal(blockedReachedHandler, false, 'the forfeited turn never runs late');
+  });
+
+  it('names the command that really holds the line, not one that finished before it', async () => {
+    // Found in review of the first version of this fix, and proved before it was believed. The
+    // refusal captured `queueHolder` when it ENQUEUED, which is not when it refuses. Two calls
+    // landing in one synchronous tick -- ordinary, since a socket message handler can deliver
+    // both -- therefore each recorded whatever had last run, and the refusal named a command
+    // that had already finished before the real holder even started.
+    //
+    // A `blockedBy` that names the wrong command is worse than none: this fix exists to make a
+    // stall diagnosable, and a confident wrong answer sends the reader somewhere else entirely.
+    const world = sharedAuthorityWorld();
+    const authority = world.realm('gm', { queueWaitMs: 25 });
+    assert.equal(
+      (
+        await authority.run({ requestId: 'first', senderId: 'player', sessionId: 'one' }, async () => ({
+          success: true,
+        }))
+      ).success,
+      true,
+      'a command runs and finishes, so it is the last name the holder took'
+    );
+
+    // Both enqueued in ONE tick, with no await between them: this is the interleaving that
+    // capturing early gets wrong.
+    let releaseWedge = null;
+    const wedged = authority.run(
+      { requestId: 'wedge', senderId: 'player', sessionId: 'two' },
+      () => new Promise((resolve) => (releaseWedge = () => resolve({ success: true })))
+    );
+    const blocked = await authority.run(
+      { requestId: 'blocked', senderId: 'player', sessionId: 'three' },
+      async () => ({ success: true })
+    );
+
+    assert.equal(blocked.blockedBy, 'command:wedge', JSON.stringify(blocked));
+    releaseWedge();
+    await wedged;
+  });
+
+  it('bounds the wait for every queued entry point, not only for commands', async () => {
+    // `run` is not the only task on the chain. `bootstrapRecovery` and `reconcile` queue too, so
+    // a wedge stalls them the same way and each has to be able to say so. Left untested, the
+    // bound would hold for the path that happened to have a test and silently not for the rest.
+    const world = sharedAuthorityWorld();
+    const authority = world.realm('gm', { queueWaitMs: 25 });
+    let releaseWedge = null;
+    const wedged = authority.run(
+      { requestId: 'wedge', senderId: 'player', sessionId: 'one' },
+      () => new Promise((resolve) => (releaseWedge = () => resolve({ success: true })))
+    );
+    await Promise.resolve();
+
+    assert.deepEqual(await authority.reconcile({ claimId: 'c1', disposition: 'reconciled' }), {
+      success: false,
+      reason: 'queue-timeout',
+      blockedBy: 'command:wedge',
+    });
+    assert.deepEqual(await authority.bootstrapRecovery(), {
+      success: false,
+      reason: 'queue-timeout',
+      blockedBy: 'command:wedge',
+    });
+
+    releaseWedge();
+    await wedged;
+  });
+
+  it('keeps a rejecting task rejecting its own caller, and only its own caller', async () => {
+    // `queue` returns a race now, not the task's own promise. Three things had to survive that:
+    // a rejection still reaches the caller that asked for it, it is never dressed up as a
+    // `queue-timeout`, and it does not escape as an unhandled rejection off the chain every
+    // later command inherits.
+    const world = sharedAuthorityWorld();
+    world.addLedger();
+    let explode = true;
+    const authority = world.realm('gm', {
+      queueWaitMs: 25,
+      beforeList: async () => {
+        if (explode) throw new Error('adapter exploded');
+      },
+    });
+    const unhandled = [];
+    const record = (reason) => unhandled.push(reason);
+    process.on('unhandledRejection', record);
+    try {
+      await assert.rejects(
+        () => authority.reconcile({ claimId: 'c1', disposition: 'reconciled' }),
+        /adapter exploded/
+      );
+      explode = false;
+      assert.equal(
+        (await authority.reconcile({ claimId: 'c1', disposition: 'reconciled' })).success,
+        true,
+        'the chain survives its own rejection'
+      );
+      await new Promise((resolve) => setImmediate(resolve));
+      assert.deepEqual(unhandled, [], 'and leaves no unhandled rejection behind');
+    } finally {
+      process.off('unhandledRejection', record);
+    }
+  });
+
+  it('reports a handler that throws as a failed operation, never as a queue timeout', async () => {
+    // The race must not launder an exception into the refusal beside it. A player told
+    // `queue-timeout` is told nothing was changed; a handler that threw part way through has no
+    // such guarantee, and conflating the two would hide the case the claim exists to record.
+    const world = sharedAuthorityWorld();
+    const authority = world.realm('gm', { queueWaitMs: 25 });
+    const response = await authority.run(
+      { requestId: 'throws', senderId: 'player', sessionId: 'one' },
+      async () => {
+        throw new Error('handler exploded');
+      }
+    );
+    assert.equal(response.reason, 'operation-failed', JSON.stringify(response));
+    assert.match(response.message, /handler exploded/);
   });
 });
