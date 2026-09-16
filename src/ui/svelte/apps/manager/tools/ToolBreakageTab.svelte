@@ -1,22 +1,15 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  THE FIRST TAB OF THE SYSTEM TOOL RULES EDITOR (issue 1373).
+  THE FIRST TAB OF THE SYSTEM TOOL RULES EDITOR, BUILT OUT OF INHERIT/OVERRIDE BECAUSE THE MODEL
+  IS: `breakage` and `onBreak` are WORLD-DEFAULT SECTIONS, so the world Tool authors an answer and
+  each crafting system either follows it or sets its own. Each section is a `ToolInheritCard`
+  carrying the state pill, the world default, the switch, and either the world value read only or
+  this system's own controls.
 
-  == IT IS BUILT OUT OF INHERIT/OVERRIDE, BECAUSE THE MODEL IS =================================
-  `breakage` and `onBreak` are WORLD-DEFAULT SECTIONS: the world Tool authors an answer and each
-  crafting system either follows it or sets its own. The screen shipped with no way to see or
-  change that at all — two bare headings on the page background, permanently in the override
-  state — while the rules list one route away already advertised `Inherits world defaults`,
-  offered `What it would inherit here`, and routed here. Each section is now a
-  `ToolInheritCard`: a card carrying the state pill, the world default, the switch, and either
-  the world value read only or this system's own controls.
-
-  == THE TAB ALSO OPENS AND CLOSES THE SYSTEM'S RELATIONSHIP WITH THE TOOL =====================
-  `Enabled in <System>` opens it and `Stop using this Tool here` closes it, exactly as the design
-  draws them. Neither is a breakage control; both are what this tab IS — this Tool, in this
-  system — and the design puts them at the two ends of it. The remove callout is the SYSTEM
-  scope's counterpart to the world entry's `Delete`, and the difference is the whole point: this
-  one takes away one system's rules and leaves the world Tool and every other system untouched.
+  THE TAB ALSO OPENS AND CLOSES THE SYSTEM'S RELATIONSHIP WITH THE TOOL. Neither `Enabled in
+  <System>` nor `Stop using this Tool here` is a breakage control; both are what this tab IS — this
+  Tool, in this system — and they sit at its two ends. The remove callout is system scope's
+  counterpart to the world entry's `Delete`, and the difference is the point: it takes away one
+  system's rules and leaves the world Tool and every other system untouched.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
@@ -47,18 +40,15 @@
     currencyEnabled = false,
     managedItems = [],
     systemName = '',
-    // WHERE THE BREAKAGE AUTHORITY ABOVE CAME FROM. The card states the world default and, when
-    // this system has departed from it, says so — which is what the design's own mode card
-    // draws and what the rules LIST one route away already chips. `authority` alone is the
-    // RESOLVED token and cannot tell "chose it" from "inherited it" (issue 1373).
+    // WHERE THE BREAKAGE AUTHORITY ABOVE CAME FROM: `authority` alone is the RESOLVED token and
+    // cannot tell "chose it" from "inherited it", which the rules LIST already chips.
     breakageSource = 'default',
     worldAuthority = '',
     persisted = true,
     saving = false,
-    // The world membership facts this tab reads to draw its inherit affordances. `member` is
-    // `false` for a pre-migration in-system Tool the world catalogue has no record of, and the
-    // cards then render exactly as they did before: their controls, with no switch and no pill,
-    // because there is no world half to inherit from.
+    // The world membership facts behind the inherit affordances. `member` is `false` for a
+    // pre-migration in-system Tool with no world half to inherit from, and the cards then render
+    // their controls with no switch and no pill.
     member = false,
     inherited = {},
     worldDefaults = null,
@@ -75,10 +65,9 @@
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
   }
-  // `limitedUses` SEEDS AT 1, NEVER AT NULL. A null `maxUses` is the UNLIMITED answer
-  // (`toolBreakageChoice`), so a config that carried it would make "pick Limited uses" land the
-  // GM back on the option they just left — silently, because the stepper used to draw the null
-  // as `1` while every reading surface said `Unlimited uses` (issue 1373).
+  // `limitedUses` SEEDS AT 1, NEVER AT NULL: a null `maxUses` is the UNLIMITED answer, so a config
+  // carrying it would land the GM back on the option they just left — silently, because the
+  // stepper drew the null as `1` while every reading surface said `Unlimited uses`.
   function createBreakageConfigs(breakage = { mode: 'limitedUses', maxUses: null }) {
     return {
       unlimited: { mode: 'limitedUses', maxUses: null },
@@ -116,9 +105,8 @@
     );
   }
 
-  // WHERE THE MODE CAME FROM, in the design's own words. `default` means this system follows
-  // the world's answer and the line names it, which is exactly the `World default` chip the
-  // rules list wears; anything else means this system departed from it and the line says so.
+  // WHERE THE MODE CAME FROM: `default` means this system follows the world's answer and the line
+  // names it, which is the `World default` chip the rules list wears.
   const authoritySourceLine = $derived(
     breakageSource === 'default'
       ? formattedText(
@@ -134,15 +122,10 @@
   );
 
   /**
-   * What one section resolves to while it INHERITS.
-   *
-   * The world defaults record is preferred and the Tool's own current value is the fallback,
-   * which is not a guess: the editor keeps the in-system record equal to the world value for as
-   * long as the switch is on (`CraftingSystemManagerRoot#setFocusedToolSectionInherited`), so
-   * for an entity whose world half authored no defaults record the two are the same answer.
-   *
-   * @param {string} section
-   * @returns {object|undefined}
+   * What one section resolves to while it INHERITS. The world defaults record is preferred and the
+   * Tool's own current value is the fallback, which is not a guess: the editor keeps the in-system
+   * record equal to the world value while the switch is on, so where the world half authored no
+   * defaults record the two are the same answer.
    */
   function inheritedFact(section) {
     return (
@@ -182,11 +165,9 @@
   // gate and by nothing else. See `toolBreakageChoice`.
   const breakageChoice = $derived(toolBreakageChoice(tool, authority));
 
-  // FOUR OPTIONS, AND `unlimited` LEADS THEM (issue 1373). It is the model's default and the
-  // only one of the four that names an ABSENCE of a mechanic, so it opens the set the way
-  // `Immune` opens the check-driven pair below. The label is the exact string the rail, the
-  // player preview and the library row already print for this state, so the four surfaces read
-  // as one answer rather than as four opinions.
+  // FOUR OPTIONS, AND `unlimited` LEADS THEM: the model's default, and the only one naming an
+  // ABSENCE of a mechanic. Its label is the exact string the rail, the player preview and the
+  // library row print, so four surfaces read as one answer rather than four opinions.
   const breakageModeOptions = $derived(
     ['unlimited', 'limitedUses', 'breakageChance', 'diceExpression'].map((mode) => ({
       value: mode,
@@ -224,9 +205,8 @@
     }))
   );
   const replacementComponentId = $derived(String(onBreak.replacementTarget?.componentId || ''));
-  // THE BAND BESIDE THE SLIDER (issue 1373, maintainer round 2). The design states what the
-  // percentage MEANS next to the number, and the ramp the chip is tinted from is the one the
-  // track already runs through, so the two never disagree.
+  // THE BAND BESIDE THE SLIDER states what the percentage MEANS, tinted from the ramp the track
+  // already runs through so the two never disagree.
   const chanceBand = $derived(toolBreakageChanceBand(tool?.breakage?.breakageChance ?? 0, text));
   function breakageModeLabel(mode) {
     return {
@@ -307,17 +287,9 @@
     {onToggleEnabled}
   />
 
-  <!--
-    THE BREAKAGE MODE, AS A READ-ONLY STATEMENT OF WHERE IT CAME FROM (issue 1373).
-
-    It used to end in a `System-wide` LOCK CHIP and to drop the world half of the sentence
-    entirely — while the rules LIST one route away chipped the very same setting `World default`.
-    Two screens a click apart said different things about one value, and the padlock claimed a
-    permanence the setting does not have: it is a system-level choice, changed on the Tool Rules
-    screen, not a thing a GM may not change. The design states its provenance on the right
-    instead — `World default · Tool-specific`, or `Overridden for <System>` — and closes with
-    where to change it.
-  -->
+  <!-- THE BREAKAGE MODE, AS A READ-ONLY STATEMENT OF WHERE IT CAME FROM. A `System-wide` LOCK CHIP
+       dropped the world half of the sentence while the rules LIST chipped the same setting
+       `World default`, and the padlock claimed a permanence the setting does not have. -->
   <section class="manager-tool-authority-readonly" data-tool-breakage-authority-explanation>
     <span class="manager-tool-authority-icon"
       ><i class="fas fa-sliders" aria-hidden="true"></i></span
@@ -373,9 +345,8 @@
         optionDataAttr="data-tool-breakage-choice"
         onChange={changeMode}
       />
-      <!-- The rule below the choices separates them from the CONFIGURATION of the chosen one.
-           `unlimited` configures nothing, so drawing it there would close the card on a line
-           with nothing under it (issue 1373). -->
+      <!-- The rule below the choices separates them from the CONFIGURATION of the chosen one, and
+           `unlimited` configures nothing, so it would close the card on an empty line. -->
       {#if breakageChoice !== 'unlimited'}
         <hr class="manager-tool-breakage-config-divider" data-tool-breakage-config-divider />
       {/if}
@@ -392,11 +363,9 @@
               )}</small
             >
           </div>
-          <!-- NO `?? 1` FALLBACK. This block renders only while `breakageChoice` is
-               `limitedUses`, which is exactly the case a non-null `maxUses` defines, so the
-               fallback that used to sit here could only ever fire for the UNLIMITED state —
-               and drew it as `1`, against a rail, a player preview and a library row all
-               reading `Unlimited uses` (issue 1373). -->
+          <!-- NO `?? 1` FALLBACK: this block renders only where a non-null `maxUses` defines the
+               case, so a fallback could fire only for the UNLIMITED state — and drew it as `1`
+               against three surfaces reading `Unlimited uses`. -->
           <Stepper
             value={tool.breakage.maxUses}
             min={1}
@@ -427,9 +396,8 @@
                 )}
               </p>
             </div>
-            <!-- THE PLAIN-LANGUAGE BAND, on the design's own five cuts. It is a claim about the
-                 number, not a control, so it is stated beside the copy the slider labels rather
-                 than beside the slider itself. -->
+            <!-- THE PLAIN-LANGUAGE BAND: a claim about the number rather than a control, so it
+                 is stated beside the copy the slider labels. -->
             <Chip tone={chanceBand.tone} data-tool-breakage-chance-band={chanceBand.tone}
               >{chanceBand.label}</Chip
             >
@@ -515,21 +483,13 @@
     disabled={saving}
     onToggle={onToggleInherited}
   >
-    <!-- STILL A `<fieldset disabled>`, and that is the immune state's whole mechanism: it
-         removes every on-break radio from interaction in one attribute rather than passing
-         `disabled` down three controls. The `Always fires` badge that used to caption its
-         legend is GONE — the design uses that slot for the inheritance pill, which the card
-         above now carries, and `Always fires` was never news. -->
-    <!-- THE CONTROL HALF of the validation row action (issue 1517). The `onBreak` and `repair`
-         checks are both about what is authored INSIDE this fieldset — the on-break mechanic, its
-         replacement target, and the repair requirement groups the `flagBroken` branch renders —
-         so the fieldset is the destination and `toolStudio.js` addresses both as `tool-on-break`.
-         A fieldset is not natively focusable, hence the tabindex, and it carries
-         `data-keyboard-focus` for the same reason every other declared `-1` here does.
-
-         IT CAN BE `disabled`, and that is deliberately left alone: an immune Tool runs no
-         on-break action, and `validationFocus.js` refuses a disabled target rather than moving
-         focus into a control the GM cannot use. The row still changes tab. -->
+    <!-- STILL A `<fieldset disabled>`, the immune state's whole mechanism: one attribute rather
+         than `disabled` passed down three controls. -->
+    <!-- THE CONTROL HALF of the validation row action. The `onBreak` and `repair` checks are both
+         about what is authored INSIDE this fieldset, so the fieldset is the destination; it is not
+         natively focusable, hence the tabindex and the keyboard-focus attribute. IT CAN BE
+         `disabled`, deliberately: an immune Tool runs no on-break action, and `validationFocus.js`
+         refuses a disabled target rather than focusing a control the GM cannot use. -->
     <fieldset
       class="manager-tool-on-break fab-stack"
       data-gap="3"
@@ -558,17 +518,10 @@
       />
       <hr class="manager-tool-on-break-divider" data-tool-on-break-divider />
       {#if onBreak.mode === 'replaceWith'}
-        <!--
-          THE SHARED CARD (issue 1373, maintainer round 2). This was a bare picker under two
-          headings: no drop target, no source line, and no way to clear a choice. `Choose
-          component` was also a HEADING as well as the button's own label, so the card said it
-          twice. Both scopes render `ToolReplacementTarget` now, so a GM meets the same control
-          on the world default and on the system override.
-
-          `sourceText` NAMES THIS SYSTEM, which is the fact system scope has and world scope does
-          not: the Component produced here is this system's, and the same world default resolves
-          to a different Component list in the next system to inherit it.
-        -->
+        <!-- THE SHARED CARD, so a GM meets the same control on the world default and on the
+             system override. `sourceText` NAMES THIS SYSTEM, the fact system scope has and world
+             scope does not: the same world default resolves to a different Component list in the
+             next system to inherit it. -->
         <ToolReplacementTarget
           {componentOptions}
           componentId={replacementComponentId}
@@ -599,19 +552,10 @@
     </fieldset>
   </ToolInheritCard>
 
-  <!--
-    THE SYSTEM SCOPE'S DESTRUCTIVE ACTION, AND IT IS NOT `Delete` (issue 1373).
-
-    The header used to carry a bare `Delete` here. On a screen whose subject is one world Tool
-    adopted by many crafting systems, `Delete` names no scope at all: it reads as deleting the
-    Tool, and a GM who wanted to stop using it in THIS system had no way to tell. The design puts
-    `Delete` on the world entry, which is the record it destroys, and gives system scope this —
-    an explained callout that says exactly which half goes and which half does not.
-
-    It renders only for a Tool this system holds a MEMBERSHIP record for. For a pre-migration
-    in-system Tool with no world half there is no membership to remove, and offering to remove
-    one would be an action with nothing behind it.
-  -->
+  <!-- THE SYSTEM SCOPE'S DESTRUCTIVE ACTION, AND IT IS NOT `Delete`, which names no scope on a
+       screen whose subject is one world Tool adopted by many systems. It belongs on the world
+       entry, the record it destroys, and system scope gets an explained callout. Rendered only for
+       a Tool this system holds a MEMBERSHIP record for. -->
   {#if member}
     <section class="manager-tool-remove-callout" data-tool-remove-from-system>
       <span class="manager-tool-remove-icon" aria-hidden="true"
@@ -629,11 +573,9 @@
           )}
         </p>
       </div>
-      <!-- NO `idleIcon`. The callout already leads with that exact glyph one column to the
-           left, and the design's own button is label-only and compact — a second copy of the
-           section's own mark inside its action reads as decoration and made the control the
-           loudest thing in a callout whose point is that it is NOT the destructive one
-           (issue 1373). -->
+      <!-- NO `idleIcon`: the callout already leads with that glyph one column to the left, and a
+           second copy made the control the loudest thing in a callout whose point is that it is
+           NOT the destructive one. -->
       <ArmedDangerButton
         token="tool-remove-from-system"
         armed={removeArmed}
@@ -667,18 +609,11 @@
 </div>
 
 <style>
-  /* THE TWO CONFIGURATION LABELS ARE TITLES, NOT EYEBROWS (issue 1373). `proto:2645` states
-     `Uses per copy` and `proto:2656` states `Break chance per use` with one string:
-     `font: 600 11.5px var(--sans); color: var(--text)` - sentence case, the body ink, one
-     weight below an eyebrow's 700 and no tracking or casing at all. Both were drawn as
-     `.manager-kicker`, which is the uppercase micro-label the reference reserves for a SECTION
-     HEAD; neither of these heads a section. Each names the control on its own row, in the same
-     voice as the sentence beneath it, which is why the fix is to remove the class rather than
-     to narrow it. 11.5px is 0.72rem against the 16px root.
-
-     `margin: 0` because the shared class carried a 2px bottom margin the reference does not
-     draw: `proto:2645` sets the note directly under the title with no step between them, and
-     the break-chance card's own note states its `--fab-space-1` a few rules below. */
+  /* THE TWO CONFIGURATION LABELS ARE TITLES, NOT EYEBROWS: sentence case in the body ink, one
+     weight below an eyebrow and with no tracking. Both were drawn as `.manager-kicker`, the
+     uppercase micro-label reserved for a SECTION HEAD, and neither of these heads a section —
+     each names the control on its own row — which is why the fix removes the class rather than
+     narrowing it. `margin: 0` because that class carried a bottom step the reference omits. */
   .manager-tool-breakage-config-title {
     margin: 0;
     color: var(--fab-text);
@@ -686,19 +621,9 @@
     font-weight: 600;
   }
 
-  /* THE BREAK-CHANCE CARD'S HEAD (issue 1373, maintainer round 2).
-
-     The design puts the plain-language band on the same line as the label the slider carries
-     (`proto:2144-2146`: `display:flex; align-items:center; gap:12px; margin-bottom:11px`), so a
-     GM reads `Break chance per use / Rarely breaks` as one statement. `12` is `--fab-space-3`
-     exactly; the `11px` bottom margin is the card's own grid `gap` and is not restated.
-
-     THE HINT RULE IS RESTATED HERE because the shipped
-     `.manager-tool-breakage-chance-card > div > p:last-child` addressed the copy block as the
-     card's DIRECT child, and the head is now that child — so the shipped rule matches nothing
-     rather than conflicting, and the treatment has to be re-declared at the new depth. Written
-     in this file rather than in `styles/fabricate.css` because this template writes both
-     elements, so the scoping hash reaches them. */
+  /* THE BREAK-CHANCE CARD'S HEAD puts the plain-language band on the label's own line. THE HINT
+     RULE IS RESTATED HERE because the shipped selector addressed the copy block as the card's
+     DIRECT child and the head is now that child, so it matches nothing rather than conflicting. */
   .manager-tool-breakage-chance-head {
     display: flex;
     align-items: center;

@@ -1,33 +1,19 @@
-<!-- Svelte 5 runes mode -->
 <!--
   The SYSTEM Tool rules editor's tab strip: `Breakage · Requirements · Validation`.
 
-  == THERE IS NO `Overview` TAB, AND ITS ABSENCE IS THE CONTRACT (issue 1373) ================
-  The design ships TWO Tool editors. The WORLD one — `scoped/WorldToolEntryPage` — opens on an
-  Overview tab, because identity is what world scope authors: the linked Item, the description,
-  the shared display label, the world enable switch. THIS editor is the SYSTEM one, and a
-  crafting system authors no identity at all; its header says so in as many words
-  (`identity comes from the world Tool`). An Overview tab here is a tab with nothing at system
-  scope to put on it, and everything that was on it was either world-scoped (the linked-Item
-  card, the description) or belongs beside the rules it qualifies (the per-system display-label
-  override and the per-system enable switch, both now on Breakage).
+  THERE IS NO `Overview` TAB, AND ITS ABSENCE IS THE CONTRACT. The WORLD Tool editor opens on one,
+  because identity is what world scope authors; a crafting system authors no identity at all, and
+  its header says so. Everything that was on it was either world-scoped or belongs beside the rules
+  it qualifies. `breakage` IS THEREFORE THE DEFAULT and the first tab, with no fallback quietly
+  mapping the retired name, because a stale caller must fail loudly rather than land on a tab the
+  design does not have.
 
-  `breakage` IS THEREFORE THE DEFAULT and the first tab. Every caller that used to open this
-  editor on `overview` opens it here instead; there is no fallback that quietly maps the retired
-  name onto a tab, because a stale caller must fail loudly rather than land on a tab the design
-  does not have.
-
-  == IT IS A THIN CALLER OF THE `EditorTabs` PRIMITIVE (issue 1038) ===========================
-  This file owns the tab list, the two badges, and this site's DOM contract — the `tool-tab-*` /
-  `tool-panel-*` id stem whose panels `ToolEditView.svelte` renders, the
-  `manager-tool-editor-tabs` container class that three rules in `styles/fabricate.css` are
-  written against, and the strip's own aria-label. Dropping `overview` is a change to the LIST,
-  not to the strip's markup, so the conversion and the retirement compose exactly.
-
-  IT RENDERS NO `data-*` TAB HOOK, alone among the six callers, so it passes
-  `hookAttribute=""`. Its mounted assertions reach the buttons by `role="tab"` and by
-  `#tool-tab-<id>`, and adding a hook to satisfy the primitive's default would have been new
-  markup in a conversion whose whole claim is that it changes none.
+  IT IS A THIN CALLER OF THE `EditorTabs` PRIMITIVE. This file owns the tab list, the two badges
+  and this site's DOM contract — the `tool-tab-*` / `tool-panel-*` id stem, the container class
+  three rules in `styles/fabricate.css` are written against, and the strip's aria-label. IT RENDERS
+  NO `data-*` TAB HOOK, alone among the six callers, so it passes `hookAttribute=""`: its mounted
+  assertions reach the buttons by `role="tab"` and by id, and adding a hook to satisfy the
+  primitive's default would be new markup in a conversion whose claim is that it changes none.
 -->
 <script>
   import EditorTabs from '../../../components/EditorTabs.svelte';

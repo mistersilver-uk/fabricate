@@ -42,7 +42,7 @@ src/ui/svelte/apps/manager/recipe-item	335
 src/ui/svelte/apps/manager/recipes	379
 src/ui/svelte/apps/manager/scoped	9061
 src/ui/svelte/apps/manager/system	75
-src/ui/svelte/apps/manager/tools	1852
+src/ui/svelte/apps/manager/tools	772
 src/ui/svelte/apps/manager/world	327
 src/ui/svelte/components	2513
 src/ui/svelte/stores	6973
