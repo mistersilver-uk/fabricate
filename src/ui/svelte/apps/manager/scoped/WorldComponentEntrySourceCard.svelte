@@ -1,23 +1,11 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  The world Component entry's `Source identity` card (issue 1371, maintainer parity round 4).
-
-  == IT IS A CARD WITH A HEAD, NOT A KICKERED BLOCK =========================================
-  `proto:845-879` draws a `fa-fingerprint` glyph in INFO ink, an `h3` at 14px serif and a
-  subtitle sentence, over four stacked regions: the uuid well with its two controls, a compact
-  replace target, the alias label and its add row, and the alias chips. Round 3 shipped a bare
-  8.5px `Linked item` kicker over the shared `ItemDropZone` in its LINKED form, which repeats
-  the art and the name the identity card above it already draws.
-
-  == IT IS A SEPARATE FILE BECAUSE THE PAGE IS ONE ==========================================
-  The entry page holds five cards, a rail and a buffered draft. Each card lifted out of it is
-  markup the page no longer has to interleave with the draft wires, and this one carries the
-  most state of the five: the copy acknowledgement, the alias draft and the duplicate scan.
-
-  == EVERY WRITE HERE IS IMMEDIATE, NOT BUFFERED ============================================
-  A drop, an unlink and an alias edit all rewrite the world entity's SOURCE-LINK fields, which
-  `IDENTITY_FIELDS` deliberately does not buffer: they are resolved from a Foundry document
-  through the shell rather than typed, so there is nothing for a Save to hold.
+  The world Component entry's `Source identity` card (issue 1371): a card with a head, not a
+  kickered block (`proto:845-879`) — the uuid well and its two controls, a compact replace target,
+  the alias add row and the alias chips. A separate file because the entry page holds five cards,
+  a rail and a buffered draft, and this one carries the most state of the five.
+  EVERY WRITE HERE IS IMMEDIATE, NOT BUFFERED: a drop, an unlink and an alias edit rewrite the
+  SOURCE-LINK fields, which `IDENTITY_FIELDS` deliberately does not buffer.
 -->
 <script>
   import Callout from '../Callout.svelte';
