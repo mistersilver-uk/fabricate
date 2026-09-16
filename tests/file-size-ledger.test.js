@@ -248,9 +248,10 @@ test('the ledger reports the two figures epic 1656 tracks', (t) => {
   // own, which the block cannot have while it is one branch inside a larger file. Not bundled
   // here, because a blocked maintainer is waiting on the defect this commit fixes, and a new
   // `.svelte` child additionally has to join `writeCompiledSvelte` and four mount harnesses.
-  // 126 after merging origin/main, which condensed 38 component headers and took Chip and
-  // IconButton back under the .svelte threshold -- two of this branch's entries removed by
-  // someone else's work rather than by ours.
-  assert.equal(files, 126, 'oversized files');
+  // 126 after merging origin/main, then 120 under issue 1681. Both falls are comment
+  // condensation: 38 component headers took Chip and IconButton back under the .svelte
+  // threshold, then the manager sub-folders took six more units under. Neither is debt
+  // discharged -- the code is what it was, and only the measurement moved.
+  assert.equal(files, 120, 'oversized files');
   assert.equal(keys.length - files, 124, 'oversized functions');
 });
