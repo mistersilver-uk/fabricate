@@ -17,7 +17,7 @@ import { dirname, join, resolve } from 'node:path';
 import { argv, exit } from 'node:process';
 import { fileURLToPath } from 'node:url';
 
-import { deriveS3Layout } from './release-s3.js';
+import { deriveS3Layout, resolveChannelConfig } from './release-s3.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DEFAULT_FABRICATE_CONFIG = join(ROOT, 'release.s3.config.json');
@@ -110,24 +110,30 @@ const named = (value) => (typeof value === 'string' ? value.trim() : '');
 /** Code-point order, because `Array#sort` without a comparator sorts as UTF-16 strings anyway. */
 const byName = (a, b) => (a < b ? -1 : Number(a > b));
 
+const groupNames = (secret) => secret.groups.map((feed) => feed.name);
+
+/** @typedef {{group: string, channel: string, modules: string[], secretEnv: string, repository: string, where: string}} Declaration */
+
 /**
- * Every `(group, secret, repository)` declaration in this repository's config, whose schema is one
- * `testerSecretEnv` per channel against an array of groups.
- * @returns {{group: string, secretEnv: string, repository: string, where: string}[]}
+ * Every tester declaration in this repository's config, resolved by the publisher's own reader so
+ * rotation and publishing cannot disagree: `resolveChannelConfig` also honours the scalar
+ * `channel`/`testerGroups` back-compat shape, which a second reader here would silently drop.
+ * @returns {Declaration[]}
  */
 function fabricateDeclarations(config, repository) {
-  const declarations = [];
-  for (const [channel, entry] of Object.entries(config?.channels ?? {})) {
-    for (const group of entry?.testerGroups ?? []) {
-      declarations.push({
-        group: named(group),
-        secretEnv: named(entry?.testerSecretEnv),
-        repository,
-        where: `${repository} channel "${channel}"`,
-      });
-    }
-  }
-  return declarations;
+  const names = [...Object.keys(config?.channels ?? {}), config?.channel].filter(Boolean);
+  const modules = [named(config?.moduleId)].filter(Boolean);
+  return [...new Set(names)].flatMap((channel) => {
+    const { testerGroups, testerSecretEnv } = resolveChannelConfig(config, channel);
+    return testerGroups.map((group) => ({
+      group: named(group),
+      channel,
+      modules,
+      secretEnv: named(testerSecretEnv),
+      repository,
+      where: `${repository} channel "${channel}"`,
+    }));
+  });
 }
 
 /**
@@ -140,6 +146,10 @@ function premiumDeclarations(config, repository) {
     for (const [group, groupEntry] of Object.entries(entry?.testerGroups ?? {})) {
       declarations.push({
         group: named(group),
+        channel,
+        // The allow-list of module slugs published into this group; a channel-level list covers a
+        // channel whose groups share it.
+        modules: (groupEntry?.modules ?? entry?.modules ?? []).map(named).filter(Boolean),
         secretEnv: named(groupEntry?.testerSecretEnv),
         repository,
         where: `${repository} channel "${channel}"`,
@@ -188,16 +198,16 @@ function assertGroupsAgree(declarations) {
  * rotating it would silently migrate an unannounced cohort.
  */
 function narrowToGroup(secrets, group) {
-  const match = secrets.find((secret) => secret.groups.includes(group));
+  const match = secrets.find((secret) => groupNames(secret).includes(group));
   if (!match) {
-    const known = secrets.flatMap((secret) => secret.groups).sort(byName);
+    const known = secrets.flatMap(groupNames).sort(byName);
     throw new Error(
       `no tester group named "${group}" is declared in either config. Known groups: ` +
         `${known.join(', ')}.`
     );
   }
 
-  const others = match.groups.filter((name) => name !== group);
+  const others = groupNames(match).filter((name) => name !== group);
   if (others.length > 0) {
     throw new Error(
       `tester group "${group}" shares ${match.name} with ${others.join(', ')}, so rotating it ` +
@@ -213,8 +223,8 @@ function narrowToGroup(secrets, group) {
  * The rotation unit is the secret, not the group: this repository's schema resolves one segment per
  * channel and applies it to every group in the array, so a channel with two groups is a shared
  * secret by construction.
- * @returns {{secrets: {name: string, groups: string[], repositories: string[]}[],
- *   warnings: string[]}} The ordered plan.
+ * @returns {{baseUrl: string, warnings: string[], secrets: {name: string, repositories: string[],
+ *   groups: {name: string, channel: string, modules: string[]}[]}[]}} The ordered plan.
  */
 export function planRotation({
   fabricateConfig,
@@ -240,7 +250,14 @@ export function planRotation({
       });
     }
     const secret = bySecret.get(declaration.secretEnv);
-    if (!secret.groups.includes(declaration.group)) secret.groups.push(declaration.group);
+    let feed = secret.groups.find((entry) => entry.name === declaration.group);
+    if (!feed) {
+      feed = { name: declaration.group, channel: declaration.channel, modules: [] };
+      secret.groups.push(feed);
+    }
+    for (const moduleId of declaration.modules) {
+      if (!feed.modules.includes(moduleId)) feed.modules.push(moduleId);
+    }
     if (!secret.repositories.includes(declaration.repository)) {
       secret.repositories.push(declaration.repository);
     }
@@ -259,7 +276,11 @@ export function planRotation({
         'whichever is not re-announced.'
     );
 
-  return { secrets, warnings };
+  return {
+    baseUrl: named(fabricateConfig?.baseUrl) || named(premiumConfig?.baseUrl),
+    secrets,
+    warnings,
+  };
 }
 
 /** Every planned write, group-major: every repository for one secret before the next secret. */
@@ -268,7 +289,7 @@ const plannedWrites = (plan) =>
     secret.repositories.map((repository) => ({
       secret: secret.name,
       repository,
-      groups: secret.groups,
+      groups: groupNames(secret),
     }))
   );
 
@@ -279,17 +300,28 @@ const describeLanded = (landed) =>
         .map((write) => `  - ${write.secret} -> ${write.repository}`)
         .join('\n')}`;
 
-/** `testers/<group>/<segment>/<moduleId>/module.json`, via the publisher's own layout so it cannot drift. */
-function testerPrefix(group, segment) {
-  const { testerTargets } = deriveS3Layout({
-    moduleId: '<moduleId>',
-    channel: 'tester',
-    version: '<version>',
-    baseUrl: '',
-    testerGroups: [group],
-    testerSegment: segment,
+/**
+ * One announceable manifest URL per module published into a group, built by the publisher's own
+ * layout so a path change cannot drift from a release. `channel` is read back out of that layout,
+ * so the channel this call passes is visible in the announcement rather than inert.
+ */
+function testerFeedLines(baseUrl, feed, segment) {
+  if (feed.modules.length === 0) {
+    return [
+      `  ${feed.name}: no module is declared for this group, so no feed URL can be announced`,
+    ];
+  }
+  return feed.modules.map((moduleId) => {
+    const { channel, testerTargets } = deriveS3Layout({
+      moduleId,
+      channel: feed.channel,
+      version: '0.0.0',
+      baseUrl,
+      testerGroups: [feed.name],
+      testerSegment: segment,
+    });
+    return `  ${feed.name} (${channel}) ${moduleId}: ${testerTargets[0].manifestUrl}`;
   });
-  return testerTargets[0].manifestKey;
 }
 
 /**
@@ -305,7 +337,7 @@ export async function runRotation({ plan, apply = false, deps = {} }) {
   log(apply ? 'Rotating tester path segments.' : 'DRY RUN — no secret will be written.');
   for (const secret of plan.secrets) {
     log(`  ${secret.name} -> ${secret.repositories.join(', ')}`);
-    log(`    serves tester group(s): ${secret.groups.join(', ')}`);
+    log(`    serves tester group(s): ${groupNames(secret).join(', ')}`);
   }
   for (const warning of plan.warnings) log(`  WARNING: ${warning}`);
   log(`${writes.length} repository write(s) across ${plan.secrets.length} secret(s).`);
@@ -322,7 +354,7 @@ export async function runRotation({ plan, apply = false, deps = {} }) {
   await assertGhIsReady(runGh);
 
   const landed = [];
-  const prefixes = [];
+  const announcements = [];
   for (const secret of plan.secrets) {
     const segment = nextSegment();
     for (const repository of secret.repositories) {
@@ -336,15 +368,17 @@ export async function runRotation({ plan, apply = false, deps = {} }) {
           { cause: error }
         );
       }
-      landed.push({ secret: secret.name, repository, groups: secret.groups });
+      landed.push({ secret: secret.name, repository, groups: groupNames(secret) });
       log(`  wrote ${secret.name} -> ${repository}`);
     }
-    for (const group of secret.groups) prefixes.push(`  ${group}: ${testerPrefix(group, segment)}`);
+    for (const feed of secret.groups) {
+      announcements.push(...testerFeedLines(plan.baseUrl, feed, segment));
+    }
   }
 
   // `gh` cannot read a secret's value back, so this is the only record of where each cohort lives.
-  log("New tester prefixes, beneath the bucket's base URL — announce these:");
-  for (const prefix of prefixes) log(prefix);
+  log('New tester feed URLs — announce these:');
+  for (const line of announcements) log(line);
 
   return { applied: true, writes: landed };
 }

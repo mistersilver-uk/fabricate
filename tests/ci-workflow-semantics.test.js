@@ -37,6 +37,9 @@ import {
   POLL_INTERVAL_MS,
   SLACK_MS,
 } from '../scripts/lib/screenshotEvidenceMatching.js';
+// The channel resolver the publishers themselves import, so a channel declared by the scalar
+// back-compat shape is not invisible to this file's second reading of the same config.
+import { resolveChannelConfig } from '../scripts/release-s3.js';
 
 function parseWorkflow(source) {
   const all = entries(source);
@@ -315,30 +318,34 @@ const WORKFLOWS = path.join(REPOSITORY_ROOT, '.github', 'workflows');
 const RELEASE_S3_WORKFLOW = './.github/workflows/release-s3.yml';
 const PATH_SECRET_NAME = /\bS3_[A-Z0-9_]*_PATH_SECRET\b/g;
 
-/** The shipped release config, and the two derived facts every assertion below is written against. */
+/**
+ * The shipped release config, read through the publisher's own resolver so a channel declared by
+ * the scalar back-compat shape is not invisible to the assertions below.
+ */
 function shippedConfig() {
   const config = JSON.parse(
     readFileSync(path.join(REPOSITORY_ROOT, 'release.s3.config.json'), 'utf8')
   );
-  const channels = Object.entries(config.channels);
-  const declared = [];
-  for (const [name, entry] of channels) {
-    if ((entry.testerGroups ?? []).length === 0) continue;
+  /** The secret a channel's own feed derives its path from, or null when it has no tester group. */
+  const secretFor = (channel) => {
+    const { testerGroups, testerSecretEnv } = resolveChannelConfig(config, channel);
+    if (testerGroups.length === 0) return null;
     // Asserted, not filtered: a `''` or absent name would drop out of `declared` and mute both
     // bindings below for the one channel that needs them.
     assert.ok(
-      typeof entry.testerSecretEnv === 'string' && entry.testerSecretEnv.trim() !== '',
-      `channel "${name}" declares tester groups with no testerSecretEnv, so its feed has no ` +
+      typeof testerSecretEnv === 'string' && testerSecretEnv.trim() !== '',
+      `channel "${channel}" declares tester groups with no testerSecretEnv, so its feed has no ` +
         'segment to derive a path from'
     );
-    if (!declared.includes(entry.testerSecretEnv)) declared.push(entry.testerSecretEnv);
-  }
-  return {
-    declared,
-    testerFree: new Set(
-      channels.filter(([, c]) => (c.testerGroups ?? []).length === 0).map(([name]) => name)
-    ),
+    return testerSecretEnv;
   };
+
+  const names = [...new Set([...Object.keys(config.channels ?? {}), config.channel].filter(Boolean))];
+  const declared = [];
+  for (const secret of names.map(secretFor)) {
+    if (secret && !declared.includes(secret)) declared.push(secret);
+  }
+  return { declared, secretFor };
 }
 
 /** Every workflow file, as `{ file, source }`. */
@@ -348,28 +355,42 @@ function workflowSources() {
     .map((entry) => ({ file: entry, source: readFileSync(path.join(WORKFLOWS, entry), 'utf8') }));
 }
 
+/** The shell form: `--channel <name>`, tolerant of the trailing punctuation an `echo` adds. */
+const shellChannels = (run) => [...run.matchAll(/--channel\s+["']?([$\w.-]+)/g)].map((m) => m[1]);
+
+/** The inline-import forms: `resolveChannelConfig(config, …)` and a `deriveS3Layout` channel key. */
+const inlineChannels = (run) => [
+  ...[...run.matchAll(/resolveChannelConfig\(\s*[\w.]+\s*,\s*([^)]*)\)/g)].map((m) => m[1]),
+  ...[...run.matchAll(/\bchannel:\s*([^,\n}]+)/g)].map((m) => m[1]),
+];
+
 /**
- * The `--channel` argument of a `release-s3.js` invocation when it is a literal, else null. A
- * workflow input (`"$CHANNEL"`) could be any channel, so only a literal can excuse a step from
- * forwarding a secret.
+ * Every channel a shell body pins itself to, and whether any reference resolves at run time. A step
+ * that reads its channel from a workflow input or a loop variable could be publishing to any of
+ * them, so only a body whose every reference is a literal may be excused a secret.
  */
-function literalChannel(run) {
-  const match = /--channel\s+["']?([$\w.-]+)/.exec(run);
-  const raw = match?.[1] ?? '';
-  return raw && !raw.includes('$') ? raw : null;
+function pinnedChannels(run) {
+  const source = String(run ?? '');
+  const channels = new Set();
+  let unresolved = false;
+  const take = (raw, literal) => {
+    const name = literal.exec(raw.trim())?.[1];
+    if (name) channels.add(name);
+    else unresolved = true;
+  };
+  for (const raw of shellChannels(source)) take(raw, /^([\w.-]+)$/);
+  for (const raw of inlineChannels(source)) take(raw, /^["']([\w.-]+)["']$/);
+  return { channels: [...channels], unresolved };
 }
 
 /**
- * Whether a shell body invokes `release-s3.js`, as opposed to naming it. `promote-to-public.yml`'s
- * dry run echoes the command it would have run, and a substring match reads that as a publish with
- * no secrets — a false failure whose obvious fix is to weaken the rule this test exists to state.
- * It also excludes three steps that inline-import `deriveS3Layout` instead of running the script:
- * promote-to-early-access's "Assert every beta target advertises the tag's version", and
- * promote-to-public's "Verify source_channel…" and "Read back the public manifests written". Each
- * forwards the secrets its own targets need but carries no `--channel` for `literalChannel` to
- * read, so covering them needs its own reader rather than a looser anchor here.
+ * Whether a shell body reaches `release-s3.js` at all — running it, or inline-importing the layout
+ * helpers that derive the same tester manifest keys from the same secret. Three steps do the
+ * latter, and an anchored `node scripts/release-s3.js` left all three unpoliced. The dry run in
+ * promote-to-public.yml that merely echoes the command it would have run is excused by its own
+ * literal `public` channel, not by a narrower matcher here that an inline importer hides behind.
  */
-const invokesReleaseS3 = (run) => /^\s*node\s+scripts\/release-s3\.js/m.test(run);
+const referencesReleaseS3 = (run) => /scripts\/release-s3\.js/.test(String(run ?? ''));
 
 test('no workflow forwards a tester-path secret the release config does not declare', () => {
   const { declared } = shippedConfig();
@@ -394,7 +415,7 @@ test('no workflow forwards a tester-path secret the release config does not decl
 });
 
 test('every declared tester-path secret reaches release-s3.js through every workflow that runs it', () => {
-  const { declared, testerFree } = shippedConfig();
+  const { declared, secretFor } = shippedConfig();
   const publishers = [];
   const callers = [];
   let declaredByReusable = null;
@@ -414,14 +435,14 @@ test('every declared tester-path secret reaches release-s3.js through every work
         callers.push({ file, name, job, inherits });
       }
       for (const step of job.steps ?? []) {
-        if (!invokesReleaseS3(step.run)) continue;
-        publishers.push({ file, step, channel: literalChannel(step.run) });
+        if (!referencesReleaseS3(step.run)) continue;
+        publishers.push({ file, step, ...pinnedChannels(step.run) });
       }
     }
   }
 
   // Non-vacuity: every assertion below is a loop, and an empty one passes.
-  assert.ok(publishers.length >= 2, `found ${publishers.length} release-s3.js invocations`);
+  assert.ok(publishers.length >= 6, `found ${publishers.length} release-s3.js references`);
   assert.ok(callers.length >= 2, `found ${callers.length} callers of ${RELEASE_S3_WORKFLOW}`);
   assert.ok(declaredByReusable, 'release-s3.yml declares no workflow_call secrets');
 
@@ -447,14 +468,25 @@ test('every declared tester-path secret reaches release-s3.js through every work
           'workflow inherits no repository secret, so the segment arrives empty'
       );
     }
-    for (const { file, step, channel } of publishers) {
-      // A step pinned to a channel that declares no tester group needs no segment at all.
-      if (channel && testerFree.has(channel)) continue;
+  }
+
+  // A step pinned to literal channels needs exactly those channels' secrets; one that resolves a
+  // channel at run time could be publishing to any of them, so it needs every declared secret.
+  let bindings = 0;
+  for (const { file, step, channels, unresolved } of publishers) {
+    const needed = unresolved
+      ? declared
+      : [...new Set(channels.map(secretFor).filter(Boolean))];
+    for (const secret of needed) {
+      bindings += 1;
       assert.ok(
         secret in step.env,
-        `${file} step "${step.name}" runs release-s3.js for channel ${channel ?? '(an input)'} ` +
-          `without ${secret} in its env:`
+        `${file} step "${step.name}" reaches release-s3.js for ` +
+          `${unresolved ? 'a channel resolved at run time' : channels.join(', ')} without ` +
+          `${secret} in its env:`
       );
     }
   }
+  // Non-vacuity: a reader that found no channel at all would excuse every step above.
+  assert.ok(bindings >= 6, `only ${bindings} publisher/secret bindings were asserted`);
 });

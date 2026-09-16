@@ -23,10 +23,12 @@ import {
 const REPOSITORY_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const FABRICATE = 'mistersilver-uk/fabricate';
 const PREMIUM = 'mistersilver-uk/fabricate-premium';
+const BASE_URL = 'https://cdn.example/base';
 
 /** This repository's schema: one `testerSecretEnv` per channel, against an array of groups. */
 const FABRICATE_CONFIG = {
   moduleId: 'fabricate',
+  baseUrl: BASE_URL,
   channels: {
     beta: { testerGroups: ['closed-beta-2026'], testerSecretEnv: 'S3_TESTER_PATH_SECRET' },
     'early-access': {
@@ -63,6 +65,9 @@ const PREMIUM_CONFIG = {
     public: { testerGroups: {}, modules: ['fabricate-premium'] },
   },
 };
+
+/** Both shared groups are fed by this repository's own module and the premium pair above. */
+const SHARED_MODULES = ['fabricate', 'fabricate-mythwright', 'fabricate-premium'];
 
 const plan = (overrides = {}) =>
   planRotation({ fabricateConfig: FABRICATE_CONFIG, premiumConfig: PREMIUM_CONFIG, ...overrides });
@@ -102,20 +107,24 @@ const refuseGh = async () => assert.fail('no `gh` invocation may be reached here
 // planRotation — the mapping
 
 test('the plan maps one secret to every repository and group it serves, in discovery order', () => {
+  const feed = (name, channel, modules) => ({ name, channel, modules });
+
+  // Each group carries the channel and the module allow-list its feed URLs are announced from, so
+  // a cohort the announcement cannot name shows up here rather than at patron-post time.
   assert.deepEqual(plan().secrets, [
     {
       name: 'S3_TESTER_PATH_SECRET',
-      groups: ['closed-beta-2026'],
+      groups: [feed('closed-beta-2026', 'beta', SHARED_MODULES)],
       repositories: [FABRICATE, PREMIUM],
     },
     {
       name: 'S3_GUILD_ARTISAN_PATH_SECRET',
-      groups: ['guild-artisan-2026'],
+      groups: [feed('guild-artisan-2026', 'early-access', SHARED_MODULES)],
       repositories: [FABRICATE, PREMIUM],
     },
     {
       name: 'S3_APPRENTICE_PATH_SECRET',
-      groups: ['apprentice-crafter-2026'],
+      groups: [feed('apprentice-crafter-2026', 'early-access', ['fabricate-mythwright'])],
       repositories: [PREMIUM],
     },
   ]);
@@ -136,7 +145,7 @@ test('the plan covers exactly the tester feeds the shipped config resolves to', 
     return testerGroups.map((group) => ({ group, secretEnv: testerSecretEnv }));
   });
   const planned = planRotation({ fabricateConfig: shipped, premiumConfig: null }).secrets.flatMap(
-    (secret) => secret.groups.map((group) => ({ group, secretEnv: secret.name }))
+    (secret) => secret.groups.map(({ name }) => ({ group: name, secretEnv: secret.name }))
   );
 
   assert.ok(published.length >= 2, 'the shipped config resolves fewer tester feeds than it declares');
@@ -178,7 +187,10 @@ test('a channel declaring two groups against one secret serves both, and refuses
   assert.deepEqual(planRotation({ fabricateConfig: shared, premiumConfig: null }).secrets, [
     {
       name: 'S3_GUILD_ARTISAN_PATH_SECRET',
-      groups: ['guild-artisan-2026', 'journeyman-smith-2026'],
+      groups: [
+        { name: 'guild-artisan-2026', channel: 'early-access', modules: [] },
+        { name: 'journeyman-smith-2026', channel: 'early-access', modules: [] },
+      ],
       repositories: [FABRICATE],
     },
   ]);
@@ -203,7 +215,7 @@ test('--group narrows to a group whose secret serves it alone', () => {
   assert.deepEqual(secrets, [
     {
       name: 'S3_APPRENTICE_PATH_SECRET',
-      groups: ['apprentice-crafter-2026'],
+      groups: [{ name: 'apprentice-crafter-2026', channel: 'early-access', modules: ['fabricate-mythwright'] }],
       repositories: [PREMIUM],
     },
   ]);
@@ -437,19 +449,62 @@ test('main --apply writes one real segment per secret and announces the new pref
   assert.equal(written[2], written[3], 'and so does the early-access one');
   assert.equal(new Set(written).size, 3, 'one segment per secret, and no two secrets share one');
 
-  // `gh` cannot read a secret back, so an unreported prefix is an unannounceable cohort.
+  // `gh` cannot read a secret back, so an unannounced feed is an unreachable cohort. Every id
+  // here is a real module slug and every channel is the group's own, so the report pastes as-is.
   const report = lines.join('\n');
-  for (const [group, segment] of [
-    ['closed-beta-2026', written[0]],
-    ['legacy-beta-2026', written[0]],
-    ['guild-artisan-2026', written[2]],
-    ['apprentice-crafter-2026', written[4]],
+  for (const [group, channel, segment, modules] of [
+    ['closed-beta-2026', 'beta', written[0], SHARED_MODULES],
+    ['legacy-beta-2026', 'beta', written[0], ['fabricate']],
+    ['guild-artisan-2026', 'early-access', written[2], SHARED_MODULES],
+    ['apprentice-crafter-2026', 'early-access', written[4], ['fabricate-mythwright']],
   ]) {
-    assert.ok(
-      report.includes(`${group}: testers/${group}/${segment}/<moduleId>/module.json`),
-      `the report does not announce the new prefix for ${group}`
-    );
+    for (const moduleId of modules) {
+      const url = `${BASE_URL}/testers/${group}/${segment}/${moduleId}/module.json`;
+      assert.ok(
+        report.includes(`  ${group} (${channel}) ${moduleId}: ${url}`),
+        `the report does not announce ${moduleId}'s new ${group} feed on ${channel}`
+      );
+    }
   }
+  assert.ok(!report.includes('<moduleId>'), 'the announcement is a template, not a set of URLs');
+});
+
+test('a config using the scalar channel shorthand still plans its group', () => {
+  // `resolveChannelConfig` honours a scalar `channel` + `testerGroups` for a config with no
+  // `channels` map. A second reader here that walked `channels` alone would plan nothing for it,
+  // and every other case in this file would stay green.
+  const shorthand = {
+    moduleId: 'fabricate',
+    baseUrl: BASE_URL,
+    channel: 'beta',
+    testerGroups: ['closed-beta-2026'],
+  };
+
+  assert.deepEqual(planRotation({ fabricateConfig: shorthand, premiumConfig: null }).secrets, [
+    {
+      name: 'S3_TESTER_PATH_SECRET',
+      groups: [{ name: 'closed-beta-2026', channel: 'beta', modules: ['fabricate'] }],
+      repositories: [FABRICATE],
+    },
+  ]);
+});
+
+test('a group no module is published into is announced as unannounceable, not skipped', async () => {
+  const noModules = {
+    channels: {
+      beta: { testerGroups: ['closed-beta-2026'], testerSecretEnv: 'S3_TESTER_PATH_SECRET' },
+    },
+  };
+  const { lines, log } = collectLog();
+
+  await runRotation({
+    plan: planRotation({ fabricateConfig: noModules, premiumConfig: null }),
+    apply: true,
+    deps: { runGh: ghDouble().runGh, newSegment: () => 'seg', log },
+  });
+
+  // Silence here rotates a cohort's segment and leaves nobody able to name where it moved to.
+  assert.match(lines.join('\n'), /closed-beta-2026: no module is declared for this group/);
 });
 
 test('main --group rotates that group alone, and refuses one sharing its secret with another', async () => {
