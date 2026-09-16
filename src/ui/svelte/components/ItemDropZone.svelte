@@ -6,39 +6,31 @@
   | prop | values | default | contract |
   | --- | --- | --- | --- |
   | `documentType` | Foundry document name | `'Item'` | What the payload must carry, so the same primitive serves an Item card and a Macro card rather than growing a component per document type. |
-  | `state` | `'linked'` \| `'missing'` | `'linked'` | `missing` paints a link whose document no longer resolves. A broken link is otherwise indistinguishable from a working one. |
-  | `address` | string | `''` | The resolved document's own address, a mono line directly UNDER the name. It is NOT a sub-line and does not displace one: the rule that a sub-line "never restates the raw uuid" is about the SUMMARY slot, which still instructs. |
-  | `subline` | string | `''` | A SECOND sub-line under `hint`, for a card carrying both a uuid and a description. Renders only when supplied. |
-  | `compact` | boolean | `false` | A PROMPT, NEVER A SUMMARY; see the invariants. |
-  | `purpose` | string | `''` | WHAT THE ZONE IS FOR, as a per-site id on `data-item-drop-zone`. It is NO LONGER a branch selector: every attribute it used to switch on is a caller's own `hookAttrs` entry. |
-  | `hookAttrs` | bag keyed by region | `{}` | The test and styling hooks, over a CLOSED region set — `root`, `hint`, `copy`, `unlink` — each an object of attribute name to value, spread onto that region. `{}` for an absent region, so a caller naming none renders byte-identically to one that passed no bag. A caller's bag is NOT necessarily static: one shipped site's two hooks are two faces of ONE state, so it derives its bag from its own link state, where a static object would render both attributes or neither. |
-  | `unlinkAttr` | attribute name | `''` | ONE attribute rather than a set, and deliberately NOT folded into the bag: three callers pass it, and a caller passing both gets both. |
-  | `onDrop(data)` | function | no-op | Receives the RAW drag data, which is the shipped contract — several consumers read `pack`/`id` for provenance. |
+  | `state` | `'linked'` \| `'missing'` | `'linked'` | `missing` paints a link whose document no longer resolves, which is otherwise indistinguishable from a working one. |
+  | `address` / `subline` | strings | `''` | The resolved document's own address, a mono line directly UNDER the name and not a sub-line; and a SECOND sub-line under `hint`, for a card carrying both a uuid and a description. Each renders only when supplied. |
+  | `compact` / `purpose` | boolean / string | `false` / `''` | A PROMPT, NEVER A SUMMARY (see the invariants); and WHAT THE ZONE IS FOR, as a per-site id on `data-item-drop-zone` rather than a branch selector. |
+  | `hookAttrs` | bag keyed by region | `{}` | The test and styling hooks, over a CLOSED region set — `root`, `hint`, `copy`, `unlink` — each an object of attribute name to value. `{}` for an absent region, so a caller naming none renders byte-identically to one that passed no bag. A caller's bag need not be static: one shipped site's two hooks are two faces of ONE state. |
+  | `unlinkAttr` / `onDrop(data)` | attribute name / function | `''` / no-op | ONE unlink attribute rather than a set, deliberately not folded into the bag, so a caller passing both gets both; and a handler receiving the RAW drag data, which is the shipped contract — several consumers read `pack`/`id` for provenance. |
 
   Invariants:
   - THE REGION SET IS CLOSED AND GUARDED AT THE SOURCE, because a bag keyed by name is otherwise
-    SILENT about a name it does not recognise: a misspelled region spreads nothing and renders
-    exactly like a site that passed no hook at all.
-    `item-drop-zone-source-contract.test.js` reads the names out of this file's own `hooksFor('…')`
-    calls and refuses a call site naming anything else.
-  - A HOOK'S VALUE IS NOT NORMALISED TO A BOOLEAN, and two shipped hooks are why. One is a STYLING
-    hook the global sheet writes a real rule against, so dropping or renaming it narrows a shipped
-    prompt VISIBLY — it is also application-rooted and outside this primitive's family, which
-    leaves the family HOST-DEPENDENT for that one caller: a named residue and a named exclusion
-    from the host-independence set. The other carries a STRING value rather than `true`.
+    SILENT about a name it does not recognise: a misspelled region spreads nothing and renders like
+    a site that passed no hook at all. `item-drop-zone-source-contract.test.js` reads the names out
+    of this file's own `hooksFor('…')` calls and refuses a call site naming anything else.
+  - A HOOK'S VALUE IS NOT NORMALISED TO A BOOLEAN, and two shipped hooks are why: one is a STYLING
+    hook the global sheet writes a real rule against — application-rooted and outside this
+    primitive's family, so it is a named residue and a named exclusion from the host-independence
+    set — and the other carries a STRING value rather than `true`.
   - THE DROP GUARD READS `resolveDropUuid(data)`, NOT `data.uuid`. A COMPENDIUM drag emits
-    `{ pack, id }` and no `uuid`, so a `uuid`-only guard was STRICTER than every one of this
-    zone's own consumers, each of which already resolves the payload itself — the zone rejected a
-    compendium drop before the consumer that would have accepted it ever saw it, which is the
-    common case for a module-shipped document rather than an edge one.
-  - `compact` SUPPRESSES THE IDENTITY BLOCK AND THE ACTIONS OUTRIGHT and renders exactly a glyph
-    over a title over a note, whatever `item` holds. It is not a density knob: its two callers
-    already show that document in full beside the target, so the default form would draw the
-    linked item a second time in the same card.
-  - A BARE ATTRIBUTE ON AN ELEMENT THAT HAS GROWN A SPREAD ARRIVES AS BOOLEAN `true` and renders
-    `="true"`, which is why this component's own root hook is written `=""`. The same mechanism
-    leaves one measured residue: an element carrying a spread has its scope hash stamped
-    defensively, so the hint `<small>` renders a `class` the compiled CSS never names.
+    `{ pack, id }` and no `uuid`, so a `uuid`-only guard was STRICTER than every one of this zone's
+    own consumers, each of which already resolves the payload itself.
+  - `compact` SUPPRESSES THE IDENTITY BLOCK AND THE ACTIONS OUTRIGHT and renders exactly a glyph over
+    a title over a note, whatever `item` holds. It is not a density knob: its two callers already
+    show that document in full beside the target.
+  - The root hook is written `=""` per the `data-*` spelling rule in
+    `openspec/specs/design-system/spec.md`; one measured residue follows from the same spread, in
+    that an element carrying one has its scope hash stamped defensively, so the hint `<small>`
+    renders a `class` the compiled CSS never names.
 -->
 <script>
   import { dragDrop } from '../actions/dragDrop.js';
@@ -68,19 +60,10 @@
 
   const isMissing = $derived(Boolean(item) && state === 'missing');
   const unlinkAttrs = $derived(unlinkAttr ? { [unlinkAttr]: true } : {});
-  /**
-   * One region's hooks, or `{}` — `EditorValidationSurface`'s own `hooksFor` verbatim, so one
-   * source-contract shape guards both bags.
-   *
-   * @param {'root'|'hint'|'copy'|'unlink'} region One of the closed region set.
-   * @returns {Record<string, unknown>} The attributes to spread onto that region.
-   */
   const hooksFor = (region) => hookAttrs?.[region] ?? {};
 
   function handleDrop(data) {
     if (data?.type !== documentType) return;
-    // `resolveDropUuid` covers BOTH shipped drag shapes. The guard only decides whether the
-    // payload names a document at all; `onDrop` still receives the raw data.
     const uuid = resolveDropUuid(data);
     if (typeof uuid !== 'string' || !uuid.trim()) return;
     onDrop(data);
@@ -139,8 +122,6 @@
 </div>
 
 <style>
-  /* The MISSING treatment: a link whose document no longer resolves reads as a warning rather
-     than as a working link, which is the failure a needs-attention filter exists to surface. */
   .manager-item-drop-zone.is-missing {
     border-color: var(--fab-danger-border);
     color: var(--fab-danger-text);
