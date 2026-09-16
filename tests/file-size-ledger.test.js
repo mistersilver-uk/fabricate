@@ -252,10 +252,10 @@ test('the ledger reports the two figures epic 1656 tracks', (t) => {
   // IconButton back under the .svelte threshold -- two of this branch's entries removed by
   // someone else's work rather than by ours.
   //
-  // 120/123 after merging #1682's sweep, which took `src/models/Recipe.js` under the 800-line
+  // 123/123 after merging #1682's sweep, which took `src/models/Recipe.js` under the 800-line
   // file threshold and its constructor under the 100-line function threshold. Regenerated from
   // the merged tree rather than reconciled by hand: these counts are derived, so picking a side
   // of the conflict would have pinned a figure no tree actually has.
-  assert.equal(files, 120, 'oversized files');
+  assert.equal(files, 118, 'oversized files');
   assert.equal(keys.length - files, 123, 'oversized functions');
 });

@@ -1,21 +1,11 @@
-/**
- * Pure anchor → inline-position mapping for the region-entry interaction prompt
- * toast (see InteractionPromptApp). The prompt is a plain fixed-position DOM
- * toast; this module turns a configured anchor id into the CSS position
- * declarations applied inline, so a GM/player can move the prompt away from a
- * conflicting on-screen widget (e.g. a camera-control panel that occupies the
- * default bottom-center). No DOM, Foundry, or Svelte dependencies so it stays
- * unit-testable.
- */
+// Anchor id to inline CSS position, for the region-entry prompt toast (`InteractionPromptApp`), so
+// a GM or player can move it away from a conflicting widget such as a camera-control panel over the
+// default bottom-center. No DOM, Foundry or Svelte dependency.
 
-/** The default anchor — the prompt's historical bottom-center position. */
+// The prompt's historical position, and the fallback for a corrupt setting.
 export const DEFAULT_INTERACTION_PROMPT_POSITION = 'bottom-center';
 
-/**
- * The offered anchors: the four screen corners and the four edge-centers, plus
- * the default bottom-center. Values are i18n label keys for the setting picker.
- * @type {Readonly<Record<string, string>>}
- */
+// The offered anchors; values are i18n label keys for the setting picker.
 export const INTERACTION_PROMPT_POSITION_CHOICES = Object.freeze({
   'top-left': 'FABRICATE.Settings.InteractionPromptPosition.Choices.TopLeft',
   'top-center': 'FABRICATE.Settings.InteractionPromptPosition.Choices.TopCenter',
@@ -27,8 +17,7 @@ export const INTERACTION_PROMPT_POSITION_CHOICES = Object.freeze({
   'bottom-right': 'FABRICATE.Settings.InteractionPromptPosition.Choices.BottomRight',
 });
 
-// Edge insets. The bottom inset clears Foundry's macro hotbar; the others clear
-// the scene navigation / sidebar with a comfortable margin.
+// The bottom inset clears Foundry's macro hotbar; the rest clear scene nav and sidebar.
 const EDGE_INSET = '16px';
 const BOTTOM_INSET = '96px';
 
@@ -44,15 +33,8 @@ const VERTICAL = Object.freeze({
   bottom: `bottom:${BOTTOM_INSET}`,
 });
 
-/**
- * Resolve an anchor id to the inline CSS position declarations (excluding the
- * constant `position:fixed`, z-index, sizing, and pointer-events the caller
- * always applies). Unknown/invalid anchors fall back to the default
- * bottom-center, so a corrupt setting never mispositions the prompt off-screen.
- *
- * @param {string} anchor One of the `INTERACTION_PROMPT_POSITION_CHOICES` keys.
- * @returns {string[]} CSS declarations, e.g. `['left:50%','bottom:96px','transform:translateX(-50%)']`.
- */
+// Position declarations only: `position:fixed`, z-index, sizing and pointer-events stay the
+// caller's. An unknown anchor falls back, so a corrupt setting never puts the prompt off-screen.
 export function resolveInteractionPromptPositionStyle(anchor) {
   const id = Object.hasOwn(INTERACTION_PROMPT_POSITION_CHOICES, anchor)
     ? anchor

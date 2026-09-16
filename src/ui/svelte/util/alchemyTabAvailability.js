@@ -1,14 +1,6 @@
-/**
- * Decide whether the Fabricate shell should surface the Alchemy tab.
- *
- * The tab appears only when there is at least one *enabled* crafting system in
- * alchemy resolution mode that owns at least one recipe. Pure and
- * dependency-injected so it can be unit tested without Foundry globals.
- *
- * @param {{ getCraftingSystemManager?: () => any, getRecipeManager?: () => any }} services
- *   Thin accessors for the crafting system and recipe managers.
- * @returns {boolean}
- */
+// The shell surfaces the Alchemy tab only when at least one ENABLED crafting system in alchemy
+// resolution mode owns at least one recipe. Dependency-injected, so it is unit-testable with no
+// Foundry globals.
 export function isAlchemyTabAvailable(services) {
   const systemManager = services?.getCraftingSystemManager?.();
   const recipeManager = services?.getRecipeManager?.();

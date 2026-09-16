@@ -13,23 +13,7 @@ function str(value) {
   return value == null ? '' : String(value);
 }
 
-/**
- * Build a synthetic book row for the "How players see it" preview.
- *
- * @param {object} args
- * @param {string} args.key Stable row key (e.g. `recipeitem:preview:<id>`).
- * @param {string} [args.name] Book display name.
- * @param {string|null} [args.img] Book image path.
- * @param {string} [args.description] Book description (shown full-width in the detail).
- * @param {number} [args.totalQuantity=1] Owned quantity (the preview owns one copy).
- * @param {'item'|'knowledge'} args.mode The book's visibility mode.
- * @param {object} [args.caps] The book's `{ item, learn }` caps.
- * @param {Array<{id:string,name:string,description?:string,img?:string|null}>} [args.recipes]
- *   Recipes the book teaches/grants.
- * @param {Array<{id:string,kind:string,name:string,icon:string,met:boolean}>} [args.requirements]
- *   Resolved learning requirements with per-requirement met/unmet.
- * @returns {object} A row shaped exactly like `InventoryListingBuilder` output.
- */
+// The preview owns ONE copy: no count the store cannot produce is invented.
 export function buildRecipeItemPreviewRow({
   key,
   name,
