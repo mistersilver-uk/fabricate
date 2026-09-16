@@ -33,6 +33,7 @@
   // The label keys are written out as LITERALS rather than interpolated, because
   // `ui-lang-keys-resolve` and `lang-keys-no-orphans` read the SOURCE: an interpolated key is
   // invisible to both, so a missing label would ship as a raw key with no gate catching it.
+  // `FABRICATE.Admin.Manager.Recipe.Tabs.${tab.key}` was that unreachable form.
   const TABS = $derived([
     {
       id: 'overview',

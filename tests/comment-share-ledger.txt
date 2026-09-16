@@ -37,7 +37,7 @@ src/ui/svelte/apps/manager/environment	467
 src/ui/svelte/apps/manager/essences	633
 src/ui/svelte/apps/manager/knowledge	200
 src/ui/svelte/apps/manager/library	59
-src/ui/svelte/apps/manager/recipe	1141
+src/ui/svelte/apps/manager/recipe	1142
 src/ui/svelte/apps/manager/recipe-item	335
 src/ui/svelte/apps/manager/recipes	379
 src/ui/svelte/apps/manager/scoped	9061
