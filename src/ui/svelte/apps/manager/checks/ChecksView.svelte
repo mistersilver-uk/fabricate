@@ -69,7 +69,7 @@
   // `resolutionMode` selects which crafting check editor renders, and the three `craftingCheck*`
   // props are the drafts the manager root owns. Salvage drives the same editors.
   let {
-    // Which activity route is open. Owned by the router, never by this component.
+    // Which activity route is open, owned by the router.
     activity = 'crafting',
     resolutionMode = 'simple',
     alchemyCheckMode = 'none',
@@ -79,8 +79,8 @@
     // The system-level `craftingCheck.consumption` block. Alchemy resolves consumption through
     // its own `consumeOnFail` flag, so these toggles are hidden there.
     craftingConsumption = null,
-    // Salvage's OWN failure consumption. Both defaults are traps, so the store projects them
-    // explicitly rather than letting this component re-derive them.
+    // Salvage's OWN failure consumption, whose defaults are both traps, so the store projects
+    // them explicitly rather than letting this component re-derive them.
     salvageConsumption = null,
     // The FAILURE-RESULT POLICY per activity, the orthogonal produce axis to the consumption
     // toggles, read from the PERSISTED system because it live-persists on select.
@@ -93,7 +93,7 @@
     previewedGatheringTask = null,
     onOpenGatheringTask = () => {},
     // The ONE system-level modifier library, rendered READ-ONLY for every activity and linked to
-    // the one surface that authors it, System settings > Modifiers. Checks owns the SELECTION.
+    // the one surface that authors it. Checks owns the SELECTION.
     modifiers = [],
     // Crafting's own SELECTION over that catalogue, persisted live and rendered for every mode
     // including the ones where the catalogue reaches no roll, which `inertCause` reports.
@@ -109,8 +109,8 @@
     gatheringDefaultModifierPolicy = 'addAll',
     gatheringDefaultModifierIds = [],
     gatheringMaxModifierPicks = null,
-    // The three system-level alchemy flags the engine honours, as live-persisting toggles.
-    // Defaults mirror the manager normalizer (all three ON).
+    // The three system-level alchemy flags the engine honours, as live-persisting toggles,
+    // defaulting as the manager normalizer does.
     alchemyLearnOnCraft = true,
     alchemyConsumeOnFail = true,
     alchemyShowAttemptHistory = true,
@@ -200,8 +200,8 @@
     },
   ];
 
-  // Failure consumption toggle states, read with the manager normalizer's own defaults —
-  // `consumeIngredientsOnFail` ON, `breakToolsOnFail` OFF — so an authored OFF is not inverted.
+  // Failure consumption toggle states, read with the manager normalizer's own defaults, so an
+  // authored OFF is not inverted.
   const consumeIngredientsOnFail = $derived(
     craftingConsumption?.consumeIngredientsOnFail !== false
   );
@@ -227,10 +227,9 @@
   );
   const craftingProgressive = $derived(resolutionMode === 'progressive');
 
-  // Which crafting check this mode actually rolls, and whether it carries an authored formula.
-  // Resolved through the shared five-mode selector rather than a local ternary, a copy of which
-  // had no case for alchemy `none` and reported a slot formula the mode never reaches. Fed from
-  // the DRAFTS, because the GM is editing those formulas on this very route.
+  // Which crafting check this mode actually rolls, and whether it carries an authored formula,
+  // through the shared five-mode selector rather than a local ternary — a copy of which had no
+  // case for alchemy `none`. Fed from the DRAFTS, the GM editing those formulas here.
   const activeCraftingCheck = $derived(
     resolveActiveCraftingCheckFormula({
       resolutionMode,
@@ -278,8 +277,8 @@
       gatheringResolutionMode
     )
   );
-  // Gathering's d100 mode is NOT a `noCheck`: the d100 against each drop's chance IS that mode's
-  // check, with no seam to add modifiers to, so it gets its own cause.
+  // Gathering's d100 mode is NOT a `noCheck`: the d100 against each drop's chance IS that
+  // mode's check, with no seam to add modifiers to, so it gets its own cause.
   const gatheringModifierInertCause = $derived(
     gatheringResolutionMode === 'd100' ? 'noModifierSupport' : inertCauseFor(activeGatheringCheck)
   );
@@ -310,19 +309,19 @@
   const salvageSimple = $derived(
     salvageResolutionMode === 'simple' || salvageResolutionMode === 'alchemy'
   );
-  // The gathering check's shape is the economy's resolution mode: d100 is the fixed roll,
-  // read-only, and progressive/routed are editable.
+  // The gathering check's shape is the economy's resolution mode: d100 is the fixed read-only
+  // roll, and progressive/routed are editable.
   const gatheringD100 = $derived(gatheringResolutionMode === 'd100');
   const gatheringProgressive = $derived(gatheringResolutionMode === 'progressive');
   const gatheringRouted = $derived(gatheringResolutionMode === 'routed');
 
-  // Optional features, and the rail already drops their children, so this route answers only
-  // for the Validation summary. Salvage defaults on, gathering off.
+  // Optional features whose children the rail already drops, so this route answers only for
+  // the Validation summary. Salvage defaults on, gathering off.
   const salvageEnabled = $derived(features?.salvage !== false);
   const gatheringEnabled = $derived(features?.gathering === true);
 
   // Crafting honours the system breakage authority; salvage and gathering do so only under
-  // their feature flag, and otherwise stay `toolSpecific`.
+  // their feature flag.
   const craftingBreakageAuthority = $derived(breakageAuthority);
   const salvageBreakageAuthority = $derived(salvageEnabled ? breakageAuthority : 'toolSpecific');
   const gatheringBreakageAuthority = $derived(
@@ -408,15 +407,15 @@
     return entry ? text(entry[0], entry[1]) : String(mode || '');
   }
 
-  // One group per in-play subsystem, against its own draft and mode. Salvage is omitted when its
-  // feature is off; GATHERING IS NOT OMITTED UNDER d100, validating a selection that reaches no
-  // roll being the one owned path for reporting that.
+  // One group per in-play subsystem, against its own draft and mode. Salvage is omitted when
+  // its feature is off; GATHERING IS NOT OMITTED UNDER d100, validating a selection that
+  // reaches no roll being the one owned path for reporting that.
   const validationSections = $derived.by(() => {
     const list = [
       {
         subsystem: 'crafting',
-        // THE SLOT, not the resolution mode: `resolveActiveCraftingCheckFormula` chooses both
-        // the check handed over and the rules it is evaluated under.
+        // THE SLOT, not the resolution mode: one resolver chooses both the check handed
+        // over and the rules it is evaluated under.
         mode: readinessModeForSlot(activeCraftingCheck.slot),
         // What the GM SELECTED, for display, in the mode picker's OWN words — a different
         // vocabulary from the readiness mode, which would name a mode no editor offers.
@@ -457,7 +456,7 @@
   });
 
   // THE SECTION STRIP. Membership, counts and dots all derive from the SAME readiness pass the
-  // rail badge and the Validation route read, so the three cannot disagree.
+  // rail badge and the Validation route read.
   const SECTION_META = {
     roll: { icon: 'fas fa-dice-d20', labelKey: 'Roll', labelFallback: 'The roll' },
     outcomes: { icon: 'fas fa-code-branch', labelKey: 'Outcomes', labelFallback: 'Outcomes' },
@@ -500,11 +499,11 @@
       (activity === 'gathering' && gatheringRouted)
   );
   // GATHERING `d100` IS THE ONLY INERT ROUTE: alchemy `none` is the OFF state of an optional
-  // check rather than a mode, so it belongs to `routeIsOff` below, which offers the way back.
+  // check rather than a mode, so it belongs to `routeIsOff`, which offers the way back.
   const routeIsInert = $derived(activity === 'gathering' && gatheringD100);
   // The check-OFF state, distinct from INERT: inert is what the MODE does, off is what the GM
-  // chose. The predicate is stated per activity rather than inferred from `optional` alone —
-  // `openspec/specs/ui-integration/spec.md` → "GM Checks Studio" says why.
+  // chose. The predicate is stated per activity for the reason
+  // `openspec/specs/ui-integration/spec.md` → "GM Checks Studio" gives.
   const routeIsOff = $derived.by(() => {
     // ALCHEMY ANSWERS FROM ITS OWN MODE, BEFORE THE ACTIVATION BAG: `activation` defaults to
     // `{}`, and with no crafting state the checks below return false, which dropped an alchemy
@@ -552,13 +551,12 @@
   });
 
   let activeSection = $state('roll');
-  // The last router request honoured, latched by NONCE. Some latch is required or the effect
-  // below drags the strip back the instant the GM clicks anything else; latching on the VALUE is
-  // the mirror defect. `-1` rather than `0`, so a first request carrying nonce 0 still lands.
+  // The last router request honoured, latched by NONCE, or the effect below drags the strip
+  // back the instant the GM clicks anything else; latching on the VALUE is the mirror defect.
+  // `-1` rather than `0`, so a first request carrying nonce 0 still lands.
   let adoptedSectionNonce = $state(-1);
   // A section the current route does not render must not stay selected. A NEW router request
-  // wins where the route offers it, which carries a Validation deep link across its own route
-  // change.
+  // wins where the route offers it, carrying a Validation deep link across its own route change.
   $effect(() => {
     if (activity === 'validation') return;
     if (
@@ -574,7 +572,7 @@
   });
 
   // The Validation rail's "All checks" card: one row per in-play activity, from the SAME pass
-  // the route's groups use, so the rail and the list beside it cannot disagree.
+  // the route's groups use.
   const SUBSYSTEM_ICONS = {
     crafting: 'fas fa-hammer',
     salvage: 'fas fa-recycle',
@@ -607,16 +605,15 @@
     })
   );
 
-  // THE VALIDATION ROW ACTION. This studio's own root, so `focusValidationTarget` resolves a
-  // `data-validation-target` inside THIS route rather than anywhere in the manager window.
+  // THE VALIDATION ROW ACTION: this studio's own root, so `focusValidationTarget` resolves a
+  // `data-validation-target` inside THIS route rather than anywhere in the window.
   let checksRoot = $state(null);
 
-  // WHAT THE LIVE REGION SAYS: the ACTION'S OUTCOME, not a count — a row action changes no
-  // tally, so a count would recite an unchanged number.
+  // WHAT THE LIVE REGION SAYS: the ACTION'S OUTCOME, not a count, a row action changing no tally.
   let issueAnnouncement = $state('');
 
-  // The destination SECTION PANEL, the focus fallback for a route-only row — the majority path
-  // here, most registered issues carrying no control address.
+  // The destination SECTION PANEL, the focus fallback for a route-only row, which is the
+  // majority path here.
   let sectionPanel = $state(null);
 
   /** The activity's own name, from the rail's key, so one word is not spelt two ways. */
@@ -676,10 +673,9 @@
 
   // THE SECTION-LEVEL CALLOUT and THE PANE HEADING, both required by
   // `openspec/specs/ui-integration/spec.md` → "GM Checks Studio". The callout reads the SAME
-  // `activeReadiness` pass the strip's dot is counted from and renders the SAME exported copy
-  // the Validation route renders, so the two cannot describe one issue differently. The pane
-  // heading is keyed on the SECTION, the activity already being named by the rail, the
-  // breadcrumb and the route title; the Outcomes sentence varies with the mode.
+  // `activeReadiness` pass the strip's dot is counted from and renders the SAME exported copy the
+  // Validation route renders. The pane heading is keyed on the SECTION, the activity already being
+  // named by the rail, the breadcrumb and the route title.
   const outcomesLead = $derived.by(() => {
     if (routeIsRouted)
       return text(
@@ -737,18 +733,15 @@
     return entry ? { title: entry[0], lead: entry[1] } : null;
   });
 
-  // WHAT THE FORMULA CARD'S `WHAT ACTUALLY GETS ROLLED` INSET RESTATES. Check modifiers are
-  // added to the roll automatically and never appear in the formula text, so the field a GM
-  // types into is not the expression the engine rolls. Fed from the SAME
-  // `resolveEligibleModifierIds` pass the section strip counts `Modifiers` from.
+  // WHAT THE FORMULA CARD'S `WHAT ACTUALLY GETS ROLLED` INSET RESTATES: check modifiers are added
+  // automatically and never appear in the formula text, so the field a GM types into is not the
+  // expression the engine rolls. Fed from the SAME `resolveEligibleModifierIds` pass the section
+  // strip counts `Modifiers` from.
   //
-  // IT MAPS TO THE VIEW SHAPE, and that is the contract. `CheckFormulaFields` takes
-  // `[{ id, name, icon }]` where a persistence entry carries `label`, so handing the raw entries
-  // through rendered `undefined` into every chip's span — three chips whose whole contribution
-  // was an `aria-hidden` glyph, with no accessible name at all. Mapped HERE rather than by
-  // reading `label` in the component, because the component is presentational and its prop is
-  // the seam. The `|| entry.id` fallback is the catalogue card's own: a label is optional in the
-  // persisted shape, so a chip must still name something.
+  // IT MAPS TO THE VIEW SHAPE, and that is the contract: `CheckFormulaFields` takes
+  // `[{ id, name, icon }]` where a persistence entry carries `label`, so the raw entries rendered
+  // `undefined` into every chip's span. Mapped HERE because the component is presentational and
+  // its prop is the seam, with the catalogue card's own `|| entry.id` fallback.
   const appliedModifiers = $derived.by(() => {
     const context = activeActivity?.modifierContext;
     if (!context) return [];
@@ -761,9 +754,8 @@
     activeActivity ? resolveModifierPolicy(activeActivity.modifierContext) : 'addAll'
   );
 
-  // THE RECORD NOUN: what this activity rolls a check FOR, in the activity's own word.
-  // Hard-coding one activity's noun is how a gathering screen comes to talk about recipes, and
-  // it is localized rather than derived from the route id, because a noun is copy.
+  // THE RECORD NOUN: what this activity rolls a check FOR, in the activity's own word, and
+  // localized rather than derived from the route id, because a noun is copy.
   const RECORD_NOUNS = {
     crafting: ['FABRICATE.Admin.Manager.Checks.RecordNoun.Crafting', 'recipe'],
     salvage: ['FABRICATE.Admin.Manager.Checks.RecordNoun.Salvage', 'salvageable item'],
@@ -774,8 +766,7 @@
     return text(entry[0], entry[1]);
   });
 
-  // The PLURAL of the same noun, sentence-initial: the `always` card's clause begins a
-  // sentence, and the three activities do not pluralize alike.
+  // The PLURAL of the same noun, sentence-initial, and the three do not pluralize alike.
   const RECORD_NOUNS_PLURAL = {
     crafting: ['FABRICATE.Admin.Manager.Checks.RecordNoun.CraftingPlural', 'Recipes'],
     salvage: ['FABRICATE.Admin.Manager.Checks.RecordNoun.SalvagePlural', 'Salvageable items'],
@@ -786,9 +777,9 @@
     return text(entry[0], entry[1]);
   });
 
-  // WHERE THE POLICY HAS NO REACH, and why: neither `routedByIngredients` nor `progressive` has
-  // an outcome tier or a reserved failure group to mark, so a stated reason renders rather than
-  // a control that silently does nothing.
+  // WHERE THE POLICY HAS NO REACH, and why: neither `routedByIngredients` nor `progressive`
+  // has an outcome tier or reserved failure group to mark, so a stated reason renders rather
+  // than a control that silently does nothing.
   const failurePolicyInertNote = $derived.by(() => {
     if (activity === 'gathering') {
       return gatheringD100
@@ -815,8 +806,8 @@
       : '';
   });
 
-  // THE ROLL SECTION'S MODE CALLOUT: the AUTHORED mode in that activity's own vocabulary, for
-  // the reason `routeModeLabel` gives, and on `roll` alone, because it is about A ROLL.
+  // THE ROLL SECTION'S MODE CALLOUT: the AUTHORED mode in that activity's own vocabulary, on
+  // `roll` alone, because it is about A ROLL.
   const calloutMode = $derived.by(() => {
     if (activity === 'salvage') return salvageResolutionMode;
     if (activity === 'gathering') return gatheringResolutionMode;
@@ -834,8 +825,7 @@
   );
 
   // THE SIMULATOR, THE ODDS HISTOGRAM AND THE PREVIEWED RECORD — ONE selection, three readers,
-  // so it lives HERE. Two components holding their own copy is how two surfaces come to
-  // disagree about which record is being previewed.
+  // so it lives HERE; two copies is how two surfaces disagree about which record is previewed.
   let previewActorId = $state(NO_ACTOR_ID);
   let previewRecordId = $state(DEFAULT_RECORD_ID);
   let previewResult = $state(null);
@@ -849,8 +839,8 @@
 
   // THE PROGRESSIVE PREVIEW SANDBOX: a progressive histogram cannot be drawn without an ORDERED
   // list of result difficulties, and that list is SANDBOX STATE ON THE CHECK rather than a
-  // record's, this screen previewing what a CHECK does. Read from the live DRAFT and written
-  // back through the usual update callback; nothing else reads it and the exporter strips it.
+  // record's. Read from the live DRAFT, written back through the usual update callback, read
+  // by nothing else and stripped by the exporter.
   const isProgressive = $derived(activeMode === 'progressive');
   const previewDifficulties = $derived(
     isProgressive && Array.isArray(activeCheck?.preview?.difficulties)
@@ -903,7 +893,7 @@
   );
   const previewFormula = $derived(String(previewPlan.formula ?? '').trim());
   // THE SAME CONTEXT THE RUNNER IS HANDED: it appends the resolved scalar itself, so a
-  // histogram computed without this context describes a formula nothing rolls.
+  // histogram computed without this describes a formula nothing rolls.
   const previewModifier = $derived(previewPlan.args?.craftingModifier ?? null);
 
   const enumeration = $derived(
@@ -913,16 +903,16 @@
           craftingModifier: previewModifier,
         })
   );
-  // `resolved === false` is EXACTLY the unresolved-roll-data refusal, read from the same signal
-  // the enumerability check reads first, so the two can never disagree.
+  // `resolved === false` is EXACTLY the unresolved-roll-data refusal, from the same signal the
+  // enumerability check reads first.
   const previewResolved = $derived(enumeration.reason !== 'unresolved-roll-data');
 
   // The reachable total range the simple check's two-band strip is drawn across; null when the
   // formula is not enumerable, the editor falling back to a window around the DC.
   const previewTrack = $derived.by(() => {
     if (!enumeration.enumerable) return { min: null, max: null };
-    // THE REACHABLE TOTALS, off the enumeration rather than recomputed from a remainder: a
-    // bounded rolling modifier contributes a clamped die, so there is no single remainder.
+    // THE REACHABLE TOTALS, off the enumeration rather than recomputed from a remainder, a
+    // bounded rolling modifier contributing a clamped die.
     const totals = enumeration.outcomes.map((outcome) => outcome.total);
     return { min: Math.min(...totals), max: Math.max(...totals) };
   });

@@ -1,15 +1,13 @@
 /**
  * Checks sub-navigation model: the expandable rail GROUP, mirroring `crafting/craftingNav.js`.
  *
- * `CHECKS_VIEWS` VALUES ARE `data-manager-view` STRINGS, not nav-item ids, and the distinction
- * is load-bearing: `craftingNav.js` declares a nav item `settings` whose view is
- * `crafting-settings`, so a pin written against nav ids would compare the wrong vocabulary.
- * `tests/view-lab-cases.test.js` pins every View Lab `expectView` value beginning `checks`
- * against this array, and `expectView` is matched against `data-manager-view`.
- *
- * The bare `checks` id is deliberately NOT a member — the root never renders it — and is
- * exported separately as {@link CHECKS_REDIRECT_VIEW}, so a deep link still has a defined answer
- * without widening the pinned set to a string no screen shows. Pure and dependency-free.
+ * `CHECKS_VIEWS` VALUES ARE `data-manager-view` STRINGS, not nav-item ids, and the distinction is
+ * load-bearing: `craftingNav.js` declares a nav item `settings` whose view is `crafting-settings`,
+ * so a pin written against nav ids would compare the wrong vocabulary.
+ * `tests/view-lab-cases.test.js` pins every `expectView` value beginning `checks` against this
+ * array, and `expectView` is matched against `data-manager-view`. The bare `checks` id is NOT a
+ * member — the root never renders it — and is exported as {@link CHECKS_REDIRECT_VIEW}, so a
+ * deep link has a defined answer without widening the pinned set. Pure and dependency-free.
  */
 
 /** The retained entry point, landing on the first AVAILABLE child, which depends on the feature
@@ -83,21 +81,19 @@ function countFor(issueCounts, id) {
 
 /**
  * Build the ordered list of visible Checks children. Salvage and gathering are optional FEATURES
- * whose children are dropped when the feature is off; crafting and Validation are always
- * present, so the list is never empty and the `checks` redirect always has a target.
+ * whose children drop when the feature is off; crafting and Validation always render.
  *
  * @param {object} args
  * @param {object} [args.features] Feature flags. `salvage` defaults ON; `gathering` is opt-in.
  * @param {string} [args.resolutionMode] The system's recipe resolution mode.
  * @param {string} [args.salvageResolutionMode] The salvage resolution mode.
- * @param {string} [args.gatheringResolutionMode] The gathering economy's resolution mode. All
- *   three are carried onto their child as `mode`, so a caller reads one shape.
- * @param {Record<string, number>} [args.issueCounts] Per-activity issue counts. Validation's own
- *   is IGNORED if supplied and computed here, being the total of the three.
+ * @param {string} [args.gatheringResolutionMode] The gathering economy's mode. All three are
+ *   carried onto their child as `mode`, so a caller reads one shape.
+ * @param {Record<string, number>} [args.issueCounts] Per-activity counts. Validation's own is
+ *   IGNORED if supplied and computed here, being the total of the three.
  * @param {Record<string, boolean>} [args.dirtyActivities] Per-activity unsaved-edit flags.
- * @returns {Array<{ id: string, view: string, icon: string, labelKey: string,
- *   labelFallback: string, activity: boolean, mode: string, issueCount: number,
- *   dirty: boolean }>}
+ * @returns {Array<{ id: string, view: string, icon: string, labelKey: string, labelFallback:
+ *   string, activity: boolean, mode: string, issueCount: number, dirty: boolean }>}
  */
 export function buildChecksNavItems({
   features = {},

@@ -1,16 +1,15 @@
 <!-- Svelte 5 runes mode -->
 <!--
   RECIPE DIFFICULTY TIERS — named difficulties a record can pick, each with its own DC, used by
-  the simple check in static DC mode and the routed check in relative type only. Controlled:
-  reads `tiers` plus the `defaultDc` that seeds a new one, and emits the next array.
+  the simple check in static DC mode and the routed check in relative type only. Controlled.
 
   IT IS A LIST OF ROWS in the same shape the Outcomes screen draws its outcome tiers, rendering
   the SAME `.manager-checks-tier-*` contract as `CraftingCheckEditor`; the column-header row goes
   with the table, one text field and one number needing none once labelled.
 
-  THE HANDLE DRAGS, a handle that does not reorder being a promise the surface does not keep, and
-  the order is real. The grip is ALSO a real BUTTON that moves its row with the arrow keys, HTML5
-  drag-and-drop having no keyboard path: one affordance answers both inputs.
+  THE HANDLE DRAGS, a handle that does not reorder being a promise the surface does not keep. The
+  grip is ALSO a real BUTTON that moves its row with the arrow keys, HTML5 drag-and-drop having
+  no keyboard path: one affordance answers both inputs.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';

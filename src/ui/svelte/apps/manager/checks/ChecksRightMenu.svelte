@@ -5,18 +5,15 @@
   Checks Studio".
 
   THE ACTIVATION CARD HAS NO HEADING, where every other section is named by a flat kicker: the
-  CARD is the statement, and an `ACTIVE` kicker above a card reading `On` says it twice.
-  STRUCTURE IS FLAT HEADINGS WITH CARDS BENEATH, each an optional right-aligned adjunct after
-  the kicker; no card wraps a section and no panel is a disclosure. THE DIGEST AND THE
-  ALL-CHECKS LIST ARE ONE CARD OF COMPACT ROWS whose chevron OPENS the section it describes,
-  through the same `onOpen` deep link the Validation issues use — so a row stating an ABSENCE
-  carries neither chevron nor target.
+  CARD is the statement, and an `ACTIVE` kicker above a card reading `On` says it twice. THE
+  DIGEST AND THE ALL-CHECKS LIST ARE ONE CARD OF COMPACT ROWS whose chevron OPENS the section it
+  describes, so a row stating an ABSENCE carries neither chevron nor target.
 
   RESPONSIVE BEHAVIOUR REUSES THE SHIPPED CONTAINER LADDER in `styles/fabricate.css` and adds no
-  breakpoint. At ≤1120 the shipped rule restacks `.manager-body` to one column with
-  `grid-auto-rows: max-content`; the rail's own `overflow-y`/`max-height` are LEFT ALONE, the
-  bound resolving to the region's own content height there. The real constraint is narrower than
-  "do not self-scroll": give no `.manager-body` child a DEFINITE height.
+  breakpoint. The rail's own `overflow-y`/`max-height` are LEFT ALONE under the ≤1120 restack,
+  the bound resolving to the region's own content height against a `max-content` track. The real
+  constraint is narrower than "do not self-scroll": give no `.manager-body` child a DEFINITE
+  height.
 -->
 <script>
   import Field from '../../../components/Field.svelte';
@@ -84,19 +81,14 @@
   const showActiveToggle = $derived(
     activeTab === 'gathering' ? !gatheringD100 : activation?.optional === true
   );
-  // THE LOCKED TOGGLE ALWAYS READS ON, with no exception, because every mode that hides the
-  // switch runs its check (`openspec/specs/ui-integration/spec.md` → "GM Checks Studio").
-  // Alchemy `checkMode: 'none'` is not one of them: it reports `optional: true` with
-  // `enabled: false` and renders the LIVE switch in its off position, because a GM looking at a
-  // check that is off needs the control that turns it back on.
+  // THE LOCKED TOGGLE ALWAYS READS ON, with no exception, every mode that hides the switch
+  // running its check (`openspec/specs/ui-integration/spec.md` → "GM Checks Studio"). Alchemy
+  // `checkMode: 'none'` is not one: it reports `optional: true` with `enabled: false` and renders
+  // the LIVE switch off, a GM looking at a check that is off needing the control that turns it on.
   //
-  // Reading this from the MODE rather than from `activation.enabled` is deliberate: a mandatory
-  // check runs whatever the persisted flag says, so a locked OFF beside a check the engine rolls
-  // would be a worse lie than no state. There is therefore no `lockedOn` flag and no off branch
-  // behind it — a constant fed into a ternary is a condition with one reachable arm.
-  //
-  // ONE VOCABULARY, and `onLabel` is the single source both slots read, so the live switch and
-  // the locked indicator can never speak differently.
+  // Reading this from the MODE rather than `activation.enabled` is deliberate: a mandatory check
+  // runs whatever the persisted flag says. There is therefore no `lockedOn` flag and no off branch
+  // behind it, and `onLabel` is the single source both slots read.
   const lockedLabel = $derived(
     `${onLabel} — ${text('FABRICATE.Admin.Manager.Checks.Active.LockedSuffix', 'locked by the resolution mode')}`
   );

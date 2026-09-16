@@ -1,15 +1,14 @@
 /**
  * The Checks Studio's outcome-preview simulator. IT DRIVES THE ENGINE'S OWN RUNNERS AND
- * REIMPLEMENTS NO RESOLUTION: a preview that disagreed with the engine about which tier a roll
- * lands on would be worse than no preview, so tier matching, forced outcomes and tier stepping
- * have one implementation, in `src/systems/checkRoll.js`.
+ * REIMPLEMENTS NO RESOLUTION: a preview that disagreed about which tier a roll lands on would be
+ * worse than no preview, so tier matching, forced outcomes and tier stepping have one
+ * implementation, in `src/systems/checkRoll.js`.
  *
  * What it must NOT do — mutate, post, prompt or execute a DC macro — is stated in
- * `openspec/specs/ui-integration/spec.md` → "Outcome-preview simulator". Two mechanisms carry it:
- * `rollOptions: null`, which the runners SPREAD into the options bag so the chat post's
- * `options?.interactive` gate and `allowInteractive: false` both hold; and never writing to
- * `Actor#getRollData()`'s LIVE `system` object, {@link cloneRollData} existing for a caller that
- * needs to augment it.
+ * `openspec/specs/ui-integration/spec.md` → "Outcome-preview simulator". Two mechanisms carry
+ * it: `rollOptions: null`, which the runners SPREAD so the chat post's `options?.interactive`
+ * gate and `allowInteractive: false` both hold; and never writing to the LIVE `system` object
+ * `Actor#getRollData()` returns, {@link cloneRollData} existing for a caller that must augment it.
  */
 
 import { isPlayerCharacterActor } from '../../../../../config/playerCharacterTypes.js';
@@ -38,7 +37,7 @@ const RUNNER_KINDS = new Map([
  * The world's PLAYER-CHARACTER actors. THIS LIST IS FILTERED: authority is not the question a
  * preview picker answers — the question is WHO A CHECK IS PREVIEWED AGAINST, and a real world's
  * actor directory is mostly bestiary. Membership is the shared, GM-CONFIGURABLE predicate that
- * already serves the actor-selection bar and the stamina, Access and Knowledge rosters. Both
+ * already serves the actor-selection bar and the stamina, Access and Knowledge rosters, and both
  * seams are injected so the list is testable without a `game`.
  *
  * @param {object} [options] Options.
@@ -97,8 +96,8 @@ export function cloneRollData(actor) {
  * The records a check can be previewed AGAINST: whatever supplies the DC, which for a simple or
  * relative-routed check is its OWN authored recipe tiers, the default DC always offered first. A
  * FIXED routed check's bands are the same for every record and the selector still lists them,
- * the readout and the "What happens" rows being per-record. A RECORD SUPPLIES A DC AND NOTHING
- * ELSE: a progressive check has none, its award count coming from the check's preview sandbox.
+ * the readout being per-record. A RECORD SUPPLIES A DC AND NOTHING ELSE: a progressive check has
+ * none, its award count coming from the check's preview sandbox.
  *
  * @param {object} params Params.
  * @param {object|null} params.check The active check draft.
@@ -134,12 +133,11 @@ export function buildPreviewRecords({ check, defaultLabel = 'Default' }) {
  * @param {'simple'|'routed'|'progressive'} params.mode The readiness mode.
  * @param {object|null} params.draft The active check draft.
  * @param {object|null} params.system The draft system, for the modifier context.
- * @param {object|null} [params.subject] The modifier context's subject; always null here, the
- *   Studio validating the SYSTEM's selection.
+ * @param {object|null} [params.subject] The modifier context's subject; always null here.
  * @param {object|null} [params.actor] The previewed actor, or null for "No actor".
  * @param {object|null} [params.record] The previewed record.
  * @param {Array<{value: number, label: string}>} [params.toolTerms] Tool contributions, which
- *   gathering has no seam for and which a preview never populates.
+ *   gathering has no seam for and a preview never populates.
  * @returns {{kind: 'passFail'|'routed'|'progressive'|null, formula: string, dc: number,
  *   dynamicDc: boolean, actor: object|null, args: object}} `kind: null` means nothing rolls.
  */

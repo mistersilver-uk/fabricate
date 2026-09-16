@@ -1,15 +1,13 @@
 /**
- * The ONE set of sentences the Checks Studio uses to describe a readiness result.
- *
- * A section's warning dot is explained IN the panel by a `Callout`, and a dot whose sentence is
- * a second copy of the Validation route's is how one issue comes to be described two different
- * ways on two screens a single click apart.
+ * The ONE set of sentences the Checks Studio uses to describe a readiness result. A section's
+ * warning dot is explained IN the panel by a `Callout`, and a dot whose sentence is a second
+ * copy of the Validation route's is how one issue comes to be described two ways on two screens
+ * a click apart.
  *
  * Each entry is `[localizationSuffix, englishFallback]`, resolved against the shared
- * `FABRICATE.Admin.Manager.Checks.Validation.` namespace by {@link checkIssueCopy} /
- * {@link checkTickCopy}; the components keep their own `text()` bridge, so this module stays
- * pure. The issue map is PROVEN EXHAUSTIVE against `CHECK_READINESS_ISSUE_IDS` by
- * `tests/checks-readiness.test.js`, in both directions.
+ * `FABRICATE.Admin.Manager.Checks.Validation.` namespace, so this module stays pure. The issue
+ * map is PROVEN EXHAUSTIVE against `CHECK_READINESS_ISSUE_IDS` in both directions by
+ * `tests/checks-readiness.test.js`.
  */
 
 /** The satisfied/unsatisfied TICKS a check reports. */
@@ -125,8 +123,7 @@ export function checkTickCopy(id) {
  * Interpolate `{name}` placeholders into an already-resolved sentence. Foundry's `i18n.format`
  * does this for a LOCALIZED string, but the fallbacks above are module constants that never
  * reach it, so a world with no `lang/` entry would render a literal `{names}`. Deliberately the
- * same `{key}` syntax Foundry uses, so one sentence serves both paths, and it lives here rather
- * than in the two components that need it. A sentence with no placeholders returns unchanged.
+ * same `{key}` syntax Foundry uses, and here rather than in the two components that need it.
  *
  * @param {string} sentence The resolved sentence.
  * @param {object} [data] Interpolation values.

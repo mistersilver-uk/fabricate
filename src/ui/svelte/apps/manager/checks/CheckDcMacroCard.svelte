@@ -4,14 +4,11 @@
   shared because the ROUTED check carries `dcMode`/`macroUuid` too: two copies would be two
   chances to drift on the one sentence telling a GM what their macro receives.
 
-  The macro receives the ANCHOR DC — the record's selected tier, or the static default —
-  alongside the ingredients, the record, the system and the actor, and returns the final number,
-  so tiers and the macro COMPOSE and the tier list is NOT hidden under dynamic. A macro that
-  throws, returns a non-number or is missing falls back to the anchor and never throws mid-craft:
-  a throw inside the engine is a CONSUMING failure, so this card's copy promises what
-  `CraftingEngine._resolveSimpleCheckDc` guarantees.
-
-  Props: macroUuid, the linked macro or null; onChange(patch), merged by the parent.
+  The macro receives the ANCHOR DC alongside the ingredients, the record, the system and the
+  actor, and returns the final number, so tiers and the macro COMPOSE and the tier list is NOT
+  hidden under dynamic. One that throws, returns a non-number or is missing falls back to the
+  anchor and never throws mid-craft: a throw inside the engine is a CONSUMING failure, so this
+  card's copy promises what `CraftingEngine._resolveSimpleCheckDc` guarantees.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';

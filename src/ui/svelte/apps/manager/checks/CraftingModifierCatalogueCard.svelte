@@ -5,15 +5,15 @@
   A crafting system defines ONE named modifier library, authored in ONE place, which this card
   deep-links to. THIS CARD AUTHORS NO ENTRY, ON ANY ACTIVITY: two editors for one array is how
   two screens come to disagree about which wrote last. What stays is the SELECTION — the
-  COMBINATION RULE, the PICK CAP (where ABSENT is a real value meaning unlimited) and the
-  DEFAULT ELIGIBLE SET — with `MODIFIER_POLICIES` and `policyDefersSelection` in the resolver as
-  the sources for the rule list, its order and which two rules defer.
+  COMBINATION RULE, the PICK CAP (where ABSENT means unlimited) and the DEFAULT ELIGIBLE SET —
+  with `MODIFIER_POLICIES` and `policyDefersSelection` as the sources for the rule list, its
+  order and which two rules defer.
 
   The two cards, the six-label eligibility vocabulary, where the rule-keyed description sits, the
   reflow and the single empty-library sentence are required by
   `openspec/specs/ui-integration/spec.md` → "Checks studio — combination rule and pick cap".
   Rendered for every sub-tab, INCLUDING those where the library reaches no roll, which is the
-  defect this card must report rather than hide. Controlled, and it emits no library patch.
+  defect this card reports rather than hides. Controlled, and it emits no library patch.
 -->
 <script>
   import Field from '../../../components/Field.svelte';
@@ -585,21 +585,17 @@
 
 <style>
   /* The card is its OWN container-query context. The shipped `@container (max-width: 620px)` rule
-       that reflows a `.is-config-cards` radio grid is UNNAMED, so it resolves against the NEAREST
+       that reflows a `.is-config-cards` radio grid is UNNAMED, so it resolved against the NEAREST
        container — the whole `fabricate-manager` shell — and fired only when the entire manager was
-       narrow. Declaring the container here makes it measure this card.
+       narrow.
 
        `:global()` AND ANCHORED ON THE TWO CARDS' OWN HOOKS: both cards are `<InspectorCard>`s, so
        `manager-inspector-card` is written by that primitive and a scoped rule stopped matching —
-       SILENTLY, because an `<i class={…}>` in this component makes every class selector in the
-       block possibly-matching, so it was emitted with the hash attached and `lint:svelte:warnings`
-       reported nothing. Measured against Svelte 5.56.3: a REGULAR element carrying a spread or an
-       expression `class` does that, and the same attribute on a COMPONENT tag does not.
-
-       Anchored on the two `data-` hooks rather than the `.manager-checks-card` modifier the cards
-       share, because that modifier has eleven other sites and `container-type` creates a
-       containment context rather than painting — widening it would re-point every unnamed
-       `@container` query inside all of them. Each half stays at (0,2,0). */
+       SILENTLY, because an `<i class={…}>` here makes every class selector in the block
+       possibly-matching, so it was emitted with the hash attached and `lint:svelte:warnings`
+       reported nothing. Anchored on the two `data-` hooks rather than the `.manager-checks-card`
+       modifier the cards share, because that has eleven other sites and `container-type` creates a
+       containment context rather than painting. Each half stays at (0,2,0). */
   :global(.manager-inspector-card[data-crafting-modifier-catalogue]),
   :global(.manager-inspector-card[data-crafting-modifier-policy-card]) {
     container-type: inline-size;

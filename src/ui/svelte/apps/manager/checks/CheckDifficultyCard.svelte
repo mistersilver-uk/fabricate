@@ -5,13 +5,9 @@
   against"; the second question inside the first card reads as part of the formula.
 
   `showDcSource` IS A MODEL FACT, NOT A PREFERENCE: the static/dynamic chooser writes `dcMode`
-  and `macroUuid`, and only the SIMPLE check slot carries those fields, so a routed check gets
-  the same card with `BASE DC` and `COMPARISON` alone rather than a chooser that cannot choose.
-  The record noun is a PROP, hard-coding one activity's word being how a gathering screen comes
-  to talk about recipes.
-
-  Props: dc / thresholdMode, the authored values; dcMode / showDcSource, the chooser;
-  recordNoun; onChange(patch), merged by the parent into the whole check.
+  and `macroUuid`, which only the SIMPLE check slot carries, so a routed check gets the same card
+  with `BASE DC` and `COMPARISON` alone rather than a chooser that cannot choose. The record noun
+  is a PROP, hard-coding one activity's word being how a gathering screen talks about recipes.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';

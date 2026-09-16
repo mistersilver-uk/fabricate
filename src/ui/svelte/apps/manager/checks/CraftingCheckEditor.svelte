@@ -5,11 +5,10 @@
   A routed crafting check has a TYPE (relative or fixed), a roll FORMULA with a default DC and
   comparison shared with the simple check, the unified `CheckTriggers` editor, and a table of
   OUTCOME TIERS — relative tiers as offsets from the record's DC, fixed tiers owning a
-  non-overlapping segment of the value range. Every outcome has a name, a generated secret id, a
-  success toggle and, under `checkDriven`, a break-tools toggle, and BOTH the relative DC and the
-  fixed start/end are kept on each, so switching type destroys neither.
+  non-overlapping segment of the value range. BOTH the relative DC and the fixed start/end are
+  kept on each outcome, so switching type destroys neither, and each also carries a name, a
+  generated secret id, a success toggle and, under `checkDriven`, a break-tools toggle.
 
-  It reuses the shared check sub-components so routed and simple stay structurally identical.
   Controlled; range parsing lives in `utils/craftingCheckExpression.js`.
 -->
 <script>
@@ -29,17 +28,15 @@
   import InspectorCard from '../../../components/InspectorCard.svelte';
 
   // `showTiers` (default true) renders the per-recipe tier table, relative type only;
-  // salvage/gathering reuse this editor with `showTiers={false}`, having no recipes to pick a
-  // tier from. `breakageAuthority` gates the per-outcome break-tools pills on `checkDriven`,
-  // tool breakage being a check-driven concept. `resolutionMode` is the SYSTEM crafting
-  // resolution mode, passed only by the crafting-tab instance, and it scopes the fixed-type DC
-  // hiding to `routedByCheck + fixed`; the salvage and gathering instances omit it entirely.
-  // `section` selects which of this editor's cards render, so the Checks Studio's five-section
-  // strip hosts the SAME editor rather than a per-section fork, and empty renders every card.
+  // salvage/gathering reuse this editor with it off, having no records to pick a tier from.
+  // `breakageAuthority` gates the per-outcome break-tools pills on `checkDriven`. `resolutionMode`
+  // is the SYSTEM crafting mode, passed only by the crafting-tab instance, and scopes the
+  // fixed-type DC hiding to `routedByCheck + fixed`. `section` selects which cards render, so the
+  // studio's strip hosts the SAME editor rather than a per-section fork.
   //
-  // `previewLabel` names the record the bands are drawn against. ONE selection, not two: the
-  // strip and the simulator's readout beside it must never describe different records, so the
-  // state is the route's and this control reports upward.
+  // `previewLabel` names the record the bands are drawn against. ONE selection, not two: the strip
+  // and the simulator's readout must never describe different records, so the state is the
+  // route's and this control reports upward.
   let {
     value = null,
     showTiers = true,
@@ -68,16 +65,15 @@
   const checkDriven = $derived(breakageAuthority === 'checkDriven');
   const shows = (id) => !section || section === id;
   // THE ONE CONDITION under which this check has no anchor. A `routedByCheck` check of `fixed`
-  // type matches a roll against ABSOLUTE value ranges, so there is no DC to meet, to exceed or
-  // for a record's difficulty tier to move, and three surfaces are withheld together for that
-  // one reason: the `Difficulty` card, the recipe difficulty tier list and `PREVIEW AGAINST`.
+  // type matches a roll against ABSOLUTE value ranges, so there is no DC to meet, to exceed or for
+  // a record's difficulty tier to move, and three surfaces are withheld together for that reason:
+  // the `Difficulty` card, the tier list and `PREVIEW AGAINST`.
   //
   // BOTH HALVES ARE LOAD-BEARING, and the gate is NAMED rather than spelled out at three call
-  // sites so it cannot drift into three slightly different conditions. `fixed` alone is not
-  // enough — salvage and gathering reuse this editor with no system resolution mode and their
-  // fixed checks keep a DC — and `routedByCheck` alone is not either, a relative routed check
-  // being DEFINED by its DC. `tests/components/crafting-check-anchor-gate.test.js` pins all
-  // four corners, so narrowing or widening it fails rather than shipping.
+  // sites. `fixed` alone is not enough — salvage and gathering reuse this editor with no system
+  // resolution mode and their fixed checks keep a DC — and `routedByCheck` alone is not either, a
+  // relative routed check being DEFINED by its DC.
+  // `tests/components/crafting-check-anchor-gate.test.js` pins all four corners.
   const bandsAreAbsolute = $derived(resolutionMode === 'routedByCheck' && type === 'fixed');
   // Outcome options for the `CheckTriggers` outcomeTier condition, from the ACTIVE list.
   const breakageOutcomeOptions = $derived(
@@ -184,27 +180,21 @@
     return !!conflicts && (conflicts.overlapping.has(index) || conflicts.invalid.has(index));
   }
 
-  // THE BAND STRIP is a VISUALISATION of the tier list; the steppers in the rows stay the
-  // control of record. Bands are handed over in ABSOLUTE track values whatever the type
-  // underneath, relative offsets resolved against the previewed DC here, a strip reading two
-  // authored shapes being two components wearing one name. Band identity is a THEME TOKEN
-  // rather than a persisted colour, and the `color` prop takes the value verbatim.
+  // THE BAND STRIP is a VISUALISATION of the tier list; the steppers stay the control of record.
+  // Bands are handed over in ABSOLUTE track values whatever the type underneath, a strip reading
+  // two authored shapes being two components wearing one name, and band identity is a THEME TOKEN.
   //
   // FIVE HUES, WALKED BY POSITION IN VALUE ORDER, and NOT by the `success` flag: a flag has two
   // values, so a flag-derived colour paints two of a five-tier check's bands identically, and
-  // ranking WITHIN each family reads worse still — a lone failure tier takes its family's
-  // strongest tone, putting the darkest band in the MIDDLE. One ramp across the whole list is
-  // what makes the strip read as escalating, and it need not restate the success/failure split
-  // that every tier row's own pill already carries.
+  // ranking WITHIN each family puts the darkest band in the MIDDLE. One ramp is what makes the
+  // strip read as escalating, and every tier row's own pill already carries the success split.
   //
-  // PREVIEW AGAINST is the record the bands are DRAWN against, in their own card; the rail's
-  // separate "Preview as" chooses an ACTOR. NEVER PERSISTED — choosing a record to look at is not
-  // an edit — but not LOCAL either where a route owns it, the rail's simulator and histogram
-  // reading the SAME record. A route supplying `previewRecords` is the authority and this control
-  // reports upward; otherwise the local fallback below keeps it live, and exactly one is read.
-  //
-  // WITHHELD ONLY WHERE THE BANDS HAVE NO ANCHOR — `bandsAreAbsolute` — a control offering to
-  // re-anchor absolute roll values being a promise the model cannot keep.
+  // PREVIEW AGAINST is the record the bands are DRAWN against, where the rail's "Preview as"
+  // chooses an ACTOR. NEVER PERSISTED, but not LOCAL either where a route owns it, the rail's
+  // simulator and histogram reading the SAME record; a route supplying `previewRecords` is the
+  // authority, otherwise the local fallback keeps it live. WITHHELD ONLY WHERE THE BANDS HAVE NO
+  // ANCHOR — `bandsAreAbsolute` — a control re-anchoring absolute roll values promising what the
+  // model cannot keep.
   let localPreviewRecordId = $state('');
   const recipeTiers = $derived(Array.isArray(value?.tiers) ? value.tiers : []);
   const routeOwnsPreview = $derived(previewRecords.length > 0);
@@ -261,16 +251,13 @@
   ]);
 
   // THE RAMP IS BOUNDED BY THE BAND NAME'S CONTRAST, and is mixed into an OPAQUE base for that
-  // reason: each band carries its tier's NAME as normal-size text, so WCAG AA wants 4.5:1
-  // against whatever the band paints, and mixing into a TRANSLUCENT surface token makes the mix
-  // percentage double as an opacity — the fill lightened as the ramp climbed and the ink fell to
-  // 1.74:1. Mixed into `--fab-bg-0` the painted colour is a pure function of the theme's tokens,
-  // which is what makes any claim about it measurable.
+  // reason: each band carries its tier's NAME as normal-size text, so WCAG AA wants 4.5:1, and
+  // mixing into a TRANSLUCENT surface token makes the mix percentage double as an opacity — the
+  // fill lightening as the ramp climbs and the ink falling to 1.74:1.
   //
-  // Each tone brings its OWN ink rather than one `--fab-text` for the whole strip, and that is
-  // what buys the headroom: a single ink holds every band under one luminance ceiling. Measured
-  // across all five tones, all seven palettes and every band count the floor is 7.12:1 — see the
-  // AA gate in tests/components/manager-layout.test.js.
+  // Each tone brings its OWN ink rather than one `--fab-text` for the whole strip, which is what
+  // buys the headroom. Measured across all five tones, all seven palettes and every band count the
+  // floor is 7.12:1 — see the AA gate in tests/components/manager-layout.test.js.
   const BAND_TONES = ['danger', 'warning', 'success', 'info', 'accent'];
   const BAND_TONE_MIX = 26;
   const BAND_TONE_BASE = 'var(--fab-bg-0)';

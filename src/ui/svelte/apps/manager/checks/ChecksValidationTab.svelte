@@ -66,16 +66,12 @@
    * formula field and the Difficulty card, and only the field is ever the offender. A row's
    * `target` is the ROUTE, resolved through `CHECK_ISSUE_SECTIONS`.
    *
-   * ROUTE-ONLY IS A STATED OUTCOME, NEVER A SILENT ONE: a row with no entry here still renders a
-   * View button and changes route, simply focusing nothing, and the mounted suite asserts which
-   * of the two shapes a row is. Most ids are route-only, for three reasons — an Outcomes issue
-   * is about one tier among several authored INLINE with no id on the row; a bounds or
-   * expression fault is one catalogue row and the issue NAMES the entries itself; and the three
-   * inert-selection issues have their remedy in the mode or the formula.
-   *
-   * The two addresses are `checks-roll-formula` (the formula input) and `checks-triggers` (the
-   * trigger LIST, a SET-level destination: both trigger issues are about the tier targets across
-   * the whole list, and each trigger's own tier control sits inside a collapsed disclosure).
+   * ROUTE-ONLY IS A STATED OUTCOME, NEVER A SILENT ONE: such a row still renders a View button
+   * and changes route, focusing nothing, and the mounted suite asserts which shape a row is.
+   * Most ids are route-only — an Outcomes issue is about one tier among several authored INLINE
+   * with no id on the row, a bounds or expression fault NAMES the entries itself, and an
+   * inert-selection issue's remedy is the mode or the formula. The two addresses are
+   * `checks-roll-formula` and the SET-level `checks-triggers`.
    *
    * @type {Readonly<Record<string, string>>}
    */

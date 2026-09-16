@@ -2,17 +2,15 @@
 <!--
   Unified per-check trigger editor. One trigger list per check, ALWAYS rendered, each pairing an
   expressive dice-matching CONDITION with three effects: `outcome` forces an automatic success or
-  failure under BOTH breakage authorities; `breakTools` breaks every required tool and is
-  authored and applied ONLY under `checkDriven`; and `tierStep` moves the rolled outcome tier,
-  routed only and deliberately NOT gated on `showBreakTools`, stepping not being a breakage
-  concept.
+  failure under BOTH breakage authorities; `breakTools` is authored and applied ONLY under
+  `checkDriven`; and `tierStep` moves the rolled outcome tier, routed only and deliberately NOT
+  gated on `showBreakTools`, stepping not being a breakage concept.
 
   An `outcomeTier` condition cannot force an outcome — the routed tier resolves AFTER the forced
   outcome would run — so its outcome segments are pinned to No effect and disabled. It CAN step.
 
-  Controlled: reads the `{ triggers[] }` block plus the roll formula and emits the next block.
-  Dice groups come from `parseDiceGroups`, so a `diceGroup` trigger targets a group by its
-  evaluated-term index, and `kind` selects which condition types are offered.
+  Controlled. Dice groups come from `parseDiceGroups`, so a `diceGroup` trigger targets a group
+  by its evaluated-term index, and `kind` selects which condition types are offered.
 -->
 <script>
   import Field from '../../../components/Field.svelte';

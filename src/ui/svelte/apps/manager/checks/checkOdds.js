@@ -1,22 +1,16 @@
 /**
- * The Checks Studio's per-outcome odds enumerator. There is nothing random here: a check whose
- * formula is ONE unmodified single die plus a deterministic remainder has a finite outcome
- * space, so the histogram ENUMERATES that die's faces and buckets each one through the SAME
- * classifier the engine resolves a real roll with. No sampling, no second model of a tier.
+ * The Checks Studio's per-outcome odds enumerator. Nothing here is random: a formula that is ONE
+ * unmodified single die plus a deterministic remainder has a finite outcome space, so the
+ * histogram ENUMERATES that die's faces and buckets each through the SAME classifier the engine
+ * resolves a real roll with.
  *
- * The POSITIVE WHITELIST over `Roll.parse` that decides enumerability, the formulas a string
- * scan would wrongly admit, and the three properties of `Roll.parse` handled below rather than
- * assumed are stated in `openspec/specs/ui-integration/spec.md` → "Per-outcome odds histogram";
- * the numbered references in this file are to that list. In short: (1) `Roll.parse` THROWS on a
- * mid-edit formula, so a thrown parse is a not-enumerable OUTCOME; (2) its `missing: "0"` hides
- * an unresolved `@` key, so the refusal reads `resolved === false` rather than the parse; and
- * (3) determinism must RECURSE, `flattenTree` pushing a parenthetical, function or pool term
- * WHOLE, while `StringTerm#isDeterministic` LIES and is refused explicitly.
- *
- * Every refusal carries a discriminated REASON CODE, so a predicate implemented as
- * `return false` is distinguishable from a correct one. `Roll` is a parameter defaulting to
- * `globalThis.Roll`, and a missing or throwing `parse` yields the not-enumerable result rather
- * than an escaped exception, which keeps a View Lab capture run from failing on this panel.
+ * The POSITIVE WHITELIST over `Roll.parse` that decides enumerability and the three properties
+ * handled below rather than assumed are stated in `openspec/specs/ui-integration/spec.md` →
+ * "Per-outcome odds histogram", which this file's numbered references are to: (1) `Roll.parse`
+ * THROWS on a mid-edit formula; (2) its `missing: "0"` hides an unresolved `@` key, so the
+ * refusal reads `resolved === false`; (3) determinism must RECURSE, and
+ * `StringTerm#isDeterministic` LIES. Every refusal carries a discriminated REASON CODE, and
+ * `Roll` is a parameter, so a missing or throwing `parse` is a result rather than an exception.
  */
 
 import {
@@ -112,11 +106,11 @@ function refuseRemainder(terms) {
 /**
  * The dice this formula rolls, in READING ORDER, or the reason it cannot be enumerated.
  *
- * IT DOES NOT SCAN THE STRING FOR `NdS`, and that is the whole point: such a scan hands back a
- * clamp's BOUND ARGUMENTS as though they were flat addends, and the histogram it draws is
- * monotone, correctly shaped, plausibly labelled and wrong. So the dice are found by the SAME
- * recursive-descent reader that reduces the expression, which knows a function argument from a
- * top-level addend because it parsed both, and which asserts END OF INPUT.
+ * IT DOES NOT SCAN THE STRING FOR `NdS`: such a scan hands back a clamp's BOUND ARGUMENTS as
+ * though they were flat addends, and the histogram it draws is monotone, correctly shaped,
+ * plausibly labelled and wrong. So the dice are found by the SAME recursive-descent reader that
+ * reduces the expression, which knows a function argument from a top-level addend because it
+ * parsed both, and which asserts END OF INPUT.
  *
  * @param {string} display The `@`-resolved formula, flavour and all.
  * @returns {{dice: Array<{faces: number}>} | {enumerable: false, reason: string}} The plan.
@@ -185,18 +179,15 @@ function enumerateOutcomes(display, dice) {
  * Decide whether a formula's outcome space can be enumerated for a previewed actor.
  *
  * IT ENUMERATES THE FORMULA THE RUNNER WILL ACTUALLY ROLL, not the one the GM authored:
- * `evaluateCheckRoll` appends the check-modifier scalar itself, so a histogram built on the
- * authored string spans `1..20` while the readout beside it rolls `5..24`. So the context IS a
- * parameter and the append is {@link resolveRolledFormula}, the SAME derivation the engine uses;
- * there is no double application, the appended string being resolved for DISPLAY with the
- * context omitted.
+ * `evaluateCheckRoll` appends the check-modifier scalar itself, so a histogram on the authored
+ * string spans `1..20` while the readout beside it rolls `5..24`. So the context IS a parameter
+ * and the append is {@link resolveRolledFormula}, with no double application.
  *
  * @param {string} formula The AUTHORED preview formula.
  * @param {object|null} actor The previewed actor, or null for "No actor".
  * @param {object} [options] Options.
  * @param {*} [options.Roll] The `Roll` class; defaults to `globalThis.Roll`.
- * @param {object|null} [options.craftingModifier] The check-modifier context the runner is being
- *   handed. Omit only where the runner is handed none.
+ * @param {object|null} [options.craftingModifier] The check-modifier context, where there is one.
  * @returns {{enumerable: true, faces: number, remainder: number, display: string}
  *   | {enumerable: false, reason: string}} The verdict.
  */
@@ -266,8 +257,7 @@ export function describeFormulaEnumerability(
  * The per-assignment dice bag, built through the PRODUCTION code path: a bag that omits
  * `results` or spells `group` differently makes every natural-20 trigger silently invisible to
  * the histogram while STILL matching a hand-computed distribution for a trigger-free check.
- * EVERY die is in it, a rolling modifier's included, because modifier terms are APPENDED and the
- * authored dice keep their group ids.
+ * EVERY die is in it, modifier terms being APPENDED and the authored dice keeping their group ids.
  *
  * @param {Array<{faces: number}>} dice The dice, in reading order.
  * @param {Array<number>} assignment The face each die shows.
@@ -335,8 +325,8 @@ export function enumerateRoutedOdds({ outcomes, args }) {
  * @param {object} params Params.
  * @param {Array<{total: number, diceGroups: Array<object>}>} params.outcomes The outcome space.
  * @param {object} params.args `{ dc, comparison, triggers }`.
- * @returns {Array<{id: string, name: string, success: boolean, count: number,
- *   percent: number}>} At most two buckets, failure first, zero-probability omitted.
+ * @returns {Array<{id: string, name: string, success: boolean, count: number, percent: number}>}
+ *   At most two buckets, failure first, zero-probability omitted.
  */
 export function enumeratePassFailOdds({ outcomes, args }) {
   const tally = { failure: 0, success: 0 };
@@ -361,17 +351,17 @@ export function enumeratePassFailOdds({ outcomes, args }) {
 }
 
 /**
- * Bucket every enumerated outcome of a progressive check by AWARD COUNT. A progressive check has
- * no tiers to land on: its total is a budget spent down an ordered list of result difficulties,
- * and the spend is {@link resolveProgressiveAward}, the same loop all three activities award
- * through. An outcome that awards nothing IS listed; a count no outcome can reach is omitted.
+ * Bucket every enumerated outcome of a progressive check by AWARD COUNT: its total is a budget
+ * spent down an ordered list of result difficulties, and the spend is
+ * {@link resolveProgressiveAward}, the same loop all three activities award through. An outcome
+ * that awards nothing IS listed; a count no outcome can reach is omitted.
  *
  * @param {object} params Params.
  * @param {Array<{total: number, diceGroups: Array<object>}>} params.outcomes The outcome space.
  * @param {Array<number>} params.difficulties The record's ordered result difficulties.
  * @param {'equal'|'exceed'|'partial'} [params.awardMode] The check's award mode.
- * @returns {Array<{id: string, awarded: number, of: number, count: number,
- *   percent: number}>} One bucket per reachable award count, ascending.
+ * @returns {Array<{id: string, awarded: number, of: number, count: number, percent: number}>}
+ *   One bucket per reachable award count, ascending.
  */
 export function enumerateProgressiveOdds({ outcomes, difficulties, awardMode = 'equal' }) {
   const results = (Array.isArray(difficulties) ? difficulties : []).map((difficulty, index) => ({

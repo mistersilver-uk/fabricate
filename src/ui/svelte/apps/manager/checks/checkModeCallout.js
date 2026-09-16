@@ -1,25 +1,16 @@
 /**
  * WHAT THIS MODE DOES: the Checks Studio's per-mode explanation, as data — a callout naming the
- * resolution mode, one paragraph on what it does with a roll, and three facts under it.
+ * mode, one paragraph on what it does with a roll, and three facts. PURE and covering EVERY
+ * mode, so `tests/check-mode-callout.test.js` proves exhaustiveness BOTH ways.
  *
- * IT IS PURE, AND IT COVERS EVERY MODE, so `tests/check-mode-callout.test.js` proves
- * exhaustiveness in BOTH directions. ALCHEMY HAS TWO ENTRIES, NOT THREE: there is no
- * `crafting:none`, alchemy at `checkMode: 'none'` being the OFF state of an optional check, so
- * `checkModeKey` returns `''` and the switched-off panel renders instead. Its SIMPLE check
- * states `check:optional` unlike its tiered sibling, a system wanting the reserved failure
- * result set having to roll one and a system that does not being served by switching it off.
+ * ALCHEMY HAS TWO ENTRIES, NOT THREE: there is no `crafting:none`, alchemy at
+ * `checkMode: 'none'` being the OFF state of an optional check, so `checkModeKey` returns `''`.
+ * Its SIMPLE check states `check:optional` unlike its tiered sibling.
  *
- * THE `MODES` TABLE IS ONE COPY-PASTE BLOCK, so keep edits inside it SMALL: thirteen entries of
- * one shape read as duplication to SonarCloud's CPD, new-code density is measured over the lines
- * a PR touches, and ANY edit there lands at 100% duplicated. That is why this rationale is in
- * the header, outside the block.
- *
- * GATHERING'S ROUTED AND PROGRESSIVE MODES ARE DORMANT, rendered disabled in the GM UI but still
- * REACHABLE, so the answer is dormancy framing in the Modifiers section's own words reused
- * VERBATIM — two sentences for one fact being the drift `checksCopy.js` prevents.
- *
- * Each entry is `{ icon, title, body, facts }` with `[key, fallback]` pairs, resolved by the
- * component's `text()` bridge.
+ * THE `MODES` TABLE IS ONE COPY-PASTE BLOCK, so keep edits inside it SMALL: SonarCloud's CPD
+ * measures new-code density over the lines a PR touches, so ANY edit there lands at 100%
+ * duplicated — which is why this rationale is in the header. GATHERING'S ROUTED AND PROGRESSIVE
+ * MODES ARE DORMANT but REACHABLE, so the framing is the Modifiers section's own, reused VERBATIM.
  */
 
 const NAMESPACE = 'FABRICATE.Admin.Manager.Checks.Mode.';
@@ -240,8 +231,8 @@ export function checkModeKey({ activity, mode, alchemyCheckMode = '' } = {}) {
 
 /**
  * Describe one resolution mode. Returns `null` for a pair this studio does not render, so a
- * caller renders NOTHING rather than a callout about some other mode: a missing explanation is
- * a gap, and a confident wrong one is a lie.
+ * caller renders NOTHING rather than a callout about another mode: a missing explanation is a
+ * gap, a confident wrong one is a lie.
  *
  * @param {object} args
  * @param {string} args.activity `crafting` | `salvage` | `gathering`.

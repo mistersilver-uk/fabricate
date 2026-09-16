@@ -106,11 +106,10 @@ const SUPPORTED_MODES = new Set(CHECK_READINESS_MODES);
 
 /**
  * The readiness mode for a RESOLVED check slot. No subsystem's AUTHORED resolution mode is ever
- * `routed`, and the translation is ALREADY OWNED by `checkModifierResolver`'s slot maps, which
- * decide which sub-config the ENGINE rolls. SO THIS TAKES THE SLOT, NOT THE MODE: a second
- * mapping is how the rail badge came to evaluate the alchemy SIMPLE draft under ROUTED rules and
- * to demand a roll formula for a mode whose route renders no formula field. The slot names ARE
- * the readiness modes, so this is total but for `null`, which becomes {@link NO_CHECK_MODE}.
+ * `routed`, and the translation is ALREADY OWNED by `checkModifierResolver`'s slot maps. SO THIS
+ * TAKES THE SLOT, NOT THE MODE: a second mapping is how the rail badge came to evaluate the
+ * alchemy SIMPLE draft under ROUTED rules and to demand a roll formula for a mode whose route
+ * renders no formula field. `null` becomes {@link NO_CHECK_MODE}.
  *
  * @param {'simple'|'routed'|'progressive'|null|undefined} slot The resolvers' `slot` field.
  * @returns {'simple'|'routed'|'progressive'|'none'}
@@ -168,10 +167,10 @@ function routedOutcomes(check) {
 
 /**
  * Readiness of a routed check's tier-STEP targets, reported only once a trigger sets
- * `tierStep.mode === 'target'`. Two rules share one green tick, both saying the targets on this
- * check name exactly one existing tier: a DANGLING target no-ops at runtime and is reachable by
- * ordinary authoring, the relative↔fixed switch dangling every `tierId` at once; MULTIPLE
- * targets are guidance, a static count not knowing which conditions will match.
+ * `tierStep.mode === 'target'`. Two rules share one green tick, both saying the targets name
+ * exactly one existing tier: a DANGLING target no-ops at runtime and is reachable by ordinary
+ * authoring, the relative↔fixed switch dangling every `tierId` at once, while MULTIPLE targets
+ * are guidance, a static count not knowing which conditions will match.
  *
  * @param {object} check    Plain check draft.
  * @param {object[]} outcomes The ACTIVE outcome-tier list (relative or fixed).
@@ -201,9 +200,9 @@ function tierStepTargetReadiness(check, outcomes) {
  * Whether a FIXED outcome set leaves a GAP — a roll value inside the set's own span that no tier
  * claims. `findRangeConflicts` sees only OVERLAP and `start > end`, so nothing else reports it,
  * and a fixed routed check has no `clampToNearest` rescue: the attempt is rolled but unrouted.
- * SPAN-INTERIOR ONLY, a set not covering every value a die can roll being a deliberate window.
- * Invalid and overlapping ranges are excluded first, both raising their own `critical` and a
- * `start > end` range otherwise manufacturing a phantom gap.
+ * SPAN-INTERIOR ONLY, a set not covering every value a die can roll being a deliberate window,
+ * and invalid and overlapping ranges are excluded first, a `start > end` range otherwise
+ * manufacturing a phantom gap.
  *
  * @param {object[]} outcomes The active FIXED outcome-tier list.
  * @param {Set<number>} excluded Indices already reported invalid or overlapping.
@@ -228,19 +227,15 @@ function fixedRangesHaveGap(outcomes, excluded) {
 }
 
 /**
- * Readiness of the check-modifier selection for this activity, every rule keyed on what this
- * activity would ACTUALLY roll rather than on the catalogue all three share. Eligibility is
- * resolved through `resolveEligibleModifierIds`, so readiness and the roll cannot disagree.
+ * Readiness of the check-modifier selection, keyed on what this activity would ACTUALLY roll
+ * rather than the catalogue all three share, and resolved through `resolveEligibleModifierIds`.
  *
- * A ROLL-SHAPED EXPRESSION IS NOT ONE OF THEM: a check appends a rolling modifier AS DICE, so
- * the blocking `modifierRollExpression` is RETIRED rather than reworded
- * (`openspec/specs/resolution-modes/spec.md` → "Check Source"). `modifierBoundsInverted` and
- * `modifierBoundsUnsafe` are that section's two bounds faults, SEPARATE because the repairs
- * differ; `modifierExpressionInvalid` is an entry whose EXPRESSION cannot contribute at all, and
- * excludes bounds faults deliberately, one entry named under two instructions being worse. All
- * three NAME the offending entries and are raised ONLY for entries this activity selects. The
- * three `modifiersInert*` warnings report a selection reaching no roll under each reason it can,
- * gated on the selection being NON-EMPTY.
+ * A ROLL-SHAPED EXPRESSION IS NOT ONE OF THEM, a check appending a rolling modifier AS DICE, so
+ * `modifierRollExpression` is RETIRED (`openspec/specs/resolution-modes/spec.md` → "Check
+ * Source", whose two bounds faults stay SEPARATE ids because the repairs differ).
+ * `modifierExpressionInvalid` is an entry whose EXPRESSION cannot contribute and excludes bounds
+ * faults. All three NAME the offending entries and cover only entries this activity selects; the
+ * three `modifiersInert*` warnings report a selection reaching no roll, gated on NON-EMPTY.
  *
  * @param {object|null} modifierContext A `buildCheckModifierContext` bag, or null (no-ops).
  * @param {{ rollsNoCheck: boolean, hasRollFormula: boolean }} formulaState
@@ -307,13 +302,12 @@ function checkModifierReadiness(modifierContext, { rollsNoCheck, hasRollFormula,
  *
  * @param {object} check Plain check draft (the active draft for its mode).
  * @param {object} [options]
- * @param {'routed'|'simple'|'progressive'|'none'} [options.mode] The mode to evaluate under, a
- *   {@link CHECK_READINESS_MODES} member callers derive through {@link readinessModeForSlot}. An
- *   unrecognized mode THROWS rather than defaulting: a caller handing through a raw resolution
- *   mode silently skipped every rule that mode has.
+ * @param {'routed'|'simple'|'progressive'|'none'} [options.mode] A {@link CHECK_READINESS_MODES}
+ *   member, derived through {@link readinessModeForSlot}. An unrecognized mode THROWS rather
+ *   than defaulting: a caller handing through a raw resolution mode silently skipped every rule.
  * @param {object|null} [options.modifierContext] A `buildCheckModifierContext` bag, or null.
  * @param {'crafting'|'salvage'|'gathering'} [options.activity] Which activity's check this is;
- *   it changes exactly one answer — WHY a no-check mode's selection reaches no roll.
+ *   it changes one answer — WHY a no-check mode's selection reaches no roll.
  * @returns {{ checks: CheckReadinessCheck[], issues: CheckReadinessIssue[] }}
  */
 export function evaluateCheckReadiness(check = {}, options = {}) {

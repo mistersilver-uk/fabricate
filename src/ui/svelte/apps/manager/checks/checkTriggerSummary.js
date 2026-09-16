@@ -1,15 +1,12 @@
 /**
  * WHAT A TRIGGER SAYS ABOUT ITSELF: the summary heading each collapsed trigger card, plus the
- * one sentence under it stating its effect. A card headed by the label of its first `<select>`
- * made a list of three triggers read `When`, `When`, `When`.
+ * sentence under it stating its effect. A card headed by the label of its first `<select>` made
+ * a list of three triggers read `When`, `When`, `When`.
  *
  * COMPOSED FROM FRAGMENTS, NOT WRITTEN PER SHAPE — a sentence per combination of five condition
  * types, five aggregates, five operators and three effects is hundreds of strings — and PURE, so
- * `tests/check-trigger-summary.test.js` pins every shape without mounting anything. Each
- * function returns `{ key, fallback, data }` for the caller's `text()` bridge.
- *
- * IT DESCRIBES; IT NEVER DECIDES: every value it states is read straight off the same
- * `condition` object the controls under it bind to.
+ * `tests/check-trigger-summary.test.js` pins every shape without mounting. IT DESCRIBES AND
+ * NEVER DECIDES: every value it states is read off the same `condition` the controls bind to.
  */
 
 const NAMESPACE = 'FABRICATE.Admin.Manager.Checks.Breakage.';
@@ -62,9 +59,8 @@ export function aggregateWord(aggregate) {
  *
  * @param {object} condition The trigger's condition.
  * @param {object} [context]
- * @param {Array<{groupId: number, label: string}>} [context.diceGroups] Groups parsed from
- *   the roll formula, so a `diceGroup` condition names the die it watches rather than an
- *   index a GM never sees.
+ * @param {Array<{groupId: number, label: string}>} [context.diceGroups] Groups parsed from the
+ *   roll formula, so a `diceGroup` condition names the die rather than an index a GM never sees.
  * @param {Record<string, string>} [context.tierNames] Outcome tier names by id.
  * @returns {{key: string, fallback: string, data: object}}
  */
@@ -177,13 +173,10 @@ export function summariseEffect(trigger = {}, context = {}) {
 }
 
 /**
- * WHAT THE COLLAPSED HEAD SHOWS. A trigger list collapses, so the head carries the effect at a
- * glance — a glyph tile and a short result chip beside the condition sentence — and every effect
- * shape gets that treatment in the glyph and family its own vocabulary already uses.
- *
- * ONE effect wins the head even when a trigger carries several, in this order: a tier step is
- * the most specific statement about the result, a forced outcome next, a bare tool break last.
- * The full combination is still stated in prose by `summariseEffect` under the title.
+ * WHAT THE COLLAPSED HEAD SHOWS: a glyph tile and a short result chip beside the condition
+ * sentence, each effect shape taking the glyph and family its own vocabulary uses. ONE effect
+ * wins the head — a tier step is the most specific statement about the result, a forced outcome
+ * next, a bare tool break last — and the combination is still in `summariseEffect`'s prose.
  *
  * @param {object} trigger The whole trigger.
  * @param {object} [context]
@@ -191,7 +184,7 @@ export function summariseEffect(trigger = {}, context = {}) {
  * @param {boolean} [context.progressive] Whether this check awards rather than passes.
  * @param {boolean} [context.showBreakTools] Whether tool breakage is authored on this check.
  * @returns {{glyph: string, tone: string, chip: (object|null)}} `chip` is null when nothing is
- *   in force, a trigger that changes nothing stating that in its own prose line.
+ *   in force, such a trigger stating that in its own prose line.
  */
 export function summariseHeadline(trigger = {}, context = {}) {
   const { tierNames = {}, progressive = false, showBreakTools = false } = context;
