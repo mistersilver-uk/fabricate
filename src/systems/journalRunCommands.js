@@ -220,22 +220,26 @@ export async function executePublicCraft({
       reason: 'execute-command-unavailable',
     };
   }
-  const settled = await executeCommand({
-    actorUuid: actor?.uuid,
-    runType: 'crafting',
-    runId: started.runId,
-    expectedRevision: started.runRevision,
-    action: 'execute',
-    payload: {
-      selectionPlan: {
-        selectedIngredientSetId: ingredientSetId,
-        ingredientOptionOverrides: options?.ingredientOptionOverrides,
-        ingredientEssenceAllocation: options?.ingredientEssenceAllocation,
+  const settled = await executeCommand(
+    {
+      actorUuid: actor?.uuid,
+      runType: 'crafting',
+      runId: started.runId,
+      expectedRevision: started.runRevision,
+      action: 'execute',
+      payload: {
+        selectionPlan: {
+          selectedIngredientSetId: ingredientSetId,
+          ingredientOptionOverrides: options?.ingredientOptionOverrides,
+          ingredientEssenceAllocation: options?.ingredientEssenceAllocation,
+        },
+        trigger: 'manual',
+        sourceActorUuids: actorUuidList(sourceActors),
       },
-      trigger: 'manual',
-      sourceActorUuids: actorUuidList(sourceActors),
     },
-  });
+    // The public API never opens a roll dialog: it has no user to answer one.
+    { interactive: false }
+  );
   if (!Array.isArray(settled?.createdResultUuids) || typeof resolveUuid !== 'function') {
     return settled;
   }
@@ -249,6 +253,70 @@ export async function executePublicCraft({
     })
   );
   return { ...settled, results: results.filter(Boolean) };
+}
+
+/**
+ * Preserve one-call completion for the public gathering API.
+ *
+ * The gathering counterpart of {@link executePublicCraft}, and it exists for the same reason.
+ * Issue 1648 gave gathering a versioned lifecycle, and `startGatheringAttempt` began selecting it
+ * unconditionally. That routes a ready attempt away from the engine's immediate resolution and
+ * into a started run awaiting execution -- so every macro and script calling
+ * `game.fabricate.startGatheringAttempt()` went on reporting `accepted: true` and silently
+ * awarded nothing. Crafting was given this boundary in the same work; gathering was not, and the
+ * Foundry smoke's guaranteed-success forage caught it the moment the Phase E hang stopped
+ * masking the rest of the run.
+ *
+ * Keyed on `canExecuteImmediately`, the same field {@link executePublicCraft} uses, because it is
+ * the one the journal command layer's result normaliser forwards. The gathering engine's native
+ * word is `state: 'ready'` and the normaliser drops it, so keying on that completed nothing at
+ * all -- every public caller reads a normalised result. A waiting or timed attempt answers
+ * `canExecuteImmediately: false` and is left exactly as it was: those mature at GM-gated world
+ * time, and finishing one here would spend the wait the task declares.
+ *
+ * The start result is kept under the settled one rather than replaced. An attempt that was
+ * accepted and then failed to execute is both of those things, and a caller reading `accepted`
+ * must not be told the attempt never happened.
+ * @param {object} options
+ * @param {Function} options.requestStart Bound versioned start, already viewer-scoped.
+ * @param {object} options.actor Resolved Actor document, not an id or UUID string.
+ * @param {Function} [options.executeCommand] Authoritative command client.
+ * @returns {Promise<object>} The start result for a waiting or refused attempt, else the start
+ *   result with its execution outcome applied over it.
+ */
+export async function executePublicGather({ requestStart, actor, executeCommand = null } = {}) {
+  if (typeof requestStart !== 'function') return operationUnavailable();
+  const started = await requestStart();
+  if (started?.accepted !== true) return started;
+  if (started.requiresExecution !== true || started.canExecuteImmediately !== true) return started;
+  const runId = validText(started.runId) ? started.runId : null;
+  if (!runId) return started;
+  if (typeof executeCommand !== 'function') {
+    return {
+      ...started,
+      success: false,
+      authorityUnavailable: true,
+      reason: 'execute-command-unavailable',
+    };
+  }
+  const settled = await executeCommand(
+    {
+      actorUuid: actor?.uuid,
+      runType: 'gathering',
+      runId,
+      // `runRevision`, not `run.runRevision`: the start this reads is already NORMALISED, and
+      // the normaliser lifts the revision to the top level and drops the run document. Reading
+      // the nested one sent `expectedRevision: undefined` and the execute answered
+      // `invalid-command`, which is a refusal the player would have seen as a gather that
+      // started and awarded nothing.
+      expectedRevision: started.runRevision,
+      action: 'execute',
+      payload: { trigger: 'manual' },
+    },
+    // The public API never opens a roll dialog: it has no user to answer one.
+    { interactive: false }
+  );
+  return { ...started, ...settled };
 }
 
 /**
@@ -567,6 +635,16 @@ function serializedOperationResult(result, { secret = false, runId = '' } = {}) 
     }),
     ...(Object.hasOwn(source, 'canExecuteImmediately') && {
       canExecuteImmediately: source.canExecuteImmediately === true,
+    }),
+    // Gathering says WHY it refused in its own vocabulary -- `state` names the condition and
+    // `blockedReasons` carries the coded detail -- where crafting uses `reason` and `message`.
+    // This list was written for crafting's words, so it dropped gathering's on the floor and a
+    // blocked attempt reached its caller as `{success: false, reason: null, message: null}`:
+    // a refusal with nothing in it, which no surface can word and no player can act on
+    // (issue 1759).
+    ...(Object.hasOwn(source, 'state') && { state: source.state ?? null }),
+    ...(Object.hasOwn(source, 'blockedReasons') && {
+      blockedReasons: Array.isArray(source.blockedReasons) ? source.blockedReasons : [],
     }),
     createdResultUuids:
       source.createdResultUuids ?? results.map((item) => item?.uuid).filter(validText),
@@ -921,9 +999,24 @@ export function createJournalRunCommandService({
     });
   }
 
-  async function executeJournalRunCommand(command) {
+  /**
+   * Run one Journal command, resolving a required check on the way.
+   *
+   * `interactive` is the CALLER'S, and it is false for the public API by contract: a macro or a
+   * script has no one to answer a dialog, and `promptCheck` awaits a human with no timeout of its
+   * own -- `sendCommand` has one, the prompt does not. A non-interactive caller therefore settles
+   * the check with the engine's own defaults instead of opening it, which is the same route a
+   * player takes after answering (issue 1683).
+   */
+  async function executeJournalRunCommand(command, { interactive = true } = {}) {
     const first = await sendCommand(command);
     if (!first?.checkRequired) return first;
+    if (!interactive) {
+      return sendCommand({
+        ...command,
+        payload: { ...command.payload, prepareToken: first.prepareToken, rollDecision: {} },
+      });
+    }
     if (typeof promptCheck !== 'function') return failure('check-prompt-unavailable');
     const decision = await promptCheck(first.promptDescriptor);
     if (!decision || decision.confirmed === false) {
