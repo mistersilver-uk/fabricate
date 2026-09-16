@@ -16,10 +16,8 @@ src/migration/migrateRecipeForModeChange.js::migrateRecipeForModeChange	107
 src/migration/migrateUnifyGatheringRegions.js::migrateUnifyGatheringRegions	126
 src/migration/migrateWorldScopeEntities.js::migrateWorldScopeEntities	286
 src/migration/remapWorldScopeIdentityFlags.js	976
-src/models/IngredientSet.js	1905
-src/models/Recipe.js	1039
-src/models/Recipe.js::_validate	126
-src/models/Recipe.js::constructor	107
+src/models/IngredientSet.js	1231
+src/models/Recipe.js::_validate	122
 src/systems/AlchemyListingBuilder.js::buildListing	120
 src/systems/BulkSalvageService.js	816
 src/systems/CompendiumImporter.js	1542
@@ -214,8 +212,8 @@ src/ui/svelte/apps/manager/tools/toolStudio.js::projectToolBehaviorFacts	166
 src/ui/svelte/apps/manager/tools/toolStudio.js::projectToolPlayerPreview	110
 src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte	1155
 src/ui/svelte/apps/manager/world/WorldModifiersTab.svelte	551
-src/ui/svelte/components/Chip.svelte	648
-src/ui/svelte/components/SearchablePopover.svelte	1052
+src/ui/svelte/components/Chip.svelte	515
+src/ui/svelte/components/SearchablePopover.svelte	882
 src/ui/svelte/stores/actorBarStore.svelte.js::createActorBarStore	205
 src/ui/svelte/stores/adminComponentRowProjection.js::_createItemCard	131
 src/ui/svelte/stores/adminRecipeRowProjection.js	889
@@ -242,5 +240,5 @@ src/ui/svelte/util/foundryBridge.js	933
 src/ui/svelte/util/foundryIconCatalogue.js	1553
 src/ui/svelte/util/recipeGraphBuilder.js	936
 src/ui/svelte/util/shoppingListAggregator.js::aggregateShoppingList	179
-src/utils/rollExpressionAverage.js::createReader	201
-src/utils/scopedEntityListModel.js::createScopedEntityListModel	157
+src/utils/rollExpressionAverage.js::createReader	181
+src/utils/scopedEntityListModel.js::createScopedEntityListModel	118

@@ -441,8 +441,8 @@ test('the Tools browser writes ONE search field, and it is inside the search car
   //
   // WHAT IT PROTECTS. Issue 1508 rewrote the Tools browser's three overrides from
   // `[data-manager-tools-search] .manager-search…` to
-  // `.manager-tools-library-card .manager-search…` (`styles/fabricate.css:23520`, `:23540`,
-  // `:23549` — re-derived for issue 1515, which deleted rules above them), on a measured
+  // `.manager-tools-library-card .manager-search…` (`styles/fabricate.css:18272`, `:18278`,
+  // `:18287` — re-derived for issue 1515, which deleted rules above them), on a measured
   // premise: `data-manager-tools-search` and
   // `.manager-tools-library-card` select the SAME `.manager-search` in this tree, because the
   // view writes exactly one search field and writes it inside the search card. A SECOND search
@@ -788,7 +788,7 @@ test('the Tool Rules toolbar renders the design’s own type and geometry', asyn
     const measured = await page.evaluate(READ_PROBES);
 
     // `proto:2512` — the search field states its own type. It declared none, so it inherited
-    // Foundry's 14px `.application` base, which is the trap `styles/fabricate.css:6149` names
+    // Foundry's 14px `.application` base, which is the trap `styles/fabricate.css:4550` names
     // for the Component Studio and repairs only for that route.
     assert.equal(measured.search.fontSize, '11.5px', 'the search field states the design size');
     assert.equal(measured.search.fontWeight, '500', 'and the design weight');

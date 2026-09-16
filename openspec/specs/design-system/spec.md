@@ -161,6 +161,8 @@ The prose above already covers such a rule — it can only ever match inside tha
 The resolution is to name the caller's container by a class the caller writes ON THAT SAME ELEMENT, at the same rank and the same position, leaving the rule app-rooted and exempt.
 That is not the "second ancestor picked for reach" this requirement forbids above: it is the SAME ancestor named a different way, and the change that does it MUST publish the measured match set of both forms.
 Where the caller writes no such class, the rule is a named residue recorded with the change that retires the family.
+A rule declared inside an `@container` block named for an application root is a residue of the same kind for a different reason: the container NAME is established by the application root itself, as `fabricate-manager` is by `.fabricate-manager`, so in a host that carries no such root there is no container to query and the rule cannot travel with the family however it is rooted.
+A change that re-roots such a family names those rules and EXCLUDES them by count from the host-equality walk, so the walk is not read as covering them; `tests/components/re-rooted-controls-host-independence.test.js` holds both the walk and the exclusions.
 The SECOND instance of that case is what makes it a rule rather than one change's episode, and it adds a discipline the first did not need.
 Where a caller writes SEVERAL classes on that element, the change picks the NARROWEST one whose carriers it has MEASURED, and records the wider candidates it refused.
 Naming a shared default instead of a per-site class widens the rule onto surfaces it has never painted, which is the same defect as picking a second ancestor for reach, arriving through a class rather than through a combinator.
@@ -193,6 +195,11 @@ A literal written for this reason still takes a published ramp value for every O
 A caller MAY carry its OWN family on the primitive's elements through DECLARED CLASS PROPS, and the family is still rooted at a class the PRIMITIVE writes into the DOM, using the value the caller supplies.
 The guarantee above is therefore unchanged, and the gate reads a declared class prop as EMISSION: what moved is which file holds the string, not whether it is rendered.
 A declared class prop is checked against the component it is PASSED TO rather than the component that passes it, so a renamed prop on the primitive reds rather than leaving the gate reading a value the framework discards.
+A class a caller hands over that way leaves the caller's own scoped `<style>` unable to reach it, and the failure is SILENT: Svelte stamps its scope hash onto the markup the caller writes and never onto the element the primitive renders, so the rule compiles, the class is on the element, and the two never meet.
+The repair is a `:global(…)` selector CHAINED onto the caller's own scoped compound rather than written alone, so the rule keeps the specificity the scoped form had; `tests/components/manager-button-scoped-class-reach.test.js` holds the registry of primitives this applies to and fails a caller that moves a styled class onto one without it.
+It fails two ways and neither names the cause — the rule is EMITTED with the hash appended and matches nothing, or it is PRUNED behind a bare `css_unused_selector` warning — and which one a caller gets is a property of the WHOLE file rather than of the class that moved: measured on Svelte 5.56.3, it is emitted-and-silent whenever that file also holds a regular element carrying a spread or an expression-valued `class`, so the silent mode is the one to assume and the caller's own style block is what to read rather than `lint:svelte:warnings`.
+A DESCENDANT selector is wrapped WHOLE, because `:global(ancestor) .child` leaves `.child` as the only scoped compound and the rule silently gains a level of specificity.
+A primitive that forwards a rest spread therefore declares `class` as a NAMED prop and writes the spread AFTER its own `class={…}`, because a rest key would REPLACE the family class outright and unstyle the control while every `data-*` selector kept resolving.
 
 The CASCADE forces a corollary.
 A caller rule that must out-rank the primitive's own is deepened at the CALLER's own namespace roots.
@@ -479,6 +486,9 @@ That is the same `reuse, then extend, then add` order this capability already st
 A property the primitive does NOT declare is unaffected and the module sheet remains its home: a host's row metrics, its layout context and its surface are layered against nothing.
 Markup is not a cascade question at all, so an element the primitive renders unconditionally can only be removed by a prop.
 
+Where the module sheet must supply a BASELINE for a bare element a component may re-declare, it is written at a specificity deliberately BELOW a Svelte scoped compound's (0,2,0), so the sheet is a floor components override rather than a rule that overrides them; `:where()` is how the scoping is bought without paying specificity for it.
+The same arithmetic runs in the other direction for a module-root rule that must NOT be beaten: a flat `.fabricate a:focus` list is (0,2,1), while the `:is()` form of the same list takes its most specific argument — `[tabindex]`, at (0,3,0) — and would newly outrank every per-component ring in the sheet, so the flat spelling is prescribed rather than stylistic.
+
 Two corollaries a reader will otherwise get wrong.
 Svelte emits some scope hashes as `:where(.svelte-<hash>)`, which contributes ZERO specificity, so a compound that looks like it gained a class may not have; and changing whether a selector's compounds sit inside `:global()` changes which form Svelte emits, which moves specificity silently while looking like a repair.
 Neither is answerable by reading the source, so the method that settles both is to compile the component with `css: 'external'` and read the emitted selector.
@@ -653,6 +663,9 @@ The licence extends to COPIES and not to VARIANTS.
 Where an area rule declares a DIFFERENT treatment it is not a copy and it survives: the roll-prompt dialog keeps a `:focus-visible` ring of its own on `select`, painting an inset `box-shadow` where the module ring paints an outset `outline`, because an outset ring on a `<select>` flush to that dialog's overflow-clipped edge is clipped and reads as a one-sided flash.
 So the dialog left the reset exemption and stayed in the ring population in the same commit, and the ratchet cannot tell the two cases apart on its own — its population is keyed on ELEMENTS, which is the part a variant shares with the rule it varies from, so membership is never a licence to delete.
 Readonly is DISTINCT from disabled: a readonly control takes focus and refuses edit, while a disabled control does not take focus.
+A focus SUPPRESSION and the ring that replaces it are a PAIR, and their element lists MUST stay identical, or an element type is stripped of a ring by the first half and given none by the second.
+Foundry core also rings the STATE class `.active` exactly as it rings `:focus`, so a module that uses `.active` as its own selected marker MUST normalise that class alongside the focus reset and at the same rank — otherwise core's ring rides along with selection and merely hides while the element is focused, appearing the moment focus moves elsewhere.
+A programmatic `.focus()` that follows a pointer activation matches `:focus` and NOT `:focus-visible`, so the pair has a hole: a control focused that way is stripped by the suppressing half and supplied by neither, and the surface that moves focus programmatically MUST stamp its own marker attribute for a third rule to paint.
 
 A loading control MUST set `aria-busy` and change its label or text.
 A spinner alone is insufficient because Foundry's bundled Font Awesome disables `fa-spin` under `prefers-reduced-motion` and every shipped spinner is `aria-hidden`, so a motion-only busy state is conveyed to a reduced-motion user by nothing at all.
@@ -661,6 +674,9 @@ Motion is limited to a 140ms ease on a control state change, and nothing else an
 Under `prefers-reduced-motion: reduce` every transition and animation is removed, and any state that animated MUST remain readable when it does not.
 NOTHING GATES THE 140ms FIGURE AND NOTHING SHIPS IT: measured across both stylesheet corpora, the durations written are 120ms seventeen times, 150ms nine times, and four others, and 140ms appears nowhere at all.
 So this sentence names a rung the product has never used, which makes it a decision owed rather than a rule enforced — either the ladder becomes 120/150 and a gate holds it, or the corpus moves onto 140 — and it is recorded here as unenforced so that the next reader does not mistake the silence for compliance.
+
+The chip's RECESSIVE TONES are one ladder rather than a set of percentages, and the order is `secondary` → `neutral` → `subtle` → `muted`, loudest to quietest: `secondary` names the rule the GM is reading, `neutral` a fact merely present, `subtle` a quiet non-actionable state, and `muted` something unavailable.
+The quantity that orders them is the CONTRAST of each ink composited over that theme's own ground — never an alpha and never a channel, because the themes do not agree on a model and an alpha comparison ties three of the four — and a caller routes by that MEANING rather than by matching a tone name to a token name, since the names deliberately do not track the tokens.
 
 A SELECTED face is a FILL and an EDGE.
 A leading inset bar is a single-select affordance and MUST NOT be drawn on a list that admits more than one answer, because several rows carry the selected state at once and a bar on each of them claims a singularity the list does not have.
@@ -697,6 +713,13 @@ An `aria-label` bound to a prop that may be empty MUST be written `aria-label={n
 
 A change with no visible focus consequence MUST be announced through a live region, and focus MUST move BEFORE the announcement is made, because polite speech is cancelled by a focus change.
 Reorder announces the moved item, its new position and the total.
+A control that DELETES the element holding focus MUST take its destination BEFORE it emits, because deleting the focused node otherwise drops focus to `<body>`, which Foundry reads as an unfocused window.
+The order is the next peer's control, then the previous peer's, then the nearest enclosing fallback hook the CALLER supplies; and because a caller's add trigger is often conditional, the caller owes a SECOND hook on the row itself, carrying `tabindex="-1"` and rendered in the empty state too, since a trigger that exists only while something is left to add disappears in exactly the removal that needs it.
+An editable set of tokens owes ONE `aria-live="polite"` summary BESIDE the row and never a region wrapped AROUND it: `aria-relevant` defaults to `additions text`, so a wrapping region announces each added token's entire subtree, its remove button's label included, and announces NOTHING AT ALL on a removal.
+The summary states NAMES as well as a count, because "3 selected" does not tell a non-sighted GM which three.
+A live region is also announced by its ROLE rather than by `aria-live` alone where the region and its text are INSERTED in one mutation, which is what a notice does: a live region created in the same mutation as its content is not announced and only its later updates are, while a live-region role is recognised on insertion.
+A control that is unavailable but must stay READABLE takes `aria-disabled` rather than the native `disabled` attribute, and the two failures that decides are defects rather than preferences: several screen readers drop a `disabled` button from the tab order, so a capped or gated control is tabbed past even though its own `aria-describedby` explains why; and `focus()` on a disabled button silently no-ops and drops the keyboard user to `<body>`, which breaks any post-deletion focus destination that lands on it.
+The trade is that `aria-disabled` does not suppress the click, so the component's own handler must refuse.
 
 Any element with a bounded width MUST state what a value too long for it does.
 The default is to wrap to a stated number of lines and then truncate with an ellipsis, never to expand the container: a long document name and a long localized string are the normal case rather than the exception, and a control that grows with its content moves every control beside it.
@@ -717,6 +740,10 @@ A count pip on such an item sits on the OUTER CORNER of that well with a ground-
 
 Every primitive renders inside a Foundry ApplicationV2 window, inside Foundry's own CSS and event handling, and MUST satisfy the following.
 
+Core's own neutralisers for its own element rules are frequently scoped to the ApplicationV1 `.app` root, so a V2 window inherits the RAW core declaration and the module sheet MUST ship the V2 counterpart itself: core colours and re-faces bare `h1`-`h6` and cancels it only for `.app`, and core's `ul li { margin-bottom: 0.25rem }` is likewise cancelled only there — where, under `align-items: stretch`, the one child core exempts takes that margin as extra border-box height and renders taller than its siblings.
+A rule that exists to beat Foundry's host CSS belongs in the global sheet rather than in a component's scoped block, which is one of the two standing exceptions to co-located primitive CSS.
+An application root MUST also declare `color-scheme`, because browser-drawn chrome a stylesheet cannot reach — the native `<select>` option popup above all — otherwise paints in the UA's own scheme rather than the theme's.
+
 Breakpoints MUST be `@container` queries and never viewport media queries, because an ApplicationV2 window resizes independently of the viewport.
 `tests/components/design-system-debt-ratchets.test.js` fails any `@media` whose query is not a user preference — `prefers-reduced-motion`, `prefers-contrast` or `forced-colors` — since those ask about the reader rather than about the window.
 A container query adds no specificity, so the narrow case is declared after the wide one.
@@ -729,6 +756,9 @@ A focusable element that is not a form control, contentEditable, or a button wit
 The condition is HOLDING FOCUS, not handling keys: an element that handles nothing still takes every keystroke the GM aims at it and hands it to the canvas, so `tabindex="-1"` on a non-form element is itself the trigger, since that attribute exists only to make the element a focus target.
 The carve-out for a button is FORM-SCOPED and stays that way: `hasFocus` answers `!!focused.form`, so a button outside a form is exactly as unrecognised as a bare div, and a roving-tabindex tab strip — which handles the arrows and calls `preventDefault()` without `stopPropagation()` — runs its own handler AND pans the canvas.
 The attribute is an OPT-IN that declares the element focused: `data-keyboard-focus="false"` does the opposite and hands the keypress to the canvas, so the value matters as much as the attribute.
+A primitive writes that attribute on the SAME SIDE of its `{...rest}` as its own `class`, because `KeyboardManager#hasFocus` reads it off the focused element with no inheritance and a spread landing after it lets a caller's attribute bag unset it unremarked.
+HOW A `data-*` VALUE IS SPELLED is part of the same contract: a bare `data-*` written on a COMPONENT tag is the boolean `true` rather than the empty string it is on an element, and an attribute-bag entry written `{ 'data-x': true }` does the same, so a call site that means the empty string MUST spell `data-x=""`.
+A presence selector resolves either way, which is why no mounted suite, source pin or smoke step written with one can see the difference.
 `tests/design-system-keyboard-focus.test.js` holds all three populations this obliges, and for two of them it holds a pinned baseline rather than an absence: the `tabindex="-1"` targets are compliant, while the elements that carry a static `tabindex="0"` and an interactive role, and the buttons with no ancestor form, are counted debt that the shared primitives emitting the attribute will collapse.
 A listbox MUST keep DOM focus on ONE element and drive selection with `aria-activedescendant`; roving focus onto option buttons re-arms those bindings and is forbidden.
 A MENU is the deliberate exception and not a loophole: its pattern requires focus to MOVE to its items, so each item carries the keyboard-focus attribute above and the bindings are declared away rather than avoided.
