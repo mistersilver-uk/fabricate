@@ -1,27 +1,21 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  Tab strip for the recipe editor (Overview / Ingredients / Results / Tools / Access /
-  Books & Scrolls / Validation).
-
-  A thin caller of the promoted `EditorTabs` primitive (issue 1038): this file owns the TAB
-  LIST — including the mode gate below — and this site's DOM contract: the
+  Tab strip for the recipe editor (Overview / Ingredients / Results / Tools / Access / Books &
+  Scrolls / Validation), a thin caller of the promoted `EditorTabs` primitive. This file owns the
+  TAB LIST — including the mode gate below — and this site's DOM contract: the
   `data-recipe-tab-button` hook, the `recipe-tab-*` / `recipe-panel-*` id stem whose panels
-  `RecipeEditView.svelte` renders, and the strip's own aria-label. Every class it used to
-  render by hand is the primitive's default, so it passes no class override at all, and no
-  rendered id, `aria-controls`, `data-*` attribute or class changed in the conversion.
+  `RecipeEditView.svelte` renders, and the strip's own aria-label. Every class it used to render
+  by hand is the primitive's default, so it passes no class override.
 
-  Access and Books & Scrolls are MODE-CONDITIONAL (issue 676), driven by the system's
-  canonical `visibilityMode` through `craftingEffect(mode)` — the same single source of
-  truth the nav, Crafting Settings and the deleted context rail used:
+  Access and Books & Scrolls are MODE-CONDITIONAL, driven by the system's canonical
+  `visibilityMode` through `craftingEffect(mode)`:
 
     restricted     (showAccess)       -> Access: who this recipe is granted to
     item/knowledge (showBooksScrolls) -> Books & Scrolls: the books teaching it
-    global         (neither)          -> neither tab: a globally-visible system grants
-                                         no per-recipe access and uses no books.
+    global         (neither)          -> neither tab
 
-  The gate lives HERE rather than in the panels so the tab BUTTON disappears with its
-  content — a tab that opens an empty panel is worse than no tab. `TAB_IDS` in
-  RecipeEditView is derived from the same `visibilityEffect`, so a deep-link cannot
+  The gate lives HERE rather than in the panels so the tab BUTTON disappears with its content, and
+  `TAB_IDS` in RecipeEditView derives from the same `visibilityEffect`, so a deep link cannot
   select a tab that does not exist.
 -->
 <script>
@@ -30,18 +24,15 @@
   let {
     activeTab = 'overview',
     badges = {},
-    // The system's craftingEffect matrix row ({ showAccess, showBooksScrolls, ... }).
-    // NOT named `effect`: a variable of that name makes the compiler read `$effect(...)`
-    // as a store subscription (`$` + `effect`).
+    // The system's craftingEffect matrix row. NOT named `effect`: the compiler would read
+    // `$effect(...)` as a store subscription.
     visibilityEffect = { showAccess: false, showBooksScrolls: true },
     onSelect = () => {},
   } = $props();
 
-  // The label keys are written out as LITERALS rather than interpolated from a tab key,
-  // because `ui-lang-keys-resolve` and `lang-keys-no-orphans` both read the source: an
-  // interpolated key is invisible to either, so a missing label would ship as a raw key
-  // with no gate catching it. Before the conversion these were built as
-  // `FABRICATE.Admin.Manager.Recipe.Tabs.${tab.key}` and were unreachable to both gates.
+  // The label keys are written out as LITERALS rather than interpolated, because
+  // `ui-lang-keys-resolve` and `lang-keys-no-orphans` read the SOURCE: an interpolated key is
+  // invisible to both, so a missing label would ship as a raw key with no gate catching it.
   const TABS = $derived([
     {
       id: 'overview',

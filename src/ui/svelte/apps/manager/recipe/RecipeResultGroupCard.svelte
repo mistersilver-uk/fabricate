@@ -1,16 +1,11 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  One result group. A recipe produces ANY one group's items (the producing group
-  is chosen at craft time via outcome routing / roll-table selection); each group
-  is a flat list of produced items (component + quantity). This renders the group
-  name, its items (via RecipeResultItemRow), an "Add item" component picker, and a
-  remove-group button.
-
-  It emits a shallow-updated copy via `onChange(nextGroup)`; new items are appended
-  id-less for the store to normalize. Empty result groups (and component-less
-  items) are gated at the model/save path (Recipe.validate), not the readiness /
-  Validation tab — so an empty group editing in-progress here is expected, not an
-  oversight.
+  One result group. A recipe produces ANY one group's items, the producing group being chosen at
+  craft time by outcome routing; each group is a flat list of component + quantity. This renders
+  the group name, its items, an "Add item" picker and a remove-group button, and emits a
+  shallow-updated copy via `onChange(nextGroup)` with new items appended id-less for the store to
+  normalize. Empty groups and component-less items are gated at the model/save path
+  (`Recipe.validate`), not at readiness, so an empty group being edited here is expected.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
@@ -23,50 +18,38 @@
     group = {},
     chromeless = false,
     componentOptions = [],
-    // Routed result routing (non-chromeless only): in 'ingredientSet' mode the
-    // result set is assigned ingredient sets (via onAssignIngredientSet, written
-    // to ingredientSet.resultGroupId); in 'check' mode it is assigned the system's
-    // routed-check outcome tiers (written to group.checkOutcomeIds). Otherwise a
-    // free-text result-set name is shown.
+    // Routed result routing (non-chromeless only): 'ingredientSet' assigns ingredient sets
+    // (`ingredientSet.resultGroupId`), 'check' assigns routed-check outcome tiers
+    // (`group.checkOutcomeIds`), and otherwise a free-text result-set name is shown.
     routingProvider = null,
     ingredientSetOptions = [],
     assignedIngredientSetIds = [],
-    // POLICY-CONDITIONAL since issue 1098 (decision 7): success-filtered when the system's
-    // `craftingCheck.failureResultPolicy` forbids failure results, unfiltered when it
-    // permits them, so a result set can be bound to a failure-marked tier exactly where the
-    // engine will route one. Resolved by the manager root, and read by `recipeReadiness`
-    // from the SAME swap, so the picker and the readiness warnings cannot disagree.
+    // POLICY-CONDITIONAL: success-filtered when `craftingCheck.failureResultPolicy` forbids
+    // failure results and unfiltered when it permits them, so a result set binds to a
+    // failure-marked tier exactly where the engine routes one. `recipeReadiness` reads the SAME
+    // swap, so the picker and the readiness warnings cannot disagree.
     outcomeTierOptions = [],
-    // Whether the routed check has ANY outcome tier (even failure-only). When
-    // `outcomeTierOptions` is empty this disambiguates "no tiers authored yet" from
-    // "tiers exist but none is offerable" for the empty hint.
+    // Whether the routed check has ANY outcome tier: with `outcomeTierOptions` empty it tells
+    // "no tiers authored yet" from "tiers exist but none is offerable" for the empty hint.
     outcomeTiersDefined = false,
-    // Whether the failure-result policy permits results on a failed check (issue 1098).
-    // Its ONLY use here is the third empty hint: with tiers defined and the list still
-    // empty, "none is marked as a Success" is only half the story under a forbidding
-    // policy, because marking one Success is not the only remedy — allowing failure
-    // results is the other, and it is the one a GM authoring a ruined-output recipe wants.
+    // Whether the failure-result policy permits results on a failed check. Its ONLY use here is
+    // the third empty hint: marking a tier Success is not the only remedy under a forbidding
+    // policy, and allowing failure results is the one a ruined-output recipe wants.
     failureResultsAllowed = false,
-    // Alchemy Simple two-slot editor (issue 554). `staticLabel` replaces the free-text
-    // name input with a fixed header label (used by both the "On success" and the
-    // reserved "On a failed check" slots). `reserved` marks the failure slot: it adds
-    // a warning icon and (with `hideRemove`) suppresses the remove button and stamps
-    // `role: 'failure'` on edit (done by the parent). `roleAccent` (e.g. 'warning')
-    // tones the static label. `hideRemove` suppresses the remove button on both slots.
+    // Alchemy Simple two-slot editor. `staticLabel` replaces the free-text name input with a
+    // fixed header label; `reserved` marks the failure slot with a warning icon; `roleAccent`
+    // tones the static label; `hideRemove` suppresses the remove button on both slots.
     staticLabel = '',
     reserved = false,
     roleAccent = '',
     hideRemove = false,
-    // Progressive systems award the group's results in ORDER (the award loop spends
-    // the check budget down the list), so the GM needs to reorder them. When set,
-    // each result row grows a drag handle wired to drag-and-drop reorder; other
-    // resolution modes ignore result order and render the list unchanged.
+    // Progressive systems award the group's results in ORDER — the award loop spends the check
+    // budget down the list — so each row grows a reorder affordance. Other modes render as-is.
     progressive = false,
     onAssignIngredientSet = () => {},
     onChange = () => {},
     onRemove = () => {},
-    // Deep-link from a progressive row's read-only difficulty badge to the component
-    // editor (component.difficulty is a Component property with four consumers).
+    // Deep link from a progressive row's read-only difficulty badge to the component editor.
     onOpenComponent = () => {},
   } = $props();
 
@@ -83,21 +66,16 @@
     return result;
   }
 
-  // THE CONTROL HALF of the validation row action (issue 1517). An unrouted-result-set
-  // warning is about THIS set's routing, so the card is the destination and
-  // `recipeReadiness.js` addresses it as `result-group-<id>`. Same literal on both sides,
-  // held together behaviourally by the pair of gates named in `recipeReadiness.js`'s own
-  // header — `recipe-validation-tab.test.js` reads the address the `unroutedResultGroup`
-  // warning emits, and `recipe-edit-mounted.test.js` finds it on this element. An id-less
-  // draft group gets no address and the producer emits a route-only issue.
+  // THE CONTROL HALF of the validation row action. An unrouted-result-set warning is about THIS
+  // set's routing, so the card is the destination and `recipeReadiness.js` addresses it as
+  // `result-group-<id>` — the same literal on both sides, held together behaviourally by the pair
+  // of gates that file's header names. An id-less draft group gets no address.
   const validationTarget = $derived(group?.id ? `result-group-${group.id}` : undefined);
 
   const results = $derived(Array.isArray(group?.results) ? group.results : []);
 
-  // Drag-reorder state (progressive only). Local so it survives the store refresh
-  // that follows every persisted edit — rows are keyed by result id. Native HTML5
-  // drag: the whole card is both the drag source and the drop target, and a splice
-  // emits the reordered group.
+  // Drag-reorder state (progressive only), local so it survives the store refresh that follows
+  // every persisted edit. Native HTML5 drag: the card is both source and target.
   let dragIndex = $state(-1);
 
   function reorderItem(from, to) {
@@ -113,11 +91,9 @@
     dragIndex = -1;
   }
 
-  // Reorder was DRAG-ONLY, with an aria-hidden grip on a draggable div and no keyboard
-  // path at all — a live accessibility hole, since order is load-bearing in progressive
-  // mode (the award loop spends the check budget down the list). These are real buttons,
-  // disabled at the ends, and the position change is announced through the aria-live
-  // region below (issue 643 §6).
+  // Order is load-bearing in progressive mode, so reorder cannot be drag-only: these are real
+  // buttons, disabled at the ends, and the position change is announced through the aria-live
+  // region below.
   let announcement = $state('');
 
   function componentNameFor(item) {
@@ -129,16 +105,14 @@
     const target = index + delta;
     if (target < 0 || target >= results.length) return;
 
-    // Read the name BEFORE the move. `reorderItem` emits the reordered group, and once
-    // the parent round-trips the new prop `results[index]` is the item that swapped INTO
-    // this slot — so announcing after the move can name the wrong result.
+    // Read the name BEFORE the move: once the parent round-trips, `results[index]` is the item
+    // that swapped INTO this slot, so announcing afterwards can name the wrong result.
     const name = componentNameFor(results[index]);
     const total = results.length;
     reorderItem(index, target);
 
-    // ONE key with three placeholders, not a concatenation of "moved to position" + "of":
-    // word order is not universal, and a sentence assembled from fragments cannot be
-    // translated.
+    // ONE key with three placeholders rather than a concatenation: a sentence assembled from
+    // fragments cannot be translated.
     announcement = format(
       'FABRICATE.Admin.Manager.Recipe.ResultMoveAnnouncement',
       '{name} moved to position {position} of {total}',
@@ -176,7 +150,7 @@
     return typeof random === 'function' ? random() : Math.random().toString(36).slice(2, 12);
   }
 
-  // Spread the existing group so its id/name (referenced by routing) survive.
+  // Spread the existing group so its id and name, which routing references, survive.
   function setName(name) {
     onChange({ ...group, name });
   }
@@ -189,15 +163,9 @@
     onChange({ ...group, results: results.filter((_, i) => i !== index) });
   }
 
-  // Adding a component the group already produces bumps that item's quantity by 1
-  // (capped) rather than appending a duplicate item. Spread the existing item so a
-  // normalized id (and any unknown fields) survive the bump.
-  //
-  // Progressive is the exception: its award loop spends the check budget down an
-  // ORDERED list, awarding each entry once (cost = the component's difficulty) and
-  // ignoring `quantity` entirely. There, repeating a component IS how the GM asks
-  // for more of it and prioritises it, so we always append a fresh, quantity-less
-  // entry — never merge.
+  // Adding a component the group already produces bumps that item's quantity rather than
+  // appending a duplicate. Progressive is the exception: its award loop ignores `quantity`
+  // entirely, so repeating a component IS how the GM asks for more of it — always append.
   function addItem(id) {
     if (progressive) {
       onChange({ ...group, results: [...results, { id: newId(), componentId: id }] });
@@ -221,10 +189,9 @@
     onChange({ ...group, results: [...results, { id: newId(), componentId: id, quantity: 1 }] });
   }
 
-  // THE THREE-WAY EMPTY HINT (issue 1098, decision 7). Written as a guard chain rather
-  // than nested ternaries: the SonarCloud gate fails those, and the ORDER is the point —
-  // "there are no tiers" has to be answered before "none of them can be offered", or a
-  // recipe on a system with no outcome tiers at all would be told to change a policy.
+  // THE THREE-WAY EMPTY HINT, a guard chain rather than nested ternaries, and its ORDER is the
+  // point: "there are no tiers" must be answered before "none can be offered", or a system with
+  // no outcome tiers at all would be told to change a policy.
   const outcomeTierEmptyHint = $derived.by(() => {
     if (!outcomeTiersDefined) {
       return text(
@@ -326,7 +293,7 @@
   {/if}
 
   {#if results.length === 0}
-    <!-- Danger-bordered dashed panel (§C5): an outcome that produces nothing is a gap. -->
+    <!-- Danger-bordered dashed panel: an outcome that produces nothing is a gap. -->
     <div class="manager-recipe-result-empty" data-recipe-result-empty>
       <p class="manager-muted">
         {text(
@@ -339,12 +306,9 @@
     <div class="manager-recipe-ingredient-set-groups">
       {#each results as item, index (item?.id || index)}
         {#if progressive}
-          <!-- Progressive: the whole card is the drag SOURCE (so the drag ghost is
-               the full row, not just the grip) and the drop TARGET; the grip + order
-               pip stay as a visual affordance. Drag is a mouse-only enhancement.
-               Progressive rows carry no quantity field (the row hides it) and no text
-               input, so dragging from anywhere on the card is safe — order +
-               repetition are the only authored inputs. -->
+          <!-- Progressive: the whole card is the drag SOURCE, so the ghost is the full row, and
+               the drop TARGET. Drag is a mouse-only enhancement, and a progressive row carries
+               no quantity field and no text input, so dragging from anywhere on it is safe. -->
           <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div
             class="manager-recipe-result-row is-reorderable"
@@ -371,16 +335,12 @@
               onRemove={() => removeItem(index)}
             >
               {#snippet leadingControls()}
-                <!-- Grip, then a SEPARATE order badge — the salvage stage row's shape
-                     (issue 676). The order was stacked UNDER the grip inside one handle,
-                     which read as a decorated grip rather than as the stage number that the
-                     award loop actually spends down.
-
-                     They are a SNIPPET rather than the card's own first two children
-                     (issue 1286) so that a stage carrying a complication band can put them
-                     on the band's own line: as the card's leading flex items they pushed
-                     the full-bleed band ~58px in. The row renders them unchanged and in the
-                     same place when there is no band. -->
+                <!-- Grip, then a SEPARATE order badge, the salvage stage row's shape: stacked
+                     inside one handle it read as a decorated grip rather than as the stage
+                     number the award loop spends down. A SNIPPET rather than the card's own
+                     first two children, so a stage carrying a complication band can put them on
+                     the band's line — as the card's leading flex items they pushed the
+                     full-bleed band ~58px in. -->
                 <span
                   class="manager-recipe-stage-grip"
                   aria-hidden="true"
@@ -394,12 +354,10 @@
                 >
               {/snippet}
               {#snippet reorderControls()}
-                <!-- Reorder lives to the RIGHT of the component's DC (issue 643): after
-                     the DC + Edit pair, before the remove control. Drag is an
-                     ENHANCEMENT; these chevrons are the accessible reorder path and are
-                     what a keyboard user gets. Disabled at the ends. They share the
-                     salvage stage row's rocker geometry (issue 676) — see the shared
-                     rule in styles/fabricate.css. -->
+                <!-- Reorder lives to the RIGHT of the component's DC, after the DC + Edit pair
+                     and before the remove control. Drag is an ENHANCEMENT; these chevrons are
+                     the accessible path, disabled at the ends, and they share the salvage stage
+                     row's rocker geometry — see the shared rule in styles/fabricate.css. -->
                 <span class="manager-recipe-stage-reorder" data-recipe-result-move>
                   <button
                     type="button"
