@@ -669,9 +669,18 @@ describe('the per-site accessor mapping', () => {
       nullDefault.map((entry) => entry.site),
       ['runHistoryEvidence.sourceItemQuantity stored source read', 'companionComponentAward stack-target base read']
     );
+    // Sorted, like its sibling below. A Map's entries follow the order `collectSources` walked
+    // the tree, so a raw comparison pins the FILESYSTEM's enumeration: this passed on Windows
+    // and failed on Linux CI the moment a third file joined the list (issue 1648).
     assert.deepEqual(
-      [...countAbsentDefaults('null').entries()],
-      [['src/systems/companionComponentAward.js', 1], ['src/systems/CraftingEngine.js', 1], ['src/systems/runHistoryEvidence.js', 2]],
+      asSortedPairs(countAbsentDefaults('null')),
+      asSortedPairs(
+        new Map([
+          ['src/systems/companionComponentAward.js', 1],
+          ['src/systems/CraftingEngine.js', 1],
+          ['src/systems/runHistoryEvidence.js', 2],
+        ])
+      ),
       'post-write measurements remain unknown when the quantity field is absent'
     );
   });
