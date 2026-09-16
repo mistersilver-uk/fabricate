@@ -9,33 +9,24 @@ import {
 } from '../../../../../utils/craftingCheckExpression.js';
 
 /**
- * Pure readiness evaluator for a single subsystem check (crafting, salvage, or
- * gathering). Mirrors `recipeReadiness.js`: it returns stable check/issue ids
- * that the Checks Validation tab maps to localized copy, so the tab is the one
- * canonical place a GM sees what is wrong with a check — the rules previously
- * lived inline inside `CraftingCheckEditor` and are surfaced here instead.
+ * Pure readiness evaluator for a single subsystem check (crafting, salvage or gathering).
+ * Mirrors `recipeReadiness.js`: it returns stable check/issue ids the Checks Validation tab maps
+ * to localized copy, so that tab is the one canonical place a GM sees what is wrong with a check.
  *
  * @typedef {{ id: string, satisfied: boolean }} CheckReadinessCheck
  * @typedef {{ id: string, severity: 'critical' | 'warning' | 'info' }} CheckReadinessIssue
  */
 
 /**
- * EVERY issue id this evaluator can raise — the SOURCE OF TRUTH, not a summary (issue
- * 1095).
- *
- * Until now every id was an inline string literal in the function body, and the only way
- * to enumerate them was to call the function with enough fixtures to reach every branch —
- * which cannot prove the set complete, because an unreached branch contributes nothing.
- * Downstream surfaces need the whole set (the Checks Validation route buckets each id to
- * a section), and a hand-copied mirror of an unprovable list is how those two drift.
+ * EVERY issue id this evaluator can raise — the SOURCE OF TRUTH, not a summary. Downstream
+ * surfaces need the whole set, and inline literals can only be enumerated by reaching every
+ * branch, which cannot prove the set complete.
  *
  * IT IS A GUARD, NOT A CONVENTION. `pushIssue` below is the ONLY way an issue reaches the
- * returned list and it THROWS on an unregistered id, so `issues.push({ id: 'newThing' })`
- * cannot quietly work: adding an id without registering it fails the first test that
- * reaches the branch, and `tests/checks-readiness.test.js` additionally scans this file's
- * source text so an id added by direct `push` is caught even on an unreached branch.
+ * returned list and it THROWS on an unregistered id, and `tests/checks-readiness.test.js`
+ * additionally scans this file's source so an id added by a direct `push` is caught even on an
+ * unreached branch. Frozen, so a consumer cannot mutate the set process-wide.
  *
- * Frozen, so a consumer cannot mutate the set process-wide.
  * @type {ReadonlyArray<string>}
  */
 export const CHECK_READINESS_ISSUE_IDS = Object.freeze([
@@ -64,11 +55,10 @@ export const CHECK_READINESS_ISSUE_IDS = Object.freeze([
 const REGISTERED_ISSUE_IDS = new Set(CHECK_READINESS_ISSUE_IDS);
 
 /**
- * The five sections an activity route renders, in reading order (issue 1096).
+ * The five sections an activity route renders, in reading order: the `data-checks-section`
+ * values the strip emits and the ids the Validation route deep-links to, declared once beside
+ * the issue registry that buckets into them.
  *
- * These are the `data-checks-section` values the section strip emits and the ids the
- * Validation route deep-links to, so they are declared once here beside the issue registry
- * that buckets into them rather than as string literals in two components.
  * @type {ReadonlyArray<string>}
  */
 export const CHECK_SECTION_IDS = Object.freeze([
@@ -80,22 +70,17 @@ export const CHECK_SECTION_IDS = Object.freeze([
 ]);
 
 /**
- * Which SECTION owns each readiness issue (issue 1096).
+ * Which SECTION owns each readiness issue. The strip's warning dots, the rail's per-activity
+ * badge and the Validation route's deep links all read this one map, so the three cannot
+ * disagree about where a problem lives.
  *
- * The section strip's warning dots, the rail's per-activity badge and the Validation
- * route's deep links are all fed from this one map, so the three cannot disagree about
- * where a problem lives.
+ * IT IS PROVEN EXHAUSTIVE: `tests/checks-readiness.test.js` asserts this key set EQUALS
+ * {@link CHECK_READINESS_ISSUE_IDS} in BOTH directions, so neither an unbucketed id nor a
+ * bucket naming an unregistered id can ship.
  *
- * IT IS PROVEN EXHAUSTIVE, not merely kept in step by convention.
- * `tests/checks-readiness.test.js` asserts this object's key set EQUALS
- * {@link CHECK_READINESS_ISSUE_IDS} — the registry `pushIssue` refuses to emit outside — in
- * BOTH directions: an id added to the registry without a bucket fails, and a bucket naming
- * an id the registry does not carry fails too. Bucketing "by issue id" against a
- * hand-copied second list is exactly how a new id (issue 1095 added three) comes to bucket
- * nowhere and silently stops raising a dot.
+ * `rangeGap` buckets to Outcomes rather than The roll: the hole is between two authored TIERS,
+ * and the tier rows that close it are on Outcomes.
  *
- * `rangeGap` buckets to Outcomes rather than to The roll: the hole is between two authored
- * TIERS, and the tier rows that close it are on Outcomes.
  * @type {Readonly<Record<string, string>>}
  */
 export const CHECK_ISSUE_SECTIONS = Object.freeze({
@@ -118,17 +103,11 @@ export const CHECK_ISSUE_SECTIONS = Object.freeze({
 });
 
 /**
- * The mode this evaluator answers "this activity rolls no check at all" under (issue 1096).
+ * The mode this evaluator answers "this activity rolls no check at all" under. Gathering `d100`
+ * and alchemy `checkMode: 'none'` are the two reachable members: the same state for everything
+ * this evaluator AUTHORS, differing only in WHY, which the modifier issue splits on. The name
+ * is this evaluator's vocabulary — "no check to AUTHOR" — not a claim that nothing is rolled.
  *
- * Gathering `d100` and alchemy `checkMode: 'none'` are the two reachable members. They are
- * the same state for everything this evaluator AUTHORS — no formula, no outcome tier and no
- * trigger — and the only rule that still applies is whether an authored check-modifier
- * selection reaches a roll (it does not, in either).
- *
- * They differ in WHY, and the modifier issue splits on it: alchemy `none` rolls nothing at
- * all, while gathering `d100` rolls the drop chance and simply cannot take modifiers yet.
- * The name is this evaluator's own vocabulary — "no check to AUTHOR" — not a claim that
- * nothing is rolled.
  * @type {'none'}
  */
 export const NO_CHECK_MODE = 'none';
@@ -142,26 +121,21 @@ export const CHECK_READINESS_MODES = Object.freeze(['simple', 'routed', 'progres
 const SUPPORTED_MODES = new Set(CHECK_READINESS_MODES);
 
 /**
- * The readiness mode for a RESOLVED check slot (issue 1096).
+ * The readiness mode for a RESOLVED check slot.
  *
- * `evaluateCheckReadiness` branches on `mode === 'routed'`, but no subsystem's authored
- * resolution mode is ever that string: crafting's is `routedByCheck`, `routedByIngredients`,
- * `simple`, `progressive` or `alchemy`, and alchemy's shape is its `checkMode` rather than
- * its resolution mode. Something has to translate — and the translation is ALREADY OWNED, by
- * `checkModifierResolver`'s `CRAFTING_CHECK_SLOTS` / `ALCHEMY_CHECK_SLOTS` /
- * `GATHERING_CHECK_SLOTS` maps, which decide which sub-config the ENGINE actually rolls.
+ * `evaluateCheckReadiness` branches on `mode === 'routed'`, but no subsystem's AUTHORED
+ * resolution mode is ever that string, so something has to translate — and the translation is
+ * ALREADY OWNED by `checkModifierResolver`'s slot maps, which decide which sub-config the
+ * ENGINE rolls.
  *
- * SO THIS TAKES THE SLOT, NOT THE MODE, and that is the whole point of the signature. A
- * second mapping from resolution mode to readiness mode is how the rail badge came to
- * evaluate the alchemy SIMPLE draft under ROUTED rules (the badge's draft was picked by one
- * mapping and its rules by another) and to demand a roll formula for alchemy `none`, a mode
- * that rolls nothing and whose route renders no formula field to clear it with. Reading the
- * slot means the check being evaluated and the rules it is evaluated under are chosen by the
- * same decision.
+ * SO THIS TAKES THE SLOT, NOT THE MODE, which is the whole point of the signature. A second
+ * mapping is how the rail badge came to evaluate the alchemy SIMPLE draft under ROUTED rules,
+ * and to demand a roll formula for alchemy `none` — a mode whose route renders no formula field
+ * to clear it with. Reading the slot means the check evaluated and the rules it is evaluated
+ * under are chosen by one decision.
  *
- * The slot names ARE the readiness modes — `simple`, `routed`, `progressive` — so this is a
- * total function with exactly one interesting case: `null`, which the resolvers return for a
- * mode that rolls no check at all, becomes {@link NO_CHECK_MODE}.
+ * The slot names ARE the readiness modes, so this is total with one interesting case: `null`,
+ * which the resolvers return for a mode that rolls no check, becomes {@link NO_CHECK_MODE}.
  *
  * @param {'simple'|'routed'|'progressive'|null|undefined} slot The `slot` field of
  *   `resolveActiveCraftingCheckFormula`, `resolveActiveSalvageCheckFormula` or
@@ -173,11 +147,8 @@ export function readinessModeForSlot(slot) {
 }
 
 /**
- * The section that owns an issue id, or `null` for an id no bucket claims.
- *
- * Returning `null` rather than a default section is deliberate: an unbucketed id is a
- * defect the test above catches at build time, and silently filing it under "The roll"
- * would put a dot on a section whose controls cannot clear it.
+ * The section that owns an issue id, or `null` for an id no bucket claims — deliberately not a
+ * default section, which would put a dot on a section whose controls cannot clear it.
  *
  * @param {string} id A {@link CHECK_READINESS_ISSUE_IDS} member.
  * @returns {string|null}
@@ -187,18 +158,12 @@ export function sectionForIssue(id) {
 }
 
 /**
- * Append one issue, refusing any id not in {@link CHECK_READINESS_ISSUE_IDS}.
+ * Append one issue, refusing any id not in {@link CHECK_READINESS_ISSUE_IDS}. The throw is the
+ * mechanism: a frozen exported array is only a convention, so the registry is made load-bearing
+ * by routing every emit through here.
  *
- * The throw is the mechanism. A frozen exported array is only a convention — nothing stops
- * a later edit pushing a literal straight onto `issues` — so the registry is made
- * load-bearing by routing every emit through here. The failure is loud and immediate
- * rather than a silently under-bucketed row on the Validation route.
- *
- * `data` is the optional interpolation payload for an issue whose sentence NAMES something
- * (issue 1117): the two bounds faults have to say WHICH entries carry them, because a shared
- * library can be long and "one of your modifiers has a bad bound" is not a repairable
- * instruction. The key is attached only when supplied, so every other issue keeps its
- * exact two-key shape and no consumer has to guard for it.
+ * `data` is the optional interpolation payload for an issue whose sentence NAMES something, and
+ * the key is attached only when supplied, so every other issue keeps its two-key shape.
  *
  * @param {CheckReadinessIssue[]} issues
  * @param {string} id
@@ -232,22 +197,15 @@ function routedOutcomes(check) {
 }
 
 /**
- * Readiness of a routed check's tier-STEP targets (issue 975), reported only once at
- * least one trigger sets `tierStep.mode === 'target'` — mirroring the outcome-tier
- * rules, which stay silent until a tier is authored.
- *
- * Two rules share one green tick, because both say the same thing to a GM: the
+ * Readiness of a routed check's tier-STEP targets, reported only once a trigger sets
+ * `tierStep.mode === 'target'` — mirroring the outcome-tier rules, which stay silent until a
+ * tier is authored. Two rules share one green tick, because both say the same thing: the
  * targets on this check name exactly one existing tier.
  *
- * - A DANGLING target (including one that has chosen no tier at all) no-ops at
- *   runtime; the relative↔fixed type switch dangles every `tierId` at once, so this
- *   is reachable by ordinary authoring and not only by import.
- * - MULTIPLE targets are guidance, not breakage. This is a static authoring count:
- *   it cannot know which conditions will match, or whether a roll will be forced, so
- *   it reports what happens if more than one does rather than calling the check broken.
- *
- * Extracted rather than inlined so the tier-step rules do not add branches to the
- * already-branchy `evaluateCheckReadiness`.
+ * - A DANGLING target no-ops at runtime, and the relative↔fixed type switch dangles every
+ *   `tierId` at once, so this is reachable by ordinary authoring and not only by import.
+ * - MULTIPLE targets are guidance rather than breakage: a static count cannot know which
+ *   conditions will match, so it reports what happens if more than one does.
  *
  * @param {object} check    Plain check draft.
  * @param {object[]} outcomes The ACTIVE outcome-tier list (relative or fixed).
@@ -274,24 +232,15 @@ function tierStepTargetReadiness(check, outcomes) {
 }
 
 /**
- * Whether a FIXED outcome set leaves a GAP — a roll value inside the set's own span that
- * no tier claims (issue 1095, DN6).
+ * Whether a FIXED outcome set leaves a GAP — a roll value inside the set's own span that no
+ * tier claims. `findRangeConflicts` sees only OVERLAP and `start > end`, so a gapped set raises
+ * nothing else; the state is reachable by ordinary authoring, and a fixed routed check has no
+ * `clampToNearest` rescue, so the attempt is rolled but unrouted.
  *
- * `findRangeConflicts` sees only OVERLAP and `start > end`, so a gapped set — Slag 1–9,
- * Rough 11–17, with 10 claimed by nobody — raises nothing at all today. That state is
- * reachable by ordinary authoring (edit one boundary and stop), and a fixed routed check
- * has no `clampToNearest` rescue: a roll of 10 matches no tier, so the attempt is rolled
- * but unrouted. The band strip's fallback note is its only signal, and that note never
- * reaches the section dot, the rail badge or the Validation route — so the four surfaces
- * disagree about whether the check is ready.
- *
- * SPAN-INTERIOR ONLY. The gap is measured between the set's own minimum and maximum, so a
- * set that simply does not cover every value a die can roll is NOT a gap: `2d20` rolls
- * 2–40 and a GM who authors 7–34 has authored a deliberate window, not a mistake. Only a
- * hole BETWEEN two authored tiers is reported.
- *
- * Invalid and overlapping ranges are excluded first: both already raise their own
- * `critical`, and a `start > end` range would otherwise manufacture a phantom gap.
+ * SPAN-INTERIOR ONLY: a set that does not cover every value a die can roll is NOT a gap — a GM
+ * who authors 7–34 of a 2–40 range has authored a deliberate window. Only a hole BETWEEN two
+ * authored tiers is reported, and invalid and overlapping ranges are excluded first, both
+ * raising their own `critical` and a `start > end` range otherwise manufacturing a phantom gap.
  *
  * @param {object[]} outcomes The active FIXED outcome-tier list.
  * @param {Set<number>} excluded Indices already reported invalid or overlapping.
@@ -307,7 +256,6 @@ function fixedRangesHaveGap(outcomes, excluded) {
     .sort((a, b) => a.start - b.start);
   if (spans.length < 2) return false;
   // Ranges are INCLUSIVE on both ends, so adjacency is `next.start === previous.end + 1`.
-  // Anything larger leaves at least one unclaimed value between the two.
   let reach = spans[0].end;
   for (const span of spans.slice(1)) {
     if (span.start > reach + 1) return true;
@@ -317,60 +265,30 @@ function fixedRangesHaveGap(outcomes, excluded) {
 }
 
 /**
- * Readiness of the check-modifier selection for this activity (issue 1095).
+ * Readiness of the check-modifier selection for this activity. Every rule is keyed on what this
+ * activity would ACTUALLY roll rather than on what the catalogue contains, because the catalogue
+ * is shared by all three and a gathering check has no business reporting a crafting-only entry.
+ * Eligibility is resolved through the resolver's own `resolveEligibleModifierIds`, so readiness
+ * and the roll cannot disagree about which entries apply.
  *
- * Two rules, both keyed on what this activity would ACTUALLY roll rather than on what the
- * catalogue contains, because the catalogue is shared by all three activities and a
- * gathering check has no business reporting a crafting-only entry:
+ * A ROLL-SHAPED EXPRESSION IS NOT ONE OF THEM: a check appends a rolling modifier AS DICE, so
+ * the blocking `modifierRollExpression` is RETIRED rather than reworded
+ * (`openspec/specs/resolution-modes/spec.md` → "Check Source").
  *
- * A ROLL-SHAPED EXPRESSION IS NOT ONE OF THEM (issue 1118). Between issues 1117 and 1118 an
- * eligible entry whose expression rolled dice raised a blocking `modifierRollExpression`,
- * because a check appended one resolved scalar as a dice-grammar `Constant` and a roll
- * cannot be one. A check now appends a rolling modifier AS DICE, so the rule it enforced no
- * longer exists and the id is retired rather than reworded — there is nothing left to report
- * about an entry that rolls.
- *
- * - **`modifierBoundsInverted`** (`critical`, BLOCKING). An entry whose authored
- *   `min > max` contributes nothing until it is repaired — the refuse posture
- *   `INVALID_CHARACTER_MODIFIER_BOUNDS` already takes for gathering drop modifiers,
- *   adopted deliberately so a check modifier and a drop modifier fail the same way. It is
- *   not a warning: the entry is silently worth nothing, which is exactly the class of
- *   defect readiness exists to surface. A dice expression does not exempt an entry from it:
- *   the bounds clamp a rolled result exactly as they clamped a resolved number.
- * - **`modifierBoundsUnsafe`** (`critical`, BLOCKING). An entry whose authored bound is
- *   finite but not expressible as a dice-grammar `Constant` — `1e21`, `1e-7`. It is a
- *   SEPARATE id rather than a second cause folded into the one above, because the two need
- *   different advice: "your minimum is above your maximum" and "this number is too large to
- *   roll" are not the same repair. It is `critical` for a stronger reason than its sibling:
- *   the resolver contains it to the offending entry, but the bound it would otherwise clamp
- *   to poisons the flat SUM, and `appendCheckModifierTerm` drops the WHOLE term for an
- *   exponent-notation value — so before the containment this single entry deleted every
- *   other flat modifier from the roll. It bites a rolling entry the same way, where the
- *   bound would be emitted into a `min(…)`/`max(…)` the grammar cannot parse.
- * - **`modifierExpressionInvalid`** (`critical`, BLOCKING; issue 1118 review). An eligible
- *   entry whose EXPRESSION cannot contribute at all — text the reducer cannot read (`1d4]`,
- *   `damage`, an empty expression) or a fragment the engine cannot roll (`MAX(1d4, 2)`,
- *   `1000d6`, `1d4 + .5`). Retiring `modifierRollExpression` left this class reported by
- *   NOTHING: the entry silently contributes zero, which is exactly the defect readiness
- *   exists to surface, and the crash cases are worse than silent because appending them would
- *   have failed the check outright. Bounds faults are excluded from it deliberately — they
- *   are reported above under repairs of their own, and one entry named under two different
- *   instructions is worse than one.
- * - All three NAME the offending entries, because a shared library can be long and "one of
- *   your modifiers has a bad bound" is not a repairable instruction. They are raised ONLY for
- *   entries this activity actually selects: a fault on an entry only gathering drop rows
+ * - **`modifierBoundsInverted`** and **`modifierBoundsUnsafe`** (`critical`, BLOCKING) are the
+ *   two bounds faults `openspec/specs/resolution-modes/spec.md` → "Check Source" states, kept
+ *   as SEPARATE ids there and here because the two need different repairs.
+ * - **`modifierExpressionInvalid`** (`critical`, BLOCKING). An eligible entry whose EXPRESSION
+ *   cannot contribute at all — text the reducer cannot read, or a fragment the engine cannot
+ *   roll. Bounds faults are excluded from it deliberately: they are reported above under
+ *   repairs of their own, and one entry named under two different instructions is worse.
+ * - All three NAME the offending entries, because a shared library can be long, and are raised
+ *   ONLY for entries this activity selects: a fault on an entry only gathering drop rows
  *   reference is not this check's problem.
  * - **`modifiersInertNoCheck` / `modifiersInertNoModifierSupport` / `modifiersInertNoFormula`**
- *   (`warning`). An eligible selection that reaches no roll, under each of the three reasons
- *   it can: the mode rolls nothing, the mode rolls but takes no modifiers yet (gathering
- *   `d100`), or the mode rolls and has no formula authored. These are the ONE owned path for
- *   "the gathering d100 check-modifier section is inert", and they are gated on the selection being
- *   NON-EMPTY for the same reason `CraftingModifierCatalogueCard` gates its notice on a
- *   non-empty catalogue: warning that nothing does anything, when nothing was authored,
- *   is noise on first contact.
- *
- * Eligibility is resolved through the resolver's own `resolveEligibleModifierIds`, so
- * readiness and the roll cannot disagree about which entries this activity applies.
+ *   (`warning`): an eligible selection reaching no roll, under each of the three reasons it can.
+ *   These are the ONE owned path for that state, and they are gated on the selection being
+ *   NON-EMPTY, because warning that nothing does anything when nothing was authored is noise.
  *
  * @param {object|null} modifierContext A `buildCheckModifierContext` bag, or null when the
  *   caller has no system to build one from (every assertion below then no-ops).
@@ -398,16 +316,14 @@ function checkModifierReadiness(modifierContext, { rollsNoCheck, hasRollFormula,
       .filter((entry) => entry && typeof entry === 'object' && typeof entry.id === 'string')
       .map((entry) => [entry.id, entry])
   );
-  // The offending ENTRIES, not just a boolean: a shared library can be long, and "one of
-  // your modifiers has a bad bound" is not a repairable instruction.
+  // The offending ENTRIES rather than a boolean: a long shared library needs naming.
   const faulted = eligible
     .map((id) => ({ entry: byId.get(id), bounds: resolveModifierBounds(byId.get(id)) }))
     .filter(({ entry }) => Boolean(entry));
   const inverted = namesOf(faulted.filter(({ bounds }) => bounds.inverted));
   const unsafe = namesOf(faulted.filter(({ bounds }) => bounds.unsafe));
-  // An entry whose EXPRESSION cannot contribute — bounds set aside, since those are reported
-  // above under their own repairs. Asked of the resolver rather than re-derived, so what
-  // readiness calls unusable and what the roll silently drops are one decision.
+  // An entry whose EXPRESSION cannot contribute, bounds set aside. Asked of the resolver rather
+  // than re-derived, so what readiness calls unusable and what the roll drops are one decision.
   const unusable = namesOf(
     faulted.filter(
       ({ entry, bounds }) =>
@@ -425,12 +341,9 @@ function checkModifierReadiness(modifierContext, { rollsNoCheck, hasRollFormula,
   if (unusable !== '') {
     pushIssue(issues, 'modifierExpressionInvalid', 'critical', { names: unusable });
   }
-  // The two no-check modes reach no roll for OPPOSITE reasons, so they cannot share a
-  // sentence. Alchemy `none` genuinely rolls nothing, and its remedy is to pick a mode that
-  // rolls. Gathering `d100` DOES roll — the d100 against each drop's chance IS that mode's
-  // check — it simply has no seam to add modifiers to yet, and telling that GM to "change
-  // the resolution mode to one that rolls a check" is wrong twice over: the mode already
-  // rolls one, and the two modes that would take modifiers cannot be selected today.
+  // The two no-check modes reach no roll for OPPOSITE reasons, so they cannot share a sentence:
+  // alchemy `none` rolls nothing and its remedy is to pick a mode that rolls, while gathering
+  // `d100` DOES roll and simply has no seam to add modifiers to.
   if (rollsNoCheck) {
     const id =
       activity === 'gathering' ? 'modifiersInertNoModifierSupport' : 'modifiersInertNoCheck';
@@ -444,19 +357,15 @@ function checkModifierReadiness(modifierContext, { rollsNoCheck, hasRollFormula,
  *
  * @param {object} check Plain check draft (the active draft for its mode).
  * @param {object} [options]
- * @param {'routed'|'simple'|'progressive'|'none'} [options.mode] The mode to evaluate
- *   under — a {@link CHECK_READINESS_MODES} member, which callers derive from the ENGINE's
- *   resolved slot through {@link readinessModeForSlot}. An unrecognized mode THROWS rather
- *   than defaulting: a caller handing through a raw resolution mode (`routedByCheck`,
- *   `alchemy`, `d100`) silently skipped every rule that mode has, on the one surface a GM
- *   consults to find out whether a check works, and a default is what made that silent.
- * @param {object|null} [options.modifierContext] A `buildCheckModifierContext` bag for
- *   this activity (issue 1095). Omitted by a caller that has no system to build one from,
- *   in which case no check-modifier rule is evaluated.
- * @param {'crafting'|'salvage'|'gathering'} [options.activity] Which activity's check this
- *   is. It changes exactly one answer — WHY a no-check mode's modifier selection reaches no
- *   roll — because gathering's no-check mode still rolls and the others' do not. Omitting it
- *   keeps the mode-rolls-nothing reading, which is right for every non-gathering caller.
+ * @param {'routed'|'simple'|'progressive'|'none'} [options.mode] The mode to evaluate under, a
+ *   {@link CHECK_READINESS_MODES} member callers derive through {@link readinessModeForSlot}.
+ *   An unrecognized mode THROWS rather than defaulting: a caller handing through a raw
+ *   resolution mode silently skipped every rule that mode has.
+ * @param {object|null} [options.modifierContext] A `buildCheckModifierContext` bag, omitted by
+ *   a caller with no system to build one from, in which case no modifier rule is evaluated.
+ * @param {'crafting'|'salvage'|'gathering'} [options.activity] Which activity's check this is.
+ *   It changes exactly one answer — WHY a no-check mode's modifier selection reaches no roll —
+ *   and omitting it keeps the mode-rolls-nothing reading.
  * @returns {{ checks: CheckReadinessCheck[], issues: CheckReadinessIssue[] }}
  */
 export function evaluateCheckReadiness(check = {}, options = {}) {
@@ -471,19 +380,16 @@ export function evaluateCheckReadiness(check = {}, options = {}) {
   const checks = [];
   const issues = [];
 
-  // A mode with NO CHECK TO AUTHOR: gathering `d100` (whose check is the fixed roll against
-  // each drop's chance, not something authored here) and alchemy `checkMode: 'none'` (which
-  // rolls nothing at all). Neither has a formula, outcome tier or trigger to validate.
+  // A mode with NO CHECK TO AUTHOR: neither gathering `d100` nor alchemy `none` has a formula,
+  // outcome tier or trigger to validate.
   //
-  // IT IS NOT A BARE EARLY RETURN (issue 1095). The check-modifier selection is authored on
-  // the activity's check regardless of the resolution mode, so a GM can author one and reach
-  // a mode that rolls nothing. Reporting `modifiersInertNoCheck` here is the only owned path
-  // for that state; returning empty left it unreported.
+  // IT IS NOT A BARE EARLY RETURN. A check-modifier selection is authored regardless of the
+  // resolution mode, so reporting `modifiersInertNoCheck` here is the only owned path for a
+  // selection that reaches a mode rolling nothing.
   //
-  // AND IT MUST NOT REPORT `noRollFormula` (issue 1096). It did, for alchemy `none`, because
-  // a second resolution-mode mapping coerced that mode to `simple`: a permanent "1 issue"
-  // badge on the rail, raised against a route that renders no formula field, so no control
-  // the GM could reach would ever clear it.
+  // AND IT MUST NOT REPORT `noRollFormula`. It did, for alchemy `none`, because a second
+  // resolution-mode mapping coerced that mode to `simple` — a permanent rail badge raised
+  // against a route that renders no formula field to clear it with.
   if (mode === NO_CHECK_MODE) {
     const modifiers = checkModifierReadiness(modifierContext, {
       rollsNoCheck: true,
@@ -493,23 +399,15 @@ export function evaluateCheckReadiness(check = {}, options = {}) {
     return { checks: modifiers.checks, issues: modifiers.issues };
   }
 
-  // Every authored check needs a roll formula to resolve. Mirrors the
-  // system-level "warn always" rule for a missing routed/progressive formula.
+  // Every authored check needs a roll formula to resolve, READ POST-SHIM, which is the whole
+  // point of this derivation rather than a bare `trimmed(check?.rollFormula)`. `checkUsable` —
+  // what the engine, the inert-cause projection and the recipe editor all dispatch on — is
+  // post-shim, so reading the RAW field ticked "Has a roll formula" green for a check that
+  // cannot roll at all, falsifying the invariant `resolution-modes/spec.md` asserts.
   //
-  // READ POST-SHIM (issue 1094), and this is the whole point of the derivation rather than
-  // a `trimmed(check?.rollFormula)`. `checkUsable` — the value the engine, the inert-cause
-  // projection and the recipe editor all dispatch on — is post-shim, so reading the RAW
-  // field here made this tab tick "Has a roll formula" green for `@craftingmod`,
-  // `1d20 * @craftingmod` and `max(@craftingmod, 2)`: a check that cannot roll at all,
-  // reported as ready, inside the module named `checksReadiness`. That falsified the
-  // invariant `resolution-modes/spec.md` asserts, on the one surface a GM consults to find
-  // out whether a check works.
-  //
-  // ONE PLAN, not one plan and one classifier. `planRetiredPlaceholderStrip` is the same
-  // decider `stripRetiredModifierPlaceholder` (and therefore `checkUsable`) reduces, so
-  // deriving BOTH the formula tick and the severity split below from this single call is
-  // what makes them incapable of disagreeing — see the split's own note for the rows that
-  // caught them disagreeing.
+  // ONE PLAN, not one plan and one classifier: `planRetiredPlaceholderStrip` is the same decider
+  // `stripRetiredModifierPlaceholder` reduces, so deriving BOTH the formula tick and the
+  // severity split below from this single call makes them incapable of disagreeing.
   const authoredFormula = trimmed(check?.rollFormula);
   const plan = planRetiredPlaceholderStrip(authoredFormula);
   const hasRollFormula = plan.outcome !== 'refused' && trimmed(plan.formula) !== '';
@@ -518,42 +416,28 @@ export function evaluateCheckReadiness(check = {}, options = {}) {
     pushIssue(issues, 'noRollFormula', 'warning');
   }
 
-  // The retired check-modifier placeholder, typed after its retirement (issue 1094). The
-  // formula field is free text, so nothing stops a GM who read an old guide from typing
-  // it, and the shim would then remove it SILENTLY on the way to the roll.
+  // The retired check-modifier placeholder, typed after its retirement: the formula field is
+  // free text, so nothing stops a GM who read an old guide from typing it and the shim would
+  // then remove it SILENTLY on the way to the roll.
   //
-  // THE SEVERITY SPLITS ON THE STRIP OUTCOME, because the two cases need opposite advice.
-  // A STRIPPED placement is genuinely ignorable: the removal is lossless, so whatever was
-  // authored around it still rolls, the modifiers still apply, and only what the GM
-  // believes about WHY is wrong — so "it is ignored and removed before the roll, delete it"
-  // is true and a warning is proportionate. (A placeholder-ONLY formula is the degenerate
-  // case: it strips losslessly to nothing, and `hasRollFormula` above is what reports that
-  // there is no formula left, because "delete the placeholder" and "author a formula" are
-  // different instructions and must not be merged into one issue.) A REFUSED
-  // one is not ignorable: the whole formula is discarded and the check does not roll at all, and
-  // telling that GM to "just delete the placeholder" is actively wrong, because deleting it
-  // out of `1d20 * @craftingmod` or `max(@craftingmod, 2)` leaves `1d20 * ` or `max(, 2)` —
-  // still broken. That one is critical and says the formula must be rewritten.
+  // THE SEVERITY SPLITS ON THE STRIP OUTCOME, because the two cases need opposite advice. A
+  // STRIPPED placement is ignorable — the removal is lossless, so whatever was authored around
+  // it still rolls and only the GM's belief about WHY is wrong — and a placeholder-ONLY formula
+  // is the degenerate case, reported by `hasRollFormula` above rather than merged into this one,
+  // "delete the placeholder" and "author a formula" being different instructions. A REFUSED
+  // placement discards the WHOLE formula, so "just delete the placeholder" is actively wrong:
+  // deleting it out of `1d20 * @craftingmod` leaves `1d20 * `, still broken.
   //
-  // IT ASKS THE DECIDER, NOT THE CLASSIFIER, and the distinction is not cosmetic. This
-  // split used to test `describeRetiredModifierPlaceholder(...).nonAdditive`, which is only
-  // the FIRST half of what decides usability: `planRetiredPlaceholderStrip` refuses a
-  // non-additive placement AND an additive one whose residue is structurally incomplete.
-  // The two disagree on exactly the rows the residue check was added for — `1d20 * -@craftingmod`,
-  // `1d20 - @craftingmod -` and `@craftingmod +` are all `nonAdditive: false` and all refused —
-  // so the tab told that GM the placeholder was "ignored and removed before the roll, so
-  // delete it", and deleting it leaves `1d20 * `, still refused, with `hasRollFormula` then
-  // reading GREEN because nothing re-validates a placeholder-free formula. The migration
-  // meanwhile counted the same formula `untouched` and said it would not roll. One decider
-  // is the only way two surfaces can give one instruction.
+  // IT ASKS THE DECIDER, NOT THE CLASSIFIER, and that is not cosmetic. Testing
+  // `describeRetiredModifierPlaceholder(...).nonAdditive` covers only the first half of
+  // usability: `planRetiredPlaceholderStrip` refuses a non-additive placement AND an additive
+  // one whose residue is structurally incomplete, and the two disagree on exactly the rows the
+  // residue check exists for. One decider is the only way two surfaces give one instruction.
   //
-  // The legacy `routed.rollExpression` alias is planned too, DEFENSIVELY rather than as a
-  // load-bearing branch: both `CraftingSystemManager._normalizeRoutedCraftingCheck` and the
-  // manager root's `cloneRoutedCheck` fold it into `rollFormula` and neither emits the key,
-  // so no draft this tab is handed carries a live one. The `1.21.0` migration sweeps it
-  // because it reads the raw SETTING, which is a different input. It stays because this is
-  // a pure evaluator over a plain check object with no normalizer of its own, and it plans
-  // through the same decider so the two branches cannot answer differently.
+  // The legacy `routed.rollExpression` alias is planned too, DEFENSIVELY: both normalizers fold
+  // it into `rollFormula` and neither emits the key, so no draft this tab is handed carries a
+  // live one. It stays because this is a pure evaluator with no normalizer of its own, and it
+  // plans through the same decider so the two branches cannot answer differently.
   const legacyPlan = planRetiredPlaceholderStrip(trimmed(check?.rollExpression));
   if (plan.outcome === 'refused' || legacyPlan.outcome === 'refused') {
     pushIssue(issues, 'retiredPlaceholderBreaksFormula', 'critical');
@@ -561,9 +445,8 @@ export function evaluateCheckReadiness(check = {}, options = {}) {
     pushIssue(issues, 'retiredPlaceholderInFormula', 'warning');
   }
 
-  // Routed checks route an outcome tier to a result set by tier NAME, and only
-  // SUCCESS tiers can be routed. The outcome-tier rules below are only meaningful
-  // once at least one tier has been authored.
+  // Routed checks route an outcome tier to a result set by tier NAME, and only SUCCESS tiers
+  // can be routed, so the rules below wait until at least one tier is authored.
   if (mode === 'routed') {
     const { type, outcomes } = routedOutcomes(check);
     if (outcomes.length > 0) {
@@ -579,11 +462,9 @@ export function evaluateCheckReadiness(check = {}, options = {}) {
         pushIssue(issues, 'noSuccessOutcome', 'critical');
       }
 
-      // Fixed tiers own a CONTIGUOUS, non-overlapping segment of the roll value range.
-      // All three of these are `critical` — including the two that predate issue 1095.
-      // No copy or test may describe `rangeInvalid` or `rangeOverlap` as a warning: each
-      // leaves a roll value that routes to the wrong tier or to none, which fails the
-      // attempt rather than degrading it.
+      // Fixed tiers own a CONTIGUOUS, non-overlapping segment of the roll value range, and all
+      // three faults are `critical`: no copy or test may describe `rangeInvalid` or
+      // `rangeOverlap` as a warning, each leaving a roll value routed wrongly or not at all.
       if (type === 'fixed') {
         const conflicts = findRangeConflicts(outcomes);
         const rangesValid = conflicts.invalid.size === 0;
@@ -596,7 +477,6 @@ export function evaluateCheckReadiness(check = {}, options = {}) {
         if (!rangesNoOverlap) {
           pushIssue(issues, 'rangeOverlap', 'critical');
         }
-        // The third range rule, and the one nothing reported before issue 1095 (DN6).
         const excluded = new Set([...conflicts.invalid, ...conflicts.overlapping]);
         const gapped = fixedRangesHaveGap(outcomes, excluded);
         checks.push({ id: 'rangesContiguous', satisfied: !gapped });
@@ -606,8 +486,8 @@ export function evaluateCheckReadiness(check = {}, options = {}) {
       }
     }
 
-    // Outside the tier-count gate on purpose: a target authored before any tier
-    // exists is exactly the dangling case a GM most needs told about.
+    // Outside the tier-count gate on purpose: a target authored before any tier exists is
+    // exactly the dangling case a GM most needs told about.
     const tierStep = tierStepTargetReadiness(check, outcomes);
     checks.push(...tierStep.checks);
     issues.push(...tierStep.issues);
