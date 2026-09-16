@@ -1,19 +1,10 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  The manager's ONE modal-dialog chrome (issue 877).
-
-  Every centred, portaled manager dialog — the folder-mapping step and the post-import
-  reference report today — renders through this component, so "modal dialog" has a
-  single implementation rather than one per feature. It owns the chrome only: the
-  portal into the nearest Fabricate application root, the fixed centring and panel surface, the compact
-  title + subtitle heading, the round close control, and the right-aligned footer rail.
-  Everything between the header and the footer is the caller's `body` snippet, which
-  keeps its own component's style scope, so a feature's row/list styling stays with
-  that feature.
-
-  `rootAttributes` exists so a caller can keep its own stable test/automation hook on
-  the dialog root (e.g. `data-import-mapping`, pinned by the Foundry smoke harness)
-  without this component knowing anything about that feature.
+  The manager's ONE modal-dialog chrome (issue 877): every centred, portaled manager dialog renders
+  through it, so "modal dialog" has a single implementation rather than one per feature. It owns the
+  chrome only — the portal, the fixed centring and panel surface, the title/subtitle heading, the
+  round close control and the right-aligned footer rail. Everything between header and footer is the
+  caller's `body` snippet, which keeps its own style scope, and `rootAttributes` lets a caller keep
+  its own stable automation hook on the dialog root without this component knowing the feature.
 -->
 <script>
   import { dismissOnOutsideClick } from '../../actions/dismissOnOutsideClick.js';
@@ -26,22 +17,17 @@
     title = '',
     subtitle = '',
     closeLabel = 'Close',
-    // Any CSS length; the panel still clamps to the viewport.
     width = '560px',
-    // Extra attributes for the dialog root (feature-owned automation hooks).
     rootAttributes = {},
     onClose = () => {},
-    // Snippets: the scrollable content and the footer's action rail.
     body = undefined,
     footer = undefined,
   } = $props();
 
-  // Resolved from the dialog node UPWARDS, never by querying the document for an application
-  // root by name (issue 1466). The old lookup was `document.querySelector('.fabricate-manager')`,
-  // which finds the manager window wherever it happens to be — so this chrome opened from any
-  // other application would have portaled its dialog into a DIFFERENT WINDOW, and its
-  // `|| document.body` fallback made that silent. An ancestor walk can only ever land inside the
-  // application the dialog was actually opened in.
+  // Resolved from the dialog node UPWARDS, never by querying the document for an application root
+  // by name (issue 1466): a `document.querySelector` lookup finds the manager window wherever it
+  // is, so this chrome opened from another application portaled into a DIFFERENT WINDOW and the
+  // `|| document.body` fallback made that silent.
   function getHost(node) {
     return resolveOverlayHost(node, { component: 'ManagerModal' });
   }

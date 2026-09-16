@@ -1,22 +1,17 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  The GM essence library (issue 1036): toolbar, selection bar, rows or cards, pager, with the
-  shell's own `.manager-inspector` column carrying `EssenceBrowserInspector` or, while a bulk
-  selection exists, `EssenceBulkEditPanel`.
-
-  It is the third studio to get this shape and it borrows rather than re-derives: the pure
-  filter/sort/paginate pipeline is `essenceBrowserModel.js`, the selection maths is the shared
-  `bulkSelectionModel.js` leaf reached through `essenceBulkEditModel.js`, the multi-select row is
-  `BulkSelectionToolbar`, and the pager is `Pagination`.
+  The GM essence library (issue 1036): toolbar, selection bar, rows or cards, pager, with the shell's
+  own `.manager-inspector` column carrying `EssenceBrowserInspector` or, while a bulk selection
+  exists, `EssenceBulkEditPanel`. It is the third studio to get this shape and it borrows rather than
+  re-derives — `essenceBrowserModel.js`, `bulkSelectionModel.js` through `essenceBulkEditModel.js`,
+  `BulkSelectionToolbar` and `Pagination`.
 
   Invariants:
-  - The browser state is LIFTED: search, status, source, sort, view mode, page and the bulk
-    selection all live on ONE `$state` object the manager root owns and binds here, so opening an
-    essence no longer resets them. Unbound, the local fallback keeps every control reactive.
-  - There is no `role="table"` head, so the rows are a plain container and carry no `role="row"` /
-    `role="cell"` / `aria-selected` — a card row has no columns to label, and `aria-selected` is
-    not valid on a plain `div`. Selection is the `.is-selected` ring plus the inspector heading,
-    matching `RecipesBrowserView`.
+  - The browser state is LIFTED: search, status, source, sort, view mode, page and the bulk selection
+    live on ONE `$state` object the manager root owns and binds here. Unbound, the local fallback
+    keeps every control reactive.
+  - There is no `role="table"` head, so the rows carry no `role="row"` / `role="cell"` /
+    `aria-selected` — a card row has no columns to label, and `aria-selected` is not valid on a plain
+    `div`. Selection is the `.is-selected` ring plus the inspector heading.
 -->
 <script>
   import Chip from '../../components/Chip.svelte';
@@ -45,11 +40,9 @@
   import ManagerToolbar from '../../components/ManagerToolbar.svelte';
 
   let {
-    // The world-scope seam (issue 1374). `scope`, `actions` and `systemId` are three of the four
-    // keys `essenceScopeProps` supplies, so declaring them is correct rather than hazardous: the
-    // spread owns each name, and the lookup never falls through to the bundle thunk. `systems` is
-    // deliberately NOT declared — this screen resolves membership against `scope.entries`, and
-    // the narrowed `{id, name}` roster answers none of the three questions it asks.
+    // The world-scope seam (issue 1374): three of the four keys `essenceScopeProps` supplies, so
+    // the lookup never falls through to the bundle thunk. `systems` is deliberately NOT declared —
+    // membership is resolved against `scope.entries`, which the narrowed roster cannot answer.
     scope = null,
     actions = null,
     systemId = '',
@@ -68,11 +61,9 @@
     browserState = $bindable(null),
   } = $props();
 
-  // THE MEMBERSHIP FILTER IS COMPONENT-LOCAL, AND THAT IS A DECISION. Every other axis on this
-  // toolbar is lifted so it survives the editor round-trip; this one is not a preference, because
-  // `All world essences` puts rows on screen that this system does not have, and a GM returning
-  // from an editor to a list of entities absent from the system they are editing would read it as
-  // data loss. It resets to `in` on every mount.
+  // THE MEMBERSHIP FILTER IS COMPONENT-LOCAL, AND THAT IS A DECISION: `All world essences` puts
+  // rows on screen this system does not have, and a GM returning from an editor to a list of absent
+  // entities would read it as data loss. It resets to `in` on every mount.
   let membershipFilter = $state('in');
 
   let ownBrowserState = $state(createEssenceBrowserState());
@@ -80,14 +71,10 @@
   // nested writes are reactive and, when bound, propagate back to the root.
   const ui = $derived(browserState ?? ownBrowserState);
 
-  // Switching system resets the SOURCE filter, the page and the bulk selection: a source filter
-  // names link states of a vocabulary the new system does not share, and the selected ids name
-  // essences it does not have. Status, sort, view mode and page size are NOT reset, because
-  // enabled means the same thing in every system.
-  //
+  // Switching system resets the SOURCE filter, the page and the bulk selection, whose subjects the
+  // new system does not share; status, sort, view mode and page size are preferences and are not.
   // The sentinel is `ui.systemId`, PERSISTED on the lifted state rather than a component-local
-  // `$state`: a local one re-initialises to '' on every mount, so returning from the editor would
-  // be misread as a system switch and would wipe the state this object exists to preserve.
+  // `$state`, which re-initialises to '' on every mount and would misread a return as a switch.
   $effect(() => {
     if (selectedSystemId === ui.systemId) return;
     ui.searchTerm = '';
@@ -136,10 +123,9 @@
     all: Math.max(worldEntries.length, (essenceCards || []).length),
   });
 
-  // BOTH COUNTS ARE ALWAYS ON SCREEN, which is why this axis is a segmented control rather than
-  // the `<select>` it shipped as: the pair is the fact, not either half of it. The count goes in
-  // the primitive's own `count` slot rather than into the label string, which is the rendering
-  // the status segments beside it already use.
+  // BOTH COUNTS ARE ALWAYS ON SCREEN, which is why this axis is a segmented control rather than the
+  // `<select>` it shipped as: the pair is the fact, not either half. The count rides the
+  // primitive's own `count` slot, as the status segments beside it do.
   const membershipOptions = $derived([
     {
       value: 'in',
@@ -155,12 +141,8 @@
     },
   ]);
 
-  /**
-   * The world essences this system has NO record for, projected into the card shape the row
-   * renders, so one list can carry both. `enabled: true` is not a fiction: `addToSystem` seeds a
-   * membership record with `enabled: true`, so it is what this row WILL be the moment the Add
-   * beside it is pressed.
-   */
+  /** The world essences this system has NO record for, in the card shape, so one list carries both.
+      `enabled: true` is not a fiction: `addToSystem` seeds a membership record with it. */
   const absentCards = $derived(
     membershipFilter === 'all' && membershipAvailable
       ? worldEntries
@@ -182,31 +164,17 @@
   );
   const listCards = $derived([...(essenceCards || []), ...absentCards]);
 
-  /**
-   * One row's three-state membership answer.
-   *
-   * @param {object} essence a rendered card.
-   * @returns {string} one of `absent` / `disabled` / `enabled`.
-   */
+  /** One row's membership answer: `absent`, `disabled` or `enabled`. */
   function membershipStateOf(essence) {
     if (!memberIds.has(essence?.id)) return 'absent';
     return essenceSystemState({ member: true, enabled: essence?.enabled !== false });
   }
 
   /**
-   * One row's summary line: what this essence DOES in this system, section by section.
-   *
-   * IT NAMES THE VALUE; the shipped line named the STATE. `Effect source overridden here` said
-   * the same four words on every row, naming nothing, so two rows overriding different things
-   * read identically. The override mark is a SUFFIX, not the subject — an inheriting section
-   * states its value with no parenthesis, which is why every member row now carries a line where
-   * only overriding rows did.
-   *
-   * What it cannot say: a macro is stored as a UUID and the store publishes no resolved name for
-   * it, so the macro clause carries `essenceShortValueName`'s terminal segment.
-   *
-   * @param {object} essence a rendered card.
-   * @returns {Array<{section: string, label: string}>}
+   * One row's summary line: what this essence DOES in this system, section by section. IT NAMES THE
+   * VALUE, where the shipped line named the STATE and so read identically on every overriding row;
+   * the override mark is a SUFFIX, not the subject. A macro is stored as a UUID with no resolved
+   * name published, so that clause carries `essenceShortValueName`'s terminal segment.
    */
   function summaryClauses(essence) {
     if (!membershipAvailable || !memberIds.has(essence?.id)) return [];
@@ -227,16 +195,8 @@
     return clauses;
   }
 
-  /**
-   * The effect-source clause, in three states. A BROKEN LINK IS ITS OWN WORDING rather than the
-   * plain phrase: the row's Effects chip already carries the breakage in a warning tone and a
-   * title, and this is the same fact in words beside it.
-   *
-   * An early-return chain, not a nested ternary: SonarCloud reports S3358 in a file it indexes.
-   *
-   * @param {object} essence
-   * @returns {string}
-   */
+  /** The effect-source clause, in three states; A BROKEN LINK IS ITS OWN WORDING. An early-return
+      chain rather than a nested ternary, which SonarCloud reports as S3358. */
   function effectClause(essence) {
     if (essence?.hasEffectTransfer !== true) {
       return text('FABRICATE.Admin.Manager.Essence.SummaryNoEffects', 'No effects');
@@ -256,25 +216,14 @@
     });
   }
 
-  /**
-   * The macro clause, in two states.
-   *
-   * @param {object} essence
-   * @returns {string}
-   */
+  /** The macro clause, in two states. */
   function macroClause(essence) {
     const name = essenceShortValueName(essence?.propertyMacroUuid);
     if (!name) return text('FABRICATE.Admin.Manager.Essence.SummaryNoMacro', 'No macro');
     return format('FABRICATE.Admin.Manager.Essence.SummaryMacro', 'Macro: {name}', { name });
   }
 
-  /**
-   * Mark a clause as this system's own rather than the world's.
-   *
-   * @param {string} clause
-   * @param {boolean} overridden
-   * @returns {string}
-   */
+  /** Mark a clause as this system's own rather than the world's. */
   function withOverride(clause, overridden) {
     if (!overridden) return clause;
     return format('FABRICATE.Admin.Manager.Essence.SummaryOverride', '{clause} (override)', {
@@ -303,10 +252,9 @@
       : listCards
   );
 
-  // THE STATUS AND SOURCE AXES ARE STILL THREADED, AND ARE NOW ALWAYS `all`. The two controls
-  // that wrote them are gone from the bar. The pure model keeps both axes because they are a
-  // property of a browser pipeline three studios share rather than of this toolbar, and pinning
-  // them here is what makes the removal a TOOLBAR change.
+  // THE STATUS AND SOURCE AXES ARE STILL THREADED AND NOW ALWAYS `all`: the pure model keeps them
+  // because they belong to a pipeline three studios share, and pinning them here is what makes the
+  // removal a TOOLBAR change.
   const model = $derived(
     buildEssenceBrowserModel(searchedEssences, {
       status: ui.statusFilter,
@@ -426,9 +374,7 @@
 
 <main class="manager-main" aria-label={text('FABRICATE.Admin.Manager.Essence.Title', 'Essences')}>
   <!-- `tabindex="-1"` makes this landmark a FOCUS TARGET without making it a tab stop (issue
-       1157). Emptying the bulk selection unmounts the panel and the Clear that was pressed, and
-       the manager root puts the keyboard here — an inert element, so Space still scrolls. The
-       root addresses it through `data-essence-toolbar`. -->
+       1157): emptying the bulk selection unmounts the panel and the Clear that was pressed. -->
   <ManagerToolbar
     class="manager-essence-toolbar"
     tabindex="-1"
@@ -449,24 +395,16 @@
         )}
         ariaLabel={text('FABRICATE.Admin.Manager.Essence.SearchLabel', 'Search essences')}
       />
-      <!-- NO STATUS SEGMENT AND NO SOURCE SELECT (issue 1372). The reference's bar carries ONE
-           filter — the membership pair below — beside the search field, where this bar carried
-           four controls.
-
-           NEITHER LOSES A STATE A GM CANNOT REACH: every row states its own enabled state as a
-           pill and its own source breakage in the summary line and the Effects chip, both of which
-           the search box reads, and `sortKey: 'status'` still groups the list by enabled-ness.
-
-           The PRESENTATION toggle stays, on row two: it is not a filter, it is the only route to
-           the grid, and `### GM World Essence Screens` requirement 7 and the essence-library
-           capability list both name that grid. -->
-      <!-- THE MEMBERSHIP AXIS, AS A TWO-SEGMENT CONTROL ON THE TOP ROW. It shipped as a `<select>`
-           on the second row, which shows one count and hides the other behind a click — and that
-           comparison is the entire subject of the control.
-
-           It renders only when the world corpus can answer it: over an unreadable corpus every
-           essence reports as absent from this system, which is a false statement rather than an
-           empty one. -->
+      <!-- NO STATUS SEGMENT AND NO SOURCE SELECT (issue 1372): the reference's bar carries ONE
+           filter beside the search field. NEITHER LOSES A STATE A GM CANNOT REACH — every row
+           states its enabled state as a pill and its source breakage in the summary line and the
+           Effects chip, both of which the search box reads. The PRESENTATION toggle stays on row
+           two: it is not a filter, it is the only route to the grid, which `### GM World Essence
+           Screens` requirement 7 names. -->
+      <!-- THE MEMBERSHIP AXIS, AS A TWO-SEGMENT CONTROL ON THE TOP ROW, because the comparison is
+           the entire subject of the control and a `<select>` hides half of it. It renders only when
+           the world corpus can answer it: over an unreadable one every essence reports as absent,
+           which is false rather than empty. -->
       {#if membershipAvailable}
         <SegmentedControl
           options={membershipOptions}
@@ -486,14 +424,9 @@
       {/if}
     </div>
 
-    <!-- ROW TWO carries how the list is ARRANGED — sort key, direction and the presentation
-         toggle — plus the retained source filter and the count.
-
-         ROW ONE IS THE FILTERS AND ROW TWO IS EVERYTHING ELSE, and the split is a WIDTH result
-         rather than a taxonomy: this screen carries two axes the prototype has no counterpart for
-         and a list/grid toggle it also lacks, and the four of them plus search will not fit on one
-         745px line. The count keeps its `margin-left: auto`, so it sits at the far end of this
-         row. -->
+    <!-- ROW TWO carries how the list is ARRANGED, plus the retained source filter and the count.
+         The split is a WIDTH result rather than a taxonomy: this screen's extra axes plus search
+         will not fit on one 745px line. -->
     <div class="manager-essence-filter-row is-secondary">
       <div class="manager-essence-filter-field">
         <span class="manager-essence-filter-label"
@@ -531,11 +464,9 @@
         </ManagerButton>
       </div>
 
-      <!-- ICON-ONLY (issue 1036): a list glyph and a grid glyph ARE the two layouts, unlike the
-           status filter beside it, where "All / Enabled / Disabled" is the vocabulary. The compact
-           track is sized to sit with the 34px `.manager-icon-button`s in a toolbar row rather than
-           to match the prototype's pixel count. The label survives in the a11y tree — see the
-           `is-icon-only` block in `SegmentedControl.svelte`. -->
+      <!-- ICON-ONLY (issue 1036): a list glyph and a grid glyph ARE the two layouts. The compact
+           track is sized to sit with the 34px icon buttons rather than to the prototype's pixel
+           count, and the label survives in the a11y tree. -->
       <SegmentedControl
         options={viewModeOptions}
         value={ui.viewMode}
@@ -566,13 +497,9 @@
           </button>
         </Chip>
       {/each}
-      <!-- THE BAR'S COUNT ANSWERS MEMBERSHIP, NOT PAGINATION: how many the filters left, how many
-           of the world's essences this system has rules for, and how many there are. The range it
-           replaces was already rendered verbatim by `Pagination` at the foot of the same list.
-
-           It falls back to that range when the world corpus cannot answer membership, because
-           `M of K` over an unreadable corpus would report every essence as absent from this
-           system. -->
+      <!-- THE BAR'S COUNT ANSWERS MEMBERSHIP, NOT PAGINATION, which `Pagination` already renders
+           verbatim at the foot of the list. It falls back to that range when the world corpus
+           cannot answer membership. -->
       <span class="manager-essence-count" data-essence-count>
         {#if membershipAvailable}
           {format(
@@ -682,14 +609,10 @@
 </main>
 
 <style>
-  /* The two list presentations, and the count. The TOOLBAR's own rhythm is not here: those rules
-     JOIN the recipe and component filter-bar rules in `styles/fabricate.css`, which is the one bar
-     all three studios render.
-
-     That is a correctness fix, not tidying. `BulkSelectionToolbar` renders its row in ITS OWN
-     template, so a rule scoped to THIS component never reached it and the selection row shipped
-     with no row metrics at all. A row class a shared primitive wears has to be authored where that
-     primitive can see it. */
+  /* The two list presentations, and the count. The TOOLBAR's own rhythm JOINS the recipe and
+     component filter-bar rules in `styles/fabricate.css` instead, which is a correctness fix:
+     `BulkSelectionToolbar` renders its row in ITS OWN template, so a rule scoped here never reached
+     it and the selection row shipped with no row metrics at all. */
 
   .manager-essence-count {
     margin-left: auto;
@@ -708,10 +631,9 @@
     cursor: pointer;
   }
 
-  /* `:global` because the `<ul>` these style is rendered by `LibraryShelf`, so a scoped selector
-     would be hashed to THIS component, match nothing, and fail `lint:svelte:warnings` as unused.
-     They stay here rather than moving into the shelf because the grid template is a per-studio
-     content judgement, and `.manager-essences-table` is unique to this studio. */
+  /* `:global` because `LibraryShelf` renders the `<ul>` these style, so a scoped selector would be
+     hashed here, match nothing and fail `lint:svelte:warnings`. They stay because the grid template
+     is a per-studio content judgement. */
   :global(.manager-essences-table) {
     display: flex;
     flex-direction: column;
@@ -721,24 +643,18 @@
     list-style: none;
   }
 
-  /* The GRID presentation. `auto-fill` rather than a fixed count so the card width stays inside
-     the readable range at every manager width.
-
-     Cards STRETCH to the tallest in their row: `align-items: start` sized every card to its own
-     copy, so a row of four ran four different heights. The card's own control cluster takes
-     `margin-top: auto` in `EssenceRow.svelte`, so the extra height lands between the description
-     and the footer and the footers line up across the row. */
+  /* The GRID presentation, `auto-fill` so the card width stays readable at every manager width.
+     Cards STRETCH to the tallest in their row, and `EssenceRow.svelte`'s control cluster takes
+     `margin-top: auto`, so the extra height lands above the footer and the footers line up. */
   :global(.manager-essences-table.is-grid) {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
     align-items: stretch;
   }
 
-  /* THE SEARCH FIELD SHRINKS BEFORE THE ROW WRAPS. The shipped `.manager-search` basis sizes it
-     for a bar carrying one or two controls beside it; row one carries two segmented tracks, and at
-     1280px the field claimed 355px of a 745px bar and pushed the membership control onto a fourth
-     band. `flex: 1 1 220px` still lets it take every pixel the two tracks do not want, and gives
-     it a floor a query is legible in. */
+  /* THE SEARCH FIELD SHRINKS BEFORE THE ROW WRAPS: the shipped `.manager-search` basis is sized for
+     a bar with one or two controls, and at 1280px it pushed the membership control onto a fourth
+     band. `flex: 1 1 220px` keeps a floor a query is legible in. */
   .manager-essence-filter-row :global(.manager-search) {
     flex: 1 1 220px;
     min-width: 0;

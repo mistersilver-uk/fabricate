@@ -1,4 +1,3 @@
-<!-- Svelte 5 runes mode -->
 <script>
   import Chip from '../../components/Chip.svelte';
   import ManagerButton from '../../components/ManagerButton.svelte';
@@ -15,16 +14,11 @@
   let {
     tool = null,
     // THE WORLD TOOL CORPUS, read for ONE question: does a world record exist for this Tool? The
-    // button below must not offer a route to an entry editor that would open on nothing, which is
-    // the state a pre-migration in-system Tool with no world half is in.
+    // button below must not route to an entry editor that would open on nothing.
     scope = null,
-    // Which system this editor is scoped to; it arrives in the `toolScopeProps` bundle the call
-    // site already spreads.
-    //
-    // `actions` is deliberately NOT declared. The two membership writes this screen performs go
-    // out as `onToggleInherited` and `onRemoveFromSystem` callbacks, because both have to be
-    // composed with a DRAFT write the shell owns and a route the shell owns; reaching the world
-    // family directly from here would do half of each.
+    // Which system this editor is scoped to. `actions` is deliberately NOT declared: the two
+    // membership writes go out as callbacks, because each has to be composed with a DRAFT write and
+    // a route the shell owns, and reaching the world family directly would do half of each.
     systemId = '',
     systemName = '',
     validation = { valid: false, errors: [] },
@@ -40,8 +34,7 @@
     currencyUnits = [],
     currencyEnabled = false,
     prerequisiteOptions = [],
-    // THE WORLD MODIFIER LIBRARY, for the Requirements tab's bonus section (issue 1373). Same
-    // shape and scope as `prerequisiteOptions`: the bonus is a PICK from
+    // THE WORLD MODIFIER LIBRARY (issue 1373): the bonus is a PICK from
     // `characterLibraries.modifiers[]` rather than a typed expression, at both scopes.
     modifierOptions = [],
     // The rail's `PREVIEW AS` roster, its roll-data resolver and its `REQUIRED FOR` list. All
@@ -62,23 +55,15 @@
     onTabChange = () => {},
     onPatch = () => {},
     onToggleEnabled = () => {},
-    // THE ROUTE OUT TO THE WORLD TOOL (issue 1373). The rules list already claims this Tool
-    // inherits world defaults and pins an `Edit the world Tool` button to its inspector, while the
-    // editor behind `Edit rules` offered no route to that record at all. This is the same
-    // navigation, wired to the same shell handler.
-    //
-    // The LINK ITSELF is not authored here any more, and the three wires that used to do it are
-    // gone with the card that used them. See `tools/ToolOverviewTab` for why.
+    // THE ROUTE OUT TO THE WORLD TOOL (issue 1373), the same navigation the rules list's inspector
+    // already pins, wired to the same shell handler. The LINK ITSELF is no longer authored here;
+    // see `tools/ToolOverviewTab`.
     onEditWorldTool = () => {},
-    // THE TWO WORLD-MEMBERSHIP WRITES THIS SCREEN OWNS (issue 1373).
-    // `onToggleInherited(section, nextInherit)` moves ONE section between following the world Tool
-    // and setting this system's own, and `onRemoveFromSystem()` takes the whole rules record away.
-    // Both are membership writes rather than draft patches, so both are the shell's to perform and
-    // both persist immediately.
-    //
-    // `onDelete` is GONE with the header button that called it: the design puts `Delete` on the
-    // world entry, which is the record it destroys, and system scope gets the explained `Stop
-    // using this Tool here` callout on `Breakage` instead.
+    // THE TWO WORLD-MEMBERSHIP WRITES THIS SCREEN OWNS (issue 1373): one section between following
+    // the world Tool and setting this system's own, and the removal of the whole rules record. Both
+    // are membership writes rather than draft patches, so both persist immediately. `onDelete` is
+    // GONE with its header button: the design puts `Delete` on the world entry, and system scope
+    // gets the `Stop using this Tool here` callout on `Breakage` instead.
     onToggleInherited = () => {},
     onRemoveFromSystem = () => {},
   } = $props();
@@ -103,12 +88,8 @@
     )
   );
   const displayImage = $derived(toolDisplayImage(tool, managedItems));
-  /**
-   * THE HEADER'S SUBTITLE, AND IT IS A STATEMENT OF SCOPE (issue 1373). It read `Linked game-world
-   * Item` — the WORLD editor's subtitle, describing the one thing this screen cannot change. What
-   * a GM needs on arriving here is which half of a Tool this screen owns: the rules are this
-   * system's, the identity is the world Tool's.
-   */
+  /** THE HEADER'S SUBTITLE IS A STATEMENT OF SCOPE (issue 1373): which half of a Tool this screen
+      owns — the rules are this system's, the identity is the world Tool's. */
   const sourceContext = $derived(
     systemName
       ? formattedText(
@@ -121,16 +102,9 @@
           'System rules · identity comes from the world Tool'
         )
   );
-  /**
-   * THE REQUIREMENTS CARD'S OPENING STRIP (issue 1373). `ToolRequirementsTab` serves both scopes,
-   * so the SENTENCE is resolved here: what it states is a fact about which crafting system these
-   * rules belong to, and only this screen has one.
-   *
-   * The design's own wording — "the world Tool only seeds them when you add it" — is not
-   * reproduced. It describes a model in which a system's copy is taken once and then stands alone;
-   * ours inherits for real, and each section follows the world default until this screen overrides
-   * it.
-   */
+  /** THE REQUIREMENTS CARD'S OPENING STRIP (issue 1373). `ToolRequirementsTab` serves both scopes,
+      so the SENTENCE is resolved here, where the crafting system is known. The design's own
+      "seeds them when you add it" wording is NOT reproduced: ours inherits for real. */
   const requirementsIntro = $derived(
     formattedText(
       'FABRICATE.Admin.Manager.Tools.Editor.RequirementsIntro',
@@ -147,12 +121,8 @@
       (tool?.bonus?.enabled ? 1 : 0)
   );
 
-  /**
-   * Whether the world catalogue actually holds a record for this Tool. `false` is a real answer
-   * rather than a fallback: a pre-migration in-system Tool that no `1.30.0` pass has lifted has no
-   * world half, and routing to its entry editor would land the GM on the `no longer in the corpus`
-   * state. The button is simply absent there.
-   */
+  /** Whether the world catalogue holds a record for this Tool. `false` is a real answer, not a
+      fallback: a pre-migration in-system Tool has no world half, so the button is absent. */
   const worldEntry = $derived(
     (Array.isArray(scope?.entries) ? scope.entries : []).find(
       (entry) => String(entry?.id ?? '') === String(tool?.id ?? '')
@@ -160,28 +130,19 @@
   );
   const worldRecordExists = $derived(worldEntry !== null);
 
-  /**
-   * This `(tool, system)` pair's row in the world projection — the only thing that can say whether
-   * a section is inherited or overridden. The system's own Tool record carries the RESOLVED values
-   * and cannot tell the two apart, which is exactly why this editor had no inheritance model.
-   * `ToolsBrowserView` already reads the same join for its per-row pill.
-   */
+  /** This `(tool, system)` pair's row in the world projection — the only thing that can say whether
+      a section is inherited or overridden, since the system's own record carries the RESOLVED
+      values. `ToolsBrowserView` reads the same join for its per-row pill. */
   const systemRow = $derived(
     (Array.isArray(worldEntry?.systems) ? worldEntry.systems : []).find(
       (row) => String(row?.systemId ?? '') === String(systemId ?? '')
     ) ?? null
   );
-  /**
-   * Whether this crafting system holds a MEMBERSHIP record for the Tool, and therefore whether the
-   * editor can offer an inherit affordance at all. `false` is a real answer: a pre-migration
-   * in-system Tool has no world half, so there is nothing to inherit FROM and nothing to be
-   * removed from, and every card then renders its controls with no switch and no pill.
-   */
-  // THE WORLD'S OWN BREAKAGE AUTHORITY, read off the world-scope projection this view already
-  // takes, exactly as `ToolsBrowserView` reads it. It is read HERE rather than threaded from the
-  // shell on purpose: `world-scope-tool-breakage-authority.test.js` pins every `toolBreakage`
-  // access in `CraftingSystemManagerRoot` to a closed set. `''` means the world corpus authored
-  // nothing, which is a different answer from an authored `toolSpecific`.
+  /** Whether this system holds a MEMBERSHIP record, and so whether an inherit affordance can be
+      offered at all; `false` renders every card's controls with no switch and no pill. */
+  // THE WORLD'S OWN BREAKAGE AUTHORITY, read HERE rather than threaded from the shell on purpose:
+  // `world-scope-tool-breakage-authority.test.js` pins every `toolBreakage` access in
+  // `CraftingSystemManagerRoot` to a closed set. `''` means the world authored nothing.
   const worldAuthority = $derived(scope?.toolBreakage?.authority ?? '');
 
   const member = $derived(systemRow?.member === true);
@@ -202,9 +163,7 @@
   // THIS editor rather than anywhere in the manager window.
   let editorRoot = $state(null);
 
-  // WHAT THE LIVE REGION SAYS: the ACTION'S OUTCOME, not a count. Activating a row action changes
-  // no tally, so a count-subjected region would recite an unchanged number at the moment a GM most
-  // needs to know where they landed.
+  // WHAT THE LIVE REGION SAYS: the ACTION'S OUTCOME, not a count a row action does not move.
   let issueAnnouncement = $state('');
 
   // The destination TAB PANEL, and the focus fallback for a route-only row (issue 1517). Every
@@ -212,16 +171,9 @@
   let tabPanel = $state(null);
 
   /**
-   * Deep-link from a validation issue: switch to the tab that hosts the gap, THEN move focus to
-   * the offending control.
-   *
-   * THE ORDER IS THE MECHANISM. The route is requested synchronously and FIRST — `onTabChange` is
-   * the shell's own `$state` write, exactly as the tab strip's own click is — so Svelte has
-   * flushed it and the destination panel exists by the time the focus helper's `queueMicrotask`
-   * runs its query. Everything after that belongs to `validationAnnouncement.js`.
-   *
-   * @param {string} targetTab the ROUTE the row carries.
-   * @param {string} [focusTarget] the CONTROL's `data-validation-target` value, if it named one.
+   * Deep-link from a validation issue: switch tab, THEN move focus. THE ORDER IS THE MECHANISM —
+   * the route is requested synchronously and FIRST, so the destination panel exists by the time the
+   * focus helper's `queueMicrotask` runs, and everything after that is `validationAnnouncement.js`'s.
    */
   function selectIssue(targetTab, focusTarget) {
     const route = Object.hasOwn(ISSUE_TABS, targetTab) ? targetTab : null;
@@ -241,14 +193,10 @@
 <main class="manager-main manager-tool-edit-main" data-tool-edit-view bind:this={editorRoot}>
   <!--
     THE ROW ACTION'S LIVE REGION, hosted here rather than in the validation surface (issue 1517):
-    activating a row action changes `activeTab`, which unmounts the whole validation panel — live
-    region included — in the same update that was supposed to announce. So the element carrying
-    `aria-live` is ALWAYS in the DOM, outside the `{#if activeTab}` chain, with its own `{#if}`
-    inside it.
-
-    A third child of this `<main>` is safe here, which is worth saying because it is not safe
-    everywhere: `.visually-hidden` is `position: absolute`, so the element is out of flow and takes
-    no track in any grid or `display: contents` chain this route is laid out by.
+    activating a row action unmounts that whole panel in the same update that was supposed to
+    announce, so the element carrying `aria-live` is ALWAYS in the DOM, outside the `{#if activeTab}`
+    chain. A third child of this `<main>` is safe, because `.visually-hidden` is `position:
+    absolute` and takes no track.
   -->
   <div class="visually-hidden" role="status" aria-live="polite" data-tool-issue-announcement>
     {#if issueAnnouncement}{issueAnnouncement}{/if}
@@ -284,16 +232,11 @@
             >{text('FABRICATE.Admin.Manager.Tools.Dirty', 'Unsaved')}</Chip
           >{/if}
         {#if dirty}<span data-tool-editor-dirty hidden>dirty</span>{/if}
-        <!-- These three are the AUTHORITY for `ManagerButton` (issue 1096): the maintainer's
-             reference for what a manager button should look like. They go through the primitive so
-             the two screens cannot drift apart again. THAT CONVERSION changed no rendering:
-             `fab-manager-button` re-declares the same `.manager-header-actions` values these
-             already inherit. -->
+        <!-- These three are the AUTHORITY for `ManagerButton` (issue 1096) and go through the
+             primitive so the two screens cannot drift apart again. -->
         <!-- BOTH NAVIGATIONS TAKE ONE TREATMENT, because the design gives them one (issue 1373):
-             transparent-over-a-border is the GHOST role here, which `Back to Tool Rules` already
-             took, while `World Tool` took the neutral role's fill — so two adjacent buttons that
-             both leave this screen read as two different weights of verb. `Save rules` stays
-             `primary` and stays green: that is a standing ruling. -->
+             the GHOST role, or two adjacent buttons that both leave this screen read as two
+             different weights of verb. `Save rules` stays `primary` and green, a standing ruling. -->
         {#if worldRecordExists}
           <ManagerButton
             role="ghost"
@@ -306,10 +249,8 @@
             ></ManagerButton
           >
         {/if}
-        <!-- `Back to Tool Rules` and `Save rules`, not `Back to tools` and `Save tool`. Both old
-             labels named the WORLD editor's job. What this screen saves is one crafting system's
-             RULES for a Tool, and a `Save tool` on a screen that cannot change the Tool is the same
-             category error as the `Delete` that used to sit between them. -->
+        <!-- `Back to Tool Rules` and `Save rules`, not `Back to tools` and `Save tool`: what this
+             screen saves is one crafting system's RULES for a Tool. -->
         <ManagerButton
           role="ghost"
           data-tool-editor-back
@@ -355,12 +296,9 @@
   />
 
   <div class="manager-tool-edit-composition">
-    <!-- `tabindex="-1"`, WAS `0` (issue 1517). The panel is the ROUTE-ONLY row's focus destination
-         — a row that names a tab and no control leaves focus on a button this update unmounts —
-         so it must be focusable programmatically. It is not a tab STOP: `0` put an empty scroll
-         container in the Tab order between the strip and the first field, which no other editor
-         panel does. `data-keyboard-focus="true"` tells Foundry the window is focused once it
-         lands. -->
+    <!-- `tabindex="-1"`, WAS `0` (issue 1517): the panel is the ROUTE-ONLY row's focus destination
+         and must be focusable programmatically, but `0` put an empty scroll container in the Tab
+         order between the strip and the first field. -->
     <div
       class="manager-tool-editor-panel"
       role="tabpanel"

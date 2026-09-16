@@ -1,30 +1,23 @@
-<!-- Svelte 5 runes mode -->
 <!--
   The system essence rules editor (issues 1036 and 1372) — the system-scope half of the essence
-  model. A world record holds the essence's identity and every crafting system resolves the same
-  one; this screen holds what that essence does on craft in ONE system. Everything visual belongs
-  to the tab bodies under `essences/` and the shared cards under `scoped/`; what is here is the
-  draft, the dirty computation, the save, and the two async resolutions the tabs cannot do for
-  themselves.
+  model: a world record holds the identity, and this screen holds what that essence does on craft in
+  ONE system. Everything visual belongs to the tab bodies under `essences/` and the shared cards
+  under `scoped/`; here are the draft, the dirty computation, the save and the two async
+  resolutions the tabs cannot do for themselves.
 
   Invariants:
   - It has TWO SHAPES and the fork is "is there a shared definition": `rulesMode` is
-    `scopedKnown && !isNew`, which gives the two-tab rules screen. Otherwise — a CREATE draft, or
-    a world corpus that cannot answer — it is the three-tab editor with its Identity tab, because
-    a create draft's in-system record is the only record there is.
-  - IDENTITY IS NOT EDITABLE FROM A SYSTEM (`ui-integration/spec.md`, `### GM World Essence
-    Screens` requirement 10): a name, glyph, colour or description edited here would rename the
-    essence in every other system holding it. The callout's `Edit shared definition` is the only
-    route this screen offers to those fields.
-  - EVERY TAB PROP MUST ALSO BE FORWARDED HERE. A prop a tab declares but this file does not pass
-    silently takes its default, which for an editor means "renders as if nothing were authored".
+    `scopedKnown && !isNew`, giving the two-tab rules screen; otherwise the three-tab editor with
+    its Identity tab, because a create draft's in-system record is the only record there is.
+  - IDENTITY IS NOT EDITABLE FROM A SYSTEM (`ui-integration/spec.md`, `### GM World Essence Screens`
+    requirement 10): a field edited here would rename the essence in every other system holding it,
+    so the callout's `Edit shared definition` is this screen's only route to those fields.
+  - EVERY TAB PROP MUST ALSO BE FORWARDED HERE, or the tab silently takes its default, which for an
+    editor renders as if nothing were authored.
   - `id="manager-essence-edit-form"` is a contract: the manager root's header Save submits through
-    `form="manager-essence-edit-form"`, and dropping either half silently stops Save working. The
-    header renders in the SHELL's action bar, which is why this file does not import it.
-  - The in-system record's fields, `enabled` included, accumulate in this draft and land on Save.
-    The MEMBERSHIP writes do not: adding this essence to the system and switching a section
-    between inherited and overridden land immediately, as `### Scoped entity editor patterns`
-    requirement 14 states.
+    `form="manager-essence-edit-form"`, and dropping either half stops Save working silently.
+  - The in-system record's fields, `enabled` included, accumulate in this draft and land on Save;
+    the MEMBERSHIP writes do not, as `### Scoped entity editor patterns` requirement 14 states.
 -->
 <script>
   import EssenceEditorTabs from './essences/EssenceEditorTabs.svelte';
@@ -100,11 +93,10 @@
   let propertyMacroUuid = $state('');
   let sourceComponentId = $state('');
   let sourceTouched = $state(false);
-  // THE COLOUR LATCH. `colorToken` is seeded from the `essence` prop, and since M29 that prop
-  // carries the WORLD essence colour overlaid over this system's own row — so sending it
-  // unconditionally persisted the world's colour onto the in-system row on every save, including
-  // on the rules screen, where there is no colour control at all. Only a GM edit sends it, and
-  // CLEARING sets the latch too, so "clearing an authored colour persists as null" survives.
+  // THE COLOUR LATCH. `colorToken` is seeded from a prop that carries the WORLD colour overlaid
+  // over this system's row (M29), so sending it unconditionally persisted the world's colour on
+  // every save. Only a GM edit sends it, and CLEARING sets the latch too, so clearing an authored
+  // colour still persists as null.
   let colourTouched = $state(false);
   let saveFailed = $state(false);
   let macroWarning = $state('');
@@ -114,9 +106,8 @@
   let lastDirty = $state(false);
   let lastDraftSignature = $state('');
 
-  // THE WORLD-SCOPE JOIN. Every one of these is guarded on `scopedKnown`, which is false for an
-  // unreadable corpus, a new draft, and an essence the world catalogue does not hold — the last
-  // being an ordinary state, because the in-system array still decides its own rows while
+  // THE WORLD-SCOPE JOIN, every part guarded on `scopedKnown` — false for an unreadable corpus, a
+  // new draft, and an essence the world catalogue does not hold, the last being ordinary while
   // `## CraftingSystem` requirement 36 holds. In each the editor renders as it did.
   const activeSystemId = $derived(String(systemId || ''));
   const worldEntry = $derived(
@@ -134,18 +125,14 @@
     (Array.isArray(systems) ? systems : []).find((system) => system?.id === activeSystemId)?.name ||
       activeSystemId
   );
-  // AN ABSENT `inherit` KEY READS AS INHERITING, matching `isSectionInherited`. So the lock is on
-  // by default for a member, which is the correct default: a fresh membership record inherits
-  // every section, and an edit affordance for it would offer to change a value the system does
-  // not own.
+  // AN ABSENT `inherit` KEY READS AS INHERITING, matching `isSectionInherited`, so the lock is on
+  // by default: a fresh membership record inherits every section.
   const lockedSections = $derived({
     effectSource: scopedKnown && member && inheritedMap.effectSource !== false,
     macro: scopedKnown && member && inheritedMap.macro !== false,
   });
-  // WHAT THE WORLD DEFAULT ACTUALLY IS, resolved once and read by BOTH halves. The note under an
-  // inherit row and the locked tile beneath it must name the SAME thing, and before issue 1372
-  // neither named the world default: the note read `effectSource` as a scalar and answered `''`
-  // for a block, while the tile rendered the DRAFT's own source under a `World default` pill.
+  // WHAT THE WORLD DEFAULT ACTUALLY IS, resolved once and read by BOTH halves: the note under an
+  // inherit row and the locked tile beneath it must name the SAME thing (issue 1372).
   const worldSourceReferent = $derived(
     essenceEffectSourceReferent(worldEntry?.defaults?.effectSource)
   );
@@ -295,10 +282,8 @@
     lastEssenceId = nextEssenceId;
   });
 
-  // THE STRIP AND THE PANEL CANNOT DISAGREE. `rulesMode` can flip after mount — the world corpus
-  // is published asynchronously — and the seed effect above only re-runs when the ESSENCE changes,
-  // so without this the strip would render with neither tab selected while the panel rendered
-  // whichever body the stale token happened to reach.
+  // THE STRIP AND THE PANEL CANNOT DISAGREE: `rulesMode` can flip after mount, and the seed effect
+  // above only re-runs when the ESSENCE changes.
   $effect(() => {
     if (editorTabs.some((tab) => tab.id === activeTab)) return;
     activeTab = editorTabs[0].id;
@@ -327,19 +312,11 @@
   let tabPanel = $state(null);
 
   /**
-   * Deep-link from a validation issue: switch to the tab that hosts the gap, THEN move focus to
-   * the offending control.
-   *
-   * THE ORDER IS THE MECHANISM. The route is set synchronously and FIRST, so Svelte has flushed it
-   * and the destination panel exists by the time the focus helper's `queueMicrotask` runs its
-   * query. Everything after that belongs to `validationAnnouncement.js`, which owns it for all
-   * five hosts.
-   *
-   * The route is checked against the LIVE tab set rather than a fixed list, because this editor
-   * renders two and a stale route must not select a tab the strip does not contain.
-   *
-   * @param {string} targetTab the ROUTE the row carries.
-   * @param {string} [focusTarget] the CONTROL's `data-validation-target` value, if it named one.
+   * Deep-link from a validation issue: switch tab, THEN move focus. THE ORDER IS THE MECHANISM —
+   * the route is set synchronously and FIRST, so the destination panel exists by the time the focus
+   * helper's `queueMicrotask` runs its query, and everything after that is
+   * `validationAnnouncement.js`'s. The route is checked against the LIVE tab set rather than a
+   * fixed list, because this editor renders two shapes.
    */
   function selectIssue(targetTab, focusTarget) {
     const route = editorTabIds.includes(targetTab) ? targetTab : null;

@@ -1,29 +1,16 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  One authoring row for a complication's conditions and effects (issue 1286): control, glyph,
-  title, detail, with a `children` slot for the input strip that is REVEALED once the row is on.
-  The complications section renders this shape six times in one card, and SonarCloud reads
-  `.svelte` and fails new code above 3% duplication. String props are PRE-LOCALIZED by the caller,
-  on the `ToggleCard` precedent.
+  One authoring row for a complication's conditions and effects (issue 1286): control, glyph, title,
+  detail, with a `children` slot for the input strip REVEALED once the row is on. The complications
+  section renders this shape six times in one card, and SonarCloud reads `.svelte` and fails new
+  code above 3% duplication. String props are PRE-LOCALIZED, on the `ToggleCard` precedent.
 
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
-  | `control` | `'checkbox' \| 'switch' \| 'none'` | `'checkbox'` | `checkbox` makes the whole head the label; `switch` leaves the head inert; `none` is a row whose ON-ness is not a flag at all |
-  | `on` | boolean | `false` | the revealed `children` render ONLY when it is true, which keeps a disabled effect's inputs out of the tab order. Ignored under `control="none"` |
-  | `form` | `'condition' \| 'effect' \| 'pill'` | `'condition'` | the row's GEOMETRY |
-  | `onTone` | `'neutral' \| 'accent'` | `'neutral'` | what the ON state MEANS: chosen among peers, or a deliberate singular choice |
-  | `tone` | `'danger' \| 'warning' \| 'success' \| 'accent' \| 'info' \| 'subtle'` | `'subtle'` | the glyph's colour family; colour only, it never changes the row |
-  | `label` | string | `''` | the control's accessible name, falling back to `title` |
-
-  Invariants:
-  - THREE GEOMETRIES, ONE PRIMITIVE. A condition is one item in a checklist and is transparent
-    until checked; an effect is a standing affordance inside the "Then" card and keeps its fill
-    either way; `pill` is a fixed-height inline control sized to its own content. `form` is a PROP
-    rather than derived from `control`, because `pill` is a `switch` and deriving would draw it as
-    an effect row.
-  - A `none` row never takes the enabled edge and its `children` are always revealed, because a
-    row with no flag cannot be off.
+  | `control` | `'checkbox'` \| `'switch'` \| `'none'` | `'checkbox'` | `checkbox` makes the whole head the label; `switch` leaves the head inert; `none` is a row whose ON-ness is not a flag at all, so it never takes the enabled edge and its `children` are always revealed |
+  | `on` | boolean | `false` | the revealed `children` render ONLY when true, which keeps a disabled effect's inputs out of the tab order. Ignored under `control="none"` |
+  | `form` | `'condition'` \| `'effect'` \| `'pill'` | `'condition'` | the row's GEOMETRY: a condition is one item in a checklist and is transparent until checked; an effect is a standing affordance inside the "Then" card and keeps its fill; `pill` is a fixed-height inline control sized to its own content. A PROP rather than derived from `control`, because `pill` is a `switch` and deriving would draw it as an effect row. |
+  | `onTone` / `tone` / `label` | | `'neutral'` / `'subtle'` / `''` | what the ON state MEANS, the glyph's colour family (colour only), and the control's accessible name, falling back to `title` |
 -->
 <script>
   import SelectionCheckbox from '../../components/SelectionCheckbox.svelte';
@@ -44,10 +31,7 @@
     dataValue = '',
     onToggle = () => {},
     children = undefined,
-    // A trailing action for the HEAD, rendered where a `switch` control would sit. The macro
-    // card's browse control uses it: that button acts on the whole card. Mutually exclusive with
-    // `control="switch"` in practice but not enforced, because a future row may legitimately want
-    // a switch and a link.
+    // A trailing action for the HEAD, where a `switch` would sit; not enforced as exclusive.
     headAction = undefined,
   } = $props();
 
@@ -56,26 +40,19 @@
   const toneClass = $derived(TONES.has(tone) ? `is-tone-${tone}` : 'is-tone-subtle');
   const hookAttributes = $derived(dataAttr ? { [dataAttr]: dataValue || true } : {});
   const accessibleName = $derived(label || title);
-  // A `none` row has no flag, so `on` is not its state. Kept as two derivations rather than one
-  // because they answer different questions: whether the row is PAINTED as enabled, and whether
-  // its children are reachable.
+  // Two derivations: PAINTED as enabled and children reachable differ for a `none` row.
   const enabled = $derived(control !== 'none' && on === true);
   const revealed = $derived(control === 'none' || on === true);
-  // Declared geometries only, on the same rule as `tone`: an unknown `form` falls back to
-  // the condition shape rather than rendering an unstyled row.
+  // Declared geometries only: an unknown `form` falls back to the condition shape.
   const FORMS = new Set(['condition', 'effect', 'pill']);
   const formClass = $derived(FORMS.has(form) ? `is-form-${form}` : 'is-form-condition');
   const onToneClass = $derived(onTone === 'accent' ? 'is-on-accent' : 'is-on-neutral');
 </script>
 
-<!-- The head's CONTENT is written once and rendered into whichever wrapper the control needs. A
-     `<label>` is right for the checkbox and wrong for the switch (a `<button>` inside a label is an
-     ambiguous click target), but restating the three children per branch would be the intra-file
-     duplication this component exists to remove. -->
+<!-- The head's CONTENT is written once: a `<label>` is right for a checkbox, wrong for a switch. -->
 {#snippet headContent()}
   {#if control === 'checkbox'}
-    <!-- `wrapper="contents"` because THIS row's head is already the `<label>`; nesting a second
-         one is invalid HTML and an ambiguous click target. -->
+    <!-- `wrapper="contents"`: this head is already the `<label>`, and nesting is invalid HTML. -->
     <SelectionCheckbox
       wrapper="contents"
       size="sm"
@@ -116,9 +93,7 @@
 </div>
 
 <style>
-  /* Theme-ROOT tokens only: this row renders inside the manager today but carries no area-scoped
-     `--fab-manager-*` property, so it stays legible if a player-side surface ever adopts it.
-     `Chip.svelte` states the rule in full. */
+  /* Theme-ROOT tokens only, so the row stays legible if a player-side surface adopts it. */
   .fab-complication-effect {
     box-sizing: border-box;
     border: 1px solid var(--fab-border);
@@ -132,8 +107,7 @@
     background: none;
   }
 
-  /* An EFFECT: a standing affordance in the "Then" card, which is why it keeps its raised fill
-     whether it is on or off. Its head centres — see the geometry note in the header.
+  /* An EFFECT keeps its raised fill on or off, and its head centres — see the header.
 
      The fill is the ramp step at this row's INDEX in the prototype rather than the token that
      matches its value; `ComponentComplicationsSection`'s `.fab-complication-card` note records
@@ -144,9 +118,7 @@
     background: var(--fab-bg-1);
   }
 
-  /* A PILL: a fixed-height inline control on a field row, sized to its content rather than to the
-     field. The explicit `height`, rather than padding alone, is what keeps it flush with the 34px
-     inputs it shares that line with. */
+  /* A PILL. The explicit `height` keeps it flush with the 34px inputs on its line. */
   .fab-complication-effect.is-form-pill {
     display: flex;
     align-items: center;
@@ -180,9 +152,8 @@
     margin: 0;
   }
 
-  /* Both roomier forms centre their head; only the EFFECT widens its gap. A pill is a
-     fixed-height inline control where an extra pixel between the glyph and its label is a pixel
-     off the control's own width, so `align-items` stays shared and `gap` does not. */
+  /* Both roomier forms centre their head; only the EFFECT widens its gap, since on a pill that
+     pixel comes off the control's own width. */
   .fab-complication-effect.is-form-effect .fab-complication-effect-head,
   .fab-complication-effect.is-form-pill .fab-complication-effect-head {
     align-items: center;
@@ -234,9 +205,7 @@
     color: var(--fab-text-subtle);
   }
 
-  /* The head's trailing action. `flex: 0 0 auto` so the copy column keeps the slack;
-     `margin-left: auto` is NOT needed, because the copy above is `flex: 1 1 auto` and already
-     pushes this to the edge. */
+  /* The head's trailing action. `margin-left: auto` is NOT needed: the copy is `flex: 1 1 auto`. */
   .fab-complication-effect-head-action {
     display: inline-flex;
     flex: 0 0 auto;
@@ -277,9 +246,8 @@
     margin: 10px 0 0 24px;
   }
 
-  /* …but ONLY where that column exists. The indent aligns the strip with the head's copy past a
-     leading checkbox, and an effect row has no checkbox: its control is the switch on the FAR
-     side, so the indent put the strip under nothing. */
+  /* …but ONLY where that column exists: an effect row's control is the switch on the FAR side, so
+     the indent put the strip under nothing. */
   .fab-complication-effect.is-form-effect .fab-complication-effect-reveal {
     margin-left: 0;
   }

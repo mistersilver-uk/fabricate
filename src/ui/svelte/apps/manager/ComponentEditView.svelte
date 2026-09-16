@@ -1,4 +1,3 @@
-<!-- Svelte 5 runes mode -->
 <script>
   import Field from '../../components/Field.svelte';
   import Chip from '../../components/Chip.svelte';
@@ -16,18 +15,15 @@
   import { stepperLabels } from '../../components/stepperLabels.js';
   import SearchablePopover from '../../components/SearchablePopover.svelte';
   import ComponentIdentityStrip from './component/ComponentIdentityStrip.svelte';
-  // The progressive-complications authoring section (issue 1286). It owns its OWN visibility
-  // gate, so it is imported and placed unconditionally rather than wrapped in a second predicate
-  // here that could drift out of step with it.
+  // The progressive-complications section (issue 1286). It owns its own visibility gate, so it is
+  // placed unconditionally rather than behind a second predicate that could drift out of step.
   import ComponentComplicationsSection from './component/ComponentComplicationsSection.svelte';
-  // The one complication summary row, in its `readonly-gm` variant. The read-only strip under
-  // each progressive salvage row consumes it rather than hand-rolling a second row: there are six
-  // call sites for that shape, and SonarCloud's copy-paste detector reads `.svelte`.
+  // The one complication summary row, in its `readonly-gm` variant: six call sites share that
+  // shape, and SonarCloud's copy-paste detector reads `.svelte`.
   import ComplicationSummaryRow from './ComplicationSummaryRow.svelte';
   import { complicationSummary } from '../../../../utils/complicationSummary.js';
-  // The shared essence quantity card (issue 772). It lives under `components/` — the BROWSER's
-  // directory — because the browser's bulk-edit panel renders it too; the screenshot evidence map
-  // names it explicitly in the editor's recipe.
+  // The shared essence quantity card (issue 772). It lives under `components/` because the
+  // browser's bulk-edit panel renders it too, and the screenshot evidence map names it there.
   import EssenceQuantityCard from './components/EssenceQuantityCard.svelte';
   import StatusToggle from '../../components/StatusToggle.svelte';
   import {
@@ -40,9 +36,8 @@
     carriedComponentEssences,
     clampComponentEssenceQuantity,
   } from '../../util/componentEditor.js';
-  // The add-new offer projection (issue 1036). The DRAFT stays unfiltered — it is the sole source
-  // `buildComponentEditorUpdates` rebuilds `updates.essences` from — and only what this grid
-  // RENDERS is narrowed.
+  // The add-new offer projection (issue 1036): only what this grid RENDERS is narrowed. The draft
+  // stays unfiltered — it is the sole source `buildComponentEditorUpdates` rebuilds essences from.
   import { visibleEssenceOptions } from '../../../../utils/essenceValidation.js';
   import {
     SALVAGE_DC_CUSTOM,
@@ -62,10 +57,7 @@
     componentWorldEssenceMap,
   } from './scoped/componentScoped.js';
 
-  /**
-   * The world entry route this screen deep-links to. A module constant because it is the one
-   * string that decides whether the navigation resolves at all.
-   */
+  /** The world entry route this screen deep-links to; the one string deciding whether it resolves. */
   const WORLD_ENTRY_ROUTE = 'world-component-entry';
 
   let {
@@ -78,81 +70,67 @@
     categoryOptions = [],
     salvageResolutionMode = 'simple',
     salvageOutcomeNames = [],
-    // Whether the SYSTEM's salvage check is enabled. With `salvageResolutionMode` this is the
-    // second axis the four brief presentations are a projection of. No new persisted token.
+    // Whether the SYSTEM's salvage check is enabled — with `salvageResolutionMode`, the second axis
+    // the four brief presentations project from. No new persisted token.
     salvageCheckEnabled = false,
-    // `salvageCraftingCheck.simple.tiers` — the DC preset source in EVERY resolution
-    // mode, routed included (decision 7, case 5). There is no `.routed.tiers` sibling.
+    // `salvageCraftingCheck.simple.tiers` — the DC preset source in EVERY resolution mode, routed
+    // included (decision 7, case 5). There is no `.routed.tiers` sibling.
     salvageCheckTiers = [],
     salvageCheckDcMode = 'static',
     salvageCheckDc = 0,
-    // The SYSTEM's one check-modifier catalogue and the SALVAGE check's selection over it (issue
-    // 1095). The picker below renders only under `bySubject` — the rule that hands the selection
-    // to the component — and only when the catalogue is non-empty: a control the system will
-    // ignore is worse than no control. `salvageModifierMaxPicks` is NOT coerced at any call site
-    // on the way here; `resolveMaxModifierPicks` owns what absence means.
+    // The SYSTEM's check-modifier catalogue and the SALVAGE check's selection over it (issue 1095).
+    // The picker renders only under `bySubject` and only over a non-empty catalogue.
+    // `salvageModifierMaxPicks` is NOT coerced on the way here; `resolveMaxModifierPicks` owns
+    // what absence means.
     checkModifierOptions = [],
     salvageModifierPolicy = 'addAll',
     salvageModifierMaxPicks = null,
-    // The salvage check's DEFAULT eligible set, so the picker can NAME what this component
-    // inherits when it has authored no pick of its own.
+    // The salvage check's DEFAULT eligible set, so the picker can NAME what is inherited when this
+    // component has authored no pick.
     salvageModifierDefaultIds = [],
     componentOptions = [],
     // Which activities THIS system resolves progressively (issue 1286), as
-    // `{ crafting, salvage, gathering }`: the complications section's own gate and its
-    // "· not progressive" annotation.
-    //
-    // `null` means "derive what this view already knows", which is the salvage axis alone —
-    // crafting and gathering live on the system record and never reach this component. A narrower
-    // default than guessing, and honest about which of the three axes this view can see.
+    // `{ crafting, salvage, gathering }`. `null` means "derive what this view knows", which is the
+    // salvage axis alone — crafting and gathering live on the system record, not on the component.
     complicationActivities = null,
-    // `{ id, label, activity }` per named trigger on the three progressive check blocks. Each
-    // activity's check block owns its own id space, so the option is labelled by its owner.
+    // `{ id, label, activity }` per named trigger. Each activity's check block owns its own id
+    // space, so an option is labelled by its owner.
     complicationTriggerOptions = [],
-    // `viewState.selectedSystem.availableScriptMacros` — already `type === 'script'`-filtered
-    // and name-sorted by the store, and deliberately not a second projection.
+    // `viewState.selectedSystem.availableScriptMacros`, already script-filtered and name-sorted by
+    // the store; deliberately not a second projection.
     macroOptions = [],
     // The client-side id mint, injected so the section never reaches for `Math.random()`.
     random = undefined,
     saving = false,
-    // Progressive difficulty, rehomed out of the deleted right-rail inspector into the body. It
-    // is STAGED, not written on change: the value lives in the manager root's
-    // `componentDifficultyDraft`. It is a SIBLING of `salvage`, not part of `updates.salvage`.
+    // Progressive difficulty. STAGED, not written on change — the value lives in the manager root's
+    // `componentDifficultyDraft` — and a SIBLING of `salvage`, never part of `updates.salvage`.
     showDifficulty = false,
     difficulty = null,
     onDifficultyChange = () => {},
-    // The four source actions are gone from this editor (issue 1371): under epic 1357 the record
-    // that names the source Item is world-scope data, so it is authored on the world Component
-    // entry, which the identity callout's one exit routes to. They are DECLARED NOWHERE rather
-    // than declared and ignored — an unread prop here is an eslint failure — and the manager root
-    // still passing them is harmless, since Svelte 5 drops a prop no destructuring names.
+    // The four source actions are DECLARED NOWHERE (issue 1371): the source Item is world-scope
+    // data, authored on the world Component entry. The root still passing them is harmless, since
+    // Svelte 5 drops a prop no destructuring names.
     onSave = () => {},
     onDirtyChange = () => {},
     onDraftChange = () => {},
     onManageCheckPresets = () => {},
-    // "Edit ↗" on a progressive salvage result row: opens the referenced YIELD component's
-    // editor. The root wires this to `editComponent(otherId)`, which routes through
-    // `confirmRouteExit` — NOT `setView('component-edit')`, which no-ops without a selectedSystem
-    // and would prompt the discard dialog then change nothing.
+    // "Edit" on a progressive salvage result row opens the referenced YIELD component's editor. The
+    // root wires this to `editComponent(otherId)`, which routes through `confirmRouteExit` — not
+    // `setView('component-edit')`, which no-ops without a selectedSystem.
     onOpenComponent = () => {},
-    // Three of the four keys the call site's component bundle spreads; `systems` stays undeclared
-    // for the reason the browser view's twin block states.
-    //
-    // `actions` IS the component write family and carries `setMutedTags`. This view holds a live
-    // write path to it and DELIBERATELY DOES NOT USE IT: muting is authored on the world entry,
-    // and the world-tag card below is read-only. That is a decision this file makes rather than a
-    // structural impossibility, which is why it is asserted rather than assumed.
+    // Three of the four keys the call site's component bundle spreads; `systems` stays undeclared,
+    // as the browser view's twin block states. `actions` carries `setMutedTags` and this view
+    // DELIBERATELY DOES NOT USE IT: muting is authored on the world entry and the world-tag card
+    // below is read-only.
     scope = null,
     actions = null,
     systemId = '',
-    // The deep link, through the banner's OWN exit rather than a second navigation control beside
-    // the read-only tag card. Called with the ROUTE TOKEN and the entity id.
+    // The deep link, through the banner's own exit. Called with the ROUTE TOKEN and the entity id.
     onOpenWorldEntry = () => {},
   } = $props();
 
-    // The world layer this system's rules sit over, read off the world projection's own JOIN —
-    // the only place the INHERIT state lives. The in-system record carries the RESOLVED value and
-    // cannot tell an inherited category from an identical overriding one.
+  // The world layer this system's rules sit over, read off the world projection's JOIN — the only
+  // place the INHERIT state lives. The in-system record carries only the RESOLVED value.
   const worldEntry = $derived(
     (Array.isArray(scope?.entries) ? scope.entries : []).find(
       (entry) => String(entry?.id ?? '') === String(component?.id ?? '')
@@ -171,23 +149,18 @@
     Array.isArray(worldSystemRow?.mutedTags) ? worldSystemRow.mutedTags : []
   );
   const worldMember = $derived(worldSystemRow?.member === true);
-  // AN ABSENT `inherit` KEY READS AS INHERITING, matching the resolver: that is the state a
-  // record created by "add to this system" is in.
+  // AN ABSENT `inherit` KEY READS AS INHERITING, matching the resolver; that is the state "add to
+  // this system" creates.
   const categoryInheriting = $derived(worldSystemRow?.inherited?.category !== false);
-  // THE OPTION IS WITHHELD WHEN NO WORLD VALUE IS AUTHORED: offering it would label the control
-  // with an empty world value, and flipping it resolves back to the in-system value anyway — a
-  // control that changes nothing while looking as though it did.
+  // THE OPTION IS WITHHELD WHEN NO WORLD VALUE IS AUTHORED: flipping it would resolve back to the
+  // in-system value anyway — a control that changes nothing while looking as though it did.
   const categoryInheritOffered = $derived(
     worldMember && componentCategoryInheritOffered(worldCategory)
   );
-  // THE STAGED INHERIT FLAG, the other half of a draft. `null` means the GM has not touched the
-  // control this session, so the persisted flag stands; anything else is a PENDING choice read
-  // everywhere `categoryInheriting` used to be read directly — the lock, the note, the select's
-  // value and the rail — so the whole screen previews the choice while it is still a draft.
-  //
-  // The flag used to be written the instant it was chosen while the value beside it was buffered
-  // until Save, so a GM who backed out left the system silently switched from inheriting to
-  // overriding. Both halves of one choice now land together; see `handleSave` for the ORDER.
+  // THE STAGED INHERIT FLAG, the other half of a draft. `null` means untouched this session, so the
+  // persisted flag stands; anything else is a PENDING choice read everywhere `categoryInheriting`
+  // is — lock, note, select value and rail — so the screen previews it while it is still a draft.
+  // Both halves of one choice land together; see `handleSave` for the ORDER.
   let categoryInheritDraft = $state(null);
   const categoryInheritStaged = $derived(
     categoryInheritDraft === null ? categoryInheriting : categoryInheritDraft
@@ -207,12 +180,10 @@
     )
   );
 
-  // THE ESSENCE SECTION'S INHERIT CHOICE (M31). The world record carries an `essences` SECTION
-  // beside `category` on the category model exactly, so this is the category machinery above over
-  // the other section: the persisted switch off the world join, the OFFER withheld while the
-  // world authored nothing, a three-valued staged flag, and a LOCK that draws the steppers
-  // read-only over the WORLD map. `worldEssenceMap` is what a locked card shows and what an
-  // override is SEEDED from, so flipping the switch moves no tile.
+  // THE ESSENCE SECTION'S INHERIT CHOICE (M31): the category machinery above, over the world record's
+  // `essences` section — persisted switch off the world join, offer withheld while the world authored
+  // nothing, three-valued staged flag, and a LOCK drawing the steppers read-only over the WORLD map.
+  // `worldEssenceMap` is what a locked card shows and what an override is seeded from.
   const worldEssences = $derived(worldEntry?.defaults?.essences);
   const worldEssenceMap = $derived(componentWorldEssenceMap(worldEntry, []));
   const essenceInheriting = $derived(worldSystemRow?.inherited?.essences !== false);
@@ -241,32 +212,27 @@
   let tagDraft = $state([]);
   let categoryDraft = $state(GENERAL_COMPONENT_CATEGORY);
   let essenceDraft = $state([]);
-  // The rendered subset (issue 1036): every ENABLED essence, plus any disabled one this component
-  // already carries a positive quantity of. `essenceDraft` itself stays whole — narrowing it
-  // would delete a disabled essence's authored quantity on the next save.
+  // The rendered subset (issue 1036): every ENABLED essence plus any disabled one already carried
+  // at a positive quantity. `essenceDraft` stays whole; narrowing it would delete those quantities.
   const offeredEssences = $derived(
     visibleEssenceOptions(
       essenceDraft,
       (option) => clampComponentEssenceQuantity(option?.quantity) > 0
     )
   );
-  // Deep clone of `component.salvage` so edits never mutate the upstream card. Only the authoring
-  // fields are edited here; the rest are preserved and spread back through `buildUpdates` so a
-  // save never drops them.
+  // Deep clone of `component.salvage` so edits never mutate the upstream card. Unedited fields are
+  // preserved and spread back through `buildUpdates`, so a save never drops them.
   let salvageDraft = $state(cloneSalvage(null));
-  // The COMPLICATIONS draft (issue 1286). A top-level sibling of `salvage`, not part of it: a
-  // complication is scoped to this component's participation in ANY progressive activity, so
-  // parking it inside the salvage sub-record would be the aggregate-boundary violation
-  // `componentComplications.js` states, and `updates.salvage` would carry it onto a system whose
-  // salvage feature is off, where the shape is spec-invalid.
+  // The COMPLICATIONS draft (issue 1286): a top-level sibling of `salvage`, never part of it.
+  // Nesting it would be the aggregate-boundary violation `componentComplications.js` states, and
+  // `updates.salvage` would carry it onto a system whose salvage feature is off.
   let complicationsDraft = $state([]);
   let saveFailed = $state(false);
   let lastComponentKey = $state(null);
   let lastDirty = $state(false);
   let lastDraftSignature = $state('');
 
-  // See the `complicationActivities` prop note: absent means "derive what this view knows",
-  // which is the salvage axis alone.
+  // See the `complicationActivities` prop note: absent derives the salvage axis alone.
   const complicationActivityProgressive = $derived(
     complicationActivities || { salvage: salvageResolutionMode === 'progressive' }
   );
@@ -284,13 +250,11 @@
         .map((opt) => opt.tag)
         .sort()
         .join(','),
-      // `category` is NOT a salvage field, so it gets its own term rather than riding
-      // `salvageSignature()`. Same one-list principle as that allowlist: an authored field missing
-      // from the signature means the editor never re-emits its draft, so the root's dirty state
-      // and Save never see it (issue 676).
+      // `category` is NOT a salvage field, so it takes its own term. An authored field missing from
+      // the signature means the editor never re-emits its draft, so Save never sees it (issue 676).
       categoryDraft,
-      // The staged INHERIT half gets its own term, THREE-valued rather than boolean: `null`
-      // (untouched) and a staged value equal to the persisted one are different states.
+      // The staged INHERIT half, THREE-valued: `null` (untouched) and a staged value equal to the
+      // persisted one are different states.
       String(categoryInheritDraft),
       // And the essence switch's staged half, three-valued for the same reason (M31).
       String(essenceInheritDraft),
@@ -299,9 +263,8 @@
         .sort()
         .join(','),
       showSalvage ? salvageSignature() : '',
-      // Its OWN term, like `category`: a complication is not a salvage field. Omit it and the
-      // issue-651 / issue-676 bug returns verbatim — the GM authors a complication, nothing is
-      // ever dirty, Save never enables, and the edit is silently discarded on exit.
+      // Its OWN term, like `category`. Omit it and the issue-651 failure returns verbatim: the GM
+      // authors a complication, nothing is dirty, and the edit is discarded on exit.
       complicationsSignature(),
       dirty ? 'dirty' : 'clean',
     ].join('')
@@ -311,16 +274,15 @@
     if (componentKey === lastComponentKey) return;
     tagDraft = cloneTagOptions(tagOptions);
     categoryDraft = normalizeComponentCategory(component?.category);
-    // Reset with the drafts it belongs to: left standing, a staged inherit choice would be
-    // re-applied to the NEXT component opened in this editor.
+    // Reset with the drafts; left standing it would re-apply to the NEXT component opened here.
     categoryInheritDraft = null;
     essenceInheritDraft = null;
     essenceDraft = cloneEssenceOptions(essenceOptions);
     salvageDraft = cloneSalvage(component?.salvage);
     complicationsDraft = cloneComplications(component?.complications);
     saveFailed = false;
-    // The DC control's Custom… choice is transient UI state, not draft data. Reset it with the
-    // drafts, or opening a second component would inherit the first's open custom input.
+    // Transient UI state, not draft data. Reset with the drafts, or a second component would
+    // inherit the first's open custom input.
     salvageDcCustomSelected = false;
     lastComponentKey = componentKey;
   });
@@ -342,14 +304,7 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  /**
-   * The interpolating localizer the shared component-scope model takes.
-   *
-   * @param {string} key
-   * @param {string} fallback
-   * @param {object} [data]
-   * @returns {string}
-   */
+  /** The interpolating localizer the shared component-scope model takes. */
   function format(key, fallback, data) {
     let result = text(key, fallback);
     for (const [token, value] of Object.entries(data ?? {})) {
@@ -358,23 +313,19 @@
     return result;
   }
 
-  // `general` first, then the system's authored vocabulary. The reserved bucket is never
-  // persisted in `categoryOptions`, so it is prepended here rather than expected in the list.
+  // `general` first, then the authored vocabulary: the reserved bucket is never persisted in
+  // `categoryOptions`.
   const effectiveCategoryOptions = $derived(getEffectiveComponentCategories(categoryOptions));
 
-  // The two tabs the reference draws, `Component rules` and `Validation`. The tab is LOCAL state
-  // and deliberately not lifted: it is a reading position rather than a draft, and the editor is
-  // re-seeded per component anyway.
+  // The two tabs the reference draws. The tab is LOCAL state and deliberately not lifted: it is a
+  // reading position rather than a draft.
   let activeTab = $state('rules');
 
   const systemLabel = $derived(String(worldSystemRow?.systemName ?? systemId));
 
   /**
-   * The name of every salvage result this system has NO rules for. `componentOptions` is the
-   * system's own component roster, so a result naming an id absent from it is a result this
-   * system cannot award — the one validation fact the draft alone cannot answer.
-   *
-   * @returns {string[]}
+   * The name of every salvage result this system has no rules for — a result naming an id absent
+   * from `componentOptions` cannot be awarded. The one validation fact the draft alone cannot answer.
    */
   function salvageResultsWithoutRules() {
     const known = new Set((componentOptions || []).map((option) => String(option?.id ?? '')));
@@ -433,11 +384,8 @@
   );
 
   /**
-   * The Validation tab's badge, in the shape `EditorTabs` takes. An early-return chain rather
-   * than a nested ternary, which SonarCloud reports as S3358.
-   *
-   * @param {{blocking: number, warnings: number}} counts
-   * @returns {{count: number, tone: string}|null}
+   * The Validation tab's badge, in the shape `EditorTabs` takes. An early-return chain rather than a
+   * nested ternary, which SonarCloud reports as S3358.
    */
   function validationBadge(counts) {
     if (counts.blocking > 0) return { count: counts.blocking, tone: 'danger' };
@@ -461,12 +409,7 @@
   ]);
   const badges = $derived({ validation: validationBadge(validation.counts) });
 
-  /**
-   * The overall status the validation hero paints, from the counts the rows are grouped by.
-   *
-   * @param {{blocking: number, warnings: number}} counts
-   * @returns {'block'|'warn'|'pass'}
-   */
+  /** The overall status the validation hero paints, from the counts the rows are grouped by. */
   function worstValidationStatus(counts) {
     if (counts.blocking > 0) return 'block';
     if (counts.warnings > 0) return 'warn';
@@ -492,9 +435,8 @@
     ),
   });
 
-  // THE CATEGORY CONTROL IS ONE SELECT: the reference folds `Inherit from world · {value}` into
-  // the select's first option, where this editor drew a floated head select, a second `Category`
-  // label, a note and a toggle in the body. One control, in the body, full width.
+  // THE CATEGORY CONTROL IS ONE SELECT: `Inherit from world · {value}` is the select's first
+  // option, in the body, full width.
   const INHERIT_OPTION = '__inherit';
   const categorySelectValue = $derived(categoryLocked ? INHERIT_OPTION : categoryDraft);
   const categoryInheritLabel = $derived(
@@ -506,16 +448,9 @@
   );
 
   /**
-   * Stage the one control's choice, which is TWO writes on the two transitions that need them.
-   *
-   * The inherit flag is a MEMBERSHIP write and the category is an IN-SYSTEM one, so choosing a
-   * concrete category while inheriting has to clear the flag as well — otherwise the read union
-   * re-applies the world value after the in-system re-spread and the typed value is discarded on
-   * the next read.
-   *
-   * NEITHER HALF IS WRITTEN HERE: both are staged and both land in `handleSave`.
-   *
-   * @param {string} value
+   * Stage the one control's choice, which is two staged writes: the inherit flag is a MEMBERSHIP
+   * write and the category an IN-SYSTEM one, so choosing a concrete category while inheriting must
+   * clear the flag too, or the read union re-applies the world value. Both land in `handleSave`.
    */
   function setCategorySelection(value) {
     if (value === INHERIT_OPTION) {
@@ -527,15 +462,9 @@
   }
 
   /**
-   * Stage the essence switch (M31). Nothing is written here, for the reason
-   * `setCategorySelection` gives: both halves land in `handleSave`.
-   *
-   * Going to OVERRIDE seeds the value draft from the WORLD map the locked card was showing, so no
-   * tile moves and the first Save writes the values the GM was already looking at. Going back to
-   * INHERIT leaves the value draft standing as the dormant override, exactly as the category
-   * draft stands behind the `Inherit from world` option.
-   *
-   * @param {boolean} nextInherit `InheritRow` reports the NEXT inherit value, never a toggle.
+   * Stage the essence switch (M31); nothing is written here. Going to OVERRIDE seeds the value draft
+   * from the WORLD map the locked card showed, so no tile moves; going back to INHERIT leaves that
+   * draft standing as the dormant override. `nextInherit` is the NEXT value, never a toggle.
    */
   function setEssenceInheritance(nextInherit) {
     essenceInheritDraft = nextInherit === true;
@@ -547,20 +476,16 @@
     }
   }
 
-  // ── D4.2 THE TAG CARD'S TWO GROUPS ─────────────────────────────────────────────────────
   const worldTagsApplied = $derived(worldTags.filter((tag) => !worldMutedTags.includes(tag)));
   const ownTagLabel = $derived(
     format('FABRICATE.Admin.Manager.Component.TagsEdit.OwnGroup', '{system}’s tags', {
       system: systemLabel,
     })
   );
-  // THE WORLD BRANCH STATES WHAT IS TRUE, WHICH IS NOT WHAT THE REFERENCE STATES. The reference
-  // writes `World tags merge with {system}'s own.` and the runtime does not do that:
-  // `resolveComponentTags` computes the additive set and the read union's trailing in-system
-  // re-spread DISCARDS it. `### GM World Component Screens` makes that a rule — no surface may
-  // assert the false half of the merge while it is unconsumed — so this is a licensed departure
-  // and the only one on this card. The card still SHOWS the world run, because showing a list is
-  // not claiming it reaches anything.
+  // THE WORLD BRANCH STATES WHAT IS TRUE, WHICH IS NOT WHAT THE REFERENCE STATES: the runtime does
+  // not merge world tags — `resolveComponentTags` computes the additive set and the read union's
+  // trailing in-system re-spread discards it. `### GM World Component Screens` forbids asserting the
+  // false half, so this is a licensed departure. The card still SHOWS the world run.
   const tagCardSubtitle = $derived(
     worldTags.length > 0
       ? format(
@@ -575,14 +500,10 @@
         )
   );
 
-  // THE `How players see it` RAIL (M27): `WorldComponentEntryPreviewRail` draws the tile, the
-  // facts and the two kickered groups on both screens, and this editor supplies only the scope
-  // and the data.
-  //
-  // BOTH FACT GROUPS ARE NARROWED TO THIS SYSTEM. The world projection's `requiredBy` and
-  // `producedBy` are world-wide and carry the owning system on every reference, so a rail on a
-  // system's rules that listed another system's recipes would be a wrong list rather than a long
-  // one.
+  // THE `How players see it` RAIL (M27): `WorldComponentEntryPreviewRail` draws it on both screens
+  // and this editor supplies only the scope and the data. BOTH FACT GROUPS ARE NARROWED TO THIS
+  // SYSTEM — the world projection's `requiredBy` and `producedBy` are world-wide, and a rail on a
+  // system's rules listing another system's recipes would be a wrong list, not a long one.
   function railRows(references, badgeFor) {
     return (Array.isArray(references) ? references : [])
       .filter((reference) => reference?.systemId === systemId)
@@ -656,8 +577,7 @@
     categoryDraft = normalizeComponentCategory(value);
   }
 
-  // Blank when unset; otherwise the staged number. Read straight off the prop — the
-  // draft itself lives in the manager root, so there is nothing to seed here.
+  // Blank when unset, else the staged number. Read off the prop: the draft lives in the root.
   const difficultyInputValue = $derived(
     difficulty === null || difficulty === undefined ? '' : difficulty
   );
@@ -684,12 +604,10 @@
       id: option.id,
       name: option.name,
       icon: option.icon,
-      // The essence's own colour as the bare `--fab-tag-*` key the Essence Catalogue stores (M29).
-      // Carried for the same reason `enabled` is: a field dropped by the clone can never reach
-      // the card.
+      // The essence's own `--fab-tag-*` colour key (M29), carried for the reason `enabled` is: a
+      // field the clone drops can never reach the card.
       colorToken: option.colorToken,
-      // Carried, or the offer filter below could never see it and every disabled essence would be
-      // offered as if enabled (issue 1036).
+      // Carried, or the offer filter below would treat every disabled essence as enabled (1036).
       enabled: option.enabled !== false,
       quantity: clampComponentEssenceQuantity(option.quantity),
     }));
@@ -700,35 +618,25 @@
     return typeof random === 'function' ? random() : Math.random().toString(36).slice(2, 12);
   }
 
-  // Deep clone the persisted salvage shape into an editable draft. Authoring only touches
-  // resultGroups/outcomeRouting/dcOverride; the rest are kept verbatim so `buildUpdates` can
-  // spread them back and never drop them.
+  // Deep clone the persisted salvage shape into an editable draft. Authoring touches only
+  // resultGroups/outcomeRouting/dcOverride; the rest are kept verbatim for `buildUpdates`.
   function cloneSalvage(salvage) {
     const source = salvage && typeof salvage === 'object' ? salvage : {};
     return {
       ...source,
-      // The component's own check-modifier pick (issue 1095). Kept as `null` for ABSENT rather
-      // than `[]`, because an authored empty array is a real pick of zero and a DIFFERENT roll.
-      // `...source` above preserves an authored one; this only normalizes the absent case so the
-      // dirty-check baseline is comparable.
+      // The component's own check-modifier pick (issue 1095). `null` for ABSENT rather than `[]`,
+      // because an authored empty array is a real pick of zero and a DIFFERENT roll.
       checkModifierIds: Array.isArray(source.checkModifierIds)
         ? [...source.checkModifierIds]
         : null,
       dcOverride: source.dcOverride ?? null,
-      // Default FALSE, matching `_normalizeSalvage` (issue 676). Do NOT copy the `!== false`
-      // shape of `allowPlayerResultReorder` below — that would default this to TRUE, flipping
-      // every component in every world to salvageable on first render and saving it back.
-      //
-      // Its other job is normalizing the DIRTY-CHECK BASELINE: leave the key absent and `enabled`
-      // compares `false` against `undefined` forever, so toggling off→on never returns to clean.
+      // Default FALSE, matching `_normalizeSalvage` (issue 676). Do NOT copy the `!== false` shape
+      // of `allowPlayerResultReorder` below: that would flip every component in every world to
+      // salvageable. It also normalizes the DIRTY-CHECK BASELINE, so toggling off then on cleans.
       enabled: source.enabled === true,
-      // Default TRUE (issue 651), matching the model; `...source` already preserves a persisted
-      // value, so this is purely about the ABSENT key.
-      //
-      // Its load-bearing job is normalizing the DIRTY-CHECK BASELINE, not rendering: `isDirty()`
-      // compares the draft's signature against `cloneSalvage(component.salvage)`, so an absent key
-      // leaves a component that has never been toggled stuck DIRTY forever once it is toggled off
-      // and back on — Save enabled with nothing to save, and the exit guard nagging on a no-op.
+      // Default TRUE (issue 651), matching the model; `...source` preserves a persisted value, so
+      // this covers the ABSENT key only. Its load-bearing job is the DIRTY-CHECK BASELINE: absent,
+      // it leaves a never-toggled component stuck dirty once toggled off and back on.
       allowPlayerResultReorder: source.allowPlayerResultReorder !== false,
       outcomeRouting:
         source.outcomeRouting && typeof source.outcomeRouting === 'object'
@@ -763,17 +671,12 @@
     return Number.isFinite(numeric) && numeric > 0 ? numeric : 1;
   }
 
-  // The dirty-check allowlist: every AUTHORED salvage field must appear here or the Save button
-  // never enables for it and the GM's edit is silently discarded on exit. That is what happened
-  // when `allowPlayerResultReorder` was added (issue 651) — persistence worked, but nothing could
-  // be saved because nothing was ever dirty.
-  //
-  // Taking a salvage OBJECT rather than having `isDirty()` hand-build a matching literal means
-  // there is ONE list, not two that must be kept in sync.
+  // The dirty-check allowlist: every AUTHORED salvage field must appear here or Save never enables
+  // for it and the edit is discarded on exit (issue 651). Taking a salvage OBJECT rather than having
+  // `isDirty()` build a matching literal keeps ONE list rather than two kept in sync.
   function salvageSignatureOf(salvage) {
     return JSON.stringify({
-      // The per-component salvage gate (issue 676). Omit it and the 651 bug returns verbatim for
-      // this field.
+      // The per-component salvage gate (issue 676); omit it and the 651 failure returns here.
       enabled: salvage.enabled,
       resultGroups: salvage.resultGroups,
       outcomeRouting: salvage.outcomeRouting,
@@ -789,16 +692,9 @@
   }
 
   /**
-   * Deep-clone the persisted complications into an editable draft (issue 1286).
-   *
-   * A STRUCTURAL clone, not a shallow copy: `when` / `rollCondition` / `effectRoll` are nested
-   * objects, and a shallow copy would share them with the upstream card, so a discarded edit
-   * would already have landed on the component the browser renders.
-   *
-   * Absent normalizes to `[]` for the same reason `enabled` and `allowPlayerResultReorder` are
-   * normalized above: comparing `[]` against `undefined` forever would leave a component whose
-   * only edit was adding and removing one complication stuck dirty. Emitting the key is a
-   * separate decision, taken in `buildUpdates()`.
+   * Deep-clone the persisted complications into an editable draft (issue 1286). STRUCTURAL, not
+   * shallow: `when` / `rollCondition` / `effectRoll` are nested objects a shallow copy would share
+   * with the upstream card. Absent normalizes to `[]` so an add-then-remove does not stay dirty.
    */
   function cloneComplications(complications) {
     return (Array.isArray(complications) ? complications : []).map((complication) => ({
@@ -810,8 +706,8 @@
     }));
   }
 
-  // ONE list again, on `salvageSignatureOf`'s reasoning: taking the ARRAY rather than reading the
-  // draft means `isDirty()` compares the same projection of both sides.
+  // ONE list again, on `salvageSignatureOf`'s reasoning: taking the ARRAY makes `isDirty()` compare
+  // the same projection of both sides.
   function complicationsSignatureOf(complications) {
     return JSON.stringify(complications);
   }
@@ -846,8 +742,7 @@
 
   function isDirty() {
     if (!component) return false;
-    // THE INHERIT FLAG IS A DRAFT FIELD LIKE ANY OTHER. Omit it and the failure is the issue-651
-    // one verbatim: the GM flips the switch, nothing is ever dirty, and the choice is discarded.
+    // THE INHERIT FLAG IS A DRAFT FIELD LIKE ANY OTHER; omit it and the issue-651 failure returns.
     if (categoryInheritDirty) return true;
     if (essenceInheritDirty) return true;
     if (categoryDraft !== normalizeComponentCategory(component?.category)) return true;
@@ -855,9 +750,8 @@
     if (showEssences && !essencesAreEqual(essenceDraft, essenceOptions)) return true;
     if (showSalvage && salvageSignature() !== salvageSignatureOf(cloneSalvage(component?.salvage)))
       return true;
-    // NOT gated on a `show*` flag: the complications section owns its own visibility gate, and a
-    // draft that differs from the persisted list is a real edit whether or not that section is on
-    // screen right now.
+    // NOT gated on a `show*` flag: the complications section owns its own gate, and a draft that
+    // differs from the persisted list is a real edit whether or not that section is on screen.
     if (
       complicationsSignature() !==
       complicationsSignatureOf(cloneComplications(component?.complications))
@@ -867,18 +761,10 @@
   }
 
   /**
-   * The essence map a set of rows produces, with the ids this system's roster cannot render
-   * carried forward. `essenceOptions` is built over the SYSTEM's `essenceDefinitions`, and a
-   * world map is not narrowed to the ids a given system holds — so an id outside the roster has
-   * no row here and was silently DROPPED from the write. It is carried rather than rendered
-   * because the system has no name, icon or colour for it and no control that could edit it.
-   *
-   * ONE FUNCTION FOR TWO ROW SETS: the write passes the DRAFT and the baseline passes the rows as
-   * they were DRAWN, and those two answers have to be produced the same way or an untouched save
-   * differs from its own baseline for a reason that is an artefact of the arithmetic.
-   *
-   * @param {object[]} rows either `essenceDraft` or `essenceOptions`.
-   * @returns {Record<string, number>}
+   * The essence map a set of rows produces, carrying forward the ids this system's roster cannot
+   * render: `essenceOptions` is built over the SYSTEM's `essenceDefinitions`, so an id outside it has
+   * no row and was silently DROPPED from the write. ONE FUNCTION FOR TWO ROW SETS — the write passes
+   * the draft, the baseline the rows as DRAWN — or an untouched save differs from its own baseline.
    */
   function essenceMapFrom(rows) {
     const essences = carriedComponentEssences(component?.essences, essenceOptions);
@@ -890,19 +776,10 @@
   }
 
   /**
-   * The map an UNTOUCHED save of the rows THIS EDITOR DREW would produce — the baseline the
-   * override rule answers "did the GM author anything" against.
-   *
-   * STATED RATHER THAN LEFT TO BE ASSUMED. `updateComponent` takes a caller that omits it to have
-   * been seeded from the read union, and this editor is seeded from the item CARD, which stopped
-   * being the same map the moment the card grew a narrowed display run beside the resolved one.
-   * `data-models` §Component scope 2a: the baseline is a fact about the RENDER, so it is captured
-   * where the rows were drawn and travels with them.
-   *
-   * `undefined` where the section is not rendered at all — there is no essence axis in the write
-   * either, so nothing compares.
-   *
-   * @returns {Record<string, number>|undefined}
+   * The map an UNTOUCHED save of the rows THIS EDITOR DREW would produce — the baseline the override
+   * rule answers "did the GM author anything" against. `data-models` §Component scope 2a: it is a
+   * fact about the RENDER, so it is captured where the rows were drawn, rather than re-derived from
+   * the read union `updateComponent` assumes. `undefined` where the section is not rendered.
    */
   function renderedEssenceBaseline() {
     return showEssences ? essenceMapFrom(essenceOptions) : undefined;
@@ -916,8 +793,7 @@
     }
     if (showEssences) updates.essences = essenceMapFrom(essenceDraft);
     if (showSalvage) {
-      // Spread the preserved (unedited) salvage fields first, then overwrite the three authored
-      // fields so enabled/ingredientQuantity/toolIds survive a save.
+      // Preserved salvage fields first, then the three authored ones, so the rest survive a save.
       updates.salvage = {
         ...salvageDraft,
         resultGroups: salvageDraft.resultGroups,
@@ -925,15 +801,13 @@
         dcOverride: salvageDraft.dcOverride,
         allowPlayerResultReorder: salvageDraft.allowPlayerResultReorder,
       };
-      // ABSENCE IS A VALUE HERE, and the normalizer keys authoredness on `Array.isArray` at
-      // entry — so the key must be DELETED, never written as `null`. Writing `null` would read as
-      // "not an array" and inherit, which is the same roll by accident rather than construction.
+      // ABSENCE IS A VALUE HERE: the normalizer keys authoredness on `Array.isArray`, so the key
+      // must be DELETED, never written as `null` — `null` would read as "not an array" and inherit.
       if (!Array.isArray(salvageDraft.checkModifierIds)) delete updates.salvage.checkModifierIds;
     }
-    // A TOP-LEVEL sibling of `salvage`, never a member of it (issue 1286). Always emitted, and
-    // always as an array: `authoredComplications` keys the persisted key on a NON-EMPTY normalized
-    // list, so an authored `[]` normalizes to ABSENT and deleting the last complication is how a
-    // GM removes the key. Omitting the field here would make that deletion unsaveable.
+    // A TOP-LEVEL sibling of `salvage` (issue 1286), always emitted and always an array:
+    // `authoredComplications` normalizes an authored `[]` to ABSENT, which is how a GM removes the
+    // key. Omitting the field here would make that deletion unsaveable.
     updates.complications = complicationsDraft;
     return updates;
   }
@@ -952,9 +826,8 @@
     };
   }
 
-  // The ONE essence write path (issue 772). `Stepper` inside `EssenceQuantityCard` emits the
-  // clamped ABSOLUTE value for its −/+ adjuncts and for a typed entry alike. The clamp stays here
-  // regardless: `Stepper`'s own `min` guards its adjuncts, but the draft is what the save reads.
+  // The ONE essence write path (issue 772). `Stepper` emits the clamped ABSOLUTE value for both its
+  // adjuncts and a typed entry; the clamp stays here regardless, because the save reads the draft.
   function setEssenceQuantity(essenceId, rawValue) {
     const quantity = clampComponentEssenceQuantity(rawValue);
     const next = essenceDraft.map((entry) =>
@@ -963,20 +836,17 @@
     essenceDraft = next;
   }
 
-  // Salvage authoring mutators. Each writes a fresh `salvageDraft`, preserving the untouched
-  // fields, so the `draftSignature` effect re-emits `onDraftChange`.
-  //
-  // The four presentations are DERIVED from the two-axis model: `salvageResolutionMode ∈ {simple,
-  // progressive, routed}` plus the off/on axis on the salvage check. No persisted token changes.
+  // Salvage authoring mutators. Each writes a fresh `salvageDraft` preserving the untouched fields,
+  // so the `draftSignature` effect re-emits `onDraftChange`. The four presentations are DERIVED from
+  // `salvageResolutionMode` plus the salvage check's off/on axis; no persisted token changes.
 
   const salvageEnabled = $derived(salvageDraft.enabled === true);
   const salvageHasGroups = $derived(salvageDraft.resultGroups.length > 0);
   const salvageProgressive = $derived(salvageResolutionMode === 'progressive');
   const salvageRouted = $derived(salvageResolutionMode === 'routed');
-  // Simple mode caps authoring at ONE success result group (issue 764), mirroring the recipe
-  // editor. The cap counts SUCCESS groups so a legacy-loaded reserved failure group neither
-  // wedges the editor nor hides the Add control while there is still no success group. The
-  // invariant itself lives at the `_normalizeSalvage` clamp; this is UX only.
+  // Simple mode caps authoring at ONE success result group (issue 764), mirroring the recipe editor.
+  // The cap counts SUCCESS groups so a legacy failure group neither wedges the editor nor hides the
+  // Add control. The invariant itself is the `_normalizeSalvage` clamp; this is UX only.
   const salvageSimpleMode = $derived(salvageResolutionMode === 'simple');
   const salvageSuccessGroupCount = $derived(
     salvageDraft.resultGroups.filter((group) => group?.role !== 'failure').length
@@ -988,25 +858,19 @@
     salvageCheckEnabled && (salvageResolutionMode === 'simple' || salvageRouted)
   );
 
-  // RULING A (issue 676). What collapses when salvage is OFF is the chrome that only has meaning
-  // once salvage RUNS — mode, DC, routing, reorder. The result-group editor stays usable, and
-  // that is not cosmetic: `data-add-salvage-group` is the ONLY add-group control in the codebase
-  // and it lives INSIDE the group editor, so collapsing the whole body would leave `resultGroups`
-  // unable to reach 1 and the toggle disabled forever — salvage unenablable for every new
-  // component.
+  // RULING A (issue 676): what collapses when salvage is OFF is the chrome that only means something
+  // once salvage RUNS — mode, DC, routing, reorder. The result-group editor stays usable, because
+  // `data-add-salvage-group` lives inside it and collapsing it would leave `resultGroups` unable to
+  // reach 1 and the toggle disabled forever.
   const salvageShowChrome = $derived(salvageEnabled);
 
-  // UX only — NOT the invariant. The invariant is the normalizer clamp (`_normalizeSalvage`) plus
-  // the removal-path auto-disable in `removeSalvageGroup`.
+  // UX only. The invariant is the `_normalizeSalvage` clamp plus `removeSalvageGroup`'s auto-disable.
   const salvageToggleDisabled = $derived(saving || !salvageHasGroups);
 
   // The off-body copy MUST branch: "Enable it above to define what it yields" is only true once
-  // groups exist, and at zero groups it points at a toggle that is correctly disabled.
-  //
-  // It is ALSO the zero-group explanation for that disabled toggle, which is why it is body copy
-  // and not a `title`: a DISABLED `<button>` receives no mouse events, so a tooltip there never
-  // appears in any browser — and a mounted test could not tell, because the attribute would be in
-  // the DOM.
+  // groups exist. It is ALSO the zero-group explanation for the disabled toggle, which is why it is
+  // body copy and not a `title`: a disabled `<button>` receives no mouse events, so a tooltip there
+  // never appears — and a mounted test could not tell, because the attribute would be in the DOM.
   const salvageDisabledNotice = $derived(
     salvageHasGroups
       ? text(
@@ -1019,11 +883,9 @@
         )
   );
 
-  // The salvage mode, displayed READ-ONLY: it is a SYSTEM-level setting authored on the Crafting
-  // Settings screen, and without it the panel silently changes shape — routing rows, ordinals and
-  // the DC control appearing and vanishing — driven by a setting the GM cannot see from here.
-  // Reuses `salvageResolutionModeOptions`, whose comment records that the persisted token is
-  // never displayed.
+  // The salvage mode, READ-ONLY: a SYSTEM-level setting authored on Crafting Settings. Without it
+  // the panel silently changes shape from a setting the GM cannot see from here. Reuses
+  // `salvageResolutionModeOptions`, which records that the persisted token is never displayed.
   const salvageModeOption = $derived(
     salvageResolutionModeOptions.find((option) => option.value === salvageResolutionMode) || null
   );
@@ -1031,7 +893,6 @@
     salvageModeOption ? text(salvageModeOption.labelKey, salvageModeOption.fallback) : ''
   );
 
-  // --- DC control (decision 7 + its five cases) ---
   const salvageDcOptions = $derived(
     buildSalvageDcOptions({
       tiers: salvageCheckTiers,
@@ -1056,18 +917,9 @@
     })
   );
   // The PERSISTED value derives the selection — never an `$effect` that writes back. An off-tier
-  // `dcOverride: 14` against a tier list with no DC 14 selects Custom… and displays 14 verbatim;
-  // it must never snap to the nearest tier, and rendering must never mark the editor dirty (AC8a).
-  //
-  // But the persisted value ALONE cannot drive the control, because `Custom…` and `System default`
-  // both persist a `dcOverride` of `null`. Deriving visibility purely from storage made Custom…
-  // DEAD from the state every component starts in: pick it, stage null, derive back to `system`,
-  // and the input never renders. The zero-authored-tiers case — the common one — is where it bites
-  // hardest: two options, one of them inert.
-  //
-  // So the GM's CHOICE is staged separately from the value, and intentionally NOT in the draft:
-  // choosing Custom… without typing a number changes nothing persisted, so it must not make the
-  // editor dirty.
+  // `dcOverride: 14` selects Custom… and displays 14 verbatim, never snapping to a tier, and
+  // rendering never marks the editor dirty (AC8a). But `Custom…` and `System default` both persist
+  // `null`, so the GM's CHOICE is staged separately and deliberately NOT in the draft.
   let salvageDcCustomSelected = $state(false);
   const salvageDcSelection = $derived(
     salvageDcCustomSelected
@@ -1077,8 +929,7 @@
   const salvageDcShowCustomInput = $derived(salvageDcSelection === SALVAGE_DC_CUSTOM);
 
   function setSalvageDcSelection(selection) {
-    // Sticky only while Custom… is the live choice; picking a tier or the system default hands
-    // control back to the persisted value.
+    // Sticky only while Custom… is live; picking a tier hands control back to the persisted value.
     salvageDcCustomSelected = selection === SALVAGE_DC_CUSTOM;
     setSalvage({ dcOverride: salvageDcOverrideForSelection(selection, salvageDraft.dcOverride) });
   }
@@ -1093,13 +944,10 @@
     });
   }
 
-  // Defence in depth behind the normalizer clamp (issue 676). This path used to be UNFLOORED: it
-  // never touched `enabled`, and `buildUpdates()` full-spreads, so enable-at-one-group then
-  // delete-that-group persisted `{enabled: true, resultGroups: []}` — violating Component
-  // Requirement 5 through the sanctioned flow's exact reverse, and then disabling the toggle that
-  // would undo it. Forcing `enabled: false` in the SAME staged `setSalvage` keeps the correction
-  // inside `isDirty()` / `draftSignature` so Save sees it. `_disableInvalidSalvageConfigs` is the
-  // house precedent.
+  // Defence in depth behind the normalizer clamp (issue 676). Unfloored, enable-at-one-group then
+  // delete-that-group persisted `{enabled: true, resultGroups: []}`, violating Component Requirement
+  // 5 and disabling the toggle that would undo it. Forcing `enabled: false` in the SAME staged
+  // `setSalvage` keeps the correction inside `isDirty()` / `draftSignature` so Save sees it.
   function removeSalvageGroup(groupId) {
     const resultGroups = salvageDraft.resultGroups.filter((group) => group.id !== groupId);
     setSalvage({
@@ -1144,22 +992,14 @@
   }
 
   // PROGRESSIVE SALVAGE IS ONE GROUP, WHOSE `results` ARE THE STAGES. Read
-  // `CraftingEngine._resolveSalvageGroups` before touching any of this: in progressive mode it
-  // takes `allGroups[0]` alone and treats that group's `results` as the ordered stage list, so
-  // `resultGroups[1..]` are dead data the engine never reads.
-  //
-  // That is why this surface renders progressive as a flat ordered list with no group chrome. The
-  // redesign prototype models the same screen as one-group-per-stage and maps
-  // `groups.map(g => g.results[0])`; porting THAT mapping literally would have authored stage 2+
-  // into groups the engine never reads, silently awarding only the first stage forever. The
-  // presentation is the prototype's; the mapping is the engine's.
+  // `CraftingEngine._resolveSalvageGroups` before touching this: progressive mode takes `allGroups[0]`
+  // alone and treats its `results` as the ordered stage list, so `resultGroups[1..]` are dead data.
+  // The presentation is the redesign prototype's; the mapping is the engine's.
   const salvageStageGroup = $derived(salvageDraft.resultGroups[0] || null);
   const salvageStages = $derived(salvageStageGroup?.results || []);
 
-  // Append a stage, creating the backing group on first use. This is ALSO the control that takes
-  // a zero-group component to one group, which is what keeps Ruling A's invariant true in
-  // progressive mode: without it `enabled` could never be set, because the normalizer clamps it
-  // to false at zero groups.
+  // Append a stage, creating the backing group on first use. This is ALSO what takes a zero-group
+  // component to one group, which is what keeps Ruling A's invariant true in progressive mode.
   function addSalvageStage() {
     const stage = { id: newId(), componentId: componentOptions[0]?.id || '', quantity: 1 };
     if (!salvageStageGroup) {
@@ -1169,10 +1009,9 @@
     updateSalvageGroupResults(salvageStageGroup.id, (results) => [...results, stage]);
   }
 
-  // Removing the LAST stage removes the empty group with it, so the normalizer's groups-based
-  // clamp can still see the component as empty and force `enabled: false`. Leave the empty group
-  // behind and the draft persists one group holding no results — the clamp holds `enabled` ON
-  // while the engine awards nothing.
+  // Removing the LAST stage removes the empty group with it, so the normalizer's groups-based clamp
+  // still sees the component as empty. Leave it behind and the clamp holds `enabled` ON while the
+  // engine awards nothing.
   function removeSalvageStage(resultId) {
     if (!salvageStageGroup) return;
     const results = salvageStages.filter((result) => result.id !== resultId);
@@ -1217,9 +1056,8 @@
     setSalvage({ outcomeRouting: next });
   }
 
-  // `Stepper` reports a clamped NUMBER, or `null` when an `allowUnset` field is cleared. The
-  // `null` fold stays: `null` is the persisted "inherit the system salvage DC" value, which is
-  // exactly what clearing the field sends.
+  // `Stepper` reports a clamped NUMBER, or `null` when an `allowUnset` field is cleared. The `null`
+  // fold stays: `null` is the persisted "inherit the system salvage DC" value.
   function setSalvageDcOverride(next) {
     setSalvage({ dcOverride: Number.isFinite(next) ? next : null });
   }
@@ -1235,10 +1073,8 @@
   }
 
   /**
-   * The complication band's eyebrow. The COUNT is the half of that sentence worth reading on a
-   * collapsed band, since the band already names the component in its Edit control. Two FULL key
-   * literals rather than one composed key, because `tests/ui-lang-keys-resolve.test.js` can only
-   * prove a key it can see written down.
+   * The complication band's eyebrow. Two FULL key literals rather than one composed key, because
+   * `tests/ui-lang-keys-resolve.test.js` can only prove a key it can see written down.
    */
   function stripTitle(count, componentId) {
     const key =
@@ -1251,17 +1087,10 @@
       .replace('{name}', salvageComponentName(componentId));
   }
 
-  // The read-only complication strip under a progressive salvage row (issue 1286). It draws the
-  // complications authored on the YIELD component the row REFERENCES, never this component's own:
-  // a stage produces that component, and the complication is a consequence of producing it.
-  //
-  // It reads the UNREDACTED authored list. `forecastComplications` filters to
-  // `visibility: 'visible'`, which is the PLAYER's projection, and the authored default is
-  // `gmOnly` — so a GM strip fed from it would be empty for exactly the complications a GM
-  // authors by default.
-  //
-  // Filtered to the SALVAGE activity: a complication enabled only for crafting says nothing about
-  // a salvage stage, and listing it here would claim a consequence this yield does not carry.
+  // The read-only complication strip under a progressive salvage row (issue 1286): the complications
+  // authored on the YIELD component the row REFERENCES, never this component's own. It reads the
+  // UNREDACTED authored list, because `forecastComplications` filters to the PLAYER's projection and
+  // the authored default is `gmOnly`. Filtered to the SALVAGE activity.
   function salvageComplicationsFor(componentId) {
     const authored = salvageComponentOption(componentId)?.complications;
     return (Array.isArray(authored) ? authored : []).filter(
@@ -1269,9 +1098,8 @@
     );
   }
 
-  // The macro and trigger vocabularies are SYSTEM-scoped, so the two lists this view already
-  // holds resolve the referenced component's names too. Without them the sentence degrades to
-  // "runs a macro", which is correct but names nothing a GM recognises.
+  // The macro and trigger vocabularies are SYSTEM-scoped, so this view's own lists resolve the
+  // referenced component's names too; without them the sentence names nothing a GM recognises.
   const complicationMacroNames = $derived(
     new Map(
       (macroOptions || [])
@@ -1296,10 +1124,8 @@
     });
   }
 
-  // The yield picker's option list (issue 676). `img` is projected onto every component option by
-  // the manager root, and `icon` is the fallback for a component whose linked item has no art:
-  // `SearchablePopover` renders a raw `<img>` ONLY when `img` is truthy, so an art-less component
-  // reads as a cube glyph rather than a broken-image box.
+  // The yield picker's option list (issue 676). `icon` is the fallback for a component whose linked
+  // item has no art: `SearchablePopover` renders a raw `<img>` only when `img` is truthy.
   const salvageComponentPickerOptions = $derived(
     (componentOptions || []).map((option) => ({
       id: option.id,
@@ -1335,22 +1161,16 @@
         );
   }
 
-  // A throw is a failure exactly as a `false` return is, so both mark the draft failed in their
-  // own branch. The save is still awaited exactly once — an extra async hop here would move the
-  // failure notice a microtask later than the mounted route tests observe it.
+  // A throw is a failure exactly as a `false` return is, so both mark the draft failed in their own
+  // branch. The save is still awaited exactly once — an extra async hop would move the failure notice
+  // later than the mounted route tests observe it.
   //
-  // ONE SAVE, TWO SETTINGS KEYS, AND THE ORDER IS THE ANSWER. The category is two facts in two
-  // world settings keys: the VALUE on the in-system component record (`craftingSystems`, written
-  // by `onSave`) and the INHERIT flag on the membership record (`componentScope`, written by
-  // `setSectionInherited`). There is no transaction across them.
-  //
-  // THE FLAG GOES FIRST, DELIBERATELY. `setSectionInheritance` SEEDS the local block with the
-  // world value when a switch goes off, so a flag-only landing leaves the system overriding with
-  // the value it was already resolving and the effective category does not move. The other order
-  // fails worse: the value would be written into a record the read union still masks with the
-  // world default, so the GM's typed category would be persisted and invisible.
-  //
-  // Neither half runs if the flag write refuses, and `saveFailed` covers both.
+  // ONE SAVE, TWO SETTINGS KEYS, AND THE ORDER IS THE ANSWER: the category VALUE lives on the
+  // in-system record (`craftingSystems`, written by `onSave`) and the INHERIT flag on the membership
+  // record (`componentScope`, written by `setSectionInherited`), with no transaction across them.
+  // THE FLAG GOES FIRST: `setSectionInheritance` seeds the local block with the world value, so a
+  // flag-only landing leaves the effective category unmoved, where the other order would persist the
+  // typed category behind a read union that still masks it. Neither half runs if the flag refuses.
   async function handleSave(event) {
     event?.preventDefault();
     if (!component?.id || saving) return;
@@ -1368,14 +1188,11 @@
           saveFailed = true;
           return;
         }
-        // THE STAGED VALUE IS NOT CLEARED HERE, and that is not an omission. Clearing it would
-        // hand the display back to `categoryInheriting` in the same tick, before the store has
-        // republished the membership record, so the select would snap to the OLD state and back
-        // one publish later. Left staged, it stops being dirty the moment the persisted flag
-        // catches up with it.
+        // THE STAGED VALUE IS NOT CLEARED HERE. Clearing it would hand the display back to
+        // `categoryInheriting` before the store republishes the membership record, so the select
+        // would snap to the OLD state and back one publish later.
       }
-      // THE ESSENCE SWITCH, SAME ORDER, SAME REASONS (M31): the flag before the values, and a
-      // refusal stops the value write. Not cleared here either.
+      // THE ESSENCE SWITCH, SAME ORDER, SAME REASONS (M31); not cleared here either.
       if (essenceInheritDirty) {
         const inherited = await actions?.setSectionInherited?.(
           component.id,
@@ -1399,22 +1216,18 @@
 </script>
 
 <!--
-  THE WORLD ENTRY'S PAGE FRAME (M27). The reference draws the rules editor and the catalogue entry
-  on ONE frame — a content column beside a 326px rail with its own scroller and left hairline — and
-  the entry's frame is the one already written to it, so this route's `<main>` IS that frame rather
-  than a second grid of its own. Every rule that paints the shared rail is keyed on the frame's
-  class, which is what makes "the same rail" a fact about the pixels rather than about the import.
+  THE WORLD ENTRY'S PAGE FRAME (M27): a content column beside a 326px rail with its own scroller and
+  left hairline. This route's `<main>` IS that frame rather than a second grid, and every rule that
+  paints the shared rail is keyed on the frame's class.
 -->
 <main
   class="manager-main manager-component-edit-main manager-component-entry-page"
   aria-label={text('FABRICATE.Admin.Manager.Component.EditTitle', 'Edit component')}
 >
   <!--
-    THE FORM IS THE FRAME'S CONTENT COLUMN (M26). It wears the world entry column's class beside
-    its own: the entry's column runs edge to edge with the tab strip as a flush band and the inset
-    given to the scrolling panel under it. Two classes rather than one —
-    `manager-component-edit-view` is the form the header's Save submits BY ID and the smoke walk
-    and the layout guards pin it, while the column class is what the frame's rules are keyed on.
+    THE FORM IS THE FRAME'S CONTENT COLUMN (M26), wearing the column class beside its own.
+    `manager-component-edit-view` is the form the header's Save submits BY ID, pinned by the smoke
+    walk and the layout guards; the column class is what the frame's rules are keyed on.
   -->
   <form
     id="manager-component-edit-form"
@@ -1422,10 +1235,8 @@
     onsubmit={handleSave}
   >
     <!--
-      THE TWO-TAB STRIP lives INSIDE the form, not beside it: the header's Save is a
-      `<button type="submit" form="manager-component-edit-form">` and submits this element by id,
-      so a form mounted only on the rules tab would silently stop being submittable the moment a
-      GM opened Validation.
+      THE TWO-TAB STRIP lives INSIDE the form: the header's Save submits this element by id, so a
+      form mounted only on the rules tab would stop being submittable on the Validation tab.
     -->
     <EditorTabs
       {tabs}
@@ -1440,9 +1251,8 @@
     />
 
     <!--
-      THE SCROLLING PANEL (M26), the entry column's own: the strip stays put and the tab body
-      scrolls under it, carrying the reference's inset so the cards are inset and the column is
-      not. It is also the tab panel the strip's `aria-controls` has named since the strip arrived.
+      THE SCROLLING PANEL (M26): the strip stays put and the tab body scrolls under it, carrying the
+      inset. It is also the tab panel the strip's `aria-controls` names.
     -->
     <div
       class="manager-component-entry-panel"
@@ -1455,10 +1265,8 @@
     >
       {#if activeTab === 'rules'}
         <!--
-        ONE IDENTITY CALLOUT. It used to be two stacked cards — an identity strip carrying the art,
-        name, lock chip, source kebab, premise note and a drop target, then a
-        `SharedDefinitionCallout` under it. The source Item is authored on the world entry rather
-        than here. See `ComponentIdentityStrip`'s own header for why both smoke hooks survive.
+        ONE IDENTITY CALLOUT; the source Item is authored on the world entry rather than here. See
+        `ComponentIdentityStrip`'s own header for why both smoke hooks survive.
       -->
         <ComponentIdentityStrip
           {component}
@@ -1470,16 +1278,12 @@
         />
 
         <!--
-        CATEGORY AND TAGS, SIDE BY SIDE. They were two full-width stacked cards; the reference
-        draws them in one `minmax(0,1fr) minmax(0,1.3fr)` grid, which is what makes the tag card's
-        two labelled groups fit beside a control that is one line high.
+        CATEGORY AND TAGS, SIDE BY SIDE in one `minmax(0,1fr) minmax(0,1.3fr)` grid, which is what
+        fits the tag card's two labelled groups beside a control one line high.
       -->
         <div class="manager-component-rules-duo">
-          <!--
-          ONE CONTROL, IN THE BODY, FULL WIDTH. The card used to float a select into its head, then
-          repeat `Category [Inherited]` as a second labelled row with a toggle and the note beside
-          it. The `InheritRow` this replaces is untouched for its other callers.
-        -->
+          <!-- ONE CONTROL, IN THE BODY, FULL WIDTH. The `InheritRow` it replaces is untouched for
+          its other callers. -->
           <section class="manager-component-rules-card" data-component-edit-section="category">
             <div class="manager-component-rules-card-head">
               <i
@@ -1517,11 +1321,10 @@
               {/each}
             </select>
             <!--
-            THE NOTE IS DIRECTLY UNDER THE SELECT and carries the model's own glyph and tone:
-            `info` while inheriting, `warning` while overriding, subtle where the world authored
-            nothing. The reference's raw literal for the inheriting branch maps to the info token
-            (recorded as E-4) and is not quoted here: the theme-colour contract scans prose as well
-            as declarations.
+            THE NOTE IS DIRECTLY UNDER THE SELECT, with the model's own glyph and tone: `info` while
+            inheriting, `warning` while overriding, subtle where the world authored nothing. The
+            inheriting branch's raw literal maps to the info token (E-4) and is not quoted here,
+            because the theme-colour contract scans prose as well as declarations.
           -->
             <p
               class={`manager-component-cat-note is-${categoryNote.tone}`}
@@ -1533,18 +1336,11 @@
           </section>
 
           <!--
-          TWO LABELLED TAG GROUPS AND A MERGE NOTE. The world tags were a card of their own, one
-          panel away from the system's own flat chip grid; the reference draws them as the FIRST
-          group inside this card, with the system's own beneath.
-
+          TWO LABELLED TAG GROUPS AND A MERGE NOTE, the world run first and the system's own beneath.
           THE WORLD GROUP IS READ-ONLY HERE, per D-r5: muting is authored on the world entry, where
-          the list and its exceptions are visible together. The two PAINTS both apply either way,
-          because a read-only chip must still show which tags are muted.
-
-          The caption drops the reference's `CLICK TO MUTE HERE` clause — an instruction a GM
-          cannot follow is worse than a plain label — and the subject-only head action is DROPPED
-          (M11), so the head is glyph, title and subtitle as the reference draws it. The route to
-          the world record is the attribution banner at the top of this editor.
+          the list and its exceptions are visible together. Both PAINTS still apply, because a
+          read-only chip must show which tags are muted. The route to the world record is the
+          attribution banner at the top of this editor.
         -->
           <section class="manager-component-rules-card" data-component-edit-section="tags">
             <div class="manager-component-rules-card-head">
@@ -1563,16 +1359,11 @@
                 </p>
                 <div class="manager-component-tag-run" data-component-edit-world-tags>
                   {#each worldTags as tag (tag)}
-                    <!-- `struck` is the reference's MUTED paint: a dashed hairline, the
-                       `surface-soft` fill and a struck-through label. NOT `disabled` — the `Chip`
-                       primitive joins `is-disabled` to the WARNING family, which would paint a
-                       muted tag amber and read as a hazard the GM must act on.
-
-                       `density="tag-run"` is the scale of a chip that is a control rather than a
-                       badge. It composes with the two paints above and shares no property with
-                       either, so a lit tag, a muted tag and a struck one all render at one size.
-                       `info` rather than `tag` because the reference inks the WORLD run blue and
-                       the system's OWN run purple; the run below is the purple one. -->
+                    <!-- `struck` is the MUTED paint. NOT `disabled` — `Chip` joins `is-disabled`
+                       to the WARNING family, which would paint a muted tag amber and read as a
+                       hazard. `density="tag-run"` is the scale of a chip that is a control rather
+                       than a badge, and composes with both paints so every tag renders at one size.
+                       `info` rather than `tag` inks the WORLD run blue; the run below is purple. -->
                     <Chip
                       density="tag-run"
                       tone={worldMutedTags.includes(tag) ? 'muted' : 'info'}
@@ -1591,15 +1382,11 @@
             <div class="manager-component-tag-group">
               <p class="manager-micro-label" data-component-own-tags-label>{ownTagLabel}</p>
               {#if tagDraft.length > 0}
-                <!-- The pill IS the shared `Chip` (issue 772). `aria-pressed` is the state, not a
-                   class. Written without internal whitespace: `Chip` records that call sites assert
-                   on exact `textContent`.
-
-                   THE LABEL ALONE, with no leading glyph and no trailing state circle (UX F-F).
-                   The world run one label above is the one that leads with an icon. The pair this
-                   dropped roughly doubled each chip's width, which is why eleven tags wrapped to
-                   four rows here against the reference's one. Nothing accessible goes with them:
-                   `aria-pressed` below is the state a screen reader reads. -->
+                <!-- The pill IS the shared `Chip` (issue 772), with `aria-pressed` as the state
+                   rather than a class, and written without internal whitespace because call sites
+                   assert on exact `textContent`. THE LABEL ALONE, with no leading glyph and no
+                   trailing state circle (UX F-F): the pair roughly doubled each chip's width, and
+                   `aria-pressed` is what a screen reader reads. -->
                 <div class="manager-component-tag-run" data-component-edit-tags>
                   {#each tagDraft as option (option.tag)}
                     <Chip
@@ -1639,47 +1426,28 @@
         </div>
 
         <!--
-        THE PROGRESSIVE DC CARD, DECLARED ONCE AND RENDERED IN ONE OF TWO PLACES.
-
-        The reference draws it INSIDE the salvage card's progressive body, and that is where it
-        renders whenever this system resolves SALVAGE progressively. It cannot live there
-        unconditionally: the value is `component.difficulty`, ONE component-level scalar that THREE
-        engines read — progressive recipes, progressive salvage and progressive gathering — so the
-        root gates the card on `componentDifficultyAxisProgressive`, true on ANY of the three.
-        Nesting it under salvage outright would hide it for every progressive-crafting or
-        progressive-gathering system whose salvage is simple or off, which is the exact
-        configuration the smoke harness drives when it fills this input.
-
-        A `{#snippet}` rather than two copies, so `data-component-edit-section="difficulty"` — the
-        selector `scripts/foundry-test-run.mjs` fills, and a step that is not waivable — resolves
-        to exactly one element in every configuration.
+        THE PROGRESSIVE DC CARD, DECLARED ONCE AND RENDERED IN ONE OF TWO PLACES. `component.difficulty`
+        is ONE component-level scalar THREE engines read — progressive recipes, salvage and gathering
+        — so the root gates the card on `componentDifficultyAxisProgressive`, true on any of them.
+        Nesting it under salvage would hide it for every progressive-crafting or -gathering system
+        whose salvage is simple or off, which is what the smoke harness drives. A `{#snippet}` rather
+        than two copies, so `data-component-edit-section="difficulty"` resolves to exactly one element.
       -->
         {#snippet progressiveDcCard()}
           {#if showDifficulty}
-            <!-- "This component's Progressive DC" (issue 676), rehomed out of the deleted
-             right-rail inspector. `data-component-edit-section="difficulty"` is PRESERVED
-             VERBATIM: `scripts/foundry-test-run.mjs` locates
-             `[data-component-edit-section="difficulty"] input` and fills it, and that step is not
-             waivable. `Stepper` renders a real `<input type="number">`, so that selector still
-             resolves.
-
-             It is a SIBLING section and not inside salvage, for the reason the snippet's
-             declaration gives. The browser row's read-only DC badge and the browser's bulk-edit
-             progressive-DC section read the same axis predicate, so all three appear together
-             (issue 772).
-
-             STAGED, not written on change — the value rides the editor's draft and persists on
-             Save, so it contributes to the dirty state and the exit guard. It is a SIBLING of
-             `salvage`, never part of `updates.salvage`. -->
+            <!-- "This component's Progressive DC" (issue 676).
+             `data-component-edit-section="difficulty"` is PRESERVED VERBATIM:
+             `scripts/foundry-test-run.mjs` fills `[data-component-edit-section="difficulty"] input`
+             and that step is not waivable. STAGED, not written on change, so it contributes to the
+             dirty state and the exit guard; a SIBLING of `salvage`, never part of `updates.salvage`. -->
             <section
               class="manager-component-panel manager-component-inline-panel"
               data-component-edit-section="difficulty"
             >
               <div class="manager-task-card-heading">
                 <div>
-                  <!-- The card title uses its OWN key: `Component.ProgressiveDifficulty` is a
-                   SHORT label shared with the browser badge and the evidence row, so it must not
-                   carry this sentence. -->
+                  <!-- Its OWN key: `Component.ProgressiveDifficulty` is a SHORT label shared with
+                   the browser badge and the evidence row, so it must not carry this sentence. -->
                   <h3>
                     {text(
                       'FABRICATE.Admin.Manager.Component.ProgressiveDifficultyCardTitle',
@@ -1694,8 +1462,7 @@
                   </p>
                 </div>
                 <!-- `manager-task-card-heading-control` opts this wrapper OUT of the heading's
-                 `> div { flex: 1 1 200px }` copy-block rule, which out-specifies the wrapper's own
-                 `flex: 0 0 auto` and otherwise grows it to half the row. -->
+                 `> div { flex: 1 1 200px }` rule, which would otherwise grow it to half the row. -->
                 <div class="manager-component-inline-stepper manager-task-card-heading-control">
                   <span class="manager-component-micro-label"
                     >{text(
@@ -1730,10 +1497,8 @@
 
         {#if showEssences}
           <!--
-        The card was titled `Essences` over a sentence about the CONTROL. The reference titles it
-        `Essence contribution` and its subtitle states the thing a GM has to know before authoring
-        one: these values are keyed to the essences THIS system uses, and a system that drops an
-        essence drops them with it.
+        `Essence contribution`, whose subtitle states what a GM must know before authoring one: these
+        values are keyed to the essences THIS system uses, and dropping an essence drops them with it.
       -->
           <section class="manager-component-rules-card" data-component-edit-section="essences">
             <div class="manager-component-rules-card-head">
@@ -1758,12 +1523,9 @@
               </div>
             </div>
             <!--
-              THE INHERIT-OR-OVERRIDE CHOICE (M31), which the reference does not draw: its essence
-              card predates the world section, so this row is M31's extra on the card. The control
-              is the shared `InheritRow`, filtered to the one section this card governs and drawn
-              INSIDE the card beside the values it locks. ON is overridden. Both it and the note
-              under it are withheld while the world authored no map, when the switch would change
-              nothing while looking as though it did.
+              THE INHERIT-OR-OVERRIDE CHOICE (M31): the shared `InheritRow`, filtered to the one
+              section this card governs and drawn INSIDE the card beside the values it locks. ON is
+              overridden. Withheld, with its note, while the world authored no map.
             -->
             {#if essenceInheritOffered}
               <InheritRow
@@ -1781,19 +1543,15 @@
               <i class={essenceNote.icon} aria-hidden="true"></i>
               <span>{essenceNote.text}</span>
             </p>
-            <!-- THE COUNT AND THE GUARD READ THE ARRAY THE GRID DRAWS. Both were `essenceDraft` —
-               the system's WHOLE roster — while the tiles below come from `offeredEssences`, issue
-               1036's enabled-plus-carried subset, so the card said `Keyed to the 6 essences …`
-               over five tiles. The guard reading the other array also made the
-               `No essences are defined …` empty state unreachable. -->
+            <!-- THE COUNT AND THE GUARD READ THE ARRAY THE GRID DRAWS — `offeredEssences`, issue
+               1036's enabled-plus-carried subset, not the whole roster. Reading the other array made
+               the card miscount and the `No essences are defined …` empty state unreachable. -->
             {#if offeredEssences.length > 0}
               <div class="manager-component-essence-grid">
                 {#each offeredEssences as option (option.id)}
-                  <!-- The card is the shared `EssenceQuantityCard` (issue 772); it was hand-rolled
-                     here and the bulk-edit panel renders the same card, so it was extracted rather
-                     than copied. Its number control is the shared `Stepper`, which emits the
-                     already-clamped ABSOLUTE value for both its adjuncts and its typed input, so
-                     one `setEssenceQuantity` covers every path. -->
+                  <!-- The shared `EssenceQuantityCard` (issue 772), also rendered by the bulk-edit
+                     panel. Its `Stepper` emits the already-clamped ABSOLUTE value for both adjuncts
+                     and typed input, so one `setEssenceQuantity` covers every path. -->
                   <!-- LOCKED WHILE INHERITING (M31): the tile shows the WORLD value and its stepper
                      is inert, exactly as the category select is pinned to the inherit option. -->
                   <EssenceQuantityCard
@@ -1827,11 +1585,9 @@
                 )}
               </p>
             {:else}
-              <!-- TWO EMPTY STATES, BECAUSE THE GRID IS EMPTY FOR TWO DIFFERENT REASONS. The guard
-                 reads `offeredEssences`, so an all-DISABLED roster over a component carrying none
-                 reaches the empty state on a system that DOES define essences. The fork is on the
-                 roster the system holds — the only fact a GM can act on differently: create
-                 essences, or enable the ones already there. -->
+              <!-- TWO EMPTY STATES, BECAUSE THE GRID IS EMPTY FOR TWO REASONS: the guard reads
+                 `offeredEssences`, so an all-DISABLED roster reaches it on a system that DOES define
+                 essences. The fork is the only fact a GM can act on differently. -->
               <p class="manager-muted">
                 {text(
                   'FABRICATE.Admin.Manager.Component.EssencesEdit.NoEnabledEssences',
@@ -1843,17 +1599,11 @@
         {/if}
 
         <!-- The yield picker, shared by BOTH salvage result rows (issue 676). A `{#snippet}` rather
-         than a new `.svelte` file: the two call sites differ only in which group they write to,
-         and a new component would have to be registered in every mount harness that renders this
-         tree, where a missing entry HANGS the suite rather than failing it.
-
-         NOT a `<select>`: the native control could show the component's NAME but never its IMAGE.
-         The trigger wraps the image AND the name — one target, both facts — and the popover is
-         portaled to `.fabricate-manager`, so it escapes the panel's `overflow: hidden`.
-
-         There is deliberately no "clear" entry, matching `RecipeResultItemRow`: the select's old
-         blank `<option>` only ever produced a result that names no component, and the row's ×
-         removes it properly. -->
+         than a new `.svelte` file: the call sites differ only in which group they write to, and a new
+         component would need registering in every mount harness, where a missing entry HANGS the
+         suite. NOT a `<select>`: the native control can show the NAME but never the IMAGE, and the
+         popover is portaled to `.fabricate-manager` so it escapes the panel's `overflow: hidden`.
+         No "clear" entry, matching `RecipeResultItemRow`: the row's × removes it properly. -->
         {#snippet salvageComponentPicker(groupId, result)}
           {@const selected = salvageComponentOption(result.componentId)}
           <span class="manager-salvage-component-field" data-salvage-result-component>
@@ -1904,9 +1654,7 @@
             data-salvage-section
           >
             <!-- THE HEADING IS THE CONTROL ROW (issue 676): mode pill, divider, ENABLED, toggle,
-             all on the heading line. It used to be a heading with the pill and then a separate
-             "Salvage this component" ToggleCard below it — two stacked rows of chrome restating one
-             fact before any content. -->
+             all on the heading line. -->
             <div class="manager-component-rules-card-head">
               <i
                 class="fas fa-recycle manager-component-rules-card-glyph is-accent"
@@ -1923,29 +1671,19 @@
                 </p>
               </div>
               <!-- `data-recipe-section` / `data-recipe-field` are `ToggleCard`'s hooks, kept
-               verbatim now the toggle is hand-rolled into the heading: they are what the AC4/AC9/
-               AC10 suites drive, and those pin the salvage ENABLEMENT rulings rather than the
-               vehicle. Renaming them would have silently unpinned all of it. -->
+               verbatim now the toggle is hand-rolled into the heading: the AC4/AC9/AC10 suites drive
+               them, and renaming them would silently unpin the salvage enablement rulings. -->
               <!-- `manager-task-card-heading-control`: see the DC card's note. -->
               <div
                 class="manager-component-heading-controls manager-task-card-heading-control"
                 data-recipe-section="salvage-enabled"
               >
                 {#if salvageModeLabel}
-                  <!-- Read-only: the mode is a SYSTEM setting, authored on Crafting Settings. It
-                   names the mode that decides this panel's shape, which the GM otherwise cannot
-                   see from this route; the persisted token is never shown.
-
-                   EXEMPT FROM RULING A, deliberately. Ruling A collapses the chrome that only has
-                   meaning once salvage RUNS; the mode PILL is not that, and the result editor below
-                   stays authorable while salvage is off. Hiding it meant authoring an ordered
-                   progressive list, or a routed set of groups, with nothing on screen saying which.
-
-                   `density="list"` is the reference's micro pill scale on the primitive, and
-                   `tone="secondary"` is its three colours — genuinely a different statement from
-                   `neutral`, which declares no fill and means "a fact that is merely present". The
-                   mode is a step louder, on a surface of its own, and a step quieter than every
-                   semantic family. -->
+                  <!-- Read-only: the mode is a SYSTEM setting, authored on Crafting Settings, and
+                   it names the mode that decides this panel's shape. EXEMPT FROM RULING A: the pill
+                   is not chrome that only means something once salvage runs, and the result editor
+                   below stays authorable while salvage is off. `tone="secondary"` is a step louder
+                   than `neutral` and quieter than every semantic family. -->
                   <Chip
                     density="list"
                     tone="secondary"
@@ -1963,16 +1701,13 @@
                     'Enabled'
                   )}</span
                 >
-                <!-- The per-component salvage gate (issue 676). It was persisted, normalized and a
-                 live runtime gate long before any control wrote it, so a component auto-disabled by
-                 `_disableInvalidSalvageConfigs` was permanently unsalvageable from the UI.
-
-                 The zero-groups explanation is VISIBLE body copy (`[data-salvage-disabled-notice]`),
-                 never a `title` on this button: a DISABLED `<button>` receives no mouse events, so
-                 a tooltip would never appear in any browser, and no mounted test would notice. -->
+                <!-- The per-component salvage gate (issue 676): persisted, normalized and a live
+                 runtime gate long before any control wrote it, so a component auto-disabled by
+                 `_disableInvalidSalvageConfigs` was permanently unsalvageable from the UI. The
+                 zero-groups explanation is VISIBLE body copy (`[data-salvage-disabled-notice]`),
+                 never a `title` here: a disabled `<button>` receives no mouse events. -->
                 <!-- The shared switch, so this card and `ToggleCard` draw one control rather than
-                 two spellings of it (issue 1040). The hand-rolled version omitted `aria-hidden` on
-                 its track, which the primitive always emits. -->
+                 two spellings of it (issue 1040). -->
                 <StatusToggle
                   on={salvageEnabled}
                   ariaLabel={text(
@@ -1990,18 +1725,12 @@
               <p class="manager-muted" data-salvage-disabled-notice>{salvageDisabledNotice}</p>
             {/if}
 
-            <!-- The banner and the reorder policy sit ABOVE the list, not after it (issue 676):
-             both describe what the ORDER MEANS, and the order is the thing being authored below.
-             The reorder card used to render after "Add group", so the GM read the policy governing
-             the list only after they had finished writing it. -->
+            <!-- The banner and the reorder policy sit ABOVE the list (issue 676): both describe
+             what the ORDER MEANS, and the order is what is authored below. -->
             {#if salvageShowChrome && salvageProgressive}
-              <!-- The shared `Callout`, in the reference's own words; the hand-rolled
-               `manager-component-info-banner` said the same thing in a second vehicle.
-
-               NEUTRAL, not info (issue 1505), on the same reading its recipe twin carries: the
-               specimen reserves the info tint for a note about LIVE state, and roll budget is an
-               invariant. It also sits directly above an info-tinted `ToggleCard`, so tinting it
-               spent the colour twice. -->
+              <!-- The shared `Callout`. NEUTRAL, not info (issue 1505): the specimen reserves the
+               info tint for a note about LIVE state, and roll budget is an invariant. It also sits
+               directly above an info-tinted `ToggleCard`. -->
               <Callout
                 tone="neutral"
                 icon="fas fa-circle-info"
@@ -2040,8 +1769,7 @@
             <Field as="div" data-salvage-result-groups="">
               {#if salvageProgressive}
                 <!-- PROGRESSIVE: an ordered list of SINGLE results, with no group chrome. See
-               `salvageStageGroup` for why the groups are still the storage and why this list is
-               `resultGroups[0].results`. -->
+               `salvageStageGroup` for why the groups are still the storage. -->
                 <span class="manager-component-readonly-label">
                   <span
                     >{text(
@@ -2069,12 +1797,10 @@
                           draggingStageIndex = null;
                         }}
                       >
-                        <!-- The stage's own LINE (issue 1286). `display: contents` unless this row
-                       draws a complication band, so on every other stage the grip, the ordinal, the
-                       picker and the trailing cluster are the ROW's flex items exactly as they were
-                       before this element existed. With a band the line becomes the real row and
-                       takes the padding the row gives up, which is what lets the band run edge to
-                       edge. -->
+                        <!-- The stage's own LINE (issue 1286): `display: contents` unless this row
+                       draws a complication band, so every other stage keeps the grip, ordinal,
+                       picker and trailing cluster as the ROW's flex items. With a band the line
+                       becomes the real row and takes the padding the row gives up. -->
                         <div class="manager-salvage-stage-line">
                           <span class="manager-salvage-stage-grip" aria-hidden="true"
                             ><i class="fas fa-grip-vertical"></i></span
@@ -2086,12 +1812,10 @@
                           >
                           {@render salvageComponentPicker(salvageStageGroup.id, result)}
 
-                          <!-- NO QUANTITY HERE (issue 676). Progressive is an ordered list of
-                       INDIVIDUAL results: the award loop charges this entry's difficulty once and
-                       awards it once, so "two of X" is authored by listing X twice.
+                          <!-- NO QUANTITY HERE (issue 676): progressive awards one entry at a
+                       time, so "two of X" is authored by listing X twice.
                        `CraftingEngine._resolveSalvageResultGroups` forces `quantity: 1` on every
-                       awarded progressive entry, and the control was removed only after that, so
-                       this hides nothing a world can still be awarded. -->
+                       awarded progressive entry, so this hides nothing awardable. -->
 
                           <!-- READ-ONLY: `difficulty` belongs to the RESULT component, whose own
                        editor owns its save lifecycle. The "Edit" link is the way to change it. -->
@@ -2103,9 +1827,8 @@
                               ? ''
                               : String(salvageResultDifficulty(result.componentId))}
                             ><!-- The fallback must MATCH the lang value, or the two disagree and the
-                       fallback silently describes a string nobody ever sees: `DifficultyUnset`
-                       resolves to "No difficulty", so the literal "DC —" only ever rendered in a
-                       test with no i18n loaded. The recipe stage row reads the same. -->
+                       fallback describes a string nobody sees: `DifficultyUnset` resolves to "No
+                       difficulty". The recipe stage row reads the same. -->
                             {salvageResultDifficulty(result.componentId) === null
                               ? text(
                                   'FABRICATE.Admin.Manager.Component.SalvageEditor.DifficultyUnset',
@@ -2115,10 +1838,9 @@
                           >
 
                           {#if result.componentId}
-                            <!-- Opens the referenced YIELD component's editor, which is now the
-                         only component-edit route. Component-to-component navigation is guarded
-                         (`confirmComponentRouteExit` deliberately has no component-edit bypass), so
-                         a dirty draft prompts rather than being discarded. -->
+                            <!-- Opens the referenced YIELD component's editor. The navigation is
+                          guarded (`confirmComponentRouteExit` has no component-edit bypass), so a
+                          dirty draft prompts rather than being discarded. -->
                             <button
                               type="button"
                               class="manager-salvage-stage-edit"
@@ -2187,25 +1909,15 @@
                           </IconButton>
                         </div>
 
-                        <!-- THE READ-ONLY COMPLICATION STRIP (issue 1286), INSIDE the stage row and
-                     FULL-BLEED, which is how the Recipe Studio draws the same band. The row and the
-                     band are ONE card: one border, one radius, and the band's `border-top` as the
-                     divider between them.
-
-                     THIS OVERRIDES THE COMPONENT STUDIO PROTOTYPE, deliberately: the maintainer
-                     ruled for the attached treatment, so the prototype's detached band is a
-                     superseded design rather than a fidelity target.
-
-                     Attaching it costs the shared rule nothing. `.manager-salvage-stage-row` is
-                     JOINED with `.manager-recipe-result-row.is-reorderable` (recorded as such in
-                     styles/fabricate.css), so relaxing it would re-shape every progressive stage
-                     row in BOTH studios. Instead the row hands its padding to
-                     `.manager-salvage-stage-line` and becomes a column ONLY under
-                     `:has(.manager-salvage-stage-complications)`. A stage with no band matches
-                     neither selector and renders exactly as it did.
-
-                     `role="presentation"` stays: the band annotates the stage above it and must
-                     never be announced as a stage of its own. -->
+                        <!-- THE READ-ONLY COMPLICATION STRIP (issue 1286), INSIDE the stage row
+                     and FULL-BLEED, as the Recipe Studio draws the same band: row and band are ONE
+                     card, with the band's `border-top` as the divider. This OVERRIDES the Component
+                     Studio prototype on a maintainer ruling. `.manager-salvage-stage-row` is JOINED
+                     with `.manager-recipe-result-row.is-reorderable` in styles/fabricate.css, so
+                     instead of relaxing that rule the row hands its padding to
+                     `.manager-salvage-stage-line` and becomes a column only under
+                     `:has(.manager-salvage-stage-complications)`. `role="presentation"` stays: the
+                     band annotates the stage above it and must never be announced as one. -->
                         {#if stageComplications.length > 0}
                           <div
                             class="manager-salvage-stage-complications"
@@ -2217,10 +1929,9 @@
                               <span class="manager-salvage-stage-complications-title"
                                 >{stripTitle(stageComplications.length, result.componentId)}</span
                               >
-                              <!-- The ONLY route to changing any of this, exactly as the row's DC
-                             badge above is: a complication belongs to the referenced component,
-                             whose own editor owns its save lifecycle. Its label names complications
-                             so it is distinguishable from the row's own Edit link. -->
+                              <!-- The ONLY route to changing any of this: a complication belongs to
+                             the referenced component, whose own editor owns its save lifecycle. Its
+                             label names complications, so it differs from the row's Edit link. -->
                               <button
                                 type="button"
                                 class="manager-salvage-stage-edit"
@@ -2281,9 +1992,8 @@
                   </p>
                 {/if}
                 <!-- `data-add-salvage-group` rides this button ONLY while there is no backing
-               group, because in that state this IS the add-group control: it takes a progressive
-               component from zero groups to one, which the normalizer's clamp requires before
-               `enabled` can ever be true. That is Ruling A's invariant in progressive mode. -->
+               group, because in that state this IS the add-group control — Ruling A's invariant in
+               progressive mode. -->
                 <ManagerButton
                   role="dashed"
                   fullWidth
@@ -2315,9 +2025,8 @@
                   >
                 </span>
                 {#if salvageSimpleMode}
-                  <!-- REQUIRED visible hint (issue 764), never a `title`: a tooltip on a hidden or
-                 absent control never fires and no mounted test would notice. It explains why the
-                 Add group control is gone at the one-group cap. -->
+                  <!-- REQUIRED visible hint (issue 764), never a `title`: a tooltip on an absent
+                 control never fires. It explains why Add group is gone at the one-group cap. -->
                   <p class="manager-muted" data-salvage-simple-hint>
                     {text(
                       'FABRICATE.Admin.Manager.Component.SalvageEditor.SimpleSingleGroupHint',
@@ -2329,13 +2038,9 @@
                   <ul class="manager-recipe-ingredient-sets">
                     {#each salvageDraft.resultGroups as group, groupIndex (group.id)}
                       <!-- One `--fab-bg-1` card per result group behind a hairline, headed by the
-                       group's name and its count in the mono face.
-
-                       THE HEAD KEEPS ITS NAME INPUT AND THE BODY KEEPS ITS ROWS. The reference
-                       draws this group as a read-only run of pills with a dashed `+ Add result`,
-                       which cannot author a quantity, choose a component or rename a group — so
-                       the card, its head and its count take the reference's anatomy and the
-                       controls inside stay controls. -->
+                       group's name and its count in the mono face. THE HEAD KEEPS ITS NAME INPUT AND
+                       THE BODY KEEPS ITS ROWS: the reference's read-only pill run cannot author a
+                       quantity, choose a component or rename a group. -->
                       <li class="manager-salvage-group-card" data-salvage-group={group.id}>
                         <div class="manager-salvage-group-header">
                           <input
@@ -2383,8 +2088,7 @@
                               >
                                 {@render salvageComponentPicker(group.id, result)}
                                 <!-- The quantity STAYS in simple and routed: these modes award the
-                               whole group as authored, so a count is a real, honoured field here.
-                               Only progressive drops it. -->
+                               whole group as authored. Only progressive drops it. -->
                                 <Stepper
                                   value={result.quantity}
                                   min={1}
@@ -2462,8 +2166,7 @@
                   </p>
                 {/if}
                 <!-- HIDDEN at the Simple one-success-group cap (issue 764). Routed keeps the
-               multi-group list and this Add control; Simple with no success group yet still shows
-               it so the GM can author the one group. -->
+               multi-group list; Simple with no success group yet still shows it. -->
                 {#if !salvageHideAddGroup}
                   <ManagerButton
                     role="dashed"
@@ -2484,13 +2187,11 @@
               {/if}
             </Field>
 
-            <!-- RULING A: everything below is CHROME — it only has meaning once salvage runs, so
-             it collapses when salvage is off. The result-group editor above deliberately does NOT,
-             because it owns the only add-group control. -->
+            <!-- RULING A: everything below is CHROME and collapses when salvage is off. The
+             result-group editor above does NOT, because it owns the only add-group control. -->
             {#if salvageShowChrome && salvageRouted}
               <!-- A `--fab-bg-1` well behind a hairline, headed by an `OUTCOME ROUTING` micro-label
-               and holding one row per outcome. The shipped block wrote the head as a readonly label
-               with a sentence under it; the reference draws neither, because the rows say it. -->
+               and holding one row per outcome. -->
               <Field as="div" class="manager-salvage-routing-card" data-salvage-routing="">
                 <p class="manager-micro-label">
                   {text(
@@ -2541,16 +2242,11 @@
               </Field>
             {/if}
 
-            <!-- The component's own check-modifier pick (issue 1095). Rendered only under the
-             salvage check's `bySubject` rule and only when the system catalogue is non-empty.
-
-             ITS GATE IS ITS OWN, NOT THE DC OVERRIDE'S. It used to be nested inside
-             `salvageShowDcOverride`, which is `simple || routed` and therefore EXCLUDES
-             progressive — but `ChecksView` renders the salvage catalogue card in the progressive
-             branch too, and `CraftingEngine._runSalvageCraftingCheck` builds the modifier context
-             before dispatch, so a progressive salvage roll honoured a pick no editor could author.
-             Two different questions: does this mode compare a roll against a DC, and does this
-             component select its own modifiers. The gathering host gates on the rule alone. -->
+            <!-- The component's own check-modifier pick (issue 1095), rendered only under the
+             salvage check's `bySubject` rule and only over a non-empty system catalogue. ITS GATE IS
+             ITS OWN, NOT THE DC OVERRIDE'S: `salvageShowDcOverride` is `simple || routed` and
+             excludes progressive, but `CraftingEngine._runSalvageCraftingCheck` builds the modifier
+             context before dispatch, so a progressive roll honoured a pick no editor could author. -->
             {#if salvageShowChrome && salvageCheckEnabled && salvageModifierPolicy === 'bySubject'}
               <SubjectModifierPicker
                 options={checkModifierOptions}
@@ -2566,8 +2262,7 @@
 
             {#if salvageShowChrome && salvageShowDcOverride}
               <!-- A `--fab-bg-1` well titled `Salvage check DC`, whose note names where the presets
-               come from. The shipped block was titled `DC override` over a sentence about the
-               STORAGE rather than about the choice. -->
+               come from. -->
               <Field as="div" class="manager-salvage-dc-card" data-salvage-dc-override="">
                 <div class="manager-salvage-dc-copy">
                   <span class="manager-salvage-dc-title"
@@ -2584,8 +2279,7 @@
                   >
                 </div>
                 <!-- Presets are the SYSTEM'S authored salvage check tiers (decision 7), never a
-                 hard-coded DC list, which would misreport the world's real DCs. Storage is
-                 unchanged: null = system default, else an integer. -->
+                 hard-coded DC list. Storage is unchanged: null = system default, else an integer. -->
                 <select
                   class="manager-input"
                   value={salvageDcSelection}
@@ -2602,16 +2296,10 @@
                   {/each}
                 </select>
                 {#if salvageDcShowCustomInput}
-                  <!-- `allowUnset`: a cleared field is not zero here, it is "inherit the system
-                   salvage check DC" — the same `dcOverride: null` the preset select writes.
-
-                   `min={0}`: a salvage DC below zero is not a DC, and an unset field steps from
-                   `min ?? 0`, so without it one click of `−` on the blank field commits -1.
-
-                   `fill` needs a slot, supplied by the `[data-salvage-dc-override] .fab-stepper`
-                   cap in the global sheet: the field is a `flex-direction: column` box whose other
-                   child is a full-width preset `<select>`, so the cap sits on the stepper rather
-                   than on the field. -->
+                  <!-- `allowUnset`: a cleared field is "inherit the system salvage check DC", the
+                   same `dcOverride: null` the preset select writes. `min={0}` because an unset field
+                   steps from `min ?? 0`, so without it one `−` click commits -1. `fill` needs a slot,
+                   supplied by the `[data-salvage-dc-override] .fab-stepper` cap in the global sheet. -->
                   <Stepper
                     value={salvageDraft.dcOverride}
                     allowUnset
@@ -2629,9 +2317,8 @@
                     onChange={setSalvageDcOverride}
                   />
                 {/if}
-                <!-- Kept by decision 7 (it replaced the hard-coded tier list, not this link). The
-                 zero-authored-tiers case is the COMMON one and is exactly why it exists: with no
-                 presets to choose, this is the way forward. -->
+                <!-- Kept by decision 7. The zero-authored-tiers case is the COMMON one and is
+                 exactly why it exists: with no presets to choose, this is the way forward. -->
                 <ManagerButton
                   class="manager-salvage-manage-presets"
                   data-salvage-manage-presets
@@ -2652,26 +2339,19 @@
         {/if}
 
         <!--
-      THE PROGRESSIVE DC CARD'S OTHER PLACEMENT. The reference draws it inside the progressive
-      salvage body and nowhere else, because it has no configuration where this component carries a
-      DC and salvage is not progressive. Fabricate does — a progressive-crafting or
-      progressive-gathering system whose salvage is simple or off — and it is the configuration the
-      smoke harness drives.
+      THE PROGRESSIVE DC CARD'S OTHER PLACEMENT, for the configuration the reference has none of and
+      the smoke harness drives: a progressive-crafting or -gathering system whose salvage is simple
+      or off.
     -->
         {#if showDifficulty && !(showSalvage && salvageProgressive)}
           {@render progressiveDcCard()}
         {/if}
 
-        <!-- COMPLICATIONS (issue 1286), last in the body and after Salvage: it is a consequence of
-         how this component's stages resolve, so it reads after the yields it can attach to.
-
-         IT HAS NO REFERENCE COUNTERPART AT ALL and is left exactly where it is and NOT restyled,
-         per `rebuild-spec.md` D10: it needs a maintainer ruling, and restyling something whose
-         existence is unsettled would make the ruling harder to take.
-
-         Placed UNCONDITIONALLY: the section renders nothing unless the system resolves some
-         activity progressively, and stating that predicate a second time here is how the two drift
-         apart. -->
+        <!-- COMPLICATIONS (issue 1286), last in the body and after Salvage, since it is a
+         consequence of how this component's stages resolve. It has no reference counterpart and is
+         left unrestyled per `rebuild-spec.md` D10, pending a maintainer ruling. Placed
+         UNCONDITIONALLY: the section owns its own gate, and restating that predicate here is how the
+         two drift apart. -->
         <ComponentComplicationsSection
           complications={complicationsDraft}
           activityProgressive={complicationActivityProgressive}
@@ -2694,11 +2374,9 @@
         {/if}
       {:else}
         <!--
-        THE VALIDATION TAB: the same `EditorValidationSurface` shape the world entry's own
-        Validation tab draws. Its checks are the SYSTEM rules' — the essence contribution, the
-        salvage results, the outcome routing and the progressive DC — which is why they come from
-        `componentRulesValidation.js` rather than from `componentScopeValidation.js`, whose subject
-        is the world record.
+        THE VALIDATION TAB: the same `EditorValidationSurface` shape the world entry's draws. Its
+        checks are the SYSTEM rules', which is why they come from `componentRulesValidation.js` and
+        not `componentScopeValidation.js`, whose subject is the world record.
       -->
         <EditorValidationSurface
           title=""
@@ -2718,17 +2396,10 @@
   </form>
 
   <!--
-    THE `How players see it` RAIL — THE WORLD ENTRY'S OWN RAIL, at the system scope (M27). The
-    reference draws the SAME rail here as on the world Component entry; the only difference is its
-    scope sentence. The markup this editor used to draw for it is gone: two drawings of one
-    template drift, and the maintainer's live test found them drifted.
-
-    It is the SECOND GRID COLUMN and a sibling of the form, never a child of it: the rail scrolls
-    independently of the content column, and a preview nested inside a `<form>` would be submitted
-    with it.
-
-    `linked` reads the WORLD record's source link, because that is what decides whether a player
-    sees art at all; the in-system record only mirrors the picture it inherits.
+    THE `How players see it` RAIL — THE WORLD ENTRY'S OWN RAIL, at the system scope (M27); only the
+    scope sentence differs. It is the SECOND GRID COLUMN and a sibling of the form, never a child:
+    the rail scrolls independently, and a preview nested inside a `<form>` would be submitted with it.
+    `linked` reads the WORLD record's source link, because that decides whether a player sees art.
   -->
   <WorldComponentEntryPreviewRail
     scope="system"
@@ -2746,47 +2417,34 @@
 </main>
 
 <style>
-  /* The read-only complication strip (issue 1286). Component-SCOPED rather than added to
-     `styles/fabricate.css`, matching every other surface this feature ships, and theme-ROOT tokens
-     only, so the band renders the same wherever this row shape is reused.
+  /* The read-only complication strip (issue 1286). Component-SCOPED and theme-ROOT tokens only, so
+     the band renders the same wherever this row shape is reused. THE BAND IS ATTACHED, overriding the
+     prototype on a maintainer ruling: what goes is the margin, the surrounding border and the
+     right-hand radii; every value the parity spec measures stands. */
 
-     THE BAND IS ATTACHED, and that overrides the prototype: the maintainer ruled for the Recipe
-     Studio's treatment, row and band as ONE card. Nothing the parity spec MEASURES on this band
-     moves — its fill, its `border-top`, its 0 top-left radius, its padding and its gap are the
-     prototype's values still. What goes is the margin, the surrounding border and the right-hand
-     radii, the three declarations that made it a second box. */
-
-  /* Scoped by `:has()` to rows that actually draw a band, so it joins nothing and moves no stage
-     row in either studio: `.manager-salvage-stage-row` is JOINED with
-     `.manager-recipe-result-row.is-reorderable` in styles/fabricate.css, and avoiding a change to
-     that rule is the whole reason this is a `:has()` and not a relaxation.
-
-     The row sheds its padding onto its own line and clips itself, so the band runs edge to edge and
-     its `border-top` reads as a card DIVIDER. `overflow: hidden` is also what keeps the band's
-     warning fill inside the card's radius, and it cannot clip the row's component picker:
-     `SearchablePopover` portals its popover to the manager host rather than rendering it in flow. */
+  /* Scoped by `:has()` to rows that actually draw a band, so it moves no stage row in either studio:
+     `.manager-salvage-stage-row` is JOINED with `.manager-recipe-result-row.is-reorderable` in
+     styles/fabricate.css. The row sheds its padding onto its own line and clips itself, so the band
+     runs edge to edge and its warning fill stays inside the card's radius; it cannot clip the
+     component picker, which `SearchablePopover` portals to the manager host. */
   .manager-salvage-stage-row:has(.manager-salvage-stage-complications) {
     flex-direction: column;
     align-items: stretch;
-    /* `gap: 0` is load-bearing. The joined rule declares the 12px BETWEEN a stage's controls, and
-       turning the row into a column re-aims that 12px at the seam between the line and the band —
-       which left the band's `border-top` floating under 12px of card fill. The line restates the
-       12px on its own axis, where it belongs. */
+    /* `gap: 0` is load-bearing: the joined rule's 12px is BETWEEN a stage's controls, and turning
+       the row into a column re-aims it at the seam, floating the band's `border-top`. */
     gap: 0;
     overflow: hidden;
     padding: 0;
   }
 
-  /* `display: contents` in the common case — every stage whose yield authors no salvage
-     complication — so the grip, the ordinal, the picker and the trailing cluster are the ROW's
-     flex items exactly as they were before this wrapper existed. */
+  /* `display: contents` in the common case, so the grip, ordinal, picker and trailing cluster stay
+     the ROW's flex items exactly as they were before this wrapper existed. */
   .manager-salvage-stage-line {
     display: contents;
   }
 
-  /* With a band the line becomes the real row and takes the padding and the 12px gap the joined
-     rule gave up above. Its own `align-items: center` is what keeps the grip and the ordinal
-     centred against the line they label rather than against the whole card. */
+  /* With a band the line becomes the real row and takes the padding and 12px gap the joined rule
+     gave up. Its `align-items: center` centres the grip and ordinal against the line, not the card. */
   .manager-salvage-stage-row:has(.manager-salvage-stage-complications) .manager-salvage-stage-line {
     display: flex;
     gap: var(--fab-space-3);
@@ -2795,10 +2453,8 @@
     padding: var(--fab-space-chip) var(--fab-space-2);
   }
 
-  /* NO margin and NO radius: the `border-top` IS the divider between the band and the line above
-     it, and a divider only reads as one when the two surfaces meet. The 2px `--fab-warning` left
-     rule stays — it is what marks this band as the stage's warning annotation — and now runs the
-     band's full height against the card's own border. */
+  /* NO margin and NO radius: the `border-top` IS the divider, and a divider only reads as one when
+     the two surfaces meet. The 2px `--fab-warning` left rule marks the stage's warning annotation. */
   .manager-salvage-stage-complications {
     display: flex;
     flex-direction: column;
@@ -2817,9 +2473,8 @@
     font-size: 9px;
   }
 
-  /* The band's eyebrow. It names the OWNING component because the row above it addresses that
-     component through a picker button, and a GM scanning a list of stages needs the band's subject
-     stated rather than inferred from adjacency. */
+  /* The band's eyebrow. It names the OWNING component, because a GM scanning a list of stages needs
+     the band's subject stated rather than inferred from adjacency. */
   .manager-salvage-stage-complications-title {
     flex: 1 1 auto;
     overflow: hidden;
@@ -2832,18 +2487,12 @@
     text-overflow: ellipsis;
   }
 
-  /* `margin-left: auto` is stated here rather than inherited: the shared
-     `.manager-salvage-stage-edit` rule places the link in the ROW's trailing cluster, and the title
-     above already takes the free space in this band. */
+  /* `margin-left: auto` is stated rather than inherited: the shared `.manager-salvage-stage-edit`
+     rule places the link in the ROW's trailing cluster, and the title above takes the free space. */
   .manager-salvage-stage-complications-head .manager-salvage-stage-edit {
     flex: 0 0 auto;
   }
-  /* THE CATEGORY NOTE IS STATED ONCE, IN THE SHEET, and the scoped copy that used to live here is
-     gone. It was not an override anybody chose: Svelte's scoping appends a hash class, so this
-     block out-specified `.fabricate-manager .manager-component-cat-note` and quietly won five
-     declarations the sheet writes to the reference — the type size, the top margin, the baseline
-     alignment, the line height, and the per-state glyph ink, which it flattened to one grey.
-
-     Two rules for one element, with the loser being the one written to the reference, is exactly
-     the shape the cascade inventory exists to surface. */
+  /* THE CATEGORY NOTE IS STATED ONCE, IN THE SHEET. Svelte's scoping appends a hash class, so a
+     scoped copy here out-specified `.fabricate-manager .manager-component-cat-note` and quietly won
+     five declarations the sheet writes to the reference. */
 </style>

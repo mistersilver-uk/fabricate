@@ -1,75 +1,34 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  ONE STAGING INSET, as the reference draws it (issue 1371 r16-list; `proto:1120`-`1240`): a
-  recessed card holding a 28px search well, a FIXED window of rows, and a pager. The system
-  Component Rules list's bulk panel draws it three times — categories, tags and essence values —
-  and the world Component catalogue's bulk panel draws the same object three more times from a
-  snippet of its own (`ComponentCatalogueBulkPanel.svelte`, `stagingInset`).
+  ONE STAGING INSET, as the reference draws it (issue 1371 r16-list): a recessed card holding a 28px
+  search well, a FIXED window of rows, and a pager. The system Component Rules bulk panel draws it
+  three times and the world Component catalogue's panel draws the same object three more.
 
-  ── WHY A COMPONENT, AND WHY ONLY ONE CALLER TODAY ──────────────────────────────────────────
-  The search well, the rows container and the pager are identical in all six insets and only the
-  ROWS differ — a tag row cycles three states, a category row is a radio, an essence row carries a
-  stepper — so the rows are `children` and everything around them is this file. Writing it a
-  second time inside the system panel would have been a 150-line copy of the world panel's scoped
-  block, which is what the SonarCloud duplication gate reads a copy as. The world panel is NOT
-  re-pointed at this component in the same change because that file is being re-geometried in a
-  parallel lane (maintainer ruling M24, lane CAT); it is the intended second caller, and the
-  design-system register (`tests/design-system-primitives.test.js`) is what will notice the moment
-  it arrives. Until then this sits under `apps/manager/` as manager-scoped chrome, beside the
-  `BulkEditPanelShell` and `BulkEditSection` it is always rendered between.
+  The well, the rows container and the pager are identical in all six and only the ROWS differ, so
+  the rows are `children` and everything around them is this file. The world panel is NOT re-pointed
+  at it in the same change because that file is being re-geometried in a parallel lane (maintainer
+  ruling M24); it is the intended second caller, and `tests/design-system-primitives.test.js` is
+  what will notice when it arrives.
 
-  ── THE ROWS CARRY THIS COMPONENT'S CLASSES, NOT THE CALLER'S ────────────────────────────────
-  A snippet rendered as `children` carries the scope hash of the component that DEFINES it, so
-  a scoped `.fab-bulk-inset-row` here would match nothing a caller writes. The row rules below
-  are therefore `:global()` and ROOTED AT THIS COMPONENT'S OWN ROOT (`.fab-bulk-inset`), which is
-  the design-system rule for a class family a shared primitive paints — rooted at the primitive,
-  never at an application root — and is what lets a caller write `<button class="fab-bulk-inset-row">`
-  and get the row the reference draws.
+  THE ROWS CARRY THIS COMPONENT'S CLASSES, NOT THE CALLER'S. A snippet rendered as `children` carries
+  the scope hash of the component that DEFINES it, so a scoped `.fab-bulk-inset-row` here would match
+  nothing a caller writes. The row rules below are therefore `:global()` and ROOTED AT THIS
+  COMPONENT'S OWN ROOT, which is the design-system rule for a class family a shared primitive paints.
 
-  ── THE ROWS ARE THIS COMPONENT'S TOO, IN FOUR KINDS (issue 1371 r16-cat, maintainer rulings
-  M24/M25 — "the two bulk panels must be structurally identical, differing only in data sources
-  and write targets") ────────────────────────────────────────────────────────────────────────
-  A caller may still pass `children` (the system panel's category and tag rows do), but a caller
-  that passes `rows` and a `kind` gets the rows drawn HERE, from data, in one of four shapes the
-  reference draws:
-   - `radio`   — one chosen row; a circle glyph, filled when chosen (`proto:5296`).
-   - `check`   — any number chosen; a 16px box, filled with a check when chosen (`proto:5273`).
-   - `tri`     — leave / add / remove; a plus or minus glyph, the removal on the danger pair
-                 (`proto:5330`).
-   - `stepper` — a value per row; the essence's glyph tile, its name, an `n/N` and the shared
-                 `Stepper` (`proto:1203-1211`, `proto:5627-5631`). The row is a static box
-                 holding a control rather than being one.
-  Every row is on a rung: 28px for a glyph row, 30px for a box row, 34px for a stepper row; the
-  window below is sized from the kind so five rows always fit (156 / 166 / 186px — the reference's
-  own 151 / 181 / 186).
+  A caller may still pass `children`, but one that passes `rows` and a `kind` gets the rows drawn
+  HERE, in one of four shapes: `radio` (one chosen), `check` (any number), `tri` (leave / add /
+  remove, the removal on the danger pair) and `stepper` (a value per row, a static box holding a
+  control rather than being one). Every row is on a rung — 28px for a glyph row, 30px for a box row,
+  34px for a stepper row — and the window is sized from the kind so five rows always fit.
 
   Props:
-   - id: the inset's name, stamped as `data-bulk-inset={id}` and on every hook below, so two
-     insets in one panel are distinguishable by selector.
-   - kind: `children` (default) or one of the four row kinds above.
-   - rows: `{id, name, state, meta?, disabled?, icon?, colorToken?, value?, active?, allowUnset?,
-     min?, max?}[]` — the rows a kind draws. `state` is `on|off` for `radio` and `check`,
-     `off|add|remove` for `tri`, and the caller's own word for `stepper` (stamped, never read).
-   - onRow(id): a `radio` / `check` / `tri` row was pressed.
-   - onStep(id, value|null): a `stepper` row's value changed; `null` when its field was cleared.
-   - rowAttr / rowStateAttr: the attribute NAMES a row is stamped with, valued `row.id` and
-     `row.state` (e.g. `data-world-component-bulk-option` / `-option-state`).
-   - activeAttr: an optional attribute NAME stamped `"true"` / `"false"` from `row.active`
-     (the system panel's `data-component-essence-active`).
-   - inputAttr: an optional attribute NAME spread onto a stepper row's `<input>`, valued `row.id`.
-   - rowsDisabled: inerts the rows alone (the systems inset is inert until a direction is chosen).
-   - max: the stepper rows' ceiling unless a row states its own (the reference's 9).
-   - query / onQuery(next): the search well's value and its change.
-   - placeholder: the well's placeholder AND its accessible name, already localized.
-   - page: `{pageIndex, pageCount, rangeStart, rangeEnd, total}` — `pageBulkInsetRows` output.
-   - onPage(index): the pager's request for another page.
-   - empty: the sentence drawn when the window holds no row, already localized.
-   - hasRows: whether `children` renders anything; `false` draws `empty` instead.
-   - disabled: inerts the well and the pager (the caller inerts its own rows).
-   - rowsAttr: an optional bare hook on the rows container, e.g. `data-component-bulk-essences`.
-   - minRows: the window's height in rows; the reference's tag and category windows hold five and
-     its essence window is taller, so the caller states which.
-   - children: the rows.
+  | prop | contract |
+  | --- | --- |
+  | `id` | the inset's name, stamped as `data-bulk-inset={id}` and on every hook, so two insets in one panel are distinguishable by selector |
+  | `kind` / `rows` / `onRow(id)` / `onStep(id, value\|null)` | the row kind, its data, and the two row callbacks; `state` is `on\|off` for `radio` and `check`, `off\|add\|remove` for `tri`, and the caller's own word for `stepper`, which is stamped and never read. `onStep` receives `null` when a field is cleared. |
+  | `rowAttr` / `rowStateAttr` / `activeAttr` / `inputAttr` / `rowsAttr` | attribute NAMES, valued `row.id`, `row.state`, `row.active` and `row.id` respectively |
+  | `rowsDisabled` / `disabled` / `max` / `minRows` | inert the rows alone, inert the well and pager, the stepper ceiling unless a row states its own, and the window's height in rows |
+  | `query` / `onQuery(next)` / `placeholder` | the search well's value, its change, and its placeholder AND accessible name |
+  | `page` / `onPage(index)` / `empty` / `hasRows` | `pageBulkInsetRows`'s output, the pager's request, the already-localized empty sentence, and whether `children` renders anything |
 -->
 <script>
   import Medallion from '../../components/Medallion.svelte';
@@ -297,13 +256,9 @@
 </div>
 
 <style>
-  /* THEME-ROOT tokens only, for the reason `BulkEditPanelShell` records: a scoped block may not
-     reach an area-scoped property from any directory.
-
-     ── THE STAGING INSET (`proto:1138`) ─────────────────────────────────────────────────────
-     A recess one rung BELOW the panel, hairline, radius 9 — `design-system/spec.md` puts a well on
-     9, which is the reference's own value. The reference's 9px padding takes `--fab-space-2`, the
-     nearest step on the published 4px scale. */
+  /* THEME-ROOT tokens only: a scoped block may not reach an area-scoped property from any
+     directory. THE STAGING INSET is a recess one rung BELOW the panel, hairline, radius 9 — the
+     spec's well rung and the reference's own value — with its 9px padding on `--fab-space-2`. */
   .fab-bulk-inset {
     display: flex;
     flex-direction: column;
@@ -334,10 +289,9 @@
     font-size: 0.56rem;
   }
 
-  /* Foundry core sizes every `<input>` to its own height and border; both are reset here so the
-     field is the WELL and not a second box inside it. STRETCHED to the well's height (issue 1371
-     r17-b): with `height: auto` alone the field was an 11px strip on the well's centre line, so a
-     click in the well's upper or lower third focused nothing — the whole well is the control. */
+  /* Foundry core sizes every `<input>` to its own height and border; both are reset so the field is
+     the WELL, not a box inside it, and STRETCHED to the well's height (issue 1371 r17-b), or a click
+     in its upper or lower third focuses nothing. */
   .fab-bulk-inset-search input {
     flex: 1 1 auto;
     align-self: stretch;
@@ -355,11 +309,9 @@
     font-weight: 500;
   }
 
-  /* THE WINDOW IS A FIXED HEIGHT, which is the whole reason the reference draws a pager on it: a
-     list that grew and shrank with its search would move the groups below it on every keystroke.
-     One row is the reference's 27px (`padding:6px 9px` around a 10.5px line plus the hairline)
-     and the gap between rows its 4px; five of them is its own `min-height:151px`
-     (`proto:1143`), which is what the calc below resolves to at the default. */
+  /* THE WINDOW IS A FIXED HEIGHT, which is why the reference draws a pager on it: a list that grew
+     and shrank with its search would move the groups below it on every keystroke. The calc below
+     resolves to the reference's own five-row minimum at the default. */
   .fab-bulk-inset-rows {
     display: flex;
     flex-direction: column;
@@ -386,11 +338,9 @@
     );
   }
 
-  /* ── THE ROW, ROOTED AT THIS COMPONENT (see the header) ──────────────────────────────────
-     `proto:1146` draws a row as `padding:6px 9px; border-radius:7px` on `--bg1` with a hairline,
-     in `600 10.5px` — a 27px row, which is the 28 rung (M24). FIXED at the rung rather than padded
-     to it, so the height holds whatever the host's button line-height does; the 9px inset is
-     `--fab-space-2`, the nearest step. It is a real `<button>` because a row here is a control. */
+  /* THE ROW, ROOTED AT THIS COMPONENT (see the header): the reference's 27px row on the 28 rung
+     (M24), FIXED at the rung rather than padded to it, so the height holds whatever the host's
+     button line-height does. A real `<button>`, because a row here is a control. */
   :global(.fab-bulk-inset .fab-bulk-inset-row) {
     appearance: none;
     display: flex;
@@ -448,10 +398,8 @@
     font-size: 0.5rem;
   }
 
-  /* THE BOX ROW (`proto:5273`, the world catalogue's systems): `7px 9px` around a 15px check box
-     — a 33px row, the 30 rung, with a 16px box so the row centres on the 4px scale; the box's 5px
-     corner takes the ladder's 6 for a control at or under 24px. Its name is the reference's
-     11px/600 SERIF where the glyph rows' is 10.5px sans. */
+  /* THE BOX ROW (the world catalogue's systems): the 30 rung, with a 16px box so the row centres on
+     the 4px scale and the ladder's 6 for a control at or under 24px. Its name is SERIF. */
   :global(.fab-bulk-inset .fab-bulk-inset-row.has-box) {
     height: 30px;
     min-height: 30px;

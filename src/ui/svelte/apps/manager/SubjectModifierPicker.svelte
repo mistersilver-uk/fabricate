@@ -1,4 +1,3 @@
-<!-- Svelte 5 runes mode -->
 <!--
   The SUBJECT's own check-modifier pick, for salvage and gathering (issue 1095). Under the
   `bySubject` combination rule the pick lives on the record being resolved, and this is the shared
@@ -7,37 +6,21 @@
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
-  | `options` | `{id,label,icon?}[]` | `[]` | the world catalogue; an empty one hides everything |
-  | `selectedIds` | `string[] \| null` | `null` | the AUTHORED pick; `null` means the record inherits |
-  | `inheritedIds` | `string[]` | `[]` | the ACTIVITY's MARK over that catalogue. A non-array is the unknown-basis sentinel: nothing is filtered and the whole catalogue is offered |
-  | `maxPicks` | number \| `null` | `null` | the activity's `maxModifierPicks`. NEVER coerced — `resolveMaxModifierPicks` owns what absence means |
-  | `disabled` | boolean | `false` | while the editor is saving |
-  | `subject` | `'component' \| 'task'` | `'component'` | which record is picking; every sentence names it |
-  | `testId` | string | | the `data-subject-modifier-*` hook prefix |
-
-  Callbacks:
-  - `onChange(nextIdsOrNull)` — `null` restores inheritance; an array, including an empty one,
-    authors a pick.
+  | `options` / `selectedIds` / `inheritedIds` | `{id,label,icon?}[]`, `string[]`\|`null`, `string[]` | `[]`, `null`, `[]` | the world catalogue (an empty one hides everything), the AUTHORED pick (`null` inherits), and the ACTIVITY's MARK over that catalogue. A non-array `inheritedIds` is the unknown-basis sentinel: nothing is filtered and the whole catalogue is offered. |
+  | `maxPicks` / `disabled` / `subject` / `testId` | | `null`, `false`, `'component'` | the activity's `maxModifierPicks`, NEVER coerced, since `resolveMaxModifierPicks` owns what absence means; whether the editor is saving; which record is picking, because every sentence names it; and the `data-subject-modifier-*` hook prefix |
+  | `onChange(nextIdsOrNull)` | | | `null` restores inheritance; an array, empty included, authors a pick |
 
   Invariants:
   - An ABSENT array inherits the activity's default set; an AUTHORED EMPTY array is a real pick of
-    zero and adds nothing to the roll. The two are different rolls, not a presence check, and the
-    toggle below IS that distinction made visible.
-  - THE ACTIVITY'S MARK BOUNDS THE PICK, the one rule all three `bySubject` hosts share: the offer
-    is `options ∩ inheritedIds`. It BOUNDS, it does not PRUNE — an id authored while marked and
-    since un-marked stays on the record, draws no chip, does not consume the cap, and returns the
-    moment the activity marks it again — and `resolveEligibleModifierIds` applies the same
-    intersection at roll time, so the offer and the roll agree.
-  - THE INHERITED SET IS NAMED, joined by `foundryBridge.formatList` and interpolated into a
-    `{list}` PLACEHOLDER, never concatenated onto a localized string: separator, conjunction and
-    Oxford comma all vary by locale, and a sentence whose tail is glued on cannot be reordered by
-    a translator.
-  - The cap is a SYSTEM fact this record cannot change, so it is stated STANDING rather than only
-    once the add button has gone dead.
-  - The recipe site is NOT converted, and the mismatch is named: `changeModifierSetMode` in
-    `RecipeOverviewTab` SEEDS the recipe's pick from the system default set on Inherit → Custom,
-    where this component's toggle deliberately authors `[]`. Reconciling them is a behaviour
-    decision about the recipe surface, not a refactor, and it is deferred.
+    zero. The two are different rolls, not a presence check, and the toggle IS that distinction.
+  - THE ACTIVITY'S MARK BOUNDS THE PICK, the rule all three `bySubject` hosts share: the offer is
+    `options ∩ inheritedIds`. It BOUNDS, it does not PRUNE — an id authored while marked and since
+    un-marked stays on the record, draws no chip, does not consume the cap, and returns when the
+    activity marks it again — and `resolveEligibleModifierIds` applies the same intersection at roll
+    time. THE INHERITED SET IS NAMED through `foundryBridge.formatList` into a `{list}` PLACEHOLDER,
+    never concatenated, because separator, conjunction and Oxford comma vary by locale.
+  - The recipe site is NOT converted: `changeModifierSetMode` in `RecipeOverviewTab` SEEDS the pick
+    from the system default set where this toggle authors `[]`, which is a behaviour decision.
 -->
 <script>
   import Field from '../../components/Field.svelte';
@@ -62,9 +45,7 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  // One vocabulary map, two subjects. The inherit sentences name the ACTIVITY's check rather than
-  // "the system": the default set is per-activity, and a GM reading "the system default set" on
-  // the salvage tab would look for it on the wrong screen.
+  // The inherit sentences name the ACTIVITY's check, since the default set is per-activity.
   const SUBJECT_COPY = {
     component: {
       headingKey: 'FABRICATE.Admin.Manager.Checks.Crafting.SubjectModifierHeadingComponent',
@@ -111,9 +92,8 @@
   const authored = $derived(Array.isArray(selectedIds));
   const picked = $derived(authored ? selectedIds : []);
 
-  // The OFFER is the activity's mark, per the header. A non-array `inheritedIds` is the
-  // unknown-basis sentinel `_normalizeCheckModifierSelection` uses for `validIds`: filter nothing
-  // rather than let an unknown basis silently empty the menu.
+  // The OFFER is the activity's mark, per the header; an unknown basis filters nothing rather than
+  // silently emptying the menu.
   const eligibleOptions = $derived(
     Array.isArray(inheritedIds)
       ? options.filter((option) => inheritedIds.includes(option?.id))
@@ -121,20 +101,15 @@
   );
   const eligibleIds = $derived(new Set(eligibleOptions.map((option) => option?.id)));
   const pickedEligible = $derived(picked.filter((id) => eligibleIds.has(id)));
-  // The cap counts what the GM can SEE: a suppressed pick that consumed a slot would deaden the
-  // add button against chips that are not on screen to remove.
+  // The cap counts what the GM can SEE, or the add button deadens against invisible chips.
   const suppressedCount = $derived(picked.length - pickedEligible.length);
 
-  // Routed through the resolver so this surface bounds what the ENGINE bounds: a stored `0`, `-2`
-  // or `"three"` all read as unlimited there, and a picker that trusted them verbatim would refuse
-  // picks the roll would have honoured.
+  // Routed through the resolver so this surface bounds what the ENGINE bounds.
   const capLimit = $derived(resolveMaxModifierPicks({ maxModifierPicks: maxPicks }));
   const capBounded = $derived(Number.isFinite(capLimit));
   const atCap = $derived(capBounded && pickedEligible.length >= capLimit);
 
-  // A cap of exactly 1 gets its own sentence, following the pair `RecipeOverviewTab` uses.
-  // `localize`'s interpolating form carries the same fallback contract as `text`: the fallback
-  // substitutes the count itself, so an unlocalized build reads identically.
+  // A cap of exactly 1 gets its own sentence, following `RecipeOverviewTab`'s pair.
   const capText = $derived.by(() => {
     if (capLimit === 1) return text(copy.capOneKey, copy.capOne);
     const translated = localize(copy.capKey, { count: capLimit });
@@ -148,10 +123,8 @@
     )
   );
 
-  // A vanished chip is ACCOUNTED FOR, never silently swallowed: the note states how many and that
-  // they return. It reuses the RECIPE's key pair rather than minting a fourth and fifth
-  // subject-named string — the sentence names no subject, and the field heading above it has
-  // already named which check is meant.
+  // A vanished chip is ACCOUNTED FOR: the note states how many and that they return. It reuses the
+  // RECIPE's key pair, because the sentence names no subject.
   const SUPPRESSED_KEY = 'FABRICATE.Admin.Manager.Recipe.CraftingModifierSuppressed';
   const suppressedText = $derived.by(() => {
     if (suppressedCount === 1) {
@@ -164,10 +137,8 @@
     if (translated && translated !== SUPPRESSED_KEY) return translated;
     return `${suppressedCount} chosen modifiers are hidden because the check no longer marks them selectable. They are kept and return if the check marks them again.`;
   });
-  // WHICH ZERO THE PILL ROW IS SHOWING. The row draws no chip both when the record authored a pick
-  // of nothing and when every pick it authored is currently suppressed, and its placeholder is
-  // also its `aria-live` summary — one sentence for two states. "Nothing is added" is true of the
-  // first and flatly contradicts the note beneath it in the second.
+  // WHICH ZERO THE PILL ROW IS SHOWING: two states draw no chip, and the placeholder is also the
+  // `aria-live` summary.
   const allPicksSuppressed = $derived(pickedEligible.length === 0 && suppressedCount > 0);
   const ALL_SUPPRESSED_KEY = 'FABRICATE.Admin.Manager.Recipe.CraftingModifierAllSuppressed';
   const emptyRowText = $derived(
@@ -179,24 +150,20 @@
       : text(copy.emptySetKey, copy.emptySet)
   );
 
-  // WHEN THE NOTE IS WORTH SAYING SEPARATELY: it explains a suppression a GM can see PART of.
-  // Once every pick is suppressed the placeholder above IS that explanation, word for word, so
-  // rendering both would read the same sentence to a GM twice.
+  // WHEN THE NOTE IS WORTH SAYING SEPARATELY: it explains a suppression a GM can see PART of; once
+  // every pick is suppressed the placeholder above IS that explanation.
   const showSuppressedNote = $derived(suppressedCount > 0 && !allPicksSuppressed);
 
-  // `aria-describedby` takes a LIST: a reader told only the cap would never hear that some of this
-  // record's own picks are missing from the row it is reading. It tracks the note's own condition,
-  // so the group is never described by an element that is not rendered.
+  // `aria-describedby` takes a LIST, and tracks the note's own condition, so the group is never
+  // described by an element that is not rendered.
   const describedBy = $derived(
     [capBounded ? CAP_HINT_ID : '', showSuppressedNote ? SUPPRESSED_ID : '']
       .filter(Boolean)
       .join(' ')
   );
 
-  // The inherited entries, BY NAME. Resolved against `options` and dropped when unknown, which is
-  // what the resolver does with the same ids, so this line cannot promise a modifier the roll
-  // would not apply. Joined by `formatList`, the ACTIVE language's list conventions, exactly as
-  // `RecipeOverviewTab` joins the same set for the same sentence.
+  // The inherited entries BY NAME, resolved against `options` and dropped when unknown, exactly as
+  // the resolver treats the same ids, so this line cannot promise a modifier the roll would skip.
   const inheritedNames = $derived(
     formatList(
       (Array.isArray(inheritedIds) ? inheritedIds : [])
@@ -210,9 +177,8 @@
     )
   );
 
-  // The list is a `{list}` PLACEHOLDER, not a runtime value concatenated onto a localized
-  // sentence: the position of a list inside its sentence is a translator's decision. Same fallback
-  // contract as `capText`.
+  // A `{list}` PLACEHOLDER, never concatenated: a list's position in its sentence is a
+  // translator's decision.
   const inheritText = $derived.by(() => {
     if (!inheritedNames) return text(copy.inheritEmptyKey, copy.inheritEmpty);
     const translated = localize(copy.inheritKey, { list: inheritedNames });
@@ -221,9 +187,7 @@
   });
 
   function toggleAuthored(checked) {
-    // Turning it ON authors an EMPTY array — a real pick of zero, the honest starting state for
-    // "this record picks its own". Turning it OFF restores inheritance by clearing the key, which
-    // is a different roll.
+    // ON authors an EMPTY array, a real pick of zero; OFF clears the key and restores inheritance.
     onChange(checked ? [] : null);
   }
 
@@ -247,11 +211,9 @@
         data-subject-modifier-authored={authored ? 'custom' : 'inherit'}
         onChange={toggleAuthored}
       />
-      <!-- PRESENTATIONAL. The `SelectionCheckbox` carries the whole accessible name in its own
-           `aria-label`, so this copy of the same words is `aria-hidden` — the rule
-           `ui-integration/spec.md` states for the catalogue card's eligibility pill ("One of the
-           two, never both"). It is not a `<label for>` either: the primitive's default wrapper
-           already renders its own `<label>` around the input. -->
+      <!-- PRESENTATIONAL: `SelectionCheckbox` carries the whole accessible name, so this copy is
+           `aria-hidden` — `ui-integration/spec.md`'s "one of the two, never both". Not a
+           `<label for>` either, since the primitive renders its own. -->
       <span class="manager-muted" aria-hidden="true">
         {text(copy.authorKey, copy.author)}
       </span>
@@ -287,10 +249,9 @@
         </p>
       {/if}
       {#if showSuppressedNote}
-        <!-- Only when a stored pick is currently un-marked AND at least one survives, so an
-             ordinary record carries no standing warning and the all-suppressed row is not told the
-             same thing twice. The count rides the attribute as well as the sentence, because a
-             test reading the sentence would assert a translation. -->
+        <!-- Only when a stored pick is un-marked AND at least one survives, so an ordinary record
+             carries no standing warning. The count rides the attribute too, because a test reading
+             the sentence would assert a translation. -->
         <p
           class="manager-muted"
           id={SUPPRESSED_ID}

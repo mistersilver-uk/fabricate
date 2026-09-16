@@ -1,35 +1,25 @@
-<!-- Svelte 5 runes mode -->
 <!--
   The manager's one bulk-edit panel chrome: the eyebrow and Clear, the accent count hero, the
-  caller's staged axes, and the docked Apply (issue 772, extracted for issue 1010). It replaces
-  a browser's single-row inspector for as long as the selection is non-empty.
+  caller's staged axes, and the docked Apply (issue 772, extracted for issue 1010). It replaces a
+  browser's single-row inspector for as long as the selection is non-empty.
 
   Props:
   | prop | values | default | contract |
   | --- | --- | --- | --- |
-  | `heading` | string | `''` | the hero's count sentence, already localized and pluralized |
-  | `applyLabel` | string | `''` | Apply's label, already localized and pluralized; it names the blast radius |
+  | `heading` / `applyLabel` / `clearLabel` / `hint` | string | `''` | the hero's count sentence and Apply's label, already localized and pluralized — Apply's names the blast radius; the last two are already-localized overrides, and `''` keeps `BulkEdit.ClearSelection` / `BulkEdit.SelectedHint`. The noun stays with the studio: this panel's own copy is noun-free under `Admin.Manager.BulkEdit.*`, a namespace written without its `FABRICATE` root on purpose, since `tests/ui-lang-keys-resolve.test.js` scans every dotted literal in `src/`. |
   | `canApply` | boolean | `false` | Apply is genuinely inert until an axis is staged, so a no-op write cannot read as success |
-  | `clearLabel` | string | `''` | already-localized override for Clear; `''` keeps `BulkEdit.ClearSelection` |
-  | `hint` | string | `''` | already-localized override for the hero sentence; `''` keeps `BulkEdit.SelectedHint` |
   | `dockBleed` | `''` \| `'space-4'` | `''` | the spacing token the dock bleeds by; it must equal the containing rail's padding |
   | `panelAttr` / `clearAttr` / `countAttr` / `applyAttr` | string | the Component Studio's | test, smoke and view-lab hook names |
+  | `onClearSelection()` / `onApply()` | | | the two callbacks |
 
   Snippets:
-  - `children` — the staged axes, rendered between hero and dock. They are flex items of this
-    panel, so a caller emits siblings rather than wrapping them; the panel's `gap` is the rhythm.
-  - `dockFoot` — a caller's control inside the dock, under Apply (`proto:791-796`).
-
-  Callbacks:
-  - `onClearSelection()` / `onApply()`.
+  - `children` — the staged axes, rendered between hero and dock. They are flex items of this panel,
+    so a caller emits siblings rather than wrapping them; the panel's `gap` is the rhythm.
+  - `dockFoot` — a caller's control inside the dock, under Apply.
 
   Invariants:
-  - The noun stays with the studio: `heading` and `applyLabel` are the caller's strings, and
-    this panel's own copy is noun-free under `Admin.Manager.BulkEdit.*`. That namespace is
-    written without its `FABRICATE` root on purpose — `tests/ui-lang-keys-resolve.test.js`
-    scans every dotted literal in `src/`, so a prose mention spelled in full counts as one.
-  - Apply's border box stays wholly inside the scrollport at every scroll offset, and that
-    holds only while a sibling delete card is shorter than the scrollport — pinned by
+  - Apply's border box stays wholly inside the scrollport at every scroll offset, and that holds
+    only while a sibling delete card is shorter than the scrollport — pinned by
     `tests/components/bulk-edit-dock-pinning.test.js`.
 -->
 <script>
@@ -61,8 +51,7 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  // Spread because the attribute NAME is a parameter. The value is `''`, not `true`: Svelte
-  // serializes `true` as `="true"` and these four hooks shipped as bare attributes.
+  // Spread because the NAME is a parameter, with `''`: Svelte serializes `true` as `="true"`.
   const panelHook = $derived({ [panelAttr]: '' });
   const clearHook = $derived({ [clearAttr]: '' });
   const countHook = $derived({ [countAttr]: '' });
@@ -125,12 +114,9 @@
 </section>
 
 <style>
-  /* Theme-root tokens only — design-system spec, *The token namespace is one generation and
-     names its purpose*, gated by `tests/token-generation-gate.test.js`. This appearance lives
-     here rather than in `styles/fabricate.css` so `VIEW_RECIPES` in
-     `scripts/ui-pr-screenshot-evidence.mjs` routes a change to the views that render it; sitting
-     outside `apps/manager/components/` and `apps/manager/recipes/`, it is enumerated BY NAME in
-     that map, and an unenumerated sibling here maps to no view at all. */
+  /* Theme-root tokens only — design-system spec, *The token namespace is one generation and names
+     its purpose*. The appearance lives here so `VIEW_RECIPES` routes a change to the views that
+     render it, and this file is enumerated BY NAME there. */
 
   .fab-bulk-edit-panel {
     display: flex;
@@ -147,8 +133,6 @@
     min-width: 0;
   }
 
-  /* Accent where the single-row inspector's eyebrow is subtle: the rail has changed what it is
-     for, and that is the first thing the GM must read. */
   .fab-bulk-edit-eyebrow {
     margin: 0;
     color: var(--fab-accent);
@@ -158,9 +142,7 @@
     text-transform: uppercase;
   }
 
-  /* The documented escape from a mode that hides the single-row actions, so it is a real
-     focusable button and the first control in the panel; Foundry's host button geometry is reset
-     explicitly, as `Chip` does. */
+  /* The documented escape from a mode that hides the single-row actions. */
   .fab-bulk-edit-clear {
     appearance: none;
     display: inline-flex;
@@ -240,40 +222,22 @@
     line-height: 1.35;
   }
 
-  /* The dock pins Apply to the rail's bottom edge; the panel is taller than the inspector's
-     scrollport in the Recipe and Component studios (issue 1015).
-
-     All three negative bleeds are load-bearing, and the two vertical ones answer different
-     clamps: `bottom` answers the scrollport clamp, because Chromium measures a sticky inset
-     from the scroll container's CONTENT box while the rail runs on to its padding box, one
-     `--fab-space-3` lower; `margin-bottom` answers the containing-block clamp, which applies to
-     the sticky box's MARGIN box and starts to bind at maximum scroll. Both are written as the
-     same token as `.manager-inspector`'s padding so the two cannot drift.
-     `tests/components/bulk-edit-dock-pinning.test.js` samples the top of the scroll range as
-     well as the bottom, because a dock that never sticks is indistinguishable from a pinned one
-     at maximum scroll.
-
-     Two configurations do not pin, and neither is a regression. A studio that renders a SIBLING
-     delete card after this shell un-pins because the shell no longer spans the rail's scrollable
-     height; what survives is reachability, and only while that sibling is shorter than the
-     scrollport. Below the manager's 1024px supported minimum,
-     `@container fabricate-manager (max-width: 1120px)` in `styles/fabricate.css` makes
-     `.manager-body` the scrollport, and a rail with no scroll range has nothing to stick within
-     — do not reach into that block from here.
-
-     No `z-index`, deliberately: nothing this dock can overlap establishes a competing stacking
-     context, and `SearchablePopover` portals out to the `.fabricate-manager` host.
-
-     The button's own box is untouched. `.fab-bulk-edit-apply` swaps places with
-     `.manager-component-browser-inspector-edit` in the rail's bottom slot, so the dock adds no
-     padding, border or min-height that would resize or re-type it. */
+  /* The dock pins Apply to the rail's bottom edge (issue 1015). All three negative bleeds are
+     load-bearing, and the two vertical ones answer different clamps: `bottom` answers the
+     scrollport clamp, since Chromium measures a sticky inset from the scroll container's CONTENT
+     box while the rail runs on to its padding box; `margin-bottom` answers the containing-block
+     clamp, which applies to the sticky box's MARGIN box at maximum scroll. Both are written as
+     `.manager-inspector`'s own padding token so the two cannot drift, and
+     `tests/components/bulk-edit-dock-pinning.test.js` samples the top of the scroll range as well
+     as the bottom, because a dock that never sticks looks pinned at maximum scroll. Two
+     configurations do not pin and neither is a regression: a SIBLING delete card un-pins it, and
+     below the supported minimum the sheet's container query makes `.manager-body` the scrollport —
+     do not reach into that block from here. No `z-index`, deliberately. */
   .fab-bulk-edit-dock {
     position: sticky;
     bottom: calc(-1 * var(--fab-space-3));
     margin-inline: calc(-1 * var(--fab-space-3));
     margin-bottom: calc(-1 * var(--fab-space-3));
-    /* The foot's own inset, so every consumer's foot breathes the same; Apply's `margin-top`
-       moved here with it. */
     padding-top: var(--fab-space-3);
     padding-inline: var(--fab-space-3);
     padding-bottom: var(--fab-space-3);
@@ -282,10 +246,7 @@
     box-shadow: 0 -2px 6px var(--fab-overlay-dark-25);
   }
 
-  /* Gated on the snippet rather than declared unconditionally: with one child the two display
-     modes are not obviously identical, and `.fab-bulk-edit-apply`'s `margin-top` is a block-flow
-     question in one mode and not a question at all in the other. With no `dockFoot` the class is
-     not emitted and the dock is byte-identical to what ships. */
+  /* Gated on the snippet: with no `dockFoot` the dock is byte-identical to what ships. */
   .fab-bulk-edit-dock.has-foot {
     display: flex;
     flex-direction: column;
@@ -293,16 +254,13 @@
   }
 
   /* A flex item's automatic minimum is its min-content width, so a `nowrap` delete label would
-     widen the column past the rail instead of ellipsising. Stated on the dock because every
-     consumer needs the same answer, and `:global` because the snippet's root carries the
-     consumer's scope hash and never this one's. */
+     widen the column past the rail. `:global` because the snippet's root is the consumer's. */
   .fab-bulk-edit-dock.has-foot > :global(*) {
     min-width: 0;
   }
 
-  /* The base rule's five container-bound declarations restated at the wider token, for a
-     container that pads `--fab-space-4`. Gated on `dockBleed`, so the three studios in the
-     shared rail are byte-identical. */
+  /* The base rule's container-bound declarations restated at the wider token, gated on `dockBleed`
+     so the three studios in the shared rail are byte-identical. */
   .fab-bulk-edit-dock.is-bleed-space-4 {
     bottom: calc(-1 * var(--fab-space-4));
     margin-inline: calc(-1 * var(--fab-space-4));
@@ -311,20 +269,13 @@
     padding-bottom: var(--fab-space-4);
   }
 
-  /* Full-width and accent, and genuinely inert until an axis is staged. Geometry, weight and
-     foreground are the browser inspector's primary button verbatim
-     (`.manager-button.manager-component-browser-inspector-edit`, styles/fabricate.css), because
-     this button literally swaps places with it in the rail's bottom slot: 38px and 0.78rem, and
-     `--fab-on-accent` rather than the surface colour `--fab-bg-1`.
-
-     `:global()` AND chained, both load-bearing (issue 1118). `:global()` because Apply is a
-     `<ManagerButton>` and Svelte does not stamp a child component's internals, so a scoped
-     selector matches nothing while the compiler reports no unused-selector warning. Chained
-     because `:global()` alone is (0,2,0) and loses to
-     `.fabricate-button.manager-button.fab-manager-button` (0,3,0), which would give up the two
-     values the dock comment above says must not change; naming the ancestor and both primitive
-     classes takes it to (0,4,0), winning on specificity rather than on injection order. The
-     `:hover`, `:disabled` and `:focus-visible` companions below are written the same way. */
+  /* Full-width and accent, inert until an axis is staged. Geometry, weight and foreground are the
+     browser inspector's primary button verbatim, because this button swaps places with it in the
+     rail's bottom slot. `:global()` AND chained, both load-bearing (issue 1118): `:global()`
+     because Apply is a `<ManagerButton>` whose internals Svelte does not stamp, so a scoped
+     selector matches nothing with no unused-selector warning; chained because `:global()` alone is
+     (0,2,0) and loses to the primitive's own (0,3,0) compound. The `:hover`, `:disabled` and
+     `:focus-visible` companions below are written the same way. */
   :global(.fabricate-manager .manager-button.fab-manager-button.fab-bulk-edit-apply) {
     display: flex;
     gap: var(--fab-space-chip);
@@ -359,11 +310,9 @@
     cursor: default;
   }
 
-  /* Apply's half of what used to be one focus group with `.fab-bulk-edit-clear`: Clear is
-     written here and carries this component's scoping class, Apply is a `<ManagerButton>` and
-     never will, so one selector cannot reach both. Anchored and chained like its three
-     companions, because `styles/fabricate.css` states `.fabricate button:focus-visible` at
-     (0,2,1) with byte-identical declarations — an unchained rule here carries no weight. */
+  /* Apply's half of what was one focus group with `.fab-bulk-edit-clear`: Clear carries this
+     component's scoping class and Apply never will, so one selector cannot reach both. Anchored
+     and chained like its companions, because the sheet states the same declarations at (0,2,1). */
   :global(.fabricate-manager .manager-button.fab-manager-button.fab-bulk-edit-apply:focus-visible) {
     outline: 2px solid var(--fab-accent);
     outline-offset: 2px;

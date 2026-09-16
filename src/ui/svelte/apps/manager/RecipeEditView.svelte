@@ -1,20 +1,15 @@
-<!-- Svelte 5 runes mode -->
 <!--
   Recipe editor shell: a tab strip (Overview / Ingredients / Results / Tools / Access* / Books &
-  Scrolls* / Validation) with the card contents in the relevant tab. The two starred tabs are
-  mode-conditional (issue 676) — `RecipeEditorTabs` owns the gate.
+  Scrolls* / Validation) with the card contents in the relevant tab; the two starred tabs are
+  mode-conditional and `RecipeEditorTabs` owns the gate (issue 676).
 
   Invariants:
   - The editor has NO right rail (issue 676): `recipe-edit` is in the two-column override list in
     `styles/fabricate.css`, so the tab panel takes the 300px back.
-  - The shell is fully CONTROLLED. The root holds the in-flight draft and passes it down as
-    `recipe`; identity inputs read straight from it and emit `onUpdateRecipe({ … })` on input, the
-    enabled toggle emits `onToggleEnabled()` (persisted immediately by the root), and every
-    requirement add/remove handler stages through `onUpdateRecipe` / `onUpdateStep`.
-  - The header Save lives in the shared header and calls the root's save handler directly — there
-    is no form wrapper to submit.
-  - EVERY TAB PROP MUST ALSO BE FORWARDED HERE: a tab prop that skips this wrapper silently takes
-    its default and the control never renders.
+  - The shell is fully CONTROLLED: the root holds the draft and passes it as `recipe`, inputs emit
+    `onUpdateRecipe({ … })`, `onToggleEnabled()` persists immediately, and the header Save lives in
+    the shared header and calls the root's handler directly.
+  - EVERY TAB PROP MUST ALSO BE FORWARDED HERE, or the control silently takes its default.
 -->
 <script>
   import EmptyState from './EmptyState.svelte';
@@ -52,14 +47,11 @@
     saveFailed = false,
     onPickImagePath = null,
     currencyUnits = [],
-    // Whether the system's currency feature is ENABLED, not merely seeded with preset units. It
-    // gates the ingredient "Add cost" affordances and drives the read-only rendering of existing
-    // currency requirements. Defaults true so a caller that only passes units keeps the pre-gate
-    // behaviour.
+    // Whether the currency feature is ENABLED, not merely seeded with preset units. Defaults true,
+    // so a caller that only passes units keeps the pre-gate behaviour.
     currencyEnabled = true,
-    // Whether the system's time-requirements feature is ENABLED (issue 714), gating the
-    // single-step Duration card and the per-step duration editor. Defaults true so a caller that
-    // omits it keeps the pre-gate always-authorable behaviour.
+    // Whether the time-requirements feature is ENABLED (issue 714). Defaults true, so a caller
+    // that omits it keeps the pre-gate always-authorable behaviour.
     timeRequirementsEnabled = true,
     toolsLibrary = [],
     componentOptions = [],
@@ -87,21 +79,17 @@
     routingProvider = null,
     routedOutcomeTierOptions = [],
     routedOutcomeTiersDefined = false,
-    // Whether the system's crafting failure-result policy permits results on a failed check
-    // (issue 1098). It is what makes `routedOutcomeTierOptions` above the UNFILTERED tier list,
-    // and it is forwarded so the group card's empty hint can name the policy as a remedy.
+    // Whether the failure-result policy permits results on a failed check (issue 1098): it makes
+    // `routedOutcomeTierOptions` above the UNFILTERED list, and names the policy as a remedy.
     routedFailureResultsAllowed = false,
-    // Alchemy enable-blocker inputs (issue 549): the alchemy context for an alchemy system (null
-    // otherwise) and the cross-recipe signature conflicts touching this recipe, for the Validation
-    // tab and the enable-toggle gate.
+    // Alchemy enable-blocker inputs (issue 549), for the Validation tab and the toggle gate.
     alchemy = null,
     signatureConflicts = [],
     // Progressive systems award a recipe's results in order, so the Results tab exposes
     // drag-reorder on the result rows. Other modes ignore result order.
     progressive = false,
-    // Progressive result rows deep-link to the COMPONENT editor's Difficulty card:
     // `component.difficulty` is consumed by recipes, salvage, gathering AND system validation, so
-    // it is a read-only badge here, never an inline stepper.
+    // a progressive result row deep-links to the component editor rather than stepping it here.
     onOpenComponent = () => {},
     // The SYSTEM's resolution mode. Never per-recipe: the banner reports it on every tab and
     // routes to Crafting Settings, which is the only place it can change.
@@ -152,11 +140,9 @@
   // recipe-level sections in that mode.
   const isMultiStep = $derived(steps.length >= 1);
 
-  // COLLAPSED chain (issue 710): a recipe that still carries authored steps while its system's
-  // multi-step feature is OFF. It is neither deleted nor reverted — the steps are preserved
-  // untouched and restored when the feature is re-enabled. While collapsed the editor presents the
-  // recipe as single-step: step authoring is gated read-only, and the Results tab surfaces the
-  // chain's EFFECTIVE output — its FINAL step's results — as editable.
+  // COLLAPSED chain (issue 710): a recipe still carrying authored steps while multi-step is OFF.
+  // They are preserved and restored on re-enable, and meanwhile the editor presents the recipe as
+  // single-step over the FINAL step's results.
   const collapsed = $derived(!multiStepEnabled && steps.length > 1);
   const finalStep = $derived(collapsed ? steps[steps.length - 1] : null);
 
@@ -182,9 +168,8 @@
     return steps.find((step) => step.id === stepId) || null;
   }
 
-  // Ingredient-mode result routing: assigning an ingredient set to a result group writes the
-  // canonical `resultGroupId` on that set. A set routes to at most one group, so assigning
-  // replaces any prior target and unassigning clears it. Ignores a not-yet-saved group.
+  // A set routes to at most one group, so assigning writes the canonical `resultGroupId` and
+  // replaces any prior target. A not-yet-saved group is ignored.
   function assignIngredientSet(stepId, groupId, setId, assigned) {
     if (!setId || (assigned && !groupId)) return;
     // Collapsed chain (issue 710): the Results tab renders single-step (stepId null) over the
@@ -201,11 +186,8 @@
     return Array.isArray(step?.toolIds) ? step.toolIds : [];
   }
 
-  // Add and remove mirror `handleAddStep`: append entries WITHOUT an id (store normalization
-  // assigns one), remove filters by the entry's id. A null stepId patches the recipe scope; a
-  // present stepId patches that step. The ingredient section emits the whole replacement sets
-  // array, shallow-cloned down to the changed node, and the store normalizes via `Recipe.fromJSON`
-  // so nothing here hand-assigns ids.
+  // Append WITHOUT an id, since store normalization assigns one, and remove by id. A null stepId
+  // patches the recipe scope, a present one that step.
   function updateIngredientSets(stepId, nextSets) {
     if (stepId == null) {
       onUpdateRecipe({ ingredientSets: nextSets });
@@ -214,15 +196,11 @@
     if (!stepById(stepId)) return;
     onUpdateStep(stepId, { ingredientSets: nextSets });
   }
-  // The result section emits the whole replacement groups array, shallow-cloned down to the
-  // changed node. The store normalizes via `Recipe.fromJSON`; existing group ids and names, which
-  // routing references, are preserved upstream in the section's edit paths.
+  // The section emits the whole replacement array, shallow-cloned to the changed node; group ids
+  // and names, which routing references, are preserved upstream.
   function updateResultGroups(stepId, nextGroups) {
-    // Collapsed chain WRITE-THROUGH (issue 710). While the multi-step feature is off the Results
-    // tab edits the collapsed recipe as single-step (a null stepId) but over the FINAL step's
-    // result groups, so a null stepId here must WRITE THROUGH to that step. The recipe-level
-    // `resultGroups` stay empty and the per-step data is never touched, so re-enabling the feature
-    // restores the full multi-step editor losslessly.
+    // Collapsed chain WRITE-THROUGH (issue 710): a null stepId edits the FINAL step's result
+    // groups, and recipe-level `resultGroups` stay empty, so re-enabling is lossless.
     const targetStepId = stepId == null && collapsed && finalStep ? finalStep.id : stepId;
     if (targetStepId == null) {
       onUpdateRecipe({ resultGroups: nextGroups });
@@ -301,17 +279,14 @@
       }
     )
   );
-  // THE BADGE IS THE VALIDATION TAB'S OWN COUNTS, READ THROUGH THE SHARED TALLY (issue 1517). It
-  // used to count issues here while the tab it badges drew a row per readiness CHECK, so an
-  // unnamed step in a multi-step recipe painted an amber row inside a tab whose strip showed
-  // nothing. Two numbers describing one screen have to be one number.
+  // THE BADGE IS THE VALIDATION TAB'S OWN COUNTS, READ THROUGH THE SHARED TALLY (issue 1517): two
+  // numbers describing one screen have to be one number.
   const validationCounts = $derived(countRecipeReadiness(readiness));
   const errorCount = $derived(validationCounts.blocking);
   const warningCount = $derived(validationCounts.warnings);
 
-  // Tab count badges (issue 643 §F1): Ingredients, Results and Tools carry a mono count.
-  // Multi-step recipes sum each tab's count across every step; single-step recipes read the
-  // recipe-scope arrays.
+  // Tab count badges (issue 643 §F1). Multi-step recipes sum each tab's count across every step;
+  // single-step recipes read the recipe-scope arrays.
   function countIngredients(scope) {
     const sets = Array.isArray(scope?.ingredientSets) ? scope.ingredientSets : [];
     return sets.reduce((total, set) => {
@@ -341,15 +316,10 @@
   const toolsCount = $derived(
     sumOverScopes(countTools) + (isMultiStep ? countTools(recipe || {}) : 0)
   );
-  // While the recipe is OFF, an enable-blocking issue disables the enable toggle so the GM cannot
-  // trigger the hard activation failure (issue 549); disabling stays free.
-  //
-  // This is NOT the recipe activation gate (issue 1018), which is `RecipeManager.canActivateRecipe`.
-  // The two are INCOMPARABLE in both directions: this one UNDER-reports, because readiness runs no
-  // essence-reference, tag-placeholder, resolution-mode or enabled-essence validation and its
-  // signature-collision branch cannot fire from here (issue 1066); and it OVER-reports, because
-  // `duplicateAlternative` and `duplicateRequirement` disable this toggle for a recipe
-  // `canActivateRecipe` accepts (issue 1067). See the ledger row in DOMAIN.md.
+  // While the recipe is OFF, an enable-blocking issue disables the toggle so the GM cannot trigger
+  // the hard activation failure (issue 549); disabling stays free. NOT the activation gate
+  // `canActivateRecipe` (issue 1018): the two are INCOMPARABLE in both directions, and DOMAIN.md
+  // carries the ledger row.
   const enableToggleBlocked = $derived(!enabled && blocksEnable(readiness.issues));
   const badges = $derived({
     ingredients: ingredientsCount > 0 ? [{ label: String(ingredientsCount), tone: 'neutral' }] : [],
@@ -375,18 +345,14 @@
   }
 
   // The resolution-mode banner's copy and icon are NOT re-authored: `resolutionModeOptions.js`
-  // already owns the canonical list System Settings and Crafting Settings render, so a second
-  // table would drift. The lookup lives here so a second banner — the Overview tab's inert
-  // check-modifier warning — can reuse the same chrome with its own copy, which is why folding it
-  // back into `RecipeModeBanner` would re-create that drift.
+  // owns the canonical list, and the lookup lives here so a second banner can reuse the chrome with
+  // its own copy — folding it back into `RecipeModeBanner` would re-create the drift.
   const modeOption = $derived(
     resolutionModeOptions.find((option) => option.value === resolutionMode) ||
       resolutionModeOptions[0]
   );
 
-  // The recipe image is always editable: a recipe can belong to many books and scrolls
-  // (`recipeIds[]` is many-to-many), so it no longer mirrors or locks to a single linked recipe
-  // item's image.
+  // Always editable: `recipeIds[]` is many-to-many, so this mirrors no single linked item.
   async function chooseImage() {
     if (typeof onPickImagePath !== 'function') return;
     const value = await onPickImagePath(img || DEFAULT_RECIPE_IMAGE);
@@ -405,9 +371,8 @@
     'validation',
   ]);
 
-  // A mode change can retire the tab the GM is standing on. Fall back to Overview rather than
-  // rendering a panel-less tabpanel whose `aria-labelledby` points at a button that no longer
-  // exists.
+  // A mode change can retire the tab the GM is standing on, leaving a tabpanel whose
+  // `aria-labelledby` points at a button that no longer exists.
   $effect(() => {
     if (!TAB_IDS.includes(activeTab)) activeTab = 'overview';
   });
@@ -428,21 +393,17 @@
   // inside THIS editor rather than anywhere in the manager window.
   let editorRoot = $state(null);
 
-  // WHAT THE LIVE REGION SAYS: the ACTION'S OUTCOME rather than a count. Activating a row action
-  // changes no tally, so a count-subjected region would recite an unchanged number at the moment a
-  // GM most needs to know where they landed.
+  // WHAT THE LIVE REGION SAYS: the ACTION'S OUTCOME rather than a count, which a row action does
+  // not move.
   let issueAnnouncement = $state('');
 
-  // The destination TAB PANEL, and the focus fallback for a route-only row (issue 1517). One
-  // element outside the tab chain rather than one per branch, so the reference stays valid across
-  // the route change the row action just made.
+  // The destination TAB PANEL and the focus fallback for a route-only row (issue 1517), outside
+  // the tab chain so the reference survives the route change.
   let tabPanel = $state(null);
 
-  // Deep-link from a validation issue: switch to the tab that hosts the gap, THEN move focus to
-  // the offending control. THE ORDER IS THE MECHANISM: the route is set synchronously and FIRST,
-  // so Svelte has flushed it and the destination panel exists by the time the focus helper's
-  // `queueMicrotask` runs its query. Everything after that belongs to
-  // `validationAnnouncement.js`, which owns it for all five hosts.
+  // Deep-link from a validation issue: switch tab, THEN move focus. THE ORDER IS THE MECHANISM —
+  // the route is set synchronously and FIRST, so the destination panel exists by the time the focus
+  // helper's `queueMicrotask` runs, and everything after that is `validationAnnouncement.js`'s.
   function selectIssue(targetTab, focusTarget) {
     const route = Object.hasOwn(ISSUE_TABS, targetTab) ? targetTab : null;
     if (route) activeTab = route;
@@ -465,14 +426,10 @@
 >
   <!--
     THE ROW ACTION'S LIVE REGION, hosted here rather than in the validation surface (issue 1517):
-    activating a row action sets `activeTab` to another value, which unmounts the whole validation
-    panel — live region included — in the same update that was supposed to announce. So the element
-    carrying `aria-live` is ALWAYS in the DOM, outside both the `{#if recipe}` guard and the
-    `{#if activeTab}` chain, with its own `{#if}` inside it.
-
-    It carries NO `manager-recipe-*` class on purpose: `manager-recipe-val*` and
-    `manager-recipe-rail*` are a pinned family with an explicit anchors list, so a natural name
-    here would join that family and change its census.
+    activating a row action unmounts that whole panel in the same update that was supposed to
+    announce, so the element carrying `aria-live` is ALWAYS in the DOM, outside both guards, with
+    its own `{#if}` inside it. It carries NO `manager-recipe-*` class on purpose: that is a pinned
+    family with an explicit anchors list, and a natural name here would change its census.
   -->
   <div class="visually-hidden" role="status" aria-live="polite" data-recipe-issue-announcement>
     {#if issueAnnouncement}{issueAnnouncement}{/if}
@@ -509,9 +466,8 @@
       />
 
       <!-- `tabindex="-1"` and `data-keyboard-focus="true"` are the ROUTE-ONLY row's focus
-           destination (issue 1517): a row that names a tab and no control leaves focus on a button
-           this update unmounts, and `<body>` is where every Foundry keybinding is live. `-1`, not
-           `0`: the panel is a programmatic destination, not a tab stop. -->
+           destination (issue 1517), since `<body>` is where every Foundry keybinding is live. `-1`,
+           not `0`: a programmatic destination, not a tab stop. -->
       <div
         class="manager-editor-tab-panel"
         role="tabpanel"

@@ -1,4 +1,3 @@
-<!-- Svelte 5 runes mode -->
 <!--
   The GM recipe library (issue 643): filter bar, collapsible category groups, rich rows, pager,
   with the shell's own `.manager-inspector` column carrying the selected-recipe inspector. All
@@ -75,20 +74,13 @@
   // nested writes are reactive and, when bound, propagate back to the root.
   const ui = $derived(browserState ?? ownBrowserState);
 
-  // Switching system resets the CATEGORY filter and the group/page position — a recipe category
-  // names a vocabulary the new system does not share. The status and lock filters are NOT reset:
-  // enabled and locked mean the same thing in every system, so they are preferences.
-  //
-  // The search term is not preserved here at all, and that asymmetry is deliberate: the STORE
-  // clears it, on a system switch and on leaving this library's route scope alike (issue 1462),
-  // because it is the one control here whose effect is not confined to this browser — an active
-  // term also changes counts on screens that render no search box for it.
-  //
-  // The sentinel is `ui.systemId`, PERSISTED on the lifted browser state and NOT a
-  // component-local `$state`: a local one re-initialises to '' on every mount, so returning from
-  // an editor was misread as a system switch and wiped the state this object preserves (issue
-  // 806). The equality early-return means writing `ui.systemId` back inside the same effect does
-  // not loop.
+  // Switching system resets the CATEGORY filter and the group/page position, because a category
+  // names a vocabulary the new system does not share; status and lock are preferences and are not
+  // reset. The search term is the STORE's to clear, on a system switch and on leaving this route
+  // alike (issue 1462), because an active term also changes counts on screens with no search box.
+  // The sentinel is `ui.systemId`, PERSISTED on the lifted state rather than a component-local
+  // `$state`, which re-initialises to '' on every mount and made returning from an editor read as
+  // a system switch (issue 806); the equality early-return keeps the write from looping.
   $effect(() => {
     if (selectedSystemId === ui.systemId) return;
     ui.categoryFilter = 'all';
@@ -100,25 +92,17 @@
     ui.systemId = selectedSystemId;
   });
 
-  // The blocked-enable flash. Enabling is GATED, and this view CLAIMS the refusal message by
-  // handing the store an `onBlocked` sink: the store then SUPPRESSES its Foundry notification, so
-  // the GM is never told the same thing twice. The error is never surfaced from inside this
-  // component — it has no Foundry notification path at all — which is what makes the seam
-  // stubbable in a mounted test and keeps the suppression invariant enforceable.
-  //
-  // TWO PARTS since issue 1515, because the vehicle is a `<Notice>` whose specimen draws a `title`
-  // over a quieter `detail`. `localizeRecipeActivationParts` builds each half from its own
-  // material rather than cutting the one-line message at a colon a translation is free to move,
-  // and the one-line string stays the fallback for a refusal that is not an activation error.
+  // The blocked-enable flash. This view CLAIMS the refusal message through the store's `onBlocked`
+  // sink, so the store SUPPRESSES its own Foundry notification and the GM is not told twice; the
+  // error is never surfaced from inside this component, which is what keeps that seam stubbable.
+  // TWO PARTS since issue 1515, because `Notice` draws a `title` over a quieter `detail`, and each
+  // half is built from its own material rather than cut at a colon a translation may move.
   let flashTitle = $state('');
   let flashDetail = $state('');
 
-  // A REFUSAL COUNTER, WHICH THE SHARED NOTICE MAKES NECESSARY (issue 1515). `Notice` owns its own
-  // dismissal and simply leaves the DOM, and this view's message is not always new: clearing the
-  // term and setting it again inside ONE toggle is a single batched update, so the `{#if}` never
-  // goes false and the same instance survives with `dismissed` still true — refuse, dismiss,
-  // refuse the same recipe again, and the second refusal would be silent. Keying the block on a
-  // counter that rises on every refusal is what makes each one a new notice.
+  // A REFUSAL COUNTER, WHICH THE SHARED NOTICE MAKES NECESSARY (issue 1515): clearing the term and
+  // setting it again is ONE batched update, so the `{#if}` never goes false and a dismissed
+  // instance survives, making the second refusal silent. Keying on a rising counter fixes that.
   let flashToken = $state(0);
 
   function handleToggleEnabled(recipe) {
@@ -291,14 +275,10 @@
     return `manager-recipe-group-${category || 'all'}`;
   }
 
-  // The header says BOTH numbers, because either one alone lies (issue 676).
-  // `buildRecipeBrowserModel` groups the PAGE, so counting `model.filtered` would put "12
-  // recipes" above the three rows page 2 renders — but counting only the page put "25 recipes"
-  // above page 1 of a 282-strong bucket. So a partially-shown group reads "25 of 282 recipes",
-  // where `group.total` is the category's size across the FILTERED list.
-  //
-  // A group shown WHOLE says it once. The plural agrees with the TOTAL, which is >= 2 whenever
-  // the "of" form is used.
+  // The header says BOTH numbers, because either alone lies (issue 676): the model groups the
+  // PAGE, so `model.filtered` over-counts and the page alone under-counts. A partially-shown group
+  // reads "25 of 282 recipes" against `group.total`, the category's size across the FILTERED list;
+  // a group shown WHOLE says it once, and the plural agrees with the TOTAL.
   function groupCountText(group) {
     const count = (group?.recipes || []).length;
     const total = group?.total ?? count;
@@ -328,11 +308,9 @@
     ui.collapsedCategories = next;
   }
 
-  // The four row states, localized. Both authoring states read ONE predicate —
-  // `recipe.enableBlocked`, "would activation refuse this recipe?" (issue 1010) — so the pilled
-  // rows, the bulk panel's pre-flight count and the set-apply write are the same set by
-  // construction. Off plus blocked means enabling would be REFUSED; on plus blocked is unfinished
-  // work with nothing being refused.
+  // The four row states. Both authoring states read ONE predicate, `recipe.enableBlocked` (issue
+  // 1010), so the pilled rows, the bulk panel's pre-flight count and the set-apply write are the
+  // same set by construction.
   const STATUS_LABELS = {
     disabled: ['FABRICATE.Admin.Manager.StatusDisabled', 'Disabled'],
     locked: ['FABRICATE.Admin.Manager.Recipe.LockedLabel', 'Locked'],
@@ -438,20 +416,13 @@
 -->
 <main class="manager-main" aria-label={text('FABRICATE.Admin.Manager.Nav.Recipes', 'Recipes')}>
   <!--
-    THE BLOCKED-ENABLE NOTICE, which is the shared primitive (issue 1515). It still REPLACES the
-    Foundry notification — the store suppresses its own toast while this view owns the message
-    through the `onBlocked` sink — so it is the only place a GM is told why the switch did not
-    move, and it still does not auto-hide.
-
-    `openspec/specs/design-system/spec.md` routes a strip carrying `role="alert"` to a BLOCKING
-    notice, and fixes its position: between the page header and the filter bar. This route has no
-    per-view page header, so that is the first child of the content region, and the bespoke toast
-    that floated bottom-centre over the list is retired with the four rules that painted it.
-
-    THE SLOT IS UNCONDITIONAL AND THE NOTICE INSIDE IT IS NOT. `.manager-main` is a grid whose
-    tracks this route names explicitly, so a CONDITIONAL direct child would move the collapsing
-    `minmax(0, 1fr)` onto a different child in each state — the defect `assertOneTrackPerGridChild`
-    names. An empty slot is a zero-height `auto` row.
+    THE BLOCKED-ENABLE NOTICE (issue 1515). It REPLACES the Foundry notification, so it is the only
+    place a GM is told why the switch did not move, and it does not auto-hide.
+    `openspec/specs/design-system/spec.md` routes a `role="alert"` strip to a BLOCKING notice and
+    fixes its position; this route has no page header, so that is the content region's first child.
+    THE SLOT IS UNCONDITIONAL AND THE NOTICE INSIDE IT IS NOT: a CONDITIONAL direct child of
+    `.manager-main` would move the collapsing `minmax(0, 1fr)` between children, which is what
+    `assertOneTrackPerGridChild` names. An empty slot is a zero-height `auto` row.
   -->
   <div class="manager-recipe-notice">
     {#key flashToken}
@@ -522,12 +493,8 @@
       />
     </div>
 
-    <!--
-      Row two carries the category FILTER together with the two VIEW controls — how the list is
-      grouped, and how it is ordered — on a single tighter row (issue 643). The view controls are
-      separated from the filter by a rule and each is titled by an uppercase micro-label that
-      precedes its control and never wraps.
-    -->
+    <!-- Row two carries the category FILTER with the two VIEW controls on one tighter row (issue
+      643), separated by a rule and each titled by a micro-label that never wraps. -->
     <div class="manager-recipe-filter-row is-secondary">
       {#if showRecipeCategories}
         <!-- Bare: the `aria-label` is the select's accessible name. -->
@@ -621,11 +588,7 @@
           </button>
         </Chip>
       {/each}
-      <!--
-        The count is quiet right-aligned metadata, not a control: a bordered mono chip read as
-        something to press. It reports the page WINDOW, because "5 of 12" never told the GM which
-        page they were looking at.
-      -->
+      <!-- The count is quiet right-aligned metadata, not a control, and reports the page WINDOW. -->
       <span class="manager-recipe-count" data-recipe-count>
         {format('FABRICATE.Admin.Manager.Recipe.CountRange', '{start}–{end} of {total}', {
           start: model.rangeStart,
@@ -636,13 +599,10 @@
     </div>
 
     <!--
-      The multi-select row is the LAST row of the toolbar, immediately above the list (issue 1010).
-      It is a row of THIS toolbar, not a sticky bar of its own over the list, so it inherits the
-      toolbar's own metrics instead of declaring a second register.
-
-      Every prop below is an OVERRIDE: the shared primitive's row class and its five `data-*` hooks
-      default to the Component Studio's strings, so this studio must name its own or both browsers
-      would answer to one set of hooks.
+      The multi-select row is the LAST row of THIS toolbar (issue 1010), not a sticky bar of its
+      own, so it inherits the toolbar's metrics rather than declaring a second register. Every prop
+      below is an OVERRIDE: the primitive's row class and five `data-*` hooks default to the
+      Component Studio's strings, so both browsers would otherwise answer to one set.
     -->
     <BulkSelectionToolbar
       rowClass="manager-recipe-filter-row"
@@ -690,14 +650,9 @@
       </EmptyState>
     {:else}
       <div class="manager-recipes-table">
-        <!--
-          The column header sits ABOVE the whole list (issue 643). It labels the row's real
-          regions — the identity, then the right cluster's Requirements, Check pill and Status
-          switch — and shares the cluster's fixed column template with every row, so the labels
-          line up with the cells beneath them. It is `aria-hidden` (the rows carry their own
-          labels) and hides at the stacked breakpoint, where a column header over a stack of cards
-          means nothing.
-        -->
+        <!-- The column header sits ABOVE the whole list (issue 643) and shares the cluster's fixed
+          column template with every row, so the labels line up. `aria-hidden`, because the rows
+          carry their own labels, and hidden at the stacked breakpoint. -->
         <div class="manager-recipe-table-head" aria-hidden="true">
           <span class="manager-recipe-head-identity"
             >{text('FABRICATE.Admin.Manager.Recipe.Column.Recipe', 'Recipe')}</span
@@ -735,11 +690,8 @@
                 {#each group.recipes as recipe (recipe.id)}
                   {@const io = ioReadout(recipe)}
                   {@const check = checkPill(recipe)}
-                  <!--
-                    `.is-bulk-selected` is a DIFFERENT question from `.is-selected` — "this row is
-                    in the set an Apply will write to" versus "you are here" — and a row can carry
-                    both (issue 1010).
-                  -->
+                  <!-- `.is-bulk-selected` is a DIFFERENT question from `.is-selected`, and a row
+                    can carry both (issue 1010). -->
                   <li
                     class={`manager-recipe-row ${isSelectedRecipe(recipe) ? 'is-selected' : ''} ${recipe.enabled === false ? 'is-off' : ''}`}
                     class:is-bulk-selected={bulkSelectedIds.has(recipe.id)}
@@ -839,12 +791,8 @@
                         ></i>
                       </IconButton>
 
-                      <!--
-                        No "On"/"Off" text IN THE ROW. The track colour already carries the state,
-                        the `aria-label` names it for assistive tech, and the row's Disabled pill
-                        says it in words. (The label stays everywhere else in the manager, where a
-                        switch has no pill beside it.)
-                      -->
+                      <!-- No "On"/"Off" text IN THE ROW: the track carries the state, `aria-label`
+                        names it, and the Disabled pill says it in words. -->
                       <span class="manager-recipe-status">
                         <StatusToggle
                           on={recipe.enabled !== false}
@@ -859,11 +807,8 @@
                         />
                       </span>
 
-                      <!--
-                        The row's single Edit affordance (issue 643). Duplicate and Delete stay
-                        inspector-only — three ghost icons on every row turned it into a toolbar and
-                        truncated the description.
-                      -->
+                      <!-- The row's single Edit affordance (issue 643); Duplicate and Delete stay
+                        inspector-only, or the row reads as a toolbar. -->
                       <IconButton
                         class="manager-recipe-edit"
                         data-recipe-edit={recipe.id}
@@ -879,22 +824,14 @@
                       </IconButton>
 
                       <!--
-                        The bulk selection box (issue 1010), AFTER the Edit pencil and INSIDE this
-                        cluster as its last cell — not a row-level sibling, or the
-                        `--fab-recipe-col-select` track appended to `--fab-recipe-cluster-cols`
-                        would have nothing to place. Trailing placement is also what lets that
-                        track be APPENDED: the column header's four explicit `grid-column`
-                        placements survive an append and would every one of them break on a
-                        prepend.
-
-                        `SelectionCheckbox` renders NO `<button>`, which is load-bearing here: the
-                        Foundry smoke walk reaches Edit through `[data-recipe-edit]` and the row
-                        through `.manager-recipe-identity`, and a selection control answering to a
-                        looser row-button selector would start intercepting those clicks.
-
-                        This cluster is a `<div>`, so the primitive renders its own `<label>`
-                        (`wrapper="label"`); without it the visible box would have no label
-                        association and no click target.
+                        The bulk selection box (issue 1010), INSIDE this cluster as its last cell:
+                        a row-level sibling would leave the appended select track nothing to place,
+                        and trailing placement is what lets it be APPENDED at all, since the column
+                        header's four explicit `grid-column` placements would break on a prepend.
+                        `SelectionCheckbox` renders NO `<button>`, which is load-bearing: a
+                        selection control answering to a looser row-button selector would intercept
+                        the smoke walk's Edit and row clicks. The cluster is a `<div>`, so the
+                        primitive renders its own `<label>` for the association and click target.
                       -->
                       <SelectionCheckbox
                         size="lg"
