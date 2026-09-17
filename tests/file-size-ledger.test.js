@@ -261,6 +261,11 @@ test('the ledger reports the two figures epic 1656 tracks', (t) => {
   // `interactableRegionFlags.js::buildInteractableBehaviorSchema`, `main.js::Hooks.once>on`,
   // `migrateRecipeForModeChange` and `remapWorldScopeIdentityFlags.js` -- on top of the figure
   // main carries.
-  assert.equal(files, 122, 'oversized files');
+  //
+  // 117/120 here: on top of everything main now carries, the scoped-pages sweep takes five more
+  // `.svelte` files under the threshold on comment lines alone. Regenerated from the merged tree
+  // rather than reconciled by hand -- these counts are derived, so picking a side of the conflict
+  // would have pinned a figure no tree actually has.
+  assert.equal(files, 117, 'oversized files');
   assert.equal(keys.length - files, 120, 'oversized functions');
 });

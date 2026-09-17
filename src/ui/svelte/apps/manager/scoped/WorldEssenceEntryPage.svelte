@@ -1,56 +1,15 @@
 <!-- Svelte 5 runes mode -->
 <!--
   The world ESSENCE ENTRY editor (issue 1372, epic 1357): one essence's shared identity, its two
-  world defaults, and the crafting systems that hold it.
-
-  ── ONLY TWO FIELDS TAKE A WORLD DEFAULT ──────────────────────────────────────────────────────
-  `effectSource` and `macro`, which are exactly `ESSENCE_SECTIONS`. Everything else Fabricate
-  carries for an essence — its per-system `enabled` flag above all — stays on the in-system record
-  and takes none, so this screen draws no control for it. A switch over a field the resolver does
-  not read through writes a key `normalizeMembership` discards on the next `load()`.
-
-  ── THE PICKER IS THE ENFORCEMENT POINT, AND IT IS A DROP TARGET ──────────────────────────────
-  `updateWorldDefaultSection` writes the section value OPAQUELY by design and the normalizer
-  coerces SHAPE rather than addressability, so neither can refuse a system-local component id.
-  `### Essence scope` requirement 5 binds a world default's `effectSource` to a WORLD-ADDRESSABLE
-  referent, and the only place that can be met is where the value is CHOSEN.
-
-  This shipped as a free-text `Item.abc123` box, which cannot meet that obligation: a GM types
-  whatever they like and the screen's only defence is a predicate run after the fact. The control
-  is the shared `ItemDropZone` now, so a value can only ever arrive from a real Foundry document
-  drag — which carries a `uuid` (world sidebar) or a `{pack, id}` pair (compendium), both of which
-  ARE world-addressable by construction. `acceptable()` still runs on the resolved uuid and still
-  refuses in words, because a refusal a GM can read is what turns the rule into a control rather
-  than a value that silently vanished.
-
-  A KNOWN LIMIT, RECORDED RATHER THAN WORKED AROUND: `essenceScopeProps` carries the ESSENCE
-  corpus alone, so this screen cannot ENUMERATE the world component catalogue and therefore cannot
-  offer its ids as options. What it accepts is what it can address without that corpus — a dragged
-  document — and it validates through the same predicate the offer filter uses. The rule is one
-  function (`worldAddressableEffectSources`), unit-tested against a world component roster.
-
-  ── TWO TABS, THROUGH THE SHARED `EditorTabs` ────────────────────────────────────────────────
-  Definition and Validation. `EssenceEditorTabs` is the pre-promotion hand-rolled strip and is NOT
-  converted here: converting a shipped site changes its rendered ids, which
-  `ui-integration/spec.md` calls a defect. A NEW editor uses the promoted primitive directly.
-
-  ── NO PAGE TITLE ────────────────────────────────────────────────────────────────────────────
-  The shell's header renders the `<h1>` and the three-crumb trail; a second title here is the
-  duplication `ScopedPlaceholderPage` records against the first frame of a world page.
-
-  Declared props are EXACTLY the bundle keys this page reads plus the static attributes the call
-  site passes. See `CraftingSystemManagerRoot.svelte`: a name declared here that the site does not
-  pass falls through to the spread and subscribes its readers to the whole bundle.
-
-  Props:
-   - scope / actions: from `essenceScopeProps`. The `systems` roster is deliberately NOT declared:
-     the membership rows come from `entry.systems`, which is the projection's JOIN and the only
-     source that can answer `member`, `inherited` and `enabled`, so declaring the narrowed
-     `{id, name}` roster beside it would offer a second answer to one question.
-   - entityId: which essence this entry is open on.
-   - onBackToCatalogue(): the middle breadcrumb's target, also offered as a control here.
-   - onDraftChange() / onDirtyChange(): the buffered edit's two wires to the shell; see the
-     BUFFERED EDIT block below and the props' own note.
+  world defaults, and the crafting systems that hold it. ONLY TWO FIELDS TAKE A WORLD DEFAULT —
+  `effectSource` and `macro`, exactly `ESSENCE_SECTIONS`. THE PICKER IS THE ENFORCEMENT POINT
+  for `### Essence scope` requirement 5, because the store writes the section opaquely and the
+  normalizer coerces shape rather than addressability; it is the shared `ItemDropZone`, so a
+  value can only arrive from a real document drag. A KNOWN LIMIT: this screen cannot ENUMERATE
+  the world component catalogue, so it cannot offer its ids as options.
+  Declared props are EXACTLY the bundle keys this page reads — one it does not pass falls
+  through to the spread and subscribes its readers to the whole bundle — and the `systems`
+  roster is deliberately absent, because the rows come from `entry.systems`, the JOIN.
 -->
 <script>
   import { localize, notifyError } from '../../../util/foundryBridge.js';
@@ -96,32 +55,11 @@
     actions = null,
     entityId = '',
     onBackToCatalogue = () => {},
-    // THE BUFFERED EDIT'S THREE WIRES TO THE SHELL (issue 1372).
-    //
-    // The header pair and the route-exit cascade are both the shell's — `.manager-header` is a
-    // SIBLING of `.manager-main`, so this page structurally cannot render into it — so the shell
-    // needs a way to flush this editor and a way to ask whether there is anything to flush.
-    //
-    //  - onDraftChange(handle|null): a LIVE handle, `{isDirty, save, discard}`, reported once on
-    //    mount and withdrawn on unmount. Live rather than a snapshot for the reason the handle's
-    //    own comment gives: the guard reads it at click time and a snapshot published by an
-    //    effect can be one turn behind.
-    //  - onDirtyChange(dirty): the reactive half, for the header button's disabled state.
-    //  - onDraftIdentityChange(identity|null): the other reactive half, for the shell chrome
-    //    that NAMES the essence — the breadcrumb's last crumb, the heading, and the medallion
-    //    beside it. All three showed the persisted record while the name field and the player
-    //    preview showed the buffered one, so one screen described one essence two ways.
-    //    The WHOLE buffered identity map goes over, not the name alone: the shell reads
-    //    whichever of those fields its chrome renders, and the three entry editors buffer
-    //    different field sets — so a fixed payload here would restate a shape `shape` owns.
-    //    WITHDRAWN BY THIS PAGE on unmount rather than by the shell's `onDraftChange(null)`,
-    //    because the shell's reader is generic across all three entry routes and must not need
-    //    a per-entity teardown to stay correct.
-    //
-    // There is deliberately NO `reseedNonce` prop, which is how `SystemEditView` spells discard:
-    // the handle carries `discard()` directly, and a nonce the call site did not pass would fall
-    // through to the bundle spread and subscribe every one of its readers to the whole world
-    // corpus — the hazard this file's header records.
+    // THE BUFFERED EDIT'S THREE WIRES TO THE SHELL (issue 1372), which owns the header pair and
+    // the route-exit cascade because `.manager-header` is a SIBLING of `.manager-main`.
+    // `onDraftChange` reports a LIVE handle, read at click time where a snapshot can be a turn
+    // behind; `onDirtyChange` and `onDraftIdentityChange` are the reactive halves, the second
+    // carrying the WHOLE buffered identity map. There is deliberately no `reseedNonce`.
     onDraftChange = () => {},
     onDirtyChange = () => {},
     onDraftIdentityChange = () => {},
@@ -136,15 +74,7 @@
 
   /**
    * PER-SECTION PRESENTATION, in ONE table rather than a chain of `section === 'macro'` tests.
-   *
-   * The prototype draws the two world defaults as two cards that differ in five ways at once —
-   * glyph, accepted document type, explanatory sentence, empty prompt and the "set" pill word —
-   * and a screen that answered those five with five separate ternaries would have five places to
-   * keep in step when a third section appears.
-   *
-   * The SECTION LABEL is deliberately NOT in here: it comes from `scopedSectionLabel`, the one
-   * list every scoped screen reads, so this screen structurally cannot name a section differently
-   * from the five sites that already render it.
+   * The SECTION LABEL is deliberately not here — it comes from `scopedSectionLabel`.
    */
   const SECTION_UI = Object.freeze({
     effectSource: Object.freeze({
@@ -185,16 +115,8 @@
   }
 
   /**
-   * THE IDENTITY FIELDS THIS EDITOR BUFFERS, which are exactly the four an essence lifts to
-   * world scope.
-   *
-   * Stated here rather than imported because this file's dependency graph is copied module by
-   * module into three hand-rolled mounted trees, and `worldScopeEntityGrouping.js` is not in all
-   * of them — an omission there HANGS a suite rather than failing it. It is a MIRROR, so it is
-   * guarded: `essence-world-scope-screens.test.js` asserts this list equals
-   * `WORLD_IDENTITY_FIELDS.essences`, and reds if either side gains or loses a field.
-   *
-   * @type {readonly string[]}
+   * THE IDENTITY FIELDS THIS EDITOR BUFFERS, stated rather than imported because this file's
+   * graph is copied into three mounted trees. A MIRROR, pinned by a source test.
    */
   const IDENTITY_FIELDS = Object.freeze(['name', 'icon', 'colorToken', 'description']);
 
@@ -211,38 +133,16 @@
   const sections = $derived(Array.isArray(scope?.sections) ? scope.sections : []);
 
   /**
-   * THE EDIT IS BUFFERED, AND SAVE IS WHAT WRITES IT (issue 1372, maintainer parity round 4).
-   *
-   * This screen persisted every keystroke and every drop on change, so it had no Save action at
-   * all — while the prototype heads it with one (`essEntry.png`) and `design-system/spec.md`'s
-   * EDITOR recipe orders "the action pair with back before save". The mechanism is
-   * `scopedEntryDraft.js`, shared with the tool entry editor rather than written twice: a draft
-   * is a SHAPE, and the same shape reached by two implementations is how a persisted record and
-   * its editors drift apart.
-   *
-   * MEMBERSHIP AND DELETE ARE NOT BUFFERED, and `scopedEntryDraft.js` records why: each is an
-   * action on a different record with its own armed confirmation, and an armed `Remove` that
-   * removed nothing until a later button says the opposite of what arming an action says.
+   * THE EDIT IS BUFFERED, AND SAVE IS WHAT WRITES IT, through `scopedEntryDraft.js`. MEMBERSHIP
+   * AND DELETE ARE NOT: each acts on a different record with its own armed confirmation.
    */
   const shape = $derived({ identityFields: IDENTITY_FIELDS, sections });
   const persisted = $derived(scopedEntryBaseline(entry, shape));
 
   /**
-   * WHAT THIS EDITOR KNOWS IS ON DISK, which is the persisted projection EXCEPT immediately
-   * after its own Save.
-   *
-   * A world-scope write reaches this screen back through Foundry: the store writes the setting,
-   * the replicated `updateSetting` hook reloads it, and only then does the admin store
-   * republish. So between a successful Save and the end of that round trip the projection still
-   * holds the OLD record — and a dirty flag measured against it alone would leave `Save` lit
-   * over an edit that had already landed, and have the route-exit guard offer to write it a
-   * second time.
-   *
-   * So a Save records what it wrote, and the next publish drops that record: whichever arrives
-   * first, the answer below is the state on disk. Nothing re-seeds the DRAFT from a publish,
-   * which is the race that would eat the keystroke a GM is in the middle of.
-   *
-   * @type {{identity: Record<string, unknown>, defaults: Record<string, unknown>}|null}
+   * WHAT THIS EDITOR KNOWS IS ON DISK — the projection EXCEPT immediately after its own Save, so
+   * a Save records what it wrote and the next publish drops that record. Nothing re-seeds the
+   * DRAFT from a publish, which is the race that eats a keystroke.
    */
   let flushed = $state(null);
   const baseline = $derived(flushed ?? persisted);
@@ -257,11 +157,9 @@
   let draft = $state(null);
   let seededEntityId = $state(undefined);
 
-  // Seed on IDENTITY change ONLY, never on every publish: the admin store republishes `viewState`
-  // twice on a refresh, and again on any unrelated world-corpus write, so a reference-triggered
-  // re-seed would overwrite whatever the GM had typed since. This is the same id gate
-  // `SystemEditView` states for the identity sub-form. Discard re-seeds through `discardDraft`
-  // rather than through this effect, so a second discard on the same essence still lands.
+  // Seed on IDENTITY change ONLY: the store republishes on any unrelated world write, so a
+  // reference-triggered re-seed would overwrite what the GM had typed. Discard re-seeds through
+  // `discardDraft` rather than this effect, so a second discard on the same essence still lands.
   $effect(() => {
     const currentId = entry?.id ?? '';
     if (currentId === seededEntityId) return;
@@ -280,20 +178,9 @@
   const dirty = $derived(scopedEntryDirty(draft, baseline));
 
   /**
-   * The sentence a REFUSED save puts in front of the GM (issue 1371 r20-entry3; Foundry review
-   * round 6 finding 4).
-   *
-   * This screen stages a MULTI-SECTION sequence, so a rejection at write *k* leaves `1..k-1`
-   * landed durably while the draft stays dirty — and the store publishes its cache before
-   * awaiting the write, so every open manager surface shows them as saved until a reload. Until
-   * r20 it passed no `onRefused` at all: the rejection was caught and the route-exit guard
-   * declined the exit, but the GM's only signal was Foundry's own raw `error.message`, which
-   * cannot say which step stopped or which had already landed. The sentence itself is composed by
-   * `reportRefusedScopedEntrySave`, shared with the component and tool entries so the three cannot
-   * drift on what a step of a Save is called.
-   *
-   * @param {{step: string, error: unknown, landed: string[]}} refusal
-   * @returns {void}
+   * The sentence a REFUSED save puts in front of the GM. This screen stages a MULTI-SECTION
+   * sequence, so a rejection at write *k* leaves `1..k-1` landed durably while the store's cache
+   * already shows them saved. Composed by the shared `reportRefusedScopedEntrySave`.
    */
   function reportRefusedSave(refusal) {
     reportRefusedScopedEntrySave({
@@ -305,13 +192,7 @@
     });
   }
 
-  /**
-   * Flush the buffered edit. Answers `false` when a write refused, which is what the route-exit
-   * guard gates navigation on: a Save that did not land must leave the GM here with the edit
-   * still in front of them.
-   *
-   * @returns {Promise<boolean>}
-   */
+  /** Flush the buffered edit; `false` for a refusal, which is what the route-exit guard reads. */
   async function saveDraft() {
     const pending = draft;
     if (!pending) return true;
@@ -333,17 +214,8 @@
   }
 
   /**
-   * THE SHELL HANDLE, and it is a LIVE ACCESSOR rather than a reported snapshot.
-   *
-   * The shell renders the header pair and owns the route-exit cascade, so it has to be able to
-   * ask "is there anything unsaved" at the moment a GM clicks something. A snapshot cannot
-   * answer that: it is published by an effect, effects flush asynchronously, and the one path
-   * that changes the answer and navigates in the same turn — Delete, which clears the draft and
-   * then returns to the catalogue — would be read at its previous value and prompt to save an
-   * essence that no longer exists.
-   *
-   * `isDirty()` reads the same `$derived` the header button is disabled from, so the guard and
-   * the button cannot disagree about one click.
+   * THE SHELL HANDLE, a LIVE ACCESSOR rather than a reported snapshot: Delete clears the draft
+   * and navigates in one turn, and a snapshot would prompt to save an essence that is gone.
    */
   const draftHandle = {
     isDirty: () => dirty,
@@ -361,65 +233,30 @@
     onDirtyChange(dirty);
   });
 
-  // THE CHROME ABOVE THIS PAGE FOLLOWS THE DRAFT (issue 1372, maintainer parity rounds 5 and 6).
-  //
-  // The heading named the PERSISTED essence while the name field and the player preview both
-  // showed the buffered one, so a GM mid-rename read `Aetherlight` in two places and `Aether` in
-  // a third on one screen. The BREADCRUMB's last crumb and the 44px MEDALLION beside the heading
-  // had the same split, and for the same reason: they resolve out of the published corpus, and
-  // the published corpus is not what the GM is editing. Name, icon and colour are all buffered
-  // identity fields here — one `IDENTITY_FIELDS` list, one `patchIdentity` — so all three follow
-  // the draft together. What signals the unsaved state is the enabled `Save essence`, which is
-  // that control's whole job; the chrome is not a second, quieter version of it.
-  //
-  // REPORTED, not read off the handle: the handle is deliberately a live accessor that never
-  // re-renders, and chrome has to. It is `identity` rather than `draft?.identity` so an unseeded
-  // editor reports the persisted values instead of blanking the header for a frame.
-  //
-  // A NEW OBJECT every time, never `identity` itself. The shell holds what it is given in its
-  // own `$state`, and Svelte 5 does not proxy a value that crossed a prop boundary — so handing
-  // over a reference and mutating it later would render nothing. `withScopedEntryIdentity`
-  // already reassigns rather than mutates; this spread means the shell does not have to rely on
-  // that staying true.
-  //
-  // The SUBTITLE stays on the projection, and that is not an oversight: it counts the systems
-  // using this essence, and a count of systems does not change until the write lands.
+  // THE CHROME ABOVE THIS PAGE FOLLOWS THE DRAFT (issue 1372): the heading, the last crumb and the
+  // medallion resolve out of the published corpus, which is not what the GM is editing. REPORTED
+  // rather than read off the handle, which never re-renders, and a NEW OBJECT every time, since
+  // Svelte 5 does not proxy a value that crossed a prop boundary.
   $effect(() => {
     onDraftIdentityChange({ ...identity });
   });
 
-  // WITHDRAWN ON UNMOUNT, from an effect with no dependencies so it runs once and tears down
-  // once. It is separate from the report above because that one re-runs on every keystroke and
-  // a teardown attached to it would publish `null` before each republish. The shell's reader is
-  // shared by all three entry routes, so a stale identity left behind here would name THIS
-  // essence in another route's breadcrumb.
+  // WITHDRAWN ON UNMOUNT, from an effect with no dependencies: attached to the report above it
+  // would publish `null` before each republish, and the shell's reader is shared by all three
+  // entry routes, so a stale identity would name THIS essence in another route's breadcrumb.
   $effect(() => () => onDraftIdentityChange(null));
 
   const normalizedIcon = $derived(normalizeEssenceIcon(identity.icon || DEFAULT_ESSENCE_ICON));
 
   /**
-   * The colour token's display name and the value this theme resolves it to.
-   *
-   * An UNSET colour renders NOTHING rather than the word "None": the medallion beside it already
-   * shows the theme-accent fallback, and a caption reading `None` under a tinted tile states the
-   * opposite of what the tile shows. See `essenceColourCaption` for why the hex is read rather
-   * than written.
+   * The colour token's display name and the value this theme resolves it to. An UNSET colour
+   * renders NOTHING rather than "None", which would contradict the tinted tile beside it.
    */
   const colourCaption = $derived(essenceColourCaption(identity.colorToken));
 
   /**
-   * The world-default card HEADINGS, in the prototype's words.
-   *
-   * `scopedSectionLabel` answers the SHORT name a section is referred to by across five screens —
-   * `Effect source`, `Property macro` — and that is right for an inherit row or a filter chip. A
-   * card heading on the screen that AUTHORS the default is a different job, and the prototype
-   * writes it as the whole phrase: `Active effect source` and `Macro on craft` (`essEntry.png`).
-   * The short name would leave the two cards named after fields rather than after what they do.
-   *
-   * An early-return chain, not a nested ternary: SonarCloud reports S3358 in a file it indexes.
-   *
-   * @param {string} section
-   * @returns {string}
+   * The world-default card HEADINGS, in the prototype's words: `scopedSectionLabel`'s SHORT name
+   * is right for an inherit row, and a card that AUTHORS the default is named for what it does.
    */
   function sectionHeading(section) {
     if (section === 'effectSource') {
@@ -436,14 +273,9 @@
   const systemRows = $derived(Array.isArray(entry?.systems) ? entry.systems : []);
   const memberCount = $derived(Number(entry?.membershipCount) || 0);
 
-  // VALIDATION AND THE PREVIEW READ THE DRAFT, not the record on disk. Both answer "what would
-  // this essence be", and on a buffered-edit screen the answer a GM needs is about the state Save
-  // would produce — a Validation tab reporting the persisted state would go on saying a default
-  // is missing while the GM was looking at the one they had just dropped in.
-  //
-  // The inherit LINES below still read `entry`, and that is the opposite case for the same
-  // reason: how many systems inherit a section is a fact about the persisted membership records,
-  // which this editor does not touch at all.
+  // VALIDATION AND THE PREVIEW READ THE DRAFT: on a buffered-edit screen the answer a GM needs is
+  // about the state Save would produce. The inherit LINES below still read `entry`, for the same
+  // reason inverted: how many systems inherit a section is a fact about persisted records.
   const validationContext = $derived({
     scope: 'world',
     memberSystemCount: memberCount,
@@ -520,33 +352,10 @@
   const deleteToken = $derived(`world-essence-delete:${entityId}`);
 
   /**
-   * The Validation tab's badge. An early-return chain rather than a nested ternary, which
-   * SonarCloud reports as S3358.
-   *
-   * THE CLEAN STATE IS A TICK, NOT AN ABSENCE (issue 1372). The prototype's tab strip reads
-   * `Validation ✓` (`essEntry.png`) and this returned `''` for it, so the one state a
-   * finished essence is normally in was the one state the strip said nothing about — a GM
-   * could not tell "everything passes" from "the checks have not been considered". The badge
-   * is honest because `essenceValidationPresentation` already resolves all three outcomes:
-   * `counts.blocking` and `counts.warnings` are the other two branches here, and their being
-   * zero IS the pass, which is the same fact `worstStatus` returns as `pass` for the summary
-   * row on the tab's own panel. Nothing is invented to render it.
-   *
-   * ── THE PASS MARK IS THE SAME VEHICLE WITH A DIFFERENT LABEL (issue 1372, round 8) ─────────
-   * It is a tick rather than the word, because the other two branches are counts and a chip that
-   * reads `0` states the opposite of what it means. It is a LABEL rather than a glyph, and that
-   * is what the reference does: its tab badge is one pill in two states,
-   * `badge: iss.block.length ? String(iss.block.length) : '✓'` (`proto:6221`-`6223`), drawn
-   * in the danger tone when blocking and the recessive one when clear. So there is no fourth
-   * mark vehicle here and no caller-supplied icon: the issue chip already draws exactly this,
-   * and `EditorTabs`'s family stays closed with no route by which a call site can choose a shape.
-   *
-   * The tone is NEUTRAL rather than success for the same reason — the reference's clear badge is
-   * `surface-soft` over `border` in `text2`, not green (`proto:4566`). A green tick claims a
-   * result where the reference states an absence of findings.
-   *
-   * @param {{blocking: number, warnings: number}} current
-   * @returns {{label: string, tone: string, name?: string}}
+   * The Validation tab's badge; early returns rather than a nested ternary (S3358). THE CLEAN
+   * STATE IS A TICK, NOT AN ABSENCE: returning `''` left the state a finished essence is normally
+   * in as the one the strip said nothing about. A LABEL rather than a glyph, as the reference
+   * draws it, and NEUTRAL, because a green tick claims a result where it states an absence.
    */
   function validationBadge(current) {
     if (current.blocking > 0) return { label: String(current.blocking), tone: 'danger' };
@@ -558,12 +367,7 @@
     };
   }
 
-  /**
-   * The summary row's status word, by the WORST outcome present.
-   *
-   * @param {{blocking: number, warnings: number}} current
-   * @returns {string}
-   */
+  /** The summary row's status word, by the WORST outcome present. */
   function worstStatus(current) {
     if (current.blocking > 0) return 'block';
     return current.warnings > 0 ? 'warn' : 'pass';
@@ -575,22 +379,10 @@
   }
 
   /**
-   * The display name of one section's stored world default, `''` when it is unset.
-   *
-   * `effectSource` GOES THROUGH ITS OWN READER, because it is the one section stored as a BLOCK
-   * rather than as a scalar (`{sourceComponentId?, sourceItemUuid?, associatedSystemItemId?}`).
-   * `essenceSectionValueName` reads a value as a string or as `{id, name}`, so handed the block it
-   * found neither and answered `''` - and this card then wore its `No default` pill and its
-   * `Drop the item…` prompt over a default that WAS authored and that every inheriting system was
-   * already resolving. That is the worst direction for this particular lie to point: it invites a
-   * GM to author a default over one they cannot see.
-   *
-   * It answers the REFERENT rather than a resolved name, because this page holds no component
-   * catalogue to resolve one against - the referent is a world component id or a document uuid,
-   * and it is the closest true thing this screen can say.
-   *
-   * @param {string} section
-   * @returns {string}
+   * One section's stored world default as a display name, `''` when unset. `effectSource` GOES
+   * THROUGH ITS OWN READER, being the one section stored as a BLOCK: the generic reader answered
+   * `''`, and the card then wore `No default` over a default every system was resolving. It
+   * answers the REFERENT, because this page holds no catalogue to resolve a name against.
    */
   function sectionValueName(section) {
     if (section === 'effectSource') return essenceEffectSourceReferent(defaults?.effectSource);
@@ -598,14 +390,8 @@
   }
 
   /**
-   * The raw stored referent for one section, for the card's uuid sub-line.
-   *
-   * A section value is opaque by design and may be a bare string or `{id, name}`, so the display
-   * NAME and the ADDRESS are two different reads. Printing only the name would hide which
-   * document a default actually points at, which is the one fact a GM needs to check a link.
-   *
-   * @param {string} section
-   * @returns {string}
+   * The raw stored referent for one section, for the card's uuid sub-line: a section value is
+   * opaque, so the display NAME and the ADDRESS are two different reads.
    */
   function sectionValueAddress(section) {
     if (section === 'effectSource') return essenceEffectSourceReferent(defaults?.effectSource);
@@ -615,16 +401,8 @@
   }
 
   /**
-   * The card's uuid SUB-LINE, or `''` when it would only restate the name above it.
-   *
-   * A section value is stored opaquely, so a bare uuid resolves to itself as its display name -
-   * and the card then printed `Macro.lab-aether-binding` twice, once in the serif title and once
-   * in the mono sub-line. The sub-line exists to say WHICH document a named default points at,
-   * so where there is no separate name there is nothing for it to add.
-   *
-   * @param {string} section
-   * @param {string} name the resolved display name, `''` when unset.
-   * @returns {string}
+   * The card's uuid SUB-LINE, or `''` where it would only restate the name above it: a bare uuid
+   * resolves to itself as its name, and the card printed it twice.
    */
   function sectionAddressLine(section, name) {
     if (!name) return '';
@@ -637,15 +415,8 @@
   }
 
   /**
-   * ONE SYSTEM ROW'S SUMMARY: what this essence resolves to in that system, in one line.
-   *
-   * The prototype's per-system row carries a summary beside the name, and without one the list
-   * is a stack of names with a switch — which says a system HAS the essence and nothing about
-   * what it does there. `row.inherited` is the resolver's own per-section map, so this sentence
-   * is read from the answer the resolver gives rather than recomputed beside it.
-   *
-   * @param {{member?: boolean, inherited?: object}} row
-   * @returns {string}
+   * ONE SYSTEM ROW'S SUMMARY: what this essence resolves to in that system. `row.inherited` is
+   * the resolver's own per-section map, so the sentence is read rather than recomputed beside it.
    */
   function systemSummary(row) {
     if (row?.member !== true) {
@@ -668,12 +439,7 @@
     );
   }
 
-  /**
-   * The row's meta word: the authored state, not a second copy of the switch.
-   *
-   * @param {object} row
-   * @returns {string}
-   */
+  /** The row's meta word: the authored state, not a second copy of the switch. */
   function systemMeta(row) {
     const state = essenceSystemState(row);
     if (state === 'enabled')
@@ -684,15 +450,8 @@
   }
 
   /**
-   * Whether a candidate value may be written as this section's world default.
-   *
-   * `effectSource` goes through the addressability predicate; `macro` requires a document UUID
-   * for the same reason and by the same test — a Macro is addressed by UUID everywhere else in
-   * this product, and a bare token names nothing outside the system that minted it.
-   *
-   * @param {string} section
-   * @param {string} value
-   * @returns {boolean}
+   * Whether a candidate may be written as this section's world default. `macro` requires a UUID
+   * for the same reason `effectSource` does: a bare token names nothing outside its own system.
    */
   function acceptable(section, value) {
     if (section === 'effectSource') return isWorldAddressableEffectSource(value, []);
@@ -700,16 +459,8 @@
   }
 
   /**
-   * A dropped document becomes this section's world default.
-   *
-   * `ItemDropZone` has already refused a payload of the wrong DOCUMENT TYPE and one that names no
-   * document at all, so what reaches here is a real reference. It still passes the addressability
-   * predicate, because that predicate — not the drop — is what `### Essence scope` requirement 5
-   * binds, and a refusal a GM can read is what makes it a control rather than a value that
-   * disappeared.
-   *
-   * @param {string} section
-   * @param {object} data the raw drag payload.
+   * A dropped document becomes this section's world default. It still runs the addressability
+   * predicate, because that predicate — not the drop — is what requirement 5 binds.
    */
   function dropSection(section, data) {
     const value = resolveDropUuid(data);
@@ -734,12 +485,7 @@
 
   /**
    * Stage one world-default section into the draft. REASSIGNED, never mutated: Svelte 5's
-   * `writable` does not proxy, so an in-place write renders nothing and a `$state`-only test
-   * passes over it — which is why `scopedEntryDraft.js` returns a new object rather than
-   * accepting one to edit.
-   *
-   * @param {string} section
-   * @param {unknown} value
+   * `writable` does not proxy, so an in-place write renders nothing and a test passes over it.
    */
   function setSection(section, value) {
     draft = withScopedEntryDefault(draft ?? persisted, section, value);
@@ -751,13 +497,8 @@
   }
 
   /**
-   * Delete the world essence, then leave.
-   *
-   * THE DRAFT IS DROPPED FIRST, and that is not tidying. The record this editor buffers an edit
-   * for no longer exists, so leaving with the draft still standing would have the route-exit
-   * guard offer to save it into a record `updateEntity` refuses — a prompt about work the GM has
-   * just deliberately destroyed. Clearing it synchronously is enough because the shell reads the
-   * handle rather than a reported snapshot.
+   * Delete the world essence, then leave. THE DRAFT IS DROPPED FIRST, or the exit guard would
+   * offer to save into a record `updateEntity` refuses.
    */
   async function deleteEssence() {
     const deleted = await actions?.deleteEntity?.(entityId);
@@ -788,14 +529,9 @@
     </EmptyState>
   {:else}
     <!--
-    ONE CHILD OF `<main>`, WITH ITS OWN TWO-ROW GRID.
-
-    `.manager-main` is `display: grid` with a single `minmax(0, 1fr)` row for a full-width world
-    route, so TWO children land in the same grid area and paint over each other: measured in the
-    View Lab, the identity fields's label sat under the shell's search box and the tab strip sat under them. `styles/fabricate.css` is closed to this lane by
-    `### GM World Scoped Entity Routes` requirement 7, so the row split belongs here — and it
-    belongs here anyway, because it is this page's composition rather than the route's.
-  -->
+      ONE CHILD OF `<main>`, WITH ITS OWN TWO-ROW GRID: the route gives a full-width world page a
+      single row, so TWO children land in the same area and paint over each other.
+    -->
     <div class="manager-scoped-entry-page">
       <EditorTabs
         {tabs}
@@ -820,27 +556,14 @@
       >
         {#if activeTab === 'definition'}
           <!--
-            TWO COLUMNS, AND THE RIGHT ONE IS THE PLAYER PREVIEW.
-
-            The prototype's essence entry is a form beside a ~310px rail headed `HOW PLAYERS SEE
-            IT`, carrying the two inventory tiles, then `EFFECTIVE BEHAVIOUR` and the live-update
-            note (`essEntry.png`). Every one of those parts already existed here — they are what
-            `EssenceBehaviorPreview` renders — but the panel stacked the aside BELOW the danger
-            card at the foot of a single column, roughly 1,100px down. The GM typing a name could
-            not see the thing the panel exists to show them changing.
-
-            The main column keeps the flex stack it had, so nothing inside it moves.
+            TWO COLUMNS, AND THE RIGHT ONE IS THE PLAYER PREVIEW (`essEntry.png`): the panel used
+            to stack the aside below the danger card, where the GM could not see it change.
           -->
           <div class="manager-scoped-entry-body">
             <div class="manager-scoped-entry-main">
-              <!--
-            THE SCOPE BANNER. Everything under it is one record shared by every crafting system,
-            and this screen is reached from a system-scoped rail — so without it a GM has no
-            standing signal that the name they are editing changes in six places at once. The
-            prototype draws it at the top of the tab body for exactly that reason, and it is a
-            heading rather than a `Callout` because it introduces a region rather than warning
-            about one.
-          -->
+              <!-- THE SCOPE BANNER: everything under it is one record shared by every crafting
+            system, reached from a system-scoped rail. A heading rather than a `Callout`, because
+            it introduces a region rather than warning about one. -->
               <div class="manager-scoped-entry-kicker is-world" data-scoped-entry-world-banner>
                 <span class="manager-scoped-entry-kicker-glyph" aria-hidden="true">
                   <i class="fas fa-globe"></i>
@@ -856,28 +579,12 @@
 
               <!--
             THE IDENTITY CARD, at the prototype's proportions: a FIXED narrow icon column and one
-            fluid field column beside it.
-
-            This shipped as a wrapping flex row of four equal-basis fields, which put Name on a
-            ~12rem basis beside the tile and left the rest of the row empty — the dead space the
-            maintainer rejected. A two-column grid is what the prototype specifies and is also the
-            only shape that keeps Name, Description and the colour palette on ONE measure, so a
-            long name and a long description align rather than stepping around the tile.
+            fluid field column, the only shape that keeps Name, Description and palette on ONE measure.
           -->
               <section class="manager-scoped-entry-identity" data-scoped-entry-identity={entry.id}>
                 <!--
-              THE SAME THREE CONTROLS THE SYSTEM-SCOPE IDENTITY TAB USES, and for the reason the
-              shells were built on: a GM authors one essence's identity, and it must not be a
-              searchable picker in one scope and a text box in the other.
-
-              This shipped as `<input type="text">` for both, which asked a GM to type a
-              FontAwesome class (`fas fa-atom`) and a palette token (`lavender`) from memory,
-              with no validation and no way to discover either. `getEssenceIconOptions` and
-              `ESSENCE_COLOR_TOKENS` were already shipped and already unused.
-
-              The tile is SQUARE where the prototype's is 150x104, because a square essence tile
-              is the maintainer's own round-3 ruling on `EssenceIdentityTab` (issue 1036) and one
-              essence identity must not read as two different shapes across the two scopes.
+              THE SAME THREE CONTROLS THE SYSTEM-SCOPE IDENTITY TAB USES: one essence's identity
+              must not be a picker in one scope and a text box in the other. The tile is SQUARE.
             -->
                 <div class="manager-scoped-entry-identity-tile">
                   <span class="manager-scoped-entry-label"
@@ -895,16 +602,8 @@
                     onChange={(iconClass) => patchIdentity('icon', iconClass)}
                   />
                   <!--
-                THE COLOUR CAPTION, under the icon picker exactly where the prototype puts it
-                (`essEntry.png`). The swatch row further down is a CHOOSER — it says which colour
-                is selected only by a ring — and this says which one in words, beside the tile the
-                colour is actually tinting.
-
-                THE HEX IS READ FROM THE CASCADE, NEVER WRITTEN. `src/ui/**` may carry no raw
-                colour literal at all, and a literal would be wrong the moment a GM switched
-                theme, since every `--fab-tag-*` token is re-declared in each of the seven theme
-                blocks. So `essenceColourCaption` resolves it from the live cascade, which makes
-                it the truthful answer for whichever theme is active.
+                THE COLOUR CAPTION, where the prototype puts it: the swatch row is a CHOOSER and
+                says which colour is selected only by a ring. THE HEX IS READ FROM THE CASCADE.
               -->
                   {#if colourCaption}
                     <span class="manager-scoped-entry-colour-caption" data-scoped-entry-colour-name>
@@ -956,11 +655,9 @@
                     <span class="manager-scoped-entry-label"
                       >{text('FABRICATE.Admin.Manager.Scoped.Essence.FieldColour', 'Colour')}</span
                     >
-                    <!--
-                  `ManagerColorPopover` takes `layout="inline"` here exactly as
+                    <!-- `ManagerColorPopover` takes `layout="inline"` here exactly as
                   `EssenceIdentityTab` does: the popover chrome is applied by the global sheet,
-                  which this lane may not open, and inline strips it and nothing else.
-                -->
+                  which this lane may not open, and inline strips it and nothing else. -->
                     <ManagerColorPopover
                       layout="inline"
                       allowNone
@@ -1029,11 +726,9 @@
                       {text(ui?.blurbKey ?? '', ui?.blurb ?? '')}
                     </p>
 
-                    <!--
-                  THE CONTROL IS THE SHARED DROP ZONE, not a uuid text box. `documentType` comes
-                  from the section table, so the effect source refuses a Macro drag and the macro
-                  refuses an Item drag before either reaches `dropSection`.
-                -->
+                    <!-- THE CONTROL IS THE SHARED DROP ZONE, not a uuid text box. `documentType`
+                  comes from the section table, so each section refuses the other's drag before it
+                  reaches `dropSection`. -->
                     <div
                       class="manager-scoped-entry-default-slot"
                       data-scoped-world-default-value={section}
@@ -1084,15 +779,10 @@
                 <span class="manager-scoped-entry-kicker-rule" aria-hidden="true"></span>
               </div>
 
-              <!-- THE MEMBERSHIP LIST. Rows come from `entry.systems` — the projection's JOIN — and
-               never from the `systems` prop, which is a narrowed `{id, name}` roster and cannot
-               answer `member`, `inherited` or `enabled`.
-
-               Each row carries the prototype's three cells rather than a bare name: a fixed
-               NAME column with the authored state under it, a fluid SUMMARY of what the essence
-               resolves to in that system, and the shipped action cluster. A stack of names and
-               switches says a system HAS the essence and nothing about what it does there, which
-               is the whole subject of this screen. -->
+              <!-- THE MEMBERSHIP LIST. Rows come from `entry.systems` — the projection's JOIN —
+               and never from a narrowed `{id, name}` roster, which cannot answer `member`. Each
+               row carries the prototype's three cells rather than a bare name, because a stack of
+               names and switches says nothing about what the essence does in that system. -->
               <section class="manager-scoped-entry-systems" data-scoped-entry-systems>
                 <header class="manager-scoped-entry-systems-head">
                   <span class="manager-scoped-entry-default-glyph" aria-hidden="true">
@@ -1187,14 +877,10 @@
               </section>
             </div>
 
-            <!-- THE LIVE NOTE IS ON (`proto:3537`). `EssenceBehaviorPreview` already renders the
-               footer strip — glyph plus "This preview updates live as you edit." — and the
-               prototype's essence-definition editor draws it at the foot of exactly this
-               panel, as every one of its six editors does (`proto:6138`, `6155`, `6209`).
-               It shipped suppressed here, which left the one panel on the page that DOES
-               recompute on every keystroke saying nothing about it; the browser inspector,
-               which is the site that legitimately suppresses it, is a read-only rail with
-               nothing to type into. -->
+            <!-- THE LIVE NOTE IS ON (`proto:3537`), as it is at the foot of every one of the
+               reference's six editors. Suppressed here, the one panel that DOES recompute on
+               every keystroke said nothing about it; the browser inspector, which legitimately
+               suppresses it, is read-only. -->
             <section class="manager-scoped-entry-preview" data-scoped-entry-preview>
               <!-- The two NAMES are shortened for display: a value stored as a document uuid would
                  otherwise render as `Runs Macro.lab-aether-binding` in the behaviour list, where
@@ -1247,14 +933,10 @@
 </main>
 
 <style>
-  /* STATIC class names, so `lint:svelte:warnings` stays at zero and `styles/fabricate.css` —
-     closed to this lane by `### GM World Scoped Entity Routes` requirement 7 — is not reopened.
-
-     Every colour is a `--fab-*` token DECLARED at `:root` or in the seven theme blocks, and that
-     is the whole check: a custom property that is not declared there is invalid at computed-value
-     time and falls back to inheritance silently rather than failing, so an invented name costs a
-     wrong colour and no error. `--fab-text-subtle` and `--fab-text-secondary`, both read below,
-     are declared. */
+  /* STATIC class names, so `lint:svelte:warnings` stays at zero and the host sheet — closed to
+     this lane by requirement 7 — is not reopened. Every colour is a `--fab-*` token declared at
+     `:root` or in the theme blocks: an undeclared custom property is invalid at computed-value
+     time and falls back to inheritance silently, so an invented name costs a colour and no error. */
   .manager-scoped-entry-page {
     display: grid;
     grid-template-rows: auto minmax(0, 1fr);
@@ -1279,18 +961,9 @@
     overflow: auto;
   }
 
-  /* EVERY REGION THE PANEL STACKS IS `flex: 0 0 auto`, and this is load-bearing rather than tidy.
-
-     The panel is a column flex container inside a `minmax(0, 1fr)` grid row, so its content
-     overflows on a 900px window — and a flex item's default `flex-shrink: 1` then compresses
-     each child toward zero. Measured in the View Lab: the per-system card, which carries
-     `overflow: hidden`, collapsed to NOTHING between its own section kicker and the preview
-     below it, so the whole membership list was simply not on the screen while every selector
-     that names it still matched. The prototype writes `flex:0 0 auto` on each child of the tab
-     body for exactly this reason.
-
-     Enumerated by class rather than written as `> *`, because a universal child selector would
-     have to be `:global` to survive scoping and this component owns every one of these six. */
+  /* EVERY REGION THE PANEL STACKS IS `flex: 0 0 auto`, and this is load-bearing: content
+     overflows a 900px window and a default `flex-shrink: 1` compresses each child toward zero —
+     measured, the per-system card collapsed to NOTHING while every selector still matched. */
   .manager-scoped-entry-body,
   .manager-scoped-entry-kicker,
   .manager-scoped-entry-identity,
@@ -1452,16 +1125,10 @@
     font-weight: 600;
   }
 
-  /* ONE CARD PER ROW, FULL WIDTH.
-
-     The prototype stacks `Active effect source` and `Macro on craft` as two full-width cards
-     (`essEntry.png`); this shipped as `auto-fit, minmax(22rem, 1fr)`, which put them side by side
-     at any width over about 45rem and halved the measure each card's drop target, uuid line and
-     inherit sentence had. Beside a 310px preview rail that is a ~330px card holding a full item
-     uuid.
-
-     `minmax(0, 1fr)` rather than removing the grid, because the gap and the overflow floor are
-     still this container's. */
+  /* ONE CARD PER ROW, FULL WIDTH (`essEntry.png`). An `auto-fit, minmax(22rem, 1fr)` grid put the
+     two side by side over about 45rem and halved the measure each card's drop target, uuid line
+     and inherit sentence had. `minmax(0, 1fr)` rather than removing the grid, because the gap and
+     the overflow floor are still this container's. */
   .manager-scoped-entry-defaults {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
@@ -1580,13 +1247,10 @@
     min-width: 0;
   }
 
-  /*
-     THREE CELLS ON ONE LINE: a fixed name column, a fluid summary, and the action cluster.
-
-     An earlier revision stacked name over actions, so each system cost roughly 68px and six of
-     them pushed the preview and everything below it off the screen. Wrapping is still allowed so
-     a long system name breaks rather than forcing the controls out of the panel.
-  */
+  /* THREE CELLS ON ONE LINE: a fixed name column, a fluid summary, and the action cluster. Stacked
+     name over actions, each system cost roughly 68px and six of them pushed the preview off the
+     screen. Wrapping is still allowed, so a long system name breaks rather than forcing the
+     controls out of the panel. */
   .manager-scoped-entry-system {
     display: flex;
     flex-wrap: wrap;
