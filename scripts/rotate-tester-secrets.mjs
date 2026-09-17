@@ -13,10 +13,11 @@
 import { execFile } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { access, readFile } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { argv, exit } from 'node:process';
 import { fileURLToPath } from 'node:url';
 
+import { resolveExecutable } from './lib/resolveExecutable.js';
 import { deriveS3Layout, resolveChannelConfig } from './release-s3.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -389,6 +390,9 @@ async function assertGhIsReady(runGh) {
   try {
     await runGh(['auth', 'status']);
   } catch (error) {
+    // Already a clear, complete message from `resolveGhBinary` — rewrapping it as "unauthenticated"
+    // would misdescribe an absent binary as a credential problem.
+    if (error.code === 'GH_UNRESOLVED') throw error;
     throw new Error(
       `\`gh\` is absent or unauthenticated (${error.message}). Install the GitHub CLI and run ` +
         '`gh auth login` with access to both repositories before rotating.',
@@ -397,11 +401,50 @@ async function assertGhIsReady(runGh) {
   }
 }
 
-/** The real `gh`, invoked without a shell so no argument is re-interpreted. */
-function ghRunner() {
+/**
+ * The absolute path of the `gh` binary to run, so `execFile` never resolves a bare command name
+ * through `PATH` at spawn time (SonarCloud `javascript:S4036`). `GH_BIN`, when set, overrides the
+ * `PATH` walk for a non-standard install, but must itself already be absolute: an override that
+ * still needed resolving would just relocate the same search.
+ * @param {NodeJS.ProcessEnv} env
+ * @returns {string}
+ * @throws {Error} With `.code === 'GH_UNRESOLVED'` when nothing usable can be resolved.
+ */
+export function resolveGhBinary(env = process.env) {
+  const override = named(env.GH_BIN);
+  if (override) {
+    if (isAbsolute(override)) return override;
+    throw Object.assign(
+      new Error(
+        `GH_BIN is set to "${override}", which is not an absolute path. Point it at the gh ` +
+          'binary directly, e.g. GH_BIN=/usr/local/bin/gh.'
+      ),
+      { code: 'GH_UNRESOLVED' }
+    );
+  }
+  const found = resolveExecutable('gh');
+  if (found) return found;
+  throw Object.assign(
+    new Error(
+      '`gh` could not be found in any absolute PATH directory. Install the GitHub CLI, or set ' +
+        'GH_BIN to its absolute path.'
+    ),
+    { code: 'GH_UNRESOLVED' }
+  );
+}
+
+/** The real `gh`, invoked without a shell so no argument is re-interpreted, at its resolved path. */
+function ghRunner(env = process.env) {
   return (args, { input } = {}) =>
     new Promise((resolvePromise, rejectPromise) => {
-      const child = execFile('gh', args, (error, stdout) =>
+      let bin;
+      try {
+        bin = resolveGhBinary(env);
+      } catch (error) {
+        rejectPromise(error);
+        return;
+      }
+      const child = execFile(bin, args, (error, stdout) =>
         error ? rejectPromise(error) : resolvePromise(stdout)
       );
       child.stdin.end(input ?? '');

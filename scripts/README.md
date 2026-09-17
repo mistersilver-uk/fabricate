@@ -51,6 +51,9 @@ Useful options:
 `--no-premium` is refused together with `--apply`.
 Without the premium config every secret looks single-repository, which suppresses both the collapse warning and the ambiguous-narrowing refusal exactly when they matter.
 
+`gh` is resolved to one absolute executable path before it is run, rather than left for `execFile` to search `PATH` at spawn time.
+Set `GH_BIN` to an absolute path when the GitHub CLI is not on `PATH` or a non-standard install must be used; a relative `GH_BIN` is refused.
+
 Rotation is a cohort migration, not hygiene.
 It deletes nothing and republishes nothing, so a superseded prefix keeps serving its last manifest and the cohort on it stops receiving updates silently rather than failing.
 Under `--apply` the script prints one feed URL per rotated group and module.

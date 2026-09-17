@@ -5,18 +5,20 @@
  */
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { mkdtemp, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import { executableExtensions } from '../scripts/lib/resolveExecutable.js';
 import { resolveChannelConfig } from '../scripts/release-s3.js';
 import {
   main,
   newSegment,
   parseArgs,
   planRotation,
+  resolveGhBinary,
   runRotation,
 } from '../scripts/rotate-tester-secrets.mjs';
 
@@ -366,6 +368,90 @@ test('--apply refuses before the first write when gh is absent or unauthenticate
     /absent or unauthenticated/
   );
   assert.deepEqual(calls, [['auth', 'status']], 'no secret may be written after a failed preflight');
+});
+
+// resolveGhBinary — the PATH-resolution seam (SonarCloud javascript:S4036)
+
+/** A fabricated PATH holding one stub `gh`, so resolution is proven without a real install. */
+async function withStubGhOnPath(run) {
+  const dir = await mkdtemp(path.join(tmpdir(), 'rotate-tester-secrets-gh-'));
+  const stub = path.join(dir, `gh${executableExtensions()[0]}`);
+  await writeFile(stub, '#!/bin/sh\nexit 0\n');
+  if (process.platform !== 'win32') await chmod(stub, 0o755);
+  const originalPath = process.env.PATH;
+  process.env.PATH = `${dir}${path.delimiter}${originalPath}`;
+  try {
+    return await run(stub);
+  } finally {
+    process.env.PATH = originalPath;
+  }
+}
+
+test('gh resolves to an absolute PATH entry holding a stub executable', async () => {
+  await withStubGhOnPath((stub) => {
+    assert.equal(resolveGhBinary({}), stub);
+  });
+});
+
+test('gh resolution refuses with a clear message when no PATH entry holds it', () => {
+  const originalPath = process.env.PATH;
+  process.env.PATH = '';
+  try {
+    assert.throws(
+      () => resolveGhBinary({}),
+      (error) => error.code === 'GH_UNRESOLVED' && /could not be found/.test(error.message),
+      'an unresolvable gh must refuse, not throw an unrelated error'
+    );
+  } finally {
+    process.env.PATH = originalPath;
+  }
+});
+
+test('a relative GH_BIN refuses instead of being searched for', () => {
+  assert.throws(
+    () => resolveGhBinary({ GH_BIN: 'gh' }),
+    (error) => error.code === 'GH_UNRESOLVED' && /not an absolute path/.test(error.message)
+  );
+  assert.throws(
+    () => resolveGhBinary({ GH_BIN: './gh' }),
+    (error) => error.code === 'GH_UNRESOLVED' && /not an absolute path/.test(error.message)
+  );
+});
+
+test('an absolute GH_BIN is used verbatim, without walking PATH at all', () => {
+  const absolute = path.resolve('some', 'nonstandard', 'gh');
+  const originalPath = process.env.PATH;
+  process.env.PATH = ''; // proves the override short-circuits the walk rather than merely winning it
+  try {
+    assert.equal(resolveGhBinary({ GH_BIN: absolute }), absolute);
+  } finally {
+    process.env.PATH = originalPath;
+  }
+});
+
+test('an unresolvable gh refuses through main, wired to the real runner, without being reworded as unauthenticated', async () => {
+  const { config, premiumConfig } = await writeConfigs();
+  const originalPath = process.env.PATH;
+  const originalBin = process.env.GH_BIN;
+  process.env.PATH = '';
+  delete process.env.GH_BIN;
+  try {
+    await assert.rejects(
+      main({
+        argv: ['--config', config, '--premium-config', premiumConfig, '--apply'],
+        deps: { log: () => {} },
+      }),
+      (error) => {
+        assert.match(error.message, /could not be found/);
+        assert.ok(!/unauthenticated/.test(error.message), 'must not be wrapped as an auth failure');
+        return true;
+      }
+    );
+  } finally {
+    process.env.PATH = originalPath;
+    if (originalBin === undefined) delete process.env.GH_BIN;
+    else process.env.GH_BIN = originalBin;
+  }
 });
 
 // main — the wiring from argv to writes
