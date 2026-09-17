@@ -136,12 +136,9 @@ test('the library has the exact structure the parser assumes', () => {
   // `<EssencePool>`, `<RunProgress> <StageNav> <StageCard>` and `<YieldScale> <OutcomeLadder>` —
   // carrying eleven names, every one of them target. RE-MEASURED by importing this parser: the
   // same revision added six routing rows and three migration rows, and moved no other count.
-  // 62 as of the result-side revision: three new SECTION-PROSE blocks in section 11 — who
-  // chooses a result-side alternative, how many a result set awards, and the reward row — which
-  // specify the result side of the choice group and the reward form of the row rather than minting
-  // a primitive, so they move the two block counts and the prose register and nothing else. The
-  // name counts below are unmoved deliberately: each heading is prose, and the `<PickerRow>` and
-  // `<ChoiceGroup>` the new prose cites are already named by the entry it sits beneath.
+  // 62 as of the result-side revision: three section-PROSE blocks under the picker-row entry, for
+  // the chooser, the award modes and the reward row. Prose, so only the block counts and the prose
+  // register move; the names they cite are already declared by the entry they sit beneath.
   assert.equal(library.blockCount, 62, 'spec-head block count');
   assert.equal(
     library.headingCount,
