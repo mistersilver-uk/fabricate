@@ -1,17 +1,8 @@
-/**
- * Hard-wrap detection and joining for Markdown authored one sentence per line.
- *
- * `AGENTS.md` requires that rule of every in-repo `*.md`; `markdownlint-sentences-per-line` only
- * caps sentences per line, so a wrapped sentence raises nothing. `wrappedSites` reports each prose
- * line continuing into the next and `joinWraps` closes it with one space, leaving every structural
- * construct below byte-identical — joining one corrupts the file with the gate still green.
- */
+/** Hard-wrap detection and joining for Markdown authored one sentence per line. */
 
 /**
  * The line endings that finish a sentence, written down because two readings of "ends a sentence"
- * differ by over 100 sites here. `.`, `!`, `?` and `…` finish one through any run of closing
- * markers (`rules.**`, `` obeys.` ``); `:` and `;` only as the literal final character, since a
- * colon closing a code span or bold label belongs to that token (`` `i18n:` ``, `**Items (7):**`).
+ * differ by over 100 sites here.
  */
 const SENTENCE_END = /(?:[.!?…][`*_)\]}"'”’»]*|[:;])$/u;
 
@@ -122,12 +113,7 @@ function continuesInto(lines, kinds, index) {
   return !endsSentence(current);
 }
 
-/**
- * The 1-based numbers of the lines that continue into the next line mid-sentence.
- *
- * @param {string} text
- * @returns {number[]}
- */
+/** The 1-based numbers of the lines that continue into the next line mid-sentence. */
 export function wrappedSites(text) {
   const lines = String(text).split('\n');
   const kinds = classifyLines(lines);

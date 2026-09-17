@@ -1,111 +1,4 @@
-/**
- * Which classes `styles/fabricate.css` still has a customer for, and which rule blocks do not.
- *
- * WHY THIS EXISTS. `styles/fabricate.css` is a 26k-line global sheet that has outlived several
- * generations of markup, so a large share of it targets class names nothing emits any more. A rule
- * that matches no element cannot move a pixel, which makes deleting it the one CSS change with no
- * visual risk — but only if "matches no element" is decided mechanically rather than by eye. This
- * module is that decision, and it is shared: issue 1498 deletes the dead blocks with it, and
- * `tests/styles-dead-classes.test.js` re-runs the same functions on every `npm test` so the set
- * cannot grow back.
- *
- * ── WHY IT DOES NOT READ `collectStyleCorpus` ────────────────────────────────────────────────
- * `tests/helpers/styleBlockScan.js` walks `.svelte`, `.css` and `.scss`. That is right for a
- * DECLARATION scan and wrong for this one: 115 `class="…"` sites and every `classes:` array on the
- * `src/ui/*.svelte.js` application shells live in `.js` files, and a live-class set that cannot see
- * them would report the classes those shells put on real Foundry windows as dead. So the source
- * side walks `src` itself, at `.js`, `.mjs` and `.svelte`. The SHEET side does reuse that helper —
- * `stripCssComments` and `splitSelectorList` — because a hand-rolled `String#split(',')` shreds
- * `:is([type="text"], [type="number"])` into two fragments, the second of which is not a selector.
- *
- * ── THE FOUR LIVENESS RULES ──────────────────────────────────────────────────────────────────
- * 1. LITERAL TOKENS. Every identifier-shaped run inside a string literal, a template literal's
- *    static text, a `class="…"` attribute, a CLASS PROP (see below), a `class:x` directive or a
- *    `:global(.x)` selector is a live class name. Comments are stripped FIRST, per region, so a
- *    class named only in prose is not live — `Stepper.svelte` names `manager-checks-outcome-row`
- *    in a `<style>` comment and must not thereby keep it alive.
- * 2. CONSTRUCTED CLASSES. A class attribute holding an interpolation is expanded: module-level
- *    `const` strings and frozen string maps that the interpolation reaches are substituted, so
- *    `${GM_CARD_BLOCK}__label` becomes a literal and `${block}__section` becomes both chat blocks.
- *    Every static fragment of the token ALSO becomes a WILDCARD AT ITS OWN POSITION — a prefix
- *    matches sheet classes starting with it, a suffix those ending with it, an infix those
- *    containing it. That positional rule is not decoration: the chat cards build `${block}__section`
- *    with the dynamic part FIRST, and a prefix-only rule would have called 15 live
- *    `fabricate-craft-chat__*` classes dead with no View Lab frame able to show it. A token that is
- *    nothing but a hole contributes NO wildcard — it would match the entire sheet — and is reported
- *    by {@link buildLiveClassSet} for manual disposition instead.
- * 3. FOUNDRY CORE CLASSES. Names Foundry itself puts in the DOM are live by the explicit
- *    {@link FOUNDRY_CORE_CLASSES} allow-list. The gate checks the list back against the sheet so it
- *    cannot drift into naming classes the sheet no longer styles.
- * 4. STATE CLASSES. An `is-`/`has-` class is never widened by a positional wildcard: one
- *    `is-${state}` site would otherwise license every `.is-*` rule in the sheet. It is live either
- *    as a literal, or through a base class BESIDE it that some site writes a dynamic state class
- *    onto — which is what keeps `.manager-danger-tag-pill.is-hazardous` alive from
- *    `class={`manager-danger-tag-pill is-${tag}`}` without licensing anything else.
- *
- * ── WHY A CLASS PROP IS READ EXACTLY LIKE A `class=` ATTRIBUTE ───────────────────────────────
- * A shared primitive takes its classes as PROPS, so a caller's family classes are emitted THROUGH
- * the primitive and the prop is the only place the caller writes them. `Select.svelte` never
- * writes `class="…"` for its own family at all: it hands `pickerClass`, `triggerClass`,
- * `valueClass` and `popoverClass` to `SearchablePopover`, and that component is what puts them on
- * the element. Read as ordinary text those values are invisible — they are backtick templates, and
- * the catch-all literal sweep matches quotes only — so 14 live `.fabricate-select*` rule blocks
- * were reported dead.
- *
- * So an attribute whose name ENDS IN `Class` is a class attribute: its quoted or braced value goes
- * through the same template path `class=` takes, static text becoming literals and interpolations
- * becoming positional wildcards. Svelte's SHORTHAND form `{triggerClass}` names the BINDING rather
- * than the value, so it is resolved out of the file's own definitions first — a `$derived(…)` or
- * `$derived.by(…)` right-hand side included, since the resolver sweeps an expression's quoted and
- * template runs rather than parsing it.
- *
- * The rule is keyed on the ATTRIBUTE NAME AND ON THE MARKUP REGION, and the pair is the whole of
- * its safety. The one-line alternative — teaching the catch-all literal sweep to read backticks
- * too — would make every identifier run in every template literal under `src/` live, an unaudited
- * widening of a gate whose failure mode is a dead rule silently surviving. A
- * `title={`Hello ${name}`}` therefore contributes nothing, and
- * `tests/stylesheet-live-classes.test.js` holds that negative as a row beside the positive ones.
- *
- * THE REGION HALF IS NOT DECORATION, and it was added after the name half shipped alone. A name
- * ending in `Class` is an ordinary JavaScript identifier as well as an attribute name, so on the
- * whole comment-stripped text `const probeClass = 'zz-dead-probe';` — in a plain `.js` module,
- * with no component and no call site anywhere — read exactly like a prop on an element and kept a
- * dead rule alive. `class=` is bounded by the language rather than by this module (`class` is a
- * reserved word, so it cannot be assigned), and this channel had no such bound. So a class prop is
- * evidence only where a prop can be WRITTEN: in a `.svelte` file, outside its `<script>` and
- * `<style>` regions. A `Class`-suffixed binding that no markup ever hands to a component is dead,
- * and the negative corpus holds that as its own row.
- *
- * ── THE ONE ASYMMETRY IN RULE 2 ──────────────────────────────────────────────────────────────
- * `class="${x}"` and `class={x}` do NOT resolve the same way. The quoted form is split into parts
- * and holes, so its hole runs through {@link constantDefinitions} and the constant behind `x` is
- * substituted. The braced form contributes the string and template literals found INSIDE the
- * expression, so a bare `class={x}` — an identifier with no quotes anywhere in it — contributes
- * nothing from that attribute at all.
- *
- * The 20 `class={classes}` sites in `src/` are nonetheless answered, by rule 1 rather than by
- * rule 2: whatever builds `classes` does so out of quoted literals in the same file, and the
- * catch-all literal sweep takes every identifier run inside every quoted string. So the brace
- * form's own contribution only ever mattered for a name SPANNING a hole, and no site builds one
- * that way. If one ever does, the asymmetry under-approximates liveness and the gate reports a
- * live rule as dead — a false dead, which a deletion makes visible as a moved frame, rather than
- * a dead rule silently surviving. Resolve bare identifiers in the braced form then; do not assume
- * it already happens. The same asymmetry and the same answer apply to a class prop, with one
- * addition: `{fooClass}` is Svelte's shorthand for `fooClass={fooClass}` and IS resolved through
- * the file's bindings, because a class prop is passed that way at every real call site.
- *
- * ── WHY RESOLUTION IS ADDITIVE, NEVER SUBSTITUTIVE ───────────────────────────────────────────
- * A resolved hole contributes its values AND still contributes its hole. That is not caution for
- * its own sake; it is a measured defect. `is-${count === 'warnings' ? 'warning' : count}` reaches
- * two string literals, both of them COMPARISON operands rather than values, and a resolver that
- * treated them as the answer condemned the live `.manager-recipe-rail-count.is-passing` and
- * `.is-blocking` rules — `count` runs over `['passing', 'warnings', 'blocking']`. Nothing short of
- * evaluating the expression can tell a comparison operand from a value, so the hole survives its
- * own resolution and the wildcard covers what the resolver could not see.
- *
- * A rule block is dead only when EVERY selector in its list is dead, and a selector is dead when
- * any of its compounds names a class that is not live. One live selector keeps the whole block.
- */
+/** Which classes `styles/fabricate.css` still has a customer for, and which rule blocks do not. */
 
 import { collectWorkingTreeSources, stripComments } from '../../tests/helpers/sourceScan.js';
 import { splitSelectorList, stripCssComments } from '../../tests/helpers/styleBlockScan.js';
@@ -116,15 +9,7 @@ export const LIVE_CLASS_SOURCE_ROOTS = Object.freeze(['src']);
 /** The extensions walked under {@link LIVE_CLASS_SOURCE_ROOTS}. `.js` is the load-bearing one. */
 export const LIVE_CLASS_SOURCE_EXTENSIONS = Object.freeze(['.js', '.mjs', '.svelte']);
 
-/**
- * Class names Foundry VTT emits into the DOM around, or inside, a Fabricate application.
- *
- * These are live by fiat because no Fabricate source file writes them: core's `ApplicationV2`
- * frame, its form and dialog partials, and its grid helpers do. The list is deliberately EXPLICIT
- * rather than a prefix negation, so adding to it is a visible edit, and
- * `tests/styles-dead-classes.test.js` fails when an entry no longer has a selector in the sheet —
- * which is what stops it from silently becoming a place to park a name and move on.
- */
+/** Class names Foundry VTT emits into the DOM around, or inside, a Fabricate application. */
 export const FOUNDRY_CORE_CLASSES = Object.freeze([
   'checkbox-label',
   'dialog-buttons',
@@ -135,13 +20,7 @@ export const FOUNDRY_CORE_CLASSES = Object.freeze([
   'window-content',
 ]);
 
-/**
- * The marker standing in for an interpolation whose value could not be resolved.
- *
- * A control character rather than a printable one, because an expanded attribute value is split on
- * whitespace afterwards: a marker that could occur inside a class name would invent a token, and a
- * marker that split as whitespace would lose the POSITION the wildcard rule is named for.
- */
+/** The marker standing in for an interpolation whose value could not be resolved. */
 const HOLE = '\u{0}';
 
 /** Identifier-shaped runs, which is the shape every CSS class name in this repository has. */
@@ -151,27 +30,14 @@ const IDENTIFIER_RUN = /[A-Za-z_][\w-]*/gu;
 const CLASS_ATTRIBUTE = /(?<![\w-])class\s*=\s*/gu;
 
 /**
- * A CLASS PROP: an attribute whose name ends in `Class`, which a shared primitive puts on an
- * element for its caller. Same `(?<![\w-])` guard as {@link CLASS_ATTRIBUTE}, and `class` itself
- * does not match it — the name must have at least one character before the capital `C`.
- *
- * Read ONLY inside a `.svelte` file's markup, per {@link markupRegions}: on the whole text this
- * shape matches a plain JavaScript assignment as readily as an attribute.
+ * A class prop: an attribute whose name ends in `Class`, which a shared primitive puts on an
+ * element for its caller.
  */
 const CLASS_PROP_ATTRIBUTE = /(?<![\w-])([A-Za-z_$][\w$]*Class)\s*=\s*/gu;
 
 /**
- * A braced expression that is EXACTLY a `Class`-suffixed identifier: Svelte's shorthand
+ * A braced expression that is exactly a `Class`-suffixed identifier: Svelte's shorthand
  * `{triggerClass}`, and the explicit `someProp={triggerClass}` it abbreviates.
- *
- * Read ONLY inside a `.svelte` file's markup, per {@link markupRegions}, for the same reason the
- * attribute form is: on the whole text this shape also matches a destructuring pattern.
- *
- * The `(?<!\$)` guard excludes `${fooClass}` INSIDE a template literal, and that is a correctness
- * point rather than caution. Such a hole is already resolved by {@link expandTemplate} AT ITS OWN
- * POSITION, where the text around it decides whether the result is a prefix, an infix or a whole
- * token; harvesting it a second time as a standalone value would throw that position away. And
- * where the template is not a class value at all, the interpolation is not class evidence.
  */
 const CLASS_PROP_SHORTHAND = /(?<!\$)\{\s*([A-Za-z_$][\w$]*Class)\s*\}/gu;
 
@@ -187,15 +53,7 @@ const BINDING = /(?:^|[;{})\s])(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*/gu;
 /** A quoted string literal, spelled once so the equality pattern below can reuse it. */
 const QUOTED = '(?:\'[^\']*\'|"[^"]*")';
 
-/**
- * A string literal that is an OPERAND of an equality test, not a value the expression yields.
- *
- * `is-${count === 'warnings' ? 'warning' : count}` reaches three string literals and only two of
- * them are candidate values; the third is what `count` is being COMPARED to. Harvesting it built
- * `is-warnings`, a class that is never written. Blanking the comparison before the literal sweep
- * removes that whole family of false candidates, and it removes nothing real: a value is not
- * spelled on the left of an equality operator.
- */
+/** A string literal that is an operand of an equality test, not a value the expression yields. */
 const EQUALITY_OPERAND = new RegExp(
   String.raw`(?:[!=]==?\s*${QUOTED})|(?:${QUOTED}\s*[!=]==?)`,
   'gu'
@@ -227,20 +85,7 @@ const MAX_PATTERN_EXPANSION = 512;
 /** How deep constant resolution follows one identifier into another. */
 const MAX_RESOLUTION_DEPTH = 6;
 
-/**
- * Blank a source file's comments, PER REGION, preserving every offset.
- *
- * Per region rather than per line, because the three comment syntaxes this repository writes are
- * not interchangeable and applying the wrong one eats real code. Two slashes are not a comment
- * delimiter in Svelte markup, so a line reading `<a class="manager-link" href="https://x">` loses
- * its class to a JavaScript stripper, and a `url(https://x)` in a `<style>` block loses the same
- * way. So markup gets HTML comments only, `<script>` gets the JavaScript stripper, and `<style>`
- * gets the CSS one.
- *
- * @param {string} file Repo-relative path; only its extension is read.
- * @param {string} source The file's text.
- * @returns {string} The text with comment characters replaced by spaces, offsets intact.
- */
+/** Blank a source file's comments, per region, preserving every offset. */
 export function stripSourceComments(file, source) {
   const text = String(source ?? '');
   if (!file.endsWith('.svelte')) return stripComments(text);
@@ -254,12 +99,7 @@ export function stripSourceComments(file, source) {
   return out;
 }
 
-/**
- * Replace HTML comment runs with spaces, keeping newlines so line numbers survive.
- *
- * @param {string} text
- * @returns {string}
- */
+/** Replace HTML comment runs with spaces, keeping newlines so line numbers survive. */
 function blankHtmlComments(text) {
   let out = '';
   let index = 0;
@@ -275,12 +115,7 @@ function blankHtmlComments(text) {
   return out;
 }
 
-/**
- * The `<script>` and `<style>` bodies of a Svelte file, as `{kind, start, end}` spans.
- *
- * @param {string} text
- * @returns {Array<{kind: string, start: number, end: number}>}
- */
+/** The `<script>` and `<style>` bodies of a Svelte file, as `{kind, start, end}` spans. */
 function embeddedRegions(text) {
   const regions = [];
   for (const kind of ['script', 'style']) {
@@ -294,21 +129,7 @@ function embeddedRegions(text) {
   return regions;
 }
 
-/**
- * The spans of a file in which a component prop can be WRITTEN, as `[start, end)` pairs.
- *
- * A `.svelte` file's markup is everything outside its `<script>` and `<style>` regions, which
- * {@link embeddedRegions} already locates for the comment strippers. Every other extension has no
- * markup at all: a `.js` or `.mjs` module can hold an HTML template literal, and `class=` is read
- * there, but it cannot hold a Svelte component tag and therefore cannot hold a class PROP.
- *
- * Offsets are into the same comment-stripped text every channel reads, so a caller compares a
- * match index against them directly.
- *
- * @param {string} file Repo-relative path; only its extension is read.
- * @param {string} text Comment-stripped source.
- * @returns {Array<{start: number, end: number}>} Ascending, non-overlapping.
- */
+/** The spans of a file in which a component prop can be written, as `[start, end)` pairs. */
 function markupRegions(file, text) {
   if (!file.endsWith('.svelte')) return [];
   const embedded = [...embeddedRegions(text)].sort((left, right) => left.start - right.start);
@@ -322,43 +143,17 @@ function markupRegions(file, text) {
   return spans;
 }
 
-/**
- * Whether an offset falls inside one of the spans {@link markupRegions} returned.
- *
- * @param {Array<{start: number, end: number}>} spans
- * @param {number} at
- * @returns {boolean}
- */
+/** Whether an offset falls inside one of the spans {@link markupRegions} returned. */
 function withinRegions(spans, at) {
   return spans.some((span) => at >= span.start && at < span.end);
 }
 
-/**
- * Every source file whose text decides liveness, as `{ repo-relative path: text }`.
- *
- * @returns {Record<string, string>}
- */
+/** Every source file whose text decides liveness, as `{ repo-relative path: text }`. */
 export function collectLiveClassSources() {
   return collectWorkingTreeSources([...LIVE_CLASS_SOURCE_ROOTS], [...LIVE_CLASS_SOURCE_EXTENSIONS]);
 }
 
-/**
- * The index of the quote closing the string literal that opens at `from`.
- *
- * The two delimiter scanners below — {@link matchingDelimiter} and {@link statementEnd} — each ran
- * their own copy of this loop, differing only in what they counted OUTSIDE a string. Shared so the
- * escape rule is stated once: a backslash consumes the next character whatever it is, which is what
- * stops `'it{s'` and `"a;b"` from being read as structure.
- *
- * Callers pass the index of the opening quote and assign the result back to their own cursor, whose
- * own increment then steps past the closer. An UNTERMINATED literal answers with the last index
- * rather than throwing, so the caller's loop still ends at `text.length` and reports the same
- * "ran off the end" answer it did before.
- *
- * @param {string} text
- * @param {number} from Index of the opening quote character.
- * @returns {number} The index of the closing quote, or the last index when there is none.
- */
+/** The index of the quote closing the string literal that opens at `from`. */
 function skipQuotedRun(text, from) {
   const quote = text[from];
   for (let scan = from + 1; scan < text.length; scan += 1) {
@@ -368,18 +163,7 @@ function skipQuotedRun(text, from) {
   return text.length - 1;
 }
 
-/**
- * The index just past the delimiter closing the one that opens at `from`.
- *
- * Quote-aware and nesting-aware, so a brace inside a string and a nested object literal both close
- * where they should.
- *
- * @param {string} text
- * @param {number} from Index of the opening delimiter.
- * @param {string} open
- * @param {string} close
- * @returns {number} The index just past the matching delimiter, or `text.length`.
- */
+/** The index just past the delimiter closing the one that opens at `from`. */
 function matchingDelimiter(text, from, open, close) {
   let depth = 0;
   for (let scan = from; scan < text.length; scan += 1) {
@@ -397,17 +181,7 @@ function matchingDelimiter(text, from, open, close) {
   return text.length;
 }
 
-/**
- * The index of the backtick closing a template literal whose body starts at `from`.
- *
- * Written rather than delegated to {@link matchingDelimiter} because a template literal's opener
- * and closer are the SAME character, so there is no depth to count: what has to be skipped instead
- * is a backslash escape and a whole substitution, which may itself contain a nested template.
- *
- * @param {string} text
- * @param {number} from Index just past the opening backtick.
- * @returns {number} The index of the closing backtick, or `text.length`.
- */
+/** The index of the backtick closing a template literal whose body starts at `from`. */
 function templateLiteralEnd(text, from) {
   for (let scan = from; scan < text.length; scan += 1) {
     const character = text[scan];
@@ -419,17 +193,7 @@ function templateLiteralEnd(text, from) {
   return text.length;
 }
 
-/**
- * The index of the quote closing an attribute value whose body starts at `from`.
- *
- * An interpolation is skipped whole, so an attribute whose expression contains the same quote
- * character ends at its own closing quote rather than at the one inside that expression.
- *
- * @param {string} text
- * @param {number} from Index just past the opening quote.
- * @param {string} quote The opening quote character.
- * @returns {number} The index of the closing quote, or `text.length`.
- */
+/** The index of the quote closing an attribute value whose body starts at `from`. */
 function quotedValueEnd(text, from, quote) {
   for (let scan = from; scan < text.length; scan += 1) {
     const character = text[scan];
@@ -441,16 +205,7 @@ function quotedValueEnd(text, from, quote) {
   return text.length;
 }
 
-/**
- * Split a quoted attribute value into its static parts and its interpolation expressions.
- *
- * Both interpolation syntaxes are read, because both spell a class in this repository: the
- * dollar-brace form in a JavaScript template literal (`CraftingChatCard.js`) and the bare-brace
- * form in Svelte markup.
- *
- * @param {string} value The raw text between the attribute's quotes.
- * @returns {{parts: string[], holes: string[]}} `parts.length === holes.length + 1`.
- */
+/** Split a quoted attribute value into its static parts and its interpolation expressions. */
 function splitInterpolations(value) {
   const parts = [];
   const holes = [];
@@ -474,19 +229,7 @@ function splitInterpolations(value) {
   return { parts, holes };
 }
 
-/**
- * One attribute's value, as `{parts, holes}` templates.
- *
- * A braced `class={expr}` form contributes the string and template literals INSIDE `expr`, which is
- * how a ternary of two string literals and a template literal both reach the same expansion path as
- * a quoted attribute. Any other opener — a bare identifier, a number, a backtick in a JavaScript
- * assignment — contributes nothing, which is what keeps a `Class`-suffixed BINDING out of the
- * evidence until a call site actually passes it.
- *
- * @param {string} text Comment-stripped source.
- * @param {number} at Index of the first character after the attribute's `=`.
- * @returns {Array<{parts: string[], holes: string[]}>}
- */
+/** One attribute's value, as `{parts, holes}` templates. */
 function attributeValueTemplates(text, at) {
   const opener = text[at];
   if (opener === '"' || opener === "'") {
@@ -499,33 +242,13 @@ function attributeValueTemplates(text, at) {
   return [];
 }
 
-/**
- * Every match of one module-level global pattern in `text`, from the start of the file.
- *
- * The `lastIndex` reset is the reason this exists rather than `String#matchAll`: these patterns are
- * shared module constants, so a previous scan leaves the cursor mid-file and the next one silently
- * loses everything above it. Stating the reset once keeps that trap in one place.
- *
- * @param {RegExp} pattern A global pattern.
- * @param {string} text
- * @yields {RegExpExecArray}
- */
+/** Every match of one module-level global pattern in `text`, from the start of the file. */
 function* matchesOf(pattern, text) {
   pattern.lastIndex = 0;
   for (let match = pattern.exec(text); match; match = pattern.exec(text)) yield match;
 }
 
-/**
- * Every value of one attribute FAMILY in a file, tagged with where the evidence came from.
- *
- * @param {string} text Comment-stripped source.
- * @param {RegExp} pattern A global pattern whose match ends at the attribute's `=`.
- * @param {(match: RegExpExecArray) => string} label The origin prefix for {@link harvestFile}.
- * @param {Array<{start: number, end: number}>} within Spans the match must fall inside. The
- *   whole-file span is stated explicitly by the one channel that takes it, rather than left
- *   implicit, so no channel is unbounded by omission.
- * @returns {Array<{parts: string[], holes: string[], origin: string}>}
- */
+/** Every value of one attribute family in a file, tagged with where the evidence came from. */
 function attributeTemplates(text, pattern, label, within) {
   const templates = [];
   for (const match of matchesOf(pattern, text)) {
@@ -537,21 +260,7 @@ function attributeTemplates(text, pattern, label, within) {
   return templates;
 }
 
-/**
- * Every SHORTHAND class prop in a file, resolved out of the file's own bindings.
- *
- * `{triggerClass}` is Svelte's shorthand for `triggerClass={triggerClass}`, so the attribute value
- * is an identifier and nothing but an identifier. Its binding's right-hand sides are therefore what
- * carries the classes, and they go through {@link quotedTemplatesIn} — the same reader the braced
- * form uses — which is why a `$derived(…)` wrapper needs no case of its own: it is swept as text,
- * not parsed. A name bound twice contributes both right-hand sides, per
- * {@link constantDefinitions}.
- *
- * @param {string} text Comment-stripped source.
- * @param {Map<string, string[]>} definitions
- * @param {Array<{start: number, end: number}>} markup Spans the shorthand must fall inside.
- * @returns {Array<{parts: string[], holes: string[], origin: string}>}
- */
+/** Every shorthand class prop in a file, resolved out of the file's own bindings. */
 function classPropShorthandTemplates(text, definitions, markup) {
   const templates = [];
   for (const match of matchesOf(CLASS_PROP_SHORTHAND, text)) {
@@ -565,22 +274,7 @@ function classPropShorthandTemplates(text, definitions, markup) {
   return templates;
 }
 
-/**
- * Every class-bearing value in one file, as a `{parts, holes, origin}` template.
- *
- * Three channels, one path: the `class=` attribute, the class PROP a shared primitive takes for its
- * caller, and that prop's Svelte shorthand. See the module header for why the prop is read here
- * rather than by widening the catch-all literal sweep to backticks.
- *
- * The two PROP channels are bounded to the file's markup and `class=` is not, which is the
- * asymmetry the header's region paragraph explains: `class` cannot be assigned in JavaScript, and
- * a `Class`-suffixed name can.
- *
- * @param {string} file Repo-relative path, for {@link markupRegions}.
- * @param {string} text Comment-stripped source.
- * @param {Map<string, string[]>} definitions
- * @returns {Array<{parts: string[], holes: string[], origin: string}>}
- */
+/** Every class-bearing value in one file, as a `{parts, holes, origin}` template. */
 function classEvidenceTemplates(file, text, definitions) {
   const markup = markupRegions(file, text);
   const wholeFile = [{ start: 0, end: text.length }];
@@ -591,12 +285,7 @@ function classEvidenceTemplates(file, text, definitions) {
   ];
 }
 
-/**
- * The string and template literals inside an expression, each as a `{parts, holes}` template.
- *
- * @param {string} expression
- * @returns {Array<{parts: string[], holes: string[]}>}
- */
+/** The string and template literals inside an expression, each as a `{parts, holes}` template. */
 function quotedTemplatesIn(expression) {
   const templates = [];
   let index = 0;
@@ -620,15 +309,7 @@ function quotedTemplatesIn(expression) {
   return templates;
 }
 
-/**
- * The right-hand sides of every binding in one file, keyed by name.
- *
- * Several right-hand sides per name are kept rather than the last one winning: a name bound twice
- * in one module has two candidate values and both are evidence.
- *
- * @param {string} text Comment-stripped source.
- * @returns {Map<string, string[]>}
- */
+/** The right-hand sides of every binding in one file, keyed by name. */
 function constantDefinitions(text) {
   const definitions = new Map();
   BINDING.lastIndex = 0;
@@ -642,13 +323,7 @@ function constantDefinitions(text) {
   return definitions;
 }
 
-/**
- * The index of the semicolon or closing bracket ending the statement that starts at `from`.
- *
- * @param {string} text
- * @param {number} from
- * @returns {number}
- */
+/** The index of the semicolon or closing bracket ending the statement that starts at `from`. */
 function statementEnd(text, from) {
   let depth = 0;
   for (let scan = from; scan < text.length; scan += 1) {
@@ -666,12 +341,7 @@ function statementEnd(text, from) {
   return text.length;
 }
 
-/**
- * The bare identifiers an expression names, with quoted text removed first.
- *
- * @param {string} expression
- * @returns {string[]}
- */
+/** The bare identifiers an expression names, with quoted text removed first. */
 function identifiersIn(expression) {
   const bare = expression.replaceAll(STRING_LITERAL, ' ').replaceAll(/`[^`]*`/gu, ' ');
   return [...bare.matchAll(/[A-Za-z_$][\w$]*/gu)].map((match) => match[0]);

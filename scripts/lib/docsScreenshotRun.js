@@ -1,50 +1,6 @@
-/**
- * The decisions a documentation screenshot run makes, apart from the run that carries them out.
- *
- * `scripts/docs-screenshots.mjs` is a CLI: it dispatches from `process.argv` at module scope, so it
- * cannot be imported without running a capture, and therefore nothing inside it can be reached from
- * a test. That mattered, because the load-bearing parts of it are refusals — the reasons a frame is
- * NOT published — and a refusal is invisible when it works. Every one of them could be deleted with
- * the suite still green, which is the same thing as not having them.
- *
- * So the judgements live here and the `.mjs` is the shell that performs their consequences. Nothing
- * in this module reads the filesystem, spawns anything, or prints: it takes what a run observed and
- * returns what the run should do about it. `scripts/lib/webpFrames.js` is the same arrangement for
- * the pixel comparison, for the same reason.
- *
- * WHY THESE FOUR AND NOT MORE
- * ---------------------------
- * Each one answers a question whose wrong answer publishes a picture that is not of this commit:
- * whether the renderer actually ran, which of its frames belong to this run, whether the tools that
- * decide "changed" are even present, and whether a partial run may certify the whole set. The
- * rendering, encoding and file copying around them are IO with no decision in them, and stay in the
- * CLI where they can be read as a sequence.
- */
+/** The decisions a documentation screenshot run makes, apart from the run that carries them out. */
 
-/**
- * Why this run's manifest cannot be trusted to describe this run, if it cannot.
- *
- * The renderer writes `manifest.json` as the LAST thing it does, and it accumulates into an output
- * directory it never clears. So a throw before its render loop — a squatted lab port, no browser
- * installed, a viewport assertion — exits without writing a manifest at all, and leaves whatever an
- * earlier run wrote sitting there to be picked up as this run's own account of itself. Every
- * downstream refusal then agrees with it, including the per-frame head check, because both sides of
- * that comparison come out of the same stale file and agree by construction. The observable result
- * is a `check` that prints "all 46 committed frame(s) match a fresh render" having rendered
- * nothing.
- *
- * The modification time is what closes it, rather than the recorded head. A manifest from an
- * earlier run AT THIS COMMIT carries this commit's head and is indistinguishable by content; it is
- * distinguishable only by the fact that this run did not write it. The renderer's own exit status
- * cannot close it either: a run with per-case failures legitimately exits non-zero having written a
- * perfectly good manifest, and that case is what {@link consumableFrames} is for.
- *
- * @param {string} outputDirectory Where the manifest was expected, for the message.
- * @param {number|undefined} before The manifest's modification time before the renderer ran, in
- *   milliseconds, or undefined when there was no manifest.
- * @param {number|undefined} after The same, after it ran.
- * @returns {string|null} Why nothing may be published, or null when the manifest is this run's.
- */
+/** Why this run's manifest cannot be trusted to describe this run, if it cannot. */
 export function staleManifestReason(outputDirectory, before, after) {
   if (after === undefined) {
     return (
@@ -63,22 +19,7 @@ export function staleManifestReason(outputDirectory, before, after) {
   return null;
 }
 
-/**
- * Split the mapped cases into the frames this run produced and the ones it did not.
- *
- * Four separate ways a case fails to be publishable, kept apart because they need different things
- * done about them and a reader of the report has to be able to tell which happened. The head
- * comparison is the subtle one: without it a case that failed today would be served from whatever
- * the renderer left on disk at some earlier commit and published as current documentation, with
- * nothing to show it was stale.
- *
- * @param {object} manifest The manifest this run wrote.
- * @param {string[]} caseIds Case ids the map declares.
- * @param {(caseId: string) => string|null} locateRenderedFrame The source frame this run left on
- *   disk for a case, or null when there is none there.
- * @returns {{usable: Map<string, string>, refused: string[]}} Usable case ids to source frame
- *   paths, and a line per refused case saying why.
- */
+/** Split the mapped cases into the frames this run produced and the ones it did not. */
 export function consumableFrames(manifest, caseIds, locateRenderedFrame) {
   if (!manifest.head) {
     throw new Error(
@@ -114,18 +55,7 @@ export function consumableFrames(manifest, caseIds, locateRenderedFrame) {
   return { usable, refused };
 }
 
-/**
- * Why the run cannot compare a frame at all, if it cannot.
- *
- * Both libwebp tools are required, and the decoder is required even by a run that ends up encoding
- * nothing: it is what turns "these two WebPs differ" into "this view changed". Without it the only
- * comparison available is byte equality, which this renderer's own jitter fails on roughly a tenth
- * of the set — so a run that quietly fell back to it would rewrite those frames and report them as
- * visual changes. This fails closed instead.
- *
- * @param {Array<[string, string|null]>} tools Each tool's name and its resolved path, or null.
- * @returns {string|null} Why nothing may be compared, or null when both are present.
- */
+/** Why the run cannot compare a frame at all, if it cannot. */
 export function missingImageToolReason(tools) {
   const missing = tools.filter(([, path]) => !path).map(([name]) => name);
   if (missing.length === 0) return null;
@@ -137,21 +67,7 @@ export function missingImageToolReason(tools) {
   );
 }
 
-/**
- * What a `generate` run may write, given what it managed to produce.
- *
- * The provenance header is the part that has to be decided rather than assumed. It records the
- * toolchain the committed set was produced by — the Foundry chrome, the Chromium build — and a
- * reader takes it to describe every frame beside it. A run that rewrote forty frames and refused
- * six would, if it stamped anyway, certify six frames it never rendered as the work of this
- * toolchain, and the drift report that exists to catch exactly that would go quiet about them
- * forever. So the stamp waits until a run has actually seen the whole set.
- *
- * @param {object[]} verdicts One verdict per frame this run produced.
- * @param {string[]} refused A line per case it did not produce.
- * @returns {{rewrite: object[], untouched: number, stampProvenance: boolean,
- *   provenanceNote: string|null, exitCode: number}} What the run may do.
- */
+/** What a `generate` run may write, given what it managed to produce. */
 export function publicationPlan(verdicts, refused) {
   const complete = refused.length === 0;
   return {

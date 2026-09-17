@@ -1,293 +1,28 @@
 /**
- * designSystemPrimitives.js
- *
  * The machine-readable half of the `design-system` capability: one row per shared UI primitive,
- * keyed on the implementation path a diff names.
+ * keyed on the implementation path a diff names. Rows live in `designSystemPrimitives.json` beside
+ * this file, because inlining them here reintroduces a failing SonarCloud duplication gate; row
+ * prose travels with its row, in the `why` field.
  *
- * `openspec/specs/design-system/spec.md` states the rules and enumerates nothing; the vocabulary
- * lives in `library.html`, as names inside its `div.spec-head > h4` blocks. Neither of them carries
- * the correspondence between a name and the file that implements it, which is what a diff needs to
- * be attributed to a primitive. This module is that correspondence, and
- * `tests/design-system-coverage.test.js` reads it against the library so the two cannot describe
- * different vocabularies without failing.
+ * Citations name a requirement heading in double quotes, never a line number, and
+ * `tests/design-system-coverage.test.js` resolves every one against the capability's own headings.
  *
- * HOW THIS FILE CITES `spec.md`
- * -----------------------------
- * By REQUIREMENT HEADING — the words `spec.md requirement` followed by the heading in double quotes
- * — and never by line number. Line citations here rotted the first time anything was inserted above
- * them: issue 1383 added six lines to the Purpose and the vocabulary requirement, and every one of
- * this module's eight `spec.md:NNN` citations then pointed at prose that said something else.
- * Nothing caught it, because a line number cannot be resolved. A heading can, and
- * `tests/design-system-coverage.test.js` resolves every one of these against `spec.md`'s own
- * `### Requirement:` headings.
- *
- * The notation is scoped to the `design-system` capability — that is the only spec it resolves
- * against — so do not write it with another capability's prefix. That guard reds on one rather
- * than answering it from the wrong document; cite another capability by some other form.
- *
- * WHY THIS IS A MODULE IN `scripts/lib/` AND NOT A LIST IN `tests/`
- * -----------------------------------------------------------------
- * The dependency direction is fixed: tests already import from `scripts/lib/`, and nothing in
- * `scripts/` imports from `tests/`. `svelteComponentFiles.js` beside this file is the exact
- * precedent, and its docblock states the same rationale — two independent consumers must agree on
- * a set and are meaningless if they disagree. Here the consumers are `viewLabCases.js`, which
- * derives its broad-signal routing from the `evidence: 'broad'` rows, and the integrity properties
- * in `tests/design-system-primitives.test.js`.
- *
- * ── WHERE THE ROWS LIVE, AND WHY THEY ARE NOT WRITTEN OUT HERE ─────────────────────────────────
- *
- * The rows are in `designSystemPrimitives.json` beside this file. Everything ELSE is here: the
- * taxonomy, the membership bar, what each column means, and the two derivations. Prose that belongs
- * to a ROW travels with it, in its `why` string — a field, not a comment — so no reasoning was lost
- * by the move, and none of it should migrate back into a comment here where it would sit away from
- * the row it judges.
- *
- * This is not a filing preference, and INLINING THESE ROWS BACK INTO THIS FILE REINTRODUCES A
- * FAILING QUALITY GATE. Written out as frozen object literals, the manifest failed SonarCloud on
- * its own: 23.0% new-code duplicated lines against a threshold of 3, from 17 copy-paste groups
- * EVERY ONE of which matched this file against itself, in blocks of 26 to 47 lines. The detector
- * normalises string literals, so two rows whose prose could not be more different reduce to the
- * same token sequence, and a run of them is one long repetition. Compacting the row shape does not
- * help — a positional one-line form is still about eleven identical normalised tokens per row
- * against a ~100-token minimum block, so ten consecutive rows still match. Any uniform table
- * expressed as code trips this; the fix is for the table to stop being code.
- *
- * Neither escape hatch was available. `sonar-project.properties` already lists `scripts/**` in
- * `sonar.cpd.exclusions` and records at length that the property is INERT under Automatic Analysis,
- * and `AGENTS.md` records that the only durable path-level exemption is a Duplication Exclusion a
- * MAINTAINER sets in the SonarCloud UI, which an agent must not assume. What made the data file the
- * answer rather than a dodge is measured against this project: SonarCloud does not index `.json`
- * here at all — `lang/en.json`, which is large and far more repetitive than this, is not a known
- * component to either the duplications or the measures API. `benchmarks/baselines/*.json`, read by
- * `scripts/lib/benchmarkBaselines.js`, is the repository's precedent for committed data beside a
- * `scripts/lib/` loader.
- *
- * The load is a synchronous read at import time resolved from `import.meta.url`, so it does not
- * depend on a working directory. This module still imports NO repository module — only Node
- * builtins — so it remains the leaf `scripts/ui-pr-screenshot-evidence.mjs` relies on to close no
- * import cycle, and it is still safe to import from `node --test` and from any script. An
- * `import ... with { type: 'json' }` attribute would be terser and is deliberately not used: the
- * `readFileSync` form is already proven against this repository's ESLint, Prettier and Node by the
- * sibling loaders in this directory, and a manifest is not the place to find out about the other.
- *
- * ── ROW SHAPE ──────────────────────────────────────────────────────────────────────────────────
- *
- *   { path, library, status, evidence, scope, why }   on {@link DESIGN_SYSTEM_PRIMITIVES}
- *   { path, library, evidence, callers, why }         on {@link NOT_A_PRIMITIVE}
- *
- * `path`    Repository-relative POSIX path of the shipped implementation, exactly as a diff names
- *           it. Asserted to exist on disk.
- * `library` The name of this primitive's entry in `openspec/specs/design-system/library.html`,
- *           written as it appears there (`'<Stepper>'`), or JSON `null`.
- * `status`  MEMBER ROWS ONLY. `'target'`, `'shipped'` or `'divergent'`: how faithfully this shipped
- *           component matches the library specimen its `library` names, per spec.md requirement
- *           "Every entry carries a status". It MUST equal the per-name status that specimen
- *           declares, and `tests/design-system-coverage.test.js` fails when the two disagree — the
- *           field is one half of a correspondence, not a second opinion. A row whose `library` is
- *           `null` carries `'target'` by construction: there is no specimen to be faithful to, so
- *           the specimen it is owed is the target. It is NOT a measure of adoption; a primitive can
- *           be `'shipped'` while most of the tree still hand-rolls what it replaces, which is what
- *           the `deferred: root convergence pending` exemptions in the source-contract tests count.
- *           The two non-member tables carry no status, because a row there records NON-MEMBERSHIP
- *           rather than a member's fidelity, and giving it one would invite the reading that a
- *           declined candidate is merely unbuilt.
- * `evidence` `'broad'` or `'targeted'`. See below — this is the field with consequences, and the
- *           integrity test asserts that EVERY row carries one of the two, so no row can be exempt
- *           from both clauses by a typo.
- * `scope`   MEMBER ROWS ONLY. `'shared'` or `'manager-only'`: whether a surface outside the GM
- *           manager may render this component, per spec.md requirement "A shared primitive's class
- *           family is rooted at the primitive, not at an app" and its scenario "A component that
- *           cannot leave its area keeps that area's root". `manager-only` is a DECISION rather than
- *           an omission, so such a row states its reason in `why` and, where a named change would
- *           flip it, names that change — `ModifierPillSelect` is the shipped instance of both, and
- *           issue 1515 is the change. WHAT THE FIELD IS NOT: it is not a proof that a family is
- *           primitive-rooted. That proof is the hand-authored entries in
- *           `tests/components/searchable-popover-area-scope.test.js`, which carry a family pattern,
- *           roots, anchors, three floors and mirrored fixture pairs that no row here holds. The
- *           register records the decision; the gate proves the rooting. FOUR rows are `shared` from
- *           an `apps/manager/` path, because a player-window importer is measured on each: a
- *           location debt is not a scope, and recording it as one would make the register lie about
- *           a component the player window already renders. The figure is re-derived from the table
- *           here rather than incremented — it read `two` when issue 1509 shipped it and THREE rows
- *           already qualified, `Callout`, `ComplicationSummaryRow` and `EmptyState`. The fourth is
- *           `SegmentedControl`, which issue 1514 moved off `manager-only` on the rule the gate
- *           actually applies: the FIRST importer resolving outside `apps/manager/` falsifies the
- *           scope, whatever audience that importer serves, because the assertion reads a PATH.
- * `callers` NON-MEMBER ROWS ONLY. Every file under `src/` that imports this one, as
- *           repository-relative POSIX paths in code-point order — the spec's "WITH ITS CALLERS
- *           NAMED", as data. Asserted EQUAL to what `scripts/lib/componentImporters.js` measures
- *           against the tree, so the claim cannot drift from the repository it describes.
- * `why`     The judgement, in prose. For a `null` library, why the correspondence is not made; for
- *           a non-member, why it is recorded rather than merely absent.
- *
- * ── WHY `callers` IS A FIELD AND NOT A SENTENCE, AND WHY MEMBERS DO NOT CARRY IT ───────────────
- *
- * It was a sentence, and sentences are not checked. Issue 1446 measured all ten count-justified
- * non-member rows against the tree and found TWO wrong in the direction that hides a converged
- * primitive and a THIRD wrong about which file its caller was. `InspectorActionButton` had said in
- * its own text, for two issues, that it was owed a move nobody made. `environment/CompositionList`
- * claimed one caller, named `environment/EnvironmentCompositionTab.svelte` as that caller, and had
- * two — and no file of that name has ever existed anywhere in this repository. Its row was
- * written and merged the day before it was found, and every gate passed. The limits tab under
- * `recipe-item/` had the right COUNT beside the wrong FILE, naming a real sibling that does not
- * import it — which is the half a count check on its own cannot see, and the reason the field
- * holds PATHS rather than a number.
- *
- * Paths, and no line numbers. This module's own citation rule above records what happened the last
- * time it wrote `NNN`: a line citation cannot be resolved by anything, so it rots the first time a
- * line is inserted above it. A caller's line moves on every edit to that caller; its path moves
- * only when it is renamed, which is a rename the equality assertion reports.
- *
- * MEMBERS DO NOT CARRY IT, and the asymmetry is the spec's, not a convenience. The requirement
- * cited below obliges a candidate BELOW the bar to be recorded with its callers named; it obliges
- * a member to nothing of the kind, and for good reason — `Chip` has 59 importers and `EmptyState`
- * 46, so an exact list there would be a manifest edit on every unrelated PR that adds one usage,
- * and a register that must be edited to add a `<Chip>` is a register people route around. What a
- * member is held to is the bar itself, which the integrity test asserts by MEASURING every member
- * at two or more importers. The two halves together mean no row's membership rests on an unchecked
- * count in either direction.
- *
- * ── A CLAIM ABOUT THE STYLESHEET IS WRITTEN IN A NOTATION, FOR THE SAME REASON ─────────────────
- *
- * `callers` is a field because a sentence is not checked. The identical failure ran one column
- * over and lasted longer, because nothing here reads CSS. Three rows asserted that the
- * `.manager-travel-*` family was 113 rules in `styles/fabricate.css` and every one of them scoped
- * under `.fabricate-manager`, and TWO of the three used that to rule a conversion structurally
- * impossible — a claim about a stylesheet disqualifying two components. It was true of the sheet
- * the plan was drafted against. Issue 1464 re-rooted the family at `.fabricate-picker` THIRTEEN
- * MINUTES before the first row repeating it merged, so the claim was already false when it was
- * authored, and it then survived two more merges — including one that edited this very manifest —
- * with every gate green. Issue 1472 corrected all three.
- *
- * A rule count is not made a field, because unlike a caller list it belongs INSIDE an argument
- * rather than beside one: the sentence is "and that is why it cannot convert", and splitting the
- * number out of it leaves the judgement unattached to the figure it rests on. It stays in `why`,
- * and is written in a NOTATION that `tests/design-system-coverage.test.js` re-derives from the
- * tree:
- *
- *   N `.<family>-*` rules in `styles/fabricate.css`
- *   N `.<family>-*` rules under `.<root>` in `styles/fabricate.css`
- *   N scoped rules                     — the rules in this row's OWN `path`, in its `<style>` block
- *
- * The notation was chosen to match what the false sentences ALREADY SAID, word for word, rather
- * than to be convenient: run the property against the manifest as it stood before issue 1472 and it
- * reports 113 against a measured 62, twice, with nothing re-authored. A notation that only reads
- * prose written after the guard existed would have proved nothing about the prose that was there.
- *
- * Two consequences to know before writing a row. A count being RETRACTED must NOT be written in the
- * notation — quote it some other way, as all three corrected rows do ("113 rules in the
- * `.manager-travel-*` family"), or the property will correctly red on the retracted figure. And the
- * notation is OPT-IN: a claim about the sheet phrased any other way is as unchecked as these were.
- *
- * What is deliberately NOT guarded is a `fabricate.css:NNN` LINE citation, of which this manifest
- * holds five. Measured at issue 1472, ALL FIVE point at the wrong rule — every asserted VALUE still
- * true and only the pointer moved. Guarding the number is the wrong repair twice over. 33 of the
- * last 200 commits touch that file, so a pin would red on unrelated changes; and it does not hold
- * still long enough to be worth pinning — two of the five were re-measured three hours apart during
- * issue 1472 itself and had drifted a further 34 lines in between, from one merge. This module's
- * own citation rule above already says what a line number is worth: nothing can resolve one. The
- * answer is to cite by something that can be — a selector — which is a prose change across four
- * MEMBER rows and `library.html` besides, so issue 1472 recorded it rather than folding it in.
- *
- * There is deliberately no `status` field. Membership is which TABLE holds the row —
- * {@link DESIGN_SYSTEM_PRIMITIVES} or {@link NOT_A_PRIMITIVE} — and a field restating that is
- * hand-typed data no consumer reads, so it can only ever be wrong. This module exists because
- * configuration nothing consults looks identical to configuration something does; a redundant
- * column would be one more instance of exactly that.
- *
- * The two halves of the conformance question are the two ways a row can be incomplete:
- *
- *   |                | `library` set          | `library: null`           |
- *   |----------------|------------------------|---------------------------|
- *   | `path` set     | conformant             | shipped but undocumented  |
- *   | `path: null`   | specified, not built   | rejected by the gate      |
- *
- * No row carries `path: null` today: this module enumerates what SHIPS. The specified-but-unbuilt
- * quadrant belongs to the conformance gate that reads `library.html`, which is deliberately a
- * later change in this programme (issue 1378) — this one builds the machine-readable half it will
- * read.
- *
- * ── HOW `library` IS ASSIGNED, AND WHEN IT IS NULL ─────────────────────────────────────────────
- *
- * A name is recorded only when the library entry names the primitive AND the shipped file IS that
- * primitive today. A shipped file the library records as COLLAPSING INTO a primitive it is not yet
- * — the catalogue pickers at `library.html:784` are the live example — takes `null`, with the
- * target named in `why`. Guessing there would fill the "conformant" quadrant with work that has
- * not been done, which is the one thing a conformance manifest must never do.
- *
- * `tests/design-system-primitives.test.js` asserts only that a recorded name is SPELLED as
- * `library.html` spells it. That is a mirror guard against inventing a name, not the conformance
- * gate; the gate is the next change.
- *
- * ── `evidence`, AND WHY IT IS A JUDGEMENT RATHER THAN A LOCATION ───────────────────────────────
- *
- * `evidence` answers: can a change to this file be attributed to particular View Lab frames?
- *
- *   `'broad'`     No. It has enough consumers that any frame is arbitrary, so a change to it
- *                 publishes the representative pair (plus any `BROAD_SIGNAL_CASE_OVERRIDES` entry
- *                 naming a frame that renders its deliberate state).
- *   `'targeted'`  Yes. Its consumers are few and named, and the cases that render it claim it by
- *                 `sourceMatches`.
- *
- * It is NOT a synonym for location, and the ten `'targeted'` rows under `apps/manager/` are the
- * proof. `viewLabCases.js` records that the four bulk-edit chrome files are DELIBERATELY excluded
- * from the broad-signal set because they have exactly two consumers each, so targeted attribution
- * is "both possible and honest"; `BulkDeleteCard` is excluded separately, because
- * `scripts/ui-pr-screenshot-evidence.mjs` routes it to the four `*-bulk-delete-*` frames that
- * actually photograph it. Making either broad here would have the two registries disagree about
- * what evidence a change to one of them requires.
- *
- * The consequence runs the other way too, and it is the defect issue 1378 names. A `'targeted'`
- * row placed under `src/ui/svelte/components/` is swallowed by that directory leg of
- * `BROAD_SIGNAL_PATTERN` whatever judgement is recorded beside it — a directory cannot tell a
- * primitive from a component that merely lives there. Property (c) of the integrity test is what
- * reports that, by asserting each row's `evidence` against what the pattern actually matches.
- *
- * ── THE MEMBERSHIP BAR ─────────────────────────────────────────────────────────────────────────
- *
- * spec.md requirement "The primitive set is a closed, versioned vocabulary" — two or more
- * INDEPENDENT callers. An importer is any other file under `src/` that imports the component by
- * path, which is the reading `scripts/lib/componentImporters.js` implements and the only one a
- * guard can decide. Ten ADJUDICATED candidates are recorded in {@link NOT_A_PRIMITIVE} rather than
- * omitted, because that same requirement obliges a candidate with fewer to be "recorded as ruled
- * out WITH ITS CALLERS NAMED — or with the fact that it has none — so the absence is a decision
- * rather than an oversight". All ten are below the bar, and that is MEASURED rather than asserted:
- * the integrity test compares each row's `callers` against the tree and fails a non-member that has
- * reached two, which is the promotion trigger this register missed twice before issue 1446.
- *
- * ADJUDICATED is the bound, and it is load-bearing: 48 of the 73 top-level `.svelte` files under
- * `apps/manager/` sit below the two-caller bar, and {@link NOT_A_PRIMITIVE} is emphatically not a
- * list of all of them. See its own docblock for the rule.
- *
- * ── WHAT THIS MODULE IS DELIBERATELY NOT ───────────────────────────────────────────────────────
- *
- * `SHARED_PRIMITIVES` in `tests/components/mounted-harness-primitive-allowlist.test.js` is NOT
- * derived from this manifest and must not become so. It answers a different question — can
- * omitting this file HANG a mounted tree — and its entries are on it for recorded reasons the
- * two-caller predicate structurally cannot express: `RowDisclosure` is on it at ONE caller, and
- * `EssenceQuantityCard` is on it at two from `apps/manager/components/`, a nested directory this
- * manifest does not enumerate. Deriving it here would silently drop both, and a missing entry there
- * does not fail a suite: it hangs it and reports `# cancelled`.
+ * Row shape is `{ path, library, status, evidence, scope, why }` on
+ * {@link DESIGN_SYSTEM_PRIMITIVES} and `{ path, library, evidence, callers, why }` on
+ * {@link NOT_A_PRIMITIVE}. `evidence` is `'broad'` or `'targeted'` and drives `viewLabCases.js`
+ * routing; `callers` holds paths, asserted equal to what `componentImporters.js` measures.
  */
 import { readFileSync } from 'node:fs';
 
 /**
- * The manager's own primitive directory, as a diff names it. Primitives sit DIRECTLY under it,
+ * The manager's own primitive directory, as a diff names it. Primitives sit directly under it,
  * mixed in with feature views, which is why the manager's set has to be named rather than globbed.
- *
- * Module-private: the paths themselves are the manifest's interface, and a second exported way to
- * ask where a primitive lives is a way for two callers to disagree.
  */
 const MANAGER_PRIMITIVE_DIRECTORY = 'src/ui/svelte/apps/manager/';
 
 /**
  * The three tables, read from the sibling data file. See the docblock above for why they are not
  * written out in this module.
- *
- * Resolved against `import.meta.url` rather than `process.cwd()`: this module is imported by
- * `node --test` from the repository root, by `scripts/*.mjs` run from anywhere, and by the
- * screenshot evidence gate under `gh`, and only one of those three has a predictable cwd. A
- * missing or malformed file throws here, at import, naming the path — which is the loud direction.
  */
 const MANIFEST = JSON.parse(
   readFileSync(new URL('designSystemPrimitives.json', import.meta.url), 'utf8')
@@ -321,27 +56,7 @@ function frozenTable(rows) {
   );
 }
 
-/**
- * Order two strings by code point, ascending.
- *
- * The reason is DETERMINISM, and the hazard is `localeCompare`, not the default comparator. A bare
- * `.sort()` on an array of strings reaches this exact order — nothing is stringified, and this
- * repository uses bare `.sort()` on string arrays elsewhere, including in this manifest's own test.
- * But `.sort()` is not available here: `npm run lint` covers this file at `--max-warnings=0` and
- * `unicorn/require-array-sort-compare` errors on a bare sort, so SOME comparator must be passed,
- * and the obvious reach is `localeCompare`. That one is locale-dependent: two machines could order
- * `EmptyState` and `EditorValidationSurface` differently and emit two different
- * `BROAD_SIGNAL_PATTERN` sources for the same manifest — passing the pinned source locally and
- * failing it on the runner. This is the comparator that satisfies the rule without introducing
- * that, and it mirrors `svelteComponentFiles.js`, which sorts the same way for the same reason.
- *
- * The sort itself is load-bearing, not decorative: removing it while moving a row reds the pinned
- * pattern source in `tests/design-system-primitives.test.js`.
- *
- * @param {string} left
- * @param {string} right
- * @returns {number} negative, zero or positive per the `Array#sort` contract
- */
+/** Order two strings by code point, ascending. */
 function byCodePoint(left, right) {
   if (left < right) return -1;
   return left > right ? 1 : 0;
@@ -350,198 +65,19 @@ function byCodePoint(left, right) {
 /**
  * The shipped shared primitive set: every file that meets the capability's two-caller bar and sits
  * in one of the two primitive directories.
- *
- * Authored alphabetically for reading. Nothing may DEPEND on that order — every derivation below
- * sorts explicitly, because an authoring order that happens to be sorted is a coincidence and the
- * first hand-added row appended in the wrong place would silently change what the derivation emits.
- *
- * @type {readonly {path: string, library: string|null, status: string, evidence: string,
- *   scope: string, why: string}[]}
  */
 export const DESIGN_SYSTEM_PRIMITIVES = frozenTable(MANIFEST.designSystemPrimitives);
 
-/**
- * ADJUDICATED candidates that sit in a primitive directory and are NOT members of the set.
- *
- * Recorded rather than omitted because the capability requires it: per spec.md requirement "The
- * primitive set is a closed, versioned vocabulary", a candidate below the two-caller bar is
- * "recorded as ruled out WITH ITS CALLERS NAMED — or with the fact that it has none — so the
- * absence is a decision rather than an oversight, and so a later reader can re-test the count
- * rather than re-derive it".
- *
- * ── WHAT BELONGS HERE, AND WHY IT IS NOT EVERY NON-MEMBER IN THE DIRECTORY ─────────────────────
- *
- * A row here records a candidate THE PROJECT HAS ALREADY ADJUDICATED — one some other artefact in
- * the repository has taken a written position on: a docblock that says why it is excluded from the
- * broad-signal set, a `library.html` entry it does or does not implement, an entry on the
- * mounted-harness hang guard. It is NOT a census of the directory. 48 of the 73 top-level `.svelte`
- * files under `apps/manager/` sit below the two-caller bar, and `components/` holds screen regions
- * and dead code besides; listing all of them would bury the ten judgements that were actually
- * made in dozens that were not, and the requirement cited above asks for recorded DECISIONS, not
- * for an inventory.
- *
- * So the next reader has two wrong moves available and neither is what this list wants: adding the
- * other 47 top-level manager files, and deleting `SystemOverviewView` as inconsistent with them.
- * The distinguishing fact is written down beside each row.
- *
- * ── EVERY ROW HERE IS RE-MEASURED, WHICH IS WHAT MAKES IT A REGISTER RATHER THAN A CLAIM ───────
- *
- * The requirement above asks that a later reader be able to "re-test the count rather than
- * re-derive it". Until issue 1446 nobody could: the count was a word in a sentence, and the only
- * clause that touched the tree was the disk check on `path`. Every row now carries `callers` as
- * data, and `tests/design-system-primitives.test.js` asserts it EQUALS what
- * `scripts/lib/componentImporters.js` measures — so a row that has quietly reached two callers
- * fails as a promotion it is owed, a row naming a caller that does not import it fails as a wrong
- * file, and a row naming a caller that does not exist fails as a phantom. All three had happened.
- *
- * `InspectorActionButton` was the worked example and is DELIBERATELY GONE, not lost. It predicted
- * its own exit here — "this row moves to {@link DESIGN_SYSTEM_PRIMITIVES} when a second inspector
- * adopts it" — `scoped/WorldEssenceCataloguePage.svelte` adopted it at issue 1400, issue 1429
- * corrected the sentence without making the move, and it then sat here for two more issues saying
- * out loud that it was in the wrong table while every gate passed. Issue 1446 made the move and
- * closed the gap that let it sit. `environment/CompositionList` left at the same time and was
- * worse: its row was authored the previous day, claimed one caller, and named a file for that
- * caller which has never existed. Do not re-add either row.
- *
- * ── THE `evidence` COLUMN HERE ─────────────────────────────────────────────────────────────────
- *
- * These rows carry `evidence` truthfully rather than aspirationally — it records what
- * `BROAD_SIGNAL_PATTERN` DOES with the path, not what anyone thinks the file deserves. The FOUR
- * under `src/ui/svelte/components/` — `DropZone`, `ImagePathPicker`, `ManagerColorPicker` and
- * `RowDisclosure` — are `'broad'` because that directory leg matches them today whatever anyone
- * thinks of them, which is the point issue 1378 makes: a directory cannot tell a primitive from a
- * component that merely lives there. The other SEVEN are `'targeted'`: the FIVE under
- * `apps/manager/` because membership in the broad set there is by NAME and none of them is on a
- * name list, and `apps/ActorSelectTopBar` and `apps/crafting/ComponentSourcesBar` because the
- * pattern does not reach `apps/` at all — it names `styles/`, `src/ui/svelte/components/`,
- * `src/ui/theme.js` and a NAME LIST under `apps/manager/`, and nothing else.
- * Either way the frames that claim each by `sourceMatches` are reached.
- *
- * `environment/EnvironmentValidationTab` stood in that list until issue 1517 and is DELIBERATELY
- * GONE, not lost: its row left when the tab adopted `EditorValidationSurface`. See the paragraph
- * below, which records the adjudication that removal overturns.
- *
- * THE FOUR AND FIVE THIS PARAGRAPH USED TO COUNT WERE DRIFT, corrected at issue 1513 against
- * `NOT_A_PRIMITIVE.length`, which `tests/design-system-primitives.test.js` pins at 12. That
- * change moves no row COUNT — it amends one row's ground, which is arithmetic-free — so the
- * numerals are corrected in the docblock it was already amending rather than by subtraction.
- * The "seven manager ones" in the same pass was drift of the same kind and is corrected here:
- * only six of the eight targeted rows are under `apps/manager/`, and reading the eighth as a
- * seventh manager row attributed `apps/ActorSelectTopBar` — a PLAYER-app file — to the name-list
- * ground rather than to the one it actually rests on.
- *
- * ── THE ROWS THAT ARE NOT UNDER-CALLED CANDIDATES ──────────────────────────────────────────────
- *
- * `SystemOverviewView` was added at issue 1444, and `recipe-item/RecipeItemLimitsTab` at issue
- * 1458. They are a different kind of non-member from the caller-count rows: both are plainly
- * single-caller, but none was proposed as a primitive in its own right. The first was proposed as
- * an unconverted CALL SITE of
- * `EditorValidationSurface` — the plan that change came from named four hand-rollers of the
- * validation surface and two of them render a different surface entirely — and the second as an
- * unconverted call site of `SearchablePopover`. So what each records is the measurement that
- * settles that, not a caller count. The distinction matters because the repair the register exists
- * to prevent is different in each case: for the caller-count rows it is "someone re-proposes
- * promoting this", and for these it is "someone re-proposes converting this", which would be
- * a visual redesign or a change of announced widget filed as an adoption.
- *
- * `apps/crafting/ComponentSourcesBar` WAS THE FOURTH MEMBER OF THIS GROUP AND HAS LEFT IT, at
- * issue 1513, for the caller-count rows — and the move is stated here rather than implied because
- * a row cannot stay in a group whose stated ground is "the measurement that settles this, not a
- * caller count" once that measurement has been settled the other way. It was recorded on a
- * disqualifier that named a missing capability: the control is a multi-select checklist and
- * `SearchablePopover` had a single `value` and closed on choose, so "a conversion needs a
- * multi-select mode on the primitive, which is a design question this row does not settle". Issue
- * 1513 settled it, added `multiple` and `stayOpen` to the primitive and CONVERTED the panel, so
- * the row survives on what every caller-count row rests on: one caller, and a screen region of
- * that size is not a shared primitive whichever primitives it reuses.
- * `recipe-item/RecipeItemLimitsTab` is now this group's ONLY member carrying a live
- * `SearchablePopover` adjudication.
- *
- * AND A FORMER MEMBER OF THIS GROUP IS AN OVERTURNED ADJUDICATION, WRITTEN OUT RATHER THAN DELETED.
- * `environment/EnvironmentValidationTab` was recorded at issue 1444 as a DIFFERENT SURFACE rather
- * than an unconverted one, measured: cards, a tick list and a `Chip` severity, with no status
- * medallion, no counts rail and no grouped row stack. The measurement was right and the conclusion
- * no longer follows. `spec.md` asks for ONE validation arrangement on every editor, so a tab that
- * draws a second one is what that requirement forbids rather than a tab exempt from it — and issue
- * 1517 converted it onto `EditorValidationSurface`, collapsing its `info` severity into `warn`
- * because the row vocabulary has no third word. The row is therefore deleted rather than reworded.
- * An audit that finds the 1444 ruling and re-proposes the conversion is re-proposing something
- * that has landed; this paragraph is where it learns that, and it is the reason a row may be
- * removed for being OVERTAKEN as well as for being wrong.
- *
- * `checks/ChecksEditorTabs` was recorded here too and is DELIBERATELY GONE, not lost. It was recorded here by
- * issue 1038 on the ground that its count is a bare mono numeral rather than a chip and "the two
- * treatments are deliberately different" — a STYLE divergence, which the maintainer has since ruled
- * is never an acceptable justification: a recorded divergence must be a FUNCTIONAL or INFORMATIONAL
- * difference the shared primitive absorbs as a capability. It was also backwards on the facts, since
- * `spec.md`'s Rail Marker Family makes the bare numeral the CORRECT vehicle for a record count and
- * `library.html`'s own `<TabBar>` specimen draws two vehicles on one bar. Issue 1429 widened
- * `EditorTabs` and converted the strip. Do not re-add this row.
- *
- * `downtime/WorldDowntimeTabs` was re-read under the SAME ruling, and its divergence claim did not
- * survive either, so its row now records CONVERSION-PENDING work rather than a justified exemption.
- * It stays on this list on its CALLER COUNT, which is what every other row here rests on and which
- * the ruling does not touch. Read the row before re-deriving the question: it names which parts of
- * that component's scoped block are a style divergence the ruling forbids as a justification, which
- * parts author a card and an identity block that are not the tablist at all, and which two are
- * genuinely functional capabilities `EditorTabs` still lacks.
- *
- * That is why the integrity test runs its per-row clauses over THESE rows too. The disk clause in
- * particular is live here: two of the twelve name files nothing imports, and their `callers` is
- * the empty array rather than an omitted field, because "measured, and there are none" and
- * "nobody filled this in" must not be the same value.
- *
- * @type {readonly {path: string, library: string|null, evidence: string,
- *   callers: readonly string[], why: string}[]}
- */
+/** Adjudicated candidates that sit in a primitive directory and are not members of the set. */
 export const NOT_A_PRIMITIVE = frozenTable(MANIFEST.notAPrimitive);
 
 /**
  * The ruled-out register, mirroring spec.md requirement "The ruled-out register is part of the
  * specification" and `library.html:1985-2002`.
- *
- * Part of the specification, not commentary: that requirement has declined candidates recorded
- * with the reasoning that declined them "so that the absence of a primitive is legible as a
- * decision", and has a re-proposal address that reasoning and, absent new evidence, use the
- * composition instead.
- *
- * GUARDED, because a hand-typed mirror shipped inside a change whose thesis is that unguarded
- * mirrors rot would be self-refuting. `tests/design-system-primitives.test.js` checks every `name`
- * against `library.html`, the same spelling guard the `library` column gets. `library.html` is the
- * only anchor: the requirement states the same ten judgements in PROSE ("a member row", "an actor
- * picker") and contains none of these names as a token, so a guard pointed there would be a guard
- * that could only be satisfied by rewriting the specification. What is asserted is spelling, not
- * that the verdict recorded here is the verdict recorded there — the conformance gate that reads
- * `library.html` structurally is the next change in this programme.
- *
- * `verdict` is `'composition'` (it decomposes entirely into members already in the set),
- * `'out-of-scope'` (declined for a product reason rather than a structural one) or `'foundry-owns'`
- * (Foundry already provides the surface). `replacement` is the composition or the API to use.
- *
- * The library's two aggregate wells are deliberately NOT rows here. "Five more" (`:1999`) names
- * five candidates in a sentence without individual reasoning, and "Graph canvas" (`:2000`) is a
- * zero-caller placeholder behind an experimental flag that "re-enters the set with the work that
- * ships it" — neither is a declined candidate with its own recorded judgement, and inventing rows
- * for them would put words in the register that the specification does not contain.
- *
- * @type {readonly {name: string, verdict: string, replacement: string|null, why: string}[]}
  */
 export const RULED_OUT = frozenTable(MANIFEST.ruledOut);
 
-/**
- * The shipped primitive paths carrying a given evidence judgement, in code-point order.
- *
- * SORTED EXPLICITLY. Callers derive regular expression sources from this, and a derivation whose
- * output depends on the manifest's authoring order is a derivation that changes the day someone
- * appends a row instead of inserting it alphabetically.
- *
- * Covers {@link DESIGN_SYSTEM_PRIMITIVES} only, never {@link NOT_A_PRIMITIVE}: a non-member must
- * not be able to widen the broad-signal set by being listed. The integrity test asserts the
- * evidence judgement of the non-member rows separately.
- *
- * @param {string} evidence `'broad'` or `'targeted'`
- * @returns {string[]} repository-relative POSIX paths
- */
+/** The shipped primitive paths carrying a given evidence judgement, in code-point order. */
 export function primitivePathsByEvidence(evidence) {
   return DESIGN_SYSTEM_PRIMITIVES.filter((row) => row.evidence === evidence)
     .map((row) => row.path)
@@ -551,14 +87,6 @@ export function primitivePathsByEvidence(evidence) {
 /**
  * The basenames, extension stripped, of the manager's own primitives carrying a given evidence
  * judgement — in code-point order.
- *
- * The manager's primitives sit DIRECTLY under `apps/manager/`, mixed in with feature views, so
- * they cannot be selected by a directory glob the way `components/` can: a glob there would
- * swallow `RecipesBrowserView.svelte` too. Consumers therefore need the names, and this is where
- * they come from.
- *
- * @param {string} evidence `'broad'` or `'targeted'`
- * @returns {string[]} component basenames without the `.svelte` extension
  */
 export function managerPrimitiveNamesByEvidence(evidence) {
   return primitivePathsByEvidence(evidence)
