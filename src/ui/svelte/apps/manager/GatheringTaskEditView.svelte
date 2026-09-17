@@ -36,11 +36,10 @@
     selectedDropId = '',
     rewardRules = null,
     characterModifierLibrary = [],
-    // The SYSTEM's one CHECK-modifier catalogue and the GATHERING check's selection over
-    // it (issue 1095). DELIBERATELY NOT `characterModifierLibrary` above: that is the d100
-    // percentage-point / multiplicative library, a different concept with different
-    // arithmetic, and the two are told apart by name rather than by a sentence on one
-    // screen. The picker below renders only under `bySubject`.
+    // The SYSTEM's one CHECK-modifier catalogue and the GATHERING check's selection over it
+    // (issue 1095). DELIBERATELY NOT `characterModifierLibrary` above: that is the d100
+    // percentage-point library, a different concept with different arithmetic. The picker below
+    // renders only under `bySubject`.
     checkModifierOptions = [],
     gatheringModifierPolicy = 'addAll',
     gatheringModifierMaxPicks = null,
@@ -159,11 +158,9 @@
   let selectedComponentTags = $state([]);
   let componentPageIndex = $state(0);
   let lastTaskId = $state('');
-  // One open flag per availability menu, rather than the single "which kind is open"
-  // string the hand-rolled menus shared (issue 1458). Each menu is its own
-  // `SearchablePopover` and owns its own open state; this map exists so the task-switch
-  // reset below can still force all three shut, and mutual exclusion now comes from the
-  // primitive's outside-click dismissal — clicking one trigger is outside the other two.
+  // One open flag per availability menu (issue 1458). Each menu is its own `SearchablePopover`
+  // and owns its open state; this map exists so the task-switch reset below can force all three
+  // shut, and mutual exclusion comes from the primitive's outside-click dismissal.
   let availabilityMenuOpen = $state({ biomes: false, timeOfDay: false, weather: false });
   let componentPageSize = $state(6);
   let toolSearchTerm = $state('');
@@ -229,15 +226,13 @@
       (componentPageIndex + 1) * componentPageSize
     )
   );
-  // This picker paginates the SAME `itemCards` the component browser renders, and since
-  // issue 1081 a card's linked source document — and therefore the live description fallback
-  // this picker's "No description has been added." message is the absence of — resolves on
-  // demand rather than during the store's refresh. This view never mounts
-  // `ComponentsBrowserView`, so without asking here a GM who comes straight to the gathering
-  // task editor sees that fallback on every compendium-linked component with an empty stored
-  // description, permanently. Scoped to this picker's own page, exactly as the browser scopes
-  // to its own; see `ComponentsBrowserView` for why it is called off the card rather than
-  // through the projection helper, and why the rejection is swallowed.
+  // This picker paginates the SAME `itemCards` the component browser renders, and since issue
+  // 1081 a card's linked source document — and therefore the live description fallback this
+  // picker's "No description has been added." message is the absence of — resolves on demand.
+  // This view never mounts `ComponentsBrowserView`, so without asking here a GM who comes straight
+  // to the task editor sees that fallback permanently. Scoped to this picker's own page; see
+  // `ComponentsBrowserView` for why it is called off the card rather than through the projection
+  // helper.
   $effect(() => {
     for (const card of paginatedComponentCards) card?.hydrate?.()?.catch?.(() => {});
   });
@@ -340,17 +335,14 @@
     return String(item?.description || '').trim();
   }
 
-  // Display precedence, per `data-models` `## Tool` requirement 13 and mirroring
-  // `toolStudio.js`: authored label, then the registration display SNAPSHOT
-  // (`name`/`img`/`description`), then the linked managed component, then the fallback.
-  // The snapshot rung is load-bearing — a first-class item-sourced tool carries
-  // `componentId: null` (issue 561), so the component-only resolver this replaced
-  // rendered "Unnamed tool" and the item-bag sentinel for a fully-populated tool
-  // (issue 976).
-  // The required-tools row's live region, on the same terms as `availabilitySummary` above:
-  // one polite summary per host row, because a chip primitive cannot own one and a removal
-  // announces nothing without it. A stale entry has no tool to name, so it reads through the
-  // same deleted-tool copy its chip carries.
+  // Display precedence, per `data-models` `## Tool` requirement 13 and mirroring `toolStudio.js`:
+  // authored label, then the registration display SNAPSHOT, then the linked managed component,
+  // then the fallback. The snapshot rung is load-bearing — a first-class item-sourced tool carries
+  // `componentId: null` (issue 561), so the component-only resolver this replaced rendered
+  // "Unnamed tool" for a fully-populated tool (issue 976).
+  // The required-tools row's live region, on the same terms as `availabilitySummary` above: one
+  // polite summary per host row, because a chip primitive cannot own one and a removal announces
+  // nothing without it.
   function requiredToolsSummary() {
     if (attachedToolEntries.length === 0) {
       return text(
@@ -383,9 +375,8 @@
     return tool?.img || component?.img || 'icons/svg/item-bag.svg';
   }
 
-  // Renders where a description belongs (it falls back to "No description has been
-  // added."), so the tool's own snapshot description outranks the linked component.
-  // The trailing component-name rung preserves the pre-976 behaviour for a
+  // Renders where a description belongs, so the tool's own snapshot description outranks the
+  // linked component. The trailing component-name rung preserves the pre-976 behaviour for a
   // component-linked tool that carries no description at all.
   function toolSummary(tool) {
     const component = managedItem(tool?.componentId);
@@ -492,12 +483,10 @@
    * The still-unselected conditions, shaped for `SearchablePopover` (issue 1458).
    *
    * Both `data` entries are hooks this VIEW owns rather than the primitive's own
-   * `data-popover-option`, and both are load-bearing. `data-gathering-task-availability-option`
-   * says which of the three menus a row belongs to — the three are rendered by one `{#each}`
-   * and the popover is portaled out of the field that anchors it, so without it a row cannot
-   * be told from its sibling menu's row. `data-condition-id` is the same attribute the
-   * SELECTED pills below carry, which is what lets one selector read a choice and its
-   * resulting pill.
+   * `data-popover-option`, and both are load-bearing: `data-gathering-task-availability-option`
+   * says which of the three menus a row belongs to, since the three are rendered by one `{#each}`
+   * and the popover is portaled out of the field that anchors it; `data-condition-id` is the same
+   * attribute the SELECTED pills carry, which lets one selector read a choice and its pill.
    *
    * @param {string} kind `biomes`, `timeOfDay` or `weather`
    * @returns {Array<object>} popover options in menu order
@@ -566,14 +555,12 @@
     return text('FABRICATE.Admin.Manager.Environment.Tasks.AnyTimeTitle', 'Any Time');
   }
 
-  // ONE live region per host row, and it is the CALLER'S to own: `Chip.svelte`'s `removable`
-  // note records that a bare chip cannot have one, because neither adding nor removing a member
-  // moves focus into the row. This is the same summary `ModifierPillSelect` books beside its own
-  // pill row, restated on every change to the set rather than announced as an event: a region
-  // wrapped around the row would read each added chip's whole subtree - its remove control's
-  // label included - and say nothing at all on a removal, since `aria-relevant` defaults to
-  // `additions text`. The names come through the active language's list conventions, because
-  // "3 selected" does not say WHICH three the row now shows.
+  // ONE live region per host row, and it is the CALLER'S to own: `Chip.svelte`'s `removable` note
+  // records that a bare chip cannot have one, because neither adding nor removing a member moves
+  // focus into the row. It restates the whole set on every change rather than announcing an event:
+  // a region wrapped around the row would read each added chip's whole subtree and say nothing at
+  // all on a removal, since `aria-relevant` defaults to `additions text`. The names come through
+  // the active language's list conventions, because "3 selected" does not say WHICH three.
   function availabilitySummary(kind) {
     const options = selectedConditionOptions(kind);
     const body =
@@ -697,9 +684,9 @@
   const respawnGainMode = $derived(respawn.gainMode || 'guaranteed');
   const respawnIsChance = $derived(respawnIsOverTime && respawnGainMode === 'chance');
   const respawnIsExpression = $derived(respawnIsOverTime && respawnGainMode === 'expression');
-  // The interval is authored as amount + unit; day/week lengths resolve against
-  // the world calendar at runtime. A legacy draft may still carry raw seconds —
-  // surface it as the largest whole unit that divides evenly.
+  // The interval is authored as amount plus unit; day and week lengths resolve against the world
+  // calendar at runtime. A legacy draft may still carry raw seconds — surface it as the largest
+  // whole unit that divides evenly.
   const intervalParts = $derived(
     (() => {
       if (respawn.intervalUnit)
@@ -730,8 +717,8 @@
   function setRespawnInterval(value, unit) {
     const next = Number(value);
     const intervalUnit = RESPAWN_UNITS[unit] ? unit : 'hours';
-    // Persist amount + unit (calendar-aware at runtime); normalization drops any
-    // legacy intervalSeconds now that a unit is present.
+    // Persist amount plus unit (calendar-aware at runtime); normalization drops any legacy
+    // `intervalSeconds` now that a unit is present.
     updateRespawn({
       intervalUnit,
       intervalAmount: Number.isFinite(next) && next > 0 ? Math.round(next) : 0,
@@ -742,8 +729,8 @@
     updateRespawn({ chance: Number.isFinite(next) ? Math.min(1, Math.max(0, next / 100)) : 0 });
   }
   function setRespawnPolicy(value) {
-    // Switching to over-time always carries a gain mode so the draft is valid
-    // even before normalization (defaults to the current/guaranteed mode).
+    // Switching to over-time always carries a gain mode so the draft is valid even before
+    // normalization.
     updateRespawn(
       value === 'overTime' ? { policy: 'overTime', gainMode: respawnGainMode } : { policy: value }
     );
@@ -755,12 +742,9 @@
     updateRespawn({ amountExpression: String(value ?? '') });
   }
 
-  // --- Depleted-behavior authoring (linked-marker canvas visual on depletion). -
-  // Applies to a placed gathering-task interactable's linked Tile marker. The only
-  // behavior is swap-image: while the environment's node for this task is depleted
-  // the marker shows `swapImage`, and it flips back to the available image when the
-  // node respawns. (A Tile marker has no nameplate, so the postfix mode is not
-  // offered; there is no destructive delete behavior.)
+  // Depleted-behavior authoring: a placed gathering-task interactable's linked Tile marker shows
+  // `swapImage` while the environment's node for this task is depleted, and flips back when the
+  // node respawns. A Tile marker has no nameplate, so the postfix mode is not offered.
   const depletedBehavior = $derived(nodes.depletedBehavior || {});
   const depletedSwapImage = $derived(
     typeof depletedBehavior.swapImage === 'string' ? depletedBehavior.swapImage : ''
@@ -785,8 +769,8 @@
     updateDepletedBehavior({ swapImage: '' });
   }
   function onDepletedImageContextMenu(event) {
-    // Right-click on the thumbnail clears the chosen depleted image (the visible
-    // "Remove image" button below covers keyboard users).
+    // Right-click on the thumbnail clears the chosen depleted image; the visible "Remove image"
+    // button below covers keyboard users.
     event.preventDefault();
     event.stopPropagation();
     if (depletedSwapImage) clearDepletedImage();
@@ -821,7 +805,7 @@
   }
 
   // Cap the number of modifier chips a drop row shows; beyond that, redirect to the selected
-  // rule's inspector. (Up to the cap, the chips still scroll if long names overflow the cell.)
+  // rule's inspector.
   function hasModifierOverflow(row) {
     return modifierEntries(row).length >= maxVisibleModifiers + 1;
   }
@@ -873,9 +857,9 @@
     return `${modifierEffectiveOperator(entry)}${magnitude}%`;
   }
 
-  // A `Chip` tone name (issue 883), so no `is-` prefix. The drop-modifier pill keeps
-  // its own positive/negative colours at three-class specificity; this only decides
-  // which of the three states a row is in.
+  // A `Chip` tone name (issue 883), so no `is-` prefix. The drop-modifier pill keeps its own
+  // positive/negative colours at three-class specificity; this only decides which of the three
+  // states a row is in.
   function modifierTone(entry) {
     if (entry && entry.kind === 'character') {
       return entry.operator === '-' ? 'negative' : 'positive';
@@ -987,13 +971,10 @@
 </script>
 
 <!--
-  Every task section opens with the same card header — an `<h3>` title over an optional
-  muted hint — so the markup is declared once here instead of at each section.
-
-  The two headers that also host a controls cluster (the component browser's two searches,
-  the drop rules search and add button) keep their own markup: a header with a second child
-  is a different composition, and routing those controls through a snippet parameter would
-  move them away from the card they belong to for no gain.
+  Every task section opens with the same card header — an `<h3>` title over an optional muted hint
+  — so the markup is declared once here instead of at each section. The two headers that also host
+  a controls cluster keep their own markup: a header with a second child is a different
+  composition.
 -->
 {#snippet taskCardHeader(title, hint)}
   <div class="manager-task-card-header">
@@ -1181,16 +1162,12 @@
         {#each ['biomes', 'timeOfDay', 'weather'] as kind (kind)}
           <Field as="div" data-gathering-task-field={kind}>
             <span>{availabilityFieldLabel(kind)}</span>
-            <!-- `SearchablePopover`, not a hand-rolled trigger-plus-listbox (issue 1458).
-                 The same conversion as `GatheringEventEditView`'s, which this menu was a
-                 near-verbatim copy of. `showSearch={false}` keeps
-                 `triggerHasPopup="listbox"` truthful and keeps the empty branch reading
-                 "All biomes selected" rather than a no-search-results hint, and the
-                 `.manager-availability-picker` wrapper is gone because
-                 `.manager-travel-picker` declares the same `position: relative;
-                 min-width: 0`. `bind:open` exists for ONE reason: the task-switch effect
-                 above closes every open menu, and a portaled panel that outlived its task
-                 would hang over a form whose contents had changed underneath it. -->
+            <!-- `SearchablePopover`, not a hand-rolled trigger-plus-listbox (issue 1458), the same
+                 conversion as `GatheringEventEditView`'s. `showSearch={false}` keeps
+                 `triggerHasPopup="listbox"` truthful and keeps the empty branch reading "All
+                 biomes selected". `bind:open` exists for ONE reason: the task-switch effect above
+                 closes every open menu, and a portaled panel that outlived its task would hang
+                 over a form whose contents had changed underneath it. -->
             <SearchablePopover
               bind:open={availabilityMenuOpen[kind]}
               options={availabilityMenuOptions(kind)}
@@ -1335,12 +1312,9 @@
                   >
                 </div>
               {/each}
-              <!-- Dashed, and deliberately NOT `fullWidth` (issue 1118, row 34). It is the
-                   add-a-row verb at the foot of the modifier list, which is what `dashed`
-                   states; the list is a column of grid rows and a full-width dashed control
-                   under them would read as a fourth row rather than as the slot that adds
-                   one. Its scoped `justify-self: start` went with the conversion — it was a
-                   grid property on a flex item and had never done anything. -->
+              <!-- Dashed, and deliberately NOT `fullWidth` (issue 1118): it is the add-a-row verb
+                   at the foot of the modifier list, and a full-width dashed control under a column
+                   of grid rows would read as a fourth row rather than as the slot that adds one. -->
               <ManagerButton
                 role="dashed"
                 disabled={(characterModifierLibrary || []).length === 0}
@@ -1356,11 +1330,10 @@
       </section>
     {/if}
 
-    <!-- This task's own CHECK-modifier pick (issue 1095). Rendered under the gathering
-         check's `bySubject` rule, whatever the resolution mode: the selection is authored
-         and persisted in every mode, and it applies once a formula-rolled mode is
-         selectable (issue 683, decision 8). The Checks screen carries the dormancy notice;
-         repeating it on every task row would be noise. -->
+    <!-- This task's own CHECK-modifier pick (issue 1095). Rendered under the gathering check's
+         `bySubject` rule, whatever the resolution mode: the selection is authored and persisted in
+         every mode. The Checks screen carries the dormancy notice; repeating it on every task row
+         would be noise. -->
     {#if gatheringModifierPolicy === 'bySubject'}
       <section class="manager-task-dc-card" data-gathering-task-check-modifiers>
         {@render taskCardHeader(
@@ -1402,14 +1375,12 @@
           <!-- `<div>`, not `<label>`: see the NAMING contract in `Stepper.svelte`. -->
           <Field as="div" class="manager-task-dc-field">
             <span>{text('FABRICATE.Admin.Manager.Gathering.TaskDcOverride', 'DC')}</span>
-            <!-- `min={0}` because a DC below zero is not a DC, and an unset field steps
-                 from `min ?? 0` — without it one click of `−` on the blank field commits
-                 -1. The bare input this replaced had no `min` either, but it also had no
-                 live decrement button.
+            <!-- `min={0}` because a DC below zero is not a DC, and an unset field steps from
+                 `min ?? 0` — without it one click of `−` on the blank field commits -1.
 
                  `fill` needs a slot to fill, and this card had none: the width comes from
-                 `.manager-task-dc-field`'s `max-width` in this component's `<style>`. See
-                 the note there for why dropping `fill` would not have been the fix. -->
+                 `.manager-task-dc-field`'s `max-width` in this component's `<style>`. See the note
+                 there for why dropping `fill` would not have been the fix. -->
             <Stepper
               value={dcOverrideValue}
               allowUnset
@@ -1502,9 +1473,9 @@
           </Field>
 
           {#if respawnIsOverTime}
-            <!-- `<div>`, not `<label>`: see the NAMING contract in `Stepper.svelte`. The
-                 Stepper precedes the unit `<select>`, so the caption bound to the Stepper's
-                 `−` button rather than to either control the reader would expect. -->
+            <!-- `<div>`, not `<label>`: see the NAMING contract in `Stepper.svelte`. The Stepper
+                 precedes the unit `<select>`, so the caption bound to the Stepper's `−` button
+                 rather than to either control the reader would expect. -->
             <Field as="div" class="manager-task-node-interval">
               <span>{text('FABRICATE.Admin.Manager.Economy.RespawnEvery', 'Every')}</span>
               <div class="manager-task-node-interval-row">
@@ -1714,12 +1685,11 @@
       <div class="manager-task-required-tools-attached" data-gathering-task-required-tools-attached>
         <!-- THE ROW IS THE LAST RUNG OF THE CHIP'S FOCUS LADDER (issue 1515), which is why it is
              rendered in BOTH states rather than only when it holds chips. `Chip` takes its focus
-             destination before it removes the chip - the next remove control, else the previous
-             one, else the nearest `[data-chip-remove-fallback]` - and the library search below
-             carries that hook only while this system HAS a tool library. Remove the last required
-             tool in a system with none and the ladder ran out and focus fell to `<body>`. A row
-             that appeared only alongside chips could not be that rung either: it would be
-             resolved, focused, and then replaced by the empty state in the same removal. -->
+             destination before it removes the chip — the next remove control, else the previous
+             one, else the nearest `[data-chip-remove-fallback]` — and the library search below
+             carries that hook only while this system HAS a tool library. A row that appeared only
+             alongside chips could not be that rung either: it would be resolved, focused, and then
+             replaced by the empty state in the same removal. -->
         <div
           class="manager-chip-row"
           tabindex="-1"
@@ -1787,13 +1757,11 @@
 
       {#if libraryToolList.length > 0}
         <div class="manager-task-required-tools-search">
-          <!-- THE FOCUS HOOK RIDES `inputAttrs`, NOT THE REST SPREAD (issue 1515). This
-               component's rest spread lands on the `<label>` and only `inputAttrs` reaches the
-               `<input>` inside it, so the hook used to name a `<label>` - which `Chip` would
-               then call `.focus()` on, and which is focusable only through the browser's own
-               label delegation. `Chip`'s contract says the caller owns this destination and
-               says nothing about delegation, and no test covered it. The input is the control
-               the GM lands on, so the hook goes where the control is. -->
+          <!-- THE FOCUS HOOK RIDES `inputAttrs`, NOT THE REST SPREAD (issue 1515). This component's
+               rest spread lands on the `<label>` and only `inputAttrs` reaches the `<input>` inside
+               it, so the hook used to name a `<label>`, which is focusable only through the
+               browser's own label delegation. `Chip`'s contract says nothing about delegation, and
+               the input is the control the GM lands on. -->
           <ManagerSearchField
             compact
             value={toolSearchTerm}
@@ -2680,18 +2648,14 @@
      card — ~670px at `manager-gathering-task-editor-normal` and ~960px at `-stacked` — and
      put the − and + most of a foot apart with the value floating between them.
 
-     A cap, rather than dropping `fill`. Dropping it fixes nothing here: an unfilled
-     `.fab-stepper` is a flex item with `width: auto`, and `align-items: stretch` widens it
-     to exactly the same box — measured at 600/600px — leaving a 48px input marooned in the
-     middle of a stretched border and the control 8px shorter than its siblings. 160px is
-     the width the `fill` variant was measured against (the pinned operand slot at
-     `styles/fabricate.css:3156`) and leaves a 106px typeable field. Taking a SIZE from the
-     layout context is permitted; restyling the primitive is not. */
-  /* `:global(...)`, chained with `.manager-field`: this class now sits on a `<Field>`, and a
-     scoped rule cannot reach a class the component hands to a child (see `Field.svelte`). The
-     `.manager-field` compound is not decoration — it restores the (0,2,0) the scoped
-     `.manager-task-dc-field.svelte-hash` form had, which the bare `:global(.manager-task-dc-field)` would drop to
-     (0,1,0). */
+     A CAP, rather than dropping `fill`: an unfilled `.fab-stepper` is a flex item with
+     `width: auto`, and `align-items: stretch` widens it to exactly the same box, leaving a 48px
+     input marooned in a stretched border. 160px is the width the `fill` variant was measured
+     against. Taking a SIZE from the layout context is permitted; restyling the primitive is not. */
+  /* `:global(...)`, chained with `.manager-field`: this class sits on a `<Field>`, and a scoped
+     rule cannot reach a class the component hands to a child. The `.manager-field` compound is not
+     decoration — it restores the (0,2,0) the scoped form had, which a bare `:global()` would drop
+     to (0,1,0). */
   :global(.manager-field.manager-task-dc-field) {
     max-width: 160px;
   }
@@ -2729,18 +2693,14 @@
     gap: var(--fab-space-2);
   }
 
-  /* Size the unit `<select>` to its content instead of letting it take `width: 100%` from
-     the blanket `.fabricate-field.manager-field select` rule.
+  /* Size the unit `<select>` to its content instead of letting it take `width: 100%` from the
+     blanket `.fabricate-field.manager-field select` rule.
 
-     The grid gives the filled Stepper a definite remaining-width track beside the unit.
-     The node grid's minimum leaves room for both controls and wraps fields when needed.
-
-     The `[data-…-unit]` qualifier is LOAD-BEARING, not a second way of saying `select`.
-     Svelte 5 emits its scoping class as `:where(.svelte-hash)` on every compound after the
-     first, and `:where()` contributes ZERO specificity — so a plain
-     `.manager-task-node-interval-row select` compiles to (0,2,1) and merely TIES the blanket
-     rule, resolving on the source order of two separately loaded stylesheets. The attribute
-     lifts the class column to 3 and makes it win outright. */
+     The `[data-…-unit]` qualifier is LOAD-BEARING, not a second way of saying `select`. Svelte 5
+     emits its scoping class as `:where(.svelte-hash)` on every compound after the first, and
+     `:where()` contributes ZERO specificity — so a plain `.manager-task-node-interval-row select`
+     compiles to (0,2,1) and merely TIES the blanket rule, resolving on the source order of two
+     separately loaded stylesheets. The attribute lifts the class column to 3. */
   .manager-task-node-interval-row select[data-gathering-task-node-interval-unit] {
     width: auto;
   }
@@ -2759,8 +2719,7 @@
     font-size: var(--font-size-13, 0.8125rem);
   }
 
-  /* Title/hint sit on the SAME row as the swap-image thumbnail (image alongside
-     the heading + description, not stacked beneath it). */
+  /* Title and hint sit on the SAME row as the swap-image thumbnail. */
   .manager-task-depleted-row {
     display: flex;
     align-items: flex-start;
@@ -2772,8 +2731,8 @@
     min-width: 0;
   }
 
-  /* The image picker plus the "Remove image" button stack vertically: the clear
-     control sits directly UNDERNEATH the thumbnail. */
+  /* The image picker plus the "Remove image" button stack vertically, so the clear control sits
+     directly underneath the thumbnail. */
   .manager-task-depleted-image-column {
     flex: 0 0 auto;
     display: flex;
@@ -2792,10 +2751,9 @@
     gap: var(--fab-space-1);
   }
 
-  /* Cost field sits beside the per-actor modifiers; captions align at the top so
-     the cost input and the first modifier row land on the same line. Grids (not
-     flex) so each control fills its track and the global input width:100% can't
-     force them onto separate lines. */
+  /* Cost field sits beside the per-actor modifiers; captions align at the top so the cost input
+     and the first modifier row land on the same line. Grids rather than flex, so each control
+     fills its track and the global `input { width: 100% }` cannot force them onto separate lines. */
   .manager-task-stamina-row {
     display: grid;
     grid-template-columns: 112px minmax(0, 1fr);
@@ -2803,20 +2761,16 @@
     align-items: start;
   }
 
-  /* `:global(...)`, chained with `.manager-field`: this class now sits on a `<Field>`, and a
-     scoped rule cannot reach a class the component hands to a child (see `Field.svelte`). The
-     `.manager-field` compound is not decoration — it restores the (0,2,0) the scoped
-     `.manager-task-stamina-cost-field.svelte-hash` form had, which the bare `:global(.manager-task-stamina-cost-field)` would drop to
-     (0,1,0). */
+  /* `:global(...)`, chained with `.manager-field`, for the reason `.manager-task-dc-field` above
+     records: the compound restores the (0,2,0) the scoped form had. */
   :global(.manager-field.manager-task-stamina-cost-field) {
     width: 100%;
   }
 
-  /* The WHOLE selector is global, not just its first compound. Svelte scopes the LAST
-     compound of a rule whose first is `:global(...)`, and it does so with a BARE
-     `.svelte-hash` rather than `:where(.svelte-hash)` — which reaches the span correctly
-     and lifts the rule from the (0,2,1) it had to (0,3,1). A repair may not move the
-     cascade, so the descendant goes inside the `:global()` too. */
+  /* The WHOLE selector is global, not just its first compound. Svelte scopes the LAST compound of
+     a rule whose first is `:global(...)`, and with a BARE `.svelte-hash` rather than
+     `:where(.svelte-hash)` — which reaches the span correctly and lifts the rule from (0,2,1) to
+     (0,3,1). A repair may not move the cascade. */
   :global(.manager-field.manager-task-stamina-cost-field > span) {
     white-space: nowrap;
   }

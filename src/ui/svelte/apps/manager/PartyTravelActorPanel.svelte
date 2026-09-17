@@ -1,44 +1,28 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  The 210px travel-actor column of a World > Parties card: eyebrow, tile, and the
-  anchored link/change control with its flipping actor picker.
+  The 210px travel-actor column of a World > Parties card: eyebrow, tile, and the anchored
+  link/change control with its flipping actor picker. A separate unlink button is present whenever a
+  travel actor is set, because the right-click affordance on the tile is not keyboard-reachable.
 
   Three things here are Fabricate's rather than the prototype's.
 
-  1. The tile's UNLINKED state renders through `EmptyState` in its `compact`
-     treatment, which `ui-integration/spec.md:174` requires of every manager "nothing
-     here" message and `:182` forbids resizing per screen. The `<button>` WRAPS the
-     primitive rather than being replaced by it, because `EmptyState` has no root
-     handlers and no element prop: replacing the button would lose click-to-open,
-     right-click-to-open and the drop target. The wrapper therefore takes the button
-     reset (Foundry pins a fixed button height, which crops the panel) and owns the
-     `is-drop-active` affordance, because after the wrap that class lands on the button
-     while the dashed border lives inside the primitive's scoped style.
-  2. The LINKED state mirrors the compact metrics (32px tile at radius 9, the same
-     padding, gap and type) rather than the prototype's 38px tile, or linking an actor
-     visibly shrinks the panel and swaps tile sizes in the same slot. The `min-height`,
-     the prototype's `--fab-bg-1` fill and its radius all hang on the WRAPPER — the slot
-     both states occupy — so the linked tile is filled as the prototype draws it without
-     any of it reaching `EmptyState`'s chrome or its no-fill contract.
-  3. The picker's candidate set is the GM-CONFIGURED player-character actor types, the
-     same membership the member picker uses — a world's NPC roster is unbounded (bestiary
-     imports run to hundreds of actors), and a picker that lists all of them buries the
-     handful of actors that could plausibly stand for a party. A GM who wants a group
-     token, vehicle or mount to be eligible adds that actor type under Player Character
-     Actor Types in the module settings, which is the one place the module decides which
-     actors it is allowed to touch. Membership is read from the projected
-     `isPlayerCharacter` flag, tested STRICTLY (`=== true`) for the reason
-     `PartyAddMemberPanel.svelte` documents. Dropping an actor onto the tile is
-     deliberately NOT filtered: a drop names one actor explicitly, so it is the escape
-     hatch for a one-off that the type list does not cover — and because that escape
-     hatch exists, the CURRENT travel actor is always offered even when it is
-     ineligible, so the picker never hides the value it is being opened to change.
-     Each option's meta says where that actor already stands ("Travel actor for X" /
-     "In X"), which surfaces the composite-uniqueness collision before the pick fails
-     instead of after.
-
-  A separate unlink button is present whenever a travel actor is set, because the
-  right-click affordance on the tile is not keyboard-reachable.
+  1. The tile's UNLINKED state renders through `EmptyState` in its `compact` treatment, which
+     `ui-integration/spec.md` requires of every manager "nothing here" message and forbids resizing
+     per screen. The `<button>` WRAPS the primitive rather than being replaced by it, because
+     `EmptyState` has no root handlers and no element prop, so replacing the button would lose
+     click-to-open, right-click-to-open and the drop target. The wrapper therefore takes the button
+     reset and owns the `is-drop-active` affordance.
+  2. The LINKED state mirrors the compact metrics rather than the prototype's 38px tile, or linking
+     an actor visibly shrinks the panel and swaps tile sizes in the same slot. The `min-height`, the
+     fill and the radius hang on the WRAPPER — the slot both states occupy — so none of it reaches
+     `EmptyState`'s chrome or its no-fill contract.
+  3. The picker's candidate set is the GM-CONFIGURED player-character actor types, the same
+     membership the member picker uses: a world's NPC roster is unbounded, and listing all of it
+     buries the handful of actors that could stand for a party. Membership is read from the
+     projected `isPlayerCharacter` flag, tested STRICTLY for the reason `PartyAddMemberPanel.svelte`
+     documents. A DROP is deliberately unfiltered — it names one actor explicitly — and because that
+     escape hatch exists the CURRENT travel actor is always offered even when ineligible, so the
+     picker never hides the value it is opened to change. Each option's meta says where that actor
+     already stands, which surfaces the composite-uniqueness collision before the pick fails.
 -->
 <script>
   import EmptyState from './EmptyState.svelte';
@@ -85,17 +69,11 @@
         : '')
   );
 
-  // The eligible set, not the world roster: an actor whose type is not one the GM listed
-  // under Player Character Actor Types is not offered.
-  //
-  // Plus the CURRENT travel actor, always, even when it is not eligible. A drop onto the
-  // tile is deliberately unfiltered, and the GM may also have set this before narrowing
-  // the configured types, so a linked actor outside the eligible set is a state the panel
-  // can genuinely be in. Filtering it out of its own picker would mean opening the picker
-  // to change a travel actor and finding nothing marked, no check glyph, and a count whose
-  // denominator silently omits the very actor the tile above is displaying — and choosing
-  // any row would then be the only way out. It is appended rather than merged into the
-  // filter so the eligibility rule stays exactly one predicate.
+  // The eligible set, not the world roster — plus the CURRENT travel actor, always, even when it
+  // is ineligible: a drop is unfiltered and the GM may have narrowed the configured types since, so
+  // that is a state the panel can genuinely be in, and filtering it out would open the picker on a
+  // list with nothing marked. Appended rather than merged into the filter, so the eligibility rule
+  // stays exactly one predicate.
   const eligibleActors = $derived(
     actorOptions.filter((option) => option.isPlayerCharacter === true)
   );
@@ -119,19 +97,12 @@
     }))
   );
 
-  // THREE reasons, in precedence order, mirroring `PartyAddMemberPanel`: an empty world
-  // and a world whose actors are all of an unconfigured type are different problems with
-  // different fixes, and collapsing them into "no actor matches your search" tells a GM
-  // staring at a world full of actors to search harder.
-  //
-  // TWO OF THE THREE LIVE HERE NOW (issue 1373). Both are reasons the LIST IS EMPTY, which is
-  // a fact about this world; the third was the SEARCH MISS, which is a fact about the control
-  // and is `noMatchesHint` below. Splitting them that way is not tidying: this site's third
-  // branch fired on `eligibleActors.length > 0`, a proxy for "the list holds something", and
-  // every other picker in the app had no such branch at all and answered a search miss with
-  // its own list-is-empty sentence. `SearchablePopover` owns the predicate now, so the
-  // distinction `openspec/specs/design-system/spec.md` requires holds at all 24 call sites
-  // rather than at the two that had remembered to write it.
+  // THREE reasons in precedence order, mirroring `PartyAddMemberPanel`: an empty world and a world
+  // whose actors are all of an unconfigured type are different problems with different fixes, and
+  // collapsing them tells a GM staring at a world full of actors to search harder. TWO live here
+  // (issue 1373) because both are facts about the WORLD; the SEARCH MISS is a fact about the
+  // control and is `SearchablePopover`'s own predicate, which is what makes the distinction
+  // `openspec/specs/design-system/spec.md` requires hold at all 24 call sites.
   const pickerEmptyHint = $derived(
     actorOptions.length === 0
       ? text(
@@ -153,10 +124,8 @@
     )
   );
 
-  // The explanation, rendered as the panel's BODY rather than appended to its title: it
-  // names the setting to change, which is prose, and `EmptyState` sets a title as a serif
-  // heading with no width cap. Only the unconfigured-types reason has one — the other two
-  // are complete in a line.
+  // The explanation is the panel's BODY, not its title: it names a setting, which is prose, and
+  // `EmptyState` sets a title as a serif heading with no width cap.
   const pickerEmptyDetail = $derived(
     actorOptions.length > 0 && eligibleActors.length === 0
       ? text(
@@ -344,22 +313,15 @@
     text-transform: uppercase;
   }
 
-  /* The slot BOTH tile states occupy, so the panel does not resize on link/unlink.
-     `height: auto` and the padding/border reset are what stop Foundry's fixed button
-     height from cropping the wrapped `EmptyState`.
+  /* The slot BOTH tile states occupy, so the panel does not resize on link/unlink. `height: auto`
+     and the padding/border reset stop Foundry's fixed button height cropping the wrapped
+     `EmptyState`, and the FILL and radius hang here rather than on `.is-linked` so the primitive's
+     own chrome and no-fill contract stay untouched (Deviation 9).
 
-     The FILL and the radius are the prototype's tile, measured like-for-like against its
-     LINKED state, and they hang here rather than on `.is-linked` for two reasons: the
-     wrapper is the slot, and `EmptyState`'s own chrome — its dashed border, its geometry
-     and its no-fill contract — stays untouched, which Deviation 9 requires of the
-     unlinked state.
-
-     `align-items: stretch` is load-bearing, not tidiness. `.manager-empty` is a
-     shrink-to-fit grid child, so under `center` a shorter localized string narrows the
-     dashed panel inside a full-width button — and the `is-drop-active` ring, which lives
-     on the BUTTON, then rings a wider box than the panel it is meant to outline. The
-     linked state puts `center` back below, because its children are a fixed 32px tile
-     over centred text rather than one full-width panel. */
+     `align-items: stretch` is load-bearing: `.manager-empty` is a shrink-to-fit grid child, so
+     under `center` a shorter localized string narrows the dashed panel inside a full-width button,
+     and the `is-drop-active` ring on the BUTTON then rings a wider box than the panel. The linked
+     state puts `center` back below, its children being a fixed tile over centred text. */
   .manager-party-actor-tile {
     display: flex;
     flex-direction: column;
@@ -376,9 +338,7 @@
     text-align: inherit;
   }
 
-  /* The linked state mirrors `EmptyState`'s COMPACT metrics — padding 16px 12px, a 6px
-     stack gap, a 32px tile at radius 9, a 12px serif title and an 11px/1.5 body — so
-     linking an actor does not visibly shrink the panel. */
+  /* The linked state mirrors `EmptyState`'s COMPACT metrics, so linking does not shrink it. */
   .manager-party-actor-tile.is-linked {
     box-sizing: border-box;
     align-items: center;
@@ -386,18 +346,12 @@
     border: 1.5px dashed var(--fab-accent-border);
   }
 
-  /* `.manager-party-actor-tile.is-drop-active` lives in `styles/fabricate.css`, not
-     here: the class is added by the `dragDrop` ACTION, never by this template, so a
-     scoped rule for it compiles to an "unused" comment with a `css_unused_selector`
-     warning — which fails `scripts/check-svelte-warnings.mjs` AND silently deletes the
-     affordance. */
+  /* `.is-drop-active` lives in `styles/fabricate.css`, not here: the `dragDrop` ACTION adds it,
+     never this template, so a scoped rule is pruned with a warning AND loses the affordance. */
 
-  /* HAND-MAINTAINED COPY of `EmptyState.svelte:180-185`'s compact tile (32px at radius 9),
-     because the linked state renders an actor rather than a no-state message and so cannot
-     reach that scoped block. The two are the two halves of ONE slot: an edit to the
-     primitive's compact tile that is not mirrored here makes the panel change size on
-     link/unlink, which is the whole defect the mirroring exists to prevent. The font-size
-     and colour are this file's own — the primitive's glyph rule is not a portrait frame. */
+  /* HAND-MAINTAINED COPY of `EmptyState`'s compact tile, because the linked state renders an actor
+     and cannot reach that scoped block. An edit there not mirrored here makes the panel change
+     size on link/unlink, which is the defect the mirroring exists to prevent. */
   .manager-party-actor-portrait {
     display: inline-flex;
     align-items: center;
