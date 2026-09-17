@@ -89,6 +89,9 @@
   --fab-accent-border: rgb(232 198 167 / 48%);
   --fab-on-accent: #111A23;
   --fab-on-danger: #0B121A;
+
+  /* `--fab-on-info` inks a solid `--fab-info` fill and takes each theme's own `--fab-on-success`, the ink that theme already proves readable on its solid fill; no rule here reads it and the premium companion does, so `tests/components/theme-rendered-validation.test.js` measures the 4.5:1 per theme and `tests/components/theme-colour-contract.test.js` pins the declaration in every theme block (issue 1765). */
+  --fab-on-info: #111A23;
   --fab-on-success: #111A23;
   --fab-biome-icon-foreground: #202124;
   --fab-success: #9AB89C;
@@ -193,6 +196,7 @@
   --fab-accent-border: rgb(99 212 123 / 54%);
   --fab-on-accent: #051E0C;
   --fab-on-danger: #04120A;
+  --fab-on-info: #051E0C;
   --fab-on-success: #051E0C;
   --fab-biome-icon-foreground: #202124;
   --fab-success: #5CB85C;
@@ -295,6 +299,7 @@
   --fab-accent-border: rgb(197 139 90 / 48%);
   --fab-on-accent: #141214;
   --fab-on-danger: #050405;
+  --fab-on-info: #141214;
   --fab-on-success: #141214;
   --fab-biome-icon-foreground: #202124;
   --fab-success: #92A78B;
@@ -397,6 +402,7 @@
   --fab-accent-border: rgb(200 163 110 / 48%);
   --fab-on-accent: #161C19;
   --fab-on-danger: #0E1310;
+  --fab-on-info: #161C19;
   --fab-on-success: #161C19;
   --fab-biome-icon-foreground: #202124;
   --fab-success: #AFC7A4;
@@ -499,6 +505,7 @@
   --fab-accent-border: rgb(159 197 232 / 48%);
   --fab-on-accent: #121824;
   --fab-on-danger: #0D1118;
+  --fab-on-info: #121824;
   --fab-on-success: #121824;
   --fab-biome-icon-foreground: #202124;
   --fab-success: #9DC9BD;
@@ -603,6 +610,7 @@
   --fab-accent-border: rgb(217 176 109 / 42%);
   --fab-on-accent: #191813;
   --fab-on-danger: #050403;
+  --fab-on-info: #F3F3F5;
   --fab-on-success: #F3F3F5;
   --fab-biome-icon-foreground: #202124;
   --fab-success: #617054;
@@ -705,6 +713,7 @@
   --fab-accent-border: rgb(228 192 102 / 46%);
   --fab-on-accent: #161007;
   --fab-on-danger: #100B05;
+  --fab-on-info: #0A0E1A;
   --fab-on-success: #0A0E1A;
   --fab-biome-icon-foreground: #202124;
   --fab-success: #81BE96;

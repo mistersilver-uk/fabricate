@@ -571,6 +571,8 @@ The forwarding-alias rule below is scoped to COLOUR, and that is narrower than a
 A colour alias is different in kind because the value it forwards is the one thing a theme swap must be able to change.
 No gate decides the colour case on its own; what a gate can decide is that the retired names do not return, which is what `tests/token-generation-gate.test.js` holds.
 
+A theme foundation read only by a companion module is declared and exempted the same way, and the companion-read set and its change-control rule are specified in `Downtime Preview and Premium Extension` in `openspec/specs/ui-integration/spec.md`.
+
 #### Scenario: A surface wants its own colour vocabulary
 
 - **WHEN** a surface wants to name a colour it already gets from a foundation token
