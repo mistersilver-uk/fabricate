@@ -24,6 +24,7 @@ import {
   managerComponentDir,
   readWorkspaceGrid,
   withoutComments,
+  compareStrings,
 } from './manager-layout-shared.js';
 import {
   ANCESTOR_CONTEXT_FLOOR,
@@ -114,7 +115,7 @@ test('Fabricate app shells suppress host click focus outlines while preserving k
   for (const [area, suppressing, supplying] of [
     ['module root', moduleFocusBlock, moduleFocusVisibleBlock],
   ]) {
-    const suppressed = elementsIn(suppressing).sort();
+    const suppressed = elementsIn(suppressing).sort(compareStrings);
     // NON-EMPTY, asserted rather than assumed, for the reason the note above gives: an empty
     // pair of lists satisfies the `deepEqual` below without comparing anything.
     assert.deepEqual(
@@ -124,7 +125,7 @@ test('Fabricate app shells suppress host click focus outlines while preserving k
         'or the comparison below is between two empty lists'
     );
     assert.deepEqual(
-      elementsIn(supplying).sort(),
+      elementsIn(supplying).sort(compareStrings),
       suppressed,
       `the ${area}'s focus-visible list must name exactly the elements its :focus list ` +
         'suppresses, or one element type is stripped of a ring and given none'
@@ -1519,11 +1520,11 @@ test('every remaining hand-rolled chip site is declared, so the migration can on
     // or the ratchet could never reach empty.
     .filter(({ path }) => /\bmanager-chip\b(?!-)/.test(readFileSync(path, 'utf8')))
     .map(({ name }) => name)
-    .sort();
+    .sort(compareStrings);
 
   assert.deepEqual(
     remaining,
-    [...UNCONVERTED].sort(),
+    [...UNCONVERTED].sort(compareStrings),
     'the hand-rolled chip list may only shrink: convert the file and delete its entry'
   );
 });

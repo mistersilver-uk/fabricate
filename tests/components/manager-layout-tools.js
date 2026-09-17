@@ -22,6 +22,7 @@ import {
   readWorkspaceGrid,
   stepperScoped,
   withoutComments,
+  compareStrings,
 } from './manager-layout-shared.js';
 import {
   AUTHORITY_PROBES,
@@ -595,7 +596,7 @@ test('both interpolated card fixtures are rooted at the class the primitive emit
   // TWO fixed arms and TWO controls, so the pair below is a discriminator rather than one value
   // four times: the controls drop the CALLER's `manager-checks-card` and keep the root.
   assert.deepEqual(
-    [...new Set(wrapperArguments)].sort(),
+    [...new Set(wrapperArguments)].sort(compareStrings),
     [`${root} manager-inspector-card`, `${root} manager-inspector-card manager-checks-card`],
     'every interpolated card fixture must carry the family root; the control arms remove the ' +
       'CALLER class and nothing else, because "the primitive unrooted" is a different mutation ' +

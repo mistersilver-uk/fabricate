@@ -12,7 +12,6 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { scopedComponentCss, withScopeHash } from '../helpers/scoped-component-css.js';
-import { declaration } from '../helpers/fullWidthRoute.js';
 import { openLayoutContext } from '../helpers/layout-harness.js';
 
 import {
@@ -20,7 +19,6 @@ import {
   chipCss,
   chipScoped,
   css,
-  stepperScoped,
   withChipHash,
 } from './manager-layout-shared.js';
 import {

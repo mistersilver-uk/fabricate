@@ -10,7 +10,6 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { declaration } from '../helpers/fullWidthRoute.js';
 import { openLayoutContext } from '../helpers/layout-harness.js';
 
 import {

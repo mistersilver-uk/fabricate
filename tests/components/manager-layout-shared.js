@@ -279,3 +279,12 @@ export function pagerBarFixture({ probe, value = '4', arrows = false }) {
     ></span>
   </div>`;
 }
+/**
+ * Order string lists deterministically. The default `sort()` coerces to string and compares UTF-16
+ * units, which is exactly what these class and selector lists want, but leaving it implicit reads
+ * as an oversight and trips the bug rule that cannot tell a string array from a numeric one.
+ */
+export function compareStrings(a, b) {
+  if (a < b) return -1;
+  return a > b ? 1 : 0;
+}
