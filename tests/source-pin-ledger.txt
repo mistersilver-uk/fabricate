@@ -69,7 +69,6 @@ tests/components/manager-contract.test.js	605
 tests/components/manager-control-rungs.test.js	7
 tests/components/manager-launch-readiness.test.js	9
 tests/components/manager-layout.test.js	96
-tests/components/manager-mounted.test.js	166
 tests/components/manager-row-menu-routing.test.js	3
 tests/components/manager-single-page-header.test.js	5
 tests/components/notice-mounted.test.js	1
@@ -128,6 +127,7 @@ tests/helpers/essenceFixtures.js	1
 tests/helpers/fabricateFacadeHarness.js	1
 tests/helpers/interactablesWindowContract.js	2
 tests/helpers/manager-button-cascade.js	2
+tests/helpers/manager/managerQueries.js	1
 tests/helpers/primitiveAdoptionContract.js	3
 tests/helpers/primitiveSourceContract.js	4
 tests/helpers/screenshot-gate-fakes.js	2
