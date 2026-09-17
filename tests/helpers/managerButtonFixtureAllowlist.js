@@ -53,7 +53,7 @@
 /** @type {ReadonlyArray<ManagerButtonFixtureExemption>} */
 export const FIXTURE_ALLOWLIST = Object.freeze([
   Object.freeze({
-    file: 'tests/components/manager-layout.test.js',
+    file: 'tests/components/manager-layout-tools.js',
     classes: 'manager-button is-primary',
     count: 1,
     why:
@@ -64,7 +64,7 @@ export const FIXTURE_ALLOWLIST = Object.freeze([
       'this one and the test proves nothing while still passing.',
   }),
   Object.freeze({
-    file: 'tests/components/manager-layout.test.js',
+    file: 'tests/components/manager-layout-tools.js',
     classes: 'manager-button is-danger',
     count: 1,
     why:
@@ -75,7 +75,7 @@ export const FIXTURE_ALLOWLIST = Object.freeze([
       'test measure the converted control twice and pass vacuously.',
   }),
   Object.freeze({
-    file: 'tests/components/manager-layout.test.js',
+    file: 'tests/components/manager-layout-browsers-fixtures.js',
     classes: 'fabricate-button manager-button is-danger',
     count: 1,
     why:
@@ -92,7 +92,7 @@ export const FIXTURE_ALLOWLIST = Object.freeze([
   // rather than quietly deleted, because this list exists to catch exactly the reverse: a
   // fixture outliving the control it models.)
   Object.freeze({
-    file: 'tests/components/manager-layout.test.js',
+    file: 'tests/components/manager-layout-tools.js',
     classes:
       'fabricate-button manager-button manager-travel-picker-trigger ' +
       'manager-checks-preview-actor-trigger',
@@ -103,7 +103,7 @@ export const FIXTURE_ALLOWLIST = Object.freeze([
       'unconverted control.',
   }),
   Object.freeze({
-    file: 'tests/components/manager-layout.test.js',
+    file: 'tests/components/manager-layout-select.js',
     classes: 'fabricate-button manager-button',
     count: 1,
     why:

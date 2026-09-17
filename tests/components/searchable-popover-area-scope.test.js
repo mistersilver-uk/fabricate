@@ -2648,8 +2648,11 @@ test('every fixture element in a picker’s family sits under one of its namespa
     );
   }
 
-  // A PRE/POST element total for one file, so a lossy stripper reds instead of passing quietly
-  // (`manager-layout.test.js` is the file issue 1470 already caught this on once). PRE is the
+  // A PRE/POST element total for one SUITE, so a lossy stripper reds instead of passing quietly
+  // (`manager-layout` is the suite issue 1470 already caught this on once). Issue 1670 split that
+  // one 13,915-line file into seven per-surface modules plus their fixtures, so the corpus is
+  // named by prefix rather than by path — the population, and therefore both thresholds below,
+  // are the ones this clause has always measured. PRE is the
   // family-relevant population a RAW, unblanked scan finds; POST is the same population after
   // blanking. The two need not agree in either direction, and today POST is the HIGHER of the
   // pair (53 against 49): this file's docblocks illustrate the very markup they describe
@@ -2661,7 +2664,15 @@ test('every fixture element in a picker’s family sits under one of its namespa
   // own stray apostrophe ("it's", "primitive's")
   // shifts the text after it and can corrupt this scanner's own `"[^"]*"|'[^']*'` quote pairing
   // well past the comment, dropping real markup along with the prose.
-  const layoutFile = 'tests/components/manager-layout.test.js';
+  const layoutFile = 'tests/components/manager-layout*.js';
+  const layoutSources = Object.keys(sources).filter((file) =>
+    file.startsWith('tests/components/manager-layout')
+  );
+  assert.ok(
+    layoutSources.length >= 7,
+    `the manager-layout suite scanned as ${layoutSources.length} modules, which is fewer than ` +
+      'the seven surfaces it is split across — the prefix has stopped reaching it'
+  );
   const familyRelevant = (text) =>
     PRIMITIVES.reduce((total, primitive) => {
       const written = classesWrittenBy(primitive);
@@ -2672,8 +2683,9 @@ test('every fixture element in a picker’s family sits under one of its namespa
         ).length
       );
     }, 0);
-  const rawLayoutElements = familyRelevant(sources[layoutFile]);
-  const blankedLayoutElements = familyRelevant(blanked.get(layoutFile));
+  const totalAcross = (read) => layoutSources.reduce((total, file) => total + familyRelevant(read(file)), 0);
+  const rawLayoutElements = totalAcross((file) => sources[file]);
+  const blankedLayoutElements = totalAcross((file) => blanked.get(file));
   assert.ok(
     blankedLayoutElements >= rawLayoutElements - 10,
     `blanking ${layoutFile}'s comments found ${blankedLayoutElements} family-relevant elements ` +
