@@ -262,11 +262,10 @@ test('the ledger reports the two figures epic 1656 tracks', (t) => {
   // `migrateRecipeForModeChange` and `remapWorldScopeIdentityFlags.js` -- on top of the figure
   // main carries.
   //
-  // 122/116 here: on top of everything main now carries, the issue-1683 sweep of the crafting and
-  // gathering engines and the two managers takes `_validateTools`, `_normalizeSalvage`,
-  // `_terminalStart` and `evaluateShoppingRequirement` back under the function threshold on
-  // comment lines alone. The file count is main's -- none of the four swept files left the list,
-  // all four are still oversized. Regenerated from the merged tree rather than reconciled by hand.
-  assert.equal(files, 122, 'oversized files');
+  // 117/120 here: on top of everything main now carries, the scoped-pages sweep takes five more
+  // `.svelte` files under the threshold on comment lines alone. Regenerated from the merged tree
+  // rather than reconciled by hand -- these counts are derived, so picking a side of the conflict
+  // would have pinned a figure no tree actually has.
+  assert.equal(files, 117, 'oversized files');
   assert.equal(keys.length - files, 116, 'oversized functions');
 });
