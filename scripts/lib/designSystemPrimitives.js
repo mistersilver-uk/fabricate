@@ -6,6 +6,8 @@
  *
  * Citations name a requirement heading in double quotes, never a line number, and
  * `tests/design-system-coverage.test.js` resolves every one against the capability's own headings.
+ * The `fabricate.css:NNN` line citations the rows carry are deliberately unguarded: nothing can
+ * resolve a line number, and a pin on one would red on unrelated edits to that sheet (issue 1472).
  *
  * Row shape is `{ path, library, status, evidence, scope, why }` on
  * {@link DESIGN_SYSTEM_PRIMITIVES} and `{ path, library, evidence, callers, why }` on
