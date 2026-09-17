@@ -1233,10 +1233,12 @@ A set MUST be renameable in the surface that shows it, because every other surfa
 A set addressable only by position is what makes reordering dangerous.
 
 A CHOICE GROUP is this document's name for the OR-alternative bundle `DOMAIN.md` calls an Ingredient Group, widened because the same bundle is valid on the result side where "ingredient" would be wrong.
+On the ingredient side it is exactly that OR: the crafter spends one alternative and the rest are untouched.
+On the RESULT side the bundle is not always exclusive — its award strategy states how many of its alternatives are handed over — so the name is retained for the shape the two sides share, which is a set of alternatives authored as one thing, rather than for the cardinality, which differs by side.
 Where the two documents are read together, they name one thing.
 A choice group is valid in BOTH containers and means something different in each, which the surface MUST make legible.
 In an ingredient set it is the crafter deciding what to spend.
-In a result set it is the player choosing which reward to take.
+In a result set it is the REWARD being selected — by the player, or by the roll, as the requirement "A result-side choice group states who chooses and how many it awards" specifies.
 A design that treats choice as ingredient-only cannot express a recipe that offers a reward the player picks.
 
 The ROUTED modes select exactly one result set per craft attempt, which is what makes the group and not the individual result row their unit of routing.
@@ -1278,7 +1280,7 @@ A mode change that would reduce the permitted cardinality MUST state what it wil
 
 - **WHEN** a GM authors alternatives inside a result set
 - **THEN** the group renders the same choice group used on the ingredient side
-- **AND** the player picks one of those alternatives when the craft resolves
+- **AND** the player picks one of those alternatives when the craft resolves, the group being set to player-chooses
 
 #### Scenario: A GM opens a result set two tiers share
 
@@ -1305,6 +1307,7 @@ An ingredient-side group is always one-of and always the crafter's decision, so 
 Offering a choice the model does not have is worse than offering none.
 
 THE CHOOSER names who picks the alternative, and it has exactly two values: the PLAYER chooses, or the ROLL decides.
+It is a different mechanism from `playerPicks`, which names who selects a check MODIFIER and is specified by the resolution-modes capability, and the two MUST NOT be unified: they decide over different objects, at different points, with different cardinalities.
 It MUST be a segmented control and MUST NOT be a toggle.
 Both values are live behaviour and neither is the absence of the other, so a two-state switch would state one of them as an off position it does not have.
 It sits in the group HEADER because it governs the whole bundle, and a copy on each row would invite a reader to set it per alternative.
@@ -1317,7 +1320,9 @@ The rows are otherwise the same row in both states: only the range cell appears 
 A range cell and an amount are different facts and MUST stay separately controlled.
 The range says WHICH alternative the roll selects; the amount says HOW MANY of it are awarded, and keeps the fixed-or-rolled control every result amount carries.
 
-THE AWARD MODE states how many alternatives the group hands over, and it is a closed set of three operations rather than one mode with a flag:
+THE AWARD STRATEGY states how many alternatives the group hands over, and it is a closed set of three operations rather than one mode with a flag:
+It is called a STRATEGY and not an award mode deliberately: `awardMode` is already canon on `progressive`, where it carries `partial`, `equal` and `exceed` and decides how a check-value budget is spent across an ordered result list.
+Two three-valued policies about what gets awarded, sharing one name, is a collision the persisted shape would inherit.
 
 - `any one of` awards exactly one.
 - `up to N` awards a SUBSET: no alternative twice, and an N above the alternative count awards all of them.
@@ -1337,14 +1342,14 @@ A draw of N above the alternative count exhausts the bundle rather than erroring
 
 A draw is ROLLED by definition, so `draw N` pins the chooser and hides it rather than leaving a player-chooses draw authorable, and pins N to its rolled form.
 
-The group header reads LEFT TO RIGHT as one sentence — award mode, N, replacement, chooser — with a help line beneath it restating the resolved behaviour in prose.
+The group header reads LEFT TO RIGHT as one sentence — award strategy, N, replacement, chooser — with a help line beneath it restating the resolved behaviour in prose.
 Four controls in a row are read faster as a sentence than as a form.
 
 A container-level group adder MUST NOT exist.
 A set's adders create ROWS, and a group is always something an existing row BECAME, reached through the convert control that row already carries.
 An "add group" button beside "add result" would ask a GM to state what the alternatives are before stating what the first one replaces, and would leave two paths to one construct.
 
-The persisted shape of the chooser, the award mode, N and replacement is out of scope for this capability and is specified by the data model.
+The persisted shape of the chooser, the award strategy, N and replacement is out of scope for this capability and is specified by the data model.
 
 #### Scenario: A GM lets the dice decide which reward is awarded
 
@@ -1373,7 +1378,7 @@ The persisted shape of the chooser, the award mode, N and replacement is out of 
 #### Scenario: A GM authors an ingredient-side choice group
 
 - **WHEN** a choice group is rendered inside an ingredient set
-- **THEN** it renders neither a chooser nor an award mode
+- **THEN** it renders neither a chooser nor an award strategy
 - **AND** it resolves as one-of, decided by the crafter
 
 ### Requirement: Every select renders the app’s own option list
