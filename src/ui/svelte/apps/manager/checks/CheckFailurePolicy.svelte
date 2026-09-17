@@ -1,34 +1,14 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  The FAILURE-RESULT POLICY card (issue 1098) — the On-failure section's first control on
-  all three activity routes.
+  The FAILURE-RESULT POLICY card — the On-failure section's first control on all three activity
+  routes. It answers exactly ONE question and the copy keeps it there: may a FAILED check produce
+  a result at all. What a failed attempt COSTS is the consumption axis, beside this card.
 
-  It answers exactly ONE question, and the copy is written to keep it there: may a FAILED
-  check produce a result at all. What a failed attempt COSTS is the consumption axis, and
-  those toggles sit beside this card rather than inside it.
-
-  ## Why the `perRecord` label is per-activity
-
-  The persisted token is activity-independent, but the word "record" is not: crafting rolls
-  for a recipe, salvage for a component, gathering for a task. The check-modifier
-  combination rule already spells one rule three ways for exactly this reason, and a single
-  "Decided per recipe" on the Gathering route would name an entity that route does not have.
-  The nouns come in as props rather than being derived here, because a noun is copy.
-
-  ## The inert note, and the prototype sentence it replaces
-
-  The prototype's card description ends "Applies to every resolution mode." That clause is
-  NOT adopted (issue 1098, DN11): the policy has no reach in `routedByIngredients` or
-  `progressive` — neither has a failure tier or a reserved failure group to mark — nor in
-  gathering `d100`, whose whole routed path ships dormant pending issue 683. Rather than
-  render a control that quietly does nothing, this states WHY it does nothing in that mode
-  and keeps the control readable and selectable, so a GM who later switches mode finds the
-  value they authored still there.
-
-  The control stays ENABLED under an inert mode on purpose. Disabling it would destroy the
-  distinction between "this system forbids failure results" and "this mode cannot express
-  them", and the policy is persisted per activity rather than per mode — a GM switching
-  `routedByIngredients` to `routedByCheck` should not discover the field reset itself.
+  The `perRecord` label is PER-ACTIVITY, the nouns arriving as props. THE INERT NOTE states WHY
+  the policy has no reach in `routedByIngredients`, `progressive` or gathering's dormant routed
+  path, rather than rendering a control that quietly does nothing — and the control stays ENABLED
+  there, disabling it destroying the distinction between "this system forbids failure results"
+  and "this mode cannot express them" for a value persisted per ACTIVITY.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
@@ -39,17 +19,14 @@
   let {
     // The persisted value: 'never' | 'perRecord' | 'always'.
     value = 'perRecord',
-    // Which activity this card is rendered on — only used to key the radio group name so
-    // three cards on three routes never share a DOM group.
+    // Keys the radio group name, so three cards on three routes never share a DOM group.
     activity = 'crafting',
-    // The activity's record noun, already localized by the caller (the same
-    // `RECORD_NOUNS` map the Difficulty card reads), singular: 'recipe' /
-    // 'salvageable item' / 'gathering task'.
+    // The activity's singular record noun, already localized by the caller.
     recordNoun = 'recipe',
     // The plural of that noun, for the `always` card's "records without one" sentence.
     recordNounPlural = 'Recipes',
-    // A stated reason the policy is inert in the CURRENT mode, or '' when it applies.
-    // Pre-localized by the caller, which is the surface that knows the mode.
+    // A stated reason the policy is inert in the CURRENT mode, or '' when it applies,
+    // pre-localized by the caller, which is the surface that knows the mode.
     inertNote = '',
     onChange = () => {},
   } = $props();
@@ -67,9 +44,7 @@
     return out;
   }
 
-  // The three cards, in the prototype's order: the strictest first, the default in the
-  // middle, the most permissive last. Icons read as "nothing at all", "it depends on the
-  // record" and "always something".
+  // The three cards, strictest first, the default in the middle, most permissive last.
   const options = $derived([
     {
       value: 'never',
@@ -124,9 +99,8 @@
     )}
   </p>
   {#if inertNote}
-    <!-- INFO stands (issue 1505): this sentence exists only because the CURRENT configuration
-         makes the policy inert, which is exactly the live state the specimen reserves the tint
-         for. -->
+    <!-- INFO stands: this sentence exists only because the CURRENT configuration makes the
+         policy inert, which is exactly the live state the info tint is reserved for. -->
     <Callout tone="info" text={inertNote} dataAttr="data-failure-result-policy-inert" />
   {/if}
   <RadioCardGroup

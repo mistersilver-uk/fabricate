@@ -1,16 +1,10 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  The Learned recipes tab of the Knowledge surface (issue 785).
+  The Learned recipes tab. Its single banner states the general rule WITHOUT promising slot recovery
+  — the per-row truth is the no-refund clause each affected row carries on its source line. The
+  erase-vs-reset `discoveryProgress` asymmetry is disclosed in the reset dialog instead, since it is
+  only actionable once the GM picks a grain.
 
-  Its single banner states the general rule WITHOUT promising slot recovery: the
-  per-row truth is the no-refund clause each affected row carries on its source line, which
-  turns the prohibition into a positive statement. The erase-vs-reset
-  `discoveryProgress` asymmetry is disclosed in the reset dialog instead — it is
-  only actionable once the GM picks a grain — so no third strip lands here.
-
-  Props:
-   - learnedRecipes: projected learned rows.
-   - armedToken, onErase, onArm, onDisarm.
+  Props: learnedRecipes, armedToken, onErase, onArm, onDisarm.
 -->
 <script>
   import Callout from '../Callout.svelte';
@@ -33,10 +27,8 @@
 </script>
 
 <div class="manager-knowledge-tab-body">
-  <!-- The erase caveat is the standing statement of how this tab behaves, so it is NEUTRAL
-       (issue 1505): the specimen reserves the info tint for a note about LIVE state, and this
-       one is true before the GM has selected anything. It is not a conditional hazard either:
-       nothing is at risk until the GM arms a row, and that row raises its own confirmation. -->
+  <!-- NEUTRAL, per `openspec/specs/ui-integration/spec.md` → "Standing statements": it is true
+       before the GM selects anything, and nothing is at risk until a row is armed. -->
   <Callout
     tone="neutral"
     text={text(

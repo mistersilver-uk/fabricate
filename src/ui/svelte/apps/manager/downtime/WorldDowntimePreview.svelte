@@ -5,9 +5,8 @@
   let { tabId = 'tracking', hidden = false } = $props();
   const preview = $derived(downtimePreviewDefinition(tabId));
   const copyBase = $derived(`FABRICATE.Admin.Manager.World.Downtime.Preview.${preview.key}`);
-  // A board row carries THREE fields, not one: the thing, what it is, and where it stands.
-  // The value column is the part that actually sells "this tracks real state for you", so a
-  // row is a record here rather than a bare label.
+  // A board row carries THREE fields — the thing, what it is, where it stands — so it reads as a
+  // record rather than a bare label.
   const previewRows = $derived(
     preview.rows.map((row, index) => ({
       icon: row.icon,
@@ -66,12 +65,8 @@
           {localize('FABRICATE.Admin.Manager.World.Downtime.PreviewBadge')}</span
         >
       </header>
-      <!--
-        The rows are a STACK, not three siblings each pushing themselves down with a margin.
-        The design states their gutter once, as the stack's own `gap`, and gives the stack a
-        single margin under the header — which is also what keeps the first row's box
-        identical to the other two instead of carrying a margin they do not.
-      -->
+      <!-- A STACK, not three siblings with margins: one `gap` plus one margin under the header,
+           which is also what keeps the first row's box identical to the other two. -->
       <div class="downtime-board-rows">
         {#each previewRows as row (row.primary)}
           <div class="downtime-board-row" data-downtime-board-row={row.tint}>
@@ -87,12 +82,8 @@
           </div>
         {/each}
       </div>
-      <!--
-        The design leads this footnote with `sparkles`, a Font Awesome PRO name that renders
-        0x0 in FA Free — the prototype itself draws nothing there, and Foundry ships Free too.
-        `fa-wand-magic-sparkles` is the Free glyph closest to the intent. The Pro name is
-        written without the `fa-` class prefix that would make it a reference in code.
-      -->
+      <!-- The design leads this footnote with a Font Awesome PRO glyph that renders 0x0 in Free,
+           which Foundry ships; `fa-wand-magic-sparkles` is the closest Free glyph. -->
       <p class="downtime-board-note" data-downtime-board-note>
         <i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i>
         {localize('FABRICATE.Admin.Manager.World.Downtime.BoardNote')}
@@ -128,11 +119,9 @@
 
 <style>
   /*
-    NO `min-height` here. The panel's scroller is `.downtime-preview-scroll` in the host, which
-    takes the host grid's `minmax(0, 1fr)` row and already scrolls whenever the preview outgrows
-    it — the connected tab card sits in the `auto` row below and stays reachable either way. A
-    720px floor did not add that behaviour; it only padded the panel out past its own content, so
-    at ordinary window heights the route scrolled a screenful of empty surface.
+    NO `min-height`. The panel's scroller is `.downtime-preview-scroll` in the host, which already
+    scrolls whenever the preview outgrows its `minmax(0, 1fr)` row. A 720px floor added nothing but
+    a screenful of empty surface to scroll at ordinary window heights.
   */
   .downtime-preview {
     container-type: inline-size;
@@ -152,8 +141,7 @@
     box-shadow: var(--fab-shadow-lg);
   }
 
-  /* The copy column is a centred stack against the board beside it, with the design's own
-     4px inner inset — the hero's 22px padding does not reach the text on its own. */
+  /* A centred stack against the board, with the design's 4px inner inset. */
   .downtime-hero-copy {
     display: flex;
     min-width: 0;
@@ -163,11 +151,9 @@
   }
 
   /*
-    Both pills share one shell and one colour pair; only their SCALE differs, so only their
-    scale is stated twice. Neither carries `text-transform`: the design uppercases exactly one
-    label in CSS (the rail's `Crafting system` micro-label) and ships every other all-caps
-    string literally, which is what `FABRICATE.…Downtime.Brand` and `.PreviewBadge` already do.
-    A `text-transform` here would shout a translation that had already shouted for itself.
+    One shell and one colour pair; only SCALE is stated twice. No `text-transform`: the design
+    uppercases exactly one label in CSS and ships every other all-caps string literally, so a
+    transform here would shout a translation that had already shouted for itself.
   */
   .downtime-premium,
   .downtime-board-badge {
@@ -190,11 +176,9 @@
   }
 
   /*
-    Explicit type, because a bare `h2`/`h3`/`h4` here states margins only and otherwise
-    inherits Foundry core's heading scale, which draws these 1.5x-2x their designed size.
-    The previous `clamp(1.65rem, 3vw, 2.35rem)` was worse than large: `vw` measures the
-    BROWSER viewport, not the ApplicationV2 window, which is precisely what this file's
-    container-query comment says a preview breakpoint must never do.
+    Explicit type: a bare `h2`/`h3`/`h4` states margins only and otherwise inherits Foundry's
+    heading scale, 1.5x-2x the designed size. A `clamp(…, 3vw, …)` was worse — `vw` measures the
+    BROWSER viewport, not the ApplicationV2 window, exactly as the container-query note below says.
   */
   h2 {
     margin: 13px 0 0;
@@ -203,8 +187,7 @@
     line-height: 1.12;
   }
 
-  /* 12.5px x 1.65 is the design's 20.625px leading exactly; everything narrower than body
-     copy re-states its own size below, because otherwise it inherits the Manager's 14px. */
+  /* 12.5px x 1.65 is the design's 20.625px leading; sub-body copy restates its size or inherits 14px. */
   p {
     margin: 10px 0 0;
     color: var(--fab-text-muted);
@@ -260,20 +243,17 @@
     font-weight: 500;
   }
 
-  /* One of the few glyphs the design colours on the `<i>` itself rather than through a
-     wrapper: the preview note's eye is informational, not brand accent. */
+  /* Coloured on the `<i>` itself: the preview note's eye is informational, not brand accent. */
   .downtime-preview-note i {
     color: var(--fab-info);
     font-size: 9px;
   }
 
   /*
-    The board is the screen's one RECESSED surface — a well cut into the hero, a step darker
-    than the pane rather than a card raised off it. The design paints it with a translucent
-    ink its own palette does not name, and `--fab-bg-0` is this palette's darkest surface: it
-    composites within two levels of that ink over the hero, so the tonal order the design
-    draws is preserved without inventing a token for a single fill. The exact value is left
-    red in the visual-parity run rather than papered over — see `tmp/parity-proto/REPORT.md`.
+    The board is the screen's one RECESSED surface, a well cut into the hero. The design paints it
+    with a translucent ink its palette does not name, and `--fab-bg-0` composites within two levels
+    of it, preserving the tonal order without inventing a token for one fill. The exact value is
+    left red in the visual-parity run rather than papered over.
   */
   .downtime-board {
     align-self: center;
@@ -331,8 +311,7 @@
     border-radius: 8px;
     background: var(--fab-accent-soft);
 
-    /* The tile carries the colour and the glyph inherits it, so a tinted slot keeps
-       following its own row instead of being frozen by a rule on the `<i>`. */
+    /* The tile carries the colour and the glyph inherits it, so a tinted slot follows its row. */
     color: var(--fab-downtime-tint, var(--fab-accent));
     font-size: 12px;
   }
@@ -343,10 +322,9 @@
   }
 
   /*
-    The design assigns these per item in its data, not per widget, so each is a tint NAME
-    the slot chooses rather than a selector that knows what it is decorating. They set a
-    custom property instead of `color` on purpose: `.downtime-board-icon` and `.is-tint-*`
-    are both single-class selectors, so two `color` declarations would race on source order.
+    Assigned per item rather than per widget, so each is a tint NAME the slot chooses. They set a
+    custom property, not `color`: both selectors are single-class, so two `color` declarations
+    would race on source order.
   */
   .is-tint-accent {
     --fab-downtime-tint: var(--fab-accent);
@@ -524,22 +502,17 @@
   }
 
   /*
-    ApplicationV2 windows resize inside Foundry's fixed browser viewport, so preview
-    breakpoints must follow this panel rather than `window.innerWidth` — a `vw` breakpoint
-    here measures the browser and not the window the GM actually sized.
+    ApplicationV2 windows resize inside Foundry's fixed browser viewport, so a breakpoint must follow
+    this PANEL: a `vw` query measures the browser, not the window the GM sized.
 
-    EACH THRESHOLD IS THE WIDTH AT WHICH ITS OWN BLOCK STOPS FITTING, and the two blocks stop
-    fitting at very different widths, so they get separate queries rather than one shared
-    number. A single 1040px query previously collapsed both, and 1040px was far above either
-    honest limit: a container query measures the CONTENT box, so an ordinary 1314px-wide
-    Foundry window gives this panel 1028px and tripped it — the board dropped below the hero
-    and the four feature cards folded to 2x2 on a window nobody would call narrow.
+    EACH THRESHOLD IS THE WIDTH AT WHICH ITS OWN BLOCK STOPS FITTING, and the two differ, so they
+    get separate queries. One shared 1040px collapsed both far above either honest limit — a
+    container query measures the CONTENT box, so an ordinary 1314px window gives this panel 1028px.
 
-      - 940px is the feature grid's limit: four cards plus three 9px gutters need 4x228px,
-        and 228px is the narrowest a card reads at with a 32px tile above 10px copy.
-      - 720px is the hero's: the board column is pinned at its own 260px minimum from 864px
-        down, so below 720px the copy column is under 420px and the headline starts breaking
-        into more lines than the board is tall.
+      - 940px is the feature grid's: four cards plus three 9px gutters need 4x228px, and 228px is
+        the narrowest a card reads at with a 32px tile above 10px copy.
+      - 720px is the hero's: the board column is pinned at its 260px minimum from 864px down, so
+        below 720px the copy column is under 420px and the headline outgrows the board's height.
   */
   @container (max-width: 940px) {
     .downtime-feature-grid {

@@ -8,10 +8,9 @@ import {
 } from '../../../../../models/toolDisplay.js';
 import { Tool } from '../../../../../models/Tool.js';
 
-// The precedence itself lives in `src/models/toolDisplay.js` so the engines, chat cards and Run
-// Journal projection can reach it too — importing this module from `src/systems/` would invert
-// the layering, which is why those surfaces each re-derived the rule and drifted (issues 976,
-// 1119). These wrappers keep the manager UI's existing `(tool, managedItems)` call shape.
+// The precedence lives in `src/models/toolDisplay.js` so the engines, chat cards and Run Journal
+// projection reach it too — importing this module from `src/systems/` would invert the layering,
+// which is why those surfaces each re-derived the rule and drifted.
 const DEFAULT_TOOL_IMAGE = TOOL_IMAGE_SENTINEL;
 
 const managedItemFor = linkedComponentFor;
@@ -37,26 +36,10 @@ export function toolBreakageSummary(tool, authority = 'toolSpecific') {
 }
 
 /**
- * THE ONE ANSWER TO "what breakage mechanic does this Tool author", including the state the
- * radio group had no option for (issue 1373).
- *
- * `breakage.mode: 'limitedUses'` carries `maxUses: number | null`, and `src/models/Tool.js:23`
- * has always said what the null means: UNLIMITED — the copy is never used up, so it never
- * breaks. `Tool#evaluateBreakage` and `toolBreakageRuntime` both short-circuit on it, and
- * `normalizeBreakage` reads the retired `mode: 'immune'` FORWARD onto it, so it is also the
- * model's own spelling of "does not break". A brand-new Tool defaults to it.
- *
- * Every reading surface already said `Unlimited uses`; only the editor's radio group and its
- * uses stepper did not, because they keyed off `breakage.mode` alone — which cannot tell the
- * two limited-uses states apart — and drew the null as `1`. This splits the presentation of one
- * MODE into the two answers a GM actually authors. It is deliberately NOT a fourth
- * `breakage.mode`: `Tool#validate` and `validBreakage` both already accept a null `maxUses`
- * under `limitedUses`, so a new mode would be a migration for a state the model holds today.
- *
- * @param {object|null} tool
- * @param {string} authority Active system breakage authority.
- * @returns {string} `unlimited`, `limitedUses`, `breakageChance`, `diceExpression`,
- *   `breakable` or `immune`.
+ * THE ONE ANSWER TO "what breakage mechanic does this Tool author", including the state the radio
+ * group had no option for: `limitedUses` with a null `maxUses` is UNLIMITED. Splitting one MODE
+ * into two presented answers is deliberately NOT a fourth `breakage.mode`, because both validators
+ * already accept that null.
  */
 export function toolBreakageChoice(tool, authority = 'toolSpecific') {
   const kind = toolBreakageSummary(tool, authority);
@@ -72,15 +55,8 @@ export function toolOnBreakSummary(tool) {
 }
 
 /**
- * Project the four behavior facts shared by the Tool browser inspector and the
- * live editor preview. Consumers own layout; wording and effective state live
- * here so the two surfaces cannot drift.
- *
- * @param {object} tool Tool draft or persisted Tool.
- * @param {string} authority Active system breakage authority.
- * @param {(key:string, fallback:string) => string} text Localization adapter.
- * @param {(key:string, data:object, fallback:string) => string} format Formatted localization adapter.
- * @returns {Array<{id:string, icon:string, heading:string, title:string, subtitle:string}>}
+ * The four behavior facts the Tool browser inspector and the live editor preview share. Consumers
+ * own layout; wording and effective state live here so the two surfaces cannot drift.
  */
 export function projectToolBehaviorFacts(
   tool,
@@ -115,9 +91,8 @@ export function projectToolBehaviorFacts(
     Number.isInteger(Number(tool?.breakage?.maxUses)) &&
     Number(tool?.breakage?.maxUses) > 0
   ) {
-    // A SINGULAR FORM, because `1 uses` is now reachable and photographed. Switching a Tool
-    // from `Unlimited uses` to `Limited uses` seeds `maxUses` at 1 (issue 1373), which is the
-    // state a GM lands on the moment they choose the option.
+    // A SINGULAR FORM, because switching to `Limited uses` seeds `maxUses` at 1, so `1 uses` is
+    // the state a GM lands on the moment they choose the option.
     const useCount = Number(tool.breakage.maxUses);
     breakageTitle = format(
       useCount === 1
@@ -159,12 +134,9 @@ export function projectToolBehaviorFacts(
         )
       : text('FABRICATE.Admin.Manager.Tools.Editor.PreviewBonusDisabled', 'No check bonus');
 
-  // THE BARE SHORT VALUE, beside the sentence. `title` is the sentence a fact row states
-  // (`On break: replace with component`); `value` is the same answer with no framing, which is
-  // what a caller states INSIDE its own frame - the rules editor's `World default: {value}`
-  // sub-line is the reason this exists (issue 1373). Deriving it at the consumer would mean
-  // stripping a localized prefix off a localized sentence, which is exactly the kind of second
-  // copy of a rule this projection exists to prevent.
+  // THE BARE SHORT VALUE beside the sentence: `title` is what a fact row states and `value` is the
+  // same answer with no framing, for a caller stating it inside its own frame. Deriving it at the
+  // consumer would mean stripping a localized prefix off a localized sentence.
   return [
     {
       id: 'breakage',
@@ -216,10 +188,8 @@ export function projectToolBehaviorFacts(
     {
       id: 'prerequisites',
       heading: text('FABRICATE.Admin.Manager.Tools.Editor.Prerequisites', 'Prerequisites'),
-      // THE GROUP GLYPH, not the single-figure-with-shield. The design draws `fa-users` on
-      // this rule row, on the Requirements tab and on the rail's `No prerequisites to use`
-      // alike; a prerequisite is a statement about WHO may wield the Tool, and the shield
-      // glyph reads as protection rather than as a roster (issue 1373).
+      // THE GROUP GLYPH, not the single-figure-with-shield: a prerequisite states WHO may wield
+      // the Tool, and a shield reads as protection rather than as a roster.
       icon: 'fas fa-users',
       title: prerequisiteTitle,
       value: prerequisiteTitle,
@@ -281,12 +251,8 @@ const VALIDATION_CHECK_BY_ERROR = {
 };
 
 /**
- * WHICH EDITOR TAB HOSTS EACH CHECK — the ROUTE half of a validation row's address
- * (issue 1517).
- *
- * `general` is deliberately absent. Its rows are the errors the projection could not place at
- * all, so there is no tab that is where they are fixed; a route invented for them would send a
- * GM to a screen chosen at random.
+ * WHICH EDITOR TAB HOSTS EACH CHECK — the ROUTE half of a validation row's address. `general` is
+ * deliberately absent, its rows being the errors the projection could not place at all.
  */
 const CHECK_ROUTE = {
   breakage: 'breakage',
@@ -297,30 +263,10 @@ const CHECK_ROUTE = {
 };
 
 /**
- * WHICH CONTROL EACH FAILURE NAMES — the `data-validation-target` half, keyed by the projected
- * error rather than by the check (issue 1517).
- *
- * Keyed by ERROR because the `breakage` check is five different controls depending on the
- * breakage mechanic: `limitedUses` configures a uses stepper, `breakageChance` a percentage
- * slider, `diceExpression` a formula field beside a threshold stepper. One address per CHECK
- * would have to name one of them and be wrong in the other two states, and the state it is
- * wrong in is the one the GM is looking at.
- *
- * The addresses, and the files that carry them:
- *
- *  - `tool-max-uses`            -> `ToolBreakageTab.svelte`, the limited-uses stepper input
- *  - `tool-breakage-chance`     -> `ToolBreakageTab.svelte`, the chance slider's number input
- *  - `tool-breakage-formula`    -> `ToolBreakageTab.svelte`, the dice formula field
- *  - `tool-breakage-threshold`  -> `ToolBreakageTab.svelte`, the break-below stepper input
- *  - `tool-on-break`            -> `ToolBreakageTab.svelte`, the on-break fieldset, which is
- *                                  also where the repair requirements are authored
- *  - `tool-prerequisites`       -> `ToolRequirementsTab.svelte`, the prerequisite section
- *  - `tool-bonus`               -> `ToolRequirementsTab.svelte`, the bonus section
- *
- * ROUTE-ONLY IS A STATED OUTCOME. `ValidationErrorBreakageMode` names the mechanic CHOICE, which
- * is a radio group rather than one control, so it emits a route and no control. So does any
- * check the local predicate failed without the domain validator naming a field — there is a tab
- * to open and nothing in it to point at — and so does every `general` row, which has neither.
+ * WHICH CONTROL EACH FAILURE NAMES — the `data-validation-target` half, keyed by the projected ERROR
+ * rather than the check, because the `breakage` check is five different controls by mechanic and
+ * one address per CHECK would be wrong in the state the GM is looking at. ROUTE-ONLY IS A STATED
+ * OUTCOME for the mechanic CHOICE, for a check no field was named on, and for a `general` row.
  */
 const CONTROL_BY_ERROR = {
   ValidationErrorMaxUses: 'tool-max-uses',
@@ -336,19 +282,9 @@ const CONTROL_BY_ERROR = {
 };
 
 /**
- * The two addresses one Validation row carries, as a spreadable bag.
- *
- * `target` is the ROUTE — the editor tab the host switches to — and `focusTarget` is the
- * CONTROL, the value of the `data-validation-target` attribute the offending control carries.
- * An empty address produces NO key rather than an empty one: the host treats any non-empty
- * string as a control it must resolve, so a `focusTarget: ''` would ask it to query for
- * something that cannot exist and the row would report as focus-wired while focusing nothing.
- *
- * A PASSING check gets no address at all, which is what keeps the View button off the eight
- * rows of a healthy Tool: the action exists to reach a defect, and a tick has none.
- *
- * @param {{id?: string, valid?: boolean, errors?: string[]}} check one row's check.
- * @returns {{target?: string, focusTarget?: string}}
+ * The two addresses one Validation row carries: `target` the ROUTE, `focusTarget` the CONTROL. An
+ * empty one produces NO key, because the host resolves any non-empty string and would report the
+ * row as focus-wired while focusing nothing. A PASSING check gets no address at all.
  */
 export function toolIssueAddress(check) {
   if (!check || check.valid) return {};
@@ -360,9 +296,8 @@ export function toolIssueAddress(check) {
 }
 
 /**
- * Project model validation details onto stable presentation categories.
- * Unknown model or service details deliberately collapse to a safe generic
- * message instead of exposing field paths or implementation terminology.
+ * Project validation details onto stable presentation categories; an unknown detail collapses to a
+ * generic message rather than exposing field paths or implementation terminology.
  */
 export function toolValidationPresentation(error) {
   const message = String(error || '');
@@ -402,9 +337,8 @@ export function filterTools(tools = [], term = '', managedItems = []) {
 }
 
 /**
- * Project a Tool through the canonical domain validator for browse surfaces.
- * Keeping this at the shared Tool Studio boundary prevents row and inspector
- * status from drifting from the save gate.
+ * Project a Tool through the canonical domain validator for browse surfaces, at this shared
+ * boundary so row and inspector status cannot drift from the save gate.
  */
 export function toolValidationStatus(tool) {
   const validation = Tool.fromJSON(tool).validate();
@@ -513,26 +447,11 @@ function validRepair(tool) {
 }
 
 /**
- * The SYSTEM Tool rules editor's validation surface.
- *
- * IDENTITY IS NOT VALIDATED HERE, AND THAT IS THE POINT (issue 1373). This used to open with a
- * `source` check reading `A game-world Item is linked`, under a `LINKED ITEM` heading, on a
- * screen that cannot link one. Identity is world scope: the linked Item, the shared name, the
- * art and the description are authored once on the world Tool and adopted by every system.
- * Asking a crafting system to satisfy a check it has no control over is asking it to repair
- * someone else's record, and while it counted toward `issueCount` it also reddened this
- * editor's tab badge over a defect no control on the screen could clear.
- *
- * The failure is not swallowed. `identityErrors` carries it out separately so the surface can
- * state it as a ROUTED notice - the thing to do about it is open the world Tool - rather than
- * as a check row. It is deliberately NOT folded into `unknownErrors`, which would
- * re-materialise it as a blocking `General` row saying nothing useful.
- *
- * @param {object|null} tool
- * @param {string} authority
- * @param {Array<string>} errors Domain validator messages.
- * @returns {{checks: Array<object>, unknownErrors: Array<object>, identityErrors: Array<string>,
- *   issueCount: number}}
+ * The SYSTEM Tool rules editor's validation surface. IDENTITY IS NOT VALIDATED HERE, AND THAT IS
+ * THE POINT: it is authored once on the world Tool, so a `source` check reddened this editor's tab
+ * badge over a defect no control on the screen could clear. The failure is not swallowed —
+ * `identityErrors` carries it out so the surface states it as a ROUTED notice — and deliberately
+ * not folded into `unknownErrors`, which would re-materialise it as a blocking `General` row.
  */
 export function toolEditorValidation(tool, authority = 'toolSpecific', errors = []) {
   const localChecks = [
@@ -581,41 +500,19 @@ export function toolEditorChecks(tool, authority = 'toolSpecific') {
 }
 
 /**
- * Whether a Tool actually names a game-world Item, through a managed Component or its own
- * source references.
- *
- * The predicate the retired `source` check used, kept as a named export because the system
- * rules editor still has to STATE a missing link - it just states it as the world Tool's
- * business rather than as a check of its own.
- *
- * @param {object|null} tool
- * @returns {boolean}
+ * Whether a Tool names a game-world Item. The retired `source` check's predicate, kept exported
+ * because the system rules editor still STATES a missing link, as the world Tool's business.
  */
 export function toolHasLinkedSource(tool) {
   return Boolean(tool?.componentId || toolSourceUuid(tool));
 }
 
 /**
- * THE PLAIN-LANGUAGE BAND A BREAK PERCENTAGE FALLS IN (issue 1373, maintainer round 2).
- *
- * The design states the band beside the slider and runs the track through the same ramp, so a
- * number and a sentence say the same thing about one value. `5%` is a quantity; `Rarely breaks`
- * is what a GM was actually deciding, and the screen shipped only the quantity.
- *
- * THE FIVE BANDS AND THEIR CUTS ARE THE DESIGN'S (`proto:4618`): `0`, `<=10`, `<=30`, `<=60`,
- * above. Its own colours are five RAW HEX LITERALS from an older palette that never entered the
- * theme's `:root` and are deliberately not copied here (this repository's colour contract scans
- * comments as well as code). They are mapped instead onto the SEMANTIC ramp
- * `--fab-tool-breakage-chance-track-gradient` already interpolates — blue, green, gold, amber,
- * red, in that order — which is what keeps the chip and the track it labels the same colour in
- * all seven themes.
- *
- * `0` IS ITS OWN BAND AND ITS OWN HUE. An unbreakable Tool is not "very rarely breaks", it is a
- * different rule, and the design tints it informational rather than green for that reason.
- *
- * @param {unknown} chance The authored break percentage.
- * @param {(key: string, fallback: string) => string} [text]
- * @returns {{tone: string, color: string, label: string}}
+ * THE PLAIN-LANGUAGE BAND A BREAK PERCENTAGE FALLS IN: `5%` is a quantity, and `Rarely breaks` is
+ * what a GM was deciding. THE FIVE BANDS AND THEIR CUTS ARE THE DESIGN'S, but its raw hex literals
+ * are deliberately not copied — this repository's colour contract scans comments as well as code —
+ * so they map onto the SEMANTIC ramp the track already interpolates, which keeps the chip and its
+ * track the same colour in all seven themes. `0` IS ITS OWN BAND AND ITS OWN HUE.
  */
 export function toolBreakageChanceBand(chance, text = (_key, fallback) => fallback) {
   const percent = Number(chance);
@@ -656,20 +553,10 @@ export function toolBreakageChanceBand(chance, text = (_key, fallback) => fallba
 }
 
 /**
- * Resolve a drag payload onto ONE managed Component, or `null`.
- *
- * PURE, and that is why it is here rather than in a component: the two Tool editors are leaves
- * with no `game`, so a drop can only ever be answered against the option list the caller was
- * already handed. Two payload shapes are accepted, and both are ones a GM can actually produce:
- * a Foundry document drag (`{uuid}` / `{type: 'Item', uuid}`), matched against each option's
- * `registeredItemUuid` then `originItemUuid`; and a Fabricate component drag carrying an `id`.
- *
- * A payload naming a Component this scope cannot address answers `null`, and the caller writes
- * nothing — which is the honest answer for an Item that is not managed here.
- *
- * @param {unknown} payload The parsed drag data.
- * @param {Array<object>} componentOptions
- * @returns {string} The resolved component id, or `''`.
+ * Resolve a drag payload onto ONE managed Component, or `''`. PURE, because the two Tool editors
+ * are leaves with no `game`, so a drop can only be answered against the option list the caller
+ * already holds. Two payload shapes a GM can produce are accepted — a Foundry document drag matched
+ * on `registeredItemUuid` then `originItemUuid`, and a Fabricate component drag carrying an `id`.
  */
 export function resolveDroppedComponentId(payload, componentOptions = []) {
   const options = Array.isArray(componentOptions) ? componentOptions : [];
@@ -685,13 +572,9 @@ export function resolveDroppedComponentId(payload, componentOptions = []) {
 }
 
 /**
- * The `projectToolBehaviorFacts` fact id each world-default SECTION resolves through.
- *
- * The section names are the resolver's (`TOOL_SECTIONS`) and the fact ids are this module's;
- * they agree on three of four and disagree on `onBreak` / `on-break`, which is exactly the kind
- * of near-miss a caller gets silently wrong. Stated once, here.
- *
- * @type {Readonly<Record<string, string>>}
+ * The `projectToolBehaviorFacts` fact id each world-default SECTION resolves through: the two
+ * vocabularies agree on three of four and disagree on the fourth, exactly the near-miss a caller
+ * gets silently wrong.
  */
 export const TOOL_SECTION_FACT_ID = Object.freeze({
   breakage: 'breakage',
@@ -701,23 +584,10 @@ export const TOOL_SECTION_FACT_ID = Object.freeze({
 });
 
 /**
- * What ONE section of a Tool's WORLD DEFAULTS resolves to, as a behaviour fact.
- *
- * READ THROUGH THE SHARED PROJECTION rather than re-derived, on `ToolBrowserInspector`'s
- * precedent: the world default record is shaped into a tool-like record and handed to
- * `projectToolBehaviorFacts`, so an inheriting card states the world value in exactly the words
- * the rail's effective-rules row states it in. A second derivation here is how the two drift.
- *
- * `undefined` when the world holds no defaults record for this Tool at all - a real answer, not
- * a fallback: a Tool that exists only in a crafting system has nothing to inherit FROM, and a
- * card must not claim a parent that does not exist.
- *
- * @param {string} section One of {@link TOOL_SECTION_FACT_ID}'s keys.
- * @param {object|null} worldDefault The world defaults record for this Tool.
- * @param {string} authority Active system breakage authority.
- * @param {(key: string, fallback: string) => string} text
- * @param {(key: string, data: object, fallback: string) => string} format
- * @returns {{id: string, icon: string, title: string, subtitle: string, value: string}|undefined}
+ * What ONE section of a Tool's WORLD DEFAULTS resolves to, as a behaviour fact. READ THROUGH THE
+ * SHARED PROJECTION rather than re-derived, so an inheriting card states the world value in exactly
+ * the rail's words. `undefined` when the world holds no defaults record — a real answer, since a
+ * Tool existing only in a crafting system has nothing to inherit FROM.
  */
 export function toolWorldDefaultFact(section, worldDefault, authority, text, format) {
   const factId = TOOL_SECTION_FACT_ID[section];
@@ -736,40 +606,15 @@ export function toolWorldDefaultFact(section, worldDefault, authority, text, for
 }
 
 /**
- * The player-facing preview of ONE copy of this Tool: the pill over its art, the sentence under
- * it, and what breakage does to the name.
+ * The player-facing preview of ONE copy of this Tool: the pill over its art, the sentence under it,
+ * and what breakage does to the name. `broken` is a PREVIEW state, never a stored one.
  *
- * `broken` is a PREVIEW state, never a stored one. Nothing here writes; the GM flips it to see
- * what the on-break action actually does to a character's copy, which is the one thing the
- * effective-rules rows state in the abstract and never show.
- *
- * == THE PREVIEW SHOWS THE CONSEQUENCE, NOT A WORD FOR IT (issue 1373, maintainer round 2) ====
- * All three on-break actions used to draw the SAME picture — the Tool's own art, dimmed, under a
- * differently-worded chip. `Destroyed` and `Replaced` are labels for two outcomes a GM can only
- * check by looking at the tile, and the tile was showing neither of them:
- *
- *  - DESTROY empties the box. The copy is gone from the inventory, so the one honest picture of
- *    it is an inventory slot with nothing in it. `imageKind: 'none'`.
- *  - REPLACE shows the REPLACEMENT COMPONENT's art and name — the thing the Tool becomes. A GM
- *    picking a replacement can then see the swap they authored rather than read that one
- *    happened. `imageKind: 'replacement'`, with `image` and `name` resolved out of
- *    `componentOptions`; both fall back to the Tool's own when the target is unset or names a
- *    Component this scope cannot address, because an unset replacement is a real state and the
- *    Validation tab is where it is reported.
- *  - MARK AS BROKEN is unchanged and keeps its pill: a broken copy IS still the Tool, dimmed,
- *    renamed, and the pill is the only thing that says the flag is set.
- *
- * The two changed branches therefore carry NO pill (`pill: null`). A chip that names the outcome
- * beside a picture of the outcome is the same statement twice.
- *
- * @param {object|null} tool
- * @param {string} authority Active system breakage authority.
- * @param {boolean} broken Show the post-breakage state.
- * @param {Array<object>} componentOptions Managed components, for a replacement target's art.
- * @param {(key: string, fallback: string) => string} text
- * @param {(key: string, data: object, fallback: string) => string} format
- * @returns {{pill: {tone: string, icon: string, label: string}|null, note: string,
- *   dimmed: boolean, nameSuffix: string, imageKind: string, image: string, name: string}}
+ * THE PREVIEW SHOWS THE CONSEQUENCE, NOT A WORD FOR IT, where all three on-break actions drew the
+ * same dimmed art under a differently-worded chip. DESTROY empties the box; REPLACE shows the
+ * REPLACEMENT COMPONENT's art and name, falling back to the Tool's own when the target is unset or
+ * unaddressable, which the Validation tab reports; MARK AS BROKEN keeps its pill, being the only
+ * thing that says the flag is set. The two changed branches carry NO pill, because a chip naming
+ * the outcome beside a picture of it is the same statement twice.
  */
 export function projectToolPlayerPreview(
   tool,
@@ -845,8 +690,7 @@ export function projectToolPlayerPreview(
       (option) => option?.id === componentId
     );
     return {
-      // NO PILL. The tile beside it now carries the replacement's own art and name, which is
-      // the statement `Replaced` was standing in for.
+      // NO PILL: the tile carries the replacement's own art and name.
       pill: null,
       note: replacement?.name
         ? format(
@@ -858,8 +702,7 @@ export function projectToolPlayerPreview(
             'FABRICATE.Admin.Manager.Tools.Editor.PlayerReplaced',
             'The copy is removed and its replacement Component is added in its place.'
           ),
-      // NOT DIMMED. The replacement is a real, working copy of something else in the inventory,
-      // so dimming it would say it is unusable.
+      // NOT DIMMED: the replacement is a real, working copy of something else.
       dimmed: false,
       nameSuffix: '',
       imageKind: replacement ? 'replacement' : 'tool',

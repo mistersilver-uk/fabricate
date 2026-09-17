@@ -1,27 +1,19 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  Access tab (issue 676): who this recipe is granted to. Rehomed out of the deleted
-  RecipeContextRail, whose ACCESS section was the only surface answering "who can
-  craft this recipe" — the standalone Access screen is organised the other way round
-  (pick a recipe, then grant it), so nothing else in the editor carried this.
+  Access tab: who this recipe is granted to. Rehomed out of the deleted RecipeContextRail, whose
+  ACCESS section was the only surface answering "who can craft this recipe".
 
-  GATED on `visibilityEffect.showAccess` — the system's canonical `visibilityMode`
-  through `craftingEffect(mode)`, exactly as the rail gated its section. A globally
-  visible system grants no per-recipe access, so the tab does not exist there; the
-  gate lives in RecipeEditorTabs so the tab BUTTON disappears with the panel.
+  GATED on `visibilityEffect.showAccess`, from the system's canonical `visibilityMode`: a globally
+  visible system grants no per-recipe access, so the tab does not exist there, and the gate lives
+  in `RecipeEditorTabs` so the tab BUTTON disappears with the panel. READ-ONLY, with authoring on
+  the Access screen this deep-links to, so there is deliberately no grant control here.
 
-  READ-ONLY, as the rail was. Authoring lives on the Access screen, which this
-  deep-links to. There is deliberately no grant control here — that would be a second
-  authoring path for the same many-to-many.
-
-  Two rules carried over verbatim from the rail; both are load-bearing:
-   - It NEVER resolves access ids. The store hands it resolved rows
-     (`resolveRecipeAccess`), because a granted id resolves over EVERY world actor,
-     not the player-character roster.
-   - "Who plays this character" is a SET. `controlledBy` is the union of assigned-
-     character and OWNER grants, and `sharedWithAllPlayers` (ownership.default >=
-     OWNER) means the grant reaches the whole table — so the sub-line says "Shared
-     with all players", never "Played by <one name>".
+  Two load-bearing rules:
+   - It NEVER resolves access ids. The store hands it resolved rows (`resolveRecipeAccess`),
+     because a granted id resolves over EVERY world actor, not the player-character roster.
+   - "Who plays this character" is a SET. `controlledBy` is the union of assigned-character and
+     OWNER grants, and `sharedWithAllPlayers` means the grant reaches the whole table — so the
+     sub-line says "Shared with all players", never "Played by <one name>".
 -->
 <script>
   import EmptyState from '../EmptyState.svelte';
@@ -29,9 +21,8 @@
   import { localize } from '../../../util/foundryBridge.js';
 
   let {
-    // Resolved (never id-only) access rows. The store resolves these; unresolvable
-    // ids are dropped from display and never persisted away, because this is
-    // read-only.
+    // Resolved, never id-only, access rows. An unresolvable id is dropped from display and never
+    // persisted away, because this tab is read-only.
     accessPlayers = [],
     accessCharacters = [],
     onOpenAccess = () => {},
@@ -42,9 +33,8 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  // The sub-line rule. Empty → NO sub-line: no invented attribution.
-  // sharedWithAllPlayers wins over any names, because it means everyone controls the
-  // actor and naming one player would tell the GM the opposite of the truth.
+  // The sub-line rule: empty means NO sub-line rather than an invented attribution, and
+  // `sharedWithAllPlayers` wins over any names, because naming one would say the opposite.
   function controllerSubline(character) {
     if (character?.sharedWithAllPlayers === true) {
       return text(
@@ -54,9 +44,8 @@
     }
     const controllers = Array.isArray(character?.controlledBy) ? character.controlledBy : [];
     if (controllers.length === 0) return '';
-    // `prefix`, not a singular controller field: a one-player attribution is the lossy
-    // model this whole function exists to avoid, and the contract test greps for that
-    // field name, so do not reintroduce it even as a local.
+    // `prefix`, never a singular controller field: that is the lossy model this function exists
+    // to avoid, and the contract test greps for the field name.
     const prefix = text('FABRICATE.Admin.Manager.Recipe.AccessTab.PlayedBy', 'Played by');
     if (controllers.length === 1) return `${prefix} ${controllers[0].name}`;
     if (controllers.length === 2) return `${prefix} ${controllers[0].name}, ${controllers[1].name}`;
@@ -158,9 +147,8 @@
         </ul>
       {/if}
     {:else}
-      <!-- The shared no-state primitive at the sidebar/inline scale. This tab used to
-           carry its own `.manager-recipe-section-empty` panel; that was a second
-           empty-state design sitting beside the manager's one, so it is gone. -->
+      <!-- The shared no-state primitive at the sidebar/inline scale, rather than this tab's own
+           second empty-state design. -->
       <EmptyState
         compact
         icon="fas fa-user-shield"
@@ -194,12 +182,10 @@
     min-width: 0;
   }
 
-  /* The access rows, rehomed from the rail (issue 740/796): the tab fills the editor width
-     like its sibling tabs, so the list tiles into a grid rather than a single stretched
-     column. A FIXED three-column grid (`minmax(0, 1fr)` so a long character name shrinks
-     its card gracefully instead of overflowing) gives ~340px per card at the ~1040px
-     editor panel — wider than the earlier `auto-fill` 220px tracks, which were truncating
-     long names — and keeps this tab in visual parity with the Books & Scrolls grid. */
+  /* The access rows tile into a grid rather than one stretched column. A FIXED three-column
+     grid with `minmax(0, 1fr)`, so a long character name shrinks its card instead of
+     overflowing, gives ~340px per card at the ~1040px editor panel and keeps this tab in
+     parity with the Books & Scrolls grid. */
   .manager-recipe-access-list {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));

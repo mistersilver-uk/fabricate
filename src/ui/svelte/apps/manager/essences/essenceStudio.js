@@ -1,17 +1,7 @@
 /**
- * The GM Essence Studio's PRESENTATION adapter (issue 1036).
- *
- * A thin layer, and deliberately so. Everything decidable without a DOM — the offer list,
- * the validation checks, the browser pipeline, the bulk staging, the delete impact — lives
- * under `src/utils/`, because `npm run lint` and `format:check` do NOT cover
- * `src/ui/**\/*.js` while SonarCloud still indexes it. What is here is the mapping from
- * those pure results onto LABELS, ICONS and TONES, which needs the caller's localizer and
- * therefore cannot be a pure leaf.
- *
- * Every export takes `text` (and where needed `format`) as a parameter rather than
- * importing `foundryBridge`: the same functions are called from four components and from
- * unit tests, and a module that reached for a Foundry global could not be exercised by
- * either.
+ * The GM Essence Studio's PRESENTATION adapter, deliberately thin: everything decidable without a
+ * DOM lives under `src/utils/`, and this maps those results onto LABELS, ICONS and TONES. Every
+ * export takes `text` (and where needed `format`) rather than importing `foundryBridge`.
  */
 
 import {
@@ -36,20 +26,9 @@ export const ESSENCE_VIEW_MODE_SEGMENTS = Object.freeze([
 ]);
 
 /**
- * The CREATE editor's three tabs, in render order: id, English fallback, glyph.
- *
- * ## This set is reached only where there is no shared world definition to contradict
- *
- * `ui-integration/spec.md` `### GM World Essence Screens` requirement 10 makes identity a WORLD
- * field that a system-scope screen may never edit, and the system Essence Rules editor therefore
- * renders {@link ESSENCE_RULES_TABS} for every essence the world catalogue holds — which, after
- * the `1.30.0` lift, is every essence a GM can open from a rules list.
- *
- * What is left on this set is the CREATE draft: an essence that exists nowhere yet, whose
- * in-system record is the only record there is and whose identity is therefore being AUTHORED
- * rather than overridden. It keeps the shipped three tabs because there is no shared layer for it
- * to disagree with, and the moment the draft is saved the world corpus answers for it and the
- * editor is the two-tab rules screen forever after.
+ * The CREATE editor's three tabs, reached ONLY where there is no shared world definition to
+ * contradict: `ui-integration/spec.md` `### GM World Essence Screens` requirement 10 makes identity
+ * a WORLD field a system-scope screen may never edit.
  */
 export const ESSENCE_EDITOR_TABS = Object.freeze([
   Object.freeze({ id: 'identity', fallback: 'Identity', icon: 'fas fa-fingerprint' }),
@@ -58,18 +37,9 @@ export const ESSENCE_EDITOR_TABS = Object.freeze([
 ]);
 
 /**
- * The SYSTEM ESSENCE RULES editor's two tabs — the set every existing essence opens on.
- *
- * There is no Identity tab, and its absence is the requirement rather than a simplification: a
- * world record holds an essence's name, glyph, colour and description, every crafting system that
- * has the essence resolves the same one, and a system-scope screen offering to edit them would be
- * offering to rename the essence in eight other systems from a screen titled with the ninth. The
- * route to those fields is the shared-definition callout's `Edit shared definition`, which opens
- * the world essence entry editor that owns them.
- *
- * `rules` rather than `oncraft` as the id, because the tab is no longer a third of an editor: it
- * carries the shared-definition callout, the per-system enable switch, both behaviour cards and
- * the copy-to-other-systems action, which is the whole of what a system authors for an essence.
+ * The SYSTEM ESSENCE RULES editor's two tabs. There is NO Identity tab, and its absence is the
+ * requirement above; the route to those fields is the shared-definition callout. `rules` rather
+ * than `oncraft`, because that tab carries the whole of what a system authors.
  */
 export const ESSENCE_RULES_TABS = Object.freeze([
   Object.freeze({ id: 'rules', fallback: 'Essence rules', icon: 'fas fa-mortar-pestle' }),
@@ -77,28 +47,10 @@ export const ESSENCE_RULES_TABS = Object.freeze([
 ]);
 
 /**
- * The two CAPABILITY pills a row, a grid card and the inspector all render.
- *
- * They are never hidden for a disabled essence — hiding a pill removes state, and "this
- * essence transfers effects, but is currently suppressed" is a different fact from "this
- * essence transfers nothing". A disabled essence renders them in the MUTED tone beside the
- * Disabled badge instead.
- *
- * ## The Effects pill reports whether the source RESOLVES, not only that one is configured
- *
- * `hasEffectTransfer` is `sourceState !== 'none'` at the store — a CONFIGURED source, which
- * a `stale` or `missing` link still is. Rendered at one tone that makes a broken link
- * indistinguishable from a working one on the library row, and the row is the only place
- * most essences are ever looked at: the inspector shows one essence at a time and the
- * needs-attention filter is a search, not a signal. So a non-`linked` source keeps the pill
- * (the intention is still authored, and hiding it would remove state) and states the
- * breakage in its own tone, glyph and title — three channels, so it survives greyscale.
- *
- * @param {{hasEffectTransfer?: boolean, hasPropertyMacro?: boolean, enabled?: boolean,
- *   sourceState?: string}} essence
- * @param {{effectTransferEnabled?: boolean, propertyMacrosEnabled?: boolean}} features
- * @param {(key: string, fallback: string) => string} text
- * @returns {{id: string, icon: string, label: string, tone: string, title: string}[]}
+ * The two CAPABILITY pills a row, a grid card and the inspector all render, MUTED rather than hidden
+ * for a disabled essence: "transfers effects but is suppressed" is a different fact from "transfers
+ * nothing". The Effects pill reports whether the source RESOLVES, so a non-`linked` one KEEPS the
+ * pill and states the breakage in tone, glyph and title — three channels, surviving greyscale.
  */
 export function essenceCapabilityPills(essence, features = {}, text = (_key, fallback) => fallback) {
   const suppressed = essence?.enabled === false;
@@ -113,10 +65,8 @@ export function essenceCapabilityPills(essence, features = {}, text = (_key, fal
       // The breakage outranks the suppression: a disabled essence with a working source is
       // a state the GM chose, and a broken link is one they have to repair either way.
       tone: sourceBroken ? 'warning' : tone,
-      // BOTH states carry a title, so the single Effects pill's two meanings — a source that
-      // resolves versus one that no longer does — are legible without a colour or glyph the
-      // reader has to already know how to decode (maintainer round). There is no separate
-      // linked/unlinked chip; this pill IS the distinction.
+      // BOTH states carry a title, so the pill's two meanings are legible without a colour or
+      // glyph the reader must already decode. There is no separate linked/unlinked chip.
       title: sourceBroken
         ? text(
             'FABRICATE.Admin.Manager.Essence.Capability.EffectsBroken',
@@ -141,34 +91,9 @@ export function essenceCapabilityPills(essence, features = {}, text = (_key, fal
 }
 
 /**
- * The EFFECTIVE BEHAVIOUR list — what this essence does to a crafted result.
- *
- * ONE projection, rendered by `EssenceBehaviorPreview`, which the editor's live preview and
- * `EssenceBrowserInspector`'s ON CRAFT section both render. They are the same list and
- * re-authoring it in the inspector is what one-implementation-per-meaning forbids.
- *
- * The arithmetic row is unconditional and comes FIRST, because it is the one thing a
- * disabled essence still does: its quantities match, accumulate and are consumed exactly as
- * before. The two behaviour rows state the SUPPRESSION in the same words when the essence
- * is disabled — the delta is explicit that this change does not claim the stacking outcome
- * is identical, so neither row says anything about stacking.
- *
- * ── WORLD SCOPE SAYS WHO INHERITS; SYSTEM SCOPE SAYS WHAT HAPPENS HERE (issue 1372) ──
- * `scope: 'world'` is the world essence entry editor's, and it is what the reference words
- * differently at that layer (`tmp/proto/essence-entry.png`): `Default effects from Starlit
- * Filament / Systems that inherit copy these onto anything crafted with it` and `Default macro
- * Brittle Temper / Runs on craft in every system that inherits`. The world screen edits a record
- * every crafting system resolves against, and the word `Default` plus the inheritance clause are
- * the only things on the panel that say so. The shipped system-scope wording — `Transfers active
- * effects / From None` — never mentioned a system or an inheritance at all, so a GM could not
- * tell from this rail that they were editing something eight systems copy.
- *
- * @param {object} essence a projected essence card, or an editor draft.
- * @param {{effectTransferEnabled?: boolean, propertyMacrosEnabled?: boolean,
- *   sourceName?: string, macroName?: string, scope?: 'world'|'system'}} context
- * @param {(key: string, fallback: string) => string} text
- * @param {(key: string, fallback: string, data: object) => string} format
- * @returns {{id: string, icon: string, title: string, subtitle: string, suppressed: boolean}[]}
+ * The EFFECTIVE BEHAVIOUR list — what this essence does to a crafted result — as ONE projection
+ * `EssenceBehaviorPreview` renders. The arithmetic row is unconditional and FIRST, being the one
+ * thing a disabled essence still does; neither behaviour row says anything about stacking.
  */
 export function projectEssenceBehaviourFacts(
   essence,
@@ -196,25 +121,13 @@ export function projectEssenceBehaviourFacts(
 
   const world = context.scope === 'world';
 
-  // ── AT SYSTEM SCOPE WITH A MEMBERSHIP RECORD, THE TWO ROWS ARE THE ON-CRAFT CARDS ──────────
-  //
-  // The reference's system rules EDITOR rail names each row after the VALUE its section resolves
-  // to and ends it in the layer — `Effects from Ember Brand / Copied onto anything crafted with
-  // it here. Overridden here.` (`tmp/proto/essence-rules-editor.png`) — which is the same
-  // question, and the same answer, as the rules LIST inspector one click away. Rendering
-  // `Transfers active effects / From Iron Ore` here left the editor stating a CAPABILITY where
-  // the reference states a resolved rule and its provenance, on the screen that changes it.
-  //
-  // So the two rows are `projectEssenceOnCraftCards`, not a third wording of the same two facts.
-  // The ARITHMETIC row above them is retained, and that is a stated divergence: the reference's
-  // editor rail draws only the two, and a disabled essence still matches, accumulates and is
-  // consumed, which is the one thing neither behaviour row can say.
+  // AT SYSTEM SCOPE WITH A MEMBERSHIP RECORD, THE TWO ROWS ARE THE ON-CRAFT CARDS, named after the
+  // VALUE each section resolves to and ending in the layer — the same question the rules LIST
+  // inspector answers one click away. The ARITHMETIC row is a stated divergence.
   if (!world && context.inherited && typeof context.inherited === 'object') {
     for (const card of projectEssenceOnCraftCards(essence, context, text, format)) {
-      // ONLY A CONFIGURED SECTION, which is the gate the two blocks below already apply: this
-      // rail describes what the essence DOES, and an unconfigured section does nothing. The
-      // inspector's own panel is the one that lists both sections unconditionally, because there
-      // it is a readout of this system's rules rather than of the essence's behaviour.
+      // ONLY A CONFIGURED SECTION: this rail describes what the essence DOES. The inspector's own
+      // panel lists both unconditionally, being a readout of rules rather than of behaviour.
       const configured =
         card.id === 'effects'
           ? essence?.hasEffectTransfer === true
@@ -230,10 +143,8 @@ export function projectEssenceBehaviourFacts(
     context.macroName ||
     text('FABRICATE.Admin.Manager.Essence.Macro.Unnamed', 'the linked property macro');
 
-  // AN UNSET WORLD DEFAULT IS NAMED, NOT INTERPOLATED. `Default effects from None` is what
-  // `{name}` produces over an empty value, and it reads as a source called "None" rather than as
-  // no source at all. The world catalogue's own cards already have the two phrases for exactly
-  // this state (`CardEffectsUnset` / `CardMacroUnset`), so this rail says what that rail says.
+  // AN UNSET WORLD DEFAULT IS NAMED, NOT INTERPOLATED: `{name}` over an empty value reads as a
+  // source called "None". The world catalogue's cards already have the phrases for this state.
   const worldEffectsTitle = context.sourceName
     ? format(
         'FABRICATE.Admin.Manager.Essence.Preview.DefaultEffects',
@@ -251,9 +162,7 @@ export function projectEssenceBehaviourFacts(
     facts.push({
       id: 'effects',
       icon: 'fas fa-wand-magic-sparkles',
-      // No effect COUNT. `_buildEssenceCards` produces `{id, name, img}` and no count, and
-      // producing one needs an async `fromUuid` plus `doc.effects.size` — a number the
-      // store cannot compute is not shipped.
+      // No effect COUNT: producing one needs an async `fromUuid` plus `doc.effects.size`.
       title: world
         ? worldEffectsTitle
         : text('FABRICATE.Admin.Manager.Essence.Preview.Transfers', 'Transfers active effects'),
@@ -261,9 +170,8 @@ export function projectEssenceBehaviourFacts(
         disabled,
         world,
         suppressedSub,
-        // An UNSET default states its consequence, not its reach: "systems that inherit copy
-        // these" over nothing at all would promise a transfer there is none of. Both sentences
-        // are the world VALIDATION rows' own, so the panel and the check agree word for word.
+        // An UNSET default states its consequence, not its reach. Both sentences are the world
+        // VALIDATION rows' own, so the panel and the check agree word for word.
         worldKey: context.sourceName
           ? 'FABRICATE.Admin.Manager.Essence.Preview.DefaultEffectsHint'
           : 'FABRICATE.Admin.Manager.Essence.Validation.WorldEffectSourceUnset',
@@ -312,15 +220,7 @@ export function projectEssenceBehaviourFacts(
   return facts;
 }
 
-/**
- * One behaviour row's SUBTITLE, in the three states it can be in.
- *
- * Extracted so the two rows above stay two literal descriptions rather than two copies of the
- * same three-branch body, which is what the SonarCloud duplication gate counts.
- *
- * @param {object} spec
- * @returns {string}
- */
+/** One row's SUBTITLE in its three states, extracted so the two rows stay literal descriptions. */
 function worldOrSystemSub(spec) {
   if (spec.disabled) return spec.suppressedSub;
   if (spec.world) return spec.text(spec.worldKey, spec.worldFallback);
@@ -328,34 +228,10 @@ function worldOrSystemSub(spec) {
 }
 
 /**
- * THE `ON CRAFT IN <SYSTEM>` CARDS: the RESOLVED rules and the layer each one came from.
- *
- * ── WHY THIS IS NOT `projectEssenceBehaviourFacts` (issue 1372, maintainer parity round 8) ────
- * The two lists look alike and answer different questions, and collapsing them is what left the
- * system Essence Rules inspector with no provenance at all on a screen whose entire subject is
- * inherit-versus-override.
- *
- * `projectEssenceBehaviourFacts` answers "what does this essence DO to a crafted result" — the
- * arithmetic row first, then a capability row per configured behaviour, worded the same at every
- * scope. That is the EDITOR's live preview and the world entry's `Effective behaviour` list.
- *
- * This answers "what does this system resolve each section TO, and did it author that or inherit
- * it" (`tmp/proto/essence-rules.png`, data at `proto:5093`-`5098`). Its card is titled after the
- * VALUE — `Ember Brand`, `Radiant Blessing` — and its note ends in the layer: `· overridden here`
- * or `· world default`. Two rows two columns left of it already print `(override)`, so the data
- * was on the screen and only this panel could not say it.
- *
- * ── THE SUFFIX IS OMITTED WHEN THERE IS NOTHING TO ATTRIBUTE ──────────────────────────────────
- * `inherited` is `null` for a system with no membership record, and the reference appends the
- * layer clause only for a member (`seiP ? … : ''`). A non-member's sections resolve to nothing at
- * all, so naming a layer for them would be inventing a provenance.
- *
- * @param {object|null} essence a projected essence card.
- * @param {{effectTransferEnabled?: boolean, propertyMacrosEnabled?: boolean, sourceName?: string,
- *   macroName?: string, inherited?: {effectSource?: boolean, macro?: boolean}|null}} context
- * @param {(key: string, fallback: string) => string} text
- * @param {(key: string, fallback: string, data: object) => string} format
- * @returns {{id: string, icon: string, title: string, subtitle: string, suppressed: boolean}[]}
+ * THE `ON CRAFT IN <SYSTEM>` CARDS: the RESOLVED rules and the layer each came from. Deliberately
+ * NOT {@link projectEssenceBehaviourFacts}, which answers what the essence DOES at every scope in
+ * the same words; the card here is titled after the VALUE and its note ends in the layer, omitted
+ * when a non-member has nothing to attribute.
  */
 export function projectEssenceOnCraftCards(
   essence,
@@ -418,14 +294,7 @@ export function projectEssenceOnCraftCards(
   return cards;
 }
 
-/**
- * One `ON CRAFT IN <SYSTEM>` card. Extracted so {@link projectEssenceOnCraftCards} stays two
- * literal descriptions rather than two copies of the same six-branch body, which is what the
- * SonarCloud duplication gate counts on a file it indexes.
- *
- * @param {object} spec
- * @returns {{id: string, icon: string, title: string, subtitle: string, suppressed: boolean}}
- */
+/** One `ON CRAFT IN <SYSTEM>` card, extracted so its caller stays two literal descriptions. */
 function onCraftCard(spec) {
   const { id, icon, configured, name, unsetTitle, setNote, unsetNote, section, essence, context, text, format } =
     spec;
@@ -454,15 +323,7 @@ function onCraftCard(spec) {
   };
 }
 
-/**
- * Which layer one section resolved from, or `''` when there is no membership record to attribute
- * it to.
- *
- * @param {string} section
- * @param {{effectSource?: boolean, macro?: boolean}|null|undefined} inherited
- * @param {(key: string, fallback: string) => string} text
- * @returns {string}
- */
+/** Which layer a section resolved from, or `''` with no membership record to attribute it to. */
 function onCraftLayerClause(section, inherited, text) {
   if (!inherited || typeof inherited !== 'object') return '';
   return inherited[section] === false
@@ -471,13 +332,8 @@ function onCraftLayerClause(section, inherited, text) {
 }
 
 /**
- * Per-check localization key, English label and owning group, keyed by the pure model's
- * check ids.
- *
- * The keys are FULLY LITERAL, not `` `…Validation.Check${id}` ``. `lang-keys-no-orphans`
- * credits a captured literal as a covering PREFIX, and an interpolation that stops
- * mid-segment yields `…Validation.Check`, which covers no leaf at all — so every one of
- * these seven would have been reported as a new orphan while rendering perfectly.
+ * Per-check localization key, English label and owning group, keyed by the model's check ids. The
+ * keys are FULLY LITERAL, because an interpolation stopping mid-segment covers no leaf at all.
  */
 const CHECK_PRESENTATION = Object.freeze({
   name: ['FABRICATE.Admin.Manager.Essence.Validation.CheckName', 'Has a name', 'identity'],
@@ -503,12 +359,9 @@ const CHECK_PRESENTATION = Object.freeze({
     'Enabled state matches its use',
     'usage',
   ],
-  // ── THE WORLD-DEFAULTS GROUP (issue 1372) ──────────────────────────────────────────────
-  // One title per check, with the STATE carried in the detail line, exactly as the seven above
-  // do. The prototype words these as two different titles per check — "Default effect source is
-  // set" against "No default effect source" — and that is deliberately not reproduced: a title
-  // that changes with the state makes the row unfindable by its own name, and the status word
-  // beside it already says which of the two it is.
+  // THE WORLD-DEFAULTS GROUP: one title per check, with the STATE in the detail line. The
+  // prototype's two-titles-per-check wording is deliberately not reproduced — a title that changes
+  // with the state makes the row unfindable by its own name.
   worldEffectSource: [
     'FABRICATE.Admin.Manager.Essence.Validation.CheckWorldEffectSource',
     'A default effect source is set',
@@ -553,18 +406,9 @@ const CHECK_PRESENTATION = Object.freeze({
 });
 
 /**
- * WHICH PART OF THE EDITOR EACH CHECK IS ABOUT — the ZONE half of a validation row's address
- * (issue 1517).
- *
- * A ZONE rather than a tab id, because this editor has TWO tab sets and they do not share their
- * spellings. A create draft renders `identity | oncraft | validation`; every essence the world
- * catalogue holds renders the rules screen's `rules | validation`, where identity is not this
- * screen's to edit at all and the on-craft cards live on the `rules` tab. Naming a tab here
- * would be right on one of the two screens and silently wrong on the other.
- *
- * THE THREE WORLD-SCOPE CHECKS ARE ABSENT ON PURPOSE. They are answered on the world essence
- * entry page, which renders this presentation through the same shell and is not this editor;
- * giving them a zone here would route a GM to a tab that cannot fix them.
+ * WHICH PART OF THE EDITOR EACH CHECK IS ABOUT — the ZONE half of a validation row's address. A ZONE
+ * rather than a tab id, because this editor has TWO tab sets with different spellings. THE THREE
+ * WORLD-SCOPE CHECKS ARE ABSENT ON PURPOSE, being answered on the world entry page.
  */
 const CHECK_ZONE = Object.freeze({
   name: 'identity',
@@ -582,24 +426,10 @@ const CHECK_ZONE = Object.freeze({
 });
 
 /**
- * WHICH CONTROL EACH CHECK NAMES — the `data-validation-target` half (issue 1517).
- *
- * The addresses, and the files that carry them:
- *
- *  - `essence-name`        -> `EssenceIdentityTab.svelte`, the name input
- *  - `essence-description` -> `EssenceIdentityTab.svelte`, the description textarea
- *  - `essence-icon`        -> `EssenceIdentityTab.svelte`, the icon tile and its picker
- *  - `essence-colour`      -> `EssenceIdentityTab.svelte`, the colour card
- *  - `essence-source`      -> `EssenceOnCraftTab.svelte`, the effect-source card
- *  - `essence-macro`       -> `EssenceOnCraftTab.svelte`, the macro card
- *
- * ROUTE-ONLY IS A STATED OUTCOME, NOT A SILENT ONE. `usage`, `systemRules`, `systemEnabled` and
- * `systemCarrier` are each about the RECORD rather than about one control — whether this system
- * has rules for the essence at all, whether it is enabled here, whether anything carries it —
- * so they emit a route and no control, and the row action changes tab without moving focus.
- *
- * `systemEffectSource` and `systemMacro` reuse the two on-craft addresses because they ARE those
- * two cards, read at system scope: the same `EssenceOnCraftTab` renders them in both modes.
+ * WHICH CONTROL EACH CHECK NAMES — the `data-validation-target` half, split between
+ * `EssenceIdentityTab.svelte` and `EssenceOnCraftTab.svelte`. ROUTE-ONLY IS A STATED OUTCOME: the
+ * four record-level checks emit a route and no control, so the row action changes tab without
+ * moving focus, and the two system-scope section checks reuse the on-craft addresses.
  */
 const CHECK_CONTROL = Object.freeze({
   name: 'essence-name',
@@ -613,15 +443,9 @@ const CHECK_CONTROL = Object.freeze({
 });
 
 /**
- * Resolve one zone onto a tab id THIS editor is actually rendering.
- *
- * `oncraft` falls back to `rules` because the rules screen's single authoring tab carries the
- * on-craft cards; `identity` has NO fallback, because on the rules screen identity belongs to
- * the world record and the route out to it is the shared-definition callout, not a tab.
- *
- * @param {string} zone
- * @param {readonly string[]} tabIds the tab set the editor is currently rendering.
- * @returns {string} a tab id, or '' when this screen cannot reach that zone.
+ * One zone onto a tab id THIS editor renders, or `''` when it cannot reach it. `oncraft` falls back
+ * to `rules`, whose single authoring tab carries the on-craft cards; `identity` has NO fallback,
+ * because on the rules screen its route out is the shared-definition callout rather than a tab.
  */
 function zoneRoute(zone, tabIds) {
   if (zone === 'identity') return tabIds.includes('identity') ? 'identity' : '';
@@ -631,19 +455,9 @@ function zoneRoute(zone, tabIds) {
 }
 
 /**
- * The validation row addresses this editor can honour, keyed by check id (issue 1517).
- *
- * Keyed by the tab set rather than fixed, because the same check is addressable on one of this
- * editor's two screens and unreachable on the other. A check whose zone this screen does not
- * render gets NO entry at all — so its row draws no View button rather than one that changes to
- * a tab the strip does not contain.
- *
- * An empty address produces no key rather than an empty one: the host treats any non-empty
- * `focusTarget` as a control it must resolve, so `focusTarget: ''` would ask it to query for
- * something that cannot exist and the row would report as focus-wired while focusing nothing.
- *
- * @param {readonly string[]} [tabIds] the tab ids the editor is rendering.
- * @returns {Record<string, {target: string, focusTarget?: string}>}
+ * The validation row addresses this editor can honour, keyed by the TAB SET rather than fixed: a
+ * check whose zone this screen does not render gets NO entry, so its row draws no View button
+ * rather than one changing to a tab the strip lacks. An empty address produces no key either.
  */
 export function essenceIssueAddresses(tabIds = []) {
   const rendered = Array.isArray(tabIds) ? tabIds : [];
@@ -676,9 +490,8 @@ const CHECK_GROUPS = Object.freeze([
     fallback: 'Usage',
     icon: 'fas fa-cubes',
   }),
-  // The two SCOPED groups (issue 1372). They render only on the screen that owns them, because
-  // `essenceValidationPresentation` drops a group with no rows and the evaluator returns no
-  // world check in system scope or vice versa.
+  // The two SCOPED groups render only on the screen that owns them, because the presentation drops
+  // a group with no rows and the evaluator returns no world check in system scope or vice versa.
   Object.freeze({
     id: 'world',
     labelKey: 'FABRICATE.Admin.Manager.Scoped.Essence.WorldDefaults',
@@ -694,20 +507,10 @@ const CHECK_GROUPS = Object.freeze([
 ]);
 
 /**
- * The Validation tab's grouped rows, in the shape `EditorValidationSurface` takes.
- *
- * The check SET, its order and every severity come from `essenceValidation.js`; this maps
- * them onto copy. A row that is informational reports `pass` and still renders, so
- * `passing + warnings + blocking` equals the number of checks and no row is uncounted.
- *
- * @param {object} essence
- * @param {object} context see `essenceEditorValidation`.
- * @param {(key: string, fallback: string) => string} text
- * @param {(key: string, fallback: string, data: object) => string} [format] the caller's
- *   interpolating localizer. It DEFAULTS to token replacement over `text`, so the three-argument
- *   call sites that shipped before issue 1372 keep working and still render the counts and names
- *   the scoped detail lines carry.
- * @returns {{checks: object[], counts: object, groups: object[]}}
+ * The Validation tab's grouped rows in the shape `EditorValidationSurface` takes; the check SET, its
+ * order and every severity come from `essenceValidation.js`. An informational row reports `pass` and
+ * still renders, so `passing + warnings + blocking` equals the check count. `format` DEFAULTS to
+ * token replacement over `text`, so three-argument call sites keep working.
  */
 export function essenceValidationPresentation(
   essence,
@@ -722,12 +525,8 @@ export function essenceValidationPresentation(
   const { checks, counts } = essenceEditorValidation(essence, context);
   const byId = new Map(checks.map((check) => [check.id, check]));
 
-  // A check the evaluator did not return is DROPPED, not rendered from a half-object. The
-  // two lists come from one module today, so this never fires — but the previous form
-  // dereferenced `check.state` unguarded behind a `.filter(Boolean)` that could not drop
-  // anything (the `.map` always returned an object), so the first time the check list and
-  // the evaluator covered different sets it would have thrown INSIDE a render rather than
-  // degrading. The filter comes BEFORE the map, which is what makes it able to drop.
+  // A check the evaluator did not return is DROPPED rather than rendered from a half-object; the
+  // filter comes BEFORE the map, which is what makes it able to drop at all.
   const rows = (groupId) =>
     ESSENCE_VALIDATION_CHECKS.filter(
       (id) => CHECK_PRESENTATION[id][2] === groupId && byId.has(id)
@@ -756,11 +555,7 @@ export function essenceValidationPresentation(
   };
 }
 
-/**
- * One check's row status. An informational row is a PASS by construction, so it can never
- * paint as a warning; the two failing severities paint as themselves. Written as an
- * early-return chain rather than a nested ternary (Sonar S3358).
- */
+/** One check's row status; an informational row is a PASS by construction. Sonar S3358: no ternary. */
 function checkStatus(check) {
   if (check.valid) return 'pass';
   return check.severity === 'blocking' ? 'block' : 'warn';
@@ -802,23 +597,9 @@ function essenceCheckDetail(id, state, text) {
 }
 
 /**
- * The detail line under one SCOPED check row (issue 1372).
- *
- * SEPARATE FROM `essenceCheckDetail` on purpose. That function answers from `(id, state)` alone
- * and every one of the seven shipped rows can; these rows cannot — "no default effect source"
- * versus "Ember Infusion — 3 systems inherit it" is the same check in two states, and the second
- * needs the count and the name the world entry already holds. Folding the context into the
- * shipped function would give five of its seven cases a parameter they never read.
- *
- * The keys are FULLY LITERAL for the reason `CHECK_PRESENTATION` states: `lang-keys-no-orphans`
- * credits a captured literal as a covering PREFIX, and an interpolation that stops mid-segment
- * covers no leaf at all.
- *
- * @param {string} id
- * @param {string} state
- * @param {object} context
- * @param {(key: string, fallback: string, data: object) => string} format
- * @returns {string}
+ * The detail line under one SCOPED check row, SEPARATE from `essenceCheckDetail`, which answers from
+ * `(id, state)` alone: these rows need a count and a name only the world entry holds, and folding
+ * the context in would give five of seven cases a parameter they never read. Keys FULLY LITERAL.
  */
 function scopedCheckDetail(id, state, context, format) {
   const inheriting = Number(context?.memberSystemCount) || 0;
@@ -863,16 +644,8 @@ function scopedCheckDetail(id, state, context, format) {
 }
 
 /**
- * The detail line under one SYSTEM-SCOPE check row (issue 1372).
- *
- * Split from {@link scopedCheckDetail} so neither function is a chain of eight branches, which
- * SonarCloud reports as cognitive complexity on a file it already indexes.
- *
- * @param {string} id
- * @param {string} state
- * @param {object} context
- * @param {(key: string, fallback: string, data: object) => string} format
- * @returns {string}
+ * The detail line under one SYSTEM-SCOPE check row, split from {@link scopedCheckDetail} so neither
+ * is a chain of eight branches, which SonarCloud reports as cognitive complexity.
  */
 function systemCheckDetail(id, state, context, format) {
   const system = context?.systemName || '';
@@ -927,15 +700,9 @@ function sectionOriginDetail(state, system, format) {
 }
 
 /**
- * How many BEHAVIOURS the On-craft tab has configured — 0, 1 or 2.
- *
- * It is the tab badge, and it counts CONFIGURED behaviours rather than effects. It never
- * counted effects, so dropping the prototype's invented effect count does not delete it.
- * A gated-off capability cannot be configured from this tab, so it does not count.
- *
- * @param {object} essence
- * @param {{effectTransferEnabled?: boolean, propertyMacrosEnabled?: boolean}} features
- * @returns {number}
+ * How many BEHAVIOURS the On-craft tab has configured — 0, 1 or 2. It is the tab badge, and it
+ * counts CONFIGURED behaviours rather than effects; a gated-off capability cannot be configured
+ * from this tab, so it does not count.
  */
 export function essenceOnCraftCount(essence, features = {}) {
   let count = 0;

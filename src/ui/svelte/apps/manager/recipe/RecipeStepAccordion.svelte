@@ -1,23 +1,14 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  Shared expandable/collapsible step accordion. Renders the recipe's ordered steps
-  as a list of rows; each row's header carries the order pip, the name/description
-  toggle, the time summary chip, and a delete button, while the expanded
-  body is supplied by the caller via the `body` snippet. An optional `footer`
-  snippet (e.g. an "add step" row) lets the Overview surface add steps.
+  Shared expandable/collapsible step accordion. Each row's header carries the order pip, the
+  name/description toggle, the time summary chip and a delete button, while the expanded body and
+  an optional trailing "add step" row are the caller's snippets.
 
-  Reordering is OVERVIEW-ONLY: pass `reorderable` to turn the header into a drag
-  handle wired to `onReorderSteps`. The Ingredients / Results / Tools tabs render
-  the same ordered steps WITHOUT drag (order is set in Overview) but keep the chips
-  and delete button so a step can be removed from any tab. Deleting a step removes
-  the whole step (its ingredients, results, and tools), so the parent confirms.
-
-  Accordion (`expandedStepId`) + drag (`dragIndex`) state are local so they survive
-  the store refresh that follows every persisted edit (rows are keyed by step.id).
-
-  When `onUpdateStep` is supplied (the Overview Steps card) the header's time chip
-  becomes an editable duration trigger (RecipeDurationEditor) that patches
-  `step.timeRequirement`; otherwise (the requirement tabs) it stays a read-only chip.
+  Reordering is OVERVIEW-ONLY (`reorderable`); the requirement tabs render the same ordered steps
+  without drag but keep the chips and the delete button, and deleting a step removes the whole
+  step, so the parent confirms. Accordion and drag state are local, so they survive the store
+  refresh that follows every persisted edit. With `onUpdateStep` the header's time chip becomes
+  an editable duration trigger patching `step.timeRequirement`; otherwise it stays read-only.
 -->
 <script>
   import Chip from '../../../components/Chip.svelte';
@@ -29,15 +20,12 @@
   let {
     steps = [],
     reorderable = false,
-    // Results and Tools render EVERY step as an always-open card (issue 643 §C1):
-    // the old single-expand accordion (expandedStepId = '') showed NOTHING by default
-    // on those tabs, so the most mode-dependent surfaces shipped unseen. Overview keeps
-    // the collapsing accordion (it is a reorder list), and Ingredients keeps it too.
+    // Results and Tools render EVERY step as an always-open card, because a single-expand
+    // accordion showed NOTHING by default there. Overview, a reorder list, keeps collapsing.
     alwaysOpen = false,
-    // Whether the system applies time requirements (issue 714). When false the inline
-    // editable duration trigger is hidden and the header shows only the read-only
-    // duration chip. Defaults true so read-only callers (Ingredients/Results/Tools
-    // tabs, which never pass onUpdateStep) keep showing the chip unchanged.
+    // Whether the system applies time requirements; when false the editable duration trigger is
+    // hidden and only the read-only chip shows. Defaults true, so read-only callers are
+    // unaffected.
     timeRequirementsEnabled = true,
     onReorderSteps = () => {},
     onDeleteStep = () => {},
@@ -96,9 +84,9 @@
           }
         : undefined}
     >
-      <!-- Overview only: the header is the drag handle, so a grab inside the expanded
-           body inputs selects text instead of starting a drag. Drag is a mouse-only
-           enhancement; the keyboard-accessible control is the nested role="button". -->
+      <!-- Overview only: the HEADER is the drag handle, so a grab inside the expanded body
+           selects text instead of starting a drag. Drag is a mouse-only enhancement; the
+           keyboard path is the nested role="button". -->
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div
         class="manager-recipe-steps-row-head"
@@ -124,8 +112,7 @@
           <span class="manager-environment-comp-order">{index + 1}</span>
         </span>
         {#if alwaysOpen}
-          <!-- Always-open (Results / Tools): the header is a static label, not a
-               toggle — the body below is permanently rendered. -->
+          <!-- Always-open: the header is a static label rather than a toggle. -->
           <div class="manager-recipe-steps-row-main is-static">
             <span class="manager-environment-comp-copy">
               <span class="manager-environment-comp-name">{stepName(step, index)}</span>
