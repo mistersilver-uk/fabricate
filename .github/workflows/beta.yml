@@ -112,10 +112,10 @@ jobs:
       overwrite: false
     secrets:
       # Reusable workflows don't inherit repo secrets; pass the tester-path secrets through
-      # explicitly. beta uses S3_TESTER_PATH_SECRET; S3_EARLY_ACCESS_PATH_SECRET is forwarded because
+      # explicitly. beta uses S3_TESTER_PATH_SECRET; S3_GUILD_ARTISAN_PATH_SECRET is forwarded because
       # release-s3.yml declares it (a later early-access caller needs it) — beta does not use it.
       S3_TESTER_PATH_SECRET: ${{ secrets.S3_TESTER_PATH_SECRET }}
-      S3_EARLY_ACCESS_PATH_SECRET: ${{ secrets.S3_EARLY_ACCESS_PATH_SECRET }}
+      S3_GUILD_ARTISAN_PATH_SECRET: ${{ secrets.S3_GUILD_ARTISAN_PATH_SECRET }}
 
   verify-publish:
     needs: [semantic-release, publish-s3]

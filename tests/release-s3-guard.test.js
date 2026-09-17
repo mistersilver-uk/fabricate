@@ -29,8 +29,8 @@ const CONFIG = {
   channels: {
     beta: { testerGroups: ['closed-beta-2026'], testerSecretEnv: 'S3_TESTER_PATH_SECRET' },
     'early-access': {
-      testerGroups: ['patrons-2026'],
-      testerSecretEnv: 'S3_EARLY_ACCESS_PATH_SECRET',
+      testerGroups: ['guild-artisan-2026'],
+      testerSecretEnv: 'S3_GUILD_ARTISAN_PATH_SECRET',
     },
     public: { testerGroups: [] },
   },
@@ -45,9 +45,9 @@ const BETA_TESTER_MANIFEST = 'testers/closed-beta-2026/seg/fabricate/module.json
 
 test('resolveChannelConfig gives early-access its OWN cohort and secret, never the closed beta', () => {
   const resolved = resolveChannelConfig(CONFIG, 'early-access');
-  assert.deepEqual(resolved.testerGroups, ['patrons-2026']);
+  assert.deepEqual(resolved.testerGroups, ['guild-artisan-2026']);
   assert.ok(!resolved.testerGroups.includes('closed-beta-2026'));
-  assert.equal(resolved.testerSecretEnv, 'S3_EARLY_ACCESS_PATH_SECRET');
+  assert.equal(resolved.testerSecretEnv, 'S3_GUILD_ARTISAN_PATH_SECRET');
   assert.equal(resolved.source, 'declared');
 });
 
@@ -664,7 +664,7 @@ test('main() refuses to publish a channel whose tester secret is unset', async (
       env: { S3_TESTER_PATH_SECRET: 'seg' },
       deps: { log: () => {} },
     }),
-    /S3_EARLY_ACCESS_PATH_SECRET is unset/
+    /S3_GUILD_ARTISAN_PATH_SECRET is unset/
   );
   assert.deepEqual(harness.puts, []);
 });
@@ -693,7 +693,7 @@ test('main() refuses a channel that declares tester groups but no testerSecretEn
         '--channel',
         'early-access',
       ],
-      env: { S3_TESTER_PATH_SECRET: 'seg', S3_EARLY_ACCESS_PATH_SECRET: 'ea-seg' },
+      env: { S3_TESTER_PATH_SECRET: 'seg', S3_GUILD_ARTISAN_PATH_SECRET: 'ea-seg' },
       deps: { log: () => {} },
     }),
     /declares no "testerSecretEnv"/
@@ -707,7 +707,7 @@ test('runCheckHeads reads every private target of the channel it is asked about'
     version: '1.5.0',
     channel: 'early-access',
     deps: {
-      env: { S3_EARLY_ACCESS_PATH_SECRET: 'ea-seg' },
+      env: { S3_GUILD_ARTISAN_PATH_SECRET: 'ea-seg' },
       createS3Client: async () => ({
         getObject: async (key) => {
           gets.push(key);
@@ -719,7 +719,7 @@ test('runCheckHeads reads every private target of the channel it is asked about'
 
   assert.deepEqual(gets, [
     'modules/fabricate/early-access/latest/module.json',
-    'testers/patrons-2026/ea-seg/fabricate/module.json',
+    'testers/guild-artisan-2026/ea-seg/fabricate/module.json',
   ]);
   assert.equal(report.safety.ok, true);
 });
@@ -739,8 +739,8 @@ test('the shipped config declares the three channels, each with its own cohort a
   });
   assert.deepEqual(resolveChannelConfig(shipped, 'early-access'), {
     channel: 'early-access',
-    testerGroups: ['patrons-2026'],
-    testerSecretEnv: 'S3_EARLY_ACCESS_PATH_SECRET',
+    testerGroups: ['guild-artisan-2026'],
+    testerSecretEnv: 'S3_GUILD_ARTISAN_PATH_SECRET',
     source: 'declared',
   });
   assert.deepEqual(resolveChannelConfig(shipped, 'public').testerGroups, []);
@@ -748,6 +748,81 @@ test('the shipped config declares the three channels, each with its own cohort a
   // The scalar defaults stay, and stay in agreement with the map.
   assert.equal(shipped.channel, 'beta');
   assert.deepEqual(shipped.testerGroups, ['closed-beta-2026']);
+});
+
+test('the shipped config names no superseded tester group and no superseded secret', async () => {
+  // Every OTHER assertion in this file runs against the synthetic local CONFIG, so all of them stay
+  // green if the shipped file is never touched. This sweep and the deepEqual above are the two that
+  // actually read what ships.
+  const shipped = JSON.parse(await readFile(join(ROOT, 'release.s3.config.json'), 'utf8'));
+  const channels = Object.values(shipped.channels);
+
+  const groups = [...(shipped.testerGroups ?? []), ...channels.flatMap((c) => c.testerGroups ?? [])];
+  const secrets = channels.map((c) => c.testerSecretEnv).filter(Boolean);
+  // Non-vacuity: a config that declared no group and no secret would satisfy every sweep below.
+  assert.ok(groups.length > 0 && secrets.length > 0, 'the shipped config declares no tester feed');
+
+  assert.ok(
+    !groups.includes('patrons-2026'),
+    'the early-access cohort was renamed to the tier the premium repository already publishes ' +
+      'under; a surviving patrons-2026 declaration splits that one cohort across two prefixes'
+  );
+  for (const name of secrets) {
+    assert.doesNotMatch(
+      name,
+      /EARLY_ACCESS/,
+      `${name} is named after a CHANNEL; a tester path secret is named after the tester GROUP it ` +
+        'serves, under the same name in every repository publishing into that group'
+    );
+  }
+});
+
+test('every channel in the shipped config declares at most ONE tester group', async () => {
+  // release-s3.js resolves ONE segment per channel and applies it to every group in the array, so a
+  // second entry would silently share the first's segment. Adding one is a deliberate cohort
+  // decision and must break this test rather than pass.
+  const shipped = JSON.parse(await readFile(join(ROOT, 'release.s3.config.json'), 'utf8'));
+
+  let withGroups = 0;
+  for (const [channel, config] of Object.entries(shipped.channels)) {
+    const declared = config.testerGroups ?? [];
+    assert.ok(
+      declared.length <= 1,
+      `channel "${channel}" declares ${declared.length} tester groups (${declared.join(', ')}); ` +
+        'they would share one segment, so give each its own channel or accept the shared prefix here'
+    );
+    if (declared.length === 1) {
+      withGroups += 1;
+      assert.ok(config.testerSecretEnv, `channel "${channel}" declares a group but no secret`);
+    }
+  }
+  assert.equal(withGroups, 2, 'beta and early-access are the two channels with a tester cohort');
+});
+
+test('early-access derives its tester feed from the guild-artisan group, never the old one', async () => {
+  const shipped = JSON.parse(await readFile(join(ROOT, 'release.s3.config.json'), 'utf8'));
+  const resolved = resolveChannelConfig(shipped, 'early-access');
+
+  const layout = deriveS3Layout({
+    moduleId: shipped.moduleId,
+    channel: 'early-access',
+    version: '1.4.0',
+    baseUrl: shipped.baseUrl,
+    testerGroups: resolved.testerGroups,
+    testerSegment: 'ea-seg',
+  });
+
+  assert.deepEqual(
+    layout.targets.map((t) => t.manifestKey),
+    [
+      'modules/fabricate/early-access/latest/module.json',
+      'testers/guild-artisan-2026/ea-seg/fabricate/module.json',
+    ]
+  );
+  assert.ok(
+    !JSON.stringify(layout.targets).includes('patrons-2026'),
+    'a target of the shipped early-access layout still addresses the superseded cohort prefix'
+  );
 });
 
 test('a hotfix channel is undeclared, so its ONLY target is its own sources feed', async () => {
