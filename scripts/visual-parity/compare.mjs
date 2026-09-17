@@ -1,32 +1,5 @@
 #!/usr/bin/env node
-/**
- * Visual-parity COMPARATOR — measure the REAL APP and compare it to the prototype fixture.
- *
- *   node scripts/visual-parity/compare.mjs --spec <spec.mjs> --fixture <fixture.json>
- *                                          [--screen <name>]
- *   node scripts/visual-parity/compare.mjs --spec <spec.mjs> --assert-locators
- *
- * Exits non-zero on any drift, any coverage hole, any malformed exemption, any chrome element
- * painting a forbidden colour, and any alignment the prototype draws and the subject breaks.
- * Screen-agnostic; see `README.md`.
- *
- * ── `--assert-locators`: the standing guard over the locator map ─────────────────────────
- * The subject half of a spec is a HAND-MAINTAINED MIRROR of the product's own selectors, and a
- * mirror rots silently. It rotted here: eighteen regions named hooks no source file has ever
- * emitted, so a third of one screen's regions measured NOTHING while the report said `nothing
- * matched` in among a hundred drift lines and read like more of the same. This mode asks the
- * one question that separates the two — does every subject locator resolve against the running
- * app at least once, or is it marked `unreachable` with a stated reason — and reports nothing
- * else. It is a full-screen-set run by definition, and it needs no fixture.
- *
- * ── Its subject is the app, not a fixture ────────────────────────────────────────────────
- * This pass used to render a hand-authored markup fixture. That fixture was a MIRROR, and a
- * mirror does not fail — it drifts, silently, into measuring something the app no longer
- * draws, or (as here) into modelling a component that was never broken while the broken one
- * went unmodelled. It is the same lesson `inventory.mjs` was created to escape, so both passes
- * now boot ONE live subject through `lib/subject.js` and read `getComputedStyle` off the
- * shipped component tree.
- */
+/** Visual-parity comparator — measure the real app and compare it to the prototype fixture. */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -56,13 +29,7 @@ function flag(name) {
   return process.argv.includes(`--${name}`);
 }
 
-/**
- * Drive the live subject to one screen and read every region and edge mapped onto it.
- *
- * @param {object} session Live subject session from `openLiveSubject`.
- * @param {object} options Spec, screen name, region query and alignment query.
- * @returns {Promise<object>} `{ regions, chrome, missingAncestors, alignments }`.
- */
+/** Drive the live subject to one screen and read every region and edge mapped onto it. */
 async function measureScreen(session, options) {
   const { spec, screen, query, alignments } = options;
   const page = await session.show(screen);
@@ -71,9 +38,7 @@ async function measureScreen(session, options) {
     alignments,
     sweep: spec.subject.chromeSweep ?? null,
     ancestors: spec.subject.requiredAncestors ?? [],
-    // EVERY locator resolves inside the subject root. The app under measurement is one window
-    // of a whole running product, and a document-wide `querySelector` would happily answer a
-    // region with a nav item or a neighbouring panel that wears the same class.
+    // Every locator resolves inside the subject root.
     root: spec.subject.root ?? null,
   });
 }
@@ -83,13 +48,7 @@ function describeLocator(locator) {
   return typeof locator === 'string' ? `\`${locator}\`` : JSON.stringify(locator);
 }
 
-/**
- * An UNREACHABLE region carries a stated reason, exactly as an exemption does.
- *
- * A region the lab's world cannot put on screen is a real constraint — an empty library
- * renders no row — but "cannot be measured" is a claim, and an unreasoned claim is
- * indistinguishable from a region somebody switched off to make the run green.
- */
+/** An UNREACHABLE region carries a stated reason, exactly as an exemption does. */
 function unreachableProblems(spec) {
   const problems = [];
   for (const [name, entry] of Object.entries(spec?.subject?.locators ?? {})) {
@@ -201,10 +160,7 @@ async function main() {
     ...subjectProblems(spec),
     ...unreachableProblems(spec),
     ...fixtureProblems,
-    // BOTH DIRECTIONS, IN THE GUARD TOO. The loop below skips a spec region that has no subject
-    // locator at all, because there is nothing to resolve — and a guard that SILENTLY skipped
-    // one would answer "every locator resolves" about a map with a hole in it, which is the
-    // vacuity it exists to prevent. In a measuring run `fixtureProblems` says this already.
+    // Both directions, in the guard too.
     ...(assertLocators
       ? spec.regions
           .filter((region) => !spec.subject.locators[region.name])
@@ -227,9 +183,8 @@ async function main() {
     if (!byScreen.has(screen)) byScreen.set(screen, { regions: {}, alignments: {} });
     return byScreen.get(screen);
   };
-  // In the locator guard the roster is the SPEC's regions and no property is read; in a
-  // measuring run it is the fixture's, because the fixture is what holds the values to compare
-  // against. One loop either way, so the two modes cannot drive the app differently.
+  // In the locator guard the roster is the spec's regions and no property is read; in a measuring
+  // run it is the fixture's, because the fixture is what holds the values to compare against.
   const roster = assertLocators
     ? spec.regions.map((region) => [
         region.name,
@@ -260,15 +215,10 @@ async function main() {
 
   const browser = await chromium.launch();
   const drift = [];
-  // ROUNDING IS REPORTED, NOT SUPPRESSED. A declared per-property tolerance answers one thing —
-  // the two documents write the same type ramp in different UNITS — and the moment it stops
-  // printing what it absorbed it becomes a gate that quietly cannot fail. Its own block, its own
-  // count, and every line carries its measured delta.
+  // Rounding is reported, not suppressed.
   const rounding = [];
   const notes = [];
-  // The locator guard's three buckets. A locator belongs in exactly one of them, which is the
-  // whole content of the claim: it RESOLVED somewhere, or it is a stated `unreachable`, or
-  // nothing in the running app answers it and nobody has said why.
+  // The locator guard's three buckets.
   const resolved = [];
   const excused = [];
   const unresolved = [];
@@ -384,9 +334,7 @@ async function main() {
   }
 
   if (assertLocators) {
-    // NON-VACUITY IS PART OF THE REPORT. "0 unresolved" out of 0 locators is what a guard
-    // pointed at nothing prints, and it is indistinguishable from a clean run unless the
-    // denominator is on the line beside it.
+    // Non-vacuity is part of the report.
     process.stdout.write(
       `locator guard: ${resolved.length} resolved, ${excused.length} unreachable ` +
         `(with a stated reason), ${unresolved.length} unresolved, of ` +

@@ -1,14 +1,4 @@
-/**
- * Reads the Font Awesome bundle Foundry ships and reports what it can actually render.
- *
- * Fabricate's icon vocabulary used to be generated from Font Awesome Free 6.7.2 metadata, which
- * describes a DIFFERENT font from the one a Foundry client loads. Foundry bundles Font Awesome
- * Pro, so an icon Foundry renders perfectly was unofferable whenever the free release lacked it.
- * This module exists so the vocabulary is derived from the stylesheet Foundry actually serves.
- *
- * Everything here is pure apart from `readWoff2Codepoints`, which is the only function that
- * touches a file.
- */
+/** Reads the Font Awesome bundle Foundry ships and reports what it can actually render. */
 
 import fs from 'node:fs';
 import zlib from 'node:zlib';
@@ -16,10 +6,8 @@ import zlib from 'node:zlib';
 const BACKSLASH = '\\';
 
 /**
- * The order of woff2's built-in table tags. A woff2 table directory entry names its table by
- * index into this list rather than by tag, unless the index is 63.
- *
- * @see https://www.w3.org/TR/WOFF2/#table_dir_format
+ * The order of woff2's built-in table tags. A woff2 table directory entry names its table by index
+ * into this list rather than by tag, unless the index is 63.
  */
 const WOFF2_KNOWN_TABLE_TAGS = [
   'cmap',
@@ -90,24 +78,7 @@ const WOFF2_KNOWN_TABLE_TAGS = [
 /** A quoted `"Font Awesome <major> <flavour>"` font-family literal, in either quote character. */
 const FONT_FAMILY_LITERAL = /(["'])(Font Awesome \d+[^"']*)\1/g;
 
-/**
- * The generation and edition a set of `font-family` literals describes, by HIGHEST MAJOR.
- *
- * Highest rather than first, and that is the whole point of the function. Foundry 14.360's
- * stylesheet declares `Font Awesome 7 Pro`, `7 Brands` and `7 Duotone` — and also `Font Awesome 5
- * Pro`, `5 Brands`, `5 Duotone` and bare `FontAwesome`, which are the backward-compatibility
- * aliases Font Awesome keeps for stylesheets written against the old family names. A first-match
- * read of that file answers `5`. Foundry 13.351 declares `Font Awesome 6 Pro`, `6 Brands`,
- * `6 Duotone`, `6 Sharp` and `6 Sharp Duotone`, with no alias to trip over.
- *
- * The edition is read from the literals AT that major, and a named edition beats an unnamed one at
- * the same major so the answer does not depend on which family the minifier emitted first —
- * `Font Awesome 6 Brands` names a face, `Font Awesome 6 Pro` names the release.
- *
- * @param {Iterable<string>} fontFamilies quoted family names, without their quotes
- * @returns {{ edition: 'Free'|'Pro'|null, major: number }|null} null when none is a Font Awesome
- *   family literal
- */
+/** The generation and edition a set of `font-family` literals describes, by highest major. */
 export function highestFontAwesomeFamilyRelease(fontFamilies) {
   let highest = null;
   for (const family of fontFamilies) {
@@ -125,29 +96,7 @@ export function highestFontAwesomeFamilyRelease(fontFamilies) {
   return highest;
 }
 
-/**
- * The release a stylesheet describes, and WHICH EVIDENCE says so.
- *
- * Measured rather than assumed, because the catalogue generated from a bundle describes one
- * Foundry release's font and nothing else. The two Foundry generations state their release in two
- * different ways, and a reader that knows only the stronger one cannot read the older bundle at
- * all:
- *
- * - Foundry 14.360 serves the stylesheet with its `/*! Font Awesome Pro 7.2.0 *\/` banner intact,
- *   so edition AND patch version are both readable.
- * - Foundry 13.351 serves a stylesheet with NO comments in it whatsoever — its build strips them —
- *   so there is no banner and no patch version to read. Its `font-family` literals still name the
- *   generation and the edition, which is less than 14 offers and considerably more than nothing.
- *
- * Throwing on the second case is what this function used to do, and it made the generator
- * unrunnable against a Foundry 13 install for want of a patch number that install does not state.
- * A null `version` reports that honestly and leaves the caller to decide whether it can proceed;
- * `evidence` names what the other fields rest on so a caller never has to guess.
- *
- * @param {string} cssText
- * @returns {{ edition: 'Free'|'Pro'|null, version: string|null, major: number, evidence: 'banner'|'font-family' }}
- * @throws {Error} when the text names no Font Awesome release at all, by either route
- */
+/** The release a stylesheet describes, and which evidence says so. */
 export function parseFontAwesomeRelease(cssText) {
   const text = String(cssText ?? '');
   const banner = /Font Awesome (Free|Pro) (\d+)\.(\d+\.\d+)/.exec(text);
@@ -173,48 +122,18 @@ export function parseFontAwesomeRelease(cssText) {
   );
 }
 
-/**
- * The edition a bundled `LICENSE.txt` grants.
- *
- * Foundry ships this file beside the stylesheet, and it is the only place a Foundry 13 install
- * states its edition in prose rather than as a side effect of a family name. Both supported
- * generations ship the identical Pro licence, including the paragraph restricting third-party
- * package use — which is why Fabricate records icon NAMES and never a glyph.
- *
- * @param {string|null|undefined} licenseText
- * @returns {'Free'|'Pro'|null}
- */
+/** The edition a bundled `LICENSE.txt` grants. */
 export function fontAwesomeLicenseEdition(licenseText) {
   return /Font Awesome (Free|Pro) License/.exec(String(licenseText ?? ''))?.[1] ?? null;
 }
 
 /**
- * A CSS escape, per CSS Syntax §4.3.7: one to SIX hex digits, optionally followed by a single
+ * A CSS escape, per CSS Syntax §4.3.7: one to six hex digits, optionally followed by a single
  * whitespace that terminates the run rather than belonging to it.
- *
- * Both halves of that are load-bearing against this bundle. The terminator form is how a minifier
- * spells an escape whose next character would otherwise be read as a seventh hex digit, and it is
- * the form `.fa-0` through `.fa-9` are written in: `--fa:"\30 "` is the digit zero, not a three.
- * The one-digit bound matters because `\a` is a legal escape naming U+000A, and a lower bound of
- * two would read it as the letter `a`.
  */
 const CSS_HEX_ESCAPE = /^([0-9a-f]{1,6})(?:\r\n|[ \n\t\r\f])?$/i;
 
-/**
- * Turns the `--fa` custom property's value into the codepoint it names.
- *
- * Font Awesome 7 assigns a glyph with `--fa:"\f6bc"` rather than a `content` rule, and the value
- * is a CSS string in which a backslash starts either a hex escape or a literal-character escape.
- * `\f6bc` is a codepoint; `\+` is the character `+`; `\30 ` is a codepoint whose trailing space
- * is the escape's terminator and not part of the value.
- *
- * The codepoint is the ONLY input to the classic-and-not-brands filter that decides what the
- * catalogue contains, so misreading one is not a cosmetic error: it decides an icon's membership
- * by whichever face happens to carry the wrong number.
- *
- * @param {string} cssValue the raw text between the quotes
- * @returns {number} a Unicode codepoint
- */
+/** Turns the `--fa` custom property's value into the codepoint it names. */
 export function parseGlyphCodepoint(cssValue) {
   const value = String(cssValue ?? '');
   if (!value.startsWith(BACKSLASH)) return value.codePointAt(0);
@@ -223,33 +142,7 @@ export function parseGlyphCodepoint(cssValue) {
   return hexEscape ? Number.parseInt(hexEscape[1], 16) : escaped.codePointAt(0);
 }
 
-/**
- * Every rule in the stylesheet that assigns a glyph, with the names that share it.
- *
- * A naive `::before` scrape finds almost nothing in Font Awesome 7 because the release moved from
- * a `content` rule to the `--fa` custom property, and several names routinely share one rule:
- * `.fa-baby-carriage,.fa-carriage-baby{--fa:"\f77d"}` is one picture under two names.
- *
- * Requiring a glyph assignment is also what drops the seventy-odd `.fa-<name>` classes that are
- * not icons — the family names, the sizes, and the animation, rotation and layout utilities. They
- * match the same selector shape and are excluded by construction rather than by a list.
- *
- * THE ASSIGNMENT ENDS AT `;` OR AT `}`, and both forms are shipped. Foundry 14's bundle writes one
- * declaration per icon (`.fa-gear{--fa:"\f013"}`); Foundry 13's writes two for all but a handful,
- * `.fa-gear{--fa:"\f013";--fa--fa:"\f013\f013"}` — 4,159 of its 4,656 icon rules take that shape
- * against 495 that do not. A reader that demanded `}` therefore found 495 rules in Foundry 13's
- * stylesheet, every one of them a brand, and NOT ONE classic glyph: the entire classic vocabulary
- * was invisible to it, which reads as "Foundry 13 has no icons" rather than as a parse failure.
- * Accepting the semicolon is measured bit-identical on Foundry 14 — same count, same names, same
- * order — and takes Foundry 13 from 495 rules and 0 classic glyphs to 4,655 and 4,088.
- *
- * What it does not read, in either bundle, is a value carrying an escaped quote: the `[^"]+` run
- * in `.fa-ditto{--fa:"\"";…}` cannot cross it. That costs one name per bundle, is the same one on
- * both, and is not what the terminator decides.
- *
- * @param {string} cssText
- * @returns {Array<{ names: string[], codepoint: number }>}
- */
+/** Every rule in the stylesheet that assigns a glyph, with the names that share it. */
 export function parseIconGlyphRules(cssText) {
   const rulePattern = /((?:\.fa-[a-z0-9-]+,)*\.fa-[a-z0-9-]+)\{--fa:"([^"]+)"(?:;|\})/g;
   const rules = [];
@@ -275,15 +168,8 @@ function readUIntBase128(buffer, cursor) {
 }
 
 /**
- * The codepoints a format 4 subtable covers: 16-bit segment mapping, the format every classic
- * face uses for the Basic Multilingual Plane.
- *
- * The final segment is the mandatory 0xFFFF-to-0xFFFF terminator rather than a mapped character,
- * so it is skipped instead of adding a codepoint no glyph is drawn for.
- *
- * @param {Buffer} cmap
- * @param {number} subtableOffset
- * @param {Set<number>} codepoints mutated in place
+ * The codepoints a format 4 subtable covers: 16-bit segment mapping, the format every classic face
+ * uses for the Basic Multilingual Plane.
  */
 function addFormat4SegmentCodepoints(cmap, subtableOffset, codepoints) {
   const segmentsTimesTwo = cmap.readUInt16BE(subtableOffset + 6);
@@ -300,10 +186,6 @@ function addFormat4SegmentCodepoints(cmap, subtableOffset, codepoints) {
 /**
  * The codepoints a format 12 subtable covers: 32-bit segmented coverage, which is how a face
  * declares anything above the Basic Multilingual Plane.
- *
- * @param {Buffer} cmap
- * @param {number} subtableOffset
- * @param {Set<number>} codepoints mutated in place
  */
 function addFormat12GroupCodepoints(cmap, subtableOffset, codepoints) {
   const groupCount = cmap.readUInt32BE(subtableOffset + 12);
@@ -315,33 +197,14 @@ function addFormat12GroupCodepoints(cmap, subtableOffset, codepoints) {
   }
 }
 
-/**
- * Add one cmap subtable's codepoints, when it is written in a format this reader understands.
- *
- * Any other format is skipped rather than guessed at: a face declares several subtables, and the
- * two above are the ones Font Awesome's woff2 files actually use — so a format nobody ships is a
- * reason to go on to the next subtable rather than to fail.
- *
- * @param {Buffer} cmap
- * @param {number} subtableOffset
- * @param {Set<number>} codepoints mutated in place
- */
+/** Add one cmap subtable's codepoints, when it is written in a format this reader understands. */
 function readCmapSubtable(cmap, subtableOffset, codepoints) {
   const format = cmap.readUInt16BE(subtableOffset);
   if (format === 4) addFormat4SegmentCodepoints(cmap, subtableOffset, codepoints);
   else if (format === 12) addFormat12GroupCodepoints(cmap, subtableOffset, codepoints);
 }
 
-/**
- * The codepoints a woff2 face actually carries, read from its `cmap`.
- *
- * This is what makes `hasRegular` and "is this a brand?" measurable rather than assumed. woff2
- * transforms `glyf` and `loca` but leaves every other table intact, so `cmap` can be read straight
- * out of the decompressed stream.
- *
- * @param {string} filePath a `.woff2` file
- * @returns {Set<number>}
- */
+/** The codepoints a woff2 face actually carries, read from its `cmap`. */
 export function readWoff2Codepoints(filePath) {
   const buffer = fs.readFileSync(filePath);
   if (buffer.toString('latin1', 0, 4) !== 'wOF2') {
@@ -392,39 +255,10 @@ export function readWoff2Codepoints(filePath) {
   return codepoints;
 }
 
-/**
- * The tokens a retired spelling ends in.
- *
- * `-o`, `-lg`/`-sm` and `-h`/`-v` are the suffixes the project used before it moved to descriptive
- * compound names, so `home-lg` is the older spelling of `house-chimney`. `-times`, `-edit` and
- * `-broken` are the same thing in word form: Font Awesome 6 renamed every one of them to `-xmark`,
- * `-pen` and `-crack`/`-slash`, and left the old spelling behind as an alias.
- */
+/** The tokens a retired spelling ends in. */
 const RETIRED_VARIANT_TOKENS = new Set(['broken', 'edit', 'times', 'o', 'lg', 'sm', 'h', 'v']);
 
-/**
- * Whether a name carries one of Font Awesome's retired-variant markers.
- *
- * A marker is a whole hyphen-delimited TOKEN, and reading the name as tokens is what says so.
- * The equivalent `/(^|-)alt($|-)|(^|-)(broken|edit|…|[0-9]+)$/` this replaces was correct, and
- * correct in a shape whose two anchors each bound to one alternative — legible only to a reader
- * who had worked that out (`javascript:S5850`), for the rule that decides which of a glyph's
- * names a GM is offered.
- *
- * `alt` counts wherever it sits rather than only at the end, because `comment-alt-dots` is a
- * retired spelling of `message-dots` and reads as one in a picker label. Every other marker counts
- * as the FINAL token only, so `times-circle` and `smoke` are names in their own right — and a
- * token is why `salt-shaker` is not an `alt` name.
- *
- * A trailing ordinal is a marker too: `battery-5`, `temperature-0` and `wifi-3` are the older
- * spellings of `battery-full`, `temperature-empty` and `wifi`. It over-matches, as `-broken` and
- * `-o` do: the ten digit icons `.fa-0` through `.fa-9`, `image-broken` and `circle-o` are not
- * retired anything. Every one of those is the only name its glyph carries, so the over-match is
- * inert — this ranks the names of ONE glyph, and a glyph with a single name has nothing to rank.
- *
- * @param {string} iconName
- * @returns {boolean}
- */
+/** Whether a name carries one of Font Awesome's retired-variant markers. */
 export function isRetiredVariantName(iconName) {
   const tokens = String(iconName ?? '').split('-');
   if (tokens.includes('alt')) return true;
@@ -433,12 +267,7 @@ export function isRetiredVariantName(iconName) {
   return RETIRED_VARIANT_TOKENS.has(finalToken) || /^\d+$/.test(finalToken);
 }
 
-/**
- * How many names in the bundle start with each leading token.
- *
- * @param {Iterable<string>} iconNames
- * @returns {Map<string, number>}
- */
+/** How many names in the bundle start with each leading token. */
 export function countLeadingTokens(iconNames) {
   const counts = new Map();
   for (const name of iconNames) {
@@ -448,26 +277,7 @@ export function countLeadingTokens(iconNames) {
   return counts;
 }
 
-/**
- * Which of a glyph's names the vocabulary offers.
- *
- * This is a PRESENTATION choice, not a claim about which name Font Awesome considers canonical.
- * The bundle cannot answer that: every one of its multi-name selector lists is sorted
- * alphabetically, so the order carries no information about which name came first. Because the
- * other names stay on the entry and resolve to it, a preference that reads oddly costs a retro
- * label and never a refused name.
- *
- * The order is: a retired-variant spelling loses; then, when one name extends another token for
- * token, the shorter wins, so the glyph a family is NAMED after keeps its plain name (`clock` over
- * `clock-four`, `folder` over `folder-blank`); then the name whose leading token names the larger
- * family in the bundle, which puts `tower-broadcast` ahead of `broadcast-tower` and `hand-fist`
- * ahead of `fist-raised`; then the longer name; then alphabetical, so the result never depends on
- * the order the stylesheet happened to list.
- *
- * @param {string[]} names every name the stylesheet gives one glyph
- * @param {Map<string, number>} leadingTokenCounts from `countLeadingTokens`
- * @returns {string}
- */
+/** Which of a glyph's names the vocabulary offers. */
 export function preferredIconName(names, leadingTokenCounts) {
   return [...names].sort((left, right) => {
     const leftRetired = isRetiredVariantName(left) ? 1 : 0;
@@ -486,15 +296,7 @@ export function preferredIconName(names, leadingTokenCounts) {
   })[0];
 }
 
-/**
- * The Title-Cased label derived from an icon code.
- *
- * Derived rather than authored: 3,700 hand-written captions would drift from their codes, and a
- * caption that disagrees with the name a GM typed is worse than a plain one.
- *
- * @param {string} iconCode
- * @returns {string}
- */
+/** The Title-Cased label derived from an icon code. */
 export function iconLabelFor(iconCode) {
   return String(iconCode ?? '')
     .split('-')
@@ -503,19 +305,7 @@ export function iconLabelFor(iconCode) {
     .join(' ');
 }
 
-/**
- * The catalogue: one entry per glyph the classic faces carry, sorted by the offered name.
- *
- * A glyph is in when the classic solid face carries its codepoint and the brands face does not.
- * That is the whole brand rule, and it is measured from the fonts rather than matched against a
- * list of company names — a logo is exactly a glyph that only the brands face draws.
- *
- * @param {object} bundle
- * @param {string} bundle.cssText the bundled `all.min.css`
- * @param {Set<number>} bundle.classicCodepoints from the classic solid face
- * @param {Set<number>} bundle.brandCodepoints from the brands face
- * @returns {Array<{ iconCode: string, label: string, aliases: string[] }>}
- */
+/** The catalogue: one entry per glyph the classic faces carry, sorted by the offered name. */
 export function buildIconCatalogue({ cssText, classicCodepoints, brandCodepoints }) {
   const rules = parseIconGlyphRules(cssText);
   const classicRules = rules.filter(

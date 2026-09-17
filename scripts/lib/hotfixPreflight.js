@@ -1,43 +1,4 @@
-/**
- * Pre-flight collision guard for cutting a hotfix line (issue #627, task 3.9).
- *
- * A hotfix line is cut from the PUBLIC tag (`git branch 1.4.x v1.4.0`) and lands `fix:` only, so
- * semantic-release computes the next patch of that public version (`v1.4.0` → `1.4.1`). But if the
- * base version is itself SOAKING as a patch — public is `1.5.0` and `v1.5.1` is already minted and
- * distributed in early-access — cutting `1.5.x` from `v1.5.0` recomputes `1.5.1`, a tag that
- * already exists on a DIFFERENT commit. That is the wrong route: a soaking patch carries only
- * `fix`/`perf` by construction, so it must be PROMOTED first, not hotfixed on top of.
- *
- * DEFENSE-IN-DEPTH, not the only guard. semantic-release already refuses this collision — it
- * computes `1.5.1`, finds it out of range for the branch, and hard-fails with `EINVALIDNEXTVERSION`
- * before pushing any tag (rehearsal-confirmed, issue #627 task 2.1(j)). This module refuses the
- * same thing EARLIER and MORE LEGIBLY: at the moment the operator is about to cut the branch,
- * naming the remedy in plain language, rather than deep inside a failed release run "at the worst
- * moment".
- *
- * STDIN CONTRACT — the remote-tag list is PIPED IN, never spawned:
- *
- *   git ls-remote --tags origin | node scripts/hotfix-preflight.mjs v1.5.0
- *
- * The tool NEVER runs `git` itself: shelling out resolves `git` off `PATH` (a writable-directory
- * injection surface, Sonar S4036), and there is no need to — the operator already has a shell open
- * to cut the branch. It reads the full `git ls-remote --tags origin` listing on stdin, extracts the
- * `refs/tags/…` refs, and refuses when the computed `v<next>` tag is present. The match is on the
- * WHOLE ref (`refs/tags/<tag>`, or its `^{}` dereferenced form for an annotated tag), never a
- * substring, so a soaking `v1.5.10` never satisfies a lookup for `v1.5.1`.
- *
- * EMPTY / MALFORMED STDIN IS A FAIL-CLOSED ERROR (exit 2), not "no such tag". The contract pipes
- * the UNFILTERED tag listing, and Fabricate's remote always carries tags (179+), so an empty or
- * unparseable stdin means the pipe broke, the wrong remote was queried, or `git ls-remote` failed —
- * an UNVERIFIABLE state. Treating it as "absent, safe to proceed" would defeat the whole guard, so
- * it refuses instead. (`git ls-remote --tags origin` with no tag argument lists every tag; there is
- * deliberately no per-tag query, because that path is exactly the shell-out we are avoiding.)
- *
- * ZERO DEPENDENCIES, by design: the `scripts/hotfix-preflight.mjs` CLI over this module may run
- * before `npm ci`, exactly like `validate-release-tag.mjs` over `releaseTags.js`. These `.js` files
- * parse as ESM only because the root `package.json` declares `"type": "module"` — do not drop that
- * declaration or relocate them under a directory with its own `package.json`.
- */
+/** Pre-flight collision guard for cutting a hotfix line (issue #627, task 3.9). */
 import { parseReleaseTag } from './releaseTags.js';
 import { parseSemver } from './semver.js';
 
@@ -52,8 +13,6 @@ const OBJECT_ID_RE = /^[0-9a-f]{40,64}$/i;
 /**
  * Read a readable stream to a UTF-8 string. Lives here so the CLI shim stays a pure argv/stdin
  * wiring with nothing testable of its own.
- * @param {import('node:stream').Readable} stream The stream to drain (typically `process.stdin`).
- * @returns {Promise<string>} The stream's full contents.
  */
 export async function readStdin(stream) {
   const chunks = [];
@@ -61,17 +20,7 @@ export async function readStdin(stream) {
   return Buffer.concat(chunks).toString('utf8');
 }
 
-/**
- * Compute the next patch tag a hotfix line cut from `baseTag` would mint.
- *
- * The base MUST be a stable public tag (`vX.Y.Z`): a hotfix line is cut from a PUBLISHED public
- * version, never from a prerelease. Version parsing is reused from the release tooling — the tag
- * shape from `parseReleaseTag`, the numeric fields from `parseSemver` — never reinvented here.
- *
- * @param {string} baseTag The hotfix line's base public tag, e.g. `v1.5.0`.
- * @returns {{baseTag: string, baseVersion: string, nextVersion: string, nextTag: string}}
- * @throws {Error} If `baseTag` is not a stable public release tag.
- */
+/** Compute the next patch tag a hotfix line cut from `baseTag` would mint. */
 export function nextPatchTag(baseTag) {
   const parsed = parseReleaseTag(baseTag);
   if (parsed?.kind !== 'stable') {
@@ -95,12 +44,7 @@ export function nextPatchTag(baseTag) {
   };
 }
 
-/**
- * Extract the `refs/…` refs from a `git ls-remote` listing.
- * @param {string} lsRemoteOutput The piped `git ls-remote --tags origin` stdout.
- * @returns {string[]} The refs (e.g. `refs/tags/v1.4.0`), preserving any `^{}` deref suffix.
- * @throws {Error} If the listing carries no parseable ref line — an unverifiable state (fail closed).
- */
+/** Extract the `refs/…` refs from a `git ls-remote` listing. */
 function parseLsRemoteRefs(lsRemoteOutput) {
   const refs = String(lsRemoteOutput)
     .split('\n')
@@ -119,10 +63,6 @@ function parseLsRemoteRefs(lsRemoteOutput) {
 
 /**
  * Run the pre-flight check for a hotfix line's base tag against a piped `git ls-remote` listing.
- * @param {string} baseTag The hotfix line's base public tag, e.g. `v1.5.0`.
- * @param {string} lsRemoteOutput The piped `git ls-remote --tags origin` stdout.
- * @returns {{ok: boolean, code: number, nextTag: string, message: string}} The verdict.
- * @throws {Error} If `baseTag` is not a stable public tag, or the listing is empty/malformed.
  */
 export function hotfixPreflight(baseTag, lsRemoteOutput) {
   const { nextTag } = nextPatchTag(baseTag);
@@ -152,12 +92,7 @@ export function hotfixPreflight(baseTag, lsRemoteOutput) {
 
 /**
  * Resolve the CLI to a process exit code: parse argv, run the check against the already-read stdin,
- * and return the code. Kept as a pure function of its inputs (argv + the stdin string + injected io)
- * so the test drives it by passing `git ls-remote` CONTENT, never a subprocess or the real remote.
- * @param {string[]} argv Arguments after the script name.
- * @param {string} input The piped `git ls-remote --tags origin` stdout.
- * @param {{log?: (msg: string) => void, error?: (msg: string) => void}} [io] Injectable output.
- * @returns {number} The exit code: 0 clear, 1 collision, 2 usage error / unverifiable input.
+ * and return the code.
  */
 export function run(argv, input, io = {}) {
   const { log = console.log, error = console.error } = io;

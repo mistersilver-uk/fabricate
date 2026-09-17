@@ -1,21 +1,4 @@
-/**
- * Minimal random-access ZIP reader (issue: full-window View Lab).
- *
- * The View Lab harvests Foundry's window chrome out of the release archive that
- * `scripts/foundry-test-up.mjs` already caches under `.foundry-e2e/cache/`. That archive is
- * ~156 MB and we want four or five members out of ~21 000, so the reader has to be
- * random-access: parse the central directory, then inflate only the members asked for.
- *
- * Why not something else:
- * - `unzip` is absent on stock Windows.
- * - PowerShell `Expand-Archive` cannot extract selected members without expanding the whole
- *   archive to disk.
- * - A `yauzl`/`adm-zip` dependency is not worth adding to read a file we already have.
- *
- * Scope: stored (method 0) and deflate (method 8) members, with ZIP64 end-of-central-directory
- * and ZIP64 extra-field overrides. Encryption, split archives, and the other compression
- * methods are not supported and throw rather than returning wrong bytes.
- */
+/** Minimal random-access ZIP reader (issue: full-window View Lab). */
 import { closeSync, openSync, readSync, statSync } from 'node:fs';
 import { inflateRawSync } from 'node:zlib';
 
@@ -50,11 +33,7 @@ function readChunk(fd, position, length) {
   return buffer;
 }
 
-/**
- * A UInt64 read that refuses to silently truncate. Zip64 sizes are 8 bytes; Node's Buffer
- * gives us a BigInt, and anything past Number.MAX_SAFE_INTEGER cannot be a Buffer length
- * anyway — so throwing here is strictly better than handing back a rounded offset.
- */
+/** A UInt64 read that refuses to silently truncate. */
 function readUInt64(buffer, offset) {
   const value = buffer.readBigUInt64LE(offset);
   if (value > BigInt(Number.MAX_SAFE_INTEGER)) {
@@ -112,9 +91,8 @@ function readCentralDirectoryLocation(fd, fileSize) {
 }
 
 /**
- * Apply the ZIP64 extended-information extra field (header id 0x0001), which carries the real
- * sizes and local-header offset whenever the 32-bit fields are saturated. The fields appear in
- * a fixed order but ONLY for those that were saturated, so the cursor advances conditionally.
+ * Apply the ZIP64 extended-information extra field (header id 0x0001), which carries the real sizes
+ * and local-header offset whenever the 32-bit fields are saturated.
  */
 function applyZip64Extra(entry, extra) {
   let cursor = 0;
@@ -176,12 +154,7 @@ function withArchive(zipPath, run) {
   }
 }
 
-/**
- * List every non-directory member of the archive.
- *
- * @param {string} zipPath Absolute path to the archive.
- * @returns {Array<{name: string, method: number, compressedSize: number, uncompressedSize: number}>}
- */
+/** List every non-directory member of the archive. */
 export function listEntries(zipPath) {
   return withArchive(zipPath, (fd, fileSize) => {
     const { directorySize, directoryOffset } = readCentralDirectoryLocation(fd, fileSize);
@@ -205,13 +178,7 @@ function inflateEntry(fd, entry) {
   throw new Error(`zipRead: ${entry.name} uses unsupported compression method ${entry.method}`);
 }
 
-/**
- * Read one member by exact name.
- *
- * @param {string} zipPath Absolute path to the archive.
- * @param {string} entryName Archive-relative member name, forward slashes.
- * @returns {Buffer} The inflated bytes.
- */
+/** Read one member by exact name. */
 export function readEntry(zipPath, entryName) {
   return withArchive(zipPath, (fd, fileSize) => {
     const { directorySize, directoryOffset } = readCentralDirectoryLocation(fd, fileSize);
@@ -222,15 +189,7 @@ export function readEntry(zipPath, entryName) {
   });
 }
 
-/**
- * Read many members in one pass over the central directory. Reading N members with
- * {@link readEntry} would re-parse ~21 000 central-directory records N times; the harvest
- * pulls hundreds of assets, so it uses this instead.
- *
- * @param {string} zipPath Absolute path to the archive.
- * @param {(name: string) => boolean} predicate Selects members by archive-relative name.
- * @returns {Map<string, Buffer>} Inflated bytes keyed by member name.
- */
+/** Read many members in one pass over the central directory. */
 export function readEntries(zipPath, predicate) {
   return withArchive(zipPath, (fd, fileSize) => {
     const { directorySize, directoryOffset } = readCentralDirectoryLocation(fd, fileSize);

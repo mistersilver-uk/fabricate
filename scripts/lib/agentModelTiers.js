@@ -1,28 +1,4 @@
-/**
- * agentModelTiers.js
- *
- * The model-tier tables and the gates over them, extracted so they are unit
- * testable.
- *
- * WHY a separate module: `scripts/validate-agent-bindings.mjs` used to compute its
- * repository root at module scope and end in `process.exit(1)`. Importing it from a
- * test therefore either asserted nothing (the work happened at import time, before
- * any assertion could run) or hard-killed the whole `node --test` process — which
- * surfaces as `# cancelled`, never as `# fail`. Every interesting gate was trapped
- * behind that, so moving only the static tables would have changed nothing.
- *
- * Everything here is PURE: no filesystem, no process, no network, no throwing.
- * Filesystem facts arrive as a `hasSkill` predicate or as already-read text, and
- * every gate RETURNS `string[]` errors so a caller can accumulate and report them.
- *
- * Two namespaces, one stripping rule. The model tier is an UNDERSCORE suffix in
- * token space (`fabricate_implementer_small`) and a HYPHEN suffix in file space
- * (`.claude/agents/fabricate-implementer-small.md`). The bindings-table parser
- * matches a bare backticked `(fabricate|foundry)_\w+` cell, and `\w` covers `_` but
- * not `-`, so a hyphenated token cell would be silently skipped — no skill check, no
- * pin check, no tool or sandbox parity for that role. Suffix stripping is defined
- * ONCE, in token space, by `splitTieredToken`.
- */
+/** The model-tier tables and the gates over them, extracted so they are unit testable. */
 
 /**
  * The three model tiers, ordered least to most capable. The order is load-bearing:
@@ -30,11 +6,7 @@
  */
 export const TIER_ORDER = ['small', 'medium', 'large'];
 
-/**
- * Provider pins per model tier — the single source of truth every binding is gated
- * against. Concrete provider model ids are volatile config and live here (and in the
- * mirroring `AGENTS.md` table), never in a canonical spec.
- */
+/** Provider pins per model tier — the single source of truth every binding is gated against. */
 export const TIER_MODELS = {
   small: { claude: 'haiku', codexModel: 'gpt-5.6-luna', codexReasoningEffort: 'low' },
   medium: { claude: 'sonnet', codexModel: 'gpt-5.6-terra', codexReasoningEffort: 'medium' },
@@ -42,10 +14,8 @@ export const TIER_MODELS = {
 };
 
 /**
- * The model tier of every skill-backed role that is NOT model-tiered, plus the
- * read-only mapping role. A role absent from this map and carrying no model-tier
- * suffix is an ERROR, never a silent skip — that is what keeps all 21 skill-backed
- * roles gated.
+ * The model tier of every skill-backed role that is not model-tiered, plus the read-only mapping
+ * role.
  */
 export const UNTIERED_ROLE_TIERS = {
   fabricate_orchestrator: 'large',
@@ -54,19 +24,7 @@ export const UNTIERED_ROLE_TIERS = {
   fabricate_pr_explorer: 'small',
 };
 
-/**
- * Paths whose touch forces `large`, mirroring the fenced list in `AGENTS.md`.
- *
- * Entries are root-anchored, repo-relative POSIX paths. `**` matches ONE OR MORE
- * path segments. An entry without `**` matches that exact path only, never a
- * basename — so a nested `src/ui/package.json` does not match the root
- * `package.json` entry.
- *
- * The agent-harness paths are on the list because a mistake there mis-routes every
- * future change. `openspec/specs/**` is deliberately NOT on it — forcing it to
- * `large` would make the `fabricate_domain_expert` lane permanently `large`; it
- * carries a `medium` floor instead.
- */
+/** Paths whose touch forces `large`, mirroring the fenced list in `AGENTS.md`. */
 export const HIGH_RISK_PATHS = [
   'module.json',
   'package.json',
@@ -101,10 +59,8 @@ export const STAGE_THRESHOLDS = {
 };
 
 /**
- * Roles whose read-only sandbox still permits command execution because their skill
- * genuinely needs `Bash` for read-only probes. Resolved against the BASE FAMILY
- * token, so the exemption survives at all three of that family's model tiers and
- * reaches no other family. Edit/Write stay banned for them.
+ * Roles whose read-only sandbox still permits command execution because their skill genuinely needs
+ * `Bash` for read-only probes.
  */
 const READONLY_BASH_ALLOWED = new Set(['foundry_integrator']);
 
@@ -130,12 +86,8 @@ const CODEX_DESCRIPTION_FIELD = /^description\s*=\s*"(.*)"$/;
 const CODEX_DESCRIPTION_BLOCK = /^description\s*=\s*"""([\s\S]*?)"""/m;
 
 /**
- * STAGE 1 of base-family resolution: split unconditionally. Any token ending in
- * `_small` / `_medium` / `_large` yields a CANDIDATE `(base, model tier)` pair.
- * This must never be conditional — a rule that refuses to derive a base for an
- * incomplete family leaves that family invisible to the very check meant to catch it.
- * @param {string} token
- * @returns {{ base: string, tier: string | null }}
+ * Stage 1 of base-family resolution: split unconditionally. Any token ending in `_small` /
+ * `_medium` / `_large` yields a candidate `(base, model tier)` pair.
  */
 export function splitTieredToken(token) {
   const value = String(token ?? '');
@@ -145,16 +97,8 @@ export function splitTieredToken(token) {
 }
 
 /**
- * Parse the `AGENTS.md` "Agent Roles & Bindings" table. Exported so tests drive the
- * VALIDATOR'S OWN row parsing rather than re-implementing the row regex and
- * asserting their own parse.
- *
- * `skipped` carries first cells that look like a routing token but do not match the
- * strict underscore pattern (a hyphenated model-tier suffix, say). Those rows are
- * silently invisible to every downstream gate, so the caller reports them.
- * @param {string} agentsMdText
- * @returns {{ headerIndex: number, rows: Array<{cells: string[], token: string}>,
- *   tokens: string[], skipped: string[] }}
+ * Parse the `AGENTS.md` "Agent Roles & Bindings" table. Exported so tests drive the validator's own
+ * row parsing rather than re-implementing the row regex and asserting their own parse.
  */
 export function parseBindingsTable(agentsMdText) {
   const lines = String(agentsMdText ?? '').split('\n');
@@ -177,19 +121,8 @@ export function parseBindingsTable(agentsMdText) {
 }
 
 /**
- * STAGE 2 of base-family resolution plus the `Family` table parity gate (both are
- * "does this family declare all three model tiers, everywhere it is named?").
- *
- * Completeness is checked over CANDIDATES whose base-family skill exists, and names
- * the family and its missing model tiers. Failure to LOCATE the `Family` table is
- * itself an error — that table is the sole path from a routing token to a
- * `subagent_type`, so skipping it when absent would leave it the one table nothing
- * parses.
- * @param {object} options
- * @param {string[]} options.tokens Routing tokens from the bindings table.
- * @param {(family: string) => boolean} options.hasSkill Does `<family>/SKILL.md` exist?
- * @param {string} [options.agentsMdText] When supplied, also gates the `Family` table.
- * @returns {string[]}
+ * Stage 2 of base-family resolution plus the `Family` table parity gate (both are "does this family
+ * declare all three model tiers, everywhere it is named?").
  */
 export function familyCompletenessErrors({ tokens, hasSkill, agentsMdText }) {
   const families = declaredFamilies(tokens);
@@ -207,20 +140,8 @@ export function familyCompletenessErrors({ tokens, hasSkill, agentsMdText }) {
 }
 
 /**
- * STAGE 3 of base-family resolution: resolve the skill path, using the base only
- * when that skill EXISTS and the family declared all three model tiers; otherwise
- * treat the role name literally. That condition is what removes the ambiguity a
- * future family whose own name ends in `_small` would create.
- *
- * The binding-file base is always derived from the FULL token — bindings are
- * per-model-tier — while the skill directory comes from the resolved family, so one
- * persona backs all three model tiers and no persona text is duplicated.
- * @param {string} token
- * @param {object} options
- * @param {string[]} options.tokens
- * @param {(family: string) => boolean} options.hasSkill
- * @returns {{ token: string, tier: string | null, declaredTier: string | null,
- *   family: string, skillDir: string, roleBase: string, viaFamily: boolean }}
+ * Stage 3 of base-family resolution: resolve the skill path, using the base only when that skill
+ * exists and the family declared all three model tiers; otherwise treat the role name literally.
  */
 export function resolveRole(token, { tokens, hasSkill }) {
   const { base, tier } = splitTieredToken(token);
@@ -241,38 +162,14 @@ export function resolveRole(token, { tokens, hasSkill }) {
 }
 
 /**
- * Resolve the read-only `Bash` exemption against the BASE FAMILY token, so
- * `foundry_integrator` keeps it at all three model tiers and no other family gains it.
- * @param {string} token
- * @returns {boolean}
+ * Resolve the read-only `Bash` exemption against the base family token, so `foundry_integrator`
+ * keeps it at all three model tiers and no other family gains it.
  */
 export function isReadonlyBashAllowed(token) {
   return READONLY_BASH_ALLOWED.has(splitTieredToken(token).base);
 }
 
-/**
- * Gate one role's provider pins against its declared model tier.
- *
- * Comparison is EXACT, never substring, so a superstring pin (`gpt-5.6-luna-preview`
- * where `gpt-5.6-luna` is expected) fails, and it covers the Codex
- * `model_reasoning_effort` field as well as `model`.
- *
- * For a MODEL-TIERED role it also gates the `description`: it must contain its own
- * model-tier word and NEITHER of the other two. The "contains its own" half alone is
- * vacuous against the failure it exists to prevent — a copy-pasted description naming
- * all three model tiers satisfies it for all three bindings.
- *
- * A binding whose text is absent is skipped here; the caller reports the missing file.
- * @param {object} binding
- * @param {string} binding.token
- * @param {string | null} binding.tier The role's DECLARED model tier.
- * @param {string} [binding.claudePath]
- * @param {string | null} [binding.claudeText]
- * @param {string} [binding.codexPath]
- * @param {string | null} [binding.codexText]
- * @param {boolean} [binding.requireClaude] False for the Codex-only mapping role.
- * @returns {string[]}
- */
+/** Gate one role's provider pins against its declared model tier. */
 export function modelPinErrors(binding) {
   const { token, tier, claudePath, claudeText, codexPath, codexText } = binding;
   const requireClaude = binding.requireClaude !== false;
@@ -292,12 +189,8 @@ export function modelPinErrors(binding) {
 }
 
 /**
- * Root-anchored glob match for the model-tier ladder's rule 1 (and, with an explicit
- * entry list, for the `openspec/specs/**` floor). `**` matches one or more path
- * segments; an entry without `**` matches that exact path only, never a basename.
- * @param {string} path Repo-relative POSIX path.
- * @param {string[]} [entries]
- * @returns {boolean}
+ * Root-anchored glob match for the model-tier ladder's rule 1 (and, with an explicit entry list,
+ * for the `openspec/specs/**` floor).
  */
 export function matchesHighRiskPath(path, entries = HIGH_RISK_PATHS) {
   const raw = String(path ?? '').trim();
@@ -308,28 +201,8 @@ export function matchesHighRiskPath(path, entries = HIGH_RISK_PATHS) {
 }
 
 /**
- * The model-tier selection ladder — first match wins — followed by the model-tier
- * floors, which only ever RAISE and always clamp at `large`.
- *
- * Rules 1 to 4 all yield `large`, so their overlap is harmless; rules 5 and 6 are
- * disjoint and rule 6 is total, so exactly one model tier is always returned. Rule 6
- * defaults UP to `medium`: nothing falls into `small` by omission, it requires the
- * positive, narrow match on rule 5.
- *
- * The driver reads the mirrored ladder in `AGENTS.md` rather than calling this. The
- * value of authoring it is that every ambiguity had to be resolved here, and that the
- * worked examples became a table test — so a later `AGENTS.md` edit contradicting
- * them fails `npm test`.
- * @param {object} spawn
- * @param {string} spawn.stage
- * @param {string[]} spawn.paths The keyed path set for this spawn.
- * @param {number | null} [spawn.sizeMetric] Delta tasks, or added + deleted diff lines.
- * @param {string | null} [spawn.ruleTwoSource] `Lane surface`, or the artifact-derived
- *   equivalent at post-implementation stages. `null` means unavailable.
- * @param {string | null} [spawn.previousExecutedTier] The model tier at which this
- *   `(family, stage)` ACTUALLY EXECUTED in a previous revision.
- * @param {boolean} [spawn.unresolvedFinding]
- * @returns {{ tier: string, baseTier: string, rule: number }}
+ * The model-tier selection ladder — first match wins — followed by the model-tier floors, which
+ * only ever raise and always clamp at `large`.
  */
 export function selectModelTier(spawn) {
   const stage = spawn?.stage ?? null;
@@ -343,22 +216,7 @@ export function selectModelTier(spawn) {
   return { tier: higherTier(base.tier, floor), baseTier: base.tier, rule: base.rule };
 }
 
-/**
- * Gate one role's Claude tool allowlist against its Codex sandbox mode.
- *
- * ONE rule, two callers: `scripts/validate-agent-bindings.mjs` applies it to the bindings on
- * disk and `scripts/lib/agentBindingRender.js` applies it to the record a binding is rendered
- * FROM, so an unsafe record cannot be written in the first place. `subject` and `against` are
- * labels so each caller names what it is actually checking.
- *
- * @param {object} parity
- * @param {string} parity.token Routing token; the `Bash` exemption resolves against its family.
- * @param {string[] | null} parity.tools The declared allowlist, or `null` when absent.
- * @param {boolean} parity.readOnly Is the Codex sandbox `read-only`?
- * @param {string} parity.subject What carries the allowlist.
- * @param {string} parity.against What the allowlist must match.
- * @returns {string[]}
- */
+/** Gate one role's Claude tool allowlist against its Codex sandbox mode. */
 export function toolParityErrors({ token, tools, readOnly, subject, against }) {
   if (!tools) {
     return [`${subject} must declare an explicit tools: allowlist (no default inheritance)`];
@@ -409,12 +267,7 @@ function declaredFamilies(tokens) {
   return families;
 }
 
-/**
- * Locate and gate the `Family` to model-tiers table. It is located by its own header
- * row — a first cell of `Family` — rather than by the bindings-table header, because
- * the bindings table's four columns and their order must not change and the new table
- * must not reuse both of its header words.
- */
+/** Locate and gate the `Family` to model-tiers table. */
 function familyTableErrors(agentsMdText, families) {
   const table = parseFamilyTable(agentsMdText);
   if (!table) {
@@ -476,13 +329,9 @@ function fieldValue(text, pattern) {
 }
 
 /**
- * TOML block form is tried FIRST because the single-line pattern is not a guard
- * against it: `description = """` satisfies `^description\s*=\s*"(.*)"$` — the
- * literal quote takes the first `"`, the anchor takes the third, and the capture
- * takes the second. That returned a lone `"` as the description and made the block
- * branch unreachable, so a block-form binding silently failed the model-tier word
- * check instead of being read. A `"""` opener is unambiguous, so matching it first
- * is the guard.
+ * Toml block form is tried first because the single-line pattern is not a guard against it:
+ * `description = """` satisfies `^description\s*=\s*"(.*)"$` — the literal quote takes the first
+ * `"`, the anchor takes the third, and the capture takes the second.
  */
 function codexDescription(text) {
   const block = CODEX_DESCRIPTION_BLOCK.exec(String(text ?? ''));

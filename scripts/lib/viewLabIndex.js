@@ -1,20 +1,4 @@
-/**
- * The View Lab's local index page, as pure functions.
- *
- * A directory of 150 identically-shaped PNGs is not browsable. This turns it into one static page
- * grouped the way the registry already describes the frames, so finding "the knowledge tab at narrow
- * width" is a scroll rather than a filename guess.
- *
- * Split into pure functions on purpose. The grouping and escaping rules are the parts that can be
- * wrong in a way nobody notices — a mis-grouped frame or an unescaped label still renders a page —
- * so they are testable without a filesystem, a browser, or a capture run. `view-lab-index.mjs` does
- * the IO and nothing else.
- *
- * Grouping is derived, never authored: the first `kinds` entry of every case is its application
- * (`manager` / `player`), and the second is its area. Both already exist and are already gated by
- * `tests/view-lab-cases.test.js`, so the index cannot drift from the registry without that failing
- * first.
- */
+/** The View Lab's local index page, as pure functions. */
 
 /** Frames whose reach is not directly comparable to a smoke frame get a visible marker. */
 const REACH_NOTE = Object.freeze({
@@ -23,17 +7,7 @@ const REACH_NOTE = Object.freeze({
   beyond: 'no live-smoke counterpart',
 });
 
-/**
- * Escape text for interpolation into HTML.
- *
- * Case labels and ids are repository-authored rather than user input, so this is not a security
- * boundary — but an ampersand in a label ("Tags & Categories", which the registry really contains)
- * produces invalid markup without it, and an index page that silently mis-renders one row is the
- * kind of thing nobody reports.
- *
- * @param {unknown} value Value to escape.
- * @returns {string} HTML-safe text.
- */
+/** Escape text for interpolation into HTML. */
 export function escapeHtml(value) {
   return String(value ?? '').replaceAll(
     /[&<>"']/g,
@@ -42,21 +16,7 @@ export function escapeHtml(value) {
   );
 }
 
-/**
- * Every tag a frame can be filtered by.
- *
- * Derived from the case, never authored twice. `kinds` already carries the whole vocabulary the
- * registry uses — the application, the area, the resolution mode, the outcome — and the previous
- * version of this file threw all but the first two entries away, which is exactly the filter this
- * page needs. `reaches` joins them because "show me only the frames that land on their exact state"
- * is the question a reviewer asks most often.
- *
- * A frame with no case gets one honest tag rather than none: an untagged card would vanish from
- * every filter, which is the opposite of what an unexplained PNG deserves.
- *
- * @param {object|null} viewCase The registry entry, or null.
- * @returns {string[]} Sorted, de-duplicated tags.
- */
+/** Every tag a frame can be filtered by. */
 export function tagsFor(viewCase) {
   if (!viewCase) return ['unregistered'];
   return [...new Set([...(viewCase.kinds ?? []), viewCase.reaches].filter(Boolean))].sort(
@@ -64,15 +24,7 @@ export function tagsFor(viewCase) {
   );
 }
 
-/**
- * The whole tag vocabulary present in a set of frames, with how many carry each.
- *
- * Counts matter: a filter offering a tag that matches two frames out of 150 is worth showing
- * differently from one that matches sixty, and a tag matching zero should not be offered at all.
- *
- * @param {Array<object>} sections Output of {@link groupFrames}.
- * @returns {Array<{tag: string, count: number}>} Tags, most common first then alphabetical.
- */
+/** The whole tag vocabulary present in a set of frames, with how many carry each. */
 export function collectTags(sections) {
   const counts = new Map();
   for (const section of sections) {
@@ -87,19 +39,7 @@ export function collectTags(sections) {
     .sort((left, right) => right.count - left.count || left.tag.localeCompare(right.tag));
 }
 
-/**
- * Group captured frames into the sections the page renders.
- *
- * Takes the manifest's frame list and the registry, and returns only frames that were ACTUALLY
- * captured — an index listing a frame that is not on disk sends the reader to a broken image, which
- * is worse than omitting it. Frames with no registry entry are still listed, under `Unknown`, rather
- * than dropped: a PNG on disk that the registry does not explain is exactly what someone needs to
- * see.
- *
- * @param {Array<{id: string, width?: number, height?: number}>} frames Captured frames.
- * @param {Array<object>} cases The case registry.
- * @returns {Array<{app: string, areas: Array<{area: string, frames: object[]}>}>} Sections, sorted.
- */
+/** Group captured frames into the sections the page renders. */
 export function groupFrames(frames, cases) {
   const byId = new Map(cases.map((entry) => [entry.id, entry]));
   const sections = new Map();
@@ -136,13 +76,7 @@ export function groupFrames(frames, cases) {
     .sort((left, right) => left.app.localeCompare(right.app));
 }
 
-/**
- * Count frames by reach, for the page's summary line.
- *
- * @param {Array<object>} frames Captured frames.
- * @param {Array<object>} cases The case registry.
- * @returns {{total: number, exact: number, window: number, beyond: number, unknown: number}} Counts.
- */
+/** Count frames by reach, for the page's summary line. */
 export function summarise(frames, cases) {
   const byId = new Map(cases.map((entry) => [entry.id, entry]));
   const counts = { total: frames.length, exact: 0, window: 0, beyond: 0, unknown: 0 };
@@ -156,17 +90,13 @@ export function summarise(frames, cases) {
 
 function renderFrame(frame, head) {
   const dimensions = frame.width && frame.height ? `${frame.width}×${frame.height}` : '';
-  // Frames accumulate across runs, so a directory can hold frames drawn by different code. Marking
-  // the ones from an earlier head is what keeps that honest: without it, "the screenshots are all
-  // there" and "the screenshots are all current" become indistinguishable.
+  // Frames accumulate across runs, so a directory can hold frames drawn by different code.
   const stale =
     head && frame.head && frame.head !== head
       ? `<p class="stale">captured at ${escapeHtml(frame.head)}, not the current ${escapeHtml(head)}</p>`
       : '';
   const note = frame.note ? `<p class="note">${escapeHtml(frame.note)}</p>` : '';
-  // The smoke label a frame corresponds to used to be printed here. It is provenance for whoever is
-  // BUILDING the harness and noise for anyone reading the evidence, so it is gone — this page is the
-  // View Lab's own frames, not a comparison against the smoke.
+  // The smoke label a frame corresponds to used to be printed here.
   const tags = frame.tags.map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join('');
   return `      <figure class="frame" id="${escapeHtml(frame.id)}" data-tags="${escapeHtml(frame.tags.join(' '))}">
         <a href="${escapeHtml(frame.file)}"><img src="${escapeHtml(frame.file)}" alt="${escapeHtml(frame.label)}" loading="lazy"></a>
@@ -179,20 +109,7 @@ function renderFrame(frame, head) {
       </figure>`;
 }
 
-/**
- * Render the whole index page.
- *
- * Self-contained by design — inline CSS, no fonts, no scripts — so it opens from `file://` with no
- * server and no network. Anything else would make "an easy place to find the screenshots" contingent
- * on running something first.
- *
- * @param {object} model Page model.
- * @param {Array<object>} model.sections Output of {@link groupFrames}.
- * @param {object} model.counts Output of {@link summarise}.
- * @param {string|null} [model.foundryVersion] Chrome version the frames were drawn with.
- * @param {string|null} [model.head] Current head sha, so frames from an earlier one are marked.
- * @returns {string} A complete HTML document.
- */
+/** Render the whole index page. */
 export function renderIndexHtml({ sections, counts, foundryVersion = null, head = null }) {
   const body = sections
     .map(

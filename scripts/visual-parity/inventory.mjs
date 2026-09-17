@@ -1,18 +1,5 @@
 #!/usr/bin/env node
-/**
- * Visual-parity STRUCTURAL INVENTORY — can the subject be missing something?
- *
- *   node scripts/visual-parity/inventory.mjs --spec <spec.mjs> [--screen <name>] [--dump]
- *
- * `compare.mjs` measures computed styles of regions that exist on BOTH sides, so it cannot
- * see absence: it reported no drift on a screen missing a whole callout card, with two
- * controls in the wrong card and no drag handle on any row. This walks the prototype's own
- * element tree, enumerates the same landmarks out of the subject, and fails on every
- * prototype landmark the subject has no counterpart for. See `lib/inventory.js` for the
- * classifier and `README.md` for the operating manual.
- *
- * Screen-agnostic: the prototype, the subject and the roots all come from the spec.
- */
+/** Visual-parity structural inventory — can the subject be missing something? */
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -38,16 +25,7 @@ function flag(name) {
   return process.argv.includes(`--${name}`);
 }
 
-/**
- * Enumerate one root's landmarks in the page it is rendered in.
- *
- * @param {object} page Playwright page.
- * @param {string|object[]|{parts: (string|object[])[]}} locator CSS selector, step list, or a
- *   declared SET of either, resolving the root.
- * @param {object} limits Classifier thresholds.
- * @param {string|object[]|null} pane Optional locator for the box the card ratio is taken from.
- * @returns {Promise<object>} `{ cards, loose }`.
- */
+/** Enumerate one root's landmarks in the page it is rendered in. */
 async function inventoryOf(page, locator, limits, pane = null) {
   const result = await page.evaluate(
     (payload) => globalThis.__fabricateParity.inventoryOf(payload),
@@ -68,10 +46,8 @@ async function inventoryOf(page, locator, limits, pane = null) {
         `overlap would be enumerated twice and reported as a duplicate card`
     );
   }
-  // A root with no box on it OR ON ANY ANCESTOR gives the card classifier no pane width to
-  // measure against, so every card verdict on that screen would be arbitrary. Said out loud
-  // rather than defaulted: the retired default was `|| 1`, which silently measured the
-  // prototype against a one-pixel pane and the subject against its real one.
+  // A root with no box on it or on any ancestor gives the card classifier no pane width to measure
+  // against, so every card verdict on that screen would be arbitrary.
   if (result.missingPane) {
     throw new Error(
       `inventory pane ${JSON.stringify(pane)} resolved to nothing — a declared pane that does ` +
@@ -150,27 +126,17 @@ async function main() {
     await prototypePage.waitForTimeout(spec.prototype.settleMs ?? 1500);
     await installRuntime(prototypePage);
 
-    // THE SAME LIVE SUBJECT the computed-style pass measures, booted by the same machinery.
-    // Two implementations of "render the real app and drive it to a screen" would be two
-    // things to keep honest, and the pass that fell behind would be the one nobody noticed.
+    // The same live subject the computed-style pass measures, booted by the same machinery.
     subject = await openLiveSubject(browser, spec);
     await installRuntime(subject.page);
 
     for (const screen of screens) {
       const roots = spec.inventory.roots[screen];
-      // ── A SCREEN THE SUBJECT CANNOT SHOW YET, stated rather than fatal ────────────────────
-      //
       // `subject.locators` has carried an `unreachable` reason since the beginning and
-      // `inventory.roots` did not, so a spec whose closed screen set legitimately runs ahead of
-      // the product — a route that exists as a placeholder while the PR that owes it is still
-      // open — could not complete a FULL pass at all: the first such screen threw a raw
-      // Playwright error and killed the run. That is not a cosmetic problem. The stale-exemption
-      // check below runs ONLY on a full pass, so for as long as one screen aborts the run, no
-      // exemption in the spec is ever checked for outliving its difference.
-      //
-      // The note is an ASSERTION, exactly as the locator one is: if the subject root resolves
-      // after all, the run FAILS and tells you to delete the note. An excuse that outlives its
-      // constraint is the same defect as an exemption that outlives its difference.
+      // `inventory.roots` did not, so a spec whose closed screen set legitimately runs ahead of the
+      // product — a route that exists as a placeholder while the PR that owes it is still open —
+      // could not complete a full pass at all: the first such screen threw a raw Playwright error
+      // and killed the run.
       if (roots.unreachable) {
         const rendered = await subject.page.evaluate(
           (payload) => Boolean(globalThis.__fabricateParity.locate(payload.locator, null)),

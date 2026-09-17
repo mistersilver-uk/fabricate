@@ -1,33 +1,11 @@
 /**
  * The Foundry V14 application-frame contract the View Lab reproduces, plus the Fabricate window
  * descriptors it reproduces it for.
- *
- * This module is a TRANSCRIPTION, not an invention. Every value below is copied from Foundry's
- * own `client/applications/api/application.mjs`, `client/applications/api/dialog.mjs`, and
- * `client/game.mjs`, and `tests/view-lab-chrome-drift.test.js` re-reads the harvested source to
- * prove the transcription still matches. Do not "improve" anything here — if a value looks wrong,
- * it is because Foundry does it that way, and changing it makes the lab render something
- * production never shows.
- *
- * Pure data + string builders only: no DOM, so the drift test can run under `node --test`.
  */
 
 /**
- * `_renderFrame` (application.mjs) builds the header with a template literal, so the lab builds
- * the same string rather than assembling elements and hoping the shape matches.
- *
- * V14 ENDS AT `</header>`. V13 appended a `<menu class="controls-dropdown"></menu>` that
- * `_updateFrame` filled with `_renderHeaderControl` list items; V14 routes header controls through
- * a context menu (`_headerControlContextEntries`) instead and emits no dropdown element at all.
- * Keeping the old element would put a node in every captured frame that production no longer has.
- *
- * V14 also added `_renderFrameButtons` / `_getFrameButtons`, which insert extra buttons before the
- * close button. `_getFrameButtons` returns `[]` on ApplicationV2 and neither Fabricate window
- * overrides it, so nothing is inserted and `templates/generic/frame-buttons.hbs` is never fetched —
- * which is why the harvest does not collect it.
- *
- * @param {{toggleControls: string, close: string}} labels Localized control labels.
- * @returns {string} The frame's inner HTML, header only.
+ * `_renderFrame` (application.mjs) builds the header with a template literal, so the lab builds the
+ * same string rather than assembling elements and hoping the shape matches.
  */
 function frameInnerHtml(labels) {
   return `<header class="window-header">
@@ -43,16 +21,7 @@ function frameInnerHtml(labels) {
 
 /**
  * `_initializeApplicationOptions`: `if (applicationOptions.window.frame)
- * applicationOptions.classes.unshift("application")`, then dedupe. Every `.application` rule in
- * `foundry2.css` hangs off this class, so a frame built from `DEFAULT_OPTIONS.classes` alone
- * gets NO chrome at all - it is the single easiest way to build a convincing-looking wrong frame.
- *
- * Note what is deliberately NOT added: `themed` / `theme-*`. `Game##configureUI` adds those only
- * to sidebar tabs, compendia, camera views, and HUDs (client/game.mjs:1745-1757); an ordinary
- * ApplicationV2 like Fabricate's is filtered out and inherits its theme from `body` instead.
- *
- * @param {{classes: readonly string[], window: {frame?: boolean}}} app An {@link APP_CHROME} entry.
- * @returns {string[]} The class list Foundry would put on the frame element.
+ * applicationOptions.classes.unshift("application")`, then dedupe.
  */
 export function frameClassesFor(app) {
   const classes = [...app.classes];
@@ -70,8 +39,7 @@ export const FOUNDRY_CHROME_SPEC = Object.freeze({
   resizeHandleHtml: '<div class="window-resize-handle"></div>',
   /**
    * `configureUI` resolves the default fontScale of 5 to `fontSizes[4]` and writes it to
-   * `documentElement.style.fontSize`. Everything in `foundry2.css` is rem-based off this, so
-   * getting it wrong rescales the entire window.
+   * `documentElement.style.fontSize`.
    */
   rootFontSizePx: 16,
   /** `<body class="vtt game system-<id>">`, plus the theme class Foundry adds at runtime. */
@@ -83,9 +51,8 @@ export const FOUNDRY_CHROME_SPEC = Object.freeze({
     '--ui-fade-delay': '500ms',
   }),
   /**
-   * `.application { max-height: calc(100vh - 1.5 * var(--hotbar-height)) }` with
-   * `--hotbar-height: 52px`. `_updatePosition` clamps to this SILENTLY, so the lab computes the
-   * same ceiling up front and refuses to capture a window that would be clamped.
+   * `.application { max-height: calc(100vh - 1.5 * var(--hotbar-height)) }` with `--hotbar-height:
+   * 52px`.
    */
   hotbarHeightPx: 52,
   maxHeightFor: (viewportHeightPx) => viewportHeightPx - 1.5 * 52,
@@ -101,19 +68,8 @@ export const FOUNDRY_CHROME_SPEC = Object.freeze({
 });
 
 /**
- * Foundry V14's `DialogV2` (`client/applications/api/dialog.mjs`), transcribed exactly as
- * {@link FOUNDRY_CHROME_SPEC} transcribes the window frame.
- *
- * A confirmation dialog is Foundry's chrome, not Fabricate's: `foundryBridge.confirmDialog` hands
- * `DialogV2.confirm` a title, some content and two button labels, and every element, class and
- * attribute around them is drawn by this module. Reproducing it from Foundry's own source under
- * the same never-commit rule and the same drift gate is what makes it genuine; drawing a Svelte
- * lookalike would be a facsimile, which this harness must never publish.
- *
- * The frame itself is inherited unchanged — `DialogV2` does not override `_renderFrame` — so the
- * header, title and content element all come from {@link FOUNDRY_CHROME_SPEC}.
- * What is new here is the `<dialog>` tag, the `dialog` class, and the form the dialog puts in the
- * `.window-content`.
+ * Foundry V14's `DialogV2` (`client/applications/api/dialog.mjs`), transcribed exactly as {@link
+ * FOUNDRY_CHROME_SPEC} transcribes the window frame.
  */
 export const FOUNDRY_DIALOG_SPEC = Object.freeze({
   /** `static DEFAULT_OPTIONS` (dialog.mjs:140-152). */
@@ -130,32 +86,19 @@ export const FOUNDRY_DIALOG_SPEC = Object.freeze({
   /**
    * `_renderHTML`'s template literal, reproduced character for character including its whitespace,
    * so the drift test can find it verbatim in the harvested source.
-   *
-   * @param {string} content Dialog content HTML (empty for a contentless dialog).
-   * @param {string} buttonsHtml The joined `outerHTML` of the rendered buttons.
-   * @returns {string} The form's inner HTML.
    */
   formInnerHtml: (content, buttonsHtml) => `
       ${content ? `<div class="dialog-content standard-form">${content}</div>` : ''}
       <footer class="form-footer">${buttonsHtml}</footer>
     `,
   /**
-   * `_renderButtons`' destructuring defaults:
-   * `const { action, label, icon, class: cls="", style={}, type="submit", disabled, tooltip } = buttonOptions`.
-   * `tooltip` is V14's addition and has no default; it gates a `data-tooltip`/`aria-label` pair
-   * emitted between the `disabled` and `autofocus` toggles.
+   * `_renderButtons`' destructuring defaults: `const { action, label, icon, class: cls="",
+   * style={}, type="submit", disabled, tooltip } = buttonOptions`.
    */
   buttonDefaults: Object.freeze({ class: '', type: 'submit' }),
   /**
-   * `_renderButtons`:
-   * `const isDefault = !!buttonOptions.default || ((i === 0) && !buttons.some(b => b.default))`.
-   *
-   * It decides which button gets `autofocus`, and `confirm` puts `default: true` on **No** — so in
-   * a Fabricate confirmation the focused button is the one that declines.
-   *
-   * @param {ReadonlyArray<{default?: boolean}>} buttons All buttons, in render order.
-   * @param {number} index Index of the button being rendered.
-   * @returns {boolean} Whether this button is the default.
+   * `_renderButtons`: `const isDefault = !!buttonOptions.default || ((i === 0) && !buttons.some(b
+   * => b.default))`.
    */
   isDefaultButton: (buttons, index) =>
     // `every(not)` rather than Foundry's `!some(...)`, which `unicorn/no-negated-array-predicate`
@@ -168,18 +111,7 @@ export const FOUNDRY_DIALOG_SPEC = Object.freeze({
   factoryPosition: Object.freeze({ width: 400 }),
 });
 
-/**
- * The two buttons `DialogV2.confirm` unshifts onto the caller's list (dialog.mjs:315-323).
- *
- * `mergeObject` is reproduced as a spread: every field of a button descriptor is a scalar, an
- * `icon` string or a callback, so a recursive merge and a shallow one agree. The one field where
- * they could differ is `style`, and no Fabricate caller passes one.
- *
- * @param {object} [overrides] Caller overrides.
- * @param {object} [overrides.yes] `config.yes`.
- * @param {object} [overrides.no] `config.no`.
- * @returns {Array<object>} The yes/no descriptors, in Foundry's order.
- */
+/** The two buttons `DialogV2.confirm` unshifts onto the caller's list (dialog.mjs:315-323). */
 export function confirmDialogButtons({ yes = {}, no = {} } = {}) {
   return [
     { action: 'yes', label: 'COMMON.Yes', icon: 'fa-solid fa-check', callback: () => true, ...yes },
@@ -198,36 +130,14 @@ export function confirmDialogButtons({ yes = {}, no = {} } = {}) {
   ];
 }
 
-/**
- * The single button `DialogV2.prompt` unshifts (`dialog.mjs:338-344`).
- *
- * Here rather than inline in `foundryDialog.js` for the same reason `confirmDialogButtons` is: the
- * descriptor is transcribed from Foundry, so it belongs on the side of the split that
- * `tests/view-lab-chrome-drift.test.js` pins string-for-string against the harvested source. The
- * label and icon are what the import dialog's Import button inherits, and a drifted one would
- * publish a frame captioned with a button Foundry no longer draws.
- *
- * @param {object} [ok] `config.ok`.
- * @returns {Array<object>} The single ok descriptor.
- */
+/** The single button `DialogV2.prompt` unshifts (`dialog.mjs:338-344`). */
 export function promptDialogButtons(ok = {}) {
   return [
     { action: 'ok', label: 'COMMON.Confirm', icon: 'fa-solid fa-check', default: true, ...ok },
   ];
 }
 
-/**
- * Resolve the frame description Foundry would render a `DialogV2` with.
- *
- * `_initializeApplicationOptions` merges, in inheritance order, ApplicationV2's `DEFAULT_OPTIONS`
- * (application.mjs:59-84), then DialogV2's (dialog.mjs:140-152), then the caller's config — arrays
- * concatenating and objects merging (`#mergeApplicationOptions`, application.mjs:419-432) — and
- * finally unshifts `"application"` onto the class list. Each field below cites the line it comes
- * from rather than being re-derived, because a wrong default here draws a window Foundry never does.
- *
- * @param {object} [config] The configuration handed to `DialogV2.confirm` / `wait`.
- * @returns {{tag: string, classes: string[], window: object, position: object}}
- */
+/** Resolve the frame description Foundry would render a `DialogV2` with. */
 export function resolveDialogChrome(config = {}) {
   const declared = config.window ?? {};
   return {
@@ -252,38 +162,14 @@ export function resolveDialogChrome(config = {}) {
       contentClasses: declared.contentClasses ?? [],
     },
     position: {
-      // application.mjs:80-83 `width: "auto", height: "auto"`. `confirm`'s `width: 400` is NOT
-      // applied here: it is merged into the config by the factory (dialog.mjs:322), so a dialog
-      // constructed directly keeps Foundry's auto width.
+      // application.mjs:80-83 `width: "auto", height: "auto"`.
       width: config.position?.width ?? 'auto',
       height: config.position?.height ?? 'auto',
     },
   };
 }
 
-/**
- * The Fabricate windows the lab can draw. Mirrors each application's `static DEFAULT_OPTIONS`;
- * `tests/view-lab-app-options-parity.test.js` parses the real classes and asserts equality, so
- * a window that is resized in `src/` cannot silently keep being captured at the old size.
- *
- * ── WHAT THE PARITY LOOP GUARDS, AND WHAT IT DOES NOT (issue 1520) ─────────────────────────────
- *
- * That loop is not field-by-field. It asserts SEVEN things — `id`, `tag`, `classes` (deepEqual),
- * `window.title`, `window.icon`, `window.resizable`, and `position` as `{width, height}` — so
- * `window.contentTag`, `window.contentClasses` and `window.controls` are transcribed here and
- * checked by NOTHING. They are not decoration: `buildAppWindow` builds the content element from
- * `contentTag` and stamps `contentClasses` onto it, so a wrong value there changes the DOM of
- * every frame of that window and no test says so.
- *
- * All five windows below declare NONE of those three in their own `DEFAULT_OPTIONS`, so all five
- * inherit ApplicationV2's — `contentTag: "section"` and `contentClasses: []`
- * (`client/applications/api/application.mjs:82-83` in the harvested chrome). `controls: []` is the
- * one modelling claim rather than a transcription: core's own default declares two entries
- * (Attach/Detach), and this spec records that Fabricate registers no header controls so
- * `_updateFrame` hides the ellipsis button. `tests/view-lab-chrome-drift.test.js` pins that pair
- * together — it re-reads the harvested `_updateFrame` and requires every entry here to declare an
- * empty `controls`.
- */
+/** The Fabricate windows the lab can draw. */
 export const APP_CHROME = Object.freeze({
   'fabricate-app': Object.freeze({
     id: 'fabricate-app',
@@ -320,21 +206,10 @@ export const APP_CHROME = Object.freeze({
     minHeight: 0,
     optionsSource: 'src/ui/SvelteCraftingSystemManagerApp.svelte.js',
   }),
-  // ── THE THREE CANVAS WINDOWS (issue 1520) ────────────────────────────────────────────────────
-  //
-  // Registered BEFORE the design-system adoption that re-skins them, not after, because until they
+  // Registered before the design-system adoption that re-skins them, not after, because until they
   // were here a diff touching all three selected exactly one case — `fabricate-app-shell`, the
-  // PLAYER crafting window — through `mapChangedFilesToCases`'s fallback, and the evidence matcher
-  // computed its expectation from the same selector and reported the gate SATISFIED. A gate that
-  // cannot fail, on a photograph of the wrong window.
-  //
-  // Their `minWidth`/`minHeight` are 0/0, and after issue 1520 adopted the shared `fabricate-app`
-  // area class on all three that is a FACT ABOUT A CLASS rather than an accident. The sheet's
-  // drag-resize floor sits on `fabricate-app-window`, which only the player window emits;
-  // `fabricate-app` itself carries typography, colour and `color-scheme` and no size. Had the
-  // floor stayed on the shared class these three would each have painted at 1024x640 — a floor
-  // beats the inline `width` the frame builder writes — while the parity loop above stayed green,
-  // because it asserts `position` and `position` does not change.
+  // player crafting window — through `mapChangedFilesToCases`'s fallback, and the evidence matcher
+  // computed its expectation from the same selector and reported the gate satisfied.
   'fabricate-interactable-browser': Object.freeze({
     id: 'fabricate-interactable-browser',
     tag: 'div',
@@ -391,11 +266,8 @@ export const APP_CHROME = Object.freeze({
 export const APP_CHROME_IDS = Object.freeze(Object.keys(APP_CHROME));
 
 /**
- * The smallest browser viewport that renders an app at its declared size without
- * `_updatePosition` clamping it.
- *
- * @param {string} appId Key of {@link APP_CHROME}.
- * @returns {{width: number, height: number}}
+ * The smallest browser viewport that renders an app at its declared size without `_updatePosition`
+ * clamping it.
  */
 export function minimumViewportFor(appId) {
   const app = APP_CHROME[appId];

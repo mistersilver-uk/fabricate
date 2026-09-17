@@ -1,14 +1,6 @@
 /**
  * Rotate every tester path segment in one pass, across both repositories publishing into the
  * Fabricate S3 bucket (issue #1761).
- *
- * A tester group is one cohort holding one URL prefix, so its segment is one value shared by every
- * repository publishing into it. Rotation deletes nothing and republishes nothing: a superseded
- * prefix keeps serving its last manifest, so pair each run with the announcement carrying the new
- * URLs. Local-only and deliberately absent from `package.json`.
- *
- * Usage: node scripts/rotate-tester-secrets.mjs [--apply] [--group <name>] [--config <path>]
- *        [--premium-config <path> | --no-premium]
  */
 import { execFile } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
@@ -119,7 +111,6 @@ const groupNames = (secret) => secret.groups.map((feed) => feed.name);
  * Every tester declaration in this repository's config, resolved by the publisher's own reader so
  * rotation and publishing cannot disagree: `resolveChannelConfig` also honours the scalar
  * `channel`/`testerGroups` back-compat shape, which a second reader here would silently drop.
- * @returns {Declaration[]}
  */
 function fabricateDeclarations(config, repository) {
   const names = [...Object.keys(config?.channels ?? {}), config?.channel].filter(Boolean);
@@ -221,11 +212,6 @@ function narrowToGroup(secrets, group) {
 
 /**
  * Derive the secret-to-writes mapping from both committed configs. Pure: no filesystem, no `gh`.
- * The rotation unit is the secret, not the group: this repository's schema resolves one segment per
- * channel and applies it to every group in the array, so a channel with two groups is a shared
- * secret by construction.
- * @returns {{baseUrl: string, warnings: string[], secrets: {name: string, repositories: string[],
- *   groups: {name: string, channel: string, modules: string[]}[]}[]}} The ordered plan.
  */
 export function planRotation({
   fabricateConfig,
@@ -303,8 +289,7 @@ const describeLanded = (landed) =>
 
 /**
  * One announceable manifest URL per module published into a group, built by the publisher's own
- * layout so a path change cannot drift from a release. `channel` is read back out of that layout,
- * so the channel this call passes is visible in the announcement rather than inert.
+ * layout so a path change cannot drift from a release.
  */
 function testerFeedLines(baseUrl, feed, segment) {
   if (feed.modules.length === 0) {
@@ -325,12 +310,7 @@ function testerFeedLines(baseUrl, feed, segment) {
   });
 }
 
-/**
- * Report the plan and, under `--apply`, write it. One segment is generated per secret, never per
- * write: generating inside the repository loop would give each repository a different prefix and
- * split one cohort across two URLs, which every mapping-only assertion still calls correct.
- * @returns {Promise<{applied: boolean, writes: object[]}>} What was planned, or what landed.
- */
+/** Report the plan and, under `--apply`, write it. */
 export async function runRotation({ plan, apply = false, deps = {} }) {
   const { runGh, newSegment: nextSegment = newSegment, log = console.log } = deps;
   const writes = plannedWrites(plan);
@@ -403,12 +383,7 @@ async function assertGhIsReady(runGh) {
 
 /**
  * The absolute path of the `gh` binary to run, so `execFile` never resolves a bare command name
- * through `PATH` at spawn time (SonarCloud `javascript:S4036`). `GH_BIN`, when set, overrides the
- * `PATH` walk for a non-standard install, but must itself already be absolute: an override that
- * still needed resolving would just relocate the same search.
- * @param {NodeJS.ProcessEnv} env
- * @returns {string}
- * @throws {Error} With `.code === 'GH_UNRESOLVED'` when nothing usable can be resolved.
+ * through `PATH` at spawn time (SonarCloud `javascript:S4036`).
  */
 export function resolveGhBinary(env = process.env) {
   const override = named(env.GH_BIN);

@@ -1,34 +1,5 @@
 #!/usr/bin/env node
-/**
- * Validate a Fabricate release tag against the shared patterns in `scripts/lib/releaseTags.js`.
- *
- * This replaces the `grep -E '^v[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$'` literal that used to be
- * hand-copied into four workflow steps — every copy of which rejected `-beta.N`.
- *
- * ZERO DEPENDENCIES, by design: workflows run it straight after `actions/checkout`, on the
- * runner's preinstalled Node, BEFORE `npm ci`. (It imports `./lib/releaseTags.js`, a `.js` file
- * that parses as ESM only because the root `package.json` declares `"type": "module"` — that
- * declaration is load-bearing for a pre-`npm ci` run, so do not drop it or relocate these files
- * under a directory with its own `package.json`.)
- *
- * Usage:
- *   node scripts/validate-release-tag.mjs <tag> [--kind beta|stable|any] [--print version|base|tag]
- *   git tag --points-at HEAD -l 'v*-*' | node scripts/validate-release-tag.mjs --filter --kind beta
- *
- * Modes:
- *   default  Validate one tag and print one field of it to stdout, so a workflow can capture it:
- *            `VERSION=$(node scripts/validate-release-tag.mjs "$TAG" --kind beta)`.
- *              --print version  the bare version, `v` stripped (default) — `1.4.0-beta.3`
- *              --print base     the version a prerelease promotes to        — `1.4.0`
- *              --print tag      the tag as given                            — `v1.4.0-beta.3`
- *   --filter Read newline-delimited tags on stdin and echo the VALID TAGS (unchanged, `v` intact)
- *            to stdout — a drop-in replacement for the `grep -E` it retires. Exits 0 whatever the
- *            input CONTAINS; it exits non-zero only when the invocation itself is wrong. A caller
- *            piping into it MUST set `shell: bash` (for `-o pipefail`), or GitHub's default
- *            `bash -e {0}` will discard that failure and hand the step `sort`'s exit status.
- *
- * Exit codes: 0 valid, 1 invalid tag, 2 usage error.
- */
+/** Validate a Fabricate release tag against the shared patterns in `scripts/lib/releaseTags.js`. */
 import process from 'node:process';
 
 import { RELEASE_TAG_KINDS, assertReleaseTagKind, validateReleaseTag } from './lib/releaseTags.js';
@@ -122,9 +93,7 @@ async function main() {
     return;
   }
 
-  // EAGER validation of the invocation, before any input is read. `--filter` used to check the
-  // kind lazily, per input line — so a typo'd `--kind` with the normal empty-stdin case (no new
-  // tag at HEAD) would have exited 0 and reported "no tags", silently.
+  // Eager validation of the invocation, before any input is read.
   assertReleaseTagKind(options.kind);
   if (!PRINTABLE_FIELDS.includes(options.print)) {
     throw new Error(
