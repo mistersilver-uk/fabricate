@@ -1,29 +1,7 @@
 #!/usr/bin/env node
 /**
- * `npm run benchmark:performance` — the deterministic, Foundry-free performance harness
- * (issue 1071).
- *
- * No Foundry installation, licence, container or browser is involved. Every profile runs under
- * plain Node against synthetic fixtures generated from `{profile, seed}` alone.
- *
- * Two artefacts come out of one run, and they are deliberately different kinds of thing:
- *
- *   1. `benchmarks/baselines/<profile>.json` — CLASS 1. Counts, sizes and fixture checksums.
- *      Machine-invariant, committed, and asserted by `tests/benchmark-baseline-drift.test.js`.
- *      Written only under `--update-baselines`; verified on every run under `--check`.
- *   2. `.benchmarks/runs/<iso8601>-<shortsha>.json` — CLASS 2. Wall clock and heap, plus the
- *      full envelope. Gitignored, never asserted, and only ever compared to another run from
- *      the SAME machine via `npm run benchmark:compare`.
- *
- * This file is an ENTRY POINT and exports nothing; everything reusable lives in
- * `scripts/lib/benchmark*.js`, which is what the drift test imports.
- *
- * Usage:
- *   npm run benchmark:performance
- *   npm run benchmark:performance -- --profile=held-inventory --reps=9
- *   npm run benchmark:performance -- --check              # fail on class-1 drift
- *   npm run benchmark:performance -- --update-baselines   # re-record class 1
- *   npm run benchmark:performance -- --list
+ * `npm run benchmark:performance` — the deterministic, Foundry-free performance harness (issue
+ * 1071).
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -77,9 +55,7 @@ const VALUE_SETTERS = {
 
 function parseArgs(argv) {
   const options = {
-    // The SWEPT list, not every registered profile. A foundry-only profile (issue 1255) has no
-    // headless cases and no committed baseline by design, so sweeping it would build a fixture,
-    // measure nothing, and then fail `--check` reading a baseline that was never meant to exist.
+    // The swept list, not every registered profile.
     profiles: [...SWEPT_SCALE_PROFILE_NAMES],
     seed: DEFAULT_SEED,
     reps: 5,
@@ -106,16 +82,7 @@ function parseArgs(argv) {
       `Unknown profile(s): ${unknown.join(', ')}. Known: ${SCALE_PROFILE_NAMES.join(', ')}`
     );
   }
-  // Refused BY NAME rather than silently dropped. A foundry-only profile is a real, buildable
-  // fixture, so `--profile=<one>` is a reasonable thing to type; it just has nothing for THIS
-  // harness to run, and a run that measured zero cases and reported success would be the least
-  // useful possible answer.
-  //
-  // No profile declares `foundryOnly` today (issue 1265 removed the last one), so this branch is
-  // currently unreachable. It stays because the MECHANISM stays: `scaleProfiles.js` still supports
-  // the flag and `printList` still reports it, so the next profile to declare it would otherwise be
-  // swept in silence — building a fixture, measuring nothing, then failing `--check` against a
-  // baseline that was never meant to exist. An unreachable refusal is cheaper than that.
+  // Refused by name rather than silently dropped.
   const foundryOnly = options.profiles.filter(
     (profile) => SCALE_PROFILES[profile].foundryOnly === true
   );

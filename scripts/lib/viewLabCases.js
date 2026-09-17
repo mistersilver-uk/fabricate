@@ -1,23 +1,14 @@
 /**
- * The canonical View Lab case registry.
+ * The canonical View Lab case registry: one entry per captured PNG, naming a window and the state
+ * to drive it to rather than a component.
  *
- * One entry per captured PNG. A case names a WINDOW and the state to drive it to — not a component
- * — because the evidence a UI PR needs is "here is the screen you changed", and a screen is an
- * application window with its rail, its chrome, and its neighbours in frame.
+ * `sourceMatches` turns a diff into a capture list, directory-anchored rather than file-anchored.
+ * Signals too broad to attribute to one window map to a small representative set instead of the
+ * whole corpus, and a change to one of the lab's own inputs selects one frame per surface
+ * ({@link LAB_SURFACE_CASES}). See {@link mapChangedFilesToCases} and {@link labSurfaceKey}.
  *
- * `sourceMatches` is what turns a diff into a capture list. Patterns are directory-anchored rather
- * than file-anchored: a window case is affected by anything under the view it renders. That creates
- * a fan-out hazard — an edit to a shared component or to `styles/` would otherwise select all
- * fourteen cases — so those broad signals deliberately map to a small representative set instead.
- * See {@link mapChangedFilesToCases}.
- *
- * The same hazard has a second, larger shape: a change to one of the lab's OWN inputs — the fixture
- * world, the mount page, the capture driver, this registry's shared code — cannot be attributed to
- * one window, and used to select the whole corpus. That answer is no longer bought: what such a
- * change has to prove is that the lab still boots and still reaches and photographs every SURFACE,
- * not that every state of every surface still looks the way it did. It therefore selects one frame
- * per surface — {@link LAB_SURFACE_CASES} — and the detailed states of a surface are captured when
- * the files that govern their behaviour or presentation change. See {@link labSurfaceKey}.
+ * The attribution walk carries a `{keys, unattributable}` pair at every level and merges both
+ * halves of its children's pairs, so no level can return a value meaning "forget what you found".
  */
 
 import { readFileSync } from 'node:fs';
@@ -33,19 +24,7 @@ const MANAGER = 'fabricate-crafting-system-manager';
 const JOURNAL_SOURCES =
   /^src\/ui\/svelte\/apps\/journal\/(?:(?:ActionsPanel|ActiveRunsList|HistoricalRunDetail|HistoryList|HistoryRow|JournalFactRow|JournalListShell|JournalView|RunCard|RunDetail|StepDetails|ThisRun|TimeRemainingBox)\.svelte|(?:journalRunStatus|historyPresentation)\.js)$/;
 
-/**
- * The three GM canvas windows (issue 1520).
- *
- * Registered BEFORE the design-system adoption that re-skins them, because until they were here a
- * diff touching all three selected exactly ONE case — {@link FALLBACK_CASE_ID}, the player
- * crafting window — and the evidence matcher computed its expectation from this same selector,
- * found that id in it, and reported the gate SATISFIED. A gate that cannot fail, on a photograph
- * of the wrong window.
- *
- * Unlike the Manager and the player app, each of these IS a single screen: no routes, and the
- * browser's two `role="tab"` panels are sub-tabs of the kind {@link labSurfaceKey} already folds
- * into their screen. So the window is the surface — see that function.
- */
+/** The three GM canvas windows (issue 1520). */
 const CANVAS_BROWSER = 'fabricate-interactable-browser';
 const CANVAS_CONFIG = 'fabricate-interactable-config';
 const CANVAS_MANAGER = 'fabricate-interactables-manager';
@@ -53,18 +32,12 @@ const CANVAS_MANAGER = 'fabricate-interactables-manager';
 /** The three, as a set, for the surface key and the readership predicate. */
 const CANVAS_APPS = Object.freeze([CANVAS_BROWSER, CANVAS_CONFIG, CANVAS_MANAGER]);
 
-/**
- * Files that can change what a window looks like. Mirrors the rule in `AGENTS.md`: a `lang/` change
- * needs evidence only when the same PR also touches a render file, which callers enforce by testing
- * `hasUiChanges` over the whole changed set.
- */
+/** Files that can change what a window looks like. */
 const UI_PATH_PATTERN = /^(src\/ui\/|styles\/)|\.(svelte|css)$/;
 
 /**
  * The harness's own inputs: the fixture world every frame renders from, the page that mounts it,
  * the Foundry shim it renders against, its capture and layout-assertion helpers, and this registry.
- * None of these is a render file, so none is selectable by {@link isUiFile} — but a change to any
- * of them can move or invalidate captured frames.
  */
 const LAB_INFRASTRUCTURE_PATTERN =
   /^(tests\/view-lab\/|scripts\/lib\/viewLab(?:Cases|LayoutAssertion)\.js$|scripts\/lib\/foundryChromeSpec\.js$|scripts\/view-lab-screenshots\.mjs$)/;
@@ -85,116 +58,31 @@ const LAB_MOUNT_PATH = 'tests/view-lab/mount.js';
 const LAB_INTERACTABLES_PATH = 'tests/view-lab/world/labInteractables.js';
 
 /**
- * ── How this machinery says "part of this reached beyond what I can attribute" ──────────────────
- *
- * It carries a `{keys, unattributable}` PAIR at every level of the attribution walk — from one
+ * It carries a `{keys, unattributable}` pair at every level of the attribution walk — from one
  * candidate anchor, up through a hunk's candidates, a patch's hunks, an input's patch, and a
  * change's inputs — and each level merges both halves of its children's pairs.
- *
- * It used to carry a sentinel instead, `EVERY_PUBLISHABLE_CASE`, which each level returned the
- * moment any child produced it. That was correct only because the value it stood for CONTAINED
- * every selection it discarded on the way out. It stands for {@link LAB_SURFACE_CASES} now — 35
- * frames a reviewer reads instead of 246 they scroll past — which contains no detailed state at
- * all, so discarding became dropping: a change that edited one case literal and also touched
- * shared code published coverage and no frame of the case it edited.
- *
- * A pair is what makes that unrepresentable rather than merely fixed. There is no value left for a
- * level to return that means "forget what you found", so the defect cannot come back one level
- * down — which is exactly how it came back once already, after the first three levels were fixed.
  */
 
 /**
  * Signals too broad to attribute to one window. A shared primitive or a global stylesheet can
- * affect every window, so selecting every case would make the evidence set useless noise. These map
- * to the representative set below plus the fallback.
- */
-/**
- * The MANAGER's own shared primitives — its equivalent of `src/ui/svelte/components/`.
- *
- * A NAMED SET rather than a directory glob, because `apps/manager/` mixes primitives with feature
- * views: a glob would swallow `RecipesBrowserView.svelte` too and route every manager change to
- * the representative set, destroying the targeting this registry exists for.
- *
- * DERIVED, never listed here. It used to be a hand-written array of fourteen names, which made
- * this file a second opinion about which components are shared primitives — a question
- * `openspec/specs/design-system/spec.md` already answers normatively and which
- * `scripts/lib/designSystemPrimitives.js` now enumerates machine-readably (issue 1378). Two
- * hand-maintained copies of one set disagree eventually, and the disagreement is silent: the
- * broad-signal routing would simply stop matching a primitive the capability had admitted, and
- * every PR touching it would publish frames that cannot contain it.
- *
- * The manifest carries a per-row `evidence` judgement rather than a location, so this takes the
- * `'broad'` rows and nothing else. The four bulk-edit chrome files and `BulkDeleteCard` are
- * `'targeted'` there for the reasons recorded below, so they stay out of this set exactly as they
- * did when the list was typed by hand.
- *
- * The derivation SORTS. `BROAD_SIGNAL_PATTERN` below embeds these names in an alternation, so its
- * source would otherwise depend on the manifest's authoring order — correct today only because
- * that order happens to be alphabetical, and wrong the first time a row is appended rather than
- * inserted. `tests/design-system-primitives.test.js` pins the resulting pattern source as a
- * literal string, so a widening or narrowing of this set has to be an accepted edit to that pin.
+ * affect every window, so selecting every case would make the evidence set useless noise.
  */
 const MANAGER_PRIMITIVES = managerPrimitiveNamesByEvidence('broad');
 
 /**
- * The shared bulk-edit chrome (issue 1010): the selection toolbar and the panel shell, section
- * and select the Component Studio and the Recipe Studio both render.
- *
- * Deliberately NOT in `MANAGER_PRIMITIVES` above, which would make them broad signals and
- * claim-exempt. A broad signal routes to the representative set, but
- * `scripts/ui-pr-screenshot-evidence.mjs` routes these same four files to the bulk-edit frames —
- * so making them broad here would have the two registries disagree about what evidence a change
- * to one of them requires. They have exactly two consumers, both of which claim them below, so
- * targeting is both possible and honest; the alternative is a shared primitive with dozens of
- * consumers, which is what `MANAGER_PRIMITIVES` is for.
- *
- * That exclusion is no longer enforced by their absence from a list in this file. They are shipped
- * primitives and `scripts/lib/designSystemPrimitives.js` carries a row for each, holding this
- * judgement as `evidence: 'targeted'` — so `MANAGER_PRIMITIVES` above, which takes the `'broad'`
- * rows, cannot pick them up. `tests/design-system-primitives.test.js` asserts the two directions
- * of that against `BROAD_SIGNAL_PATTERN` itself, which is what makes the judgement recorded beside
- * the row and the routing it produces the same fact rather than two.
+ * The shared bulk-edit chrome (issue 1010): the selection toolbar and the panel shell, section and
+ * select the Component Studio and the Recipe Studio both render.
  */
 const BULK_EDIT_CHROME_PATTERN =
   /^src\/ui\/svelte\/apps\/manager\/Bulk(?:SelectionToolbar|EditPanelShell|EditSection|EditSelect|StagingInset)\.svelte$/;
 
 /**
- * The shared bulk-DELETE card (issue 1132): the heading, impact statement, standing hint and
- * armed control every studio's set delete renders.
- *
- * Separate from `BULK_EDIT_CHROME_PATTERN` because the two select DIFFERENT frames. The chrome
- * appears in every bulk-edit frame; this card is below the sticky Apply dock and under the rail's
- * fold, so the only frames that photograph it at all are the four `*-bulk-delete-*` cases, each of
- * which scrolls or clicks it into view. Attributing it to the bulk-EDIT frames would publish a
- * frame in which the changed component is not visible.
- *
- * Not in `MANAGER_PRIMITIVES` either, for the reason stated above: a broad signal is claim-exempt
- * and routes to the representative set, and this component has exactly the delete frames as its
- * consumers, so targeting is both possible and honest. Its manifest row in
- * `scripts/lib/designSystemPrimitives.js` records that as `evidence: 'targeted'`, separately from
- * the four chrome files, because the two select different frames.
+ * The shared bulk-DELETE card (issue 1132): the heading, impact statement, standing hint and armed
+ * control every studio's set delete renders.
  */
 const BULK_DELETE_CARD_PATTERN = /^src\/ui\/svelte\/apps\/manager\/BulkDeleteCard\.svelte$/;
 
-/**
- * The trigger set the three `manager-recipes-bulk-edit*` frames share (issue 1010).
- *
- * The first two patterns are the recipe browser's own pair, exactly as every other recipe case
- * declares them. The third is the shared chrome above, which sits directly under `apps/manager/`
- * and therefore falls through BOTH — without it a change to the toolbar or the panel shell would
- * select the Component Studio's bulk frames and none of the Recipe Studio's.
- *
- * The fourth is the pure staging model. Like `RunJournalBuilder.js` on the blind-run cases, it
- * cannot SELECT a frame today (`mapChangedFilesToCases` filters to `isUiFile` first, and
- * `src/utils/` is not a render path); it is declared because it is what these three frames are
- * evidence ABOUT — every sentinel, every tri-state and the blocked count are computed there — and
- * because the moment that filter widens, these are the cases that must answer for it.
- *
- * Hoisted rather than repeated three times: `scripts/**` is analysed by SonarCloud's Automatic
- * Analysis, which counts repeated literals and ignores `cpd.exclusions`. It sits OUTSIDE every
- * case region on purpose — `parseCaseLineRegions` maps only the lines inside a case literal, so a
- * change here widens the capture selection instead of narrowing it to one arbitrary frame.
- */
+/** The trigger set the three `manager-recipes-bulk-edit*` frames share (issue 1010). */
 const RECIPE_BULK_EDIT_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/Recipe/,
   /^src\/ui\/svelte\/apps\/manager\/recipes?\//,
@@ -202,68 +90,22 @@ const RECIPE_BULK_EDIT_MATCHES = [
   /^src\/utils\/recipeBulkEditModel\.js$/,
 ];
 
-/**
- * The trigger set the ten system Tool Rules LIST frames share (issue 1373).
- *
- * It replaces the pair those ten cases each declared —
- * `^src/ui/svelte/apps/manager/Tool` and `^src/ui/svelte/apps/manager/tools/` — and the
- * replacement is a NARROWING, which is the whole point. Both of those patterns are directory or
- * prefix anchors over a directory that holds two different screens: the LIST, which is
- * `ToolsBrowserView` plus the rail `CraftingSystemManagerRoot` mounts beside it, and the
- * EDITOR, which is `ToolEditView` and the six tab bodies under `tools/`. Ten list frames
- * therefore answered for every editor file in the directory, and the failure that produced is
- * not theoretical: `tools/ToolEditorTabs.svelte` published exactly ten frames and NONE of them
- * renders it, because all ten are the list.
- *
- * The membership is derived from the import graph rather than chosen. `ToolsBrowserView.svelte`
- * imports exactly one module from `tools/` — `toolStudio.js`, for `projectToolRow` and
- * `toolSearchText` — and `tools/ToolBrowserInspector.svelte` is the list's right-hand rail,
- * imported by `CraftingSystemManagerRoot`. Nothing else under `tools/` is reachable from the
- * list at all; every other file in it is imported only by `ToolEditView` or by
- * `scoped/WorldToolEntryPage`, and both of those screens have frames of their own that claim
- * their files by name.
- *
- * It sits outside every case region for the same reason `RECIPE_BULK_EDIT_MATCHES` does: a
- * change here has to widen the capture selection rather than be attributed to whichever case
- * literal happens to surround it.
- */
+/** The trigger set the ten system Tool Rules list frames share (issue 1373). */
 const TOOL_LIST_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/ToolsBrowserView\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/tools\/ToolBrowserInspector\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/tools\/toolStudio\.js$/,
 ];
 
-/**
- * The trigger set every SYSTEM Tool rules EDITOR frame shares (issue 1373).
- *
- * The editor's own shell and its tab strip, which is the half of the narrowing above that has to
- * land somewhere. `ToolEditView.svelte` was already claimed by name on most editor cases;
- * `tools/ToolEditorTabs.svelte` was claimed by nothing that renders it, so a change to the strip
- * — its tab list, its two badges, the neutral tick — published ten frames of the list it is not
- * in. Hoisted rather than repeated so the two files cannot drift apart per case.
- */
+/** The trigger set every system Tool rules editor frame shares (issue 1373). */
 const TOOL_EDITOR_SHELL_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/tools\/ToolEditorTabs\.svelte$/,
 ];
 
 /**
- * The literal typed into the World Tools Catalogue's search field by
- * `world-tool-catalogue-search`, and the literal typed into it by
- * `world-tool-catalogue-filtered-empty`.
- *
- * EXPORTED for the reason {@link WORLD_PARTIES_SEARCH_TERM} is: which rows survive a term is a
- * fact about the lab fixture rather than about the case, and an over-match is invisible in a
- * screenshot — a frame showing four rows where two were meant looks like a frame. The catalogue
- * searches an entity's name, its description and BOTH of its Item uuids
- * (`worldToolSearchText`), so a term chosen off the names alone can be answered by a uuid.
- * `tests/view-lab-cases.test.js` derives the survivors from `labContent.js` and fails by name
- * when a rename makes either term match a different set.
- *
- * `rune` survives on `rw-tool-stylus` and `rw-tool-punch` and nothing else; the miss term
- * survives on nothing, which is the filtered-empty hero's whole premise.
- *
- * @type {string}
+ * The literal typed into the World Tools Catalogue's search field by `world-tool-catalogue-search`,
+ * and the literal typed into it by `world-tool-catalogue-filtered-empty`.
  */
 export const WORLD_TOOL_SEARCH_TERM = 'rune';
 
@@ -271,34 +113,14 @@ export const WORLD_TOOL_SEARCH_TERM = 'rune';
 export const WORLD_TOOL_SEARCH_MISS_TERM = 'quenching trough';
 
 /**
- * The literal typed into the World > Parties search field by `manager-world-parties-search-filtered`.
- *
- * EXPORTED, and that is the point. The World > Parties filter matches a party's name, any
- * member's name AND its travel actor's name, so which parties survive a given term is a fact
- * about the lab fixture rather than about this case — and an over-match is invisible in a
- * screenshot, because a frame showing three cards where two were meant looks like a frame.
- * `tests/view-lab-cases.test.js` derives the survivors from `labWorld.js` and `labActors.js`
- * and fails by name when a rename makes this term match a third party.
- *
- * It sits outside every case region for the same reason `RECIPE_BULK_EDIT_MATCHES` does.
- *
- * @type {string}
+ * The literal typed into the World > Parties search field by
+ * `manager-world-parties-search-filtered`.
  */
 export const WORLD_PARTIES_SEARCH_TERM = 'wagon';
 
 /**
- * The literal typed into the Access route's PLAYERS roster search by
+ * The literal typed into the Access route's players roster search by
  * `manager-access-recipe-roster-no-match`.
- *
- * EXPORTED for `WORLD_PARTIES_SEARCH_TERM`'s reason read the other way round: this term has to
- * match NOTHING, and "nothing" is a fact about the seeded roster rather than about this case. A
- * term that started matching a user renders a roster row where the frame's whole subject is the
- * quiet line that stands in for one, and a frame showing a row where none was meant looks like a
- * frame. `tests/view-lab-cases.test.js` runs it against the shim's own roster table.
- *
- * It sits outside every case region for the same reason the term above does.
- *
- * @type {string}
  */
 export const ACCESS_ROSTER_SEARCH_MISS_TERM = 'zzz-no-such-user';
 
@@ -311,32 +133,7 @@ export const BROAD_SIGNAL_PATTERN = new RegExp(
   ].join('|')
 );
 
-/**
- * Deliberate visible states that a broad primitive's representative pair does not contain.
- *
- * Broad signals still select {@link REPRESENTATIVE_CASE_IDS}; these are additive, narrowly named
- * exceptions for a primitive whose changed presentation is otherwise absent from both generic
- * frames. Keeping the path literal makes the mapping test fail on a primitive rename, while the
- * case id fails closed through the registry filter if its deliberate state is removed.
- *
- * ── THE HAZARD THIS TABLE CARRIES, AND WHY IT IS EXPORTED ──────────────────────────────────────
- *
- * "Fails closed through the registry filter" is exactly the problem as well as the safety. A value
- * naming a case id that does not exist, or one whose case has `publish: false`, is dropped by the
- * `selected.has(id) && viewCase.publish` filter at the end of {@link mapChangedFilesToCases} —
- * silently. The primitive then keeps publishing the representative pair, the entry sits here
- * looking like configuration, and nothing anywhere says it never ran. Issue 1116 names that
- * precisely: unreachable configuration looks identical to working configuration.
- *
- * So this is EXPORTED, solely so `tests/design-system-primitives.test.js` can assert the entries
- * resolve — every key matched by {@link BROAD_SIGNAL_PATTERN} and present on disk, every value the
- * id of a case that publishes. That test also pins the KEY LIST, not just the entries, because a
- * later refactor that moved these into the case literals and left an empty object behind would
- * leave the loop running over nothing and the property green over an empty domain.
- *
- * This is not a mistake the registry has been spared: two comments in this file cited
- * `manager-gathering-stamina-rolls` for years and no case has ever had that id.
- */
+/** Deliberate visible states that a broad primitive's representative pair does not contain. */
 export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // Issue 1648: each run control maps to a state that actually renders it.
   'src/ui/svelte/components/RunActionBar.svelte': Object.freeze([
@@ -368,11 +165,9 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'fabricate-journal-lifecycle-past-stage',
     'fabricate-journal-lifecycle-future-stage',
   ]),
-  // `HistoricalRunDetail.svelte:168` renders this card too, so a change to its inset or its
-  // region rhythm moves the multi-stage HISTORY cards as well as the active ones — and the three
-  // active frames alone would publish evidence that does not show it. `claim-retained` is here
-  // because it is the state where the card's first region is the io block with no stage heading
-  // above it, which is the shape the top-inset rule governs.
+  // `HistoricalRunDetail.svelte:168` renders this card too, so a change to its inset or its region
+  // rhythm moves the multi-stage history cards as well as the active ones — and the three active
+  // frames alone would publish evidence that does not show it.
   'src/ui/svelte/components/StageCard.svelte': Object.freeze([
     'fabricate-journal-lifecycle-ready-single',
     'fabricate-journal-lifecycle-past-stage',
@@ -397,286 +192,69 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   'src/ui/svelte/components/OutcomeLadder.svelte': Object.freeze([
     'fabricate-journal-lifecycle-gathering-check',
   ]),
-  // The shared icon picker (issue 1269). Everything it presents — the pinned resolved row, the
-  // row labels, the popover's own geometry — exists ONLY in the open popover, and neither
-  // representative frame opens one. This is the one case whose steps click an icon-picker trigger.
+  // The shared icon picker (issue 1269).
   'src/ui/svelte/components/IconPicker.svelte': Object.freeze(['manager-system-edit-lists']),
   // The most-used control in the app, and until issue 1378 it published no frame that renders one.
-  // Both representative frames are browse surfaces: `manager-components-normal` lists components
-  // and `fabricate-app-shell` lists recipes, and neither contains a stepper at all, so every PR
-  // that restyled this primitive published two frames in which the changed control is absent.
-  //
-  // `manager-gathering-economy-actors` is the frame that answers for it. Its actor stamina table
-  // is a four-track grid of steppers and its steps drive THREE states into one frame: Brenna's row
-  // is rolled, so its Current stepper is live and filled while its Max stepper renders the
-  // rolled-max PLACEHOLDER (the unset-value state), and Idrin's and Vosk's rows render the
-  // DISABLED state. `GatheringEconomyView.svelte:498,514` renders the two bindings, and this
-  // case's own steps fill one at `[data-economy-stamina-max]`.
   'src/ui/svelte/components/Stepper.svelte': Object.freeze(['manager-gathering-economy-actors']),
-  // The manager's ONE selection box, whose `sm` SIZE has exactly one caller and is absent from
-  // both representative frames: `manager-components-normal` and `fabricate-app-shell` draw the
-  // browse row's `lg` box and nothing else. `sm` is the Tool Studio's prerequisite row (issue
-  // 1373, round 5), and until that round's case existed no frame in the registry drew it at all
-  // — which is how it went on inheriting the row's 14px into a 16px box, unphotographed.
-  //
-  // ADDITIVE, not a replacement: `selectRenderFileCases` adds the representative pair for any
-  // broad-signal file as well, so a change to the box still publishes the browse surfaces that
-  // draw the other two sizes.
+  // The manager's one selection box, whose `sm` size has exactly one caller and is absent from both
+  // representative frames: `manager-components-normal` and `fabricate-app-shell` draw the browse
+  // row's `lg` box and nothing else.
   'src/ui/svelte/components/SelectionCheckbox.svelte': Object.freeze([
     'manager-tool-prerequisites-selected-1280x720',
   ]),
-  // THE APP'S ONE ART TILE (issue 1506), which is the change that earned it an entry. That change
-  // retired both crafting thumbnails into this tile — 35 render sites across two windows — and it
-  // moved the tile's `tint` from a surface WASH onto the GLYPH alone. Both representative frames
-  // draw the tile and NEITHER draws a tinted one: `manager-components-normal`'s component rows bind
-  // a colour no file in `src/` produces, so they render untinted, and `fabricate-app-shell` lists
-  // recipes, which carry artwork rather than a palette key. `world-component-entry-essences` is the
-  // one published frame whose tiles are genuinely tinted — its essence contribution cards draw the
-  // glyph-chip variant from the world essence catalogue's own `colorToken` — so it is the frame
-  // that can show the wash's absence at all.
-  //
-  // ADDITIVE, like every entry here: the representative pair is still added, so a change to the
-  // tile still publishes the two browse surfaces that draw its untinted and artwork faces.
+  // The app's one art tile (issue 1506), which is the change that earned it an entry.
   'src/ui/svelte/components/Medallion.svelte': Object.freeze(['world-component-entry-essences']),
-  // The manager's on/off switch (issue 1040), and the ONE entry here whose three frames are
-  // chosen per HOST rather than per state. The primitive's `as` prop is a closed set of three
-  // element shapes — a pressable `<button>`, a read-only `<span role="img">` reading, and a
-  // `<label>` wrapping a transparent `<input type="checkbox">` — and they draw different
-  // markup, take different attributes and are painted by different rules, so a change to one
-  // is invisible in a frame that renders another.
-  //
-  // The representative pair does not answer for any of them. `fabricate-app-shell` is the
-  // PLAYER window and contains no manager switch at all, and `manager-components-normal`
-  // contains exactly one: the component browser's grouping filter, which is the TRACK-ONLY
-  // form with no reading beside it, so the label — 28 of the 37 converted sites — appears in
-  // neither.
-  //
-  // `manager-system-edit-normal` is the labelled button host, and the densest frame of it in
-  // the registry: the settings tab's Optional features card
-  // (`SystemEditView.svelte`'s `data-edit-control="advanced-options"`) stacks seven labelled
-  // On/Off switches in one column, so alignment, the 78px cap and the label ellipsis are all
-  // visible at once.
-  //
-  // `coverage-mode-routed-check-checks` is the ONLY frame that draws the indicator host. The
-  // locked activation reading appears when a check's mode requires it, which
-  // `CraftingSystemManagerRoot.svelte`'s `checkActivation` reports as `optional: false` for
-  // `routedByCheck` and `progressive` — and `lab-runework`, this case's system, is the routed
-  // one. Every other checks frame sits on a `simple` or `routedByIngredients` system and draws
-  // the live switch instead.
-  //
-  // `manager-tool-parity-04-requirements-1280x720` is the only frame that draws the checkbox
-  // host: the Tool Studio's Requirements tab is where both of those two switches live.
+  // The manager's on/off switch (issue 1040), and the one entry here whose three frames are chosen
+  // per host rather than per state.
   'src/ui/svelte/components/StatusToggle.svelte': Object.freeze([
     'manager-system-edit-normal',
     'coverage-mode-routed-check-checks',
     'manager-tool-parity-04-requirements-1280x720',
   ]),
-  // BOTH band-strip frames, for the same two-mode reasoning `SearchablePopover` carries below. The
-  // strip has exactly two importers — `checks/CraftingCheckEditor.svelte` and
-  // `checks/SimpleCraftingCheckEditor.svelte` — and they are its two modes, not two instances of
-  // one. `coverage-mode-routed-check-checks` is the routed mode: many tiers, and the only frame in
-  // the registry showing a NAMED label on the strongest band. `manager-checks-simple-two-band-strip`
-  // is the simple mode: two outcomes and a DRAGGABLE handle, which the routed frame does not draw.
-  // A change to the handle is invisible in the first and a change to band naming is invisible in
-  // the second, so one of the two would always be the wrong frame to publish alone.
+  // Both band-strip frames, for the same two-mode reasoning `SearchablePopover` carries below.
   'src/ui/svelte/components/ThresholdBandStrip.svelte': Object.freeze([
     'manager-checks-simple-two-band-strip',
     'coverage-mode-routed-check-checks',
   ]),
-  // THE manager's labelled form field (issue 1428), on 81 call sites across 23 components — and
-  // in NEITHER representative frame. `manager-components-normal` is a browse list and
-  // `fabricate-app-shell` is the player shell; neither renders a `.manager-field` at all, so a
-  // change to the field column would publish two frames that do not contain one.
-  //
-  // TWO entries, because the primitive's `as` set is three hosts and the two frames between them
-  // render all three. `manager-gathering-task-editor-normal` is the densest field surface in the
-  // registry — `GatheringTaskEditView.svelte` alone holds 14 fields, `<label>` and `<div>` hosts
-  // side by side, and it is where four of this conversion's six `:global()` cascade repairs
-  // landed, so a repair that reaches the element but loses the cascade shows up there.
-  // `manager-system-edit-normal` is the frame that renders the corpus's ONE `<fieldset>` field:
-  // `RadioCardGroup`, which issue 1509 made a direct render when the `ResolutionModeCard` shim
-  // that used to stand between them was deleted.
+  // The manager's labelled form field (issue 1428), on 81 call sites across 23 components — and in
+  // neither representative frame.
   'src/ui/svelte/components/Field.svelte': Object.freeze([
     'manager-gathering-task-editor-normal',
     'manager-system-edit-normal',
   ]),
-  // The manager's icon-only button (issue 1422). 36 callers, and the representative pair does
-  // reach it — but only ever in its NEUTRAL state. `manager-components-normal` renders
-  // `components/ComponentRow.svelte`'s edit pencil and `Pagination`'s two arrows;
-  // `fabricate-app-shell` renders those arrows alone. Every icon button in either frame is a
-  // bare `manager-icon-button`, so a change to the DANGER treatment — 20 of the 82 converted
-  // sites, the second most common form by a wide margin — would publish two frames in which
-  // it does not appear.
-  //
-  // `world-modifiers` is the unconditional one: a World Modifiers row draws three neutral
-  // icon buttons and the `is-danger` delete beside them, in one dense cluster, and that
-  // case's steps already `scroll: true` the list into the frame because it runs below the
-  // page's own fold.
-  //
-  // `manager-environment-edit-blind-weights` is the second because it is the ONLY published
-  // frame that reaches the `is-primary` treatment at all: Shadow Thicket is a MANUAL
-  // composition, so its Tasks tab renders both the composition rows carrying the `is-danger`
-  // quick exclude and the Available-to-add rows carrying the `is-primary` quick include.
-  // `is-primary` has exactly one call site in the codebase — `environment/CompositionList.svelte`
-  // — and it is a conditional row action, so without this entry that treatment is
-  // unphotographed anywhere.
-  //
-  // Still uncovered, and named rather than left to be discovered: `is-ghost`, whose only site
-  // is `ComplicationSummaryRow.svelte`'s compound `is-ghost is-danger`. No published case
-  // reaches a complication row with its delete rendered, so a change to the ghost treatment
-  // publishes these two frames and neither contains it.
+  // The manager's icon-only button (issue 1422). 36 callers, and the representative pair does reach
+  // it — but only ever in its neutral state.
   'src/ui/svelte/components/IconButton.svelte': Object.freeze([
     'world-modifiers',
     'manager-environment-edit-blind-weights',
   ]),
-  // The manager's FILTER BAR (issue 1039), extracted from 11 hand-written
-  // `class="manager-toolbar"` sections. Unlike the card shell below, one representative frame
-  // DOES contain it, and that was established from the static import closure rather than
-  // assumed either way: `ComponentsBrowserView` reaches `components/ManagerToolbar.svelte`, so
-  // `manager-components-normal` draws the bar in its BASE treatment; `FabricateAppRoot` does
-  // NOT reach it — measured over the whole transitive `.svelte` import graph, not by looking at
-  // the frame — so the player window cannot contain one at all. Both entries here are therefore
-  // additive states the base frame cannot hold, not a repair for a blind pair.
-  //
-  // `world-component-catalogue` is the ONLY published frame that renders
-  // `.manager-scoped-list-toolbar`, and it is the one bar in the corpus whose sizing is stated
-  // from a SCOPED rule in its own component rather than from `styles/fabricate.css`:
-  // `scoped/EntityListInspectorFrame.svelte` declares `flex: 0 0 auto` inside a
-  // `flex-direction: column` column. That rule died SILENTLY to this conversion — emitted with
-  // the hash attached, `lint:svelte:warnings` green, compiled `css.code` byte-identical — and
-  // is repaired as `:global(.manager-toolbar.manager-scoped-list-toolbar)` at unchanged
-  // specificity. If the repair is ever wrong the bar absorbs the column's slack instead of the
-  // row list, which is a whole-frame collapse and is visible in exactly this frame.
-  //
-  // `manager-environments-browse-normal` is the SCROLLING cap. `.manager-environments-toolbar`
-  // is `max-height: 100px; overflow-y: auto` (`fabricate.css:4182`) and
-  // `.manager-task-toolbar` is the same shape at 112px; the component browser's bar has no cap
-  // at all, so the representative frame cannot show either. This is the frame the environments
-  // bar is drawn in.
-  //
-  // The sheet's remaining branch, `.manager-toolbar:not(:has(.manager-toolbar-primary))`
-  // (`:4176`), is NOT listed and is not a gap: measured across `src/`, no component writes
-  // `.manager-toolbar-primary`, so every shipped bar takes that branch and the grid form at
-  // `:4165` is declared and never rendered. Naming a frame for it would be an override for a
-  // state the product cannot reach.
+  // The manager's filter bar (issue 1039), extracted from 11 hand-written `class="manager-toolbar"`
+  // sections.
   'src/ui/svelte/components/ManagerToolbar.svelte': Object.freeze([
     'world-component-catalogue',
     'manager-environments-browse-normal',
   ]),
-  // The manager's SEARCH FIELD (issue 1039). Same closure argument as the bar above, with the
-  // same two answers: `ComponentsBrowserView` reaches `components/ManagerSearchField.svelte`
-  // and `FabricateAppRoot` does not, so the base 34px pill is in the representative frame and
-  // the player window holds none. The two entries are the treatments that frame cannot hold.
-  //
-  // `manager-gathering-task-editor-normal` is the COMPACT density — `is-compact`, the
-  // `min(220px, 30%)` 32px form at `fabricate.css:11638`, which three of the twenty converted
-  // sites take and all three live in that editor. Its drop-rules card renders one
-  // unconditionally, and the sheet gives that card's controls a second override on top
-  // (`:11651`), so the frame draws the density and its per-card refinement together.
-  //
-  // `manager-knowledge-owned-copies` is the one place the field is NOT the flexible member of
-  // a row: `.manager-knowledge-roster .manager-search` overrides the shared `flex: 1 1 260px`
-  // to `flex: 0 0 auto` (`fabricate.css:10718`), authored alongside the Access roster's
-  // identical rule. `KnowledgeView.svelte:159` renders the roster unconditionally, so this
-  // frame always contains it.
-  //
-  // Three `.manager-search` sites are NOT this primitive and are deliberately unphotographed
-  // here: the tag combobox in the gathering task editor and the manager root's two character
-  // modifier comboboxes, which are `SearchablePopover`'s surface and are recorded as
-  // adjudicated opt-outs in `tests/components/manager-filter-bar-source-contract.test.js`.
+  // The manager's search field (issue 1039).
   'src/ui/svelte/components/ManagerSearchField.svelte': Object.freeze([
     'manager-gathering-task-editor-normal',
     'manager-knowledge-owned-copies',
   ]),
   // The manager's card shell (issue 1427), extracted from 80 hand-written
-  // `class="manager-inspector-card"` sections. NEITHER representative frame contains one, and
-  // that is established from the trees rather than assumed: `fabricate-app-shell` is the PLAYER
-  // window and the class is painted only under `.fabricate-manager`, while
-  // `manager-components-normal` renders the components browser with nothing selected — its right
-  // rail is `components/ComponentBrowserInspector.svelte`, which was rebuilt precisely to REPLACE
-  // four stacked cards, and the card-bearing bulk rail only appears once rows are selected. So a
-  // restyle of the shell published two frames that could not contain it.
-  //
-  // Two, because the shell has two painted treatments and one frame cannot hold both.
-  // `manager-essences-disabled-in-use` is the BASE box — `fabricate.css:9948` and `:10449`, the
-  // 8px radius on `--fab-overlay-light-04`: it is the one essence frame whose steps select a row,
-  // and the inspector it opens is six of these stacked, which is the densest run of the base
-  // treatment in the registry.
-  //
-  // `coverage-mode-routed-check-checks` is the CHECKS box — `fabricate.css:1724`, which overrides
-  // the base at (0,3,0) to radius 11, zero padding and `--fab-bg-2` — and it reaches the Checks
-  // rail's own third treatment (`:2334`) in the same frame. Twenty-five of the sweep's 48
-  // converted sites are in that studio.
-  //
-  // The sheet's fourth treatment, `.is-sticky` (`:5404`), is NOT listed here and is not a gap:
-  // measured across `src/`, no component writes that class at all, so it is a dead rule rather
-  // than an unphotographed state. Naming a frame for it would be an override for a state the
-  // product cannot reach.
+  // `class="manager-inspector-card"` sections.
   'src/ui/svelte/components/InspectorCard.svelte': Object.freeze([
     'manager-essences-disabled-in-use',
     'coverage-mode-routed-check-checks',
   ]),
-  // THE PERCENTAGE SLIDER (issue 1508), and the entry closes a gap that the SOURCE-MATCH route
+  // The percentage slider (issue 1508), and the entry closes a gap that the source-match route
   // could not: this component is under `components/`, so the directory leg of
   // `BROAD_SIGNAL_PATTERN` claims it and `selectRenderFileCases` never consults any case's
-  // `sourceMatches` for it at all. Until this entry existed, every change to the control
-  // published the representative pair and nothing else, and neither frame draws one:
-  // `manager-components-normal` is the components browser and `fabricate-app-shell` is the
-  // player window, which has no percentage slider anywhere.
-  //
-  // ONE frame, and it is chosen because it DRAWS the control rather than because it claims the
-  // file that renders one. `world-tool-entry` opens the world Tool catalogue's
-  // `sm-tool-hammer`, whose fixture declares `breakage: { mode: 'breakageChance' }`
-  // (`tests/view-lab/world/labContent.js`), and its third step clicks
-  // `[data-world-tool-entry-tab="breakage"]` — which is the arm
-  // `scoped/WorldToolEntryPage.svelte` renders the `<ChanceSlider>` in.
-  //
-  // `manager-tool-parity-03-breakage-1280x720` is NOT a second entry, and that is measured
-  // rather than assumed. Its walk clicks an UNQUALIFIED `[data-tool-edit-rules]`, so it opens
-  // the first row of the default system's tool list, which is sorted by name and begins with the
-  // anvil — whose fixture breakage mode is `limitedUses`. `tools/ToolBreakageTab.svelte`
-  // renders its slider inside `{:else if breakageChoice === 'breakageChance'}`, so that frame
-  // draws the uses stepper and no slider at all; its `sourceMatches` claim on that tab proves
-  // the FILE and not the frame.
+  // `sourceMatches` for it at all.
   'src/ui/svelte/components/ChanceSlider.svelte': Object.freeze(['world-tool-entry']),
-  // AN ACTOR'S PORTRAIT (issue 1506), and the first entry in this table gained by a primitive
-  // ARRIVING rather than by an extraction leaving one state unphotographed. Neither
-  // representative frame is a Knowledge screen: `manager-components-normal` is the component
-  // browser and `fabricate-app-shell` is the PLAYER window, which has no GM Knowledge surface at
-  // all — so without this entry every change to the portrait would publish two frames that
-  // structurally cannot contain one.
-  //
-  // ONE frame, because one frame holds BOTH call sites. `manager-knowledge-owned-copies` opens
-  // the Knowledge route with the projection's default character selected, so it draws the
-  // roster's 34px row portraits down the second column and the detail header's 50px portrait
-  // beside the name stack in the third — the two sites this conversion moves, in the same
-  // photograph, at the geometry each renders at.
-  //
-  // `manager-knowledge-narrow` is deliberately NOT a second entry. It is the same two sites at
-  // 880px, and this component is fixed-size at both widths, so it would publish a second frame
-  // of a treatment the first already shows. It is still selected on a change to either CALLER,
-  // through the `knowledge/` directory pattern those cases already carry; what this table is for
-  // is the states a broad primitive's own frames cannot reach.
-  //
-  // The INITIALS state is reached by no case in the registry and is recorded as such rather than
-  // covered by an override that cannot draw it: it renders only when an actor has no artwork, and
-  // Foundry assigns default artwork on creation, so no lab character is art-less. It is held by
-  // `tests/components/avatar-mounted.test.js` instead.
+  // An actor's portrait (issue 1506), and the first entry in this table gained by a primitive
+  // arriving rather than by an extraction leaving one state unphotographed.
   'src/ui/svelte/components/Avatar.svelte': Object.freeze(['manager-knowledge-owned-copies']),
-  // THE editor tab strip (issue 1509), and the FIRST key this table gains because a component
-  // MOVED rather than because one acquired a state its frames could not reach. The strip was an
-  // `evidence: 'targeted'` row under `apps/manager/`, so the six cases that render it claimed it
-  // through their own `sourceMatches`; moving it into `components/` puts it behind the DIRECTORY
-  // leg of `BROAD_SIGNAL_PATTERN`, and `selectRenderFileCases` `continue`s on a broad-signal file
-  // BEFORE it reads any case's `sourceMatches`. Left where they were, those six claims would be
-  // silently unreachable and a change to the strip would publish the representative pair alone.
-  // So the six patterns were DELETED in the same commit and re-expressed here: this entry
-  // PRESERVES the routing that shipped rather than inventing one.
-  //
-  // Six, because between them they draw every vocabulary of the strip — the system editor's
-  // strip, the recipe-item editor's overview and validation tabs, the one Checks section tab
-  // wearing a count and a dot at once, the environment editor's Events tab, and the Knowledge
-  // editor's learned/lost counts in their active and inactive treatments together.
+  // The editor tab strip (issue 1509), and the first key this table gains because a component moved
+  // rather than because one acquired a state its frames could not reach.
   'src/ui/svelte/components/EditorTabs.svelte': Object.freeze([
     'manager-system-edit-normal',
     'manager-recipe-item-overview',
@@ -685,109 +263,14 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-environment-edit-events',
     'manager-knowledge-learned-lost-copy',
   ]),
-  // THE editor validation surface (issue 1444). Five files render it and it reaches NINE
-  // GM-visible surfaces — `scoped/ScopedValidationTab` is one of the five and is an intermediary
-  // rather than a screen, with five callers of its own, so 5 + 5 − 1. The figure written here
-  // used to be "seven renderers", which was neither of those two numbers and matched nothing that
-  // could be measured; issue 1517 replaced it with both counts and the arithmetic between them.
-  //
-  // NEITHER of the original representative frames can contain the surface, and that is
-  // established from the static import closure rather than from looking at a frame: walking every
-  // transitive `.svelte` import, this surface is in neither `ComponentsBrowserView`'s closure nor
-  // `FabricateAppRoot`'s — only `CraftingSystemManagerRoot`'s holds it. So a restyle of the
-  // medallion, the count tiles or the row stack published two frames that structurally could not
-  // contain one. (Three module counts used to be quoted for those three closures. Every one was
-  // stale by issue 1517 and they are dropped rather than reset: they were never the argument, and
-  // a reset buys one commit of accuracy before it rots again.)
-  //
-  // FOUR MEMBERS. The first two are the surface's two rail ARITIES, which one frame cannot hold
-  // both of. The third is the row's View deep link, which neither arity frame can draw. The
-  // fourth is the IN-GROUP ORDER, which none of the first three can show.
-  //
-  // `manager-checks-validation` is the only published frame that draws it inside
-  // `.manager-checks-validation-route`, and that route is the one place its metrics are
-  // re-stated: `styles/fabricate.css:2814-2841` overrides the summary card's gap, padding,
-  // radius and fill, the count tile's height and radius, the group label's size and tracking,
-  // and the row stack's radius and fill. Every geometry decision in the surface is therefore
-  // arbitrated twice, and this is the frame that shows the second arbitration.
-  //
-  // `manager-recipe-item-validation-blocked` is the only published frame that draws the
-  // TWO-TILE rail. The Books & Scrolls check set has no warning tier at all, so that tab
-  // reports `{ passing, blocking }` and the surface omits the Warnings tile — the one state
-  // where the rail's own flex distribution differs, and the state issue 1444 turned from a
-  // hand-rolled second markup block into a property of what a caller reports. Its all-clear
-  // twin is NOT listed: the arity is the same in both and the blocked one additionally draws
-  // the danger medallion and a Block pill.
-  //
-  // `manager-recipe-edit-validation` is the third member, and it is the ROW'S VIEW DEEP LINK
-  // (issue 1517). That button renders only where a row carries a `target`, and exactly two of the
-  // nine surfaces produce such rows: the recipe editor, whose `recipe/recipeReadiness.js` emits a
-  // target at eleven sites, and the Checks route, which synthesises one in its own tab. The pair
-  // above holds neither — `manager-recipe-item-validation-blocked`'s producer builds its rows
-  // inline with no target at all — so a change to that button published two frames that could not
-  // contain it.
-  //
-  // THE MEMBERSHIP ALONE DID NOT CLOSE THAT GAP, and a first draft of this paragraph said it did.
-  // The case reached the tab by clicking the FIRST Edit button of an A-to-Z list, and it asserted
-  // `.manager-recipe-val-row` — a class every row carries whatever its status, on a tab where
-  // `evaluateRecipeReadiness` always emits its structural ticks. So the selector was satisfied by
-  // construction on every recipe in the corpus and could not reject an all-clear frame: the entry
-  // read SATISFIED while naming a frame that structurally could not contain the button, which is
-  // the issue-1444 defect this whole table exists to refuse, wearing the table's own uniform.
-  //
-  // IT IS CLOSED BY PINNING THE RECIPE AND THE BUTTON. The case now opens
-  // `sm-r-runeplate-draft` by id and asserts `[data-recipe-issue-view]`, the hook the recipe
-  // editor puts on the button itself. Derived rather than assumed: of the lab world's 35 recipes
-  // that one is the ONLY one whose readiness emits an issue carrying a `target`, and
-  // `tests/view-lab-cases.test.js` re-derives that from `buildLabContent()` through the real
-  // `evaluateRecipeReadiness` rather than trusting this sentence. The registry called that
-  // tightening "the change that turns this from evidence into a gate"; this is it.
-  // `manager-checks-validation-retired-placeholder` is the fourth, and it is the ONE PUBLISHED
-  // FRAME IN WHICH THE IN-GROUP SORT IS VISIBLE (issue 1517). The surface lifts blocking rows to
-  // the top of their group, which can only be SEEN where a group holds more than one kind of row
-  // — and the Checks route is the only one that does, drawing a check tick and an issue in the
-  // same subsystem group. `manager-checks-validation` is that route in its clean state, so its
-  // groups are ticks alone; this case types a placement the shim refuses and reaches a CRITICAL
-  // issue, which is the row that rises. Its `sourceMatches` are `apps/manager/checks/` only, so
-  // before this entry a change to the shared surface did not select it at all.
-  //
-  // WHAT THE FRAME SHOWS, stated so a reader can check it: the crafting group's FIRST row is the
-  // `retiredPlaceholderBreaksFormula` row, above that subsystem's ticks. That criterion is
-  // enforced in `tests/components/checks-validation-tab.test.js` rather than folded into this
-  // case's `expectSelector`, deliberately — a positional selector that stops matching fails the
-  // capture job WHOLE and publishes nothing for every case in the run, which is too much to
-  // wager on a fixture's issue set staying single-membered.
+  // The editor validation surface (issue 1444).
   'src/ui/svelte/components/EditorValidationSurface.svelte': Object.freeze([
     'manager-checks-validation',
     'manager-recipe-item-validation-blocked',
     'manager-recipe-edit-validation',
     'manager-checks-validation-retired-placeholder',
   ]),
-  // The shared empty panel. Both representative frames are POPULATED states — the components
-  // browser lists components and the player app shell lists recipes — so the dashed panel this
-  // primitive draws appears in neither, and a restyle of it would publish two frames that do not
-  // contain it. `manager-systems-empty` is the frame that does, and it is the frame
-  // `docs/help/quickstart.md` Step 1 embeds, so a silent miss here is the first screenshot a new
-  // reader sees going stale.
-  // A SECOND ENTRY as of issue 1373, and it is a second TREATMENT rather than a second
-  // instance. `manager-systems-empty` is the hero panel filling a pane; the `note` variant
-  // released the panel entirely for an empty inside an overlay the product has already drawn a
-  // boundary around, and that treatment appears in no frame that draws a pane.
-  // `world-tool-entry-on-break-repair-tag-picker-empty` is the one frame that draws it.
-  //
-  // A THIRD ENTRY as of issue 1514, and `filtered` IS A THIRD TREATMENT rather than a variant
-  // of either. The reasoning above stopped at "two treatments" and the table stopped with it,
-  // so the variant that centres its stack, keeps the dashed panel and deliberately skips the
-  // icon/title apparatus was selected by nothing. That mattered the moment this issue moved its
-  // ink: `filtered` took the largest single change in the round, 2.66:1 to 5.42:1, across nine
-  // render sites of which six are outside this issue entirely — and every frame the table
-  // selected drew one of the other two treatments, which is exactly the "publishes two frames
-  // that do not contain the change" failure this table exists to prevent.
-  // `world-tool-catalogue-filtered-empty` is the one frame that draws it: the World Tools
-  // Catalogue searched to nothing, with the `Clear filters` action the variant renders as its
-  // own `children`. `tests/design-system-primitives.test.js` asserts only that entries RESOLVE,
-  // so it could not have caught the omission; the miss is a reasoning gap and is fixed here as
-  // one.
+  // The shared empty panel.
   'src/ui/svelte/apps/manager/EmptyState.svelte': Object.freeze([
     'manager-systems-empty',
     'world-tool-entry-on-break-repair-tag-picker-empty',
@@ -797,102 +280,22 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-gathering-event-availability-feedback-normal',
     'manager-gathering-event-availability-feedback-narrow',
   ]),
-  // BOTH parties pickers, because between them they are the primitive's two modes and
-  // neither renders the other's chrome. `inlineSearchTrigger` (the actor picker) replaces
-  // its trigger with the search field and suppresses the in-popover search row; the
-  // realm-override picker keeps its value-bearing trigger and renders that row. A change
-  // to the search row, the header ordering or the compact field is invisible in the first
-  // frame and a change to the inline trigger is invisible in the second.
-  // The drop target (issue 1373). Its representative pair are browse surfaces that render no drop
-  // zone at all, so every PR that restyled it published two frames in which the changed control is
-  // absent. `world-tool-catalogue-list-head` exists precisely because the resting catalogue case
-  // auto-scrolls to a selected row and carries the list head off the top: this is the one frame
-  // that photographs the zone as the list's FIRST element, which is where the design puts it.
-  //
-  // THREE MORE, AND THEY ARE THREE FACES RATHER THAN THREE INSTANCES (issue 1373). The entry
-  // above names the CREATE zone only — `kind="tool-create"`, which is a full-width dashed
-  // panel — so the world Tool entry's `tool-source` tile published nothing at all, and the
-  // round-2 repair that gave its LINKED face a solid fill and handed the dashed edge back to
-  // the unlinked prompt was evidenced by no frame in the corpus. The component's `state` prop
-  // is a closed set of three and each is painted differently:
-  //
-  //   - `world-tool-entry-overview` is the LINKED face: a solid, filled tile with the Item's
-  //     art, its name and the Unlink control, which is what the repair actually moved;
-  //   - `world-tool-entry-unlinked` is the UNLINKED face: the dashed prompt in the danger ink,
-  //     which is the face the linked one was wrongly wearing;
-  //   - `world-tool-entry-source-missing` is the MISSING face, the one a GM meets when the
-  //     linked Item has been deleted out from under the record. It is reachable only from a
-  //     world entity whose `registeredItemUuid` resolves to nothing, which the lab corpus had
-  //     none of until `lab-tool-warped-crucible` — see `labContent.js`.
+  // Both parties pickers, because between them they are the primitive's two modes and neither
+  // renders the other's chrome.
   'src/ui/svelte/components/ItemDropZone.svelte': Object.freeze([
     'world-tool-catalogue-list-head',
     'world-tool-entry-overview',
     'world-tool-entry-unlinked',
     'world-tool-entry-source-missing',
   ]),
-  // The radio-card group (issue 1373). TWO frames because the primitive has two faces and the
-  // representative pair renders neither: `manager-tool-parity-03-breakage-1280x720` is the
-  // `is-config-cards` face at system scope, and `world-tool-entry-requirements` is the same face
-  // at world scope, inside a card whose heading idiom is the kicker rather than the title.
-  //
-  // The world entry was named for `legendVisible` — the un-hidden gate-mode legend — until issue
-  // 1373's round 5 removed that caller: `proto:2334` introduces the gate pair with the sentence
-  // above it and heads it with nothing, so the legend is screen-reader-only again at both scopes
-  // and no frame in the corpus draws a visible one. The pair is kept because the two SCOPES still
-  // differ around the group, which is what a change to it would show up differently in.
+  // The radio-card group (issue 1373).
   'src/ui/svelte/components/RadioCardGroup.svelte': Object.freeze([
     'world-tool-entry-requirements',
     'manager-tool-parity-03-breakage-1280x720',
   ]),
-  // THE titled status card (issue 1509), and it GAINS an override in the same commit that MOVES
-  // it. It was a broad signal through the manager-name alternation and is one through the
-  // `components/` directory leg now, so its routing does not change — but a broad-signal
-  // `.svelte` with no override is a member of `PRIMITIVES_WITH_NO_FRAME`, and it LEAVES that
-  // list in this commit rather than a later one. The two registers are read by one `deepEqual`,
-  // so a commit that did either alone would be red.
-  //
-  // ONE frame, and it is chosen by the WALK rather than by a `sourceMatches` claim.
-  // `manager-recipe-edit-normal` opens the recipe editor and lands on `#recipe-tab-overview`,
-  // and `recipe/RecipeOverviewTab.svelte` renders TWO of these cards on that tab, so the frame
-  // draws the control rather than merely naming the file that renders one.
-  //
-  // `manager-tool-stress-long-name` is recorded as REFUSED. It claims `ToolSystemScopeCards`,
-  // which renders this card, but that case's own comment says its editor lands on the Breakage
-  // tab — so the card is not in the photograph, and a claim is not a drawing.
+  // The titled status card (issue 1509), and it gains an override in the same commit that moves it.
   'src/ui/svelte/components/ToggleCard.svelte': Object.freeze(['manager-recipe-edit-normal']),
-  //
-  // A THIRD entry as of issue 1458, and it is a third MODE rather than a third instance. Both
-  // parties pickers above render the search row; the three converted add menus render none, which
-  // is the `showSearch={false}` presentation that keeps `triggerHasPopup="listbox"` truthful on
-  // the trigger. `manager-gathering-task-availability-menu` is the one frame in the registry that
-  // OPENS one — every other gathering-task frame draws the trigger closed, where the whole
-  // conversion is a wrapper class and a scoping hash.
-  //
-  // A FOURTH entry as of issue 1475, and it is the first that is not a manager frame at all. The
-  // three above photograph the primitive in the crafting-system manager, which was the only
-  // application it could paint in until #1464 re-rooted its family and #1466 taught it to resolve
-  // a portal host; `player-actor-picker` is the frame that shows it doing so. A change to this
-  // primitive that broke only outside the manager would otherwise publish three frames in which it
-  // still works.
-  //
-  // A FIFTH AND A SIXTH as of issue 1373, and they are the primitive's EMPTY branch and the one
-  // caller whose panel had no frame at all. Every one of the four above opens a picker over a
-  // populated list, so the branch that renders when the list is empty — reached by all 22 call
-  // sites, and by five of them with no `emptyHint` to render — was published by nothing, which
-  // is how a dashed hero panel with a magnifier and no words shipped inside a 240px popover.
-  // `manager-recipe-edit-tag-picker` is the populated tag picker, over the herbalism system's
-  // own eight-tag vocabulary; `world-tool-entry-on-break-repair-tag-picker-empty` is the same
-  // control at WORLD scope, where the vocabulary is the union of every world component's own
-  // `defaults.tags` and only `setWorldTags` ever writes one — so it is empty in the lab world
-  // and in a freshly installed one alike, which is the state a GM meets on day one.
-  //
-  // A FIFTH entry as of issue 1373 round 8, and it is a fifth CONFIGURATION: the recipe row's
-  // `or…` menu is the only frame that renders this primitive's `popoverTitle` header on a panel
-  // that has NO search field, at a caller-fixed 150px. The parties pickers draw the header over a
-  // search row and the availability menu draws the search-less list with no header, so between
-  // them the two halves are covered and their COMBINATION is not — which is exactly where the
-  // width floor bit: the shared box declares `min-width: 240px`, so a caller asking for 150 got
-  // 240 with its own inline width sitting there looking honoured.
+  // A third entry as of issue 1458, and it is a third mode rather than a third instance.
   'src/ui/svelte/components/SearchablePopover.svelte': Object.freeze([
     'manager-world-parties-actor-picker',
     'manager-world-parties-realm-override-picker',
@@ -901,260 +304,57 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-recipe-edit-tag-picker',
     'world-tool-entry-on-break-repair-tag-picker-empty',
     'manager-recipe-edit-ingredients-or-menu',
-    // AN EIGHTH, and it is the primitive's GRID LIST FORM (issue 1503). `as="grid"` has exactly
-    // one caller in `src/` — `EssenceSourceSelector` — so `manager-essences-source-picker` is the
-    // only frame in the registry that draws a two-column panel, the `data-picker-columns` the
-    // keyboard cursor reads its step from, and a caller-supplied `option` snippet inside the
-    // primitive's own row element. The seven frames above are all flex-column lists of the
-    // primitive's own rows, so a change to the grid rung or to the snippet seam published nothing
-    // that could contain it.
+    // An eighth, and it is the primitive's grid list form (issue 1503).
     'manager-essences-source-picker',
-    // A NINTH AND A TENTH, and they are the primitive's MULTI-SELECT mode and the one caller
-    // that stays open without it (issue 1513). `player-crafting-sources-picker` is the only
-    // frame in the registry that draws `aria-multiselectable` over rows marked several at once,
-    // and it is a PLAYER frame drawing a caller's `option` snippet inside the primitive's own
-    // row; `manager-recipe-item-contents-picker` is the only one that draws the panel a choice
-    // does not close. Neither state exists in any of the eight above, so a change to the
-    // selection model or to the stay-open gate published eight frames none of which could
-    // contain it.
+    // A ninth AND A tenth, and they are the primitive's multi-select mode and the one caller that
+    // stays open without it (issue 1513).
     'player-crafting-sources-picker',
     'manager-recipe-item-contents-picker',
   ]),
-  // THE APP'S OWN SELECT (issue 1504), whose panel is drawn by the primitive above and whose whole
-  // subject — the option list — exists only while it is OPEN. Neither representative frame holds
-  // one: `manager-components-normal` is a browse list and `fabricate-app-shell` is the player
-  // shell, and each draws its pager's per-page trigger CLOSED, where the conversion is a button
-  // with a chevron.
-  //
-  // THREE entries. The first two are a polarity pair, because `showTick` is a CONFIGURATION and
-  // no one frame holds both of its values: `manager-recipes-bulk-edit-check-tier` is the ticked,
-  // grouped, hinted list — the densest composition any caller reaches — and
-  // `player-inventory-page-size` is the TICKLESS one, which is the polarity no other frame in the
-  // registry holds: issue 1511 added three more open player panels and every one of them ticks,
-  // so this pair is still the only place a change to the tick gutter, to the group heading's
-  // inset or to the panel band can be read in both of its states. It is a player frame as well,
-  // which is a second portal host with its own per-site trigger rules, but that is no longer what
-  // makes it the entry — the absent gutter is.
-  //
-  // The third is the LABELLED FORM, and it was added at issue 1510 because that change swapped
-  // the form's host element — `<Field as="label">` to `<Field as="div">`, so the caption is no
-  // longer a hit target and the trigger is named by pointing at it — and neither frame above
-  // draws a caption at all. `interactables-manager-region-open` is the promote card's
-  // `<Select label="Region">` with its panel open at this window's full-width trigger, so the
-  // caption, the trigger and the panel are all in one frame; the change that repaired the form
-  // touched twelve shipped call sites without editing one of them, which is exactly the shape of
-  // change a published frame is for.
-  //
-  // ADDITIVE, like every entry here: `selectRenderFileCases` still adds the representative pair,
-  // which is what keeps the trigger's own CLOSED treatment — the form nine pagers draw — in the
-  // published set.
-  //
-  // ROUTED ONLY HERE. `selectRenderFileCases` skips a broad-signal file BEFORE it reads any case's
-  // patterns, so a `sourceMatches` naming this path selects nothing and reds
-  // `tests/design-system-primitives.test.js`'s shadowed-baseline clause instead.
+  // The app's own select (issue 1504), whose panel is drawn by the primitive above and whose whole
+  // subject — the option list — exists only while it is open.
   'src/ui/svelte/components/Select.svelte': Object.freeze([
     'manager-recipes-bulk-edit-check-tier',
     'player-inventory-page-size',
     'interactables-manager-region-open',
   ]),
-  // The essence SOURCE picker (issue 1503), whose panel moved wholesale onto the primitive above
-  // — a new backdrop rung, `--fab-shadow-lg`, a 10px radius, the primitive's search row and list,
-  // and the shared two-column template in place of a caller rule. Neither representative frame can
-  // contain it: `manager-components-normal` is the component browser and `fabricate-app-shell` is
-  // the PLAYER window, and this control exists only in an essence inspector.
-  //
-  // ONE entry, because the panel is visible only while OPEN and exactly one frame opens it.
-  // `manager-essences-source-picker` selects `mote` — the lab corpus's only essence with no
-  // `sourceComponentId`, and so the only one whose inspector draws this control instead of the
-  // linked-source card — and clicks `.essence-source-trigger`. That case declares no
-  // `sourceMatches` pattern for this file and cannot: the directory leg of `BROAD_SIGNAL_PATTERN`
-  // claims it, so `selectRenderFileCases` `continue`s before reading any case's patterns. This
-  // entry is the seam for exactly that condition, and the case records the same fact beside its
-  // own `sourceMatches`.
+  // The essence source picker (issue 1503), whose panel moved wholesale onto the primitive above —
+  // a new backdrop rung, `--fab-shadow-lg`, a 10px radius, the primitive's search row and list, and
+  // the shared two-column template in place of a caller rule.
   'src/ui/svelte/components/EssenceSourceSelector.svelte': Object.freeze([
     'manager-essences-source-picker',
   ]),
-  // THE overflow action menu (issue 1477), extracted from four hand-rolled `role="menu"` blocks in
+  // The overflow action menu (issue 1477), extracted from four hand-rolled `role="menu"` blocks in
   // the environment editor and one `SearchablePopover` in the component editor that was announcing
-  // two commands as selectable options. NEITHER representative frame can contain it, and that is
-  // established from the static import closure rather than by looking at a frame: walking every
-  // transitive `.svelte` import, `ComponentsBrowserView` reaches neither `environment/`
-  // `CompositionList` nor `component/ComponentIdentityStrip`, and `FabricateAppRoot` is the PLAYER
-  // window and reaches neither either. Only `CraftingSystemManagerRoot`'s closure holds them. So a
-  // restyle of the menu published two frames that structurally could not contain one.
-  //
-  // ONE entry, because a menu is only visible while it is OPEN and exactly one published frame
-  // opens one. `manager-environment-edit-automatic-force-add` is that frame: its last step clicks
-  // a Non-matching row's kebab, and its `expectSelector` is the Force add INSIDE the open panel.
-  // Every other environment and component frame draws the trigger closed, where the whole
-  // conversion is an unchanged 34px icon button.
-  //
-  // TWO entries as of issue 1515, and the second is a different CALLER rather than a second view of
-  // the same one. `manager-systems-row-menu-open` opens a BROWSE ROW's menu — the shape the four
-  // converted browse views render, whose items are a two-verb Duplicate/Export plus a danger
-  // Delete — while the environment frame opens a COMPOSITION row's, with seven verbs and a
-  // disabled note among them. A change to this component reaches both callers, so it publishes
-  // one frame of each.
-  //
-  // The browse frame also carries the DANGER item (`is-danger`, the red Delete), which the note
-  // below used to record as uncovered. Still uncovered: the DISABLED note ("Enable in library
-  // first"), which lives on a library-disabled composition row, and only one menu can be open in
-  // one frame — so it needs a case that opens a different row than either of these.
+  // two commands as selectable options.
   'src/ui/svelte/components/ActionMenu.svelte': Object.freeze([
     'manager-environment-edit-automatic-force-add',
     'manager-systems-row-menu-open',
   ]),
   // The pill multi-select (issue 1458), whose add menu became a `SearchablePopover` in the same
-  // change. It sits under `components/`, so the directory leg of `BROAD_SIGNAL_PATTERN` claims it
-  // whatever anyone thinks of it — and until now it published only the representative pair, in
-  // which it appears nowhere: `manager-components-normal` is a browse list and
-  // `fabricate-app-shell` is the player window, and this control exists on two manager editors.
-  //
-  // `manager-recipe-edit-crafting-modifier-cap-reached` is the frame that answers for it, and it
-  // is chosen for the state rather than for the presence. The conversion left this component
-  // exactly ONE painted rule of its own — the at-cap trigger treatment, `aria-disabled='true'`
-  // taking `--fab-text-disabled` at `opacity: 0.55` — and that rule had to be re-anchored as
-  // `:global(.manager-availability-multi .manager-availability-menu-button[aria-disabled='true'])`
-  // because the button is the primitive's element now. A repair that reaches the button but loses
-  // its (0,3,0) to `.fabricate-manager .manager-availability-menu-button:hover` renders the capped
-  // control as a live one, which is precisely what this frame draws. Its sibling
-  // `-cap-available` draws the un-capped reading and would show nothing about the repair.
+  // change.
   'src/ui/svelte/components/ModifierPillSelect.svelte': Object.freeze([
     'manager-recipe-edit-crafting-modifier-cap-reached',
   ]),
-  // THE UPPERCASE MICRO-LABEL (issue 1505), on sixteen converted eyebrow sites across nine files.
-  // Neither representative frame draws one it renders: `manager-components-normal` is the
-  // component browser and `fabricate-app-shell` is the player shell, and every converted site is
-  // inside a crafting recipe detail or the recipe-item editor.
-  //
-  // TWO entries, because the two callers are in different windows and the conversion is a
-  // different act in each. `player-crafting-slot-rail` is the crafting one: its own comment
-  // records that the requirement rail draws three slot states in that frame, and the rail renders
-  // its header eyebrow whenever it renders at all — so it is a frame the registry already
-  // ASSERTS contains one. `manager-recipe-item-overview` is the manager one, and it is where the
-  // conversion moves the most: three field labels go from `0.66rem / .1em` to the ladder's
-  // `8.5px / .11em`, and the nested "from linked item" note goes with them because it declares no
-  // size of its own. THAT IS TRUE OF SIZE AND WAS NOT TRUE OF COLOUR (issue 1514): the note DID
-  // declare its own ink, so the mark's contrast correction reached the label and stopped at the
-  // tail, splitting one 8.5px line into two tones. The note's `color` was deleted rather than
-  // the correction narrowed, so it now inherits the mark's ink as it already inherited its size,
-  // and this frame is the one that shows both halves of that line agreeing.
-  //
-  // Still uncovered, and named rather than left to be discovered: `tone="accent"`. It is
-  // specimen-mandated — `library.html` declares the rule, draws the example and states when to
-  // reach for it — but no converted site passes it, so no frame in the registry contains an
-  // accent kicker and a change to that ink publishes two frames without one.
+  // The uppercase micro-label (issue 1505), on sixteen converted eyebrow sites across nine files.
   'src/ui/svelte/components/Kicker.svelte': Object.freeze([
     'player-crafting-slot-rail',
     'manager-recipe-item-overview',
   ]),
-  // THE AT-A-GLANCE FIGURE (issue 1505). Neither representative frame draws a stat grid, and the
-  // reason is structural rather than incidental: the component has exactly two callers, the
-  // player crafting app's Shopping list and the manager's Books & Scrolls inspector aside.
-  //
-  // TWO entries, one per caller, because both are now drawn. `player-crafting-essence-shopping`
-  // is the player frame: its steps press a recipe row's cart button, so the list is non-empty and
-  // its three summary cards are in the picture — and the recipe it adds can never be funded, which
-  // puts one of the three cards in the `danger` tone, so the frame carries the tone model as well
-  // as the box. `manager-books-scrolls-item` is the manager frame, and it was ADDED for this
-  // component: `manager-books-scrolls-normal` renders the inspector's EMPTY branch, since nothing
-  // in the registry clicked `[data-books-scrolls-select]`, and the two recipe-item cases route past
-  // the aside into the editor — so the item page's three tiles were unphotographed, and with them
-  // `tone="info"`, whose only reach anywhere in the tree is the middle one. That case's
-  // `expectSelector` requires the accented tile inside the grid, so the frame cannot go green
-  // without it. The conversion is ALSO held by `tests/components/item-page-inspector-mounted.
-  // test.js` and by `manager-mounted`, which pin all six of its `data-*` hooks.
+  // The at-a-glance figure (issue 1505).
   'src/ui/svelte/components/StatBox.svelte': Object.freeze([
     'player-crafting-essence-shopping',
     'manager-books-scrolls-item',
   ]),
-  // THE SURFACE THAT REPORTS SOMETHING THAT JUST HAPPENED (issue 1505), on two callers.
-  // `manager-components-normal` and `fabricate-app-shell` are both resting browse surfaces, so
-  // neither can contain a notice at all — a notice exists because something happened.
-  //
-  // ONE entry, and the other caller is recorded here as unphotographed rather than named.
-  // `player-inventory-bulk-report` is the frame: its `expectSelector` already requires
-  // `[data-inventory-bulk-panel="report"]` with a populated subject list, and the report's own
-  // root renders this component unconditionally above those subjects. The alchemy caller is NOT
-  // here, and cannot be: `lastBrew` initialises null and is set only inside the brew flow, no
-  // published case clicks `[data-alchemy-brew]`, and the smoke's alchemy walk does not brew
-  // either — so that conversion is UNPHOTOGRAPHED and is held instead by
-  // `tests/components/alchemy-workbench-mounted.test.js`, which acts on every one of its four
-  // tones. A case that drives a brew is what would close it.
-  //
-  // Still uncovered, and named rather than left to be discovered: `action`, `dismissable` and
-  // `blocking`. Neither shipped caller reaches any of the three, so `tests/components/
-  // notice-mounted.test.js` ACTS on them rather than a frame showing them.
+  // The surface that reports something that just happened (issue 1505), on two callers.
   'src/ui/svelte/components/Notice.svelte': Object.freeze(['player-inventory-bulk-report']),
-  // THE STANDING STATEMENT (issue 1505), widened onto its specimen and re-authored at 15
-  // importing files. It reached this table through `MANAGER_PRIMITIVES` long before it had an
-  // entry, and it was in `PRIMITIVES_WITH_NO_FRAME` for exactly that reason: neither
-  // representative frame draws one. `manager-components-normal` is the component browser, whose
-  // rail holds no callout, and `fabricate-app-shell` is the player window, which had no importer
-  // of this component at all until this change.
-  //
-  // TWO entries, because the widening moved two different things and one frame holds neither
-  // pair. `manager-tool-parity-04-requirements-1280x720` is the DEFAULT treatment: the Tool
-  // Studio's Requirements tab opens with a system-scope introduction, which is documentation and
-  // so takes the specimen's neutral chrome — the radius, the fill, the type and the glyph ink all
-  // move there, because the shipped component was info-tinted by default. `player-salvage` is the
-  // TINTED, TITLE-BEARING form and the first player frame this primitive has ever had: the salvage
-  // banner passes a title, so it exercises the `role="note"` rooting, the per-tone title ink and
-  // the tinted glyph ink in one picture. That frame ALSO draws the `actions` snippet, because the
-  // salvage reorder note converted onto it with its Reset control in that slot — so the snippet's
-  // geometry is photographed rather than argued from source. Its other caller, the Tool Studio's
-  // identity notice, renders on `identityBroken`, which no published frame reaches; that one is
-  // held by `tests/components/tool-studio-mounted.test.js`, which clicks the route and asserts the
-  // Tool id it forwards, and by `tests/components/manager-layout.test.js`'s pointer hit-test.
+  // The standing statement (issue 1505), widened onto its specimen and re-authored at 15 importing
+  // files.
   'src/ui/svelte/apps/manager/Callout.svelte': Object.freeze([
     'manager-tool-parity-04-requirements-1280x720',
     'player-salvage',
   ]),
-  // THE SHEET ITSELF, and the first entry here whose key is not a component (issue 1515).
-  //
-  // It is legal, and by the same rule every other entry obeys: `BROAD_SIGNAL_PATTERN`'s first
-  // alternative is `^styles/`, so `selectRenderFileCases` reaches this table for a stylesheet
-  // exactly as it does for a primitive. What made every existing key a component path is
-  // history, not a constraint — the table was written when the only unphotographed things were
-  // components.
-  //
-  // ONE ENTRY, NECESSARILY. A JavaScript object holds a path once, so "a second override for
-  // the other phase" is not a shape this table can take: a sheet change that moves two
-  // unrelated surfaces widens this ARRAY, it does not add a key. That is the answer to the
-  // question issue 1515's plan asks of this phase, and it is structural rather than a
-  // preference.
-  //
-  // A `styles/`-only change selected exactly the representative pair — `fabricate-app-shell`,
-  // the PLAYER window, and `manager-components-normal`, one browse list. Between them they draw
-  // no availability pill, no rail marker beyond the plain nav row, and no Downtime group at all,
-  // so the two sheet sweeps this change makes would each have published two frames that
-  // structurally cannot contain what they moved.
-  //
-  // Three frames, one per surface the sweeps touch:
-  //
-  //  - `manager-gathering-task-editor-normal` is the availability card's chip run, which was the
-  //    `.manager-availability-*` family until issue 1515 routed it to `<Chip>`. The task editor is
-  //    where that run renders densest — biome, time-of-day and weather tokens side by side under
-  //    their pickers — and it is already this registry's `Field.svelte` frame for the same
-  //    density reason.
-  //  - `manager-world-downtime-tracking` is the rail marker family, EXPANDED. Its first step
-  //    clicks `#manager-world-nav-downtime`, and `openWorldDowntime` sets
-  //    `railGroupUserExpanded.worldDowntime`, so the frame carries the whole group at once: the
-  //    parent row's PREMIUM chip, the sub-items' padlocks, and the `.manager-nav-callout`
-  //    premium-preview note that renders only while the group is open and no companion holds the
-  //    surface. No other frame in the registry draws that callout.
-  //  - `manager-world-downtime-collapsed` is the same group under the 56px rail, which is a
-  //    different set of rules rather than a smaller view of the same one: the collapsed rail
-  //    hides the labels, the toggle and the submenu, so a change to the collapsed treatment is
-  //    invisible in the expanded frame and vice versa.
-  //
-  // ADDITIVE, like every entry here: the representative pair is still selected, so a sheet
-  // change still publishes the player window and a manager browse list beside these three.
-  //
-  // It does NOT settle the thirteen cases that name `^styles/fabricate\.css$` in their own
-  // `sourceMatches` and are shadowed by the broad signal (`tests/design-system-primitives.test.js`
-  // registers them). Those are a separate adjudication, one case at a time, and honouring them
-  // wholesale is what would take a sheet change from two frames to fifteen.
+  // The sheet itself, and the first entry here whose key is not a component (issue 1515).
   'styles/fabricate.css': Object.freeze([
     'manager-gathering-task-editor-normal',
     'manager-world-downtime-tracking',
@@ -1162,23 +362,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   ]),
 });
 
-/**
- * The player crafting app, split by which resolution mode's body a file belongs to.
- *
- * Every crafting case used to carry one blanket `^src/ui/svelte/apps/crafting/` pattern, so a change
- * to `detail/ProgressiveBody.svelte` selected all 27 crafting frames when only the four progressive
- * ones render it — 2.5 minutes of capture to answer a question four frames answer. Targeting that
- * over-selects is not wrong, but it is what makes a per-PR capture feel expensive enough to skip.
- *
- * The split is derived from the real import graph, not guessed. `RecipeDetail.svelte:69-72` maps
- * mode -> body component, and exactly four bodies exist; each is imported ONLY by `RecipeDetail`,
- * and three of them own one further component apiece that nothing else imports. Everything else
- * under `crafting/` — `RecipeBodyShell`, `IoTable`, `RequirementRail`, `CraftingCheckCard`,
- * `EssencePoolPanel` and the rest — is reached from more than one body and stays shared.
- *
- * `tests/view-lab-cases.test.js` derives each case's mode from the fixture recipe its steps select
- * and asserts the case carries the matching pattern, so this cannot drift by hand-editing.
- */
+/** The player crafting app, split by which resolution mode's body a file belongs to. */
 const CRAFTING_MODE_FILES = Object.freeze({
   simple: ['SimpleRecipeBody', 'StepRequirementsList'],
   routedByIngredients: ['IngredientRoutedBody'],
@@ -1186,27 +370,7 @@ const CRAFTING_MODE_FILES = Object.freeze({
   progressive: ['ProgressiveBody', 'ProgressiveStageList'],
 });
 
-/**
- * The ONE not-yet-ready chrome all five player views draw (issue 1514).
- *
- * It sits directly under `apps/`, so it matches NEITHER leg of `BROAD_SIGNAL_PATTERN` and no
- * directory pattern reaches it — without a claim of its own it selects `FALLBACK_CASE_ID` alone,
- * which `view-lab-source-coverage.test.js` reds on by name. It is claimed by ONE representative
- * frame per player app rather than by every player case: the component is in the render path of
- * all of them (its `{:else}` branch renders the ready content), so five frames prove the populated
- * tree is undisturbed across all five windows without publishing sixty for a one-line change.
- *
- * WHAT THOSE FIVE FRAMES CANNOT SHOW, stated rather than left to be discovered: no case in this
- * registry seeds a player view's loading, error, no-actor or empty state — every player case
- * renders a populated window — so the chrome this component draws in its OTHER branch is
- * photographed nowhere. The lab has no query parameter that produces one either, so closing that
- * gap is a lab-input change (`tests/view-lab/mount.js`) rather than a registry edit, and it is
- * recorded here as the gap it is rather than papered over with a frame that cannot contain it.
- *
- * Hoisted outside every case region for the reason `RECIPE_BULK_EDIT_MATCHES` records: a change
- * inside a case literal narrows the capture selection to that one frame, and a shared pattern
- * belongs to all five.
- */
+/** The one not-yet-ready chrome all five player views draw (issue 1514). */
 const PLAYER_VIEW_STATE = /^src\/ui\/svelte\/apps\/PlayerViewState\.svelte$/;
 
 /** Everything under `crafting/` that is NOT one mode's own body. Applies to every crafting case. */
@@ -1216,12 +380,7 @@ const CRAFTING_SHARED = new RegExp(
     String.raw`)\.svelte$)`
 );
 
-/**
- * The body files one resolution mode owns.
- *
- * @param {string} mode One of `CRAFTING_MODE_FILES`' keys.
- * @returns {RegExp} Pattern matching only that mode's body files.
- */
+/** The body files one resolution mode owns. */
 function craftingMode(mode) {
   return new RegExp(
     '^src/ui/svelte/apps/crafting/detail/(' +
@@ -1235,23 +394,7 @@ const CRAFTING_ROUTED_INGREDIENTS = craftingMode('routedByIngredients');
 const CRAFTING_ROUTED_CHECK = craftingMode('routedByCheck');
 const CRAFTING_PROGRESSIVE = craftingMode('progressive');
 
-/**
- * Bulk salvage / bulk destroy (issue 859): the fields every one of its cases shares.
- *
- * Spread rather than restated, for the reason the case factories exist at all — five fields times
- * six entries is thirty lines that say nothing, and a duplication detector counts `scripts/**`.
- *
- *   - `reaches: 'beyond'` + `smokeLabels: []`. The live smoke walks no bulk selection at all, so
- *     there is no counterpart to fall short of. The two go together: `view-lab-cases.test.js`
- *     requires a `beyond` case to claim ZERO smoke labels.
- *   - `sourceMatches` is the SAME pair the six existing inventory cases carry. Deliberately no new
- *     pattern for `apps/inventory/bulk/`: `^src/ui/svelte/apps/inventory/` already covers it, so
- *     `view-lab-source-coverage` is satisfied in both directions, and a narrower pattern would only
- *     mean a change to the panel selects fewer frames of the screen it changes.
- *
- * A case that opens a dialog overrides `query` wholesale, which is why the query lives here as a
- * whole object rather than as a bare tab name.
- */
+/** Bulk salvage / bulk destroy (issue 859): the fields every one of its cases shares. */
 const BULK_DEFAULTS = Object.freeze({
   reaches: 'beyond',
   smokeLabels: [],
@@ -1263,35 +406,16 @@ const BULK_DEFAULTS = Object.freeze({
   ],
 });
 
-/**
- * The inventory grid card for one listing key.
- *
- * Keys are `system:component` for a component card and `essence:<system>:<id>` /
- * `recipeitem:<system>:<id>` for the two card kinds that are never salvageable.
- *
- * @param {string} key The listing key.
- * @returns {string} A selector for the card element.
- */
+/** The inventory grid card for one listing key. */
 const CARD = (key) => `.inventory-card[data-inventory-card="${key}"]`;
 
 /**
- * The button INSIDE that card, which is what a selection gesture actually clicks — the card element
+ * The button inside that card, which is what a selection gesture actually clicks — the card element
  * itself carries no handler.
- *
- * @param {string} key The listing key.
- * @returns {string} A selector for the card's button.
  */
 const CARD_BUTTON = (key) => `${CARD(key)} .inventory-card-button`;
 
-/**
- * A shift-click step: the one gesture that both ENTERS and extends a bulk selection.
- *
- * The first shift-click also promotes the currently-inspected card, so a plain click followed by a
- * shift-click selects TWO — which is what `player-inventory-bulk-mixed` is held to.
- *
- * @param {string} key The listing key.
- * @returns {object} A step for the capture driver.
- */
+/** A shift-click step: the one gesture that both enters and extends a bulk selection. */
 const SHIFT_CLICK = (key) => ({ selector: CARD_BUTTON(key), modifiers: ['Shift'] });
 
 /** One player screen and one manager screen: enough to show a shared-primitive change in context. */
@@ -1299,55 +423,22 @@ const REPRESENTATIVE_CASE_IDS = Object.freeze(['fabricate-app-shell', 'manager-c
 
 export const FALLBACK_CASE_ID = 'fabricate-app-shell';
 
-/**
- * Each app's default window geometry.
- *
- * Named rather than written inline in the two factories, because a THIRD reader appeared: the
- * surface-coverage chooser asks whether a case renders at its app's default size, and a case that
- * does not is a responsive STATE of a surface rather than the surface itself. Two literals and a
- * predicate that had to agree with them by eye is exactly the drift that silently picks a 680px
- * frame as a screen's only coverage.
- */
+/** Each app's default window geometry. */
 const DEFAULT_POSITION = Object.freeze({
   [MANAGER]: Object.freeze({ width: 1280, height: 820 }),
   [PLAYER]: Object.freeze({ width: 1280, height: 860 }),
-  // The three canvas windows are captured at their DECLARED size, unlike the two above — the
-  // Manager's smoke counterpart is photographed at 1280x820 rather than its declared 1280x940,
-  // and the player app's frames are 860 rather than its own default. These three have no such
-  // divergence to honour, so the numbers are their `DEFAULT_OPTIONS.position` verbatim
-  // (`InteractableBrowserApp.svelte.js:55-58`, `InteractableConfigApp.svelte.js:82-85`,
-  // `InteractablesManagerApp.svelte.js:77-80`). `tests/view-lab-app-options-parity.test.js`
-  // pins the chrome spec's copy of those numbers to `src/`; this pins the capture to the same
-  // size, which is what makes "the window renders at 420 wide" a measurement rather than a claim
-  // — `assertWindowGeometry` fails the frame when the rendered box is not the declared one.
+  // The three canvas windows are captured at their declared size, unlike the two above — the
+  // Manager's smoke counterpart is photographed at 1280x820 rather than its declared 1280x940, and
+  // the player app's frames are 860 rather than its own default.
   [CANVAS_BROWSER]: Object.freeze({ width: 420, height: 620 }),
   [CANVAS_CONFIG]: Object.freeze({ width: 480, height: 680 }),
   [CANVAS_MANAGER]: Object.freeze({ width: 560, height: 680 }),
 });
 
-/**
- * The Foundry application theme every case renders under unless it says otherwise. Only the
- * `coverage-theme-light-*` pair says otherwise, and the cascade it guards is a different surface
- * from the same screen in dark — see {@link labSurfaceKey}.
- */
+/** The Foundry application theme every case renders under unless it says otherwise. */
 const DEFAULT_COLOR_SCHEME = 'dark';
 
-/**
- * Case factories.
- *
- * `app` and `publish` are not independent facts — they follow from which window a case targets.
- * Restating them 150 times made the registry longer without making it clearer, and made every entry
- * look alike to a duplication detector because every entry WAS alike in several of its lines.
- * `position` defaults to the geometry most of that app's cases use; a case that needs a responsive
- * size still states it, which is now the only reason a case mentions position at all.
- *
- * There was a third such field, `readySelector`. It is gone: nothing read it. The driver waits on
- * `data-view-lab-ready`, and the only other reference was a test asserting the string was non-empty
- * — a guard over a value with no consumer, which reads as coverage and is not.
- *
- * @param {object} entry Case fields.
- * @returns {object} A complete case.
- */
+/** Case factories. */
 function managerCase(entry) {
   return {
     app: MANAGER,
@@ -1357,24 +448,7 @@ function managerCase(entry) {
   };
 }
 
-/**
- * Choose an actor in the Checks rail's "Preview as" picker.
- *
- * TWO STEPS, because that control is a `SearchablePopover` rather than a native `<select>`
- * (issue 1097 follow-up): a world's actor directory is mostly bestiary, so the list is
- * filtered to player characters and made searchable. There is no `selectOption` to issue —
- * open the trigger, then click the option by its own `data-popover-option` identity handle
- * rather than by its localized label.
- *
- * Written once and spread into every case that needs it. Five cases select an actor before
- * they can reach their state (every lab system's check formula carries
- * `@abilities.int.mod`, so under the resting "No actor" selection nothing reduces to a
- * number), and five hand-written pairs are five places for the control's hooks to drift out
- * of step — a stale one fails the capture job WHOLE and publishes nothing.
- *
- * @param {string} actorId The lab actor id to preview as.
- * @returns {object[]} The ordered steps.
- */
+/** Choose an actor in the Checks rail's "Preview as" picker. */
 function previewAsActor(actorId) {
   return [
     { selector: '[data-checks-preview-actor]' },
@@ -1382,62 +456,13 @@ function previewAsActor(actorId) {
   ];
 }
 
-/**
- * Choose a value on one of the app's own `<Select>` controls.
- *
- * TWO STEPS, for the reason `previewAsActor` above takes two: the control is not a native
- * `<select>` and there is no `selectOption` to issue (issue 1504). The trigger is clicked by the
- * SAME stable hook the case already carried — `data-pagination-size`, `data-scoped-list-sort`,
- * `data-recipe-bulk-category` and friends ride across the conversion on `Select`'s `triggerData`
- * and land on the trigger button — and the row is then clicked by its own `data-popover-option`
- * identity handle rather than by its localized label.
- *
- * SCOPED TO THE PANEL, not to the trigger's container. `SearchablePopover` portals the open panel
- * out of the trigger's subtree into the nearest `.fabricate-manager` / `.fabricate-app` root, so a
- * row selector inherited from the trigger's scope — `.manager-main`,
- * `.inventory-grid-pagination` — matches nothing and the step throws. `.fabricate-select-popover`
- * is the primitive's own panel class: it sits inside the portal host in BOTH applications, so one
- * form serves the manager and the player, and it cannot match a row in another picker's panel.
- *
- * A sentinel option carrying the empty string is stamped `__unchanged__` instead, because an
- * attribute cannot carry an empty value (`Select.svelte`); no case chooses one today.
- *
- * `host` MAKES THE ROW STEP A PORTAL ASSERTION as well as a click (issue 1520 review). The
- * design-system capability requires a change that adds a portalled control to a window to carry
- * a case proving the panel is a DIRECT CHILD of that window's frame, because the fallback still
- * draws the panel where its trigger is and loses only the window's stacking and its clip — so
- * the two outcomes are nearly indistinguishable in a rendered frame, and the unscoped form above
- * matches a `<body>`-hosted panel exactly as happily. A step that cannot match fails the capture
- * WHOLE, which is the same gating force an `expectSelector` has, so passing the frame class here
- * discharges that requirement for a window without spending a second frame on it. Left off where
- * the case is not the one making that claim: every manager and player call site inherits the
- * unscoped form, and their windows' portal is asserted by their own cases.
- *
- * @param {string} trigger Selector for the control's trigger button.
- * @param {string} value The option's own value, as `data-popover-option` carries it.
- * @param {string} [host] The window frame class the panel must be a direct child of.
- * @returns {object[]} The ordered steps.
- */
+/** Choose a value on one of the app's own `<Select>` controls. */
 function chooseSelectOption(trigger, value, host = '') {
   const panel = host ? `${host} > .fabricate-select-popover` : '.fabricate-select-popover';
   return [{ selector: trigger }, { selector: `${panel} [data-popover-option="${value}"]` }];
 }
 
-/**
- * The three canvas-window factories.
- *
- * One per window rather than one taking an app id, for the reason `managerCase` and `playerCase`
- * are two functions rather than one: at the call site `browserCase({...})` says which window the
- * frame is of, and `canvasCase(CANVAS_BROWSER, {...})` says it twice — once in a parameter a
- * reader has to resolve. They are generated from the app id because the bodies are otherwise
- * identical, which keeps the trio from being three copied blocks.
- *
- * Each defaults `position` to the window's declared size and `publish` to true, exactly as the
- * two shipped factories do.
- *
- * @param {string} app An {@link APP_CHROME} id.
- * @returns {(entry: object) => object} The factory.
- */
+/** The three canvas-window factories. */
 function canvasCaseFactory(app) {
   return (entry) => ({ app, position: DEFAULT_POSITION[app], publish: true, ...entry });
 }
@@ -1507,11 +532,7 @@ function journalHistoryBatchCases() {
   );
 }
 
-/**
- * TP14 history-data witnesses. Each selector names the evidence that DEFINES its state on the
- * selected record — the recorded row, the recovered name, the confirmed prefix — never a
- * populated shell, because the states differ only in what their evidence says.
- */
+/** TP14 history-data witnesses. */
 const JOURNAL_HISTORY_DATA_EVIDENCE = Object.freeze({
   // Two independent recorded rolls and no global cut: the approved row-only legacy exception.
   // Their quantities (2 and 1) come from the hauls, so no evaluated row quantity can supply them.
@@ -1883,9 +904,7 @@ function journalLifecycleCases() {
       '.journal-view-container' +
       has('[data-run-status="ready"]', `${detail} ${enabledPrimary}`) +
       lacks('[data-stage-nav]'),
-    // The pre-D-026 run the shipped release armed. It has taken its start, so it offers the
-    // PRIMARY and no begin control, and nothing refuses it: the deadlock this case exists to
-    // photograph is the absence of a blocker here (issue 1648).
+    // The pre-D-026 run the shipped release armed.
     'legacy-armed':
       '.journal-view-container' +
       has('[data-run-status="ready"]', `${detail} ${enabledPrimary}`) +
@@ -1912,9 +931,7 @@ function journalLifecycleCases() {
     // and NO roll offered at all until it has started (issue 1648, M13/M15).
     'stage-not-started':
       detail + has('[data-run-action="begin"]:not(:disabled)', '[data-run-begin]') + lacks(primary),
-    // Issue 1648, M10. The frame has to show the state reaching the surfaces a player scans, so
-    // it asserts the Active ROW's chip, the header's chip and the one state notice together —
-    // and that the notice is the info-toned guidance rather than a refusal.
+    // Issue 1648, M10.
     'awaiting-choice':
       '.journal-view-container' +
       has(
@@ -1936,9 +953,7 @@ function journalLifecycleCases() {
         '[data-slot-row]'
       ),
     // A currency-only ingredient set is valid and authorable (D-031), so a started stage whose
-    // whole requirement was a price is a reachable state. Its receipt is a PAYMENT and no item
-    // rows at all — the shape that used to render the started branch wholly blank, because both
-    // of its inner blocks were empty and the requirement rail is their `{:else}`.
+    // whole requirement was a price is a reachable state.
     'stage-paid':
       detail +
       has('[data-journal-stage-consumed] [data-journal-fact]') +
@@ -2077,11 +1092,9 @@ function journalLifecycleCases() {
       'succeeded',
       '[data-history-stages] [data-stage-io="produced"]'
     ),
-    // Issue 1648, M15: the same unmade-choice shape as `awaiting-choice`, on a run armed
-    // before the D-028 lock existed (started, but never locked, so its essence pick is still
-    // live-resolved and still open). The conservative automatic blocker spends nothing
-    // server-side; the primary itself now also stays refused client-side rather than reach a
-    // command refusal, so this no longer depicts a `data-journal-command-error` banner.
+    // Issue 1648, M15: the same unmade-choice shape as `awaiting-choice`, on a run armed before the
+    // D-028 lock existed (started, but never locked, so its essence pick is still live-resolved and
+    // still open).
     'automatic-blocker':
       detail +
       has(
@@ -2156,10 +1169,7 @@ function journalLifecycleCases() {
         `${primary}:disabled`,
         '[data-run-action="cancel-arm"]:disabled'
       ),
-    // ONE notice for one run state, carrying the GM's way out of it (issue 1648). The run is
-    // ALSO paused, which is the composition the maintainer reported as three separate alert
-    // blocks: the refusal leads, the paused state is its detail, and `data-journal-paused` is
-    // on the same element rather than on a second notice of its own.
+    // One notice for one run state, carrying the GM's way out of it (issue 1648).
     'claim-retained':
       detail +
       has(
@@ -2170,9 +1180,8 @@ function journalLifecycleCases() {
       lacks('[data-journal-recovery]', '[data-journal-paused]:not([data-journal-action-blocker])'),
     wide: roomy,
     narrow: roomy,
-    // A choice slot exists only BEFORE the stage starts now (M21), so this state's stage is
-    // unbegun. What it still depicts is unchanged: the tile is pointer-reachable and its
-    // option list is closed until the tile is pressed.
+    // A choice slot exists only before the stage starts now (M21), so this state's stage is
+    // unbegun.
     'current-choice-closed':
       detail +
       has('[data-stage-state="current"] [data-slot-row] button.fab-slot-tile') +
@@ -2335,30 +1344,7 @@ function journalLifecycleCases() {
   );
 }
 
-/**
- * The Journal's in-flight BLIND gathering run, from both sides of the redaction (issue 901).
- *
- * TWO cases rather than one, because the change is a DIFFERENCE between viewers and no single
- * photograph holds both: the acting player must see the generic blind label where the real task
- * name used to be rendered, and the GM must see the real task behind a warning-toned "GM only"
- * chip. A case model that captured one viewer per frame would publish half the fix.
- *
- * Both drive the SAME state — the blind run card selected, so the redaction shows in the card, in
- * the detail title, and in the run's own header — and differ only in `viewer`, which is what makes
- * the pair readable side by side: everything that is not the redaction is held constant.
- *
- * `reaches: 'beyond'`. The live smoke walks no blind gathering run into the Journal, so there is no
- * counterpart to fall short of, and no smoke label to claim.
- *
- * `expectSelector` carries the assertion in both directions, so a frame that does not show what the
- * case names fails the capture instead of being published:
- *   - the GM frame must CONTAIN `[data-run-secret-preview]`;
- *   - the player frame must contain a blind run card that does NOT, which is the leak itself.
- * Without the second one, a regression that rendered the chip (and the real name) to players would
- * publish silently under a case whose whole subject is that it must not.
- *
- * @returns {object[]} The player and GM cases, in that order.
- */
+/** The Journal's in-flight blind gathering run, from both sides of the redaction (issue 901). */
 function journalBlindRunCases() {
   // The in-flight blind run seeded by `tests/view-lab/world/labRunStates.js`.
   const card = '.journal-run-card[data-run-id="lab-gathering-blind-waiting"]';
@@ -2378,10 +1364,7 @@ function journalBlindRunCases() {
     sourceMatches: [
       JOURNAL_SOURCES,
       /^src\/ui\/svelte\/stores\/journalStore/,
-      // The projection that decides what each viewer is told. It is not a render file, so it
-      // cannot SELECT a frame today (`mapChangedFilesToCases` filters to `isUiFile` first) — it is
-      // declared because it is what these two frames are evidence about, and because the moment
-      // that filter widens this is the case that must answer for it.
+      // The projection that decides what each viewer is told.
       /^src\/systems\/RunJournalBuilder\.js$/,
     ],
   };
@@ -2397,9 +1380,7 @@ function journalBlindRunCases() {
       ...shared,
       id: 'fabricate-journal-blind-run-gm',
       label: 'Player app — Journal, in-flight blind gathering run (GM secret preview)',
-      // The player app rendered for a GM. An ordinary state — a GM owns the same tabs — and the
-      // only one in which the secret preview exists at all: the projection consults the GM-owned
-      // blind-run store for no other viewer.
+      // The player app rendered for a GM.
       query: { tab: 'journal', viewer: 'gm' },
       expectSelector: `${card} [data-run-secret-preview]`,
     }),
@@ -2409,20 +1390,6 @@ function journalBlindRunCases() {
 /**
  * The player companion surface (issue 1198): the route key its frames address, the rail control
  * that addresses it, and the render files those frames are evidence about.
- *
- * The route key is `ext:<surfaceId>:<tabId>` and it is what `activeTab`, `data-active-tab` and
- * `data-player-nav-tab` all carry, so the same string is the `?tab=` query, the tab the capture
- * driver's derived `expectTab` gate checks, and the rail selector. Written once for that reason.
- *
- * Selection is by ATTRIBUTE and never by id: the key contains colons, and an id selector
- * containing a colon is invalid CSS — it throws `SyntaxError` rather than returning null. The
- * matching `id` exists only as an IDREF target, where no CSS parse happens.
- *
- * `sourceMatches` is shared rather than restated three times: fifteen identical lines is what a
- * duplication detector counts, and `scripts/**` is analysed by SonarCloud's Automatic Analysis.
- * The five files are the whole seam a Core frame can show — the mount host, the shell that
- * composes the rail, the registry the shell reads, its shared factory, and the pure derivation
- * all three call — so a change to any of them selects these frames rather than an unrelated one.
  */
 const PLAYER_EXTENSION_ROUTE = 'ext:downtime:projects';
 const PLAYER_EXTENSION_RAIL_BUTTON = `[data-player-nav-tab="${PLAYER_EXTENSION_ROUTE}"]`;
@@ -2434,113 +1401,13 @@ const PLAYER_EXTENSION_SOURCES = Object.freeze([
   /^src\/ui\/extensionRegistry\.js$/,
 ]);
 
-/**
- * The shared positioning seam every OPEN popover frame draws (issue 1500).
- *
- * `actions/anchoredPopover.js` is the measure, flip, clamp, portal and re-measure pass seven
- * surfaces used to hand-write, and `util/overlayBounds.js` holds the clipping boundaries those
- * copies hard-coded. Both are new files, and neither is a BROAD-SIGNAL path — they sit under
- * `actions/` and `util/`, not `components/` — so neither can be a `BROAD_SIGNAL_CASE_OVERRIDES`
- * key: that map is consulted only once a change is already a broad signal, and its own test
- * requires every key in it to be a broad-signal file.
- *
- * So they route the ordinary way, by being named in the `sourceMatches` of the cases that OPEN a
- * panel. Without this a change to either mapped to `fabricate-app-shell` alone — the fallback
- * frame, which draws no popover at all — and a regression in the pass that places every floating
- * surface in the product would have published one frame that could not contain it.
- *
- * THE SET IS EVERY FRAME THAT RESTS ON AN OPEN PANEL, and it is FIFTEEN — not the seven
- * `SearchablePopover` frames alone. The seam is the positioning pass, so the component the panel
- * happens to be is not the question a frame answers; whether the frame's own `expectSelector`
- * requires a panel to be measured, placed and portaled is:
- *
- *   `SearchablePopover`  `manager-recipe-edit-tag-picker`, `manager-recipe-edit-ingredients-or-menu`,
- *                        `manager-gathering-task-availability-menu`, `manager-world-parties-actor-picker`,
- *                        `manager-world-parties-realm-override-picker`, `player-actor-picker`,
- *                        `world-tool-entry-on-break-repair-tag-picker-empty`,
- *                        `manager-recipes-bulk-edit-picker` and
- *                        `manager-essences-source-picker`, whose panel is drawn by
- *                        `EssenceSourceSelector` THROUGH this primitive (issue 1503)
- *   `Select`             `manager-recipes-bulk-edit-check-tier` and `player-inventory-page-size`
- *                        (issue 1504), the two frames that rest on a `<Select>`'s option list —
- *                        also drawn THROUGH this primitive, and one of them in the PLAYER window,
- *                        where the seam clamps against a different application root
- *   `IconPicker`         `manager-system-edit-lists`, whose walk opens a modifier's icon picker
- *   `ActionMenu`         `manager-environment-edit-automatic-force-add`, whose last step opens the
- *                        row menu and whose selector names an item inside the portaled panel
- *   `Select`, canvas     `interactables-config-source-open` and
- *                        `interactables-manager-region-open` (issue 1520 review round 2) — the
- *                        two GM canvas windows' open option panels, in a third and fourth
- *                        application root the seam clamps against
- *
- * The `IconPicker` and `ActionMenu` frames are not reached by `BROAD_SIGNAL_CASE_OVERRIDES`. That
- * map answers a DIFFERENT question — which frames a change to `IconPicker.svelte` or
- * `ActionMenu.svelte` publishes — whereas this array is what a change to `anchoredPopover.js`
- * publishes, and a broad-signal entry for a component says nothing about a file that component
- * imports. Reading the override as cover for those two frames is a category error, and it left the
- * seam publishing seven of ten.
- *
- * THE TWO CANVAS FRAMES WERE THE SAME ERROR THROUGH A DIFFERENT DOOR, and the round that found it
- * found it by measuring one of them: `interactables-config-source-open` was already published, and
- * its panel opened 110px narrower than the trigger it dropped from — a defect whose repair was in
- * this seam, in a frame this seam did not route to. The cover being read that time was the
- * window's own two source patterns, which answer "what does a change to this window publish" and
- * not "what does a change to the pass that places its panel publish". A frame that rests on an
- * open panel and does not name the seam is a frame the seam can break without publishing.
- *
- * `manager-recipes-bulk-edit-picker` takes `[...RECIPE_BULK_EDIT_MATCHES, ...ANCHORED_POPOVER_SOURCES]`
- * rather than gaining the seam through the shared array: four other bulk-edit frames use
- * `RECIPE_BULK_EDIT_MATCHES` and none of them opens a panel, so putting the seam in there would
- * publish four frames that cannot show a regression in it.
- *
- * `EssenceSourceSelector`'S PANEL JOINED THAT ROSTER AT ISSUE 1503, and what it took is worth
- * recording because the gap had stood for four rounds while reading as mere inattention. That
- * panel renders only for an essence with NO linked source — `EssenceBrowserInspector` draws it in
- * the `{:else}` of `essence.associatedItem`, and `EssenceOnCraftTab` in the `{:else}` of
- * `sourceLinked` — and `mote` is the lab corpus's ONLY sourceless essence, selected by no case
- * into an inspector. So no step could be added to an existing frame: every essence case sits on
- * an essence that renders the LINKED card instead, and repointing one would have traded the state
- * it was built for. `manager-essences-source-picker` selects `mote` and opens the panel, which is
- * what this change's re-platform of that panel — a new backdrop, shadow, radius, search row, list
- * and empty note — needed and did not have.
- *
- * THREE POSITIONED PANELS ARE IN NO FRAME AT ALL, and none of those gaps is this array's to close.
- * No case opens `ManagerColorPicker`'s popover or `RecipeDurationEditor`'s — their triggers
- * (`.manager-color-picker-trigger`, `[data-recipe-duration-trigger]`) appear in no case's steps,
- * and the one colour control a case does click is the essence entry's `layout="inline"`
- * `ManagerColorPopover`, which is neither positioned nor portaled. And no case CAN open the biome
- * colour popover in `EnvironmentsBrowserView` — its trigger is a right-click, and the capture
- * runner has no right-click verb (`scripts/view-lab-screenshots.mjs`: `press` is Enter or Space).
- * Adding a pattern for any of them would be configuration that selects nothing; the frames have to
- * exist first.
- */
+/** The shared positioning seam every open popover frame draws (issue 1500). */
 const ANCHORED_POPOVER_SOURCES = Object.freeze([
   /^src\/ui\/svelte\/actions\/anchoredPopover\.js$/,
   /^src\/ui\/svelte\/util\/overlayBounds\.js$/,
 ]);
 
-/**
- * The environment editor's directory, MINUS its validation tab (issue 1517).
- *
- * Four cases claim that directory — the environments browser, the Events tab, the blind task
- * weights and the automatic Force add — and **not one of them opens the validation tab**. Because
- * `EnvironmentValidationTab.svelte` is in the mounted import closure, those four claims were the
- * only thing keeping `tests/view-lab-source-coverage.test.js` green on it, so the file was not
- * unclaimed: it was claimed by four frames that structurally cannot contain it. A change to it
- * published the environments list, the Events tab, a weight field and an open row menu, and every
- * one of them reported SATISFIED. That is a worse failure than no evidence, and it is the one this
- * registry exists to prevent.
- *
- * A NEGATIVE LOOKAHEAD rather than an explicit alternation of the directory's other members. Every
- * other file in the directory must stay claimed or the coverage gate reds in the other direction;
- * an alternation would have to be re-derived by hand every time a file lands there, and the
- * failure of forgetting is silent — no count of that directory is written here for the same
- * reason. The exclusion is anchored with `$`, so a future `EnvironmentValidationTab.svelte.js` —
- * or anything else merely beginning with that name — stays claimed.
- *
- * SHARED rather than written out four times: the four cases exclude the same file for the same
- * reason, and four copies of a regex are four chances for one of them to be edited alone.
- */
+/** The environment editor's directory, minus its validation tab (issue 1517). */
 const ENVIRONMENT_DIR_EXCEPT_VALIDATION_TAB =
   /^src\/ui\/svelte\/apps\/manager\/environment\/(?!EnvironmentValidationTab\.svelte$)/;
 
@@ -2549,10 +1416,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     id: 'manager-recipes-editor-roundtrip',
     label: 'Manager — Recipes editor roundtrip',
     smokeLabels: ['manager-recipes-editor-roundtrip'],
-    // The state is what SURVIVED a round trip, so every step is load-bearing: filter to a
-    // category, select a row into the shared inspector (the collapse below leaves no row to
-    // click), collapse the group, open the editor from the inspector, and come back. The frame is
-    // the browser afterwards — filter chip still lit, group still collapsed, zero rows rendered.
+    // The state is what survived a round trip, so every step is load-bearing: filter to a category,
+    // select a row into the shared inspector (the collapse below leaves no row to click), collapse
+    // the group, open the editor from the inspector, and come back.
     reaches: 'exact',
     query: {},
     steps: [
@@ -2582,36 +1448,12 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
       /^src\/ui\/svelte\/stores\/adminStore\.js$/,
-      // `SystemsBrowserView` ALONE (issue 1515). This alternation used to read
-      // `Systems?(Browser|Overview)View`, which also claimed `SystemOverviewView.svelte` — and
-      // that component is the SYSTEM EDITOR'S VALIDATION TAB (`SystemEditView.svelte:569` is its
-      // only render site), not anything on the `systems` route. So the two cases carrying the
-      // alternation, this one and `manager-systems-empty`, were the frames an edit to the
-      // validation list published: both `expectView: 'systems'`, neither containing a single
-      // issue row. That is the failure this registry exists to prevent — a gate that reports
-      // SATISFIED on a photograph of the wrong screen — and it is worse than no claim at all,
-      // because a reader counting frames sees two.
-      //
-      // `manager-system-edit-validation` carries the `SystemOverviewView` claim now, and it is
-      // the one case that clicks `#system-tab-validation`.
+      // `SystemsBrowserView` alone (issue 1515).
       /^src\/ui\/svelte\/apps\/manager\/SystemsBrowserView\.svelte$/,
     ],
   }),
   managerCase({
-    // A BROWSE ROW'S OVERFLOW MENU, OPEN (issue 1515). The four browse views traded their loose
-    // Duplicate/Export/Delete buttons for one shared `<ActionMenu>` per row, and every published
-    // frame of all four draws that trigger CLOSED - where the conversion is an unchanged 34px icon
-    // button and nothing about it is visible. The registry held exactly one open-menu frame,
-    // `manager-environment-edit-automatic-force-add`, and it opens a COMPOSITION row's menu inside
-    // the environment editor, which is a different caller with different items.
-    //
-    // THE SYSTEMS LIBRARY IS THE ROW CHOSEN, because it is the manager's default route: the case
-    // needs no query and no navigation step, so the only thing between the mount and the state is
-    // the click this case is about.
-    //
-    // The panel is PORTALED to `.fabricate-manager`, so it is a sibling of the browse pane rather
-    // than a descendant of the row that opened it; a row-scoped `expectSelector` would wait forever
-    // and take every frame in the run with it. See the environment case's note.
+    // A browse row's overflow menu, open (issue 1515).
     id: 'manager-systems-row-menu-open',
     label: 'Manager — System library row menu open',
     reaches: 'beyond',
@@ -2624,11 +1466,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       },
     ],
     expectView: 'systems',
-    // THE PANEL'S OWN ACCESSIBLE NAME IS THE ASSERTION, not merely the panel. `ActionMenu` gives
-    // the panel its trigger's name, and issue 1515's review made that name RECORD-IDENTIFIED — so
-    // this selector fails both when the menu does not open and when every row goes back to
-    // announcing the same generic "System actions". The `^=` is what keeps it about the template
-    // rather than about the lab world's system names.
+    // The panel's own accessible name is the assertion, not merely the panel.
     expectSelector:
       '.fabricate-manager .fabricate-action-menu-panel[role="menu"][aria-label^="System actions for"]',
     kinds: ['manager', 'systems'],
@@ -2639,37 +1477,23 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — System library empty',
     // `beyond`: the live smoke seeds a crafting system before it opens the manager at all, so no
     // smoke frame shows the library with nothing in it and there is no counterpart to fall short
-    // of. It is also the first screen a new installation draws, which is why it earns a frame
-    // despite having no twin.
+    // of.
     reaches: 'beyond',
     smokeLabels: [],
-    // NO new lab input, and that is the finding rather than a shortcut. `clearSystem` already
-    // empties the world's crafting systems — `buildLabWorld` sets `content.systems = []` for it,
-    // because a real Manager refresh resolves an empty SELECTION back to the first available
-    // system and only an empty LIBRARY makes "nothing selected" stable. So the state this case
-    // photographs was already reachable from the query layer, and a second flag meaning the same
-    // thing would only have widened what a `mount.js` change selects.
+    // No new lab input, and that is the finding rather than a shortcut.
     query: { clearSystem: '1' },
     steps: [],
     expectView: 'systems',
-    // Both halves of what this frame is named for, in one assertion. The `:has()` requires the
-    // browse pane's dashed empty panel — and not its LOADING twin, which carries
-    // `data-systems-loading` and draws a setup card of its own — while the subject requires the
-    // first-run panel the inspector column renders only while the world holds no system at all.
+    // Both halves of what this frame is named for, in one assertion.
     expectSelector:
       '.fabricate-manager:has(.manager-table-scroll .manager-empty:not([data-systems-loading]))' +
       ' .manager-setup-card',
     kinds: ['manager', 'systems'],
-    // Deliberately NO pattern for `manager/EmptyState.svelte`, for the reason
+    // Deliberately no pattern for `manager/EmptyState.svelte`, for the reason
     // `manager-gathering-economy-actors` records about `Stepper`: `EmptyState` is in
     // `MANAGER_PRIMITIVES`, so `BROAD_SIGNAL_PATTERN` matches it and `selectRenderFileCases`
-    // `continue`s on a broad-signal file BEFORE consulting any case's `sourceMatches` — such an
-    // entry would be unreachable. This case is reached instead through
-    // `BROAD_SIGNAL_CASE_OVERRIDES`, which is the seam for exactly this condition: a primitive
-    // whose changed presentation is absent from both representative frames.
-    // `SystemsBrowserView` alone, for the reason `manager-default-selection` records above: the
-    // retired `Systems?(Browser|Overview)View` alternation claimed the system editor's validation
-    // tab for a frame of the empty library, which cannot contain it.
+    // `continue`s on a broad-signal file before consulting any case's `sourceMatches` — such an
+    // entry would be unreachable.
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/SystemsBrowserView\.svelte$/,
@@ -2680,13 +1504,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Selected normal',
     smokeLabels: ['manager-selected-normal'],
     // Reached the way the smoke reaches it: by CLICKING the system row's identity, which is what
-    // `selectSmokeSystemInManager` does. A seeded `lastManagedCraftingSystem` lands on the same
-    // scope, but a case that seeds it is evidence that the setting works, not that the row does.
-    //
-    // The resulting frame is the same screen as `manager-default-selection`, and that is faithful
-    // rather than a duplicate to be explained away: the smoke's own two counterparts
-    // (screenshot-13 / screenshot-14) are the same screen too, because it captures the default
-    // selection AFTER selecting and then re-clicks an already-selected row.
+    // `selectSmokeSystemInManager` does. This exact line is pinned by `tests/view-lab-cases.test.js`
+    // as the comment-only registry change that must select one frame.
     reaches: 'exact',
     query: {},
     steps: [
@@ -2703,12 +1522,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     id: 'manager-rail-expanded',
     label: 'Manager — Rail expanded',
     smokeLabels: ['manager-rail-expanded'],
-    // The smoke's counterpart is the EXPANDED baseline it establishes before collapsing: it enters
+    // The smoke's counterpart is the expanded baseline it establishes before collapsing: it enters
     // the system scope, collapses the rail if it is not already expanded, and photographs that.
-    // Here the rail starts expanded, so the equivalent of "prove it is expanded because the toggle
-    // put it there" is a round trip through the toggle — collapse, expand — which also means this
-    // case fails loudly if the toggle stops restoring the rail, instead of quietly capturing a rail
-    // that merely never moved.
     reaches: 'exact',
     query: {},
     steps: [
@@ -2741,9 +1556,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     id: 'manager-selected-stacked',
     label: 'Manager — Selected stacked',
     smokeLabels: ['manager-selected-stacked'],
-    // Clicks the row, exactly as its normal-width twin does. It had no steps at all, so it captured
-    // the DEFAULT selection at the stacked breakpoint — the thing that case's own comment rejects
-    // as "evidence that the setting works, not that the row does".
+    // Clicks the row, exactly as its normal-width twin does.
     reaches: 'exact',
     query: {},
     steps: [
@@ -2768,46 +1581,25 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['manager', 'system-edit'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/,
-      // `ResolutionModeCard` LEFT this alternation at issue 1509, which deleted the file: the
-      // shim's four call sites render `RadioCardGroup` directly now. A dead branch of an
-      // alternation is exactly the failure `every knowledge render file the predicate probes
-      // is a real source file` records — the other branches keep resolving, so `every
-      // sourceMatches pattern resolves to at least one source file` stays green over a name
-      // that matches nothing. `RadioCardGroup` does NOT take its place: it is a broad-signal
-      // file routed by its own `BROAD_SIGNAL_CASE_OVERRIDES` entry, and `selectRenderFileCases`
-      // skips a broad-signal file before it reads any case's `sourceMatches` at all.
+      // `ResolutionModeCard` left this alternation at issue 1509, which deleted the file: the
+      // shim's four call sites render `RadioCardGroup` directly now.
       /^src\/ui\/svelte\/apps\/manager\/(CraftingEffectPanel|ItemPageInspector)\.svelte$/,
     ],
   }),
   managerCase({
     id: 'manager-system-edit-validation',
     label: 'Manager — System edit validation tab',
-    // THE VALIDATION TAB, WHICH HAD NO FRAME AT ALL (issue 1515). `SystemOverviewView.svelte`
-    // renders in exactly one place — `SystemEditView.svelte:569`, the `validation` branch of this
-    // route's two-tab panel — and every other `system-edit` case clicks `#system-tab-settings`
-    // instead, so a change to the issue list published a frame of the settings form. Two cases
-    // DID claim the component, `manager-default-selection` and `manager-systems-empty`, and both
-    // are `expectView: 'systems'` frames that cannot contain it; their claims are split off in
-    // the same change and land here.
-    //
-    // `beyond`: the smoke never opens this tab, so there is no counterpart frame to fall short
-    // of and no label to name.
+    // The validation tab, which had no frame at all (issue 1515).
     reaches: 'beyond',
     smokeLabels: [],
-    // `lab-smithing` STATED rather than inherited from the seeded default, because the frame's
+    // `lab-smithing` stated rather than inherited from the seeded default, because the frame's
     // whole content is that system's validation report: `sm-r-runeplate-draft` contributes a
     // critical `noResultGroup` and a `disabledIncomplete` warning, and `sm-r-deepbind` a
-    // `requirementOverlap` warning. `tests/view-lab-cases.test.js` derives that report from
-    // `evaluateSystemValidation` over the fixture, so a fixture repair that empties it fails
-    // there rather than publishing the empty-state panel under a case named for the list.
+    // `requirementOverlap` warning.
     query: { system: 'lab-smithing' },
     steps: ['System Overview', { selector: '#system-tab-validation' }],
     expectView: 'system-edit',
-    // THREE claims in one selector, because each alone publishes something this case is not.
-    // The counts row alone is satisfied by a zero-issue report; the group alone is satisfied by
-    // a card with no rows in it; and neither says the tab is the one on screen. Together they
-    // say the validation panel rendered, kept its severity counts, and drew a populated
-    // kind-grouped list — which is the surface Phase 3 of this change reconciles.
+    // Three claims in one selector, because each alone publishes something this case is not.
     expectSelector:
       '.fabricate-manager [data-system-overview]:has([data-system-overview-counts])' +
       ' [data-system-overview-group="recipe"] .manager-system-overview-row',
@@ -2851,32 +1643,20 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — World Modifiers list ergonomics',
     smokeLabels: ['manager-system-edit-lists'],
     // The settings-list ergonomics card, with one modifier open and its IconPicker down.
-    //
-    // It framed all THREE lists together while they shared the System Settings page. Issue 1278
-    // took Currency Units to its own World route and issue 1311 took these two, so the three are
-    // now three frames — this one, `currency-actor-property`, and `world-prerequisites` — and
-    // this case keeps the ergonomics half. It also no longer needs a selected system: the library
-    // is world scope since issue 1308, so the `system` query is gone with it.
     reaches: 'exact',
     steps: [
       { selector: '#manager-world-nav-rules', press: 'Enter' },
       { selector: '#manager-rules-nav-modifiers', press: 'Enter' },
       { selector: '[data-world-modifier] [data-toggle-modifier]' },
       { selector: '[data-world-modifier] .essence-icon-picker-trigger' },
-      // Anchored on the card's TITLE, not the card. `scrollIntoViewIfNeeded` lands an
-      // over-tall element's BOTTOM edge, and issue 1117 made this section taller (a bounds
-      // row and its hint per open entry), which pushed the renamed "Modifiers" heading off
-      // the top of the frame. The title anchors it from the top instead — the same fix the
-      // checks-entries case records for the same cause.
+      // Anchored on the card's title, not the card.
       { selector: '[data-world-modifiers] .manager-card-title', scroll: true },
     ],
     expectView: 'world-modifiers',
-    // THE ONE AUTHORING SURFACE (issue 1117), asserted on the fields it ABSORBED from the retired
+    // The one authoring surface (issue 1117), asserted on the fields it absorbed from the retired
     // Checks-tab editor rather than only on the section it already had: the open row's `min`
-    // Stepper is what proves the check-only bounds pair reached this card, and it is the only
-    // frame in the registry that can show it now that no Checks route authors an entry.
-    // `hb-mod-medicine` is the world's only BOUNDED entry, so this frame carries real values
-    // rather than two `Unbounded` placeholders.
+    // Stepper is what proves the check-only bounds pair reached this card, and it is the only frame
+    // in the registry that can show it now that no Checks route authors an entry.
     expectSelector:
       '.fabricate-manager [data-world-modifiers]' +
       ':has([data-world-modifier-bounds] [data-world-modifier-field="min"])',
@@ -2884,20 +1664,11 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['manager', 'world'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/world\/WorldModifiersTab\.svelte$/,
-      // The expression field this screen is now the ONLY caller of (issue 1373). It was a
-      // BROAD SIGNAL until the Tool check bonus stopped authoring a raw expression and took
-      // its modifiers from the world library instead; a broad-signal file cannot be claimed
-      // by `sourceMatches` at all, so this pattern would have been unreachable configuration
-      // before that change and is load-bearing after it.
+      // The expression field this screen is now the only caller of (issue 1373).
       /^src\/ui\/svelte\/apps\/manager\/RollDataExpressionInput\.svelte$/,
-      // The icon vocabulary the shared picker lists (issue 1269). `IconPicker.svelte`
-      // itself is a BROAD SIGNAL and reaches this case through
-      // `BROAD_SIGNAL_CASE_OVERRIDES`; these are not, so they are claimed here.
+      // The icon vocabulary the shared picker lists (issue 1269).
       /^src\/ui\/svelte\/util\/(?:essenceIcons|foundryIconVocabulary|foundryIconCatalogue)\.js$/,
-      // The positioning seam the open picker's panel is placed by (issue 1500). This is the
-      // registry's ONLY frame with an `IconPicker` panel down, and the override above cannot
-      // stand in for it: that entry routes a change to `IconPicker.svelte`, not a change to a
-      // file `IconPicker.svelte` imports.
+      // The positioning seam the open picker's panel is placed by (issue 1500).
       ...ANCHORED_POPOVER_SOURCES,
     ],
   }),
@@ -2908,16 +1679,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // opens the FIRST one, which is flat. Nothing anywhere framed a rolling entry.
     reaches: 'beyond',
     smokeLabels: [],
-    // THE STATE ISSUE 1118 CREATES. A check accepts dice now, so `hb-mod-luck` (`1d4`, capped at
-    // +3) is a first-class entry rather than one the surface warns about: the row's "Rolls dice"
-    // chip is neutral, the open editor's roll note says the dice reach the check's own roll and
-    // that a competing rule ranks the entry by its average, and the bounds pair beside it clamps
-    // the ROLLED result. The retired copy said the opposite of all three, so this frame is the
-    // one place the reversal is visible.
-    //
-    // Anchored on the OPEN ROW rather than on the card title: the note and the bounds pair are
-    // what this frame exists for, and `manager-system-edit-lists` already frames the card from
-    // its heading.
+    // The state issue 1118 creates.
     steps: [
       { selector: '#manager-world-nav-rules', press: 'Enter' },
       { selector: '#manager-rules-nav-modifiers', press: 'Enter' },
@@ -2939,12 +1701,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — World Currency actor property',
     smokeLabels: ['currency-actor-property'],
     reaches: 'exact',
-    // World > Currency (issue 1278). The ladder is WORLD scope, so this route needs no selected
+    // World > Currency (issue 1278). The ladder is world scope, so this route needs no selected
     // system and is ungated — the card renders whether or not any crafting system has switched
-    // currency on. `scroll` is load-bearing and not a convenience: the ladder runs below the
-    // page's own fold, and `frame.screenshot()` on the outer `.application` does not scroll
-    // nested overflow containers, so without it every assertion passes and the units are simply
-    // absent from the PNG.
+    // currency on.
     steps: [
       { selector: '#manager-world-nav-rules', press: 'Enter' },
       { selector: '#manager-rules-nav-currency', press: 'Enter' },
@@ -2994,19 +1753,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/world\/WorldCurrencyTab\.svelte$/],
   }),
   managerCase({
-    // THE SUB-UNIT CHIP, WHICH NO FRAME HELD (issue 1515). The three currency cases above all
-    // photograph the ladder COLLAPSED - a summary row per unit - and the sub-unit membership token
-    // renders only inside an EXPANDED unit's editor. So the one control this change converted onto
-    // `<Chip>` on this screen, a removable token wrapping an editable `<input type="number">`, was
-    // unphotographed while three frames of the screen it lives on were published.
-    //
-    // A FOURTH CASE RATHER THAN A STEP ON ONE OF THE THREE. All three are `exact`, meaning they
-    // reach the same state as a named smoke frame; adding an expand step to one would make the lab
-    // frame and its counterpart show different states, which is the pairing those cases exist to
-    // hold. This one claims no smoke label and states `beyond`.
-    //
-    // GOLD, because the lab's ladder gives it a sub-unit (`10 sp`) and a super-unit above it, so
-    // the frame shows the chip in a unit that is neither end of the chain.
+    // The sub-unit chip, which no frame held (issue 1515).
     id: 'manager-world-currency-subunit-expanded',
     label: 'Manager — World Currency sub-unit chip expanded',
     reaches: 'beyond',
@@ -3021,9 +1768,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       },
     ],
     expectView: 'world-currency',
-    // The chip itself, inside the unit that owns it. The section around it renders for any
-    // expanded unit and would be satisfied by the empty "This unit is a base denomination." state
-    // the chip row now also draws.
+    // The chip itself, inside the unit that owns it.
     expectSelector:
       '.fabricate-manager [data-world-currency-unit="gp"] [data-world-currency-subunit="sp"]',
     position: { width: 1280, height: 900 },
@@ -3033,17 +1778,11 @@ export const VIEW_LAB_CASES = Object.freeze([
   managerCase({
     id: 'world-prerequisites',
     label: 'Manager — World Character prerequisites',
-    // NO COUNTERPART, and the empty array is a correction rather than an omission (issue 1520).
-    // This case claimed `world-prerequisites` as its smoke label from the day it was written, and
-    // the live walk has never emitted a frame by that name — `world-prerequisites` does not occur
-    // in `scripts/foundry-test-run.mjs` at all. Nothing could see it: the shape check over
-    // `smokeLabels` never asked whether the harness emits what a case claims, which is the gap the
-    // cross-check below this registry now closes.
+    // No counterpart, and the empty array is a correction rather than an omission (issue 1520).
     smokeLabels: [],
     reaches: 'beyond',
-    // World > Rules & Resources > Character prerequisites (issue 1311). The library is WORLD
-    // scope since issue 1308, so this route needs no selected system and is ungated. Both steps
-    // are needed: the parent lands on Currency, and the sub-item is what moves to this page.
+    // World > Rules & Resources > Character prerequisites (issue 1311). The library is world scope
+    // since issue 1308, so this route needs no selected system and is ungated.
     steps: [
       { selector: '#manager-world-nav-rules', press: 'Enter' },
       { selector: '#manager-rules-nav-prerequisites', press: 'Enter' },
@@ -3054,34 +1793,10 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['manager', 'world'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/world\/WorldPrerequisitesTab\.svelte$/],
   }),
-  // ── THE OPEN-PANEL FRAMES FOR ISSUE 1510'S FIRST PHASE ────────────────────────────────────
-  //
-  // Every converted control's OPEN state became photographable for the first time with the
+  // Every converted control's open state became photographable for the first time with the
   // conversion — a native `<select>`'s popup is drawn by the operating system and does not appear
-  // in a screenshot at all — and an open-panel case cannot double as its view's closed-state
-  // frame, because the portal occludes the screen behind it. So these sit beside the closed
-  // frames rather than replacing them.
-  //
-  // The set is chosen by what can BREAK rather than by what changed: one case per tick polarity,
-  // the narrowest trigger in the phase (whose panel is the one overridden away from its rung's
-  // 240px floor), and the trailing-edge trigger of a two-column row, where a panel wider than its
-  // trigger is clipped by the window edge if it is clipped at all.
-  //
-  // TWO OF THE PHASE'S LISTS HAVE NO CASE, and the reason is the world rather than the plan. The
-  // currency PROVIDER roster renders only under the `actorInventory` strategy, and dnd5e
-  // registers no inventory provider — `currency-actor-inventory` above photographs the
-  // no-provider callout that appears in its place. The folder-import category list renders only
-  // inside a modal opened by a folder drop, which no case performs. Both are the genuinely
-  // data-driven lists this phase converted, and both are measured instead by
-  // `tests/components/manager-select-conversion-rendered.test.js`, which mounts their real
-  // components against the real sheet.
-  //
-  // ONE CLOSED-STATE FRAME JOINS THEM: `world-prerequisites-condition-row`. Its route's ordinary
-  // closed frame (`world-prerequisites` above) draws the list with every item COLLAPSED, so the
-  // condition row the conversion moved appears in no frame at all except the open-panel one that
-  // occludes it. A converted control's closed treatment is the state a GM reads for all but a
-  // moment, and where the ordinary `mapChangedFilesToCases` frame does not reach it, the registry
-  // owes it a case rather than an assumption.
+  // in a screenshot at all — and an open-panel case cannot double as its view's closed-state frame,
+  // because the portal occludes the screen behind it.
   managerCase({
     id: 'world-currency-strategy-list',
     label: 'Manager — World Currency spend strategy list',
@@ -3096,14 +1811,9 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-world-currency-strategy-select]' },
     ],
     expectView: 'world-currency',
-    // THREE claims, and a trigger-only frame satisfies none of them: the panel exists, it is a
-    // DIRECT child of the manager root (the portal, not the fallback that draws it in place), and
-    // it is the UNTICKED configuration. The rung is deliberately NOT compounded in: the class is
-    // composed as `fabricate-select-popover-${rung}` in a template literal, so a literal
-    // `fabricate-select-popover-form` appears nowhere in `src/` and the registry's own
-    // selector-liveness gate reads it as naming UI that does not exist. The rung is measured
-    // where it can be — the mounted and rendered suites. The `:not()` is the half that matters — a caller that lost `showTick={false}` draws a tick gutter with every other claim
-    // here still true.
+    // Three claims, and a trigger-only frame satisfies none of them: the panel exists, it is a
+    // direct child of the manager root (the portal, not the fallback that draws it in place), and
+    // it is the unticked configuration.
     expectSelector:
       '.fabricate-manager > .fabricate-select-popover' +
       ':not(.fabricate-select-popover-ticked) [data-popover-option="macro"]',
@@ -3116,12 +1826,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — World Character prerequisite operator list',
     smokeLabels: [],
     reaches: 'beyond',
-    // THE NARROWEST TRIGGER IN THE PHASE, and the one whose panel is overridden. The operator sits
-    // in a `flex: 1 1 160px` cell beside a wider path field and a narrow value field, so its
-    // column is the tightest box any converted control in this phase opens from — and the caller
-    // states `minWidth={160}` so the panel hugs that column instead of opening at the `form`
-    // rung's 240px floor and overhanging the cell it belongs to. It is also the phase's TICKED
-    // case: nine comparison operators are close cousins and the trigger shows one symbol.
+    // The narrowest trigger in the phase, and the one whose panel is overridden.
     steps: [
       { selector: '#manager-world-nav-rules', press: 'Enter' },
       { selector: '#manager-rules-nav-prerequisites', press: 'Enter' },
@@ -3129,13 +1834,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-prerequisite-operator]' },
     ],
     expectView: 'world-prerequisites',
-    // The tick element ON THE SELECTED ROW, which is the claim the panel's own class does not
-    // make. `.fabricate-select-popover-ticked` says the list RESERVES a gutter; naming a tick
-    // inside a row that `-ticked` already selected only re-asserts it. What a reader of this
-    // frame needs is that the row `aria-selected="true"` names is the row DRAWING the tick — the
-    // gutter is reserved, occupied, and occupied in the right place — because a run of
-    // single-line rows with an empty gutter, or with the mark on the wrong row, is exactly the
-    // regression this frame exists to be read against.
+    // The tick element on the selected row, which is the claim the panel's own class does not make.
     expectSelector:
       '.fabricate-manager > .fabricate-select-popover.fabricate-select-popover-ticked ' +
       '[role="option"][aria-selected="true"] .fabricate-select-tick',
@@ -3147,19 +1846,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
   }),
   managerCase({
-    // THE CONVERTED ROW WITH ITS LIST SHUT (issue 1510). Its sibling above is the only frame in
-    // the registry that draws this control, and it draws it OPEN — the panel occludes the row it
-    // belongs to, so the trigger's own closed treatment inside the condition row (its box in a
-    // `flex: 1 1 160px` cell, its chevron, its baseline against the path and value inputs beside
-    // it) is not readable in any published frame. That is the state a GM sees for all but a
-    // moment, and it is the state the demotion moved: the caller's wrapper was a `<label>` and is
-    // a `Field as="div"` behind a `visually-hidden` caption now, with the trigger's width stated
-    // by the caller's own scoped counterpart.
-    //
-    // The steps are the operator list's own, minus its last: opening the panel is exactly what
-    // this case must not do. The trailing `scroll` is what puts the expanded item in the PNG —
-    // `frame.screenshot()` does not scroll a nested overflow container, so without it every
-    // assertion passes on a frame that shows the list header alone.
+    // The converted row with its list shut (issue 1510).
     id: 'world-prerequisites-condition-row',
     label: 'Manager — World Character prerequisite condition row, operator closed',
     smokeLabels: [],
@@ -3173,11 +1860,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-world-prerequisites-page]', scroll: true },
     ],
     expectView: 'world-prerequisites',
-    // BOTH halves matter. `[data-prerequisite-operator]` is the caller's own hook and
-    // `.fabricate-select-trigger` is the primitive's class, so the pair asserts that the hook is
-    // still ON the converted trigger rather than on a wrapper — which is what a caller that
-    // reached for a wrapper instead of `triggerData` would produce — and the ancestor asserts the
-    // row it sits in still exists under the class its width counterpart is anchored at.
+    // Both halves matter.
     expectSelector:
       '.manager-prerequisite-condition [data-prerequisite-operator].fabricate-select-trigger',
     position: { width: 1280, height: 900 },
@@ -3187,17 +1870,10 @@ export const VIEW_LAB_CASES = Object.freeze([
   managerCase({
     id: 'world-modifiers',
     label: 'Manager — World Modifiers',
-    // NO COUNTERPART, for the reason its sibling above records. The smoke DOES reach the
-    // Modifiers route — `manager-system-edit-lists` is captured there — but it takes no frame
-    // under this name, and `world-modifiers` occurs in the harness only inside the
-    // `[data-world-modifiers]` selector that walk uses. So there is no counterpart frame this one
-    // could be compared with, which is what `beyond` says.
+    // No counterpart, for the reason its sibling above records.
     smokeLabels: [],
     reaches: 'beyond',
-    // World > Rules & Resources > Modifiers (issue 1311). `scroll` is load-bearing for the reason
-    // the currency cases give: the list runs below the page's own fold and `frame.screenshot()`
-    // does not scroll nested overflow containers, so without it the entries are simply absent
-    // from the PNG while every assertion still passes.
+    // World > Rules & Resources > Modifiers (issue 1311).
     steps: [
       { selector: '#manager-world-nav-rules', press: 'Enter' },
       { selector: '#manager-rules-nav-modifiers', press: 'Enter' },
@@ -3208,52 +1884,15 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['manager', 'world'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/world\/WorldModifiersTab\.svelte$/],
   }),
-  // ── The world scoped-entity routes (issue 1362, epic 1357) ──────────────────────────────
-  //
-  // FRAMES FROM THIS PR PROVE THE SHELL ONLY. Every one of these routes is a PLACEHOLDER: no
-  // catalogue, no editor, no `InheritRow`. What the frames show is the shell decision that has
-  // to be right before PRs 6a/6b/6c and 7 can fill them — the four rail leaves in the
-  // prototype's authored order, a route reached with NO crafting system selected, a real
-  // breadcrumb, the released column with no dead inspector strip, and the placeholder itself.
-  //
-  // NO `system` QUERY, deliberately. These are world screens, and "reachable with no crafting
-  // system selected" is the property `normalizedActiveView`'s `if (!system) return 'systems'`
-  // fallthrough would otherwise break. A case that selected a system first could not see it.
+  // Frames from this PR prove the shell only. Every one of these routes is a placeholder: no
+  // catalogue, no editor, no `InheritRow`.
   managerCase({
     id: 'world-component-catalogue',
     label: 'Manager — World Component catalogue',
-    // BEYOND THE SMOKE, and the empty `smokeLabels` says so explicitly rather than by
-    // omission. The Foundry capture walk does not visit the world scoped-entity routes at
-    // all — they are new here — so there is no smoke frame for any of these six to pair with.
+    // Beyond the smoke, and the empty `smokeLabels` says so explicitly rather than by omission.
     reaches: 'beyond',
     smokeLabels: [],
-    // THE ROW IS INSPECTED, NOT MERELY LISTED (issue 1371). The shell's inspector column is
-    // where the world `category` card, its inherit count and the per-system membership rows
-    // live, and none of it renders at rest — so the shipped steps photographed the inspector's
-    // EMPTY state, and the inspector's contents are half of what this screen decides.
-    //
-    // `sm-iron-ingot` is the row whose world default is SEEDED and whose smithing membership
-    // record INHERITS it, which is the state the card's inherit count exists to state.
-    // NARROW THE LIST FIRST, OR THE ROW HAS NO HOOK AT ALL (issue 1371, round 2).
-    //
-    // The shared frame PAGES at ten rows and sorts `name-asc`, and the lab world holds 68 world
-    // components — so `sm-coal` is on page 2, `sm-iron-ingot` on page 4 and `lab-unbound-salt`
-    // on page 7, and none of their row hooks is in the DOM at rest. The capture driver throws
-    // by name on a selector that matches nothing and aborts the WHOLE run, so these four cases
-    // published nothing and took every other case's frame down with them.
-    //
-    // A search `fill` is the narrowing the frame already offers a GM. Renaming the fixture rows
-    // to sort onto page one was the alternative and is worse: it would bend the corpus around
-    // the capture rather than driving the screen the way the screen is driven.
-    //
-    // AND THE SEARCH IS CLEARED AGAIN BEFORE THE SHUTTER (issue 1371, round 3). Narrowing to one
-    // row is how the inspection is REACHED; leaving it narrowed is what the frame then shows, and
-    // a browse screen photographed at one row is not a frame of a browse screen. Clearing restores
-    // the full sixty-seven — ten rows, `67 of 67 components`, and the pager reading
-    // `Showing 1-10 of 67 - Page 1 of 7` — while the inspection SURVIVES, because the frame holds
-    // the inspected id on the browser view-state rather than on the rendered row.
-    //
-    // A cleared search is safe HERE and would not be on the sibling case below; see its own note.
+    // The row is inspected, not merely listed (issue 1371).
     steps: [
       { selector: '#manager-world-nav-component-catalogue' },
       { selector: '[data-scoped-list-search]', fill: 'Iron Ingot' },
@@ -3264,10 +1903,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     // The page's own hook, so a route that silently fell back to the systems library fails the
     // capture rather than publishing a frame of the wrong screen.
     expectSelector: '[data-scoped-page="world-components"]',
-    // THE FOUR LEAVES, IN THE PROTOTYPE'S AUTHORED ORDER, each proved to hold its own icon
-    // rather than merely to exist. Order is asserted by the parity oracle
-    // (`scripts/visual-parity/inventory.mjs` asserts landmark ORDER); this is the frame it
-    // reads it from.
+    // The four leaves, in the prototype's authored order, each proved to hold its own icon rather
+    // than merely to exist.
     expectContained: [
       {
         container: '#manager-world-nav-component-catalogue',
@@ -3282,10 +1919,7 @@ export const VIEW_LAB_CASES = Object.freeze([
         container: '#manager-world-nav-tool-catalogue',
         target: '#manager-world-nav-tool-catalogue > i',
       },
-      // THE PAGER, WHICH IS THE CLEARED SEARCH'S OWN WITNESS. `Pagination` is `multiPageOnly`, so
-      // it renders only over a corpus longer than one page: a frame still narrowed to the one
-      // searched row draws no pager at all and fails here. That makes the clear step assertable
-      // rather than merely written down.
+      // The pager, which is the cleared search's own witness.
       {
         container: '[data-scoped-page="world-components"]',
         target: '[data-pagination-page]',
@@ -3293,78 +1927,35 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],
-    // THE PLACEHOLDER CLAIM IS GONE (issue 1371), and dropping it is not optional bookkeeping:
+    // The placeholder claim is gone (issue 1371), and dropping it is not optional bookkeeping:
     // `tests/manager-scoped-prop-contract.test.js` pairs "a case claims the shared placeholder
-    // body" with "that route's page still imports it", so a real body left claiming the
-    // placeholder publishes this route's screen as evidence of a placeholder change.
-    //
-    // The shell primitives this screen now composes are claimed instead, each by the case that
-    // RENDERS it: the catalogue shell, the list frame behind it, the bulk panel the selection
-    // swaps in, and the two pure leaves the row and the inspector read.
+    // body" with "that route's page still imports it", so a real body left claiming the placeholder
+    // publishes this route's screen as evidence of a placeholder change.
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentCataloguePage\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityCatalogueShell\.svelte$/,
-      // issue 1371 r8-cat: THE FRAME IS THIS SCREEN TOO. The comment above already named "the
-      // list frame behind it" and the list omitted it, so a change to the row, the toolbar or
-      // the inspector identity block — every one of which this frame writes — published the
-      // essence and tool catalogues' frames and not this one. It is on the sibling catalogues'
-      // cases already; this is the entry that was missing.
+      // Issue 1371 r8-cat: the frame is this screen too.
       /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityListInspectorFrame\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/componentScoped\.js$/,
     ],
   }),
   managerCase({
-    // THE SELECTION'S OWN FACE (issue 1371). The frame above photographs the inspector
-    // describing ONE component; the moment a row is ticked the frame swaps that panel for the
-    // bulk staging model, and nothing in the resting frame can show it. Four staging groups,
-    // the accent register band and the write count on the Apply dock are all this case's.
+    // The selection's own face (issue 1371).
     id: 'world-component-catalogue-bulk',
     label: 'Manager — World Component catalogue, bulk selection',
     reaches: 'beyond',
     smokeLabels: [],
-    // ONE SEARCH OVER BOTH SUBJECTS, AND A STAGED INSTRUCTION (issue 1371, round 3).
-    //
-    // The steps used to search twice, once per row, on the claim that the selection SURVIVES the
-    // second search. It does not: `EntityListInspectorFrame.svelte:421-428` prunes `selectedIds`
-    // against the FILTERED rows, so the second search silently dropped the first tick and the
-    // frame published `1 component selected` under a comment asserting two. Paging does not prune
-    // — the prune is on the filter, not on the slice — so the "spans two pages" half of that claim
-    // was true and the "spans two searches" half was never true.
-    //
-    // `salt` matches three rows and TWO of them are the subjects, so one search reaches both. And
-    // for the same pruning reason there is NO trailing `fill: ''` here: clearing the search is a
-    // filter change like any other, and it would prune the very selection this case exists to
-    // photograph.
-    //
-    // A REMOVAL IS STAGED, because an unstaged panel is a panel at rest and this case's whole
-    // subject is the staging model. `Remove from` is the destructive direction — the one whose
-    // note and chip tone round 2 made legible — and one tag staged for addition puts a second
-    // axis and the dock's write-naming label in the same frame.
+    // One search over both subjects, AND A staged instruction (issue 1371, round 3).
     steps: [
       { selector: '#manager-world-nav-component-catalogue' },
       { selector: '[data-scoped-list-search]', fill: 'salt' },
       { selector: '[data-scoped-list-select="tw-brine-salt"]' },
       { selector: '[data-scoped-list-select="al-saltpetre"]' },
-      // issue 1371 r8-cat: THE TAG IS STAGED FROM THE INSET ROW. The three staging groups were
-      // `Pick a … ▾` popover triggers and are now the reference's inline search + rows + pager
-      // insets, so the chip this step used to click no longer exists; the row is the stager and
-      // the chip is what a staged direction PUTS on screen.
-      //
-      // issue 1371 r14-cat: THE TAG IS ONE THE WORLD VOCABULARY AUTHORS. The inset offers the
-      // vocabulary's tags and nothing else (maintainer ruling M18 on its second surface), and the
-      // lab world authors `ore`, `ingot` and `moss` — `fuel` is applied by a migrated world default
-      // and was only ever offered by the corpus union this ruling struck. `moss` is the one tag in
-      // both lists, so this step resolves on either side of the change.
+      // Issue 1371 r8-cat: the tag is staged from the inset row.
       {
         selector: '[data-bulk-inset="tags"] [data-world-component-bulk-option="moss"]',
       },
-      // AND THE DIRECTION IS STAGED LAST, WHICH IS ALSO WHAT SCROLLS THE PANEL BACK TO ITS HEAD.
-      // The three insets make this panel taller than the column, so the LAST click decides what
-      // the frame shows: staging the tag last left the shot on the panel's foot, with none of the
-      // register, the standing explanation or the membership track in it — the three things this
-      // case's own `expectContained` list is about. `scroll` cannot fix that (`scrollIntoViewIfNeeded`
-      // is a no-op on an element already partly in view), and the ordering is free: the two axes
-      // are independent, so staging them in either order composes the same instruction.
+      // AND the direction is staged last, which is also what scrolls the panel back to its HEAD.
       { selector: '[data-world-component-bulk-mode-option="remove"]' },
     ],
     expectView: 'world-components',
@@ -3378,10 +1969,8 @@ export const VIEW_LAB_CASES = Object.freeze([
         container: '[data-world-component-bulk-panel]',
         target: '[data-world-component-bulk-apply]',
       },
-      // THE TWO STAGED AXES, so the frame is asserted to hold the CHANGED panel rather than the
-      // resting one. The mode note is what `Remove from` swaps in, and the tag stager is the
-      // second axis; a panel that reverted to `Unchanged` still renders the mode track and the
-      // Apply dock above, so those two alone cannot tell the states apart.
+      // The two staged axes, so the frame is asserted to hold the changed panel rather than the
+      // resting one.
       {
         container: '[data-world-component-bulk-panel]',
         target: '[data-world-component-bulk-mode-state]',
@@ -3390,9 +1979,7 @@ export const VIEW_LAB_CASES = Object.freeze([
         container: '[data-world-component-bulk-panel]',
         target: '[data-world-component-bulk-tag-chip="moss"]',
       },
-      // AND THE THREE INSETS THEMSELVES (issue 1371 r8-cat, gap-list rows 43-45). A panel that
-      // fell back to the popover triggers still renders the mode track, the Apply dock and a
-      // staged chip, so none of the four assertions above can tell the two forms apart.
+      // AND the three insets themselves (issue 1371 r8-cat, gap-list rows 43-45).
       {
         container: '[data-world-component-bulk-panel]',
         target: '[data-bulk-inset="systems"]',
@@ -3415,21 +2002,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
   }),
   managerCase({
-    // THE ENTRY EDITOR'S DEFINITION TAB (issue 1371), reached the way a GM reaches it: through
-    // the catalogue row's pen. A case that seeded the route directly would depict a state no
-    // navigation produces, which is the fixture-bypass hazard this registry already carries
-    // against itself.
-    //
-    // `sm-coal` is the subject because it is the ONE lab component carrying world tags AND a
-    // per-system mute — which is what the SIBLING case below photographs, after scrolling to it.
-    //
-    // THIS FRAME PROMISES ONLY WHAT IT SHOWS (issue 1371, round 2). It used to claim "the world
-    // tag list, its note and the N-by-M mute grid … all in one frame", and no frame at 1280x900
-    // can deliver that: the Definition tab's card stack puts the World tags card below the panel's
-    // scroll fold, so the containment test could never be satisfied and the case failed on an
-    // assertion rather than on a defect. The evidence is SPLIT rather than weakened — this case
-    // holds the identity, linked-item and category cards, and `world-component-entry-tags` scrolls
-    // to the tag card and the mute grid.
+    // The entry editor's definition tab (issue 1371), reached the way a GM reaches it: through the
+    // catalogue row's pen.
     id: 'world-component-entry-definition',
     label: 'Manager — World Component entry',
     reaches: 'beyond',
@@ -3458,21 +2032,14 @@ export const VIEW_LAB_CASES = Object.freeze([
         container: '[data-scoped-page="world-component-entry"]',
         target: '[data-scoped-entry-preview-tile]',
       },
-      // THE CATEGORY CARD'S CLAIMS MOVED TO THE TAGS CASE (issue 1371, round 2), because that is
-      // the frame the card is fully drawn in. It sat one line inside this frame's fold, and the
-      // restored `Edit world vocabulary` exit — a button on the card's head row, where a kicker
-      // used to sit alone — is taller than the line it replaced. The choice was to shrink the
-      // affordance to fit an assertion or to assert it where it is drawn; the tags case already
-      // scrolls to exactly that region, so the claim is unchanged and only its frame moved.
+      // The category card's claims moved to the tags case (issue 1371, round 2), because that is
+      // the frame the card is fully drawn in.
     ],
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentEntryPage\.svelte$/,
-      // THE THREE CHILDREN THE ENTRY WAS REBUILT AS (issue 1371, parity round 4). Without them a
-      // change to the source card or the rail maps to NO case, and the capture job publishes an
-      // unrelated frame — which is the failure this registry exists to prevent. The systems card
-      // claims the third case below, which is the frame it is drawn in.
+      // The three children the entry was rebuilt as (issue 1371, parity round 4).
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentEntrySourceCard\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentEntryPreviewRail\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedEntryHeaderActions\.svelte$/,
@@ -3480,16 +2047,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
   }),
   managerCase({
-    // THE OTHER HALF OF THE ENTRY'S DEFINITION TAB (issue 1371, round 2), reached by SCROLLING.
-    //
-    // The driver's `scroll` verb exists for exactly this: `frame.screenshot()` on the outer
-    // application does NOT scroll a nested overflow container, so a card below the panel fold is
-    // absent from the frame while every assertion still passes. Scrolling the tag card into view
-    // moves the identity and linked-item cards off the top, which is why this is a second case
-    // rather than two more steps on the first.
-    //
-    // `sm-coal` again: it is the one lab component with world tags AND a member muting one, so
-    // the tag list, its note and the N-by-M mute grid are all here.
+    // The other half of the entry's definition tab (issue 1371, round 2), reached by scrolling.
     id: 'world-component-entry-tags',
     label: 'Manager — World Component entry, world classification',
     reaches: 'beyond',
@@ -3502,14 +2060,9 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-scoped-entry-tags="sm-coal"]', scroll: true },
     ],
     expectView: 'world-component-entry',
-    // ONE CARD, TWO COLUMNS (issue 1371, parity round 4): `proto:881-910` draws category and tags
-    // in a single `World classification` card, and the two-card split this case used to
-    // photograph is gone. The card is the container for every claim below, which is exactly what
-    // would red if it were split again.
-    //
-    // THE N-BY-M MUTE GRID IS GONE WITH IT, and its claim with it: the reference draws no
-    // per-system tag mute anywhere on this screen, so there is no longer a frame that could show
-    // one. That removal is reported to the maintainer rather than absorbed here.
+    // One CARD, two columns (issue 1371, parity round 4): `proto:881-910` draws category and tags
+    // in a single `World classification` card, and the two-card split this case used to photograph
+    // is gone.
     expectSelector: '[data-scoped-entry-category="sm-coal"]',
     expectContained: [
       {
@@ -3532,62 +2085,31 @@ export const VIEW_LAB_CASES = Object.freeze([
         container: '[data-scoped-entry-tags="sm-coal"]',
         target: '[data-scoped-entry-tag-note]',
       },
-      // ONE LIT CHIP, AND IT IS THE FRAME'S POINT (issue 1371 r17, UX F-N2). Under M18 the run
-      // offers the world vocabulary alone, and `sm-coal`'s migrated `fuel` / `bulk` sit outside
-      // it — so until the lab applied `moss` on this record too, EVERY chip here was unlit and
-      // the parity region for a lit chip measured an unlit one against the prototype's lit
-      // `Reclaimed`. This claim is the lit state: a vocabulary tag the record applies, pressed.
-      // It reds if the lab stops applying `moss` on `sm-coal`, if the run stops drawing
-      // `aria-pressed`, or if the chip leaves the card.
+      // One lit chip, AND it is the frame's point (issue 1371 r17, ux F-N2).
       {
         container: '[data-scoped-entry-tags="sm-coal"]',
         target: '[data-scoped-entry-tag="moss"][aria-pressed="true"]',
       },
-      // THE APPLIED-BUT-UNAUTHORED CHIP (issue 1371 r18-entry, maintainer ruling M33, closing
-      // D-CJ). `sm-coal`'s migrated default applies `fuel` and `bulk`, which the lab's vocabulary
-      // (`ingot` / `moss` / `ore`) never authored; under M18 they were invisible on this run and
-      // only the note counted them. M33 draws each as a LIT, STRUCK, clearable chip after the
-      // vocabulary's, with an accessible name that says it is not in the vocabulary, its clear
-      // staged until `Save entry` (M34). This claim reds if the run stops drawing them, if they
-      // lose the struck face's hook, or if the lab's `sm-coal` stops applying `fuel`.
+      // The applied-but-unauthored chip (issue 1371 r18-entry, maintainer ruling M33, closing
+      // D-CJ).
       {
         container: '[data-scoped-entry-tags="sm-coal"]',
         target:
           '[data-scoped-entry-tag="fuel"][aria-pressed="true"][data-scoped-entry-tag-unauthored]',
       },
     ],
-    // THE TAG CHIP OWNS ITS OWN CENTRE (issue 1371, revision 8 — UX F13). The world tag run is a
-    // wrapping row of 999-radius chips inside a two-column grid column, and a chip is a real
-    // `<button>` with `aria-pressed`: a run that overflowed its column, or a card head that
-    // overlapped it, would leave a chip present in the DOM, correct in every mounted assertion
-    // and unclickable on screen. `elementFromPoint` at the chip's centre is the only check that
-    // can tell those apart, and no mounted suite can make it — happy-dom lays nothing out.
-    //
-    // issue 1371 r15-entry: THE CHIP IS ONE THE WORLD VOCABULARY AUTHORS. The run offers the
-    // vocabulary's tags and nothing else (maintainer ruling M18 on its last surface), and the lab
-    // world authors `ore`, `ingot` and `moss` — `fuel` is applied by `sm-coal`'s migrated default
-    // and was only ever drawn by the corpus union this ruling struck. `moss` is drawn on either
-    // side of the change, a world default carrying it as well as the vocabulary authoring it, so
-    // this hit-test resolves on both; a selector the run no longer draws aborts the whole capture.
-    // Since issue 1371 r17 `sm-coal` applies `moss` as well, so the chip hit here is the LIT one
-    // the claim above pins.
+    // The tag chip owns its own centre (issue 1371, revision 8 — ux F13).
     expectCenterHit: '[data-scoped-entry-tag="moss"]',
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentEntryPage\.svelte$/],
   }),
   managerCase({
-    // THE ENTRY'S `Essence contribution` CARD (issue 1371 r18-entry, maintainer ruling M31), reached
-    // by SCROLLING for the reason the tags case gives: the card follows `World classification`, so
-    // at 1280x900 the definition frame shows its head and the tops of its tiles and puts the
-    // steppers under the panel's fold, where every assertion passes on a frame that shows no
-    // control. `sm-coal` again, so all four entry cases follow ONE navigation: the lab's `1.32.0`
-    // pass elects its world map from the smithing row, which is what lights the `fire` tile here
-    // and draws `Fire 2` in the rail.
-    //
-    // THE PROTOTYPE DRAWS NO ESSENCE CARD ON ITS ENTRY SCREEN (`proto:805-1035`); the card is
-    // M31's extra, on the shape of the rules editor's card (`proto:1343-1356`), which is the
-    // reference it is measured against.
+    // The entry's `Essence contribution` CARD (issue 1371 r18-entry, maintainer ruling M31),
+    // reached by scrolling for the reason the tags case gives: the card follows `World
+    // classification`, so at 1280x900 the definition frame shows its head and the tops of its tiles
+    // and puts the steppers under the panel's fold, where every assertion passes on a frame that
+    // shows no control.
     id: 'world-component-entry-essences',
     label: 'Manager — World Component entry, essence contribution',
     reaches: 'beyond',
@@ -3636,13 +2158,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
   }),
   managerCase({
-    // THE MAINTAINER'S SECOND EXHIBIT (issue 1371, parity round 4): `Systems using this
-    // component`, and the `Delete from the world` card under it. Neither was photographed by any
-    // case — the systems card sat below the fold of both frames above, and deletion was a header
-    // button until this round moved it into a card at the foot of the tab.
-    //
-    // `sm-coal` again, so all three entry cases follow ONE navigation and differ only in scroll
-    // position, which is what keeps them comparable frame to frame.
+    // The maintainer's second exhibit (issue 1371, parity round 4): `Systems using this component`,
+    // and the `Delete from the world` card under it.
     id: 'world-component-entry-systems',
     label: 'Manager — World Component entry, systems and deletion',
     reaches: 'beyond',
@@ -3677,25 +2194,9 @@ export const VIEW_LAB_CASES = Object.freeze([
         target: '[data-scoped-entry-delete-note]',
       },
     ],
-    // TWO POINTER PROOFS ON ONE FRAME (issue 1371, revision 8 — UX F13), because these are the two
+    // Two pointer proofs on one frame (issue 1371, revision 8 — ux F13), because these are the two
     // controls on this screen a compressed row can swallow and no mounted test can see: happy-dom
     // lays nothing out, so every mounted assertion about either passes on a zero-sized target.
-    //
-    // `expectCenterHit` takes the member row's EXIT ICON in its IDLE face, which is the narrowest
-    // thing this screen draws — a 26px icon-only control in a trailing cluster that shares one
-    // flex row with an ellipsising summary column and, on a member row, with `View system rules`.
-    // That is the exact geometry the delta names: a row whose middle column refuses to shrink
-    // compresses the cluster instead, and the icon keeps its box in the DOM while losing its
-    // centre.
-    //
-    // `expectClick` takes the DELETE, and it is the stronger check of the two — a real Playwright
-    // pointer click, whose actionability pass fails on an obscured, zero-sized or covered target
-    // rather than dispatching a synthetic event at it. Clicking ARMS the control, which writes
-    // nothing (the token is page-local) and cannot delete anything (`sm-coal` has rules in
-    // `lab-smithing`, so the confirm is refused by the page itself). What it buys beyond the
-    // proof is the frame: this case now publishes the armed REFUSAL — `Cannot delete` over the
-    // note naming the system that causes it — which is the state the refusal exists for and
-    // which no frame has ever shown.
     expectCenterHit:
       '[data-scoped-entry-system="lab-smithing"] [data-arm-token="scoped-membership-remove:sm-coal|lab-smithing"]',
     expectClick: '[data-arm-token="world-component-delete:sm-coal"]',
@@ -3706,10 +2207,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
   }),
   managerCase({
-    // THE VALIDATION TAB, on the ONE lab component that fails a blocking check: `lab-unbound-salt`
+    // The validation tab, on the one lab component that fails a blocking check: `lab-unbound-salt`
     // is seeded with no source uuid at all, so `No source item linked` blocks and the two world
-    // classification rows warn. A frame taken on a healthy record would photograph four passes
-    // and prove nothing about the severities this tab exists to distinguish.
+    // classification rows warn.
     id: 'world-component-entry-validation',
     label: 'Manager — World Component entry, validation',
     reaches: 'beyond',
@@ -3738,27 +2238,11 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [/^src\/utils\/componentScopeValidation\.js$/],
   }),
   managerCase({
-    // ══ THE SHARED EDITOR FRAME, STACKED (issue 1371 r19-entry2) ═══════════════════════════════
-    //
     // The frame the world Component entry and the system component rules editor share stacks its
     // rail under its content column below `@container fabricate-manager (max-width: 1000px)`, and
-    // until this revision NOTHING in the registry reached that state on either consumer — while
+    // until this revision nothing in the registry reached that state on either consumer — while
     // their three neighbours (`manager-components-stacked`, `manager-essences-stacked`,
-    // `manager-tags-categories-stacked`) all have one. The state is ordinary: the manager window
-    // is resizable with no minimum and opens sixty pixels above the threshold. What the gap let
-    // through was a rules editor whose content column resolved to `0px` when the pane had a
-    // definite height — no tab strip, neither tab, no card, and no scroller to reach them.
-    //
-    // `expectLayout` IS THE ASSERTION THAT ONLY THE STACKED STATE SATISFIES, and it has to be a
-    // measurement rather than a selector: the stack is a container query, so the DOM is identical
-    // on both sides of the threshold and no `expectSelector` can tell them apart. One resolved
-    // column track on the frame's own grid is the stacked shape and exactly two is the wide one,
-    // so a case that stopped stacking would FAIL the capture rather than publish a wide frame
-    // under a name that says otherwise.
-    //
-    // `expectCenterHit` is the other half, and it is the defect stated as a pointer fact: with
-    // the rail taking the pane the first tab is still in the DOM with a box of its own, and only
-    // `elementFromPoint` says that the rail is drawn over it.
+    // `manager-tags-categories-stacked`) all have one.
     id: 'world-component-entry-stacked',
     label: 'Manager — World Component entry stacked',
     reaches: 'beyond',
@@ -3768,11 +2252,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-scoped-list-search]', fill: 'Coal' },
       { selector: '[data-scoped-list-inspect="sm-coal"]' },
       { selector: '[data-scoped-component-open-entry]' },
-      // THE STRIP INTO VIEW BEFORE THE POINTER TEST. Stacked, the frame keeps its content height
-      // and `.manager-body` is the scroller; opening the entry moves focus into the tab panel,
-      // which scrolls the strip off the top of the window. `scrollIntoViewIfNeeded` is a no-op
-      // where it is already in frame, so this states "photograph the top of the frame" rather
-      // than moving the case's subject.
+      // The strip into view before the pointer TEST.
       { selector: '[data-scoped-entry-tab="definition"]', scroll: true },
     ],
     expectView: 'world-component-entry',
@@ -3789,12 +2269,9 @@ export const VIEW_LAB_CASES = Object.freeze([
         target: '[data-scoped-entry-preview-tile]',
       },
     ],
-    // 980 RATHER THAN THE REGISTRY'S USUAL 1024, and the twenty-two pixels are measured rather
-    // than chosen: the lab's manager container resolves to the window width MINUS TWO (measured at
-    // five widths), and the frame's own query is `max-width: 1000px` on that container. A 1024px
-    // window leaves the container at 1022 and the frame WIDE — the capture fails with two resolved
-    // tracks, which is how this number was arrived at. 980 clears the threshold by the same margin
-    // it would otherwise miss it by. The height is the registry's narrow one.
+    // 980 rather than the registry's usual 1024, and the twenty-two pixels are measured rather than
+    // chosen: the lab's manager container resolves to the window width minus two (measured at five
+    // widths), and the frame's own query is `max-width: 1000px` on that container.
     position: { width: 980, height: 860 },
     kinds: ['manager', 'world', 'scoped', 'responsive'],
     // The frame is the SHEET's and the two pages that wear it, so a change to either page or to
@@ -3809,26 +2286,12 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — World Tags & Categories',
     reaches: 'beyond',
     smokeLabels: [],
-    // The leaf whose label is CHARACTER-FOR-CHARACTER identical to the system-scope entry
-    // further up the same rail. Reached by its stable id, which is the whole reason the id
-    // exists: no text locator can tell the two apart.
+    // The leaf whose label is character-for-character identical to the system-scope entry further
+    // up the same rail.
     steps: [{ selector: '#manager-world-nav-vocabulary' }],
     expectView: 'world-vocabulary',
     expectSelector: '[data-scoped-page="world-vocabulary"]',
-    // THE THREE DELETE CONTROLS, ONE PER PANEL, EACH KEYED ON ITS OWN PANEL (issue 1392).
-    //
-    // This is the CLIPPING criterion, and it is mechanical rather than visual. `VocabularyPanel`
-    // draws its rows on a `repeat(auto-fill, minmax(340px, 1fr))` track and this route's
-    // `.manager-main` keeps `overflow-x: hidden`, so a panel column narrower than that track
-    // CLIPS rather than scrolls — and the element it clips first is the row's trailing
-    // `.manager-icon-button`, the delete. At this case's 1280px the 2-up grid clears the track by
-    // 130px; a third column would not, and nothing else in this registry could see that. The
-    // width is what that clearance depends on, and it is unchanged.
-    //
-    // BOTH SIDES ARE KEYED PER KIND, on the panel's own `rowAttr`, and that is required rather
-    // than tidy: `expectContained` resolves each side with `document.querySelector` and is
-    // first-match and document-wide, so an unkeyed `.manager-icon-button` target would send all
-    // three entries to the same button and two of the three would assert nothing.
+    // The three delete controls, one per panel, each keyed on its own panel (issue 1392).
     expectContained: [
       {
         container: '[data-wvocab-panel="recipeCategories"]',
@@ -3843,82 +2306,33 @@ export const VIEW_LAB_CASES = Object.freeze([
         target: '[data-component-tag-id] .manager-icon-button',
       },
     ],
-    // TALLER THAN THE WORLD SCOPED-ENTITY CASES, and the extra 100px is the FULL-WIDTH TAG BAND
-    // (issue 1392). This screen stacks a 2-up grid over a third panel rather than filling one
-    // pane, so the tag vocabulary's own head, control row, add form, search row and first row all
-    // sit below the taller of the two category panels — and the `moss` row, which is the whole
-    // reason this screen's count asymmetry is photographable, is the one a short frame cuts.
-    //
-    // 1000 IS A CEILING, NOT A PREFERENCE. `.application` is clamped to
-    // `100vh - 1.5 * hotbar`, which at the driver's fixed 1920x1080 context is 1002px, and that
-    // context is shared with the live smoke — so a taller frame does not render taller, it
-    // renders clamped and wrong, silently. Height alone could never have fitted this row anyway:
-    // nothing in the column flexes, so the row sits where the content above it puts it. The fit
-    // was bought by flattening the primitive's add form inside the panel, emptying the hint
-    // paragraph the head subline already says, and zeroing the empty status region — all three in
-    // the page's own scoped block.
-    // `tests/components/world-vocabulary-control-row-cascade.test.js` asserts the fit against
-    // THIS number and against the lab fixture's own row counts, so the frame and the assertion
-    // cannot drift apart.
+    // Taller than the world scoped-entity cases, and the extra 100px is the full-width tag band
+    // (issue 1392).
     position: { width: 1280, height: 1000 },
     kinds: ['manager', 'world', 'scoped'],
-    // THE `ScopedPlaceholderPage` CLAIM IS DELETED HERE, not merely joined by the new patterns
-    // (issue 1392). The shared placeholder body is claimed by every case that RENDERS it, and
-    // this route no longer does — so a claim left behind would publish this screen as evidence
-    // of a change to a component it does not contain, the exact inversion
-    // `manager-scoped-prop-contract.test.js` reds on in both directions. The remaining claim
-    // lives on `world-component-catalogue`, whose page still delegates.
-    //
-    // `VocabularyPanel.svelte` is claimed here as well as by the system-scope vocabulary cases:
-    // this screen renders three of it, and an edit to the primitive changes this frame.
+    // The `ScopedPlaceholderPage` claim is deleted here, not merely joined by the new patterns
+    // (issue 1392).
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldVocabularyPage\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/worldVocabularyStudio\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/VocabularyPanel\.svelte$/,
     ],
   }),
-  // ── The two world ESSENCE screens, REAL bodies from issue 1372 ─────────────────────────────
-  //
-  // The catalogue's `ScopedPlaceholderPage` claim is DELETED here, not merely joined by the new
-  // patterns. The shared placeholder body is claimed by every case that renders it and this route
-  // no longer does, so a claim left behind would publish this screen as evidence of a change to a
-  // component it does not contain — the exact inversion `manager-scoped-prop-contract.test.js`
-  // reds on, in both directions.
+  // The catalogue's `ScopedPlaceholderPage` claim is deleted here, not merely joined by the new
+  // patterns.
   managerCase({
     id: 'world-essence-catalogue',
     label: 'Manager — World Essence Catalogue',
     reaches: 'beyond',
     smokeLabels: [],
-    // THE SECOND STEP SELECTS A ROW, AND WITHOUT IT THIS CASE PHOTOGRAPHS THE WRONG SCREEN.
-    //
-    // The inspector is most of a 300px column and the richest region on the page — the world
-    // defaults, their inherit counts, the per-system rules list and the deep link into the entry
-    // editor all live in it. It renders `Nothing selected` until a row is clicked, so a case that
-    // stops at the rail entry publishes a frame in which the whole right-hand third of the screen
-    // is an empty state. Three review rounds compared that frame against a prototype whose
-    // inspector is full and read the difference as a styling gap.
-    //
-    // `[data-scoped-list-inspect]` matches every row's identity button and the runner takes
-    // `.first()`, so this selects the first row of the default `Name A–Z` page — `Aether`, which
-    // carries a colour token, a linked effect source and a property macro, and is therefore the
-    // one row that exercises every readout the inspector can draw.
+    // The second step selects A row, AND without it this case photographs the wrong screen.
     steps: [
       { selector: '#manager-world-nav-essence-catalogue' },
       { selector: '[data-scoped-list-inspect]' },
     ],
     expectView: 'world-essences',
     expectSelector: '[data-scoped-page="world-essences"]',
-    // THE ROWS AND THE FILLED INSPECTOR, proved present rather than assumed. `expectSelector`
-    // alone passes on a route that rendered its shell and no rows at all, which is what an
-    // unseeded world corpus looks like — and a frame of an empty catalogue is not evidence of a
-    // catalogue.
-    //
-    // The per-system PIP STRIP is no longer asserted because the row no longer draws one: it was
-    // six identical dots the prototype does not have, and the three states it encoded are now
-    // words on the inspector's system rows. What replaces it as the proof that the panel is
-    // populated is the inspector's own content — a world-default card and the foot action — which
-    // is a stricter assertion of the same claim, because both are unreachable until a row is
-    // selected and the previous set was not.
+    // The rows AND the filled inspector, proved present rather than assumed.
     expectContained: [
       {
         container: '[data-scoped-list]',
@@ -3937,23 +2351,11 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['manager', 'world', 'scoped'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldEssenceCataloguePage\.svelte$/,
-      // The two shared list primitives this screen composes (issue 1380). They are claimed by the
-      // cases that RENDER them, exactly as the placeholder body was: a shell edit that selected no
-      // frame would publish nothing, and one that selected an unrelated frame would be worse.
+      // The two shared list primitives this screen composes (issue 1380).
       /^src\/ui\/svelte\/apps\/manager\/scoped\/Entity(?:CatalogueShell|ListInspectorFrame)\.svelte$/,
-      // The `SYSTEM RULES n / m` panel the shell's inspector composes (issue 1372). It renders
-      // only once a row is selected, which the second step above does, and it is claimed HERE as
-      // well as on `manager-essences-normal` because the reference draws the identical panel on
-      // both rails and a change to it has to publish both.
+      // The `SYSTEM RULES n / m` panel the shell's inspector composes (issue 1372).
       /^src\/ui\/svelte\/apps\/manager\/scoped\/SystemRulesRoster\.svelte$/,
-      // The inspector's FOOT ACTION, which this case draws and did not claim (issue 1446). The
-      // `essenceInspectorFoot` snippet renders `Open definition` as an `InspectorActionButton`,
-      // and `expectContained` above already asserts `[data-scoped-list-inspector-foot]` is inside
-      // the inspector — so the frame provably contains it. It was claimed only by the four
-      // `manager-essences-*` frames, which render the OTHER caller, so a change to the primitive
-      // published four frames of one adopter and none of the other. That is the same rule the two
-      // shared list primitives above are claimed under, applied to the third thing this screen
-      // composes rather than owns.
+      // The inspector's foot action, which this case draws and did not claim (issue 1446).
       /^src\/ui\/svelte\/apps\/manager\/InspectorActionButton\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/essenceScoped\.js$/,
       /^src\/utils\/scopedEntityListModel\.js$/,
@@ -3964,30 +2366,15 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — World Essence entry',
     reaches: 'beyond',
     smokeLabels: [],
-    // REACHED THE WAY A GM REACHES IT, through the catalogue row's pen. That is the whole reason
-    // this case could not exist before issue 1372: the route normalized and rendered, and nothing
-    // navigated to it, so a case would have had to seed a state no GM can produce — the
-    // fixture-bypass hazard this registry already carries against it.
+    // Reached the way A GM reaches it, through the catalogue row's pen.
     steps: [
       { selector: '#manager-world-nav-essence-catalogue' },
       { selector: '[data-scoped-list-action="open-entry"]' },
     ],
     expectView: 'world-essence-entry',
     expectSelector: '[data-scoped-page="world-essence-entry"]',
-    // BOTH world-default cards, with their inherit lines. A frame that showed the identity fields
+    // Both world-default cards, with their inherit lines. A frame that showed the identity fields
     // alone would show nothing this screen exists for.
-    //
-    // ── THE MACRO CARD IS MEASURED AGAINST ITS SECTION, NOT THE PAGE, AND THAT IS THE DESIGN ──
-    // The prototype stacks the two world defaults as full-width cards (`essEntry.png`), and its
-    // OWN 900px frame cuts the second one off at the fold — the effect-source card ends around
-    // 710px and the macro card runs from about 730 past the bottom edge. So "both cards inside the
-    // page's rect at 1280x900" is not a fact about this screen being correct; it is a fact about
-    // the cards being side by side, which is the layout this pass replaced.
-    //
-    // What the assertion still buys is everything it was for: the macro card RENDERS, and it is
-    // not clipped by the container that owns it. The effect-source card and its inherit line stay
-    // measured against the page, so a frame that scrolled past the whole defaults region still
-    // fails.
     expectContained: [
       {
         container: '[data-scoped-page="world-essence-entry"]',
@@ -4008,10 +2395,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldEssenceEntryPage\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/MembershipActions\.svelte$/,
       // The buffered-save seam (issue 1372): the header's `← Back` / `Save essence` pair and the
-      // draft leaf behind it. Claimed by the case that RENDERS them, exactly as the shared list
-      // primitives are on the catalogue above — a change to either with no claim would publish an
-      // unrelated window as its evidence. The world tool entry claims both too when it ships,
-      // which is what a shared seam's claim set is supposed to look like.
+      // draft leaf behind it.
       /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedEntryHeaderActions\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/scopedEntryDraft\.js$/,
     ],
@@ -4021,23 +2405,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager - World Essence entry, unsaved',
     reaches: 'beyond',
     smokeLabels: [],
-    // THE STATE THE EXPLICIT SAVE EXISTS FOR (issue 1372, maintainer parity round 4).
-    //
-    // The entry editor buffers its edit now, so `Save essence` is disabled until there is
-    // something to flush - which means the resting frame beside this one photographs the button
-    // in its DISABLED treatment, and the whole change is a control nobody can see working. This
-    // case types into the name field and captures the same header with the edit standing: an
-    // enabled, primary Save, and the identity card showing the buffered value.
-    //
-    // `fill` rather than a click for the NAME, because a dirty form is unreachable by clicking:
-    // the draft is seeded from the persisted record and only an `input` event moves it.
-    //
-    // The COLOUR swatch is clicked as well, and that is what makes this frame evidence rather
-    // than decoration (maintainer parity round 6). Name, icon and colour are all buffered
-    // identity fields, and the chrome above the page — the breadcrumb's last crumb, the heading
-    // and the 44px medallion beside it — has to follow all of them. A case that moved only the
-    // name photographs a medallion that cannot be wrong, so the one control the round-6 fix is
-    // about would have been unphotographed in the frame published as its proof.
+    // The state the explicit save exists for (issue 1372, maintainer parity round 4).
     steps: [
       { selector: '#manager-world-nav-essence-catalogue' },
       { selector: '[data-scoped-list-action="open-entry"]' },
@@ -4046,9 +2414,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     expectView: 'world-essence-entry',
     expectSelector: '[data-scoped-page="world-essence-entry"]',
-    // THE HEADER PAIR, proved present and inside the band that owns it. A frame in which the
-    // Save had not rendered at all would satisfy `expectSelector` on its own, and that is the
-    // one thing this case exists to show.
+    // The header pair, proved present and inside the band that owns it.
     expectContained: [
       {
         container: '.manager-header-actions',
@@ -4061,12 +2427,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],
-    // THE SAME THREE FILES THE RESTING CASE CLAIMS, deliberately: this is the `-narrow` /
-    // `-normal` relationship, where one screen is photographed in two states and a change to it
-    // publishes both. The two frames answer different questions - the resting one shows the
-    // screen, this one shows that its Save is a live control - and a change to the header pair or
-    // the draft leaf that only ever published the resting frame would publish a DISABLED button
-    // as its evidence.
+    // The same three files the resting case claims, deliberately: this is the `-narrow` / `-normal`
+    // relationship, where one screen is photographed in two states and a change to it publishes
+    // both.
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldEssenceEntryPage\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedEntryHeaderActions\.svelte$/,
@@ -4078,19 +2441,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — World Tools Catalogue, list head',
     reaches: 'beyond',
     smokeLabels: [],
-    // THE ONE STATE THE RESTING CATALOGUE FRAME CANNOT SHOW (issue 1373).
-    //
-    // The design opens the list with a full-width dashed creation zone directly under the
-    // toolbar (`tmp/proto/tool-catalogue.png`); what shipped had it hoisted OUT of the list into
-    // the band above, sharing a row with the world breakage card and taking a third of its
-    // width. Moving it back is `EntityListInspectorFrame`'s new `listLead` snippet.
-    //
-    // IT NEEDS ITS OWN FRAME because the sibling case INSPECTS a row two thirds of the way down
-    // an eleven-row list, and inspecting a row auto-scrolls it into view - which carries the head
-    // of the list, and therefore the zone, off the top. The two frames answer different
-    // questions: that one shows what the catalogue DECIDES, this one shows what it OPENS with.
-    //
-    // NO ROW STEP AT ALL, which is the whole point: the list rests at its own top.
+    // The one state the resting catalogue frame cannot show (issue 1373).
     steps: [{ selector: '#manager-world-nav-tool-catalogue' }],
     expectView: 'world-tools',
     expectSelector: '[data-item-drop-zone="tool-create"]',
@@ -4121,23 +2472,16 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — World Tools Catalogue',
     reaches: 'beyond',
     smokeLabels: [],
-    // `Tools Catalogue` is PLURAL where its siblings are singular, and `Tools` is a live
-    // substring of it — which is why the shipped `Tools` rail entry could no longer be reached
-    // by text either.
-    // THE ROW IS INSPECTED, not merely listed. The shell's inspector column is where the
-    // per-section inherit counts and the per-system membership cluster live, and neither is
-    // rendered at rest - so a frame taken without this click shows a list and nothing this
-    // screen decides.
+    // `Tools Catalogue` is plural where its siblings are singular, and `Tools` is a live substring
+    // of it — which is why the shipped `Tools` rail entry could no longer be reached by text
+    // either.
     steps: [
       { selector: '#manager-world-nav-tool-catalogue' },
       { selector: '[data-scoped-list-inspect="sm-tool-hammer"]' },
     ],
     expectView: 'world-tools',
     expectSelector: '[data-scoped-page="world-tools"]',
-    // THE REAL CATALOGUE, not the placeholder (issue 1373). Three things have to be IN the
-    // frame rather than merely rendered somewhere: the World breakage default card with a
-    // segment selected, a populated row, and that row's source badge. `expectContained` is
-    // what proves each is inside its container rather than clipped out of it.
+    // The real catalogue, not the placeholder (issue 1373).
     expectContained: [
       {
         container: '[data-world-tool-break-mode]',
@@ -4150,11 +2494,7 @@ export const VIEW_LAB_CASES = Object.freeze([
         container: '[data-scoped-list="world-tools"]',
         target: '[data-scoped-list-row="sm-tool-hammer"] [data-scoped-list-row-facts]',
       },
-      // AND THE FOOT PAGER, WHICH ELEVEN ROWS NOW HAVE (issue 1373, maintainer feedback round 2).
-      // The window was twenty-five, so an eleven-tool world was one page and the `multiPageOnly`
-      // bar never rendered — twelve tools as one unbounded scroll, with no page control at all.
-      // Asserted INSIDE the list column rather than merely present, because the inspector's own
-      // system roster carries a pager too and a bare presence check is satisfied by that one.
+      // AND the foot pager, which eleven rows now have (issue 1373, maintainer feedback round 2).
       {
         container: '.manager-scoped-list-column',
         target: '[data-pagination-page]',
@@ -4163,51 +2503,16 @@ export const VIEW_LAB_CASES = Object.freeze([
         container: '[data-scoped-list-inspector]',
         target: '[data-scoped-list-inherit-count="breakage"]',
       },
-      // THE FIFTH INSPECTOR CARD IS GONE, and nothing replaces it here.
-      // `[data-scoped-list-extra-card="repair"]` stated `{n} groups` over a seed whose contents
-      // name components world scope cannot address (issue 1373), and the design draws four
-      // world-default cards at either scope.
-      //
-      // THE CREATION ZONE'S NEW PLACE IS THE SIBLING CASE'S FRAME. It is the list's first
-      // element now rather than a third of the band above the toolbar, and inspecting a row two
-      // thirds down an eleven-row list auto-scrolls the head of the list off the top — so this
-      // frame structurally cannot contain it. `world-tool-catalogue-list-head` is the one that
-      // does, and it claims the same two files.
-      //
-      // AND THE UNLINKED ROW'S SOURCE BADGE MOVED TO `world-tool-catalogue-page-two` for the
-      // same kind of reason: `Unclaimed Bellows` sorts last of eleven, so at a ten-row window it
-      // is the whole of page two and no page-one frame can contain it. That case walks to it.
+      // The fifth inspector CARD is gone, and nothing replaces it here.
     ],
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],
-    // THE PLACEHOLDER CLAIM IS GONE, and dropping it is not optional bookkeeping.
-    // `tests/manager-scoped-prop-contract.test.js` pairs "a case claims the shared placeholder
-    // body" against "that route's page still imports it" as a BICONDITIONAL, so a claim left
-    // behind here publishes this route's real screen as evidence of a placeholder-body change.
+    // The placeholder claim is gone, and dropping it is not optional bookkeeping.
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolCataloguePage\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityCatalogueShell\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityListInspectorFrame\.svelte$/,
-      // `MembershipActions` IS NO LONGER CLAIMED HERE, AND NO CASE REPLACES IT (issue 1373).
-      //
-      // The claim was added on the reasoning that the inspector renders the cluster per crafting
-      // system row. It does not, on THIS surface: `WorldToolCataloguePage` passes
-      // `systemRowAction="navigate"` with a non-null `onOpenSystemRules`, and the cluster's own
-      // branch is the OTHER arm of that test — so the component is structurally unreachable in
-      // every state this frame can be driven to. That is unreachable configuration, which issue
-      // 1116 names precisely because it is indistinguishable from working configuration: the
-      // pattern matched, the frame published, and the changed component was not in it.
-      //
-      // The right answer is to remove the pattern rather than to add a case, because the state is
-      // not one this screen has. `world-essence-entry` and the three essence editor frames claim
-      // the component on the surfaces that DO render it.
-      //
-      // `toolStudio.js` TAKES ITS PLACE, and for the opposite reason: it is genuinely rendered
-      // here and was claimed by nothing that shows it. `worldToolStudio.js` was the only studio
-      // module named, while the row's badges, its break summary and the inspector's own facts all
-      // come through `tools/toolStudio.js` — which published one world frame
-      // (`world-tool-entry-destroyed-preview`) and the ten SYSTEM list frames, none of them this
-      // catalogue.
+      // `MembershipActions` is no longer claimed here, AND no case replaces it (issue 1373).
       /^src\/ui\/svelte\/apps\/manager\/tools\/toolStudio\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/worldToolStudio\.js$/,
     ],
@@ -4217,19 +2522,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — World Tools Catalogue, page two',
     reaches: 'beyond',
     smokeLabels: [],
-    // THE PAGER, DRIVEN (issue 1373, maintainer feedback round 2).
-    //
-    // The catalogue had no pagination at all: `Pagination` is `multiPageOnly` on this frame, the
-    // window was twenty-five rows, and the lab world holds eleven tools - so the bar never
-    // rendered and a real world's twelve tools were one unbounded scroll. The window is ten now,
-    // which is the smallest size the pager itself offers and the maintainer's stated pair
-    // (eleven rows must show a bar, three must not).
-    //
-    // A SECOND PAGE IS THE ONLY THING THAT PROVES IT WORKS. A frame of page one shows a bar; this
-    // one shows the bar MOVING the list, which is the difference between a rendered control and a
-    // working one. It is also where the unlinked record lives now - `Unclaimed Bellows` sorts
-    // last of eleven - so the source badge this registry has always photographed comes with it
-    // rather than being dropped.
+    // The pager, driven (issue 1373, maintainer feedback round 2).
     steps: [
       { selector: '#manager-world-nav-tool-catalogue' },
       { selector: '[data-pagination-next]' },
@@ -4266,20 +2559,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — World Tools Catalogue, bulk edit',
     reaches: 'beyond',
     smokeLabels: [],
-    // THE STATE THAT SHIPPED BROKEN AND THAT NO CASE COULD SEE (issue 1373, maintainer feedback
-    // round 2). Every row on this screen has carried a selection box since it shipped and the
-    // toolbar has counted the ticks; the inspector beside it went on saying `Nothing selected`,
-    // because `bulk` is a lane snippet and the page passed none. A conditional on an undefined
-    // snippet is silent, so nothing failed and no frame showed it - this registry photographed
-    // the resting panel and the inspected panel and never a selected one.
-    //
-    // FOUR ROWS, which is the maintainer's own reproduction and is not arbitrary: it is enough
-    // for the count in the toolbar and the count in the panel hero to be checked against each
-    // other in one photograph, and enough for the plural wording of both.
-    //
-    // Ticked through the LABEL rather than the input, which is the idiom every other
-    // multi-select case here uses: `SelectionCheckbox` renders the real control visually hidden
-    // behind its own box, and the label is the click target a GM actually has.
+    // The state that shipped broken AND that no case could see (issue 1373, maintainer feedback
+    // round 2).
     steps: [
       { selector: '#manager-world-nav-tool-catalogue' },
       { selector: 'label:has(input[data-scoped-list-select="sm-tool-anvil"])' },
@@ -4290,9 +2571,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectView: 'world-tools',
     expectSelector: '[data-world-tool-bulk-panel]',
     expectContained: [
-      // IN THE INSPECTOR'S OWN COLUMN. Rendered anywhere on the screen the panel would satisfy
-      // `expectSelector`; this is what says it REPLACED the identity panel rather than appearing
-      // somewhere else, which is the whole of the finding.
+      // In the inspector's own column.
       {
         container: '[data-scoped-list-inspector]',
         target: '[data-world-tool-bulk-panel]',
@@ -4307,9 +2586,7 @@ export const VIEW_LAB_CASES = Object.freeze([
         container: '[data-world-tool-bulk-panel]',
         target: '[data-world-tool-bulk-apply]',
       },
-      // AND THE TOOLBAR'S OWN COUNT, in the same frame. The two numbers are derived from one
-      // `selection` object, so a frame holding both is what makes "the toolbar says four and the
-      // inspector says nothing" impossible to ship again unnoticed.
+      // AND the toolbar's own count, in the same frame.
       {
         container: '.manager-scoped-list-column',
         target: '[data-scoped-list-selection-count]',
@@ -4322,9 +2599,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/scoped\/ToolCatalogueBulkPanel\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityCatalogueShell\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityListInspectorFrame\.svelte$/,
-      // The shared bulk chrome the panel composes. These sit directly under `apps/manager/` and
-      // fall through every directory glob in the registry, so the case that RENDERS them claims
-      // them by name - the same rule the studio bulk cases follow.
+      // The shared bulk chrome the panel composes.
       /^src\/ui\/svelte\/apps\/manager\/BulkEditPanelShell\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/BulkEditSection\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/BulkSelectionToolbar\.svelte$/,
@@ -4335,23 +2610,14 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — World Tools Catalogue, empty world',
     reaches: 'beyond',
     smokeLabels: [],
-    // THE EMPTY CATALOGUE, WHICH THE FIXTURE COULD NOT PRODUCE (issue 1373, maintainer feedback
-    // round 2). `noTools` is a lab flag rather than a fixture edit for the reason `stripTools`
-    // records: the lab runs every migration on every build and the world-scope pass lifts each
-    // crafting system's own tools into world records, so an empty `toolScope` alone still boots
-    // an eleven-row catalogue. Nothing here could reach the state, so nothing photographed it -
-    // which is exactly why its drop zone touched the hero and its inspector said nothing.
-    //
-    // The scope band is deliberately still authored: it is a world SETTING rather than a Tool,
-    // and a frame that had blanked it too would photograph two absences as one.
+    // The empty catalogue, which the fixture could not produce (issue 1373, maintainer feedback
+    // round 2).
     query: { noTools: '1' },
     steps: [{ selector: '#manager-world-nav-tool-catalogue' }],
     expectView: 'world-tools',
     expectSelector: '[data-scoped-list-state="empty"]',
     expectContained: [
-      // THE HERO, UNDER THE ZONE AND INSIDE THE LIST. The zone renders in the empty states too -
-      // an empty catalogue is when a GM most needs the surface that makes the first record - and
-      // the two touched, because the gap belonged to neither of them.
+      // The hero, under the zone AND inside the list.
       {
         container: '[data-scoped-list="world-tools"]',
         target: '[data-item-drop-zone="tool-create"]',
@@ -4360,11 +2626,7 @@ export const VIEW_LAB_CASES = Object.freeze([
         container: '[data-scoped-list="world-tools"]',
         target: '[data-scoped-list-state="empty"]',
       },
-      // AND THE INSPECTOR'S OWN NO-STATE, inside the column that owns it. On an empty catalogue
-      // the whole right-hand track is this one box, and this frame is what says which SHAPE it
-      // takes: a content-height panel at the top of a full-height aside, the same treatment
-      // `.manager-tool-browser-inspector-empty` records for the system Tool Rules rail, rather
-      // than a ~700px dashed box stretched down the whole column.
+      // AND the inspector's own no-state, inside the column that owns it.
       {
         container: '[data-scoped-list-inspector]',
         target: '[data-scoped-list-inspector-state="resting"]',
@@ -4382,53 +2644,25 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolCataloguePage\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityCatalogueShell\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityListInspectorFrame\.svelte$/,
-      // `EmptyState.svelte` AND `ItemDropZone.svelte` WERE CLAIMED HERE AND ARE NOT ANYMORE.
-      // Both are BROAD SIGNALS (`BROAD_SIGNAL_PATTERN`, via the named manager-primitive leg), and
-      // `selectRenderFileCases` `continue`s on a broad-signal file BEFORE it reads any case's
-      // `sourceMatches` — so the two patterns declared an interest the router could never act on,
-      // and `tests/design-system-primitives.test.js` property (b) failed on them from the commit
-      // that added them. Removing them changes no routing whatsoever: a change to either file
-      // publishes the representative pair exactly as it did with the claim present. The seam for
-      // "this frame is the one that draws the primitive's deliberate state" is
-      // `BROAD_SIGNAL_CASE_OVERRIDES`, and giving either file one is a routing decision about
-      // every screen that renders it rather than about this case.
+      // `EmptyState.svelte` AND `ItemDropZone.svelte` were claimed here AND are not anymore.
     ],
   }),
-  // ── THE WORLD TOOLS CATALOGUE'S TOOLBAR, DRIVEN (issue 1373) ─────────────────────────────────
-  //
-  // Until these four cases existed the registry contained ZERO steps naming
+  // Until these four cases existed the registry contained zero steps naming
   // `data-scoped-list-search`, `data-scoped-list-sort`, `data-scoped-list-clear-filters` or
-  // `data-scoped-list-state="filtered"` — across all of its cases, not just this screen's. Every
-  // frame of every scoped catalogue photographed the toolbar at rest, so the row's five controls
-  // were evidenced as five shapes and none of them as a control that does anything.
-  //
-  // Four rather than six, because two pairs of states share a frame without either being hidden
-  // by the other: the desc direction is only reachable by choosing a sort to reverse, and the
-  // inert direction toggle is only reachable by choosing the lane sort that disables it.
+  // `data-scoped-list-state="filtered"` — across all of its cases, not just this screen's.
   managerCase({
     id: 'world-tool-catalogue-search',
     label: 'Manager — World Tools Catalogue, filtered by search',
     reaches: 'beyond',
     smokeLabels: [],
-    // A TYPED SEARCH, which no case in the registry had ever driven on this frame. The field is
-    // the toolbar's widest member and the one whose sizing three separate rounds argued about
-    // (see `EntityListInspectorFrame`'s own note on the filter row having been three things), and
-    // every argument was settled against a frame in which nothing had been typed.
-    //
-    // WHAT IT PROVES BEYOND THE FIELD is the pair the count states: `2 of 12 tools`, which is the
-    // reading that tells a GM "this world holds twelve" apart from "ten are hidden by a filter I
-    // forgot". A frame of the resting list shows those two numbers equal, which is the one state
-    // in which the pair says nothing.
+    // A typed search, which no case in the registry had ever driven on this frame.
     steps: [
       { selector: '#manager-world-nav-tool-catalogue' },
       { selector: '[data-scoped-list-search]', fill: WORLD_TOOL_SEARCH_TERM },
     ],
     expectView: 'world-tools',
     expectSelector: '[data-scoped-list-row="rw-tool-stylus"]',
-    // BOTH SURVIVORS, inside the list. The term matches on an entity's name, its description AND
-    // both of its Item uuids, so a frame asserting one row would pass over a filter that had
-    // silently widened to a third — which is exactly the failure `WORLD_TOOL_SEARCH_TERM`'s own
-    // derivation test above exists to catch from the other end.
+    // Both survivors, inside the list.
     expectContained: [
       {
         container: '[data-scoped-list="world-tools"]',
@@ -4454,24 +2688,16 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — World Tools Catalogue, filtered to nothing',
     reaches: 'beyond',
     smokeLabels: [],
-    // FILTERED TO NOTHING IS NOT AN ABSENCE, and the frame draws a different panel to say so:
-    // `EmptyState` at `filtered`, with a `Clear filters` action rather than the corpus-empty
-    // hero's creation prompt. `world-tool-catalogue-empty` photographs the OTHER panel — a world
-    // with no Tools at all — and the two are one selector apart and completely different
-    // statements, which is why one cannot stand in for the other.
-    //
-    // The term is a MISS by construction and the miss is derived rather than assumed: the
-    // catalogue searches names, descriptions and both Item uuids, so a term that reads like a
-    // miss can still be answered by a uuid. See `WORLD_TOOL_SEARCH_MISS_TERM`.
+    // Filtered to nothing is not an absence, and the frame draws a different panel to say so:
+    // `EmptyState` at `filtered`, with a `Clear filters` action rather than the corpus-empty hero's
+    // creation prompt.
     steps: [
       { selector: '#manager-world-nav-tool-catalogue' },
       { selector: '[data-scoped-list-search]', fill: WORLD_TOOL_SEARCH_MISS_TERM },
     ],
     expectView: 'world-tools',
     expectSelector: '[data-scoped-list-state="filtered"]',
-    // THE ACTION, INSIDE THE PANEL. `Clear filters` is the whole difference between this panel
-    // and a dead end, and it is drawn by nothing else in the corpus — a frame proving only the
-    // hero would pass over a panel that had lost its one way out.
+    // The action, inside the panel.
     expectContained: [
       {
         container: '[data-scoped-list-state="filtered"]',
@@ -4494,21 +2720,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — World Tools Catalogue, sorted by systems descending',
     reaches: 'beyond',
     smokeLabels: [],
-    // THE TWO HALVES OF THE SORT CONTROL, IN ONE FRAME, and neither was in any frame before.
-    // `systems` is one of the two non-default sort keys the frame offers, and `desc` is the only
-    // state the direction toggle has other than the one it boots in — so a change to either the
-    // select or the toggle's pressed treatment published frames showing both at their defaults.
-    //
-    // THE TOGGLE STATES ITS OWN POSITION rather than offering the other one, which is a decision
-    // a frame can check and a source read cannot: `aria-pressed` follows `asc` and the visible
-    // word follows the CURRENT direction. Reversed, it must read `Desc`.
-    //
-    // AND IT IS HALF OF A PAIR. The glyph follows the direction too — `arrow-down-a-z` ascending,
-    // `arrow-up-a-z` descending — which it did not until issue 1373: the control drew the
-    // descending arrow in both positions, so in `desc` the mark asserted the opposite of the
-    // order on screen. The ASC half is not a case of its own: every resting catalogue frame draws
-    // it, and `world-tool-catalogue-list-head` in particular photographs the toolbar untouched at
-    // the top of the list. This is the frame that has to be read against those.
+    // The two halves of the sort control, in one frame, and neither was in any frame before.
     steps: [
       { selector: '#manager-world-nav-tool-catalogue' },
       ...chooseSelectOption('[data-scoped-list-sort]', 'systems'),
@@ -4516,10 +2728,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     expectView: 'world-tools',
     expectSelector: '[data-scoped-list-direction="desc"]',
-    // THE TOGGLE IS LIVE HERE, which is the half that separates this frame from its sibling
-    // below: `systems` is one of the frame's OWN sort keys, so the direction composes with it and
-    // the control is enabled. Asserted by attribute rather than by containment, because what is
-    // under test is which value the button carries, not where it sits.
+    // The toggle is live here, which is the half that separates this frame from its sibling below:
+    // `systems` is one of the frame's own sort keys, so the direction composes with it and the
+    // control is enabled.
     expectAttributes: [
       { selector: '[data-scoped-list-direction]', name: 'aria-pressed', value: 'false' },
     ],
@@ -4541,36 +2752,15 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — World Tools Catalogue, the lane sort with the direction inert',
     reaches: 'beyond',
     smokeLabels: [],
-    // THE SHARPEST OF THE FOUR, and the one written FOR a frame that did not exist. A lane sort
-    // is its own whole order — the descriptor supplies one `compare`, not a pair — so composing a
-    // direction onto it would produce an id `project` does not know and fall back silently to
-    // name order. The frame's answer is to DISABLE the direction toggle rather than hide it, on
-    // the stated reasoning that a GM who cannot reverse an order can still see that reversing is
-    // what the control does.
-    //
-    // That reasoning is entirely about what the control LOOKS like when it is inert, and no frame
-    // in the registry drew one. `break-asc` is the world Tool catalogue's one lane descriptor,
-    // and this is the case that chooses it.
-    //
-    // THE ROWS ARE THE SECOND HALF. A disabled toggle over a list that had NOT reordered would be
-    // the silent fallback the frame exists to prevent — a lane id composed with a direction falls
-    // through to name order and looks exactly like a working sort — so the containment names a row
-    // the BREAK order puts on the first page and the name order does not.
-    //
-    // `lab-tool-warped-crucible` is that row, and the coupling is deliberate rather than
-    // incidental: it carries a 0% break chance, so `worldToolSorts` puts `0% break` first of
-    // twelve, while its name sorts it last of twelve and onto page two. The pairing is stated at
-    // the fixture too, so a later edit to either end has a note at the other.
+    // The sharpest of the four, and the one written for a frame that did not exist.
     steps: [
       { selector: '#manager-world-nav-tool-catalogue' },
       ...chooseSelectOption('[data-scoped-list-sort]', 'break-asc'),
     ],
     expectView: 'world-tools',
     expectSelector: '[data-scoped-list-direction][disabled]',
-    // `aria-pressed` STILL FOLLOWS `asc`, which is the second half of "inert, not hidden": the
+    // `aria-pressed` still follows `asc`, which is the second half of "inert, not hidden": the
     // control keeps saying which way the order runs even though pressing it would do nothing.
-    // Asserted rather than assumed, because the obvious wrong repair — clearing the attribute
-    // with the disable — is invisible in a screenshot.
     expectAttributes: [
       { selector: '[data-scoped-list-direction]', name: 'aria-pressed', value: 'true' },
     ],
@@ -4594,59 +2784,15 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/scoped\/worldToolStudio\.js$/,
     ],
   }),
-  // ── STATES OF THESE SCREENS THAT CANNOT EXIST, RECORDED SO NOBODY ADDS A CASE (issue 1373) ───
-  //
   // An enumeration of ~200 reachable states over the four Tool surfaces turned up four that look
-  // like coverage gaps and are not. Each is written here rather than left to be rediscovered,
-  // because "no frame draws it" and "no frame CAN draw it" are indistinguishable from a registry
-  // listing, and the second one has already cost this file one unreachable `sourceMatches`
-  // pattern (see `world-tool-catalogue`'s note on `MembershipActions`).
-  //
-  //   - THE MEMBERSHIP SEGMENTED CONTROL, on the world Tools Catalogue.
-  //     `WorldToolCataloguePage` passes `membershipFilter={false}`, so the whole `{#if}` arm is
-  //     dead on this surface. The system Tool Rules list asks the same question with its own
-  //     segmented track and `manager-tool-rules-overriding-filter-1280x720` photographs that one.
-  //
-  //   - THE `MembershipActions` CLUSTER, on the same screen and for the same kind of reason:
-  //     `systemRowAction="navigate"` with a non-null handler takes the other arm of the test the
-  //     cluster is behind. Removing the claim was the fix; adding a case would have been a case
-  //     for a state the screen has no route to.
-  //
-  //   - THE UNAVAILABLE-CORPUS BRANCH (`data-scoped-list-state="unavailable"`). It renders when
-  //     the world settings corpus cannot be READ, which the lab has no mechanism to produce — the
-  //     fixture writes the settings map directly and every read succeeds by construction. A mount
-  //     flag that faked it would be photographing the flag.
-  //
-  //   - `saveError` ON THE WORLD ENTRY (`data-tool-save-error`). It renders when a write is
-  //     REJECTED, and nothing in the lab rejects one; the draft flush goes through the real store
-  //     against a real settings map.
-  //
-  //   - EVERY DRAG-OVER STATE — `data-tool-replacement-drop="over"`, `ItemDropZone`'s own
-  //     `is-over`, and the scoped list's row drop targets. These are honest non-gaps rather than
-  //     impossible states: the capture runner has five verbs and none of them is a drag, so the
-  //     states are real and simply not photographable by this harness. A verb would be the fix,
-  //     not a case.
-  //
-  //   - `BLOCKS ENABLE` ON THE WORLD ENTRY'S VALIDATION TAB, which IS a gap and is recorded here
-  //     because it looks like one that a case could close and cannot. All four of that tab's
-  //     checks bottom out at `warn` in the lab: `name` falls back through the linked Item's name
-  //     to the record id, so it can never be blank; `source` and `membership` are warn-only by
-  //     construction; and `breakage-value` blocks only on a `diceExpression` whose formula parses
-  //     and cannot be ROLLED, which `formulaRolls` decides — and that predicate FAILS OPEN when
-  //     the dice class has no `evaluateSync`, which the lab's `Roll` double does not. So the
-  //     block face needs `tests/view-lab/foundry/labRoll.js` to grow a maximizing synchronous
-  //     evaluate, which would re-answer every authored formula in the corpus and is a fixture
-  //     change with its own capture to justify it. `world-tool-entry-validation` photographs the
-  //     warn face; `manager-tool-stress-invalid-validation` is the corpus's one `BLOCKS ENABLE`.
+  // like coverage gaps and are not.
   managerCase({
     id: 'world-tool-entry',
     label: 'Manager — World Tool entry',
     reaches: 'beyond',
     smokeLabels: [],
-    // REACHED BY CLICKING A CATALOGUE ROW, which is the only way in: the entry route takes an
-    // entity id the rail cannot supply. That is why the lab fixture seeds a world tool corpus
-    // (`tests/view-lab/world/labContent.js`) - the capture driver throws by name on a selector
-    // that matches nothing, so the fixture and this case ship together.
+    // Reached by clicking A catalogue row, which is the only way in: the entry route takes an
+    // entity id the rail cannot supply.
     steps: [
       { selector: '#manager-world-nav-tool-catalogue' },
       {
@@ -4656,9 +2802,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     expectView: 'world-tool-entry',
     expectSelector: '[data-scoped-page="world-tool-entry"]',
-    // A SECTION TAB OPEN WITH ITS INHERIT COUNT, the read-only world break mode, and at least
-    // one per-system row. Each is a distinct decision this screen makes, and a frame missing
-    // any of them is evidence of a different screen.
+    // A section tab open with its inherit count, the read-only world break mode, and at least one
+    // per-system row.
     expectContained: [
       {
         container: '[data-scoped-page="world-tool-entry"]',
@@ -4674,10 +2819,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/worldToolStudio\.js$/,
-      // The buffered-save seam (issue 1373), claimed by the SECOND screen that renders it.
-      // The essence entry's own claim set says this is what a shared seam's claims are
-      // supposed to look like: a change to the pair or to the draft leaf publishes every
-      // window that draws them, rather than one of them standing in for the other.
+      // The buffered-save seam (issue 1373), claimed by the second screen that renders it.
       /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedEntryHeaderActions\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/scopedEntryDraft\.js$/,
     ],
@@ -4687,17 +2829,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — World Tool entry, unsaved',
     reaches: 'beyond',
     smokeLabels: [],
-    // THE STATE THE EXPLICIT SAVE EXISTS FOR (issue 1373), and the twin of
+    // The state the explicit save exists for (issue 1373), and the twin of
     // `world-essence-entry-dirty` beside it.
-    //
-    // The entry editor buffers its edit now, so `Save tool` is DISABLED until there is
-    // something to flush — which means every other frame of this screen photographs the button
-    // in its disabled treatment, and the whole change is a control nobody can see working.
-    // This case types into the display label and captures the same band with the edit
-    // standing: an enabled, primary Save, and the heading following the buffered name.
-    //
-    // `fill` rather than a click, because a dirty form is unreachable by clicking: the draft is
-    // seeded from the persisted record and only an `input` event moves it.
     steps: [
       { selector: '#manager-world-nav-tool-catalogue' },
       {
@@ -4707,9 +2840,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     expectView: 'world-tool-entry',
     expectSelector: '[data-scoped-page="world-tool-entry"]',
-    // THE HEADER PAIR, proved present and inside the band that owns it. A frame in which the
-    // Save had not rendered at all would satisfy `expectSelector` on its own, and that is the
-    // one thing this case exists to show.
+    // The header pair, proved present and inside the band that owns it.
     expectContained: [
       {
         container: '.manager-header-actions',
@@ -4722,10 +2853,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],
-    // THE SAME FILES THE RESTING CASE CLAIMS, deliberately: one screen photographed in two
-    // states, where the resting frame shows the screen and this one shows that its Save is a
-    // live control. A change to the header pair or the draft leaf that only ever published the
-    // resting frame would publish a DISABLED button as its evidence.
+    // The same files the resting case claims, deliberately: one screen photographed in two states,
+    // where the resting frame shows the screen and this one shows that its Save is a live control.
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/ScopedEntryHeaderActions\.svelte$/,
@@ -4737,14 +2866,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — World Tool entry, Overview',
     reaches: 'beyond',
     smokeLabels: [],
-    // A SECOND FRAME ON ONE SCREEN, because the entry's two tabs make DIFFERENT decisions and
-    // its sibling case opens Breakage. Overview is where the world record's identity and its
-    // MASTER SWITCH live (issue 1373), and the switch is the one control on this screen that
-    // reaches every crafting system at once - a state no case covered, which is exactly the
-    // gap that publishes an unrelated frame.
-    //
-    // NO TAB STEP: Overview is the tab the route opens on, and clicking the tab it is already
-    // on would assert nothing the default does not.
+    // A second frame on one screen, because the entry's two tabs make different decisions and its
+    // sibling case opens Breakage.
     steps: [
       { selector: '#manager-world-nav-tool-catalogue' },
       {
@@ -4753,26 +2876,19 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     expectView: 'world-tool-entry',
     expectSelector: '[data-world-tool-entry-card="enabled"]',
-    // THE SWITCH AND THE CONSEQUENCE COUNT BESIDE IT. A world-scope write persists on change
-    // and has no confirmation step, so a frame proving the control without the count would be
-    // evidence of the half that is safe to ship on its own and is not.
+    // The switch AND the consequence count beside it.
     expectContained: [
       {
         container: '[data-world-tool-entry-card="enabled"]',
         target: '[data-world-tool-entry-enabled]',
       },
-      // AND THE OPTIONAL DISPLAY LABEL'S HELPER (issue 1373). The reach sentence that used to be
-      // asserted here is now the switch's accessible name rather than a third visible line — the
-      // design's card is a title, one line and a bare pill — so what this frame proves instead is
-      // the affordance the Overview tab had lost: that the label may be left blank and what
-      // answers for it when it is.
+      // AND the optional display label's helper (issue 1373).
       {
         container: '[data-world-tool-entry-card="display-label"]',
         target: '[data-world-tool-entry-name-hint]',
       },
-      // THE HEADER `Delete`, which the design draws between Back and Save and which this screen
-      // did not have. It is claimed on THIS case because the body card it replaces was on this
-      // tab, so the frame that showed the card is the frame that has to show its successor.
+      // The header `Delete`, which the design draws between Back and Save and which this screen did
+      // not have.
       {
         container: '.manager-header-actions',
         target: '[data-arm-token^="world-tool-delete:"]',
@@ -4790,25 +2906,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — World Tool entry, no linked Item',
     reaches: 'beyond',
     smokeLabels: [],
-    // THE OTHER FACE OF THE SOURCE TILE, which no case reached (issue 1373, maintainer round 2).
-    //
-    // `ItemDropZone` paints two faces and every world Tool frame photographed the LINKED one, so
-    // the design's own idiom could be inverted — the healthy state drawn dashed and unfilled,
-    // which is the design's BROKEN state — and no frame could show it. The repair makes the
-    // linked tile solid and filled and gives the dashed edge back to the unlinked prompt in the
-    // danger ink, and half of that repair is unphotographable without this case.
-    //
-    // THE STATE IS ONE THE MIGRATION PRODUCES, not a synthetic. `worldScopeEntityGrouping`
-    // records that a definition with no source references of its own becomes a world entity
-    // flagged unlinked, and `lab-tool-unlinked` is that record in the lab corpus — already
-    // seeded, already listed by the catalogue case, and until now never opened.
-    // THE PAGER STEP IS LOAD-BEARING, and it was added after a cross-lane break (issue 1373).
-    // This case reached the row directly until the catalogue's window became ten rows in the same
-    // epic: `Unclaimed Bellows` sorts last of eleven, so the record moved to page two and the row
-    // selector matched nothing — `the case cannot reach its view state`, which fails the whole
-    // capture and publishes NO frames rather than one bad one. Neither change was wrong alone and
-    // neither lane's own capture could see it, because the case and the page size were authored in
-    // different worktrees. `world-tool-catalogue-page-two` states the same fact from the other end.
+    // The other face of the source tile, which no case reached (issue 1373, maintainer round 2).
     steps: [
       { selector: '#manager-world-nav-tool-catalogue' },
       { selector: '[data-pagination-next]' },
@@ -4819,9 +2917,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     expectView: 'world-tool-entry',
     expectSelector: '[data-world-tool-entry-card="linked-item"]',
-    // BOTH HALVES OF THE UNLINKED FACE, inside the card that owns them: the drop prompt itself
-    // and the sentence that says what the record has without an Item. A frame proving only the
-    // card would pass on a screen that had fallen back to the linked tile with an empty name.
+    // Both halves of the unlinked face, inside the card that owns them: the drop prompt itself and
+    // the sentence that says what the record has without an Item.
     expectContained: [
       {
         container: '[data-world-tool-entry-card="linked-item"]',
@@ -4831,14 +2928,7 @@ export const VIEW_LAB_CASES = Object.freeze([
         container: '[data-world-tool-entry-card="linked-item"]',
         target: '[data-world-tool-entry-unlinked]',
       },
-      // AND THE WORLD MASTER SWITCH, OFF (issue 1373). No Tool in the lab corpus was ever
-      // disabled at world scope, so the one control on this screen that reaches every crafting
-      // system at once was photographed exclusively in its ON position — on all three of the
-      // surfaces that draw it. `lab-tool-unlinked` now carries `enabled: false` in its world
-      // default, which is the cheapest place in the corpus to put it: the record has no
-      // membership and no system, so the veto reaches nothing but the three world-scope surfaces
-      // it is evidence for. The catalogue's row toggle and its inspector pill are the other two,
-      // and `world-tool-catalogue-page-two` is the frame that draws the row.
+      // AND the world master switch, off (issue 1373).
       {
         container: '[data-world-tool-entry-card="enabled"]',
         target: '[data-world-tool-entry-enabled="off"]',
@@ -4856,24 +2946,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — World Tool entry, linked Item deleted',
     reaches: 'beyond',
     smokeLabels: [],
-    // THE THIRD FACE OF THE SOURCE TILE, and the one no corpus state could reach (issue 1373).
-    //
-    // `ItemDropZone` paints three: LINKED, UNLINKED and MISSING. The first two have frames;
-    // `missing` renders only when the record NAMES a game-world Item and that Item no longer
-    // resolves, which is the state a GM is in the moment they delete the Item behind a Tool — and
-    // the lab minted an Item for every tool it seeded, so no fixture record could be in it.
-    // `sourceMissing` is the derivation and it deliberately requires a NON-EMPTY roster, because
-    // an empty one is a roster that has not loaded rather than evidence of a broken link.
-    //
-    // `lab-tool-warped-crucible` is that record: a world Tool naming
-    // `Item.lab-tool-warped-crucible`, which `buildDocumentIndex` does not mint because the
-    // entity is world-only and the index is built from the crafting systems' own tool
-    // definitions. See `labContent.js` for the rest of what it carries and why.
-    //
-    // IT IS ON PAGE TWO, and the pager step is load-bearing for the same reason
-    // `world-tool-entry-unlinked`'s is: `Warped Crucible` sorts last of twelve under the default
-    // name order, so a case reaching for its row on page one would match nothing and fail the
-    // whole capture rather than publish one bad frame.
+    // The third face of the source tile, and the one no corpus state could reach (issue 1373).
     steps: [
       { selector: '#manager-world-nav-tool-catalogue' },
       { selector: '[data-pagination-next]' },
@@ -4884,10 +2957,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     expectView: 'world-tool-entry',
     expectSelector: '[data-item-drop-zone="tool-source"]',
-    // THE MISSING FACE ITSELF, by its own state value. The tile is the same element in all three
-    // faces, so a bare selector on the zone is satisfied by the LINKED one — which is exactly
-    // what this record would fall back to if the resolution ever stopped distinguishing a dead
-    // uuid from a live one, and the fallback renders a plausible tile under the snapshot name.
+    // The missing face itself, by its own state value.
     expectAttributes: [
       {
         selector: '[data-item-drop-zone="tool-source"]',
@@ -4913,23 +2983,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — World Tool entry, display label left blank',
     reaches: 'beyond',
     smokeLabels: [],
-    // THE OPTIONAL FIELD, ACTUALLY LEFT BLANK (issue 1373). The design draws the display label
-    // EMPTY with the linked Item's name as its placeholder, under `Leave blank to use the linked
-    // Item name.`, and the whole point of that pair is that a GM can see both that the field may
-    // be left alone and what answers for it when they do. Every world Tool in the corpus carries
-    // an authored name, so every frame of this card drew a FILLED field and the placeholder — the
-    // half of the affordance that is only visible when the field is empty — appeared nowhere.
-    //
-    // AUTHORED RATHER THAN SEEDED, and that is not a convenience. `scopedEntryName` falls back to
-    // the record ID when an entity's own name is blank, and the catalogue sorts on exactly that
-    // string — so a persisted blank-named Tool would sort under `lab-tool-…` while displaying the
-    // Item's name, moving it into the middle of page one and carrying `Smith's Hammer` off it.
-    // Six cases open the hammer from page one. Clearing the field in the DRAFT reaches the same
-    // rendering with the persisted record untouched.
-    //
-    // IT IS ALSO A DIRTY FORM, and that overlap is deliberate rather than accidental:
-    // `world-tool-entry-dirty` photographs a dirty header with a LONGER name typed in, so between
-    // them the buffered edit is shown adding and removing.
+    // The optional field, actually left blank (issue 1373).
     steps: [
       { selector: '#manager-world-nav-tool-catalogue' },
       {
@@ -4939,10 +2993,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     expectView: 'world-tool-entry',
     expectSelector: '[data-world-tool-entry-card="display-label"]',
-    // THE FIELD AND ITS HELPER, inside the card. The helper has TWO branches — one for a record
-    // with an Item to fall back on and one for a record without — and this frame is the first
-    // that draws the first branch over an empty field, which is the only state in which the
-    // sentence and the placeholder are saying the same thing at the same time.
+    // The field AND its helper, inside the card.
     expectContained: [
       {
         container: '[data-world-tool-entry-card="display-label"]',
@@ -4965,13 +3016,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — World Tool entry, Requirements',
     reaches: 'beyond',
     smokeLabels: [],
-    // THE FOURTH TAB, which the screen did not have (issue 1373). `prerequisites` and `bonus`
-    // became world-default sections a crafting system inherits and may override, so the world
-    // entry is where the default is authored - and until this tab existed there was nowhere to
-    // author it, which is what left the design's four tabs at three.
-    //
-    // IT RENDERS THE SHIPPED `ToolRequirementsTab`, the same component the SYSTEM editor mounts,
-    // so this frame is also the evidence that one meaning has one shape across the two scopes.
+    // The fourth tab, which the screen did not have (issue 1373).
     steps: [
       { selector: '#manager-world-nav-tool-catalogue' },
       {
@@ -4988,22 +3033,12 @@ export const VIEW_LAB_CASES = Object.freeze([
         container: '[data-world-tool-entry-card="requirements"]',
         target: '[data-tool-prerequisites-enabled]',
       },
-      // THE REACH LINE MOVED INSIDE THE SECTION IT COUNTS (issue 1373, maintainer round 2).
-      // It was `data-world-tool-entry-inherit-count="prerequisites"`, a paragraph stacked at the
-      // foot of a WRAPPER card beside an identical one for the bonus; the wrapper is gone with
-      // the card-inside-a-card it made, and each sentence is now the last line of its own
-      // section's card as `data-tool-section-note`.
+      // The reach line moved inside the section it counts (issue 1373, maintainer round 2).
       {
         container: '[data-world-tool-entry-card="requirements"]',
         target: '[data-tool-section-note="prerequisites"]',
       },
-      // AND THE BONUS IS A PICK FROM THE WORLD MODIFIER LIBRARY (issue 1373, maintainer round
-      // 3). The tab shipped a free-text `Bonus expression` field the design has no counterpart
-      // for; `proto:2353`-`2369` draws a single-select list of `characterLibraries.modifiers[]`
-      // instead. This frame could not have caught that: `sm-tool-hammer` carried neither
-      // section, so both cards drew their off-state sentence and the control under test was on
-      // no frame at all. `TOOL_WORLD_REQUIREMENT_DEFAULTS` gives the hammer a bonus, and the
-      // containment below is what stops the list falling back to the empty-library sentence.
+      // AND the bonus is A pick from the world modifier library (issue 1373, maintainer round 3).
       {
         container: '[data-world-tool-entry-card="requirements"]',
         target: '[data-tool-bonus-modifier]',
@@ -5021,9 +3056,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       // BOTH of this tab's lists' row (issue 1373, rounds 4 and 5) — the bonus list, shared
       // with the Checks Studio catalogue, and the prerequisite list above it.
       /^src\/ui\/svelte\/apps\/manager\/ModifierLibraryRow\.svelte$/,
-      // The card the tab draws each of its two sections as (issue 1373). This frame is the only
-      // one that photographs the WORLD face of it: `headingStyle="kicker"`, and the section
-      // subtitle, which at system scope the inherit row spends the head on instead.
+      // The card the tab draws each of its two sections as (issue 1373).
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolInheritCard\.svelte$/,
     ],
   }),
@@ -5032,27 +3065,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — World Tool entry, bonus with no world modifiers',
     reaches: 'beyond',
     smokeLabels: [],
-    // THE STATE THE MAINTAINER'S OWN WORLD IS IN (issue 1373, maintainer round 3): the bonus
-    // section selects over the WORLD modifier library, and most worlds have authored none. The
-    // section then draws one muted sentence naming where modifiers come from — the shape and
-    // voice the prerequisite list one section up already uses for the same absence, which this
-    // frame shows directly BELOW it for exactly that comparison.
-    //
-    // `clearSystem` is the whole mechanism and it is not a side effect: both world libraries are
-    // built by the `1.28.0`/`1.30.0` passes LIFTING each crafting system's own copy, so a world
-    // with no crafting systems is the honest way to reach an empty one. It leaves the world Tool
-    // corpus, the entry route and the record's own authored bonus untouched, so what changes
-    // between this frame and `world-tool-entry-requirements` is the library and nothing else.
-    //
-    // THE `1` ON THE VALIDATION TAB IS THAT WORLD, NOT THIS SECTION: with no crafting systems
-    // the entry's `membership` check warns that nothing has the Tool. It is stated here because
-    // a reader comparing this frame with its sibling would otherwise read the badge as a fault
-    // the bonus list introduced.
-    //
-    // AND THE RECORD'S OWN `@prof` IS STILL SET, so this frame carries the second state as well:
-    // an authored expression the library cannot account for keeps its own row rather than being
-    // silently dropped. Those two are the same picture in a world with no library at all, which
-    // is exactly the world a GM installing Fabricate starts in.
+    // The state the maintainer's own world is in (issue 1373, maintainer round 3): the bonus
+    // section selects over the world modifier library, and most worlds have authored none.
     query: { clearSystem: '1' },
     steps: [
       { selector: '#manager-world-nav-tool-catalogue' },
@@ -5089,24 +3103,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — World Tool entry, an unlimited-uses world default',
     reaches: 'beyond',
     smokeLabels: [],
-    // THE FIRST-RUN BREAKAGE STATE, WHICH NO FRAME REACHED (issue 1373). Every other
-    // `world-tool-entry-*` case opens a `breakageChance` Tool, so the arm of this panel that a
-    // brand-new Tool lands in was drawn by nothing at world scope — and that is not an exotic
-    // corner: a Tool created by dropping an Item defaults to `limitedUses` with no `maxUses`,
-    // which IS `Unlimited uses`.
-    //
-    // AND IT IS THE STATE THE SCREEN GOT WRONG, which is what makes the frame evidence rather
-    // than an illustration. `sm-tool-anvil`'s world default is `{mode: 'limitedUses', maxUses:
-    // null}`, and the panel rendered `Limited uses` selected, a stepper reading `1` against
-    // `min={1}`, and a summary line reading `Unlimited uses` — three answers to one field, with
-    // no control that could restore the state the record was actually in. So a GM who touched the
-    // stepper silently converted an unlimited Tool into a one-use Tool for every inheriting
-    // system. The mode list is four cards now, `unlimited` leading, and the state has a card of
-    // its own with no argument under it.
-    //
-    // THE GROUP IS TWO COLUMNS OF FOUR, so the card block is two rows deep rather than one. That
-    // is stated here because it moves everything below it on this tab, and because a frame is the
-    // only place it can be seen.
+    // The first-run breakage state, which no frame reached (issue 1373).
     steps: [
       { selector: '#manager-world-nav-tool-catalogue' },
       {
@@ -5115,17 +3112,8 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-world-tool-entry-tab="breakage"]' },
     ],
     expectView: 'world-tool-entry',
-    // THE CHOSEN CARD AND THE ABSENT INSET, IN ONE SELECTOR, and the absence is the load-bearing
-    // half. `Unlimited uses` is a mode with no argument — that is the whole of what it means — so
-    // the correct rendering has NO value editor under the cards at all. The defect drew one: a
-    // stepper against `maxUses ?? 1` with `min={1}`, which is a control that cannot express the
-    // state it is displaying and whose first nudge converts an unlimited Tool into a one-use Tool
-    // for every inheriting system.
-    //
-    // A frame asserting only the chosen card would pass with that stepper still standing beside
-    // it, which is exactly how the state shipped. `:not(:has(...))` is what refuses it, and the
-    // registry already uses that shape on `manager-world-parties-last-page` for the same reason:
-    // some claims are about what is NOT on the screen.
+    // The chosen CARD AND the absent inset, in one selector, and the absence is the load-bearing
+    // half.
     expectSelector:
       '[data-world-tool-entry-card="breakage"]' +
       ':has([data-world-tool-entry-breakage-mode="unlimited"] input:checked)' +
@@ -5155,38 +3143,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — World Tool entry, Validation',
     reaches: 'beyond',
     smokeLabels: [],
-    // THE FOURTH TAB, WHICH HAD NO FRAME AT ALL (issue 1373). Four tabs, three photographed —
-    // and the unphotographed one is where four separate defects accumulated, which is not a
-    // coincidence: a surface with no case, no frame and no assertion is a surface nothing can
-    // report on.
-    //
-    // IT MOUNTS A WORLD-SPECIFIC GROUP. `ScopedValidationTab` is shared with the system editor
-    // and with the essence entry, but the four checks in it are this screen's own — a name, a
-    // source link, the breakage mode's value, and whether any crafting system has the Tool at all
-    // — and `EditorValidationSurface` is where the whole `is-pass` / `is-clear` colour defect of
-    // this issue lives. A blocked record and a clean one rendered identically, which is precisely
-    // the kind of fault a frame settles and a source read cannot.
-    //
-    // NO HEADING AND NO INTRO AT THIS SCOPE, and that is what the frame is partly for. The
-    // surface's in-pane title is optional, and world scope was passing both — drawing a heading
-    // the reference does not have and duplicating the tab label a few pixels above it. The
-    // panel's first element is the summary head now, which is a statement about vertical rhythm
-    // that only a photograph settles.
-    //
-    // THE WARPED CRUCIBLE, because a Validation tab whose every row passes is evidence for a
-    // layout and not for a judgement. That record is the corpus's NEGLECTED one — a 0% break
-    // chance, so `The breakage mode has no usable value`, and no crafting system at all, so `No
-    // crafting system has this Tool` — which puts two warnings, two passes and the `Needs
-    // attention` summary in one frame. The anvil next door is the all-clear reading and is
-    // photographed by its own Breakage frame instead.
-    //
-    // `BLOCKS ENABLE` IS NOT IN THIS FRAME, and cannot be in any world one — see the recorded
-    // impossible states above the `world-tool-entry` case for the whole reason. The system
-    // editor's `manager-tool-stress-invalid-validation` is the corpus's one frame of it.
-    //
-    // THE PAGER STEP IS LOAD-BEARING for the reason `world-tool-entry-source-missing` records:
-    // `Warped Crucible` sorts last of twelve, so it is the whole of page two with the unlinked
-    // record, and a case reaching for its row on page one would fail the capture WHOLE.
+    // The fourth tab, which had no frame at all (issue 1373).
     steps: [
       { selector: '#manager-world-nav-tool-catalogue' },
       { selector: '[data-pagination-next]' },
@@ -5198,10 +3155,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     expectView: 'world-tool-entry',
     expectSelector: '[data-world-tool-entry-validation]',
-    // THE SUMMARY, THE COUNTS RAIL AND A NAMED CHECK. The named check is what stops this passing
-    // over a surface that rendered its head and no rows — and `breakage-value` specifically,
-    // because it is one of the two rows carrying this record's warnings and therefore a row whose
-    // STATUS the frame is evidence about.
+    // The summary, the counts rail AND A named check.
     expectContained: [
       {
         container: '[data-world-tool-entry-validation]',
@@ -5230,20 +3184,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — World Tool entry, an empty repair set',
     reaches: 'beyond',
     smokeLabels: [],
-    // THE STATE A GM IS IN THE INSTANT THEY PICK `Mark as broken`, and it was drawn by nothing
-    // (issue 1373). Three strings exist solely for it — the count chip's `none yet`, the summary
-    // line's `Nothing listed — a broken copy cannot be mended.`, and the set card's own empty
-    // paragraph — and every fixture Tool that selects `flagBroken` ships a populated seed, so all
-    // three were unreachable from the corpus.
-    //
-    // AUTHORED BY THE CLICK RATHER THAN SEEDED, which is the only honest route: a second
-    // `flagBroken` Tool with an empty seed would sit in the catalogue permanently, changing the
-    // row count and the inspector's own arithmetic on every other frame of this screen, to depict
-    // a state that lasts one interaction. `sm-tool-hammer` is destroy-mode with no repair
-    // requirements at all, so choosing `Mark as broken` on it is exactly the transition.
-    //
-    // NO SCROLL STEP, unlike its populated sibling: an empty set is a heading, a chip, a hint,
-    // one adder row and a summary, so the whole section fits under the breakage card without one.
+    // The state A GM is in the instant they pick `Mark as broken`, and it was drawn by nothing
+    // (issue 1373).
     steps: [
       { selector: '#manager-world-nav-tool-catalogue' },
       {
@@ -5282,19 +3224,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — World Tool entry, a replacement with no target chosen',
     reaches: 'beyond',
     smokeLabels: [],
-    // `ToolReplacementTarget`'s EMPTY FACE, which has sixty lines of CSS written for it and no
-    // frame at either scope (issue 1373). Both fixture Tools carrying `replaceWith` ship a chosen
-    // target, so the corpus could only ever draw the FILLED tile — and the empty one is not a
-    // smaller version of it: it is a dashed drop target holding a search trigger, and its rules
-    // exist specifically to defeat the full-width treatment a `manager-button` takes inside a
-    // card.
-    //
-    // IT IS ALSO THE STATE A GM PASSES THROUGH EVERY TIME. Choosing `Replace with component` and
-    // then naming the component is two acts, and the screen between them is this one — which
-    // used to be the state the screen could not author at all, before world scope got the picker.
-    //
-    // ON THE HAMMER, which is destroy-mode, so the click is the whole of the setup and the
-    // record's own persisted `onBreak` is untouched.
+    // `ToolReplacementTarget`'s empty face, which has sixty lines of CSS written for it and no
+    // frame at either scope (issue 1373).
     steps: [
       { selector: '#manager-world-nav-tool-catalogue' },
       {
@@ -5304,9 +3235,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-world-tool-entry-onbreak-mode="replaceWith"]' },
     ],
     expectView: 'world-tool-entry',
-    // THE DROP FACE, by its own idle value. `[data-tool-replacement-target]` is the card in both
-    // faces, so asserting the card would pass over the filled tile — which is the exact frame
-    // `world-tool-entry-on-break-replace` already publishes.
+    // The drop face, by its own idle value.
     expectSelector: '[data-tool-replacement-drop="idle"]',
     expectContained: [
       {
@@ -5330,47 +3259,21 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — World Tool entry, repair route',
     reaches: 'beyond',
     smokeLabels: [],
-    // A STATE NO CASE COULD REACH, WHICH IS WHY THE SCREEN SHIPPED WITHOUT THE CONTROL (issue
-    // 1373, maintainer round 2). `Mark as broken` is the on-break action that takes an ARGUMENT
-    // — the ingredient groups that mend a broken copy — and no lab tool selected it, so every
-    // frame of this tab photographed `Destroy the item`, which configures nothing. Two automated
-    // parity passes then read the tab as complete while it rendered nothing at all for the two
-    // modes that DO configure something.
-    //
-    // `sm-tool-tongs` carries `onBreak: {mode: 'flagBroken'}` and a two-group repair seed for
-    // this case, and a 22% break chance so this frame also shows the chance track and its band
-    // one step along from the hammer's.
+    // A state no case could reach, which is why the screen shipped without the control (issue 1373,
+    // maintainer round 2).
     steps: [
       { selector: '#manager-world-nav-tool-catalogue' },
       {
         selector: '[data-scoped-list-row="sm-tool-tongs"] [data-scoped-list-action="open-entry"]',
       },
       { selector: '[data-world-tool-entry-tab="breakage"]' },
-      // SCROLLED, because the repair editor is the LAST thing in the second card of a panel
-      // that also holds the read-only mode band and the whole breakage card. Anchored on the
-      // repair section itself rather than on a row inside it: `scrollIntoView` aligns what it is
-      // given to the TOP of the scroller, so anchoring deeper would leave the section's own
-      // heading above the fold and the frame would prove rows with nothing naming them.
+      // Scrolled, because the repair editor is the last thing in the second card of a panel that
+      // also holds the read-only mode band and the whole breakage card.
       { selector: '[data-tool-repair-requirements]', scroll: true },
     ],
     expectView: 'world-tool-entry',
     expectSelector: '[data-tool-repair-requirements]',
-    // THE ROWS AND THE ADDERS. A frame proving the section exists but not that it holds real
-    // ingredient rows would be evidence for a heading, and the repair editor's whole claim is
-    // that world scope can now NAME the Components a broken copy is mended with. The adder
-    // proves it is a CONTROL: the `REPAIR MATERIALS` card this replaces could state a group
-    // COUNT and offered only to destroy the list behind it.
-    //
-    // THE BREAK-CHANCE BAND IS DELIBERATELY NOT ASSERTED HERE even though this Tool has one:
-    // the frame is scrolled to the repair section, which puts the band above the fold, so a
-    // containment assertion on it could never pass. `world-tool-entry` photographs the band.
-    //
-    // AND THE TAG ROW, which no repair frame held until round 6. `sm-tool-tongs` carries a
-    // third group whose one row is a TAG requirement, because the tag arm is the only row
-    // anatomy that carries several values at once and a Tool inspector is the NARROW copy of
-    // it - narrower than the recipe tab `manager-recipe-edit-ingredients-cost` measures. The
-    // arm not being drawn at all, and the arm being drawn shredded one chip to a line, are the
-    // two failures this containment separates from a frame of the section alone.
+    // The rows AND the adders.
     expectContained: [
       {
         container: '[data-scoped-page="world-tool-entry"]',
@@ -5390,10 +3293,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolEntryPage\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRepairRequirements\.svelte$/,
-      // THE ROW ITSELF, because this is the only frame in the registry that photographs a TAG
-      // requirement inside a Tool inspector. Without the claim a change to the row published
-      // the recipe tab's frames and left this one stale - which is how a four-line tag arm
-      // shipped past two capture runs.
+      // The row itself, because this is the only frame in the registry that photographs a tag
+      // requirement inside a Tool inspector.
       /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeIngredientOption\.svelte$/,
     ],
   }),
@@ -5402,35 +3303,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — World Tool entry, repair route with no catalogue',
     reaches: 'beyond',
     smokeLabels: [],
-    // THE STATE THE MAINTAINER'S OWN WORLD IS IN (issue 1373, maintainer round 5). The repair
-    // row's name field completes from the world component and essence catalogues, and a world
-    // that has authored neither — which is every world a GM installs Fabricate into — gets a
-    // field that can complete nothing. The design's answer, and premium's, is a DEGRADED field
-    // rather than a blocked one: the input still renders and is still typeable, and one muted
-    // line under it says there is nothing to name yet.
-    //
-    // TWO INPUTS, BECAUSE THE WORLD CATALOGUE HAS TWO SOURCES (issue 1540). `clearSystem` is the
-    // first and it is the same one `world-tool-entry-bonus-empty-library` uses: both world
-    // catalogues are built by LIFTING each crafting system's own copy, so a world with no
-    // crafting systems lifts nothing into either.
-    //
-    // That was the WHOLE mechanism until issue 1392 gave the fixture a world-only component —
-    // `lab-world-component-curio`, which the world Tags & Categories screen needs and which no
-    // `clearSystem` can remove, because nothing lifted it. ONE catalogue row is not an empty
-    // catalogue: the field draws its ordinary search face, `data-recipe-option-empty-catalogue`
-    // is never stamped, and this case failed on the containment assertion that names it — which
-    // is exactly the assertion doing its job, since the frame underneath was a populated field
-    // published under the name of an empty one.
-    //
-    // `noAuthoredWorldComponents` is the second input and it removes that record and only that
-    // record. The two together are the day-one world this frame is named for: nothing lifted and
-    // nothing authored. Both leave the world Tool corpus, the entry route and this Tool's own
-    // authored repair seed untouched, so what changes between this frame and
-    // `world-tool-entry-on-break-repair` is the catalogue and nothing else.
-    //
-    // WHICH IS ALSO WHY BOTH FRAMES ARE NEEDED. The populated one photographs a named row
-    // reading back on its chip; this one photographs the field a GM meets on day one. A single
-    // frame of either would be evidence that the OTHER state renders correctly by assumption.
+    // The state the maintainer's own world is in (issue 1373, maintainer round 5).
     query: { clearSystem: '1', noAuthoredWorldComponents: '1' },
     steps: [
       { selector: '#manager-world-nav-tool-catalogue' },
@@ -5442,10 +3315,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     expectView: 'world-tool-entry',
     expectSelector: '[data-tool-repair-requirements]',
-    // THE DEGRADED FIELD ITSELF, not merely the section. A frame asserting only that the editor
-    // rendered would pass just as well over a row that had silently dropped its field, which is
-    // the failure this state is most likely to arrive as — and the marker is what separates a
-    // field that CANNOT complete from one that simply has not been typed into yet.
+    // The degraded field itself, not merely the section.
     expectContained: [
       {
         container: '[data-tool-repair-requirements] [data-recipe-option]',
@@ -5469,16 +3339,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — World Tool entry, repair route with an empty tag row',
     reaches: 'beyond',
     smokeLabels: [],
-    // THE ROW THE MAINTAINER AUTHORED, WHICH NO FIXTURE COULD SEED (issue 1373, maintainer
-    // round 7). `sm-tool-tongs` carries a POPULATED tag row because an option with no tags
-    // fails `Ingredient.validate`, so an empty-tag seed would flip this Tool's Validation badge
-    // and change what every other frame of it is evidence for. But an empty tag arm — the
-    // policy word and `+ Tag`, with no chips between them — is the state a GM meets the instant
-    // they press `Add tag`, and it is the ONE the maintainer photographed at 96px against the
-    // other rows' 46px.
-    //
-    // Pressing the adder is how this case reaches it: the state is authored rather than seeded,
-    // so the Tool's stored requirements are untouched and no other frame of it moves.
+    // The row the maintainer authored, which no fixture could seed (issue 1373, maintainer round
+    // 7).
     steps: [
       { selector: '#manager-world-nav-tool-catalogue' },
       {
@@ -5490,9 +3352,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     expectView: 'world-tool-entry',
     expectSelector: '[data-tool-repair-requirements]',
-    // THE ARM, IN A ROW THAT HOLDS NO CHIPS. The populated frame beside this one cannot stand
-    // in for it: with two chips the arm is wide enough to look inline whatever its own wrap
-    // behaviour is, and it was green through the defect for exactly that reason.
+    // The arm, in A row that holds no chips.
     expectContained: [
       {
         container:
@@ -5514,32 +3374,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — World Tool entry, the tag picker over a world with no tags',
     reaches: 'beyond',
     smokeLabels: [],
-    // THE STATE THE MAINTAINER'S OWN WORLD IS IN, and the one the redesign is actually about. A
-    // world that has authored no component tags gives this picker nothing to list, and until
-    // this case existed no frame in the registry drew ANY picker with an empty list — so the
-    // dashed hero panel `EmptyState` used to put inside a 240px popover was unphotographed at
-    // all 24 call sites. `EmptyState`'s own override names `manager-systems-empty`, which is the
-    // hero panel in a full pane and cannot show the note.
-    //
-    // NO `clearSystem`, AND THAT IS STILL THE FINDING. The tag list this picker offers is not
-    // lifted from the crafting systems the way the world component and essence catalogues are:
-    // it is the union of every world component's own `defaults.tags`, which only the explicit
-    // `setWorldTags` action ever writes, and a freshly installed world has none. Removing the
-    // crafting systems would therefore prove nothing about THIS picker while costing the frame
-    // every other row on the screen. Its populated twin runs in the recipe editor instead, where
-    // `itemTags` is the selected system's own vocabulary.
-    //
-    // WHAT THE ORDINARY FIXTURE IS NO LONGER, IS TAGLESS (issue 1540). Issue 1392 authored one
-    // world-only component whose default carries the tag `moss`, so the world Tags & Categories
-    // screen could photograph a tag whose ONLY reference is a world default — the asymmetry that
-    // screen exists to make readable. That one authored tag is also a row in this picker, which
-    // is not the empty list this case is named for, and the case failed on its own note selector
-    // with a populated popover underneath.
-    //
-    // `noAuthoredWorldComponents` drops that record and only that record. The migration still
-    // lifts a world component out of every system's library, so the repair row's own component
-    // catalogue is as populated here as in its sibling frames and this frame still differs from
-    // them in one thing: the picker it opens.
+    // The state the maintainer's own world is in, and the one the redesign is actually about.
     query: { noAuthoredWorldComponents: '1' },
     steps: [
       { selector: '#manager-world-nav-tool-catalogue' },
@@ -5576,15 +3411,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — World Tool entry, repair route with a suggestion list open',
     reaches: 'beyond',
     smokeLabels: [],
-    // NO CASE IN THE REGISTRY OPENED A SUGGESTION LIST (issue 1373, maintainer round 7), which
-    // is why the row that completes a typed name shipped centred and unphotographed. The
-    // suggestion panel is the whole point of the inline field: it is what makes the field
-    // COMPLETE a name rather than open a second surface over the row, so a registry that never
-    // draws it is evidence for the field and not for the thing the field is for.
-    //
-    // Clearing the first row and typing into it is the shortest route: `or…`-free, one
-    // requirement, and `ingot` matches several world components so the panel holds real rows
-    // rather than the `No matches` line the empty-catalogue frame would give.
+    // No case in the registry opened A suggestion list (issue 1373, maintainer round 7), which is
+    // why the row that completes a typed name shipped centred and unphotographed.
     steps: [
       { selector: '#manager-world-nav-tool-catalogue' },
       {
@@ -5597,9 +3425,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     expectView: 'world-tool-entry',
     expectSelector: '[data-tool-repair-requirements] [data-recipe-option-suggestion]',
-    // THE PANEL UNDER THE FIELD IT COMPLETES. Containment against the field's own wrapper is
-    // what says the two are one control; against the page it would pass just as well over a
-    // panel drawn anywhere on the screen.
+    // The panel under the field it completes.
     expectContained: [
       {
         container: '[data-scoped-page="world-tool-entry"]',
@@ -5619,15 +3445,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — World Tool entry, replacement component',
     reaches: 'beyond',
     smokeLabels: [],
-    // THE OTHER UNREACHABLE STATE: replace-mode WITH a component attached. `hb-tool-alembic`
-    // has carried `onBreak: {mode: 'replaceWith', replacementTarget: {componentId:
-    // 'hb-empty-vial'}}` in the fixture all along, and no case ever opened it — so the world
-    // entry could offer `Replace with component` and name nothing, and nothing photographed the
-    // gap.
-    //
-    // IT ALSO CARRIES THE PLAYER PREVIEW'S SECOND FACE. `Show as broken` on a replace-mode Tool
-    // draws the REPLACEMENT Component's art rather than a `Replaced` chip over the Tool's own,
-    // and this is the only Tool in the lab that can show it.
+    // The other unreachable state: replace-mode with a component attached.
     steps: [
       { selector: '#manager-world-nav-tool-catalogue' },
       {
@@ -5641,10 +3459,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     expectView: 'world-tool-entry',
     expectSelector: '[data-tool-replacement-target]',
-    // THE FILLED FACE OF THE DROP ZONE AND THE TILE IT EXPLAINS. `data-tool-replacement-tile`
-    // proves a Component is actually attached rather than that the card rendered empty, and
-    // `data-tool-player-image="replacement"` is the assertion that the preview swapped the art
-    // — an empty box and a Tool's own art are the same selector without it.
+    // The filled face of the drop zone AND the tile it explains.
     expectContained: [
       {
         container: '[data-tool-replacement-target]',
@@ -5670,17 +3485,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — World Tool entry, destroyed copy',
     reaches: 'beyond',
     smokeLabels: [],
-    // THE THIRD FACE OF `Show as broken`, and the one no case could reach (issue 1373,
-    // maintainer round 2). Destroy-on-break leaves NOTHING in the inventory, and the rail drew
-    // the Tool's own art dimmed under a chip reading `Destroyed` — a word for the outcome
-    // beside a picture of the opposite of it. It draws an EMPTY SLOT now, and an empty slot is
-    // exactly what a selector on the tile cannot distinguish from a missing region, which is
-    // why the frame is asserted on `data-tool-player-image="none"`.
-    //
-    // `sm-tool-hammer` is the lab's destroy-mode Tool, so this case is its Overview route with
-    // the preview toggle flipped; its sibling `world-tool-entry-on-break-replace` photographs
-    // the replacement face on `hb-tool-alembic`, and `world-tool-entry-player-preview` the
-    // working copy.
+    // The third face of `Show as broken`, and the one no case could reach (issue 1373, maintainer
+    // round 2).
     steps: [
       { selector: '#manager-world-nav-tool-catalogue' },
       {
@@ -5715,41 +3521,23 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — World Tool entry, player preview',
     reaches: 'beyond',
     smokeLabels: [],
-    // THE THIRD FRAME ON THIS SCREEN, and it is the only one that can show its preview COLUMN
-    // (issue 1373). The column has four regions and the pane is 900px: its two siblings both
-    // photograph the tab BODY, so `Preview as` and `Required for` are below the fold in both and
-    // a change to either would publish a frame that cannot contain it.
-    //
-    // WHAT THE THREE LOWER REGIONS ANSWER is the half of this screen a rules list cannot: what a
-    // COPY of the Tool looks like in a player's inventory, whether one named character may wield
-    // it, and what stops working if the Tool is deleted. None is derivable from the world
-    // defaults above them.
+    // The third frame on this screen, and it is the only one that can show its preview column
+    // (issue 1373).
     steps: [
       { selector: '#manager-world-nav-tool-catalogue' },
       {
         selector: '[data-scoped-list-row="sm-tool-hammer"] [data-scoped-list-action="open-entry"]',
       },
-      // SCROLLED, because the column is what this frame is about and it does not fit. Anchored
-      // on the last region's LAST ELEMENT rather than on the region itself: `scrollIntoView`
-      // aligns what it is given to the TOP of the scroller, so anchoring on the region left its
-      // own pager below the rail's bottom edge and the capture gate reported the region as
-      // clipped. Anchoring on the pager pulls the whole region up with it.
+      // Scrolled, because the column is what this frame is about and it does not fit.
       { selector: '[data-tool-required-for] .manager-pagination', scroll: true },
     ],
     expectView: 'world-tool-entry',
     expectSelector: '[data-world-tool-entry-preview]',
-    // ONE ASSERTION PER REGION, against the preview column itself. A frame proving only the
+    // One assertion per region, against the preview column itself. A frame proving only the
     // inventory tile would be evidence for a third of the change.
-    //
-    // THE HOOKS ARE THE SHARED RAIL'S NOW (issue 1373). This column was a FORK of
-    // `tools/ToolBehaviorPreview` that re-implemented all five regions and lost the treatment of
-    // four of them; it composes the shared component instead, so the per-region hooks are the
-    // ones that component writes. `data-world-tool-entry-preview` survives as the aside's own
-    // name, which is a `hookAttribute` prop for exactly the reason `EditorTabs` carries one.
     expectContained: [
-      // THE PLAYER TILE, ITS NAME CAPTION, THE USABILITY CARD AND THE PAGED `Required for` LIST —
-      // one per region. The fork drew a bare 64px thumbnail with no caption element at all, and a
-      // dead `and 5 more` sentence where the pager is.
+      // The PLAYER tile, its name caption, the usability CARD AND the paged `Required for` list —
+      // one per region.
       {
         container: '[data-world-tool-entry-preview]',
         target: '[data-tool-player-preview]',
@@ -5762,13 +3550,8 @@ export const VIEW_LAB_CASES = Object.freeze([
         container: '[data-world-tool-entry-preview]',
         target: '[data-tool-preview-usability]',
       },
-      // THE `Required for` REGION IS ASSERTED THROUGH ITS TWO PARTS rather than its wrapper, and
-      // that is a real constraint rather than a weaker claim. The region is the LAST of four in a
-      // rail that scrolls inside a 900px window, so its wrapper is taller than the space any
-      // scroll position can leave for it and a rect-containment check on the wrapper can never
-      // pass. A ROW and the PAGER are what findings 20 and 21 are about — the icon-tiled row
-      // treatment the fork had lost, and the pager that replaced its dead `and 5 more` sentence —
-      // and each of them fits.
+      // The `Required for` region is asserted through its two parts rather than its wrapper, and
+      // that is a real constraint rather than a weaker claim.
       {
         container: '[data-world-tool-entry-preview]',
         target: '[data-tool-required-row]',
@@ -5795,18 +3578,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — World scoped rail collapsed',
     reaches: 'beyond',
     smokeLabels: [],
-    // KEPT AND LOAD-BEARING. The prototype has NO collapsed rail state, so the parity oracle
-    // structurally cannot reach this; this frame and the full-width set-equality gate are its
-    // only evidence.
-    //
-    // WHAT IT SHOWS IS THE FOUR LEAVES SURVIVING AS AN ICON STRIP — the glyph reachable inside
-    // its 56px button, and the route still active. It does NOT show a count badge, and that
-    // correction is worth recording: the plan expected an unclipped badge at 56px, and the
-    // shipped rail hides `.manager-nav-count` outright when it collapses. Asserting a badge
-    // here therefore failed the capture on the first run, correctly. The only badge a
-    // collapsed rail keeps is the Checks parent's `manager-nav-issue-badge`, which is a
-    // different element with its own rule; making a world leaf's record count behave like an
-    // issue count would be a rail-wide UX change, not this PR's.
+    // Kept AND load-bearing. The prototype has no collapsed rail state, so the parity oracle
+    // structurally cannot reach this; this frame and the full-width set-equality gate are its only
+    // evidence.
     steps: [
       { selector: '#manager-world-nav-component-catalogue' },
       { selector: '[data-manager-rail-toggle]' },
@@ -5847,11 +3621,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [{ selector: '#manager-world-nav-component-catalogue' }],
     expectView: 'world-components',
     expectSelector: '[data-scoped-page="world-components"]',
-    // THE ABSENCE OF THE DEAD STRIP, MEASURED IN THE BROWSER rather than inferred from the
+    // The absence of the dead strip, measured in the browser rather than inferred from the
     // stylesheet. `expectedTracks: 2` is the released column; `absentSelector` is the aside.
-    // Both halves are needed and they fail differently: release the column without suppressing
-    // the aside and the empty aside wraps to an implicit grid row, where the track count is
-    // still two and the frame still photographs a dead strip.
     expectLayout: {
       containerSelector: '.fabricate-manager',
       gridSelector: '.manager-body',
@@ -5860,10 +3631,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     },
     position: { width: 1024, height: 860 },
     kinds: ['manager', 'world', 'scoped', 'responsive'],
-    // THE PLACEHOLDER CLAIM IS GONE HERE TOO (issue 1371). This case reaches the same route as
-    // the catalogue case above, so it carried the same claim and goes stale in the same way —
-    // and it is the half a lane replacing the body is most likely to miss, because nothing about
-    // this case's own assertions mentions a placeholder.
+    // The placeholder claim is gone here too (issue 1371).
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldComponentCataloguePage\.svelte$/,
     ],
@@ -5885,28 +3653,12 @@ export const VIEW_LAB_CASES = Object.freeze([
   managerCase({
     id: 'manager-recipes-blocked-enable-flash',
     label: 'Manager — Recipes blocked-enable flash',
-    // THE FLASH, WHICH NO CASE REACHED (issue 1515). `RecipesBrowserView.svelte` renders a
-    // dismissible `role="alert"` — a `<Notice blocking dismissable>` since this issue's sixth
-    // phase, in the position the design system fixes for a blocking notice on a browse screen,
-    // which is above the filter bar — and it exists only after a refusal:
-    // the view claims the store's blocked-enable message by handing it an `onBlocked` sink
-    // (`:124-130`), which SUPPRESSES the Foundry notification, so this element is the only place
-    // a GM is told why the switch did not move. Every other recipes frame is a resting browse
-    // surface and structurally cannot contain it.
-    //
-    // `beyond`: the smoke's recipe walk never presses a refused enable, so there is no
-    // counterpart frame and no label to name.
+    // The flash, which no case reached (issue 1515).
     reaches: 'beyond',
     smokeLabels: [],
-    // `sm-r-runeplate-draft` is the lab's one OFF-and-un-enableable recipe — an incomplete
-    // shell with no result groups, which also requires the disabled `aether` essence — so its
-    // row's switch is the one gesture in the corpus that produces a refusal rather than a
-    // write. Clicking any other row's switch would DISABLE it, which is never gated, and the
-    // frame would be the plain browser under a case named for the alert.
-    //
-    // `tests/view-lab-cases.test.js` derives that premise from the fixture through
-    // `evaluateSystemValidation` rather than restating it, so a fixture repair that completes
-    // the recipe fails there instead of publishing a frame with no flash in it.
+    // `sm-r-runeplate-draft` is the lab's one OFF-and-un-enableable recipe — an incomplete shell
+    // with no result groups, which also requires the disabled `aether` essence — so its row's
+    // switch is the one gesture in the corpus that produces a refusal rather than a write.
     query: { system: 'lab-smithing' },
     steps: [
       'Crafting',
@@ -5918,41 +3670,15 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     expectView: 'recipes',
     // The alert AND its dismiss control, because the flash is specified as dismissible and
-    // non-auto-hiding: an alert drawn without its control is a different contract from the one
-    // this frame is evidence for. The title line is required too — an empty notice is a lit
-    // container, and `flashMessage` is what gates the block at all.
-    //
-    // THE CLASS AND THE DISMISS HOOK ARE THE PRIMITIVE'S NOW (issue 1515). `<Notice>` takes no
-    // `class` and stamps no per-caller hook on the control it draws, so the three tokens that
-    // named the retired bespoke strip — `.manager-recipe-flash`, `.manager-recipe-flash-message`
-    // and `[data-recipe-flash-dismiss]` — are `.fab-notice`, `.fab-notice-title` and
-    // `[data-notice-dismiss]`. What the caller still owns is the `dataAttr` hook, which is what
-    // keeps THIS notice distinguishable from any other the route could grow.
+    // non-auto-hiding: an alert drawn without its control is a different contract from the one this
+    // frame is evidence for.
     expectSelector:
       '.fabricate-manager .fab-notice[data-recipe-flash][role="alert"]' +
       ':has(.fab-notice-title)' +
       ' [data-notice-dismiss]',
-    // THE REFUSAL IS LOGGED, AND THE LOG IS THE STATE WORKING (issue 1515, driver capture).
-    // `adminStore.js`'s `toggleRecipeEnabled` catch reports the rejected write with
-    // `console.error` BEFORE it hands the localized message to this view's `onBlocked` sink, and
-    // the capture driver fails a render on any console error. So the one case in the registry
-    // that presses a refused write cannot render without declaring it.
-    //
-    // THE CALL SITE, not the error class. `/RecipeActivationError/` would also match, and would
-    // additionally tolerate that error logged from anywhere else in the render — a create path, a
-    // signature re-check, a future caller — which is a wider licence than this case needs. The
-    // store's own message prefix is a string literal at exactly one site, so this pattern
-    // tolerates that site and nothing else.
-    //
-    // It is an ASSERTION as much as a tolerance: `partitionConsoleErrors` fails the case when a
-    // declared pattern matches NOTHING, so a fixture repair that lets the enable succeed reds here
-    // rather than publishing the resting recipe browser under a case named for the flash.
+    // The refusal is logged, AND the log is the state working (issue 1515, driver capture).
     allowedConsoleErrors: [/Fabricate \| Failed to toggle recipe enabled state/],
-    // THE FLASH HAS TO BE IN THE PICTURE, not merely in the DOM. It is the leading grid row of
-    // this route's `.manager-main` (`fabricate.css`), so it does not move with the row list —
-    // but the click that produces it auto-scrolls its target, and `expectSelector` cannot see
-    // where that left the frame. Stating the containment makes "the alert is in the photograph"
-    // a measurement.
+    // The flash has to be in the picture, not merely in the DOM.
     expectContained: [{ container: '.manager-main', target: '[data-recipe-flash]' }],
     kinds: ['manager', 'recipes'],
     sourceMatches: [
@@ -5982,19 +3708,14 @@ export const VIEW_LAB_CASES = Object.freeze([
     // The row's "No check" warning pill is a SYSTEM-level fact, not a recipe one:
     // `_buildRecipeCheckSummary` reports `kind: 'none'` for any non-`routedByIngredients` system
     // whose check slot carries no authored roll formula — "check enabled" is not the same thing.
-    // Every lab system authors one, so the case CLEARS it, which is the GM action that produces
-    // this state and is the same fact the smoke reaches by switching to a system authored without
-    // one. Driven rather than fixtured because a permanently check-less system would strip the DC
-    // pill from the flagship recipe library every other recipe frame photographs.
     reaches: 'exact',
     query: {},
     steps: [
       'Checks',
       { selector: '#manager-checks-nav-crafting' },
       { selector: '[data-check-roll-formula]', fill: '' },
-      // The Checks view is a STAGED editor: typing only marks the draft dirty, and the browser's
-      // check pills read the PERSISTED system. Without this the case cleared the field, navigated
-      // away, and photographed twelve DC pills while claiming to show the no-check warning.
+      // The Checks view is a staged editor: typing only marks the draft dirty, and the browser's
+      // check pills read the persisted system.
       { selector: '[data-checks-save]' },
       'Crafting',
     ],
@@ -6009,12 +3730,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     id: 'manager-recipes-grouped-continuation',
     label: 'Manager — Recipes grouped continuation',
     smokeLabels: ['manager-recipes-grouped-continuation'],
-    // Page TWO of a grouped list: with "Group by category" on, ordering is category-major BEFORE
-    // pagination, so a category larger than the page continues across the boundary instead of
-    // being re-sliced alphabetically per page. The smoke seeds 14 rows into one category to force
-    // that; here the page is shrunk to 10 instead, which produces the same boundary against the
-    // library the other recipe frames photograph rather than a throwaway category that has to be
-    // seeded and torn down.
+    // Page two of a grouped list: with "Group by category" on, ordering is category-major before
+    // pagination, so a category larger than the page continues across the boundary instead of being
+    // re-sliced alphabetically per page.
     reaches: 'exact',
     query: {},
     steps: [
@@ -6029,40 +3747,12 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/recipes?\//,
     ],
   }),
-  // ── The Recipe Studio's bulk edit panel (issue 1010) ───────────────────────────────────────────
-  //
-  // THREE frames, because the panel's five axes cannot be photographed in one. A staged axis and
-  // its `Unchanged` face are mutually exclusive states of the same control, and the blocked-enable
-  // Callout only exists while Enable is staged over a selection that contains a refused recipe —
-  // so the pristine face and the warning face are each the sole evidence of what they show.
-  //
-  // Every row click is pinned BY ID rather than by position. `data-recipe-select` sits on a
-  // visually hidden input, so the click target is the wrapping `<label>` (the Component Studio's
-  // cases below do the same). Position would not do: the blocked frame needs one SPECIFIC row —
-  // the only one in the world that is both off and un-enableable — and an ordering change would
-  // silently stage Enable over two ordinary recipes and publish a frame with no Callout at all.
+  // Three frames, because the panel's five axes cannot be photographed in one.
   managerCase({
     id: 'manager-recipes-bulk-edit',
     label: 'Manager — Recipes bulk edit',
     smokeLabels: ['manager-recipes-bulk-edit'],
-    // The STAGED face, over two ordinary Weaponsmithing recipes. Every axis the panel owns is
-    // armed at once: a category, Status at `Enable`, Lock at `Lock`, a named check tier, and the
-    // book axis's STAGED LIST holding one book at `add` beside another at `remove` — which is why
-    // the lab world authors two smithing books rather than one.
-    //
-    // The book axis is a search-and-pick control (issue 1010), so each staged book costs three
-    // steps: open the picker, choose the book, press the action. The pick then CLEARS, which is
-    // what returns the trigger and lets the second book be staged at all — the frame is therefore
-    // also the evidence that staging accumulates rather than replacing.
-    //
-    // The two actions are not interchangeable. `Add` is dead for a book that already holds every
-    // selected recipe and `Remove` is dead for one that holds none, so the Folio (which holds
-    // neither selected recipe) can only be added and the Almanac (which holds the greatsword,
-    // through the legacy scalar — see `labContent.js`) can only be removed.
-    //
-    // Enable is staged over two recipes that are already ON, so `countBlockedRecipeEnables` is 0
-    // and the warning Callout stays absent. That is deliberate: the Callout is the blocked frame's
-    // subject, and a staged frame carrying it would make the two photographs the same picture.
+    // The staged face, over two ordinary Weaponsmithing recipes.
     reaches: 'exact',
     query: {},
     steps: [
@@ -6084,9 +3774,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     expectView: 'recipes',
     // Both staged states must be on screen at once, or a control that shows one book at a time
-    // reads as a control that stages one book at a time. A frame showing only `add` is the
-    // failure this assertion exists to refuse, and the staged list is what makes it satisfiable:
-    // the pick card can only ever hold the book it is composing.
+    // reads as a control that stages one book at a time.
     expectSelector:
       '.fabricate-manager [data-bulk-book-state="add"] ~ [data-bulk-book-state="remove"], ' +
       '.fabricate-manager [data-bulk-book-state="remove"] ~ [data-bulk-book-state="add"]',
@@ -6097,10 +3785,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     id: 'manager-recipes-bulk-edit-unstaged',
     label: 'Manager — Recipes bulk edit unstaged',
     smokeLabels: ['manager-recipes-bulk-edit-unstaged'],
-    // The PRISTINE face: a selection and nothing staged. It is the only evidence of the three
-    // `Unchanged` segments, of BOTH check-tier sentinels — `— Leave unchanged —` and `Default DC`,
-    // which look alike and mean opposite things — and of the genuinely disabled Apply. None of
-    // those can appear in the staged frame, because staging is what replaces them.
+    // The pristine face: a selection and nothing staged.
     reaches: 'exact',
     query: {},
     steps: [
@@ -6117,20 +3802,13 @@ export const VIEW_LAB_CASES = Object.freeze([
     id: 'manager-recipes-bulk-edit-blocked',
     label: 'Manager — Recipes bulk edit blocked',
     smokeLabels: ['manager-recipes-bulk-edit-blocked'],
-    // The BLOCKED face, and the frame acceptance criterion 6 is settled by: the panel's warning
+    // The blocked face, and the frame acceptance criterion 6 is settled by: the panel's warning
     // Callout counting the same rows the browser has pilled, in one photograph, so the two cannot
     // be shown to disagree.
-    //
-    // `sm-r-runeplate-draft` is the world's only off-and-un-enableable recipe and is what makes
-    // the count non-zero; `sm-r-longsword` is an ordinary enabled row, so the Callout reads "at
-    // least 1 of 2" rather than a degenerate 1-of-1 and the LOWER-BOUND wording is legible.
     reaches: 'exact',
     query: {},
-    // ORDER IS LOAD-BEARING, and `expectSelector` cannot enforce it: a click auto-scrolls its
-    // target into view, so whichever row is ticked LAST is the one the frame is scrolled to.
-    // Ticking the blocked row first scrolled it off the top and published a Callout with none
-    // of the rows it counts — DOM-present, so the guard passed, and visually a lie.
-    // `sm-r-longsword` therefore goes first and the blocked row last.
+    // Order is load-bearing, and `expectSelector` cannot enforce it: a click auto-scrolls its
+    // target into view, so whichever row is ticked last is the one the frame is scrolled to.
     steps: [
       'Crafting',
       { selector: 'label:has(input[data-recipe-select="sm-r-longsword"])' },
@@ -6138,42 +3816,17 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-recipe-bulk-status-option="enable"]' },
     ],
     expectView: 'recipes',
-    // BOTH halves of the claim, in one selector, because either alone would publish a lie: a
+    // Both halves of the claim, in one selector, because either alone would publish a lie: a
     // Callout with no pilled row says the panel invented a count, and a pilled row with no Callout
-    // is the plain browser frame under a case named for the warning. `expectView` cannot see
-    // either — the route is `recipes` whether the panel staged anything or not.
-    //
-    // Written as manager-with-Callout DESCENDANT row-with-pill rather than as two `:has()`
-    // clauses on the root, so every `:has()` argument is a simple selector. Both forms are
-    // correct CSS and Chromium (which is what `document.querySelector` runs here) evaluates
-    // either; this one is additionally checkable outside a browser, and `:has(A B)` is where
-    // the DOM implementations disagree.
+    // is the plain browser frame under a case named for the warning.
     expectSelector:
       '.fabricate-manager:has([data-recipe-bulk-blocked-warning]) ' +
       '.manager-recipe-row[data-recipe-id="sm-r-runeplate-draft"]:has(.manager-chip.is-danger)',
     kinds: ['manager', 'recipes'],
     sourceMatches: RECIPE_BULK_EDIT_MATCHES,
   }),
-  // ── The two surfaces the three frames above cannot hold (issue 1010) ───────────────────────────
-  //
-  // The staged case opens the picker, picks, presses the action and repeats; the pick CLEARS on
-  // staging by design, so that frame lands on the trigger plus the staged list. The unstaged case
-  // shows the trigger alone. Between them, the two surfaces this redesign actually INTRODUCES were
-  // photographed nowhere: the open option list, whose two-line rows state the membership fact the
-  // GM chooses on, and the pick card, whose Add/Remove counts and opposite disabled states are the
-  // whole argument for replacing the chip run. A redesign commissioned because a chip per book is
-  // unusable at eight-plus books cannot be reviewed from frames showing neither replacement.
-  //
-  // `reaches: 'beyond'` with no smoke labels, which is the honest declaration and not a way around
-  // adding one: the smoke's own bulk-edit walk drives THROUGH both of these states to the staged
-  // one and never rests on either, so neither has a counterpart to fall short of. They still
-  // PUBLISH — `beyond` is a statement about the smoke, not about whether a frame is evidence, and
-  // the issue-901 Journal pair sets the same precedent — which is what makes them the PR's evidence
-  // for the part of this change nothing else photographs. No new smoke label means no new
-  // `SCREENSHOT_CAPTURE_ORDER` entry either.
-  //
-  // Both stop one step short of an existing case's walk rather than driving anywhere new, so the
-  // fixture facts they rest on are the ones the staged case already documents.
+  // The staged case opens the picker, picks, presses the action and repeats; the pick clears on
+  // staging by design, so that frame lands on the trigger plus the staged list.
   managerCase({
     id: 'manager-recipes-bulk-edit-picker',
     label: 'Manager — Recipes bulk edit picker',
@@ -6188,19 +3841,14 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     expectView: 'recipes',
     // Three claims in one selector, and the trigger-only frame satisfies none of them: the popover
-    // exists at all, it is portaled INTO the manager (the whole reason it escapes the inspector's
-    // `overflow: hidden`), and its rows carry the second META line — which is the fact the GM
-    // chooses on and which only renders when the option was given one. Asserting the popover alone
-    // would pass over a run of bare single-line rows, which is the state this frame exists to
-    // distinguish itself from.
+    // exists at all, it is portaled into the manager (the whole reason it escapes the inspector's
+    // `overflow: hidden`), and its rows carry the second meta line — which is the fact the GM
+    // chooses on and which only renders when the option was given one.
     expectSelector:
       '.fabricate-manager .manager-travel-popover ' +
       '[data-popover-option="sm-book"] .manager-travel-option-meta',
     kinds: ['manager', 'recipes'],
-    // SPREAD, not the shared array (issue 1500). This is the one bulk-edit frame that rests on an
-    // OPEN panel, so it is the one that must answer for the positioning seam; the four siblings
-    // that share `RECIPE_BULK_EDIT_MATCHES` photograph the bar, the staged list and the blocked
-    // warning, none of which a change to `anchoredPopover.js` can move.
+    // Spread, not the shared array (issue 1500).
     sourceMatches: [...RECIPE_BULK_EDIT_MATCHES, ...ANCHORED_POPOVER_SOURCES],
   }),
   managerCase({
@@ -6217,15 +3865,8 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-popover-option="sm-book"]' },
     ],
     expectView: 'recipes',
-    // The card for the Folio, which holds NEITHER selected recipe — so `Add 2` is live and `Remove`
-    // is dead with its count dropped rather than rendered as `Remove 0`. Both states are asserted,
-    // in opposite directions, because they ARE the design argument: two real buttons whose labels
-    // name what each would actually write and which go inert when that number is zero. A card-only
-    // assertion would pass over two enabled buttons labelled with the selection size, which is the
-    // prototype defect this control was corrected away from.
-    //
-    // Every `:has()` argument is a simple compound, for the reason the blocked case records: `:has(A
-    // B)` is where DOM implementations disagree, and this form is checkable outside a browser.
+    // The card for the Folio, which holds neither selected recipe — so `Add 2` is live and `Remove`
+    // is dead with its count dropped rather than rendered as `Remove 0`.
     expectSelector:
       '.fabricate-manager [data-recipe-bulk-book-pick="sm-book"]' +
       ':has([data-recipe-bulk-book-add]:not([disabled]))' +
@@ -6233,26 +3874,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['manager', 'recipes'],
     sourceMatches: RECIPE_BULK_EDIT_MATCHES,
   }),
-  // ── The check-tier list, open (issue 1504) ────────────────────────────────────────
-  //
-  // THE THIRD SURFACE THIS PANEL CANNOT HOLD, and the first frame in the registry that draws a
-  // `<Select>`'s option list at all. The two frames above open the BOOK picker — a
-  // search-and-pick control over a flat list — and every other bulk-edit frame draws its selects
-  // CLOSED, where the whole conversion is a trigger and a chevron.
-  //
-  // The check tier is the composition the specimen does not draw and no other caller reaches: a
-  // GROUPED list, a per-option hint under each label, `(DC n)` on the authored tiers to tell them
-  // apart from the two instruction rows, and the TICK COLUMN present — so the gutter, the group
-  // heading's inset against the labels beside it and the two-line row are in one photograph. The
-  // player pager below is its pair, and the half that reads at `showTick={false}`.
-  //
-  // Karrun Forgecraft is the only lab system that authors check tiers, which is what makes the
-  // control reachable at all: every other system renders the info Callout in its place, as the
-  // staged case above records.
-  //
-  // `reaches: 'beyond'` with no smoke labels, for the reason the picker pair records — the
-  // smoke's bulk-edit walk drives THROUGH this state to the staged one and never rests on it, so
-  // there is no counterpart to fall short of and no label to claim.
+  // The third surface this panel cannot hold, and the first frame in the registry that draws a
+  // `<Select>`'s option list at all.
   managerCase({
     id: 'manager-recipes-bulk-edit-check-tier',
     label: 'Manager — Recipes bulk edit check tier list',
@@ -6269,19 +3892,16 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-recipe-bulk-check-tier]' },
     ],
     expectView: 'recipes',
-    // FOUR claims, and the trigger-only frame satisfies none of them: the panel exists, it is
-    // portaled onto the manager ROOT (the whole reason it escapes the rail's `overflow: hidden`),
-    // it is the TICKED configuration, and the row this frame is named for carries a tick element
-    // of its own. Asserting the panel alone would pass over a tickless run of single-line rows,
-    // which is the frame this one exists to be read against.
+    // Four claims, and the trigger-only frame satisfies none of them: the panel exists, it is
+    // portaled onto the manager root (the whole reason it escapes the rail's `overflow: hidden`),
+    // it is the ticked configuration, and the row this frame is named for carries a tick element of
+    // its own.
     expectSelector:
       '.fabricate-manager > .fabricate-select-popover.fabricate-select-popover-ticked ' +
       '[data-popover-option="sm-tier-masterwork"]:has(.fabricate-select-tick)',
-    // The two affordances the frame is FOR, asserted geometrically because both are things a
+    // The two affordances the frame is for, asserted geometrically because both are things a
     // reviewer reads off the picture: a group heading and a per-option hint, each inside the
-    // panel's own box rather than clipped by it. The primitive draws neither unless the caller
-    // authors `group` and `hint` on its options, so this is also where a conversion that
-    // flattened the list to bare labels fails instead of publishing a frame that looks right.
+    // panel's own box rather than clipped by it.
     expectContained: [
       { container: '.fabricate-manager', target: '.fabricate-select-popover' },
       { container: '.fabricate-select-popover', target: '.manager-travel-popover-group-label' },
@@ -6293,36 +3913,15 @@ export const VIEW_LAB_CASES = Object.freeze([
     // two that must answer for the positioning seam.
     sourceMatches: [...RECIPE_BULK_EDIT_MATCHES, ...ANCHORED_POPOVER_SOURCES],
   }),
-  // ── The Recipe Studio's set delete (issue 1132) ────────────────────────────────────
-  //
-  // BOTH FRAMES RUN ON HERBALISM, NOT ON THE FLAGSHIP SMITHING LIBRARY every other recipe case
-  // photographs, and the choice is the whole reason these frames say anything. The card states
-  // three numbers and two of them are unreachable on smithing: no actor has learned a smithing
-  // recipe (`labActors.js` teaches only `hb-*`), and smithing is deliberately on the LEGACY
-  // membership basis with both its books' `recipeIds` absent, so its recipe-item figure comes
-  // from a single legacy scalar. Photographed there the card would render its subject row and
-  // one gated-away consequence, which is the state the Component Studio's frames already show.
-  //
-  // Herbalism is knowledge-gated and modern-basis: `hb-book` holds healing, salve and grind,
-  // Idrin has learned healing and salve, and Vosk has learned oil. The selection below is
-  // therefore 3 recipes / 1 recipe item / 2 characters — every row rendered, and the recipe
-  // count deliberately DISAGREEING with the item count, which is the state the corrected copy
-  // exists for. The delta's authored "1 book or scroll will lose it." would read as a lie in
-  // this exact frame.
+  // Both frames run on herbalism, not on the flagship smithing library every other recipe case
+  // photographs, and the choice is the whole reason these frames say anything.
   managerCase({
     id: 'manager-recipes-bulk-delete-idle',
     label: 'Manager — Recipes bulk delete idle',
     smokeLabels: [],
     reaches: 'beyond',
-    // The UNARMED face: the impact statement and the standing permanence hint, rendered BEFORE
-    // the control is armed. That pairing is the entire justification for this action arming
-    // instead of raising a `confirmDialog`, so it is the frame the carve-out rests on.
-    //
-    // The explicit `scroll` step is not optional. The card sits below the panel shell and below
-    // the sticky Apply dock, which puts it under the rail's fold at the registry's 1280x820
-    // position, and `frame.screenshot()` does not scroll nested overflow containers — without it
-    // the card is out of frame while every assertion still passes. The Component Studio's idle
-    // twin records the same measurement.
+    // The unarmed face: the impact statement and the standing permanence hint, rendered before the
+    // control is armed.
     query: { system: 'lab-herbalism' },
     steps: [
       'Crafting',
@@ -6347,22 +3946,15 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Recipes bulk delete armed',
     smokeLabels: [],
     reaches: 'beyond',
-    // The ARMED half, and the frame whose final step clicks INSIDE the delete card. The first
-    // click only arms, so this shows `Confirm delete` beside the impact statement it is a
-    // confirmation OF, with nothing written.
-    //
-    // Two frames rather than one because the two states are the point: the idle sibling shows
-    // the statement rendered before arming, and this one shows that the arm is a second,
-    // separate act. Either alone leaves half of the pairing unphotographed.
+    // The armed half, and the frame whose final step clicks inside the delete card.
     query: { system: 'lab-herbalism' },
     steps: [
       'Crafting',
       { selector: 'label:has(input[data-recipe-select="hb-r-healing"])' },
       { selector: 'label:has(input[data-recipe-select="hb-r-salve"])' },
       { selector: 'label:has(input[data-recipe-select="hb-r-oil"])' },
-      // The BUTTON, not the card: `ArmedDangerButton` stamps `data-arm-token` on the control it
-      // arms, so this cannot drift onto a wrapper the way a class selector could. Clicking also
-      // scrolls it into view, which is why this case needs no `scroll` step.
+      // The button, not the card: `ArmedDangerButton` stamps `data-arm-token` on the control it
+      // arms, so this cannot drift onto a wrapper the way a class selector could.
       { selector: '[data-arm-token="delete-recipes"]' },
     ],
     expectView: 'recipes',
@@ -6380,10 +3972,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     id: 'manager-crafting-group-expanded',
     label: 'Manager — Crafting group expanded',
     smokeLabels: ['manager-crafting-group-expanded'],
-    // The rail's Crafting GROUP expanded to all four subitems — Recipes, Books & Scrolls,
-    // Knowledge, Settings — over a multi-category recipe library. Books & Scrolls and Knowledge
-    // exist only for a knowledge-gated system (`buildCraftingNavItems`), so the default globally
-    // visible system advertises two of the four and cannot show this rail at all.
+    // The rail's Crafting group expanded to all four subitems — Recipes, Books & Scrolls,
+    // Knowledge, Settings — over a multi-category recipe library.
     reaches: 'exact',
     query: { system: 'lab-herbalism' },
     steps: ['Crafting'],
@@ -6406,17 +3996,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/BooksScrollsView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe-item\//,
-      // The inspector aside this route mounts (issue 1505). It was claimed by no case that
-      // renders it: `mapChangedFilesToCases` answered `manager-system-edit-normal` alone, which
-      // DECLARES the file and does not draw it, so an inspector change published a frame it is
-      // not in. This frame draws the aside's EMPTY branch — no case selects a row — so it is
-      // honest evidence about the aside's chrome and not about its stat tiles.
+      // The inspector aside this route mounts (issue 1505).
       /^src\/ui\/svelte\/apps\/manager\/ItemPageInspector\.svelte$/,
-      // The manager router and the Crafting entry model (issue 1151). Both decide which
-      // mode-conditional entries this frame's submenu shows and which route survives a
-      // system change, and neither is reachable from the view components above — so
-      // without these two a router change published nine frames that never render the
-      // Crafting submenu at all.
+      // The manager router and the Crafting entry model (issue 1151).
       /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/crafting\/craftingNav\.js$/,
     ],
@@ -6424,21 +4006,7 @@ export const VIEW_LAB_CASES = Object.freeze([
   managerCase({
     id: 'manager-books-scrolls-item',
     label: 'Manager — Books scrolls item',
-    // THE STAT GRID NO FRAME DREW (issue 1505). `manager-books-scrolls-normal` above renders this
-    // route's inspector aside in its EMPTY branch — `selectedRecipeItemId` initialises `''` and
-    // nothing in the registry clicked `[data-books-scrolls-select]` — and the two recipe-item
-    // cases route PAST the aside into the editor. So the aside's populated branch, and with it the
-    // three `<StatBox>` tiles the conversion moved onto the shared primitive, was drawn by no case
-    // at all, and an inspector change published a frame that does not contain the thing it changed.
-    //
-    // This is `manager-books-scrolls-normal`'s steps PLUS one row click. `hb-book` is the row to
-    // click for the same reason the recipe-item cases open it: it is the herbalism world's one
-    // definition that links a world item and three recipes and caps learning at a positive number,
-    // so every tile in the grid carries a real figure rather than a zero.
-    //
-    // `beyond` with NO smoke label: the smoke's Books & Scrolls walk captures the resting route
-    // and never selects a row, so an `exact` claim here would name a counterpart that does not
-    // exist.
+    // The stat grid no frame drew (issue 1505).
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-herbalism' },
@@ -6453,9 +4021,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // `tone="info"` on the middle tile is the one reach of that tone anywhere in the tree.
     expectSelector: '[data-item-page-stats] [data-stat-tone="info"]',
     kinds: ['manager', 'books-scrolls'],
-    // The INSPECTOR only. `BooksScrollsView.svelte` is not claimed here because the case above
-    // already photographs the list this one merely clicks through, and two near-identical frames
-    // for one list change is the unrelated-evidence noise the source map exists to avoid.
+    // The inspector only.
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ItemPageInspector\.svelte$/],
   }),
   managerCase({
@@ -6472,22 +4038,7 @@ export const VIEW_LAB_CASES = Object.freeze([
   managerCase({
     id: 'manager-recipe-item-overview',
     label: 'Manager — Recipe item overview',
-    // THE TAB NO FRAME LANDED ON (issue 1505). Both `manager-recipe-item-validation*` cases step
-    // straight through to `[data-recipe-item-tab-button="validation"]`, so the editor's OPENING
-    // tab — the one a GM sees first — was drawn by nothing, and the three eyebrow labels on it
-    // could not move a frame.
-    //
-    // Reached WITHOUT a tab click, which is the whole shape of the case: `RecipeItemEditorTabs`
-    // defaults `activeTab = 'overview'` and the root seeds `recipeItemActiveTab = 'overview'` when
-    // it opens the editor, so this is `manager-recipe-item-validation`'s steps MINUS its final
-    // click. Fewer steps is also what makes it the surface's resting state, and therefore the
-    // representative frame for `recipe-item-edit` in the coverage set — a swap that is the
-    // mechanism working rather than a side effect: an editor's own opening tab is a better
-    // photograph of that screen than its fourth tab is.
-    //
-    // `beyond` with NO smoke label, on the same measurement decision 1362's tab strip records:
-    // the smoke walk clicks through to validation and captures only the two validation frames, so
-    // an `exact` claim here would name a counterpart that does not exist.
+    // The tab no frame landed on (issue 1505).
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-herbalism' },
@@ -6509,24 +4060,7 @@ export const VIEW_LAB_CASES = Object.freeze([
   managerCase({
     id: 'manager-recipe-item-contents',
     label: 'Manager — Recipe item contents',
-    // THE TAB BETWEEN THE TWO THAT HAD FRAMES (issue 1513). `manager-recipe-item-overview` stops
-    // on the editor's opening tab and both validation cases step straight past this one to
-    // `[data-recipe-item-tab-button="validation"]`, so the Contents tab — the list of recipes a
-    // reader can learn from the item — was drawn by no published frame at all.
-    //
-    // It is the RESTING half of a pair. The case below drives the same tab one click further and
-    // opens its link-recipe picker, and a panel frame cannot stand in for this one: the open
-    // panel covers the very list this tab is about.
-    //
-    // `hb-book` for the reason both validation cases open it — it is the herbalism world's one
-    // definition carrying authored membership, so the linked-list branch renders here rather than
-    // the `data-recipe-item-contents-empty` line. The membership is pinned against
-    // `buildLabContent()` in `tests/view-lab-cases.test.js`, because a drifted fixture id in a
-    // step selector is otherwise undetected (issue 1632).
-    //
-    // `beyond` with NO smoke label, on the measurement `manager-recipe-item-overview` records: the
-    // smoke walk clicks through to validation and captures only the two validation frames, so an
-    // `exact` claim here would name a counterpart that does not exist.
+    // The tab between the two that had frames (issue 1513).
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-herbalism' },
@@ -6550,19 +4084,7 @@ export const VIEW_LAB_CASES = Object.freeze([
   managerCase({
     id: 'manager-recipe-item-contents-picker',
     label: 'Manager — Recipe item contents, the link-recipe picker open',
-    // THE PICKER NO CASE OPENED (issue 1513). `RecipeItemContentsTab` renders a `SearchablePopover`
-    // over the whole linkable recipe library, and every case that reached this editor drew that
-    // control CLOSED — so the panel, its option rows and the search it is about to gain were
-    // published by nothing. The phase that turns that search on comes after this case, which is
-    // why the case lands first: the before frame has to exist while the tree still draws it.
-    //
-    // `hb-book` links three of herbalism's nine recipes, so six are linkable: the trigger is
-    // enabled (it carries `triggerAriaDisabled={linkable.length === 0}`, and the primitive refuses
-    // to open on that flag exactly as it does on `disabled`) and the panel opens over a POPULATED
-    // list rather than over its no-matches branch.
-    //
-    // `beyond`, `smokeLabels: []`: the live smoke opens no recipe-item picker, so there is no
-    // counterpart to fall short of, and a `beyond` case must claim zero labels.
+    // The picker no case opened (issue 1513).
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-herbalism' },
@@ -6574,30 +4096,15 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-recipe-item-link-recipe-toggle]' },
     ],
     expectView: 'recipe-item-edit',
-    // THE PANEL, ITS SEARCH ROW AND A ROW IN IT. The panel alone would pass over an empty list,
-    // and the option row is what makes this frame evidence for the populated presentation. Scoped
-    // to `.fabricate-manager` because the panel is PORTALED there — a portal that failed to land
-    // would leave it inside the tab's own clipped column, where this selector cannot match.
-    //
-    // `:has(.manager-travel-popover-search)` IS A RESTATEMENT, in the commit that falsified the
-    // claim it replaces (`design-system/spec.md:222`: a docblock refusing something the tree has
-    // since overturned is restated by the change that overturns it, not left standing). This
-    // comment used to read "No `.manager-travel-popover-search` claim: this call site passes
-    // `showSearch={false}` today, and that is exactly what the next phase changes." That phase
-    // has landed — `RecipeItemContentsTab` passes no `showSearch` at all now — so the frame's
-    // SUBJECT moved: it is the searchable library panel, and a regression that took the field
-    // back off would otherwise publish a frame that still passed. The `:has()` form is the one
-    // `player-actor-picker` already uses to claim a sibling subtree from a single selector.
+    // The panel, its search row AND A row in it. The panel alone would pass over an empty list, and
+    // the option row is what makes this frame evidence for the populated presentation.
     expectSelector:
       '.fabricate-manager .fabricate-picker-popover.manager-travel-popover' +
       ':has(.manager-travel-popover-search)' +
       ' .manager-travel-popover-options .manager-travel-option',
     kinds: ['manager', 'books-scrolls'],
-    // `...ANCHORED_POPOVER_SOURCES` because this frame RESTS ON AN OPEN PANEL the shared
+    // `...ANCHORED_POPOVER_SOURCES` because this frame rests on an open panel the shared
     // positioning seam measured, clamped and portaled, which is that array's own membership test.
-    // `SearchablePopover.svelte` is deliberately NOT named here, for the reason
-    // `manager-recipe-edit-tag-picker` records: it is a broad-signal file, so a pattern naming it
-    // is shadowed by that signal and the mapping gate reds on it.
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/BooksScrollsView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe-item\//,
@@ -6608,9 +4115,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     id: 'manager-recipe-item-validation',
     label: 'Manager — Recipe item validation',
     smokeLabels: ['manager-recipe-item-validation'],
-    // The recipe-item editor's Validation tab in its ALL-CLEAR state. `hb-book` is the world's
-    // only definition that passes every check for a knowledge-gated system: it links a world item
-    // (`registeredItemUuid`), links three recipes, and caps learning at a positive number.
+    // The recipe-item editor's Validation tab in its all-clear state.
     reaches: 'exact',
     query: { system: 'lab-herbalism' },
     steps: [
@@ -6630,10 +4135,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     id: 'manager-recipe-item-validation-blocked',
     label: 'Manager — Recipe item validation blocked',
     smokeLabels: ['manager-recipe-item-validation-blocked'],
-    // The same tab in its BLOCKING state, which is a different summary card, a different count
-    // split and a Block pill on the offending row. `hb-primer` links a world item but no recipes,
-    // so `recipeLinked` fails — the one blocking check the fixture can hold without also breaking
-    // the owned-copy frames that read the same definition on the Knowledge surface.
+    // The same tab in its blocking state, which is a different summary card, a different count
+    // split and a Block pill on the offending row.
     reaches: 'exact',
     query: { system: 'lab-herbalism' },
     steps: [
@@ -6652,28 +4155,8 @@ export const VIEW_LAB_CASES = Object.freeze([
   managerCase({
     id: 'manager-recipe-item-preview-recipe-pager',
     label: 'Manager — Recipe item preview, the book detail recipe pager',
-    // THE SIXTH CONVERTED SELECT'S ONLY FRAME (issue 1511), and the reason it is a MANAGER case is
-    // measured rather than chosen. `InventoryBookDetail`'s recipes-per-page control renders only
-    // behind `filteredRecipes.length > RECIPE_PAGE_SIZES[0]`, so a book has to teach more than six
-    // recipes before the control exists at all — and no book any lab actor HOLDS can carry that
-    // membership. `labContent.js` confines authored membership to the one book nobody holds,
-    // because a held book with members reveals them through `hasMatchedItem` in the player's
-    // knowledge-gated crafting listing and pushes the recipes the player cases select onto page 2.
-    // So the player route to this control costs a world-fixture rewrite whose blast radius that
-    // file documents, and this route costs four clicks.
-    //
-    // The rail embeds the REAL player component: `RecipeItemEditor` feeds `InventoryDetail` a
-    // synthetic row through `recipeItemPreviewRow.js` precisely so the preview cannot drift from
-    // what a player sees. The control photographed here is therefore the converted one, drawn by
-    // the same `Select` call site, and this frame is what keeps that call site out of the set of
-    // conversions no frame can show.
-    //
-    // FOUR LINK CLICKS, not a fixture edit. `hb-book` links three of herbalism's nine recipes, and
-    // the picker `stayOpen`s, so four more can be linked without re-opening it. Seven clears the
-    // six-recipe guard by one, which is the smallest count that proves the boundary rather than
-    // sailing past it. The last step re-clicks the trigger to CLOSE the panel: this frame's
-    // subject is the pager, and an open picker would both occlude the rail and make the case a
-    // fifth claimant on the anchored-popover seam it has no business naming.
+    // The sixth converted select's only frame (issue 1511), and the reason it is a MANAGER case is
+    // measured rather than chosen.
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-herbalism' },
@@ -6691,15 +4174,9 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-recipe-item-preview] [data-inventory-recipe-pager]', scroll: true },
     ],
     expectView: 'recipe-item-edit',
-    // The TRIGGER, inside the preview, by the hook `triggerData` puts on the button. Scoped to
-    // `[data-recipe-item-preview]` because the rail is the only place this control can appear in a
-    // manager window: an unscoped claim would pass on any page-size trigger the editor grew.
+    // The trigger, inside the preview, by the hook `triggerData` puts on the button.
     expectSelector: '[data-recipe-item-preview] [data-inventory-page-size]',
-    // IN THE PHOTOGRAPH, not merely in the document. The rail is an overflow-scrolled column and
-    // the pager sits below seven recipe rows, so the selector above matches while the control is
-    // still off the visible edge — the "read from the frames rather than from their existence"
-    // failure this confirmation exists to prevent. The box check is what makes the scroll step a
-    // requirement rather than a courtesy.
+    // In the photograph, not merely in the document.
     expectContained: [
       { container: '[data-recipe-item-preview]', target: '[data-inventory-page-size]' },
     ],
@@ -6733,48 +4210,15 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/recipe\//,
     ],
   }),
-  // ── The recipe end of the `bySubject` rule (issues 1055, 1095) ───────────────────────────────
-  //
-  // Every frame below reaches its state by CLICKING the rule group (and, for the capped pair, by
-  // typing into the pick-cap Stepper) rather than by authoring a second catalogued system. The
-  // cost asymmetry is stark:
-  //
-  //   - A click costs one step. `selectPolicy` emits `{ defaultModifierPolicy }` through
-  //     `onChange` -> `adminStore.saveCraftingCheckModifiers` -> `updateSystem` + `refresh`, so it
-  //     is a real persisted world write, and the lab's settings Map holds it for the life of the
-  //     page — which is what lets a case navigate away to the recipe editor and still see it.
-  //   - Authoring costs a permanent rewrite. `RecipeOverviewTab` gates the ENTIRE modifier row on
-  //     `craftingModifierOptions.length > 0`, so a rule can only be authored onto a system that
-  //     has a catalogue, and giving a second lab system one would add a control to every recipe
-  //     Overview frame that system already has. A new SEVENTH system instead would move the
-  //     manager's system-library row count and the rail's system count — the cost
-  //     `labContent.js`'s `LAB_SYSTEM_IDS` already discloses for the sixth.
-  //
-  // All of them run on `lab-herbalism`: it is the only system carrying a catalogue, and a
-  // catalogue is what makes any of this render at all.
-  //
-  // Clicking a `RadioCardGroup` radio is legal HERE and banned in `scripts/foundry-test-run.mjs`,
-  // which is not an inconsistency: `tests/screenshot-capture-scoping.test.js` bans the shape in
-  // the harness generically because that file spells this family by interpolation, and exempts
-  // `RadioCardGroup` in this registry because its radio is a visible in-flow 16x16 control that is
-  // safe to click through. The card persists on change, so no Save step follows.
+  // Every frame below reaches its state by clicking the rule group (and, for the capped pair, by
+  // typing into the pick-cap Stepper) rather than by authoring a second catalogued system.
   managerCase({
     id: 'manager-recipe-edit-crafting-modifier-inherit',
     label: 'Manager — Recipe edit crafting modifier inherit',
-    // BEYOND the smoke. Its Overview-tab frame (`manager-recipe-edit-normal`) opens Brew Healing
-    // Potion, which authors a pick — so the smoke photographs this control OVERRIDDEN and has no
-    // counterpart for the inherit state. Claiming `exact` against it would be the overclaim the
-    // tuple test explicitly cannot catch: same screen, different state.
+    // Beyond the smoke.
     reaches: 'beyond',
     smokeLabels: [],
-    // The per-recipe check-modifier picker AT REST. `RecipeOverviewTab` gates the whole control on
-    // `craftingModifierOptions.length > 0` AND on the system's rule being `bySubject`, so it exists
-    // on exactly one lab system — herbalism, the only one carrying a catalogue — and every other
-    // recipe-editor frame in this registry runs on smithing or jewelry.
-    //
-    // `hb-r-kiln` authors no `craftingModifier`, so the eligible-set tri-state sits on `Inherit
-    // system default` and under it the inherited set is NAMED rather than left as the word
-    // "inheriting". That naming is the half of the control a custom-set frame cannot show.
+    // The per-recipe check-modifier picker at rest.
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
@@ -6787,9 +4231,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-recipe-crafting-modifier-picker]', scroll: true },
     ],
     expectView: 'recipe-edit',
-    // The picker cell AND the inherited-names paragraph. The first proves the rule click landed
-    // (the cell renders under no other rule), the second proves the set axis is on `Inherit`
-    // rather than on a custom set — which is the sibling case below.
+    // The picker cell AND the inherited-names paragraph.
     expectSelector:
       '.fabricate-manager [data-recipe-editor] ' +
       '[data-recipe-crafting-modifier-picker] [data-recipe-crafting-modifier-inherited]',
@@ -6807,25 +4249,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     reaches: 'beyond',
     smokeLabels: [],
     // `hb-r-stillroom` authors `{ modifierIds: [...three] }`, so the tri-state reads `Custom set`
-    // above a three-pill row. This is the widest the modifier row ever gets and the frame the grid
-    // arrangement has to be judged from — the tri-state select lives INSIDE the picker cell rather
-    // than being a cell of its own precisely so that this case still aligns with Category.
-    // `lab-herbalism` is progressive, so its grid is two cells here: Category and the picker. The
-    // four-cell arrangement (a Check tier or a Minimum success tier alongside) is unreachable here
-    // and the FIVE-cell one is unreachable anywhere: `resolveRecipeCheckTierOptions` offers tiers
-    // only for simple-static or routed-RELATIVE, and `resolveRecipeFixedOutcomeTierOptions` offers
-    // a minimum tier only for routedByCheck + FIXED, so those two cells are mutually exclusive by
-    // construction and no system can render both.
-    //
-    // The system is left UNBOUNDED, so no cap sentence renders and the pill row is the whole cell.
-    // The two capped readings are the pair below.
-    //
-    // Unbounded is CLEARED here, not inherited. `lab-herbalism` authors `maxModifierPicks: 3`
-    // because the lab boots every migration over its world and 1.20.0's would otherwise stamp a cap
-    // of 1 onto it (see `PROGRESSIVE_CHECK` in `tests/view-lab/world/labContent.js`), so this case
-    // empties the Stepper to reach the no-cap state — the same tab and the same verb its capped
-    // siblings below use to reach theirs. Without the clear a cap sentence renders and this frame
-    // is one of them rather than the third reading.
+    // above a three-pill row.
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
@@ -6839,9 +4263,8 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-recipe-crafting-modifier-picker]', scroll: true },
     ],
     expectView: 'recipe-edit',
-    // The pill row is what a `Custom set` adds over `Inherit`; the ABSENT cap sentence is what
-    // separates this frame from both of its capped neighbours. Asserting the picker cell alone
-    // would be satisfied by all three.
+    // The pill row is what a `Custom set` adds over `Inherit`; the absent cap sentence is what
+    // separates this frame from both of its capped neighbours.
     expectSelector:
       '.fabricate-manager [data-recipe-editor] ' +
       '[data-recipe-crafting-modifier-picker]:has([data-modifier-pill-select])' +
@@ -6852,19 +4275,8 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/recipe\//,
     ],
   }),
-  // THE SUPPRESSED-PICK STATE (issue 1608): the same seeded custom set as the case above, after
-  // one of its three stored picks is un-marked on the Checks tab rather than removed on the
-  // recipe. `hb-r-stillroom` still authors `{ modifierIds: ['hb-mod-medicine', 'hb-mod-nature',
-  // 'hb-mod-tools'] }` — this walk clicks NOTHING on the recipe side — but the catalogue's
-  // eligibility button for `hb-mod-medicine` is toggled off first, so `RecipeOverviewTab`'s
-  // `eligibleOptions = craftingModifierOptions ∩ craftingModifierDefaultIds` intersection drops
-  // it and the frame renders the OTHER two picks' pills alone: the offer narrowed by exactly the
-  // one mark this walk removes.
-  //
-  // The stored id is not pruned. `pickedEligibleIds` filters it out of the visible row and
-  // `suppressedPickCount` counts the gap it leaves — one, here — which is what the note beside
-  // the cap hint states and what this case's `expectSelector` reads back directly, rather than
-  // merely asserting the note is present.
+  // The suppressed-pick state (issue 1608): the same seeded custom set as the case above, after one
+  // of its three stored picks is un-marked on the Checks tab rather than removed on the recipe.
   managerCase({
     id: 'manager-recipe-edit-crafting-modifier-suppressed',
     label: 'Manager — Recipe edit crafting modifier suppressed pick',
@@ -6878,9 +4290,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '#manager-checks-nav-crafting' },
       { selector: '#checks-section-modifiers' },
       { selector: '[data-crafting-modifier-policy-option="bySubject"] input' },
-      // Un-marks `hb-mod-medicine` selectable. A click on the catalogue's own eligibility toggle
-      // button (`CraftingModifierCatalogueCard.svelte:624`), not on a `RadioCardGroup` radio, so
-      // it needs no scoping exemption of its own.
+      // Un-marks `hb-mod-medicine` selectable.
       { selector: '[data-crafting-modifier-eligibility-input="hb-mod-medicine"]' },
       'Crafting',
       { selector: '[data-recipe-edit="hb-r-stillroom"]' },
@@ -6888,11 +4298,10 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-recipe-crafting-modifier-picker]', scroll: true },
     ],
     expectView: 'recipe-edit',
-    // The COUNT, not merely the note's presence: a click that landed on the wrong row, or one
-    // that toggled nothing, would still leave all three picks eligible and render no note at all,
-    // and a selector asserting only `[data-recipe-crafting-modifier-suppressed]` would be
-    // satisfied by any nonzero count. "1" is what un-marking exactly one of the three stored
-    // picks produces.
+    // The count, not merely the note's presence: a click that landed on the wrong row, or one that
+    // toggled nothing, would still leave all three picks eligible and render no note at all, and a
+    // selector asserting only `[data-recipe-crafting-modifier-suppressed]` would be satisfied by
+    // any nonzero count.
     expectSelector: '.fabricate-manager [data-recipe-crafting-modifier-suppressed="1"]',
     kinds: ['manager', 'recipes'],
     sourceMatches: [
@@ -6900,17 +4309,9 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/recipe\//,
     ],
   }),
-  // ── The pick cap, from the recipe's side (issue 1055) ────────────────────────────────────────
-  //
-  // Two frames, because the cap has two readings and they are different pictures: BELOW the bound
-  // the sentence states it and the Add menu is live, AT the bound the sentence gains its
-  // at-cap clause and the Add menu goes dead. A single frame could only ever show one of them, and
-  // the at-cap one is the state a GM reports as "the button is broken".
-  //
-  // Both are reached by typing into the Checks tab's pick-cap Stepper, which is the only route:
-  // absence is the unlimited reading, so a bound cannot be reached by clicking anything.
-  // `hb-r-stillroom` picks three modifiers, so a cap of 5 leaves it below the bound and a cap of 3
-  // puts it exactly at one.
+  // Two frames, because the cap has two readings and they are different pictures: below the bound
+  // the sentence states it and the Add menu is live, at the bound the sentence gains its at-cap
+  // clause and the Add menu goes dead.
   managerCase({
     id: 'manager-recipe-edit-crafting-modifier-cap-available',
     label: 'Manager — Recipe edit crafting modifier below the pick cap',
@@ -6970,15 +4371,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     // no counterpart frame of the surface being gone.
     reaches: 'beyond',
     smokeLabels: [],
-    // THE NEGATIVE FRAME, and the one the redesign turns on. Under any rule but `bySubject` this
-    // tab renders NOTHING about check modifiers — no picker, and no standing "the system decides"
-    // banner either. The rejected design put such a banner on every recipe of every system that
-    // never delegated, and this frame is the evidence that it is gone rather than merely restyled.
-    //
-    // No steps beyond opening the recipe: `lab-herbalism` is authored `highest`, which is already
-    // a non-selecting rule, so the absent state is this world's RESTING state. `hb-r-stillroom`
-    // deliberately — the recipe that DOES carry a pick — so the frame also shows that a stored
-    // pick sits unhonoured and unadvertised rather than leaking a control back.
+    // The negative frame, and the one the redesign turns on. Under any rule but `bySubject` this
+    // tab renders nothing about check modifiers — no picker, and no standing "the system decides"
+    // banner either.
     query: { system: 'lab-herbalism' },
     steps: [
       'Crafting',
@@ -7000,22 +4395,9 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/recipe\//,
     ],
   }),
-  // ── The inert catalogue, RE-AIMED rather than retired (issue 1094) ─────────────────
-  //
-  // Both cases used to photograph the `noPlaceholder` inert cause — a formula authored but
-  // never spending the check-modifier roll-formula placeholder — and that cause retires with
-  // the placeholder: the scalar is appended to whatever the GM authored, so the state is
-  // unreachable.
-  //
-  // An earlier draft DELETED them. That was wrong, and the reason is worth recording: after
-  // the deletions NO case reached `ModifierInertNoCheck`, `ModifierInertNoFormula`,
-  // `ModifierCatalogueEmpty`, `ModifierCatalogueIntro`, `CraftingModifierEmptySet` or
-  // `CraftingModifierInertHint` — six of the strings this change rewrites — so the copy
-  // shipped unphotographed while `check-screenshots` stayed green. Re-aiming at `noFormula`
-  // costs one changed step per case and restores the whole inert surface to evidence.
-  //
-  // `fill: ''` rather than a placeholder-free formula: an empty formula is now the ONLY way
-  // to make an authored check inert, which is exactly what makes it worth a frame.
+  // Both cases used to photograph the `noPlaceholder` inert cause — a formula authored but never
+  // spending the check-modifier roll-formula placeholder — and that cause retires with the
+  // placeholder: the scalar is appended to whatever the GM authored, so the state is unreachable.
   managerCase({
     id: 'manager-checks-crafting-modifier-inert',
     label: 'Manager — Checks crafting modifiers inert',
@@ -7049,15 +4431,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // BEYOND the smoke, for the same reason as the sibling above.
     reaches: 'beyond',
     smokeLabels: [],
-    // The recipe end of the same fact, and the ONLY check-modifier banner this tab has left.
-    // It earns its interruption because it reports a genuine CONTRADICTION: the system's rule
-    // handed the pick to this recipe, and the system rolls no check for the picks to reach.
-    // The banner BEATS the picker — a pick the engine cannot honour is not worth authoring —
-    // so this frame is also the only evidence that the control is withdrawn rather than left
-    // live-but-useless, and the only one showing `RecipeModeBanner`'s warning tone at all.
-    //
-    // The `bySubject` click is what makes the contradiction reachable: under a non-selecting
-    // rule there are no picks to warn about and the tab says nothing.
+    // The recipe end of the same fact, and the only check-modifier banner this tab has left.
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
@@ -7076,9 +4450,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-recipe-modifier-inert]', scroll: true },
     ],
     expectView: 'recipe-edit',
-    // The cause, and the withdrawal. The rule click puts this system on `bySubject`, so an
-    // inert state that failed to suppress the control would still render the picker cell —
-    // which is exactly what this frame claims cannot happen.
+    // The cause, and the withdrawal.
     expectSelector:
       '.fabricate-manager [data-recipe-editor]:has([data-recipe-modifier-inert="noFormula"])' +
       ':not(:has([data-recipe-crafting-modifier-picker]))',
@@ -7094,10 +4466,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: ['manager-recipe-edit-books-scrolls'],
     reaches: 'exact',
     query: { system: 'lab-herbalism' },
-    // Pinned by row id rather than left on "whichever row is first". Recipes now carry the
-    // category the fixture always meant them to (`Recipe` reads the SINGULAR `category`), so the
-    // library groups category-major and the first row is no longer the alphabetically first
-    // recipe. Naming the recipe keeps this frame showing the same editor it has always shown.
+    // Pinned by row id rather than left on "whichever row is first".
     steps: [
       'Crafting',
       { selector: '[data-recipe-edit="hb-r-greater-healing"]' },
@@ -7140,17 +4509,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '#recipe-tab-ingredients' },
     ],
     expectView: 'recipe-edit',
-    // THE CONVERGED ROW, NAMED (issue 1373). This case had nothing but its route, and the frame
-    // it published depicted the RETIRED row: a `REQUIRED` pill, a chevroned picker trigger and
-    // three adders whose strings are no longer in `lang/en.json`. A stale frame is not a
-    // registry fault on its own — the capture refreshes it — but an unasserted case is what let
-    // the frame go on standing as this tab's evidence through the whole conversion, because
-    // `expectView: 'recipe-edit'` is satisfied by any tab of the editor.
-    //
-    // `data-recipe-option-kind` is the row's leading KIND SELECT, which is the single element the
-    // old anatomy did not have and the new one cannot be without: the retired row opened a popover
-    // to pick a kind BEFORE it existed, so a row with a kind control on it is a row from after the
-    // convergence. Its shipped counterpart is `fabricate-premium`'s `RewardRow`.
+    // The converged row, named (issue 1373).
     expectSelector: '[data-recipe-option] [data-recipe-option-kind]',
     expectContained: [
       {
@@ -7174,12 +4533,10 @@ export const VIEW_LAB_CASES = Object.freeze([
     id: 'manager-recipe-edit-ingredients-cost',
     label: 'Manager — Recipe edit ingredients cost',
     smokeLabels: ['manager-recipe-edit-ingredients-cost'],
-    // The essence + currency-cost requirement rows, which sit BELOW the fold of the plain
+    // The essence + currency-cost requirement rows, which sit below the fold of the plain
     // ingredients frame — the smoke splits them into their own capture for exactly that reason and
     // scrolls the currency row (the last requirement) into view so both rows and their end-of-row
-    // Steppers are on screen. The currency row needs the system's currency feature ON with units
-    // authored (`canAddCost`), so this runs on herbalism, the only currency-enabled system the
-    // player never sees.
+    // Steppers are on screen.
     reaches: 'exact',
     query: { system: 'lab-herbalism' },
     steps: [
@@ -7199,17 +4556,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     id: 'manager-recipe-edit-tag-picker',
     label: 'Manager — Recipe edit, the tag picker open over a system vocabulary',
     smokeLabels: [],
-    // NO CASE IN THE REGISTRY OPENED THIS POPOVER (issue 1373, maintainer round 8), which is the
+    // No case in the registry opened this popover (issue 1373, maintainer round 8), which is the
     // third such gap in as many rounds and is why it went on drawing a panel that is not the
-    // design's. `BROAD_SIGNAL_CASE_OVERRIDES` routes a `SearchablePopover` change to four frames
-    // and each is a picker in a different surface over a populated list, so the panel, the field
-    // and the option rows this primitive draws for the recipe editor's `+ Tag` — the control the
-    // maintainer put beside `proto:2258` — were published by nothing.
-    //
-    // `hb-r-tincture` is the one lab recipe carrying a TAG requirement: `hb-set-tincture-g3`
-    // matches `solvent`, and herbalism authors eight tags, so opening the picker over that row
-    // lists the seven it does not already hold. `reaches: 'beyond'` because the state is
-    // authored by clicking rather than seeded, exactly as the sibling cost frame's scroll is.
+    // design's.
     reaches: 'beyond',
     query: { system: 'lab-herbalism' },
     steps: [
@@ -7220,20 +4569,13 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-recipe-option-tags] [data-recipe-add-tag]' },
     ],
     expectView: 'recipe-edit',
-    // THE PANEL AND A ROW IN IT. The panel alone would pass over an empty list, which is the
-    // OTHER new case and a different picture; the row is what makes this frame evidence for the
-    // populated presentation — the 30px option rows, their 8px gap and their 7px corner.
+    // The panel AND A row in it.
     expectSelector:
       '.fabricate-manager .fabricate-picker-popover.manager-travel-popover ' +
       '.manager-travel-popover-options .manager-travel-option',
-    // Portaled, so containment is asserted against the APPLICATION ROOT rather than against the
-    // row that owns the trigger: the panel escapes the editor's clipping on purpose, so a
-    // container assertion on that row could only ever fail.
-    //
-    // `SearchablePopover.svelte` is deliberately NOT in `sourceMatches`. It is a broad-signal
-    // file, so a pattern naming it is shadowed by that signal and the mapping gate reds on it;
-    // the routing that reaches this frame from a change to the primitive is its
-    // `BROAD_SIGNAL_CASE_OVERRIDES` entry, which names both of these cases.
+    // Portaled, so containment is asserted against the application root rather than against the row
+    // that owns the trigger: the panel escapes the editor's clipping on purpose, so a container
+    // assertion on that row could only ever fail.
     expectContained: [
       {
         container: '.fabricate-manager',
@@ -7252,22 +4594,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Recipe edit ingredients, the "or…" menu open',
     reaches: 'beyond',
     smokeLabels: [],
-    // NO CASE IN THE REGISTRY HAD EVER OPENED THIS MENU (issue 1373, maintainer round 8), and that
+    // No case in the registry had ever opened this menu (issue 1373, maintainer round 8), and that
     // is the whole reason it shipped as a wide list of four full sentences with no header and no
-    // colour while three surfaces around it were being brought onto the design. The registry held
-    // frames of the requirement row, of its suggestion list and of its empty tag arm; the one
-    // overlay the row can open was evidence-free, so the only thing anyone could check it against
-    // was its own source, and its source read as though it were fine.
-    //
-    // `lab-herbalism` rather than the default system because the menu's LENGTH is configuration-
-    // dependent: Currency appears only when the system enables currency and has authored units,
-    // and Essence only when it has essences. Herbalism is the one system with both, so this is the
-    // frame that shows all four kinds — and therefore the only one that can show four tints.
-    //
-    // The FIRST requirement is the one opened. It is a bare single-alternative component row
-    // (`hb-moonleaf`), which is the shape that carries the inline `or…` control at all — a
-    // two-alternative requirement drops it for the dashed adders at its foot — and it sits at the
-    // top of the list, so the panel is fully on screen without a scroll step to keep in sync.
+    // colour while three surfaces around it were being brought onto the design.
     query: { system: 'lab-herbalism' },
     steps: [
       'Crafting',
@@ -7276,10 +4605,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '.manager-recipe-or-trigger' },
     ],
     expectView: 'recipe-edit',
-    // NAMED ON THE LAST KIND, not on the panel. The panel exists the moment the trigger is
-    // pressed; `alternative-currency` is the choice that is only offered when the system really
-    // does configure currency, so a fixture drift that quietly turned it off would publish a
-    // three-entry menu under a case whose whole subject is four.
+    // Named on the last kind, not on the panel.
     expectSelector: '.manager-recipe-or-popover [data-recipe-add="alternative-currency"]',
     // The panel is PORTALED to the manager root (`util/overlayHost.js`), so the container is that
     // root and not the recipe view: it is deliberately outside the scrolling editor pane, and
@@ -7301,36 +4627,16 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: ['manager-recipe-edit-validation'],
     reaches: 'exact',
     query: {},
-    // THE RECIPE IS NAMED, and that is the whole difference between this frame and the one it
-    // replaces. `.manager-icon-button[aria-label^="Edit"]` opened whichever row sorted first,
-    // and `adminRecipeRowProjection` sorts A to Z — so the frame landed on a complete recipe
-    // whose validation tab is five green ticks and no View button at all.
-    //
-    // `sm-r-runeplate-draft` is the corpus's one routed-issue recipe: it has ingredient sets and
-    // NO result groups, so readiness raises a critical `noResultGroup` deep-linking to Results
-    // and a warning `disabledIncomplete` deep-linking to Overview. Two buttons, in a tab that
-    // also draws ticks, which is the mixed row stack this member exists to photograph. The id is
-    // pinned the way `manager-recipe-edit-multistep` pins its own.
+    // The recipe is named, and that is the whole difference between this frame and the one it
+    // replaces.
     steps: [
       'Crafting',
       { selector: '[data-recipe-edit="sm-r-runeplate-draft"]' },
       { selector: '#recipe-tab-validation' },
     ],
     expectView: 'recipe-edit',
-    // A REPRESENTATIVE FRAME FOR `EditorValidationSurface` SINCE ISSUE 1517, and it had no
-    // assertion at all until then. `expectView` gates the ROUTE, and the route is `recipe-edit`
-    // whichever tab the editor is on — so a renamed tab id published the Overview tab under a
-    // name promising validation, and a change to the surface's rows would have read it as
-    // evidence.
-    //
-    // THE BUTTON, not a row. A row was the first attempt and it could not fail: the surface puts
-    // `manager-recipe-val-row` on every `<li>` whatever its status, and readiness always emits
-    // its structural ticks, so that selector was satisfied by construction on every recipe here.
-    // It rejected a wrong tab and an empty stack and never a missing button — under a case whose
-    // stated subject IS the button. `[data-recipe-issue-view]` is the hook the recipe editor
-    // passes as `viewDataAttr`, so it exists only where a row carried a route and the surface
-    // drew the action. That makes the selector a gate on the thing this member represents, and it
-    // is safe to name because the recipe is pinned above rather than taken from a sort order.
+    // A representative frame for `EditorValidationSurface` since issue 1517, and it had no
+    // assertion at all until then.
     expectSelector: '[data-recipe-tab="validation"] [data-recipe-issue-view]',
     kinds: ['manager', 'recipes'],
     sourceMatches: [
@@ -7342,10 +4648,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     id: 'manager-recipe-edit-multistep',
     label: 'Manager — Recipe edit multistep',
     smokeLabels: ['manager-recipe-edit-multistep'],
-    // The Overview tab's editable STEPS accordion, with a per-step duration control on each header.
-    // Only a recipe carrying authored `steps[]` renders it, and `sm-r-pattern-blade` is the world's
-    // only one — the first-row default opens a single-step recipe and photographs an Overview with
-    // no steps card at all.
+    // The Overview tab's editable steps accordion, with a per-step duration control on each header.
     reaches: 'exact',
     query: {},
     steps: [
@@ -7383,11 +4686,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     id: 'manager-recipe-edit-results-multistep',
     label: 'Manager — Recipe edit results multistep',
     smokeLabels: ['manager-recipe-edit-results-multistep'],
-    // The Results tab's PER-STEP result sections — the frame that proves a multi-step recipe's
+    // The Results tab's per-step result sections — the frame that proves a multi-step recipe's
     // Results renders something rather than an empty tab (the structural bug that shipped unseen
-    // for want of exactly this coverage). Needs the same authored-steps recipe as the Overview
-    // frame above; every other recipe here draws the single-set Results shape already captured by
-    // `manager-recipe-edit-results`.
+    // for want of exactly this coverage).
     reaches: 'exact',
     query: {},
     steps: [
@@ -7408,9 +4709,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: ['manager-multistep-disable-confirm'],
     reaches: 'exact',
     // `dialog: 'open'` leaves Foundry's own DialogV2 standing and unresolved, which is the whole
-    // point of this frame: the confirmation itself is the state, not what follows it. Reachable
-    // only since the dialog was transcribed from the harvested `client/applications/api/dialog.mjs`
-    // — before that, `confirmDialog` returned false unconditionally and the toggle silently no-oped.
+    // point of this frame: the confirmation itself is the state, not what follows it.
     query: { dialog: 'open' },
     steps: [
       'System Overview',
@@ -7423,10 +4722,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // silently no-oping toggle would have published.
     expectSelector: '.application.dialog',
     kinds: ['manager', 'recipes'],
-    // Matches the screen it RENDERS. These named `RecipeEditView.svelte` and `manager/recipe/`,
-    // neither of which appears in this frame — so a change to the settings tab did not select the
-    // only case showing its confirmation, and a change to the recipe editor selected a frame of
-    // the system-edit screen.
+    // Matches the screen it renders.
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
@@ -7436,11 +4732,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     id: 'manager-recipe-edit-collapsed',
     label: 'Manager — Recipe edit collapsed',
     smokeLabels: ['manager-recipe-edit-collapsed'],
-    // The COLLAPSED editor: `RecipeEditView` draws a read-only steps card plus its explanatory
+    // The collapsed editor: `RecipeEditView` draws a read-only steps card plus its explanatory
     // note, instead of the editable accordion, whenever `!multiStepEnabled && steps.length > 1`.
-    // The smoke reaches it by toggling the feature off through a confirm dialog; the lab reaches
-    // the same end state from persisted data, because Sablewright Jewellers declares
-    // `multiStepRecipes: false` and `jw-r-circlet` carries two authored steps.
     reaches: 'exact',
     query: { system: 'lab-jewelry' },
     steps: [
@@ -7481,9 +4774,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     id: 'manager-recipe-edit-results-alchemy',
     label: 'Manager — Recipe edit results alchemy',
     smokeLabels: ['manager-recipe-edit-results-alchemy'],
-    // Alchemy Results: the two-slot shape — an authored success set plus a RESERVED, undeletable
-    // "On a failed check" set the editor draws itself. Also a system-mode fact, so only the
-    // alchemy system can show it.
+    // Alchemy Results: the two-slot shape — an authored success set plus a reserved, undeletable
+    // "On a failed check" set the editor draws itself.
     reaches: 'exact',
     query: { system: 'lab-alchemy' },
     steps: [
@@ -7510,11 +4802,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/AccessTabView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/GrantAccessInspector\.svelte$/,
-      // The manager router and the Crafting entry model (issue 1151), for the reason
-      // recorded on `manager-books-scrolls-normal`. This case runs on `lab-alchemy`,
-      // which is restricted AND alchemy, so its submenu is the two-conditional-entry
-      // shape — `Recipes / Access / Knowledge / Settings` — that the wider Knowledge
-      // gate produces.
+      // The manager router and the Crafting entry model (issue 1151), for the reason recorded on
+      // `manager-books-scrolls-normal`.
       /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/crafting\/craftingNav\.js$/,
     ],
@@ -7522,27 +4811,7 @@ export const VIEW_LAB_CASES = Object.freeze([
   managerCase({
     id: 'manager-recipe-edit-access-inspector',
     label: 'Manager — Recipe access inspector, a recipe selected',
-    // THE INSPECTOR NO FRAME FILLED (issue 1513). `manager-recipe-edit-access-rail` above is the
-    // Access screen's resting frame and it draws this inspector's SELECT-A-RECIPE empty state:
-    // `selectedRecipeIdForAccess` opens as `''` and that case's steps select no row. So the two
-    // rosters — the search field that never appears below seven rows and the hand-rolled pager
-    // beside it — were published by nothing at all.
-    //
-    // A NEW CASE rather than a step added to the rail frame, because that frame is `reaches:
-    // 'exact'` against a live smoke label: driving it one click further would move a frame the
-    // smoke has a counterpart for, and the counterpart does not move with it.
-    //
-    // `al-r-elixir` is REACHABLE, not merely present. The list opens unfiltered at
-    // `pageSize = 10` and `lab-alchemy` holds five recipes, so every row is on page one — both
-    // facts pinned against `buildLabContent()` in `tests/view-lab-cases.test.js`, because a
-    // drifted fixture id in a step selector is otherwise undetected (issue 1632).
-    //
-    // NO GRANT IS SEEDED, and the refusal is deliberate rather than an omission. An ungranted
-    // roster draws both sections and both controls, which is the whole subject of this frame,
-    // while a seeded grant reaches `RecipeVisibilityService`'s player-visibility resolution on a
-    // `restricted` system — the class of mechanism `labContent.js` already records pushing player
-    // cases onto page 2. The granted-row appearance is held by
-    // `tests/components/grant-access-inspector-mounted.test.js`.
+    // The inspector no frame filled (issue 1513).
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-alchemy' },
@@ -7564,15 +4833,7 @@ export const VIEW_LAB_CASES = Object.freeze([
   managerCase({
     id: 'manager-access-recipe-selected',
     label: 'Manager — Recipe access rosters for a selected recipe',
-    // THE POPULATED HALF OF THE ACCESS INSPECTOR (issue 1515). `manager-recipe-edit-access-rail`
-    // is the only other frame of this route, and it rests on the aside's `{#if !recipe}` branch
-    // — the `Select a recipe` `EmptyState` at `GrantAccessInspector.svelte:199-207`. So every
-    // component the inspector actually exists to draw (the identity strip, the access summary,
-    // and both name-sorted rosters with their per-row switches) was unphotographed while the
-    // route LOOKED covered, which is worse than uncovered: a reader counting frames finds one.
-    //
-    // `beyond`: the smoke's crafting walk does not enter the Access route at all, so there is
-    // no counterpart frame and no label to name.
+    // The populated half of the access inspector (issue 1515).
     reaches: 'beyond',
     smokeLabels: [],
     // `lab-alchemy` is a `restricted` system, which is what makes the Access rail entry render
@@ -7585,11 +4846,9 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-access-row="al-r-elixir"]' },
     ],
     expectView: 'access',
-    // The inspector's POPULATED branch, proved by an element that exists only in it: the empty
+    // The inspector's populated branch, proved by an element that exists only in it: the empty
     // branch draws an `EmptyState` and nothing else, so `[data-access-inspector]` alone is
-    // satisfied by the frame this case exists to distinguish itself from. The summary line and
-    // a real roster row are both required — a roster head with no rows under it is the same
-    // silence in a different place.
+    // satisfied by the frame this case exists to distinguish itself from.
     expectSelector:
       '.fabricate-manager [data-access-inspector]:has([data-access-summary])' +
       ' [data-access-roster="characters"] [data-access-character-row]',
@@ -7603,18 +4862,7 @@ export const VIEW_LAB_CASES = Object.freeze([
   managerCase({
     id: 'manager-access-recipe-roster-paged',
     label: 'Manager — Recipe access players roster paged',
-    // THE ROSTER'S PAGER, WHICH NO CASE COULD REACH (issue 1515). `manager-access-recipe-selected`
-    // photographs the populated inspector against the resting lab world, whose `game.users.players`
-    // holds ONE non-GM user — so the Players roster is a single row, its pager is below its
-    // threshold and its own search field is not rendered at all. Two of the three things that
-    // roster does were therefore unphotographable for a fixture reason rather than a product one.
-    //
-    // `manyPlayers` is what answers it: `tests/view-lab/mount.js` asks the shim for the crowded
-    // roster, and ONLY the two cases that name the flag see it, so every other frame keeps the
-    // two-seat table it was photographed against.
-    //
-    // `beyond`: the smoke's crafting walk does not enter the Access route at all, so there is no
-    // counterpart frame and no label to name.
+    // The roster's pager, which no case could reach (issue 1515).
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-alchemy', manyPlayers: '1' },
@@ -7624,20 +4872,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-access-row="al-r-elixir"]' },
     ],
     expectView: 'access',
-    // A FULL PAGE OF SIX, which is the paged state stated as something the DOM can answer. The
-    // roster's page size is six and the seeded roster is eight, so a sixth row exists only when
-    // the crowded fixture reached this frame — one row is what the flagless world draws — and a
-    // roster of eight at a page size of six is two pages, which is what puts the bar beneath it.
-    //
-    // The arithmetic is not restated here: `tests/view-lab-cases.test.js` derives it from the
-    // shim's own roster table and from `GrantAccessInspector.svelte`'s own `ROSTER_PAGE_SIZE`, so
-    // a fixture that quietly fell to six would fail there rather than publish a full page with no
-    // bar under a case named for the bar.
-    //
-    // It names no pager element, and that is deliberate rather than weak: issue 1513 replaces this
-    // inspector's hand-rolled bar with the shared `<Pagination>` on a branch of its own, and the
-    // two draw disjoint hooks — so a selector naming either one fails the WHOLE capture depending
-    // on merge order. The rows are what both versions render identically.
+    // A full page of six, which is the paged state stated as something the DOM can answer.
     expectSelector:
       '.fabricate-manager [data-access-inspector] [data-access-roster="players"]' +
       ' .manager-access-roster-rows [data-access-player-row]:nth-child(6)',
@@ -7646,26 +4881,15 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/AccessTabView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/GrantAccessInspector\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/RosterRow\.svelte$/,
-      // NO `Pagination.svelte` PATTERN, though this frame is the registry's only paged roster.
-      // That file is a BROAD SIGNAL, and `selectRenderFileCases` skips a broad-signal file before
-      // it consults any case's `sourceMatches` — so the declaration would be inert, which
-      // `tests/design-system-primitives.test.js` reports as a defect rather than tolerating.
+      // No `Pagination.svelte` pattern, though this frame is the registry's only paged roster.
     ],
   }),
   managerCase({
     id: 'manager-access-recipe-roster-no-match',
     label: 'Manager — Recipe access players roster no match',
-    // THE PER-ROSTER NO-MATCH LINE (issue 1515), the second state the one-user roster made
-    // unreachable: the field that produces it renders only over a roster with something in it,
-    // and a roster of one has nothing a query can miss that the screen does not already show.
-    //
-    // It is the shared `EmptyState` in its QUIET form as of this phase — one line at the
-    // column's own scale, no dashed edge, no fill and no tile — which is what
-    // `openspec/specs/design-system/spec.md` rules for an emptiness inside a boundary the screen
-    // has already drawn. So this frame is also the only evidence that this inspector's last
-    // hand-rolled no-state message is gone.
-    //
-    // `beyond`, for the reason the paged case above states.
+    // The per-roster no-match line (issue 1515), the second state the one-user roster made
+    // unreachable: the field that produces it renders only over a roster with something in it, and
+    // a roster of one has nothing a query can miss that the screen does not already show.
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-alchemy', manyPlayers: '1' },
@@ -7676,11 +4900,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-access-roster-search="players"]', fill: ACCESS_ROSTER_SEARCH_MISS_TERM },
     ],
     expectView: 'access',
-    // BOTH ROSTERS, because the claim is that ONE of them missed. The Characters roster is
-    // untouched by a query typed into the Players roster's own field — the two terms are separate
-    // state — so an inspector drawing the quiet line under Players AND real rows under Characters
-    // is the frame, while the same line with an empty inspector behind it would be a different
-    // and much less interesting one.
+    // Both rosters, because the claim is that one of them missed.
     expectSelector:
       '.fabricate-manager [data-access-inspector]' +
       ':has([data-access-roster="characters"] [data-access-character-row])' +
@@ -7689,10 +4909,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/AccessTabView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/GrantAccessInspector\.svelte$/,
-      // NO `EmptyState.svelte` PATTERN, for the reason the paged case above records about
-      // `Pagination`: it is a broad signal, so the pattern could never be consulted. The `note`
-      // variant this frame draws already has an override frame of its own
-      // (`world-tool-entry-on-break-repair-tag-picker-empty`).
+      // No `EmptyState.svelte` pattern, for the reason the paged case above records about
+      // `Pagination`: it is a broad signal, so the pattern could never be consulted.
     ],
   }),
   managerCase({
@@ -7703,11 +4921,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: {},
     steps: [{ selector: '#manager-nav-component-rules' }],
     expectView: 'components',
-    // issue 1371 r13-list — THE LIST OPENS ON ITS FIRST DRAWN ROW (maintainer ruling M14). This
-    // frame used to photograph the inspector describing the manager's STORED-first card while no
-    // row in the list was marked; it now photographs the first row marked and the inspector it
-    // opened. Both are stated so a regression to the unmarked state fails the capture rather
-    // than publishing a frame that quietly shows it.
+    // Issue 1371 r13-list — the list opens on its first drawn row (maintainer ruling M14).
     expectContained: [
       {
         container: '.manager-table-scroll',
@@ -7725,14 +4939,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
   }),
   managerCase({
-    // issue 1371 r18-colour — THE ROW BADGES IN THE ESSENCE'S OWN COLOUR (maintainer ruling M29).
-    // `manager-components-normal` opens on the list's first group, `Finished Goods`, whose rows
-    // carry no essence, so that frame cannot show what this revision changed: each essence badge
-    // and the inspector's essence run now draw in the colour the Essence Catalogue gave the
-    // essence. The essence filter's `Carries any essence` predicate brings the carrying rows to
-    // the top, and the containment names a TINTED chip — `data-chip-tint` is stamped only when a
-    // colour reached the chip — so a regression to grey badges fails the capture rather than
-    // publishing a frame that quietly shows it.
+    // Issue 1371 r18-colour — the row badges in the essence's own colour (maintainer ruling M29).
     id: 'manager-components-essence-chips',
     label: 'Manager — Components essence chips',
     reaches: 'beyond',
@@ -7765,15 +4972,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
   }),
   managerCase({
-    // THE INHERITING RULES EDITOR (issue 1371, round 2), and it is the ONLY state that renders the
-    // category note in its info tone — the pixel behind E-4's `tone: 'info'`, which round 1
-    // shipped as a unit-tested constant no frame could contain. `manager-component-edit-normal`
-    // opens the FIRST row, which overrides, so it photographs the warning branch and can never
-    // show this one.
-    //
-    // `sm-iron-ingot` is the pair the lab fixture seeds for exactly this: a membership record that
-    // inherits `category`, PAIRED with an explicit world default, because a refused election
-    // photographs the third branch and looks like a correct inheriting frame.
+    // The inheriting rules editor (issue 1371, round 2), and it is the only state that renders the
+    // category note in its info tone — the pixel behind E-4's `tone: 'info'`, which round 1 shipped
+    // as a unit-tested constant no frame could contain.
     id: 'manager-component-edit-inheriting',
     label: 'Manager — Component edit inheriting',
     reaches: 'beyond',
@@ -7784,12 +4985,10 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-component-edit]' },
     ],
     expectView: 'component-edit',
-    // THE CATEGORY CONTROL IS ONE SELECT NOW, NOT AN `InheritRow` (issue 1371, parity round 4,
+    // The category control is one select now, not an `InheritRow` (issue 1371, parity round 4,
     // rebuild-spec D4.1 / gap-list rows 132-133): the reference draws a single full-width select
-    // whose FIRST option is `Inherit from world · {category}`, with the state note directly under
-    // it — no separate toggle, no second `Category` label, no floated head control. The
-    // `[data-scoped-inherit-*]` hooks this named still exist on the WORLD ENTRY, which is why the
-    // registry's selector guard stayed green while this case could no longer reach its state.
+    // whose first option is `Inherit from world · {category}`, with the state note directly under
+    // it — no separate toggle, no second `Category` label, no floated head control.
     expectSelector: '[data-component-edit-category]',
     expectContained: [
       // THE INFO-TONE BRANCH, which is this case's whole subject: `inherited` is the state
@@ -7804,12 +5003,7 @@ export const VIEW_LAB_CASES = Object.freeze([
         container: 'main.manager-component-edit-main',
         target: '[data-component-edit-section="identity"]',
       },
-      // THE ESSENCE SECTION'S INHERIT CHOICE (issue 1371 r18-entry, maintainer ruling M31). The
-      // world record carries an `essences` section now, elected by the `1.32.0` pass from the
-      // oldest system's row, so `sm-iron-ingot` INHERITS it here as it inherits its category —
-      // and this is the only frame that shows the essence card locked over the world map under
-      // the shared inherit row's `Inherited` chip and the info-tone note. The claim reds if the
-      // row leaves the card, if the lab's ingot stops inheriting, or if the note loses its state.
+      // The essence section's inherit choice (issue 1371 r18-entry, maintainer ruling M31).
       {
         container: '[data-component-edit-section="essences"]',
         target: '[data-scoped-inherit-toggle="essences"]',
@@ -7828,14 +5022,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
   }),
   managerCase({
-    // THE RULES EDITOR'S READ-ONLY WORLD TAG CARD (issue 1371, round 3), which no frame reached.
-    //
-    // A SECOND CASE rather than two more steps on the one above, for the reason the entry's own
-    // definition/tags split records: the card sits below the editor's scroll fold, and scrolling
-    // to it moves the identity strip and the inherit row — that case's whole subject — out of
-    // frame. It also needs a DIFFERENT COMPONENT: `sm-iron-ingot` carries no world tags at all, so
-    // the card does not render for it, and `sm-coal` is the one lab component with world tags AND
-    // a member muting one, which is what makes the muted/unmuted chip pair visible here.
+    // The rules editor's read-only world tag CARD (issue 1371, round 3), which no frame reached.
     id: 'manager-component-edit-world-tags',
     label: 'Manager — Component edit world tags',
     reaches: 'beyond',
@@ -7849,19 +5036,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectView: 'component-edit',
     expectSelector: '[data-component-edit-section="world-tags"]',
     expectContained: [
-      // THE COUNT NOTE IS CONTAINED BY THE CARD, not by the world-tag GROUP, and the difference is
-      // what this pair was getting wrong. Parity round 4 rebuilt this card into a head, TWO
-      // labelled groups and a count note; `[data-component-edit-section="world-tags"]` is the
-      // first of those groups, so the note (which sits under BOTH groups, because it counts them
-      // together) is its SIBLING and can never be inside it. The case had asked for exactly that
-      // and failed every render since — "is clipped or extends outside", which reads as a layout
-      // defect and is really a capture state that did not co-evolve with the surface it captures.
-      //
-      // THE `Edit world tags` EXIT WAS THE THIRD PAIR HERE AND IS GONE (revision 8, M11). The
-      // reference draws no action in this card's head, so the shipped head is glyph + title +
-      // subtitle and there is nothing left to contain. A capture state outlives the surface it
-      // captures unless it is edited with it — which is why this entry is removed rather than
-      // left to fail as a layout finding.
+      // The count note is contained by the CARD, not by the world-tag group, and the difference is
+      // what this pair was getting wrong.
       {
         container: '[data-component-edit-section="tags"]',
         target: '[data-component-edit-world-tags-note]',
@@ -7881,41 +5057,29 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
   }),
   managerCase({
-    // THE WIDENED MEMBERSHIP COHORT (issue 1371, round 2): the ghost rows, their Add, and the
-    // toolbar counting the widened set. It is the ONE route in the product to adopt a world
-    // component into a crafting system, and round 1 shipped it with no frame at all.
+    // The widened membership cohort (issue 1371, round 2): the ghost rows, their Add, and the
+    // toolbar counting the widened set.
     id: 'manager-components-world-cohort',
     label: 'Manager — Components world cohort',
     reaches: 'beyond',
     smokeLabels: [],
     steps: [
       { selector: '#manager-nav-component-rules' },
-      // THE COHORT SWITCH IS A `SegmentedControl`, NOT A `<select>` (issue 1371, parity round 4,
+      // The cohort switch is A `SegmentedControl`, not A `<select>` (issue 1371, parity round 4,
       // rebuild-spec C6): the reference draws two inline segments and the shipped control now
       // renders one `<label>` per option carrying `data-component-membership-option="<value>"`
-      // (`data-component-membership-filter` is on the TRACK, and stamps `true`, not a value).
-      // `selectOption` on it threw, so this case reached no state at all.
+      // (`data-component-membership-filter` is on the track, and stamps `true`, not a value).
       { selector: '[data-component-membership-option="all"]' },
-      // SCROLL TO THE COHORT, because it sits below every member row: the lab world's smithing
+      // Scroll to the cohort, because it sits below every member row: the lab world's smithing
       // system holds a handful of components and the world corpus holds sixty-five, so the ghost
       // list starts well past the fold and an unscrolled frame photographs the member rows this
       // case is not about.
-      //
-      // A GHOST ROW IS THE MEMBER ROW, DIMMED AND STATED (rebuild-spec C6), so it is named by the
-      // membership attribute every row carries rather than by a marker only the ghost has: there
-      // is no separate ghost component to hang one on, and inventing an attribute for the test
-      // would be a hook with no product reader.
       { selector: '.manager-component-row[data-component-member="false"]', scroll: true },
     ],
     expectView: 'components',
     expectSelector: '.manager-component-row[data-component-member="false"]',
     expectContained: [
-      // A ROW, NOT THE WHOLE `<ul>`. The ghost body is a sixty-row list inside a SCROLLING
-      // container, so it legitimately extends past its own scroller and the containment check
-      // reads that as clipping — an assertion that can only pass on a world small enough for the
-      // whole cohort to fit, which is not a property this case is about. Containing the row the
-      // frame is scrolled to is the real claim: the cohort renders inside the table rather than
-      // spilling out of it.
+      // A row, not the whole `<ul>`.
       {
         container: '.manager-table-scroll',
         target: '.manager-component-row[data-component-member="false"]',
@@ -7925,10 +5089,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentsBrowserView\.svelte$/],
   }),
   managerCase({
-    // THE `Add from catalogue` PICKER, OPEN AND MULTI-SELECTED (issue 1371, M9). The header action
-    // it hangs off had NO frame and no test at all through revision 5 — which is how it shipped
-    // navigating to a token that resolves to nothing. A control with no capture state publishes
-    // an unrelated frame when it changes, which is the failure this registry exists to prevent.
+    // The `Add from catalogue` picker, open AND multi-selected (issue 1371, M9).
     id: 'manager-components-add-from-catalogue',
     label: 'Manager — Components add from catalogue',
     reaches: 'beyond',
@@ -7936,20 +5097,14 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [
       { selector: '#manager-nav-component-rules' },
       { selector: '[data-component-add-from-catalogue]' },
-      // TWO ROWS TICKED, BY STATE RATHER THAN BY ID. A picked row carries `is-picked`, so
-      // `:not(.is-picked)` is always the first UNPICKED row and two of these steps tick the first
-      // two — with no dependence on which world components the lab fixture happens to sort first,
-      // which an id-named step would silently acquire.
+      // Two rows ticked, by state rather than by ID.
       { selector: '[data-component-add-from-catalogue-row]:not(.is-picked)' },
       { selector: '[data-component-add-from-catalogue-row]:not(.is-picked)' },
     ],
     expectView: 'components',
     expectSelector: '[data-component-add-from-catalogue-dialog]',
     kinds: ['manager', 'components'],
-    // THE PICKER'S OWN FILE, AND NOT `ManagerModal.svelte`. The shared modal chrome is a BROAD
-    // SIGNAL, so `selectRenderFileCases` never reaches a per-case pattern naming it and the
-    // declaration would do nothing — `design-system-primitives.test.js` (b) reds exactly that.
-    // A chrome change selects the representative pair instead.
+    // The picker's own file, AND not `ManagerModal.svelte`.
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/ComponentAddFromCatalogueDialog\.svelte$/,
     ],
@@ -7960,20 +5115,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: ['manager-components-bulk-edit'],
     reaches: 'exact',
     query: {},
-    // The STAGED face. `data-component-select` sits on a visually hidden input, so the click
-    // target is its wrapping `<label>`; two rows, because a one-row selection reads as an
-    // accident. Then the three axes the smoke stages: one essence increment, which is what arms
-    // the destructive-overwrite warning; the tag tri-state at BOTH its non-default faces (one
-    // click = add, two = remove); and a category — an inline inset ROW since issue 1371 r16-list
-    // (M23), so a click rather than a select.
-    //
-    // THE ESSENCE IS STAGED FIRST AND THE CATEGORY LAST (issue 1371 r17-b, quality N4), because
-    // the LAST click decides what the frame shows: the three insets make the panel taller than
-    // its column, and Playwright scrolls the clicked control into view. Ending on the essence
-    // stepper photographed the panel from the tags inset's third row down, with the staged
-    // category and the chip run above the fold; ending on the category row lands the shutter on
-    // the panel's head, as the world twin does. The axes are independent, so the order composes
-    // the same instruction.
+    // The staged face. `data-component-select` sits on a visually hidden input, so the click target
+    // is its wrapping `<label>`; two rows, because a one-row selection reads as an accident.
     steps: [
       { selector: '#manager-nav-component-rules' },
       { selector: 'label:has(input[data-component-select="sm-iron-ore"])' },
@@ -7993,10 +5136,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     expectView: 'components',
     expectSelector: '[data-component-bulk-panel]',
-    // THE THREE STAGED AXES, asserted (issue 1371 r17-b, quality N4): a category radio or tag
-    // tri-state that stopped staging on THIS panel would otherwise still publish a green frame.
-    // The tag states are read off the staged CHIP RUN rather than the rows, because the well is
-    // cleared above and both tags sit past page one of the resting inset.
+    // The three staged axes, asserted (issue 1371 r17-b, quality N4): a category radio or tag
+    // tri-state that stopped staging on this panel would otherwise still publish a green frame.
     expectContained: [
       {
         container: '[data-component-bulk-panel]',
@@ -8029,21 +5170,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Components bulk delete idle',
     reaches: 'beyond',
     smokeLabels: [],
-    // The UNARMED face of the set remove (issue 1129; the reference's `Remove N components from
+    // The unarmed face of the set remove (issue 1129; the reference's `Remove N components from
     // {system}…` leg in the shell's dock since issue 1371 r16-list, M23), and the frame that
     // photographs its consequence note.
-    //
-    // The bulk-edit cases above do NOT photograph the note "for free": the leg sits in the
-    // pinned dock under the primary, and the note's counted recipe sentences are what this frame
-    // exists for. The `scroll` step is kept so the dock is in frame whatever the rail's fold.
-    //
-    // `sm-iron-ingot` is selected on PURPOSE, and the choice is load-bearing. Through the real
-    // describer the lab fixture yields 7 recipes rewritten and 3 of them disabled, so this is
-    // the only frame in the registry that photographs the DISABLED row at all — the armed twin
-    // below selects iron+copper ore, which computes 2 / 1 / 0 and therefore photographs the
-    // zero-gating instead. Between the two, every branch of the impact list has a frame.
-    // Selecting an ore here as well would leave the card's most consequential sentence, and the
-    // one this round rewrote, with no visual evidence anywhere.
     query: {},
     steps: [
       { selector: '#manager-nav-component-rules' },
@@ -8051,9 +5180,8 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-component-bulk-remove]', scroll: true },
     ],
     expectView: 'components',
-    // UNARMED is the state under test, and `data-armed="false"` is what separates this frame
-    // from its armed twin below — an `expectSelector` naming only the card would pass on
-    // either.
+    // Unarmed is the state under test, and `data-armed="false"` is what separates this frame from
+    // its armed twin below — an `expectSelector` naming only the card would pass on either.
     expectSelector: '.fabricate-manager [data-arm-token="delete-components"][data-armed="false"]',
     kinds: ['manager', 'components'],
     sourceMatches: [
@@ -8069,15 +5197,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Components bulk delete armed',
     reaches: 'beyond',
     smokeLabels: [],
-    // The ARMED half of the set remove (issue 1129; in the dock since issue 1371 r16-list), the
-    // twin of `manager-essences-bulk-delete-armed`. The first click only ARMS, so this frame
-    // shows `Confirm — remove N from {system}` over the note it is a confirmation OF, with
-    // nothing written.
-    //
-    // Two frames rather than one because the two states are the point: the idle sibling
-    // directly above shows the impact statement rendered BEFORE arming, and this one shows
-    // that the arm is a second, separate act. Either frame alone would leave half of the
-    // pairing — statement plus arm — unphotographed.
+    // The armed half of the set remove (issue 1129; in the dock since issue 1371 r16-list), the
+    // twin of `manager-essences-bulk-delete-armed`.
     query: {},
     steps: [
       { selector: '#manager-nav-component-rules' },
@@ -8211,21 +5332,11 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     kinds: ['manager', 'components'],
     // The three complication components are claimed by the four `*-complications-*` and
-    // `*-salvage-stage-strip` cases below, NOT here (issue 1286). This case runs on the
-    // default system, `lab-smithing`, which resolves crafting, salvage and gathering
-    // non-progressively — and `ComponentComplicationsSection`'s own gate is "some activity in
-    // this system is progressive", so the section renders nothing at all in this frame. A
-    // claim here would route a change to those files at a photograph that provably cannot
-    // contain them, which is the unrelated-evidence failure the registry's own orphan check
-    // exists to prevent and which no mechanical gate catches: the files ARE in the mounted
-    // closure, so both directions of `view-lab-source-coverage` pass either way.
+    // `*-salvage-stage-strip` cases below, not here (issue 1286).
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
   }),
   managerCase({
-    // THE OTHER CONSUMER OF THE SHARED FRAME, STACKED (issue 1371 r19-entry2). Its twin is
-    // `world-component-entry-stacked`, whose comment carries the whole reasoning; this is the
-    // screen the collapse was actually found on, because its page IS its `<main>` and that
-    // element declares the row template M26 gave it for the full-height rail.
+    // The other consumer of the shared frame, stacked (issue 1371 r19-entry2).
     id: 'manager-component-edit-stacked',
     label: 'Manager — Component edit stacked',
     reaches: 'beyond',
@@ -8257,12 +5368,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     id: 'manager-component-edit-salvage',
     label: 'Manager — Component edit salvage',
     smokeLabels: ['manager-component-edit-salvage'],
-    // The ROUTED salvage authoring body: per-component result groups plus a POPULATED
-    // outcome-routing table (`[data-salvage-routing]`) and the DC override. Three things have to
-    // be true at once — routed salvage mode, an authored routed salvage check with tiers, and
-    // more than one result group — and Runework is the only system where they all are. The
-    // Simple-mode smithing component this case used to open cannot draw the routing table at all;
-    // its own body is `manager-component-edit-salvage-simple`.
+    // The routed salvage authoring body: per-component result groups plus a populated
+    // outcome-routing table (`[data-salvage-routing]`) and the DC override.
     reaches: 'exact',
     query: { system: 'lab-runework' },
     steps: [
@@ -8274,12 +5381,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     expectView: 'component-edit',
     kinds: ['manager', 'components'],
-    // The SHARED subject check-modifier picker does NOT render here, and this list used to
-    // claim it did (issue 1095). `lab-runework`'s salvage check is on `addAll`, and the picker
-    // renders under `bySubject` alone — so routing the component's changed file to this case
-    // would publish a frame that provably cannot depict it. The two cases that CAN are
-    // `manager-component-edit-salvage-modifier-pick` and
-    // `manager-gathering-task-edit-modifier-pick`, each of which clicks the rule first.
+    // The shared subject check-modifier picker does not render here, and this list used to claim it
+    // did (issue 1095).
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
   }),
   managerCase({
@@ -8315,30 +5418,15 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
   }),
 
-  // ── PROGRESSIVE COMPONENT COMPLICATIONS (issue 1286) ──────────────────────────────────────────
-  //
   // Five frames, and every one of them is on `lab-herbalism` because no other lab system can draw
   // any of them: `ComponentComplicationsSection` gates itself on "some activity in this system
   // resolves progressively", and herbalism is the world's only progressive system on any axis.
-  // The default system, `lab-smithing`, renders the section not at all — which is why
-  // `manager-component-edit-normal` above deliberately does NOT claim these files.
-  //
-  // All five are `reaches: 'beyond'` with no smoke labels: the live Foundry smoke walks no
-  // complication authoring, no progressive salvage editor strip and no Recipe Studio stage strip,
-  // so there is no counterpart to fall short of. That is the honest declaration, not a way around
-  // the `exact` collision rule — these five have distinct steps and would not collide anyway.
-  //
-  // The fixture is what makes each state reachable, and it is authored in
-  // `tests/view-lab/world/labContent.js` rather than reached by clicking: Ground Reagent carries
-  // two complications, Frostcap Mushroom one, and Empty Vial — stage ONE of both progressive
-  // lists — carries none, so both strips draw a bare row above two annotated ones.
   managerCase({
     id: 'manager-component-complications-empty',
     label: 'Manager — Component complications empty',
-    // The section's EMPTY state, which is `EmptyState`'s new `inline` variant (issue 1286) and
-    // exists on no other screen: the stack flips to a row and the 46px icon tile is released
-    // into a bare glyph, neither of which `is-compact` does. Empty Vial is the component that
-    // authors none, so this is the one editor in a progressive system that draws it.
+    // The section's empty state, which is `EmptyState`'s new `inline` variant (issue 1286) and
+    // exists on no other screen: the stack flips to a row and the 46px icon tile is released into a
+    // bare glyph, neither of which `is-compact` does.
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-herbalism' },
@@ -8363,9 +5451,7 @@ export const VIEW_LAB_CASES = Object.freeze([
   managerCase({
     id: 'manager-component-complications-collapsed',
     label: 'Manager — Component complications collapsed',
-    // The resting list: two summary rows, both closed. It is the frame that shows the row
-    // anatomy — severity tile, name, generated trigger sentence, Player pill, severity chip and
-    // the activity glyph run — and the two rows differ on every one of those axes on purpose.
+    // The resting list: two summary rows, both closed.
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-herbalism' },
@@ -8378,9 +5464,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-complications-section]', scroll: true },
     ],
     expectView: 'component-edit',
-    // A ROW, and specifically the authoring variant. `ComplicationSummaryRow` renders three
-    // variants off one scaffold, so asserting the shared class alone would pass on the read-only
-    // strip this screen also draws further up.
+    // A row, and specifically the authoring variant.
     expectSelector:
       '.fabricate-manager [data-complications-section] [data-complication-row="authoring"]',
     kinds: ['manager', 'components', 'complications'],
@@ -8392,12 +5476,9 @@ export const VIEW_LAB_CASES = Object.freeze([
   managerCase({
     id: 'manager-component-complications-expanded',
     label: 'Manager — Component complications expanded',
-    // The OPEN row, which is where the section's whole authoring surface lives: the identity
-    // strip, the Applies-to chips, and the When and Then cards with six `ComplicationEffectRow`
-    // instances between them. `hb-comp-dust-cloud` is opened rather than its sibling because it
-    // is the one whose condition roll AND effect roll are both enabled — the revealed input
-    // strips render only when their row is on, so opening the other would photograph six
-    // collapsed heads and none of the controls.
+    // The open row, which is where the section's whole authoring surface lives: the identity strip,
+    // the Applies-to chips, and the When and Then cards with six `ComplicationEffectRow` instances
+    // between them.
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-herbalism' },
@@ -8427,12 +5508,7 @@ export const VIEW_LAB_CASES = Object.freeze([
   managerCase({
     id: 'manager-component-complications-salvage-stage-strip',
     label: 'Manager — Component complications salvage stage strip',
-    // The READ-ONLY strip under a progressive salvage stage row. `hb-cracked-alembic` is the
-    // world's only progressive-salvage component, and its three stages are Empty Vial (no
-    // complications), Ground Reagent (two) and Frostcap Mushroom (one) — so one frame carries
-    // the bare row, the two-row band and the one-row band together, which is what makes the
-    // band's PLACEMENT legible: it hangs off the row it annotates rather than sitting in the
-    // list as another stage.
+    // The read-only strip under a progressive salvage stage row.
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-herbalism' },
@@ -8456,14 +5532,8 @@ export const VIEW_LAB_CASES = Object.freeze([
   managerCase({
     id: 'manager-recipe-complications-stage-strip',
     label: 'Manager — Recipe complications stage strip',
-    // The Recipe Studio's counterpart, and the reason it is a SEPARATE frame rather than the
-    // same one photographed twice: the two strips are deliberately asymmetric. The Component
-    // Studio hangs the band OUTSIDE the stage row, tucked and left-ruled; the Recipe Studio
-    // draws it INSIDE the stage card as an own-line section. Both are the prototypes' own rule,
-    // and a single frame could not show that the two disagree on purpose.
-    //
-    // `hb-r-grind` produces the same three components in the same order as the salvage list
-    // above, so the bare-stage adjacency reads identically on both surfaces.
+    // The Recipe Studio's counterpart, and the reason it is a separate frame rather than the same
+    // one photographed twice: the two strips are deliberately asymmetric.
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-herbalism' },
@@ -8511,17 +5581,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/.*Check/,
     ],
   }),
-  // The retired-placeholder readiness SPLIT (issue 1094). Two issues share one surface and
-  // differ only by severity and copy, so a frame is the only thing that shows a GM which one
-  // they are looking at — and the critical is the one whose advice ("rewrite it by hand")
-  // contradicts the warning's ("delete the placeholder").
-  //
-  // Reached by FILLING the formula rather than by seeding the token in `labContent.js`, and
-  // that is load-bearing: the lab boots the real migration runner on every build, so a
-  // fixture carrying `1d20 * @craftingmod` would be counted `untouched: 1` and post a
-  // PERMANENT warning — which `installFoundryShim` routes to a console error that fails the
-  // capture job whole. Typing it into the draft reproduces exactly the GM behaviour the
-  // readiness warning exists to catch, after the migration has already run.
+  // The retired-placeholder readiness split (issue 1094).
   managerCase({
     id: 'manager-checks-validation-retired-placeholder',
     label: 'Manager — Checks validation retired placeholder',
@@ -8547,10 +5607,8 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/.*Check/,
     ],
   }),
-  // ── The GM Checks Studio IA (issue 1096) ──────────────────────────────────────────────
-  //
-  // Six states the old four-tab surface had no shape for, and every one of them is a claim
-  // this change makes that only a photograph settles.
+  // Six states the old four-tab surface had no shape for, and every one of them is a claim this
+  // change makes that only a photograph settles.
   managerCase({
     id: 'manager-checks-rail-group',
     label: 'Manager — Checks rail group expanded',
@@ -8576,11 +5634,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Checks rail dirty marker beside an issue badge',
     reaches: 'beyond',
     smokeLabels: [],
-    // THE THREE-MARKER COLUMN. An unsaved edit is staged on Crafting, then the GM moves to
-    // Salvage — so the rail shows a DIRTY marker on a route they are not standing on, an
-    // ISSUE badge on another, and the record-count numerals of every non-Checks entry above.
-    // The drafts living above the route is what makes this state reachable at all; under the
-    // old per-tab model the edit would have been abandoned by the move.
+    // The three-marker column.
     query: { system: 'lab-jewelry' },
     steps: [
       'Checks',
@@ -8601,15 +5655,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Checks section with a count AND a warning dot',
     reaches: 'beyond',
     smokeLabels: [],
-    // No frame in the prototype shows a section carrying BOTH markers, and they occupy the
-    // same slot, so this is the one that proves they do not collide. Runework is routed by
-    // check with THREE authored tiers — the count the header badge reads — and blanking the
-    // first one's NAME raises `unnamedOutcome`, which buckets to Outcomes, the section that
-    // already carries the tier count.
-    //
-    // The tier it blanks is the TOP one, so this frame's strongest band is captioned with
-    // nothing. That is correct for what this case photographs and wrong for anything about
-    // band NAMES: `coverage-mode-routed-check-checks` is the frame that shows those.
+    // No frame in the prototype shows a section carrying both markers, and they occupy the same
+    // slot, so this is the one that proves they do not collide.
     query: { system: 'lab-runework' },
     steps: [
       'Checks',
@@ -8630,10 +5677,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Checks crafting switched off',
     reaches: 'beyond',
     smokeLabels: [],
-    // Reached by TURNING THE CHECK OFF rather than by a fixture whose check is already off:
-    // every lab system authors an enabled check, and a seventh system carrying a disabled one
-    // would change the system count every other manager frame is composed against. Jewelry's
-    // `routedByIngredients` check is the optional one, so its rail toggle is live.
+    // Reached by turning the check off rather than by a fixture whose check is already off: every
+    // lab system authors an enabled check, and a seventh system carrying a disabled one would
+    // change the system count every other manager frame is composed against.
     query: { system: 'lab-jewelry' },
     steps: [
       'Checks',
@@ -8653,10 +5699,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Checks stacked at the declared floor',
     reaches: 'beyond',
     smokeLabels: [],
-    // THE 1024x640 DECLARED FLOOR, and it is STACKED there rather than a side rail: the
-    // shipped `fabricate-manager` container ladder restacks `.manager-body` to one column at
-    // 1120, so at the floor every panel is reached by scrolling the body. An acceptance that
-    // described a side rail at this width would have been read as a defect in the frame.
+    // The 1024x640 declared floor, and it is stacked there rather than a side rail: the shipped
+    // `fabricate-manager` container ladder restacks `.manager-body` to one column at 1120, so at
+    // the floor every panel is reached by scrolling the body.
     query: { system: 'lab-runework' },
     steps: ['Checks', { selector: '#manager-checks-nav-crafting' }],
     expectView: 'checks-crafting',
@@ -8689,15 +5734,7 @@ export const VIEW_LAB_CASES = Object.freeze([
   managerCase({
     id: 'manager-checks-salvage-on-failure',
     label: 'Manager — Checks salvage on failure',
-    // BEYOND the smoke, and beyond every previous build: this SECTION HAS NEVER EXISTED.
-    // Until issue 1098 the salvage route's On-failure section rendered the shared "nothing
-    // to set here" empty state, which was true of the screen and false of the data —
-    // `consumeComponentOnFail` and `breakToolsOnFail` have been persisted since 1.7.0 and
-    // were reachable from no editor at all.
-    //
-    // `lab-runework` is the system that authors BOTH of them at their non-default values
-    // (`consumeComponentOnFail: false`, `breakToolsOnFail: true`), so the frame photographs
-    // persisted state rather than two defaults, and its salvage policy is `always`.
+    // Beyond the smoke, and beyond every previous build: this section has never existed.
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-runework' },
@@ -8719,11 +5756,9 @@ export const VIEW_LAB_CASES = Object.freeze([
   managerCase({
     id: 'manager-checks-gathering-on-failure',
     label: 'Manager — Checks gathering on failure',
-    // The activity that renders the policy and NO consumption toggles, because it has no
+    // The activity that renders the policy and no consumption toggles, because it has no
     // consumption block — plus the dormancy notice naming issue 683 and the read-only
-    // `task.failureOutcome` cross-reference in its no-record state. The absence of the
-    // toggles is the subject as much as the presence of the policy, and an absence is only
-    // judgeable from a photograph.
+    // `task.failureOutcome` cross-reference in its no-record state.
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-herbalism' },
@@ -8749,14 +5784,9 @@ export const VIEW_LAB_CASES = Object.freeze([
   managerCase({
     id: 'manager-recipe-edit-results-failure-tier',
     label: 'Manager — Recipe edit results failure tier',
-    // DECISION 7, and the only frame of it: a routed-by-check recipe's result-group card
-    // offering a FAILURE-MARKED outcome tier, which is reachable only because
-    // `lab-runework`'s crafting check authors `failureResultPolicy: 'always'`. Under the
-    // `never` every other routed system would carry, the picker offers success tiers only
-    // and this frame would be indistinguishable from `coverage-mode-routed-check-results`.
-    //
-    // The selector names `rw-ruined` — the world's one `success: false` tier —
-    // rather than counting options, because a count would pass on three success tiers.
+    // Decision 7, and the only frame of it: a routed-by-check recipe's result-group card offering a
+    // failure-marked outcome tier, which is reachable only because `lab-runework`'s crafting check
+    // authors `failureResultPolicy: 'always'`.
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-runework' },
@@ -8778,30 +5808,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     id: 'manager-checks-crafting-modifiers',
     label: 'Manager — Checks crafting modifiers',
     smokeLabels: ['manager-checks-crafting-modifiers'],
-    // The check-modifier CATALOGUE card, which sits last in the crafting panel and is therefore
+    // The check-modifier catalogue card, which sits last in the crafting panel and is therefore
     // below the fold of `manager-checks-crafting-consumption`'s frame — hence a dedicated capture
-    // that scrolls to it. Populated on herbalism alone: a non-empty catalogue also un-hides the
-    // recipe editor's per-recipe modifier override, which would have added a control to every
-    // already-captured smithing recipe Overview frame.
-    //
-    // RE-PINNED for issue 1055. The rule group is now FOUR options laid out as a 2x2 — the two
-    // non-selecting rules on the top row, the two that defer the selection on the bottom one — and
-    // that arrangement is the frame's whole subject. `RadioCardGroup` uses a FIXED track count, so
-    // the 2x2 is a decision rather than a reflow, and it is only judgeable from a photograph.
-    //
-    // `lab-herbalism` is authored `playerPicks` — a SELECTING rule — so this frame is also the one
-    // that shows the pick-cap field in its UNLIMITED reading: a blank input behind an "Unlimited"
-    // placeholder. That is the state a system authored on a selecting rule and never asked about a
-    // bound is in, and it is only legible as a photograph; the bounded reading is the sibling case
-    // below.
-    //
-    // It is reached by CLEARING the Stepper rather than by leaving the field alone, and that is a
-    // property of the harness rather than of the rule. The lab seeds no `migrationVersion`, so
-    // `fabricate.initialize()` runs every migration over the world on every build, and 1.20.0's
-    // `migrateMaxModifierPicks` stamps `maxModifierPicks = 1` onto any `playerPicks` system that
-    // carries no cap — which is what this case used to assert `unlimited` against. `lab-herbalism`
-    // now authors a cap the migration leaves alone (`labContent.js`), and emptying the field here
-    // is what puts the control back into the reading this frame is named for.
+    // that scrolls to it.
     reaches: 'exact',
     query: { system: 'lab-herbalism' },
     steps: [
@@ -8809,35 +5818,12 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '#manager-checks-nav-crafting' },
       { selector: '#checks-section-modifiers' },
       { selector: '[data-crafting-modifier-max-picks-input]', fill: '' },
-      // RE-ANCHORED (issue 1095 review). `[data-crafting-modifier-defaults]` was the anchor while
-      // it was the pill row directly under "Default modifiers"; this change turned it into the
-      // eligibility intro and MOVED it above the rows, so the anchor stopped naming the thing it
-      // was chosen for — and each entry grew from two lines to four at the same time, so the
-      // published frame clipped mid-entry with two `Unbounded` steppers and a `Selectable` pill
-      // whose own row's icon, name, expression and delete button were all above the fold.
-      //
-      // "Put the WHOLE card in frame" is no longer achievable and the claim is retired rather
-      // than restated: at four entries the card is ~1240px and `.application`'s max-height
-      // resolves to ~1000px against the harness viewport, which the harness refuses outright
-      // rather than silently clamping. So the two crafting cases were split by SUBJECT instead.
-      // This one is the RULE GRID and the UNLIMITED cap reading, so it anchors the cap — the
-      // card's last element — and carries the grid above it, with the not-selected eligibility
-      // pill of the last entry for context. `manager-checks-crafting-modifier-entries` below is
-      // the entry editor's own frame.
+      // Re-anchored (issue 1095 review).
       { selector: '[data-crafting-modifier-max-picks]', scroll: true },
     ],
     expectView: 'checks-crafting',
-    // Two things at once, on the one card — and that card is `How they combine`, which issue
-    // 1096's parity round split out of the catalogue card. This selector named
-    // `[data-crafting-modifier-catalogue]`, which is now the LIBRARY card and contains neither
-    // the rule grid nor the cap: left alone it would match nothing, and a registry selector
-    // that matches nothing fails the capture job whole and publishes NO frames at all.
-    //
-    // `bySubject` is the FOURTH option — the one the redesign restored, the one that makes the
-    // row count even, and the only one whose absence would silently turn the 2x2 this frame is
-    // evidence for back into a three-across row. The `unlimited` cap reading is the other half,
-    // and asserting the VALUE rather than the field's presence is what separates this frame
-    // from its bounded sibling.
+    // Two things at once, on the one card — and that card is `How they combine`, which issue 1096's
+    // parity round split out of the catalogue card.
     expectSelector:
       '.fabricate-manager [data-crafting-modifier-policy-card]' +
       ':has([data-crafting-modifier-policy-option="bySubject"])' +
@@ -8855,14 +5841,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // counterpart frame of a BOUNDED cap exists.
     reaches: 'beyond',
     smokeLabels: [],
-    // The other half of the cap's two readings. Unlimited is a BLANK field with an "Unlimited"
-    // placeholder (the sibling above); bounded is a number in the same field, and the two are
-    // different pictures of the same control — which is exactly the pair a reviewer needs to judge
-    // whether "empty means no limit" is legible without reading the hint.
-    //
-    // `bySubject` rather than `playerPicks`, so the two cap frames also differ in their hint: the
-    // cap means a bound on the RECIPE AUTHOR at edit time here and on the PLAYER at roll time
-    // there, and the card keys its sentence off the rule rather than writing one ambiguous line.
+    // The other half of the cap's two readings.
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
@@ -8870,11 +5849,8 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '#checks-section-modifiers' },
       { selector: '[data-crafting-modifier-policy-option="bySubject"] input' },
       { selector: '[data-crafting-modifier-max-picks-input]', fill: '1' },
-      // The CAP FIELD, which is this case's whole subject and the card's last element, so the
-      // frame carries the rule grid above it. NOT the rows: at four entries the card is
-      // ~1240px against a ~1000px maximum viewport, so no anchor frames the whole of it, and
-      // an anchor that framed the entries would push this case's own subject off the bottom.
-      // The entries have their own case (`manager-checks-crafting-modifier-entries`).
+      // The cap field, which is this case's whole subject and the card's last element, so the frame
+      // carries the rule grid above it.
       { selector: '[data-crafting-modifier-max-picks]', scroll: true },
     ],
     expectView: 'checks-crafting',
@@ -8894,19 +5870,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // two sibling cases above frame the rule grid and the cap rather than the entries.
     reaches: 'beyond',
     smokeLabels: [],
-    // THE CRAFTING ROWS, and since issue 1117 what they show is the ABSENCE of an editor.
-    // This case framed the entry editor while crafting owned the entries; crafting now renders
-    // the library read-only exactly as salvage and gathering do, so the frame's job is to prove
-    // that symmetry on the one activity that used to be special — the identity/expression
-    // read-out, the bounds chip on the world's only bounded entry, and the deep link that
-    // replaces the add button.
-    //
-    // Anchored on the card's TITLE (issue 1096's parity round), not on its first row.
-    // `scrollIntoViewIfNeeded` lands an over-tall element's BOTTOM edge, so anchoring the rows
-    // container frames the last entries; anchoring the first ROW was the previous fix and it
-    // now drops the card HEAD — which is where the rebuild put the deep link and the rule's own
-    // sentence, and is therefore half of what this frame exists to show. The title anchors it
-    // from the top, the same fix `manager-system-edit-lists` records for the same cause.
+    // The crafting rows, and since issue 1117 what they show is the absence of an editor.
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
@@ -8918,11 +5882,10 @@ export const VIEW_LAB_CASES = Object.freeze([
       },
     ],
     expectView: 'checks-crafting',
-    // THE WHOLE OF THE REBUILT CARD, clause by clause, because each clause is a thing that
-    // shipped wrong and could come back: the rule's sentence in the head's description slot,
-    // the read-only expression, the bounds chip ON the row, the deep link (which was a
-    // full-width button at the foot), and the library note that now CLOSES the card instead of
-    // opening it.
+    // The whole of the rebuilt CARD, clause by clause, because each clause is a thing that shipped
+    // wrong and could come back: the rule's sentence in the head's description slot, the read-only
+    // expression, the bounds chip on the row, the deep link (which was a full-width button at the
+    // foot), and the library note that now closes the card instead of opening it.
     expectSelector:
       '.fabricate-manager [data-crafting-modifier-catalogue="crafting"]' +
       ':has(.manager-checks-card-head [data-crafting-modifier-defaults])' +
@@ -8934,23 +5897,13 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
       /^src\/ui\/svelte\/apps\/manager\/.*Check/,
-      // The entry ROW itself, which sits OUTSIDE `checks/` since issue 1373's round 4 moved
-      // it into a shared component the Tool Studio's check-bonus picker also calls. The
-      // directory pattern above cannot reach it, and this is a frame that photographs it.
+      // The entry row itself, which sits outside `checks/` since issue 1373's round 4 moved it into
+      // a shared component the Tool Studio's check-bonus picker also calls.
       /^src\/ui\/svelte\/apps\/manager\/ModifierLibraryRow\.svelte$/,
     ],
   }),
-  // ── the OTHER TWO activities' modifier cards (issues 1095, 1117) ────────────────────────────
-  //
-  // Every activity renders the library READ-ONLY now, with a bounds chip and a link to the system
-  // editor, while the per-entry eligibility control and the rule grid stay fully editable. What
-  // distinguishes these two frames from the crafting one above is therefore their SELECTION and
-  // their notices, not their editability — which is exactly the asymmetry issue 1117 removed.
-  //
-  // Both run on `lab-herbalism`, the one system with a catalogue, and both its salvage and its
-  // gathering features are on. Their selections DIFFER from crafting's (`labContent.js`), which is
-  // what makes the two frames distinguishable from the crafting one at a glance rather than three
-  // photographs of the same state.
+  // Every activity renders the library read-only now, with a bounds chip and a link to the system
+  // editor, while the per-entry eligibility control and the rule grid stay fully editable.
   managerCase({
     id: 'manager-checks-salvage-modifiers',
     label: 'Manager — Checks salvage modifiers',
@@ -8966,9 +5919,8 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-crafting-modifier-rows]', scroll: true },
     ],
     expectView: 'checks-salvage',
-    // THE READ-ONLY ROW, asserted through the one element the retired editable branch could not
-    // draw. The `has(...bounds-chip)` clause pins the bounds chip against the world's only
-    // bounded entry, `hb-mod-medicine`.
+    // The read-only row, asserted through the one element the retired editable branch could not
+    // draw.
     expectSelector:
       '.fabricate-manager [data-crafting-modifier-catalogue="salvage"]' +
       ':has([data-crafting-modifier-readonly="expression"])' +
@@ -8978,9 +5930,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
       /^src\/ui\/svelte\/apps\/manager\/.*Check/,
-      // The entry ROW itself, which sits OUTSIDE `checks/` since issue 1373's round 4 moved
-      // it into a shared component the Tool Studio's check-bonus picker also calls. The
-      // directory pattern above cannot reach it, and this is a frame that photographs it.
+      // The entry row itself, which sits outside `checks/` since issue 1373's round 4 moved it into
+      // a shared component the Tool Studio's check-bonus picker also calls.
       /^src\/ui\/svelte\/apps\/manager\/ModifierLibraryRow\.svelte$/,
     ],
   }),
@@ -9012,32 +5963,13 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
       /^src\/ui\/svelte\/apps\/manager\/.*Check/,
-      // The entry ROW itself, which sits OUTSIDE `checks/` since issue 1373's round 4 moved
-      // it into a shared component the Tool Studio's check-bonus picker also calls. The
-      // directory pattern above cannot reach it, and this is a frame that photographs it.
+      // The entry row itself, which sits outside `checks/` since issue 1373's round 4 moved it into
+      // a shared component the Tool Studio's check-bonus picker also calls.
       /^src\/ui\/svelte\/apps\/manager\/ModifierLibraryRow\.svelte$/,
     ],
   }),
-  // ── the SHARED subject picker, one case per host (issue 1095) ───────────────────────────────
-  //
-  // `SubjectModifierPicker` is one component with TWO hosts, and both gate it on the activity's
-  // rule being `bySubject`. Both lab systems author a non-selecting rule, so it renders in NO
-  // existing frame — which is why these two cases click the rule card first, exactly as the
-  // recipe picker's cases do. Clicking a `RadioCardGroup` radio is legal in this registry (see the
-  // recipe block's own note); the card persists on change, so no Save step follows.
-  //
-  // Both open the picker in its INHERIT state, which is the reading the pill row cannot show: the
-  // inherited set is NAMED from the activity's own `defaultModifierIds`, and a picker that said
-  // "inheriting" and stopped there told the GM nothing about what the record actually rolls.
-  //
-  // BOTH FRAMES DEPEND ON A FIXTURE, not merely on the click. The inherit note has a SECOND
-  // reading — "the default set is empty, so no check modifier applies" — and that is what renders
-  // when the activity has no eligible entries. `lab-herbalism` carries a `salvageCraftingCheck`
-  // and (since issue 1095's review) a `gatheringCraftingCheck`, each with its OWN non-empty
-  // `defaultModifierIds`, precisely so each frame photographs the NAMING reading. Both
-  // `expectSelector`s therefore assert the inherit note itself rather than only that the picker
-  // rendered — without that, a world whose default set went empty would publish a frame showing
-  // the opposite sentence and the case would still pass.
+  // `SubjectModifierPicker` is one component with two hosts, and both gate it on the activity's
+  // rule being `bySubject`.
   managerCase({
     id: 'manager-component-edit-salvage-modifier-pick',
     label: 'Manager — Component edit salvage modifier pick',
@@ -9059,9 +5991,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-subject-modifier-picker="salvage-check-modifier"]', scroll: true },
     ],
     expectView: 'component-edit',
-    // The picker AND its inherit note. The first proves the rule click landed (the picker renders
-    // under no other rule), the second proves the frame shows the inherit reading rather than an
-    // authored pick — and the note is where the inherited entries are named.
+    // The picker AND its inherit note.
     expectSelector:
       '.fabricate-manager [data-subject-modifier-picker="salvage-check-modifier"] ' +
       '[data-subject-modifier-inherited]',
@@ -9112,12 +6042,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // BEYOND the smoke: the walk runs one geometry, and the whole subject here is the other one.
     reaches: 'beyond',
     smokeLabels: [],
-    // THE 1x4 REFLOW, which is only judgeable from a photograph. The rule grid is a FIXED
-    // two-track `RadioCardGroup`, so its 2x2 is a decision rather than a reflow — and the card
-    // declares itself a container so the shipped `@container (max-width: 620px)` rule measures
-    // THIS card's inline size instead of the whole manager shell's. That is what drops the grid to
-    // 1x4 at a narrow pane, and a claim about a container query with no narrow frame behind it is
-    // a claim about code nobody has looked at.
+    // The 1x4 reflow, which is only judgeable from a photograph.
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
@@ -9126,10 +6051,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-crafting-modifier-policy]', scroll: true },
     ],
     expectView: 'checks-crafting',
-    // RE-POINTED at the rule card (issue 1096's parity round). The grid moved out of
-    // `[data-crafting-modifier-catalogue]` into its own `How they combine` card, so the old
-    // descendant selector matches nothing — and a registry selector that matches nothing fails
-    // the capture job whole rather than this one case.
+    // Re-pointed at the rule card (issue 1096's parity round).
     expectSelector:
       '.fabricate-manager [data-crafting-modifier-policy-card] [data-crafting-modifier-policy]',
     position: { width: 1000, height: 720 },
@@ -9158,10 +6080,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     id: 'manager-components-grouped-continuation',
     label: 'Manager — Components grouped continuation',
     smokeLabels: ['manager-components-grouped-continuation'],
-    // The component library's half of the grouped-continuation pair: page two of a
-    // category-major list, where a category larger than the page continues across the boundary.
-    // Same mechanism as the recipe frame — shrink the page rather than seed and tear down a
-    // throwaway category — over the 23-component smithing library the other component frames use.
+    // The component library's half of the grouped-continuation pair: page two of a category-major
+    // list, where a category larger than the page continues across the boundary.
     reaches: 'exact',
     query: {},
     steps: [
@@ -9187,9 +6107,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['manager', 'tags'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/TagsCategories/,
-      // `VocabularyTabs` is the strip issue 1429 extracted OUT of `TagsCategoriesView`, so the
-      // `TagsCategories` prefix above stops reaching it. An uncovered state publishes an
-      // unrelated frame, which is the failure this registry exists to prevent.
+      // `VocabularyTabs` is the strip issue 1429 extracted out of `TagsCategoriesView`, so the
+      // `TagsCategories` prefix above stops reaching it.
       /^src\/ui\/svelte\/apps\/manager\/(VocabularyTabs|VocabularyPanel|InlineVocabularyAdd)\.svelte$/,
     ],
   }),
@@ -9222,36 +6141,10 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/VocabularyTabs\.svelte$/,
     ],
   }),
-  // ── The GM Essence Studio (issue 1036) ────────────────────────────────────────────────────────
-  //
-  // Every case below carries the SAME `sourceMatches`, and it is wider than the shipped one in two
+  // Every case below carries the same `sourceMatches`, and it is wider than the shipped one in two
   // ways that both mattered: the shipped `/apps\/manager\/Essence/` is case-SENSITIVE, so it
   // matched neither the new lowercase `essences/` directory nor the pure models under `src/utils/`,
   // and a redesign confined to those would have published no essence frame at all.
-  //
-  // The lab fixture is what makes these frames worth capturing: smithing is the one system that
-  // declares BOTH `features.effectTransfer` and `features.propertyMacros`, four of the five
-  // essences carry a distinct colour with `air` deliberately unset, and `aether` is DISABLED while
-  // two components carry it and one recipe requires it — the feature's headline state, which no
-  // existing fixture could reach.
-  //
-  // One more pattern joined the set for `InspectorActionButton.svelte` (issue 1036's Duplicate /
-  // Edit / Delete / Copy source UUID / Unlink extraction). It sits directly under `apps/manager/`,
-  // not `apps/manager/essences/`, so the directory glob above does not reach it on its own — and it
-  // is deliberately NOT a broad signal. `MANAGER_PRIMITIVES` above is no longer a list anyone can
-  // add a name to: it is derived from the `evidence: 'broad'` rows of
-  // `scripts/lib/designSystemPrimitives.js`, so the edit that would make this component broad is to
-  // its manifest row, which today reads `evidence: 'targeted'` in `NOT_A_PRIMITIVE` with the reason
-  // beside it. Broad membership is for a primitive several studios render; today this one has
-  // exactly one consumer, `EssenceBrowserInspector.svelte`, which makes it a narrow signal. The
-  // recipe, component and gathering inspectors are its planned remaining consumers — a follow-up,
-  // not yet built — and the day they adopt it the manifest row moves to the shipped set and its
-  // evidence is re-judged there, rather than the pattern being copied onto three more case arrays
-  // now for consumers that do not exist yet.
-  // It is added only to the four cases below that actually put an essence in the inspector —
-  // `manager-essences-normal`, `-stacked`, `-disabled-in-use` and `-grid` — not to the bulk-edit
-  // pair, whose rail shows `EssenceBulkEditPanel` instead, and not to the `essence-edit` cases,
-  // whose rail shows `EssenceBehaviorPreview` instead: neither renders this component.
   managerCase({
     id: 'manager-essences-normal',
     label: 'Manager — Essences normal',
@@ -9265,8 +6158,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/Essence(?:Browser|Edit)View\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/essences\//,
       // The `SYSTEM RULES n / m` panel, which the browser inspector composes from the world
-      // catalogue's own component (issue 1372). This is the OTHER rail the reference draws it on,
-      // so a change to it publishes this frame beside `world-essence-catalogue`'s.
+      // catalogue's own component (issue 1372).
       /^src\/ui\/svelte\/apps\/manager\/scoped\/SystemRulesRoster\.svelte$/,
       // The shared studio-library SHELF — the scroll section, the empty states, the
       // list-or-grid `<ul>` and the pager — is rendered by every essence browser frame.
@@ -9280,11 +6172,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     id: 'manager-essences-stacked',
     label: 'Manager — Essences stacked',
     smokeLabels: ['manager-essences-stacked'],
-    // REPOINTED, not duplicated (issue 1036). The row left the narrow `@container` join that used
-    // to re-template it into one column — `align-items: stretch` there is a live flex property and
-    // would stretch the medallion and the whole control cluster to full card height — so at 1000px
-    // it now WRAPS: identity on the first line, the capability pills, usage readout, toggle, pencil
-    // and selection box aligned right on a second. This frame is the evidence for that behaviour.
+    // Repointed, not duplicated (issue 1036).
     reaches: 'exact',
     query: {},
     steps: [{ selector: '#manager-nav-essence-rules' }],
@@ -9310,9 +6198,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     reaches: 'beyond',
     smokeLabels: [],
     // The state this whole feature exists to add, and the one the prototype never depicts: an
-    // essence that is DISABLED while components carry it and a recipe requires it. Selecting it
-    // puts the inspector's suppression rows, its two stat cards and its blocked-delete note in
-    // frame beside the row's own Disabled badge and muted capability pills.
+    // essence that is disabled while components carry it and a recipe requires it.
     query: {},
     steps: [
       { selector: '#manager-nav-essence-rules' },
@@ -9337,20 +6223,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // BEYOND the smoke: the walk selects no essence row, so there is no counterpart frame.
     reaches: 'beyond',
     smokeLabels: [],
-    // THE OTHER PICKER THIS EPIC RE-PLATFORMED, and the one that had no frame at all (issue 1503).
-    // `EssenceSourceSelector`'s panel moved wholesale onto `SearchablePopover`: its backdrop went
-    // from the lightest background rung to the darkest, it took `--fab-shadow-lg` and a 10px
-    // radius, its search row and list became the primitive's elements, its two-column template
-    // moved from a caller rule to the shared `[data-picker-columns='2']` rung, and its empty note
-    // was replaced. `IconPicker`'s panel has `manager-system-edit-lists`; this one had nothing, so
-    // one of the two re-platformed panels shipped with visual evidence and the other with none.
-    //
-    // `mote` RATHER THAN ANY OTHER ESSENCE, and it is the only possible choice: the inspector
-    // draws this control in the `{:else}` of `essence.associatedItem`, so an essence with a linked
-    // source renders the summary card and the two source actions instead, and `mote` is the lab
-    // corpus's only essence with no `sourceComponentId`. It is also the ZERO-CARRIER essence, so
-    // the inspector around the open panel is the sparsest one the screen draws — which keeps the
-    // frame's subject the panel rather than the rail behind it.
+    // The other picker this epic re-platformed, and the one that had no frame at all (issue 1503).
     query: {},
     steps: [
       { selector: '#manager-nav-essence-rules' },
@@ -9358,10 +6231,9 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '.essence-source-trigger' },
     ],
     expectView: 'essences',
-    // NAMED ON THE PANEL'S OWN CLASS PAIR, which is what the caller keeps through the
-    // re-platform: `fabricate-source-picker-popover essence-source-picker-popover` rides
-    // `popoverClass` onto the node the primitive portals. A trigger click that opened nothing
-    // would publish the inspector under a case whose whole subject is the panel.
+    // Named on the panel's own class pair, which is what the caller keeps through the re-platform:
+    // `fabricate-source-picker-popover essence-source-picker-popover` rides `popoverClass` onto the
+    // node the primitive portals.
     expectSelector: '.essence-source-picker-popover',
     // The panel is PORTALED to the manager root (`util/overlayHost.js`), so the container is that
     // root and not the inspector column: it is deliberately outside that scroller, and containment
@@ -9373,27 +6245,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Essence(?:Browser|Edit)View\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/essences\//,
-      // Deliberately NO pattern for the two components that DRAW this frame's subject.
-      // `EssenceSourceSelector.svelte` and `SearchablePopover.svelte` both sit under
-      // `components/`, which `BROAD_SIGNAL_PATTERN`'s directory leg claims, and
-      // `selectRenderFileCases` `continue`s on a broad-signal file BEFORE it consults any case's
-      // `sourceMatches` — so a pattern naming either would be configuration that can never fire.
-      // `tests/design-system-primitives.test.js` reports exactly that shape as shadowed.
-      //
-      // THIS CASE IS NONETHELESS `EssenceSourceSelector`'S EVIDENCE (issue 1503), through the
-      // other seam: `BROAD_SIGNAL_CASE_OVERRIDES` is keyed on the file rather than declared by the
-      // case, and its entry for that caller names this id. That is additive — a change to the
-      // caller publishes the representative pair AND this frame.
-      //
-      // `SearchablePopover` REACHES THIS FRAME THROUGH ITS OWN OVERRIDE ENTRY, for the same
-      // reason and by the same seam: measured across `src/`, this caller is the primitive's ONLY
-      // `as="grid"` site, so without that entry the grid list form and its `data-picker-columns`
-      // cursor were drawn by no frame the primitive selected. That is a routing decision about
-      // the primitive rather than about this case, so it is made where the primitive is keyed and
-      // pinned in `tests/view-lab-cases.test.js`, not restated as a pattern here.
-      //
-      // The patterns above and below are not duplicates of the override: it selects this case when
-      // the COMPONENT changes, they select it when the view or the positioning seam does.
+      // Deliberately no pattern for the two components that draw this frame's subject.
       ...ANCHORED_POPOVER_SOURCES,
     ],
   }),
@@ -9403,18 +6255,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     // BEYOND the smoke: the presentation toggle is new, so nothing in the walk presses it.
     reaches: 'beyond',
     smokeLabels: [],
-    // The grid carries the SAME state vocabulary as the list — the Disabled pill, the capability
+    // The grid carries the same state vocabulary as the list — the Disabled pill, the capability
     // pills and the recipe count — because a presentation toggle must not silently remove state.
-    // This frame is what proves it, beside `manager-essences-normal`'s list. It is ALSO the only
-    // proof that the card's identity `<button>` grows past Foundry's fixed button height instead
-    // of cropping: happy-dom computes no cascade, so no unit test can see it.
-    //
-    // The step clicks the segment LABEL, not its radio. `SegmentedControl` hides the radio with
-    // `clip: rect(0 0 0 0)` at 1x1, and `view-lab-screenshots.mjs` uses `target.click()`, whose
-    // hit-target check requires the element under the click point to BE the target or a
-    // descendant of it — here it is the enclosing `<label>`, an ANCESTOR. That step timed out for
-    // 30s and, because one failing case fails the whole capture job, published nothing at all.
-    // `:706` and `:707` in this file already click the label for exactly this control and pass.
     query: {},
     steps: [
       { selector: '#manager-nav-essence-rules' },
@@ -9446,18 +6288,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Essences bulk edit',
     reaches: 'beyond',
     smokeLabels: [],
-    // An ACTIVE bulk selection, so the rail shows the bulk panel rather than the inspector.
-    //
-    // The ticked pair is `mote` + `aether`, and the pairing is the whole point. `aether` is
-    // delete-BLOCKED (components carry it), which puts the named blocked member and a non-zero
-    // carrier count on screen; `mote` is the corpus's only DELETABLE essence, which is what makes
-    // "1 essence definition will be deleted", "1 recipe will be rewritten" and a LIVE Delete
-    // button possible at all.
-    //
-    // It previously ticked `earth`, which is carried like every other lab essence, so the frame
-    // could only show the inert all-blocked state — 0/0/0 above a DISABLED button — and the
-    // maintainer's binding decision (state the impact, then Arm/Confirm) was photographed nowhere.
-    // No selection reachable in this world could have fixed that without a deletable essence.
+    // An active bulk selection, so the rail shows the bulk panel rather than the inspector.
     query: {},
     steps: [
       { selector: '#manager-nav-essence-rules' },
@@ -9465,9 +6296,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-essence-select="aether"]' },
     ],
     expectView: 'essences',
-    // The frame must show the LIVE action, not the inert one. `ArmedDangerButton` renders the
-    // idle danger button without `disabled` only when something is actually deletable, so this
-    // fails loudly if the selection ever stops containing a deletable member.
+    // The frame must show the live action, not the inert one.
     expectSelector:
       '.fabricate-manager [data-essence-bulk-delete-card] .manager-button.is-danger:not([disabled])',
     kinds: ['manager', 'essences'],
@@ -9483,13 +6312,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Essences bulk delete armed',
     reaches: 'beyond',
     smokeLabels: [],
-    // The ARMED half of the maintainer's binding decision, which no case photographed. The same
-    // selection as above, plus one click on the danger button: the first click only ARMS, so this
-    // frame shows `Confirm delete` beside the impact statement it is a confirmation OF, with
-    // nothing written.
-    //
-    // Two frames rather than one because the two states are the decision: an impact statement
-    // stated BEFORE arming, and an arm that is a second, separate act.
+    // The armed half of the maintainer's binding decision, which no case photographed.
     query: {},
     steps: [
       { selector: '#manager-nav-essence-rules' },
@@ -9517,20 +6340,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Essence edit first state',
     smokeLabels: ['manager-essence-edit-first-state'],
     // The smoke opens an essence row's Edit action and photographs the editor as it arrives, and
-    // this lands in the same place. It is REPOINTED at `aether` (issue 1036): the editor's headline
-    // state is a DISABLED essence — the enable card switched off, both behaviour cards wearing
-    // their `Suppressed` pill — and `earth` cannot show it.
-    //
-    // WHAT "FIRST STATE" MEANS CHANGED AT ISSUE 1372 and this case follows it rather than
-    // photographing the old one: the editor now opens on `Essence rules`, whose head is the
-    // shared-definition callout naming the world record, the `Edit shared definition` exit and
-    // the per-system enable card. There is no Identity tab to open on, because identity is a
-    // world field a system-scope screen may not write.
-    //
-    // The step still navigates by the row's FIRST `.manager-icon-button`, which must remain the
-    // Edit pencil. The row now also carries an enable toggle and a selection box: the toggle wears
-    // `.manager-status-toggle`, not `.manager-icon-button`, and `SelectionCheckbox` deliberately
-    // renders no `<button>` at all, so neither can intercept.
+    // this lands in the same place.
     reaches: 'exact',
     query: {},
     steps: [
@@ -9547,13 +6357,10 @@ export const VIEW_LAB_CASES = Object.freeze([
       // change to it is visible in all three editor cases (issue 1124).
       /^src\/ui\/svelte\/util\/essencePreviewRow\.js$/,
       // The world-scope model this editor renders since issue 1372: the inherit switches, the
-      // membership cluster and the pure leaf behind their copy. Claimed on the three editor
-      // frames because those are the frames that show them, exactly as the placeholder body was
-      // claimed by every case that rendered it.
+      // membership cluster and the pure leaf behind their copy.
       /^src\/ui\/svelte\/apps\/manager\/scoped\/(?:InheritRow|MembershipActions)\.svelte$/,
-      // The two cards issue 1372 gives the rules tab: the shared-definition callout it opens
-      // with and the copy-to-other-systems action it closes with. Claimed on the editor frames
-      // because those are the frames that show them.
+      // The two cards issue 1372 gives the rules tab: the shared-definition callout it opens with
+      // and the copy-to-other-systems action it closes with.
       /^src\/ui\/svelte\/apps\/manager\/scoped\/(?:CopyRulesCard|SharedDefinitionCallout)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/essenceScoped\.js$/,
     ],
@@ -9563,22 +6370,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Essence edit On craft',
     reaches: 'beyond',
     smokeLabels: [],
-    // The two behaviour cards, SCROLLED INTO THE FRAME rather than reached by a tab click.
-    //
-    // Issue 1372 collapsed the editor's three tabs to two — `Essence rules` and `Validation` —
-    // because identity is a world field a system-scope screen may not edit, so there is no longer
-    // an `On craft` tab to select. What that tab held is now the lower half of the rules tab,
-    // below the shared-definition callout and the enable card, and a frame taken at the top of
-    // the page would be `manager-essence-edit-first-state` a second time. Scrolling the macro
-    // page's FOOT in is what keeps the two frames distinct states of one screen: it lands the
-    // macro card and the `Reuse these rules` card in one frame, which is the half of the reference
-    // the first-state frame cannot reach.
-    //
-    // `aether` carries BOTH persisted fields — a linked source component and a property macro —
-    // so both sections render populated, both wear their `Suppressed` pill (the essence is
-    // disabled), and the macro card photographs in its MISSING state, because the lab world
-    // declares no `Macro` documents at all. The resolved state routes to smoke or maintainer
-    // evidence rather than being implied here.
+    // The two behaviour cards, scrolled into the frame rather than reached by a tab click.
     query: {},
     steps: [
       { selector: '#manager-nav-essence-rules' },
@@ -9595,13 +6387,10 @@ export const VIEW_LAB_CASES = Object.freeze([
       // change to it is visible in all three editor cases (issue 1124).
       /^src\/ui\/svelte\/util\/essencePreviewRow\.js$/,
       // The world-scope model this editor renders since issue 1372: the inherit switches, the
-      // membership cluster and the pure leaf behind their copy. Claimed on the three editor
-      // frames because those are the frames that show them, exactly as the placeholder body was
-      // claimed by every case that rendered it.
+      // membership cluster and the pure leaf behind their copy.
       /^src\/ui\/svelte\/apps\/manager\/scoped\/(?:InheritRow|MembershipActions)\.svelte$/,
-      // The two cards issue 1372 gives the rules tab: the shared-definition callout it opens
-      // with and the copy-to-other-systems action it closes with. Claimed on the editor frames
-      // because those are the frames that show them.
+      // The two cards issue 1372 gives the rules tab: the shared-definition callout it opens with
+      // and the copy-to-other-systems action it closes with.
       /^src\/ui\/svelte\/apps\/manager\/scoped\/(?:CopyRulesCard|SharedDefinitionCallout)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/essenceScoped\.js$/,
     ],
@@ -9612,9 +6401,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     reaches: 'beyond',
     smokeLabels: [],
     // The third tab, and the only surface that reports an unresolvable property macro: at craft
-    // time such a macro is logged and SKIPPED SILENTLY, deliberately, so this is the GM's one route
-    // to the fact. `aether`'s macro does not resolve, so the tab shows a real warning rather than
-    // an all-clear.
+    // time such a macro is logged and skipped silently, deliberately, so this is the GM's one route
+    // to the fact.
     query: {},
     steps: [
       { selector: '#manager-nav-essence-rules' },
@@ -9634,13 +6422,10 @@ export const VIEW_LAB_CASES = Object.freeze([
       // change to it is visible in all three editor cases (issue 1124).
       /^src\/ui\/svelte\/util\/essencePreviewRow\.js$/,
       // The world-scope model this editor renders since issue 1372: the inherit switches, the
-      // membership cluster and the pure leaf behind their copy. Claimed on the three editor
-      // frames because those are the frames that show them, exactly as the placeholder body was
-      // claimed by every case that rendered it.
+      // membership cluster and the pure leaf behind their copy.
       /^src\/ui\/svelte\/apps\/manager\/scoped\/(?:InheritRow|MembershipActions)\.svelte$/,
-      // The two cards issue 1372 gives the rules tab: the shared-definition callout it opens
-      // with and the copy-to-other-systems action it closes with. Claimed on the editor frames
-      // because those are the frames that show them.
+      // The two cards issue 1372 gives the rules tab: the shared-definition callout it opens with
+      // and the copy-to-other-systems action it closes with.
       /^src\/ui\/svelte\/apps\/manager\/scoped\/(?:CopyRulesCard|SharedDefinitionCallout)\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/essenceScoped\.js$/,
     ],
@@ -9654,20 +6439,6 @@ export const VIEW_LAB_CASES = Object.freeze([
     reaches: 'beyond',
     smokeLabels: [],
     // The two-option membership filter with its counts, switched to `All world essences`.
-    //
-    // ── WHAT THIS FRAME DOES NOT SHOW, AND WHY THAT IS NOT AN OVERSIGHT ─────────────────────
-    // It does NOT show an ABSENT row or its Add action, because the lab world cannot reach that
-    // state: `tests/view-lab/world/labContent.js` gives all three crafting systems the SAME
-    // `ESSENCES` list, so after the `1.30.0` lift every system is a member of all six world
-    // essences and none is absent from any of them. The first run of this case failed exactly
-    // there, which is the correct outcome — a case may not assert a state its fixture cannot
-    // produce, and the alternative was to widen a fixture that six other essence frames read for
-    // their counts, their status segments and their disabled-in-use headline.
-    //
-    // The absent row is covered where it can be reached:
-    // `tests/components/essence-world-scope-screens-mounted.test.js` renders it, and
-    // `world-essence-catalogue` photographs all THREE per-system states from the world side,
-    // where the fixture does vary. Recorded here rather than left as a silent gap.
     query: {},
     steps: [
       { selector: '#manager-nav-essence-rules' },
@@ -9677,10 +6448,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     expectView: 'essences',
     expectSelector: '[data-essence-membership-filter]',
-    // CONTAINMENT IS FOR CONTROLS THAT MUST FIT, never for list rows: `expectContained` asserts a
-    // target sits inside its container's BOX, and a row in a scrolling column legitimately
-    // extends past `.manager-main`. Measured — the first run failed for a row that renders
-    // correctly.
+    // Containment is for controls that must fit, never for list rows: `expectContained` asserts a
+    // target sits inside its container's box, and a row in a scrolling column legitimately extends
+    // past `.manager-main`.
     expectContained: [{ container: '.manager-main', target: '[data-essence-membership-filter]' }],
     kinds: ['manager', 'essences'],
     sourceMatches: [
@@ -9688,23 +6458,10 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/essences\/EssenceRow\.svelte$/,
     ],
   }),
-  // ── `manager-essence-edit-inherit-lock` IS DELIBERATELY NOT REGISTERED ──────────────────────
-  //
-  // The state it would show — one section INHERITED with its value card locked and one OVERRIDDEN
+  // The state it would show — one section inherited with its value card locked and one overridden
   // beside it — is reached by flipping an inherit switch, and in the View Lab that write does not
   // reach the screen: the toggle renders and clicks, and neither its own state chip nor the value
-  // card beneath it changes. The cause is not in this registry and not in the screens: a
-  // world-scope write persists through `ScopedDefinitionStore#save`, and `viewState.worldScope` is
-  // rebuilt ONLY inside `adminStore`'s `refresh()`, which no world-scope action calls and which
-  // the manager app invokes from its own document hooks alone. So every world-scope write is
-  // durable and invisible until the next refresh.
-  //
-  // A CASE THAT CANNOT REACH ITS STATE IS NOT REGISTERED, because a failing case fails the capture
-  // job WHOLE and publishes NOTHING for every other case in the run — which is how one bad
-  // selector costs an entire evidence set. The lock itself is asserted in both directions in
-  // `tests/components/essence-edit-view-mounted.test.js`, which drives `scope` as a prop and so
-  // cannot see the missing refresh. This note stands until that seam is wired, and the change that
-  // wires it registers the case.
+  // card beneath it changes.
   managerCase({
     id: 'manager-environments-browse-normal',
     label: 'Manager — Environments browse normal',
@@ -9738,11 +6495,8 @@ export const VIEW_LAB_CASES = Object.freeze([
   managerCase({
     id: 'manager-gathering-tasks-browse-normal',
     label: 'Manager — Gathering tasks browse normal',
-    // BEYOND the smoke: `screenshotCaptureMap.js` carries the two task-EDITOR labels and nothing
-    // for the library that lists them, so there is no smoke routine to name. An events-browse
-    // case existed and a tasks-browse one did not, which left the task inspector's facts
-    // unphotographed — including `data-gathering-task-fact="environments"`, the number issue
-    // #1321 corrects.
+    // Beyond the smoke: `screenshotCaptureMap.js` carries the two task-EDITOR labels and nothing
+    // for the library that lists them, so there is no smoke routine to name.
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-herbalism' },
@@ -9751,10 +6505,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     // key stays `environments` and the second step moves the section rather than the route.
     steps: ['Gathering', { selector: '#manager-gathering-nav-tasks' }],
     expectView: 'environments',
-    // The inspector fact, which needs no click to populate: `selectedGatheringTaskId` falls back
-    // to `gatheringTaskDefinitions[0]?.id` over the declaration-ordered library, so the browse
-    // opens on `hb-task-forage`. Asserted on the fact itself because an empty inspector renders
-    // the surrounding card without it.
+    // The inspector fact, which needs no click to populate: `selectedGatheringTaskId` falls back to
+    // `gatheringTaskDefinitions[0]?.id` over the declaration-ordered library, so the browse opens
+    // on `hb-task-forage`.
     expectSelector: '.fabricate-manager [data-gathering-task-fact="environments"]',
     kinds: ['manager', 'environments'],
     sourceMatches: [
@@ -9767,11 +6520,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: ['manager-gathering-task-editor-normal'],
     reaches: 'exact',
     query: { system: 'lab-herbalism' },
-    // The rail's gathering group is a SUBMENU, so reaching the task library is two clicks:
-    // `Gathering` opens the group on Environments, then the `tasks` subitem switches the
-    // section. The row's own Edit control is what routes to `gathering-task-edit`; the task is
-    // named by `data-gathering-task-id` rather than taken as `.first()` so the frame does not
-    // silently follow a re-ordered library.
+    // The rail's gathering group is a submenu, so reaching the task library is two clicks:
+    // `Gathering` opens the group on Environments, then the `tasks` subitem switches the section.
     steps: [
       'Gathering',
       { selector: '#manager-gathering-nav-tasks' },
@@ -10001,29 +6751,13 @@ export const VIEW_LAB_CASES = Object.freeze([
   managerCase({
     id: 'manager-gathering-task-availability-menu',
     label: 'Manager — Gathering task availability menu open',
-    // BEYOND the smoke: no smoke routine opens an availability menu, so there is no counterpart
+    // Beyond the smoke: no smoke routine opens an availability menu, so there is no counterpart
     // frame of this state and no label to name.
-    //
-    // THE FRAME THE CONVERSION TURNS ON (issue 1458). Three hand-rolled add menus became
-    // `SearchablePopover`, and the change a GM sees is entirely in the OPEN panel: it was a
-    // `.manager-availability-menu` pinned `left: 0; right: 0` under its own field and clipped by
-    // the editor's scroller, and it is now the shared popover — PORTALED to the `.fabricate-manager`
-    // host, laid out against the trigger, 240-340px wide, drawn in the picker's neutral chrome
-    // rather than the availability widget's amber one. Every other gathering-task frame shows the
-    // menu CLOSED, where the only differences are a wrapper class and a scoping hash, so without
-    // this case the whole visible half of the conversion is unphotographed.
-    //
-    // It is also the frame that answers for the primitive's `showSearch={false}` presentation:
-    // the two World > Parties pickers this primitive's `BROAD_SIGNAL_CASE_OVERRIDES` entry names
-    // both render the search row, and this panel deliberately renders none — which is what keeps
-    // `triggerHasPopup="listbox"` truthful on the trigger.
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-herbalism' },
     // `hb-task-slowbloom` authors `biomes: ['mountain']` against a four-entry biome vocabulary, so
-    // the menu opens on the THREE still-unselected biomes rather than on the empty state. That is
-    // the reading worth photographing: an add menu that offers nothing draws `EmptyState` and says
-    // nothing about the option rows.
+    // the menu opens on the three still-unselected biomes rather than on the empty state.
     steps: [
       'Gathering',
       { selector: '#manager-gathering-nav-tasks' },
@@ -10035,9 +6769,8 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-gathering-task-field="biomes"] .manager-condition-menu-button' },
     ],
     expectView: 'gathering-task-edit',
-    // The PORTALED panel, and an option inside it. Asserting the option alone would be satisfied
-    // by the old in-place menu; asserting the popover alone would be satisfied by an empty one.
-    // Together they say the menu opened, moved to the manager host, and has rows in it.
+    // The portaled panel, and an option inside it. Asserting the option alone would be satisfied by
+    // the old in-place menu; asserting the popover alone would be satisfied by an empty one.
     expectSelector:
       '.fabricate-manager .manager-travel-popover [data-gathering-task-availability-option="biomes"]',
     kinds: ['manager', 'environments'],
@@ -10059,10 +6792,9 @@ export const VIEW_LAB_CASES = Object.freeze([
         selector:
           '[data-gathering-task-id="hb-task-slowbloom"] .manager-icon-button[aria-label^="Edit"]',
       },
-      // At 1000px the task library stacks, so Playwright has to scroll the panel to reach the
-      // row's Edit control — and the editor then mounts into a container that KEPT that scroll
-      // offset, framing "Required Tools" instead of the identity card. Scrolling the first card
-      // back into view is what makes the stacked frame the same screen as the normal one.
+      // At 1000px the task library stacks, so Playwright has to scroll the panel to reach the row's
+      // Edit control — and the editor then mounts into a container that kept that scroll offset,
+      // framing "Required Tools" instead of the identity card.
       { selector: '[data-gathering-task-core-editor]', scroll: true },
     ],
     expectView: 'gathering-task-edit',
@@ -10080,10 +6812,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Environment edit placeholder',
     smokeLabels: ['manager-environment-edit-placeholder'],
     // The environment editor's Overview tab — identity, context, player-facing behaviour and
-    // composition mode, with the summary/linked-scene/validation/runtime inspector beside it. The
-    // name is historical: the route stopped being a placeholder when the composition editor
-    // landed, and the smoke label kept its old name. Pinned to `hb-env-grove` by row, which is the
-    // one environment carrying a linked scene, an automatic composition and node runtime.
+    // composition mode, with the summary/linked-scene/validation/runtime inspector beside it.
     reaches: 'exact',
     query: { system: 'lab-herbalism' },
     steps: [
@@ -10155,14 +6884,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Environment edit Events tab',
     smokeLabels: ['manager-environment-edit-events'],
     // `exact`: the smoke's own walk clicks this tab and photographs it without selecting anything,
-    // and so does this. The editor auto-selects the first available record of the tab's kind, so
-    // both frames carry a populated event inspector for the same reason.
+    // and so does this.
     reaches: 'exact',
-    // No fixture change. Sunlit Grove composes automatically and the two herbalism library events
-    // carry no biome or danger tags, so both match it: the Included list holds them, Excluded and
-    // Non-matching read zero. A zero there is the composition rule working, not a gap in the
-    // world — a matching-tagged event would have to be authored to make it read anything else,
-    // and that would be a `tests/view-lab/world/` change reaching every frame in the corpus.
+    // No fixture change.
     query: { system: 'lab-herbalism' },
     steps: [
       'Gathering',
@@ -10173,10 +6897,8 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '#environment-tab-events' },
     ],
     expectView: 'environment-edit',
-    // The route survives a tab click that did nothing, so the assertion names the tab panel AND
-    // the inspector the auto-selection populates. Without the second half a frame of the Events
-    // tab with an empty inspector — the state a broken auto-selection produces — would publish
-    // under a name promising the composed event beside its matching evidence.
+    // The route survives a tab click that did nothing, so the assertion names the tab panel AND the
+    // inspector the auto-selection populates.
     expectSelector:
       '.fabricate-manager:has([data-environment-tab="events"] .manager-environment-comp-row.is-selected)' +
       ' [data-record-inspector="event"]',
@@ -10200,8 +6922,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectView: 'environments',
     // The inspector fact, pinned because it is the only evidence that the event browser calls
     // `activeEnvironmentsForRecord` correctly (issue 1321): the seam's own suite proves the return
-    // value, and the caller is an unexported component local no unit test can reach. Without this
-    // the frame would publish the surrounding card with the fact missing and say nothing.
+    // value, and the caller is an unexported component local no unit test can reach.
     expectSelector: '.fabricate-manager [data-gathering-event-fact="environments"]',
     kinds: ['manager', 'environments'],
     sourceMatches: [
@@ -10224,12 +6945,7 @@ export const VIEW_LAB_CASES = Object.freeze([
         selector:
           '[data-gathering-event-id="hb-event-wolves"] .manager-icon-button[aria-label^="Edit"]',
       },
-      // THE DANGER PILLS INTO FRAME (issue 1515). The Danger tags card sits below the fold on
-      // this editor, and `frame.screenshot()` does not scroll a nested overflow container - so the
-      // one control on this screen that did NOT converge onto the shared chip, and whose six-level
-      // ramp is the reason it did not, was in no published frame at all while the converted chips
-      // beside it were in several. Scrolling to it puts the pill and the converted availability
-      // chips in one photograph, which is what makes the divergence checkable rather than asserted.
+      // The danger pills into frame (issue 1515).
       { selector: '[data-gathering-event-danger-pills]', scroll: true },
     ],
     expectView: 'gathering-event-edit',
@@ -10349,15 +7065,12 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['manager', 'environments', 'world'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|EnvironmentsBrowserView|GatheringPartiesTab)\.svelte$/,
-      // The gate lock this case is NAMED for is drawn by `PartyExpandedBody`, in the card's
-      // right column. Without this pattern, editing that component selects every other party
-      // case and not the only one that photographs the unavailable state.
+      // The gate lock this case is named for is drawn by `PartyExpandedBody`, in the card's right
+      // column.
       /^src\/ui\/svelte\/apps\/manager\/Party/,
     ],
   }),
-  // The World > Parties states the populated frame cannot hold. Each is `beyond`: none has a
-  // Foundry smoke counterpart, because the smoke world seeds neither an empty party list nor a
-  // fifth party, and no smoke walk opens a travel-actor picker.
+  // The World > Parties states the populated frame cannot hold.
   managerCase({
     id: 'manager-world-parties-empty',
     label: 'Manager — World Parties empty',
@@ -10387,15 +7100,9 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-manager-party-search]', fill: WORLD_PARTIES_SEARCH_TERM },
     ],
     expectView: 'world',
-    // Both survivors on ONE page is the claim, and it is unreachable unfiltered: the five
-    // parties page at three, and these two are the second and the fifth, so they are never
-    // siblings in the same list without the filter. The `long-haul` card matches on its TRAVEL
-    // ACTOR's name alone — the widened domain this change added — which a party-name-only
-    // filter cannot fake.
-    //
-    // The filtered set is TWO, which is below `PAGER_THRESHOLD`, so this frame deliberately
-    // shows the pane with NO pager footer. That is the state under test — a filtered pane
-    // whose bar has gone with the matches it described — and not a missing control.
+    // Both survivors on one page is the claim, and it is unreachable unfiltered: the five parties
+    // page at three, and these two are the second and the fifth, so they are never siblings in the
+    // same list without the filter.
     expectSelector:
       '[data-travel-panel="parties"] .manager-travel-parties-list' +
       ':has([data-manager-travel-party-id="lab-party-long-haul"])' +
@@ -10418,9 +7125,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     expectView: 'world',
     // Five records at the default page size of three: page two holds the trailing two, so the
-    // absence of the first card is as load-bearing as the presence of the last. This is also
-    // the only frame in which the pager's own state — a live prev arrow, "Page 2 of 2" and the
-    // per-page select — is anything other than its resting one.
+    // absence of the first card is as load-bearing as the presence of the last.
     expectSelector:
       '[data-travel-panel="parties"] .manager-travel-parties-list' +
       ':has([data-manager-travel-party-id="lab-party-wagonwright"])' +
@@ -10435,68 +7140,28 @@ export const VIEW_LAB_CASES = Object.freeze([
   managerCase({
     id: 'manager-world-parties-pane-alert',
     label: 'Manager — World Parties refused enable',
-    // THE PANE ALERT, WHICH NO CASE REACHED (issue 1515). `GatheringPartiesTab.svelte:286-293`
-    // renders a `role="alert"` summary line, and it is the pane's ONLY channel for a travel
-    // write the store refused with no field to attach the reason to: `paneError` (`:138-140`)
-    // is `travelError` MINUS the two field errors the cards draw themselves, so a refusal
-    // routed to a card's own field renders there and never here.
-    //
-    // `setPartyEnabled` is the operation that produces it. `withSave` passes NO `fieldContext`
-    // for that call (`adminStore.js`), so `_travelErrorState` writes a summary and no field
-    // error at all — which is exactly the shape `paneError` is the only renderer of.
-    //
-    // `beyond`: no smoke walk presses a refused enable, so there is no counterpart frame and no
-    // label to name.
+    // The pane alert, which no case reached (issue 1515).
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-smithing' },
-    // `lab-party-emberwatch` is DISABLED and holds two of the three characters that the enabled
+    // `lab-party-emberwatch` is disabled and holds two of the three characters that the enabled
     // `lab-party` already holds, so enabling it violates `GatheringPartyStore`'s composite
-    // uniqueness invariant and the write is refused. It is the third of five cards at a page
-    // size of three, so it is on the resting page and needs no pager step.
-    //
-    // `tests/view-lab-cases.test.js` derives that collision from the seeded party list rather
-    // than restating it, so a fixture edit that makes the enable SUCCEED fails there instead of
-    // publishing a pane with no alert in it under a case named for one.
+    // uniqueness invariant and the write is refused.
     steps: [
       { selector: '#manager-world-nav-parties', press: 'Enter' },
       { selector: '[data-manager-party-enable="lab-party-emberwatch"]' },
-      // AND SCROLL BACK TO THE ALERT, which is the whole subject of the frame (issue 1515,
-      // driver capture). Playwright scrolls a click target into view, so pressing the third
-      // card's pill leaves the pane resting on that card — and the alert renders ABOVE the
-      // list, so the first capture of this case photographed a pane with the refusal message
-      // off the top edge. Every assertion passed: `expectSelector` resolves against the DOM and
-      // cannot see the scroll position.
-      //
-      // `world-component-catalogue-bulk` records the same defect from the other end and
-      // warns that `scroll` cannot fix it there, because `scrollIntoViewIfNeeded` is a no-op on
-      // an element already PARTLY in view. That is what makes it the right verb here and the
-      // wrong one there: this alert is entirely above the scroller's viewport, so the step is
-      // not a no-op, and scrolling minimally to it brings the pane's head into frame.
+      // AND scroll back to the alert, which is the whole subject of the frame (issue 1515, driver
+      // capture).
       { selector: '[data-manager-party-summary-error]', scroll: true },
     ],
     expectView: 'world',
-    // The alert INSIDE the parties pane, not merely somewhere in the window: the same refusal
-    // reaches a card's own field error on a different operation, and that element is a
-    // different contract with a different owner. Scoping to the panel and naming the summary
-    // line's own hook is what keeps the two apart.
-    //
-    // THE CLASS IS THE PRIMITIVE'S NOW (issue 1515). The line is a `<Notice blocking>`, which
-    // takes no `class`, so `.manager-travel-parties-summary-error` is `.fab-notice`. The
-    // caller's own `dataAttr` hook is what still tells this notice from any other, and the
-    // `role` is what the conversion had to preserve rather than acquire.
+    // The alert inside the parties pane, not merely somewhere in the window: the same refusal
+    // reaches a card's own field error on a different operation, and that element is a different
+    // contract with a different owner.
     expectSelector:
       '[data-travel-panel="parties"]' +
       ' .fab-notice[data-manager-party-summary-error][role="alert"]',
-    // IN THE PICTURE, not merely in the DOM. The container is the pane's own SCROLLER — the
-    // element `GatheringPartiesTab.svelte` binds as `scroller` and clips with `overflow` — so an
-    // alert scrolled above its viewport has a bounding box above the container's and fails here.
-    // Neither `expectSelector` nor `expectVisible` can see that: `isVisible()` asks about
-    // `display` and box size, not about the scroll offset, and both were green on the frame that
-    // did not contain the alert.
-    //
-    // Paired with the `scroll` step above rather than replacing it: the step puts the alert in
-    // frame and this proves it is still there when the shutter opens.
+    // In the picture, not merely in the DOM.
     expectContained: [
       {
         container: '.manager-travel-parties-content',
@@ -10521,12 +7186,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-manager-party-actor-trigger="lab-party"]' },
     ],
     expectView: 'world',
-    // Content, not the trigger. The trigger-only frame satisfies none of these claims:
-    // the popover exists and is portaled into the manager (the reason it escapes the pane's
-    // own `overflow: auto`), it uses the shared title/count header with no duplicated unlink
-    // footer, and its rows carry the placement meta line that surfaces a composite-uniqueness
-    // collision BEFORE the pick fails. Asserting the trigger alone would pass over a closed
-    // picker, which is precisely the frame this case exists to distinguish itself from.
+    // Content, not the trigger.
     expectSelector:
       '.fabricate-manager .manager-travel-actor-popover' +
       ':has([data-popover-header])' +
@@ -10552,19 +7212,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '.manager-travel-parties-override-trigger' },
     ],
     expectView: 'world',
-    // The ONLY frame that renders `SearchablePopover`'s in-popover search row. The
-    // travel-actor picker next to it is `inlineSearchTrigger`, which suppresses that row
-    // entirely and replaces its trigger instead — so the actor-picker case above, which
-    // `BROAD_SIGNAL_CASE_OVERRIDES` routes a `SearchablePopover.svelte` change to, cannot
-    // photograph the compact search field, its leading glyph, or the fact that it now sits
-    // BELOW the title/count header rather than above it.
-    //
-    // The selector demands all three of the things that distinguish this presentation from
-    // the plain popover the other 13 consumers render: the shared header, the compact
-    // search row, and a compact option row. The DOM order of the header before the search
-    // row is what `:has(...) + ...` would assert; `:has()` is unordered, so the ordering
-    // claim is left to `tests/components/party-expanded-body.test.js` and this frame
-    // carries the visual one.
+    // The only frame that renders `SearchablePopover`'s in-popover search row.
     expectSelector:
       '.fabricate-manager .manager-travel-popover.is-compact-option-rows' +
       ':has([data-popover-header])' +
@@ -10670,10 +7318,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       expectCenterHit: '.downtime-preview:not([hidden]) .downtime-cta',
       expectClick: '.downtime-preview:not([hidden]) .downtime-cta',
       expectNoHorizontalOverflow: ['[data-world-downtime-host]', '.manager-main', '.manager-body'],
-      // The pane OWNS the vertical overflow at every size, which is what `expectOverflowY`
-      // states. It does not overflow at 1330x900 — the preview fits — so no `expectScrollable`
-      // here; `manager-world-downtime-narrow` is the frame whose window really cannot hold it
-      // and is where that proof lives. See the note in `tests/view-lab-cases.test.js`.
+      // The pane owns the vertical overflow at every size, which is what `expectOverflowY` states.
       expectOverflowY: '.downtime-preview-scroll',
       position: { width: 1330, height: 900 },
       kinds: ['manager', 'world', 'downtime'],
@@ -10795,22 +7440,14 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/downtime\//,
     ],
   }),
-  // Issue 1185 — the PREMIUM-INSTALLED chrome. Every other manager case renders the free
-  // module, so without this one the title bar's gold badge, the rail's muted Downtime chip
-  // and the installed-state rail tooltip have no frame at all, and a push would publish an
-  // unrelated free-module frame as evidence for them.
+  // Issue 1185 — the premium-installed chrome.
   managerCase({
     id: 'manager-world-downtime-test-companion-installed',
     label: 'Manager — premium-installed chrome, driven by a TEST companion',
     smokeLabels: [],
     reaches: 'beyond',
     query: { system: 'lab-smithing', downtimeProvider: '1' },
-    // COLLAPSE THE RAIL FIRST, and the order is the whole point (issue 1213). The lab world
-    // seeds `managerRailCollapsed: false` and cases cannot override a lab setting, so a frame
-    // that never touches the toggle is pixel-identical whether the rail lock ships or not and
-    // proves nothing about it. Pressing it here, one route BEFORE Downtime, reaches a genuinely
-    // stored collapsed rail — and it has to happen here rather than on the route, where the
-    // control is `disabled` and Playwright's actionability check would refuse to press it.
+    // Collapse the rail first, and the order is the whole point (issue 1213).
     steps: [
       { selector: '[data-manager-rail-toggle]', press: 'Enter' },
       { selector: '#manager-world-nav-downtime', press: 'Enter' },
@@ -10901,16 +7538,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^styles\/fabricate\.css$/,
     ],
   }),
-  // The companion driving CORE'S header. Every other Downtime frame photographs a resting
-  // list screen, which renders identically whether or not the runtime route-chrome channel
-  // exists — so without this case a change to that channel would publish a frame that cannot
-  // show it, which is precisely the mis-evidence this registry exists to prevent.
-  //
-  // The state is only reachable through the companion: the lab provider's drill-down button
-  // calls `context.setRouteChrome(...)`, and Core repaints its own header without remounting.
-  // The frame is the proof that a companion's editor is INDISTINGUISHABLE from one of
-  // Fabricate's own — same medallion identity block, same `Unsaved` chip, same ghost/danger/
-  // primary trio — which is a claim about pixels that no assertion here can make on its own.
+  // The companion driving core's header.
   managerCase({
     id: 'manager-world-downtime-test-companion-chrome',
     label: 'Manager — route header driven by a TEST companion',
@@ -10978,12 +7606,9 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^styles\/fabricate\.css$/,
     ],
   }),
-  // Issue 1302 — the Downtime parent rollup, the state Core reaches on a fresh Manager open:
-  // the disclosure closed and never yet visited (`railGroupUserExpanded.worldDowntime` seeds
-  // `false`, and `isWorldDowntimeRoute` is false off the Downtime route, so nothing locks it
-  // open). No other frame reaches this with zero interaction, and it is the only frame that
-  // can photograph the chip/rollup swap without also proving the rail-collapse or group-toggle
-  // path — see the `manager-world-downtime-test-companion-installed` and `-collapsed` frames for those.
+  // Issue 1302 — the Downtime parent rollup, the state Core reaches on a fresh Manager open: the
+  // disclosure closed and never yet visited (`railGroupUserExpanded.worldDowntime` seeds `false`,
+  // and `isWorldDowntimeRoute` is false off the Downtime route, so nothing locks it open).
   managerCase({
     id: 'manager-world-downtime-test-companion-rollup',
     label: 'Manager — Downtime rollup on a closed disclosure, with a TEST companion',
@@ -10992,21 +7617,18 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-smithing', downtimeProvider: '1' },
     steps: [],
     expectView: 'systems',
-    // One selector proves both halves of the swap: the rollup is present inside the parent
-    // button, and — because `:not(:has(...))` is scoped to that same button — the muted
-    // `PREMIUM` chip is NOT a descendant of it. The two are mutually exclusive by contract
-    // (`{#if !downtimeNavRollupVisible}` wraps the chip), so proving one absent while the
-    // other is present is a DOM-removal claim, not a restyling one.
+    // One selector proves both halves of the swap: the rollup is present inside the parent button,
+    // and — because `:not(:has(...))` is scoped to that same button — the muted `PREMIUM` chip is
+    // not a descendant of it.
     expectSelector:
       '#manager-world-nav-downtime:not(:has([data-world-nav-premium])) [data-world-downtime-badge-total]',
     expectAttributes: [
       {
         selector: '[data-world-downtime-badge-total]',
         name: 'aria-label',
-        // The lab provider's only badge is the four-digit one on `ledger` (1284), so the
-        // rollup total is that same value — Core sums the RESOLVED badge once per tab it
-        // renders, never registered-plus-runtime. `{count} update`/`updates` is rendered
-        // unformatted (issue 1302 accepted limitation 5), so no thousands separator here.
+        // The lab provider's only badge is the four-digit one on `ledger` (1284), so the rollup
+        // total is that same value — Core sums the resolved badge once per tab it renders, never
+        // registered-plus-runtime.
         value: '1284 updates',
       },
     ],
@@ -11016,11 +7638,8 @@ export const VIEW_LAB_CASES = Object.freeze([
         target: '[data-world-downtime-badge-total]',
       },
     ],
-    // The Downtime parent row is the LAST rail entry, below Parties, Travel and Currency, and
-    // nothing scrolls it into view without a step this state deliberately takes none of. Every
-    // assertion above still passes against the un-scrolled DOM regardless of window height, but
-    // 1000px — the tallest the capture viewport's `.application` max-height clamp allows — is
-    // what actually keeps the row in the published frame, so a human can judge it too.
+    // The Downtime parent row is the last rail entry, below Parties, Travel and Currency, and
+    // nothing scrolls it into view without a step this state deliberately takes none of.
     position: { width: 1330, height: 1000 },
     kinds: ['manager', 'world', 'downtime'],
     sourceMatches: [
@@ -11030,17 +7649,8 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^styles\/fabricate\.css$/,
     ],
   }),
-  // Issue 1332 — the companion NAVIGATING. Every other Downtime frame is reached by pressing
-  // something of CORE'S: a rail entry, a rail sub-item, a preview tab. This one is reached by
-  // pressing a control the COMPANION drew, whose only job is to take the GM to another of that
-  // companion's own screens — and until Core published `navigateToTab` such a control could name
-  // its destination and not reach it. That is a distinction no resting frame can carry, because
-  // a dead button and a working one photograph identically until one of them is pressed.
-  //
-  // It earns a case of its own rather than a step on `-test-companion-installed`, whose subject
-  // is the rail LOCK and whose every assertion is about the `ledger` panel this navigation
-  // deliberately leaves. Adding the press there would have swapped that frame's subject for this
-  // one and photographed neither well.
+  // Issue 1332 — the companion navigating. Every other Downtime frame is reached by pressing
+  // something of core's: a rail entry, a rail sub-item, a preview tab.
   managerCase({
     id: 'manager-world-downtime-test-companion-tab-navigation',
     label: 'Manager — a TEST companion sending the GM to another of its own tabs',
@@ -11070,9 +7680,8 @@ export const VIEW_LAB_CASES = Object.freeze([
         value: 'manager-downtime-nav-label-crew',
       },
     ],
-    // The destination screen carries its OWN cross-navigation control, pointing on to the third
-    // tab — so the frame shows a capability every screen has rather than one button that worked
-    // once. Matched on the stable prefix; the destination's own label is the fixture's.
+    // The destination screen carries its own cross-navigation control, pointing on to the third tab
+    // — so the frame shows a capability every screen has rather than one button that worked once.
     expectVisible: '[data-lab-companion-tab-link]:has-text("Go to Test Companion")',
     expectNoHorizontalOverflow: [
       '[data-world-downtime-host]',
@@ -11091,11 +7700,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
   }),
   managerCase({
-    // World > Travel is UNGATED (issue 1282). This case used to prove the opposite — that the
-    // selected-system Travel group DISAPPEARED when that system's Travel & Realms toggle was
-    // off — and the fact it asserted went with the route. It now proves the rule that replaced
-    // it, on the same non-participating system: the World entry is there regardless, because
-    // realms are world geography and have to be authorable before any system opts in.
+    // World > Travel is ungated (issue 1282).
     id: 'manager-world-travel-ungated',
     label: 'Manager — World Travel present for a non-participating system',
     smokeLabels: ['manager-world-travel-ungated'],
@@ -11263,10 +7868,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // touching a control, which is the whole point of the frame — the settings a GM finds, not a
     // state a walk drove them into.
     reaches: 'exact',
-    // DELIBERATELY not `manager-gathering-economy-actors`, which reaches the same tab. That case
-    // enables the Stamina limitation, fills a maximum, rolls a pool and then scrolls the panel to
-    // the actor table, so it shows a driven state of a region far below this one. A documentation
-    // frame of the limitation card has to be the untouched page.
+    // Deliberately not `manager-gathering-economy-actors`, which reaches the same tab.
     query: { system: 'lab-herbalism' },
     steps: ['Gathering', { selector: '#manager-gathering-nav-settings' }],
     expectView: 'environments',
@@ -11286,50 +7888,23 @@ export const VIEW_LAB_CASES = Object.freeze([
     // frame for this to fall short of.
     reaches: 'beyond',
     smokeLabels: [],
-    // The actor stamina table is the ONLY surface no case reached (issue 1050). Eight cases carry
-    // a `Gathering(Economy|…)` pattern and every one of them `expectView`s somewhere else, so a
-    // change to `GatheringEconomyView.svelte` published a frame that does not contain it. It is
-    // also this change's tightest layout: the row is a four-track grid of two filled, comfortable
-    // steppers, re-pinned from `56px 56px` to `106px 106px`, which is why the actor subsection was
-    // reflowed out of `.manager-economy-stamina-grid` to the card's full width.
+    // The actor stamina table is the only surface no case reached (issue 1050).
     query: { system: 'lab-herbalism' },
-    // The state is DRIVEN rather than seeded. The fixture world enables stamina on no system, and
-    // seeding one would be a `tests/view-lab/**` change — which `LAB_INFRASTRUCTURE_PATTERN` maps
-    // to surface coverage, and which would put a stamina readout into the player
-    // gathering frames of whichever system it was seeded on (`GatheringDetail.svelte` renders one
-    // whenever `staminaEnabled`). Four GM gestures reach the same state and disturb nothing:
-    // enable the Stamina limitation, give it a max expression (without one
-    // `seedActorStaminaIfNeeded` no-ops and Roll does nothing at all), then roll the FIRST
-    // character's pool. That leaves Brenna rolled and Idrin and Vosk un-rolled, so one row renders
-    // the live, comfortable, filled steppers and two render the DISABLED state — and the rolled
-    // row's Max stepper renders its rolled-max PLACEHOLDER, which is the unset-value state D1
-    // added. All three states in one frame.
+    // The state is driven rather than seeded.
     steps: [
       'Gathering',
       { selector: '#manager-gathering-nav-settings' },
       { selector: '[data-economy-mode-option="stamina"]' },
       { selector: '[data-economy-stamina-max]', fill: '12' },
       { selector: '[data-economy-actor-roll]' },
-      // A CONFIRMING step, not a cosmetic one. `runSteps` throws when a selector matches nothing,
-      // so this turns "the roll silently did not land" — which would otherwise publish a table of
-      // three identically disabled rows under a name claiming otherwise — into a loud capture
-      // failure. It scrolls the rolled row into frame as its side effect.
+      // A confirming step, not a cosmetic one.
       { selector: '[data-economy-actor-rolled="true"]', scroll: true },
     ],
     expectView: 'environments',
     kinds: ['manager', 'environments'],
-    // Deliberately NO pattern for `components/Stepper.svelte`: `BROAD_SIGNAL_PATTERN` matches
+    // Deliberately no pattern for `components/Stepper.svelte`: `BROAD_SIGNAL_PATTERN` matches
     // `^src/ui/svelte/components/`, and `selectRenderFileCases` `continue`s on a broad-signal file
-    // BEFORE it consults any case's `sourceMatches`, so such an entry would be unreachable code.
-    //
-    // THIS CASE IS NONETHELESS THE STEPPER'S EVIDENCE (issue 1378). The seam is the other one:
-    // `BROAD_SIGNAL_CASE_OVERRIDES` is keyed on the primitive rather than declared by the case, and
-    // it names this id. That is additive — a stepper change publishes the representative pair AND
-    // this frame — so the pair is not lost, which is the property `viewLabCases.js`'s override
-    // docblock states and `tests/view-lab-cases.test.js` pins.
-    //
-    // The pattern below is still required and is not a duplicate of that: the override selects this
-    // case when the PRIMITIVE changes, and this pattern selects it when the VIEW does.
+    // before it consults any case's `sourceMatches`, so such an entry would be unreachable code.
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/GatheringEconomyView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/EnvironmentsBrowserView\.svelte$/,
@@ -11342,17 +7917,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // `beyond`: the live smoke never walks the Gathering Settings tab at all.
     reaches: 'beyond',
     query: { system: 'lab-herbalism' },
-    // THE TRAILING-EDGE TRIGGER OF THE PHASE. The regeneration row is a two-column grid and the
-    // unit control is its right-hand cell, so its panel is the one that opens nearest the window
-    // edge — the case where a panel wider than its trigger is clipped if it is clipped at all.
-    // It is also the phase's second UNTICKED list, drawn from a caller that adopted the
-    // primitive's own labelled form rather than demoting a wrapper.
-    //
-    // THE STATE IS DRIVEN, on `manager-gathering-economy-actors`' own reasoning: the fixture world
-    // enables stamina on no system, and seeding one would put a stamina readout into the player
-    // gathering frames of whichever system it was seeded on. Four gestures reach it — enable the
-    // Stamina limitation, give it a max expression, switch regeneration to Over world time (which
-    // is what renders the unit cell at all), then open the unit list.
+    // The trailing-edge trigger of the phase.
     steps: [
       'Gathering',
       { selector: '#manager-gathering-nav-settings' },
@@ -11373,15 +7938,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Environment edit blind task weights',
     reaches: 'beyond',
     smokeLabels: [],
-    // `CompositionList`'s weight field renders in ONE state — `showBlindWeights`, which is
-    // `kind === 'task' && selectionMode === 'blind'` — and no case reached it: the list's single
-    // existing claim (`manager-environments-browse-normal`) stops at the environments browser.
-    // Shadow Thicket is the world's blind-selection environment and already carries authored
-    // weights for both of its forced tasks, so its Tasks tab renders the field populated rather
-    // than empty. Phase 4 deleted that field's bespoke `width: 42px` global rule and widened the
-    // `--fab-env-comp-grid` weight track to fit a filled stepper beside the percent readout; this
-    // is the frame that shows whether it fits, in both the wide and the `max-width: 960px`
-    // container branch.
+    // `CompositionList`'s weight field renders in one state — `showBlindWeights`, which is `kind
+    // === 'task' && selectionMode === 'blind'` — and no case reached it: the list's single existing
+    // claim (`manager-environments-browse-normal`) stops at the environments browser.
     query: { system: 'lab-herbalism' },
     steps: [
       'Gathering',
@@ -11403,28 +7962,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Environment edit automatic Force add',
     reaches: 'beyond',
     smokeLabels: [],
-    // Issue 1315 moved Force add to AUTOMATIC mode, where a filter exists for it to override, and
-    // nothing in the lab photographed the result: the automatic Non-matching section is the
-    // section this control lives in, and no case reached it. `manager-environment-edit-placeholder`
-    // opens this same environment and stops on Overview; `manager-environment-edit-blind-weights`
-    // reaches a Tasks tab, but Shadow Thicket is MANUAL, so it renders Available-to-add and no
-    // Non-matching section at all. Before 1315 the control could not have been photographed
-    // anywhere, in either mode: its four branches demanded `mode === 'manual'` inside a section
-    // gated on `mode !== 'manual'`, so they were unreachable by construction.
-    //
-    // Sunlit Grove is `compositionMode: 'automatic'` with `biomes: ['forest']`, and the herbalism
-    // library carries exactly three `biomes: ['mountain']` tasks — Tend the Slow Bloom, the icecap
-    // and the ridgemoss — which fail its match and land in Non-matching. That is fixture the world
-    // already has: no lab content changes for this frame, which matters because a change under
-    // `tests/view-lab/world/` selects the whole corpus.
-    //
-    // The last step OPENS THE ROW MENU, and the frame is published for what that menu contains.
-    // The Non-matching row's actions are split by kind — an event row renders the labelled amber
-    // `warning`-role button inline, a task row renders this menu item — so a task frame that
-    // stopped at the section would show a closed ellipsis and prove only that the section exists.
-    // The herbalism events carry no biome or danger tags, so every event matches every environment
-    // and the world has no non-matching EVENT to photograph the labelled twin with; that gap is a
-    // fixture matter and is recorded rather than papered over here.
+    // Issue 1315 moved Force add to automatic mode, where a filter exists for it to override, and
+    // nothing in the lab photographed the result: the automatic Non-matching section is the section
+    // this control lives in, and no case reached it.
     query: { system: 'lab-herbalism' },
     steps: [
       'Gathering',
@@ -11439,73 +7979,25 @@ export const VIEW_LAB_CASES = Object.freeze([
       },
     ],
     expectView: 'environment-edit',
-    // The open menu's Force add itself, not the section that holds it. The section renders for any
-    // automatic environment with a rejected record and would be satisfied by the very state this
-    // case exists to prove is over: a Non-matching list offering nothing to do about it.
-    //
-    // NOT NESTED IN THE ROW ANY MORE (issue 1477). The menu is `<ActionMenu>` now and its panel is
-    // PORTALED to `.fabricate-manager`, so it is a sibling of the editor rather than a descendant
-    // of the row that opened it — a row-scoped selector would wait forever and take every frame in
-    // this run with it. Exactly one menu is open at a time and `force-include` is offered by no
-    // other menu in the file, so the panel-scoped form is as discriminating as the row-scoped one
-    // was.
+    // The open menu's Force add itself, not the section that holds it.
     expectSelector: '.fabricate-manager .fabricate-action-menu-panel [data-action="force-include"]',
     kinds: ['manager', 'environments'],
     sourceMatches: [
       ENVIRONMENT_DIR_EXCEPT_VALIDATION_TAB,
       /^src\/ui\/svelte\/apps\/manager\/EnvironmentEditView\.svelte$/,
-      // The positioning seam (issue 1500). The selector above names an item inside the PORTALED
-      // menu panel, which is the only thing in this frame the seam can move, and this is the
-      // registry's only frame with an `ActionMenu` panel open. `ActionMenu.svelte`'s own
-      // broad-signal override routes changes to that component; it says nothing about the action
-      // the component delegates its placement to, so the seam is claimed here.
+      // The positioning seam (issue 1500).
       ...ANCHORED_POPOVER_SOURCES,
     ],
   }),
   managerCase({
     id: 'manager-environment-validation',
     label: 'Manager — Environment edit Validation tab',
-    // BEYOND, with an empty label array to match: `screenshotCaptureMap.js` carries no routine for
-    // this tab, so the smoke has no counterpart to fall short of. It is also the pairing this case
-    // has to declare — `tests/view-lab-cases.test.js` requires a `beyond` case to name NO smoke
-    // label, and naming one would make this tab the smoke harness's problem as well as the lab's,
-    // which is a file this change deliberately does not touch.
+    // Beyond, with an empty label array to match: `screenshotCaptureMap.js` carries no routine for
+    // this tab, so the smoke has no counterpart to fall short of.
     reaches: 'beyond',
     smokeLabels: [],
-    // THE FIRST FRAME OF THIS TAB, and it is registered BEFORE the change that re-skins it
-    // (issue 1517), so the conversion has a before to be compared against. The gap it closes was
-    // not an absence: four cases claimed this file through the `environment/` directory prefix and
-    // none opens the tab — see `ENVIRONMENT_DIR_EXCEPT_VALIDATION_TAB`, which is the other half of
-    // this entry.
-    //
-    // SHADOW THICKET rather than Sunlit Grove, and the choice is the frame's content. Readiness
-    // always emits its six checks, so any environment draws the check list; what differs is the
-    // ISSUE list, and the grove carries a `sceneUuid` while the thicket does not — so the thicket
-    // is the environment whose `noScene` warning gives this frame a populated issues card and a
-    // non-clear verdict, and the grove would publish "No issues detected." No fixture changes for
-    // it: a `tests/view-lab/world/` edit selects the whole corpus, which is a cost this frame does
-    // not need to incur to show the surface it is registered for.
-    //
-    // WHAT THIS FRAME CANNOT SHOW, measured rather than discovered at review. The tab's deep-link
-    // button is gated on an issue carrying a `recordId`, and exactly two issues carry one:
-    //
-    //   `staleIncluded` needs a record whose composition state is `includedNotMatching`, which is
-    //   assigned ONLY to a manual environment's explicitly included record that fails its match.
-    //   The world holds two manual environments (Shadow Thicket, The Deepvault) and three tagged
-    //   records in total — `hb-task-slowbloom`, `-icecap` and `-ridgemoss`, all `biomes:
-    //   ['mountain']` — and neither manual environment includes any of the three. Everything they
-    //   do include is untagged, so nothing fails a match and the state is unreachable.
-    //
-    //   `taskNoDescription` needs an available task with an empty description. All seven lab
-    //   gathering tasks carry one.
-    //
-    // So no frame of this tab can draw the deep link, on any environment in the corpus, and a
-    // change to that button's treatment is covered by the mounted deep-link test rather than by a
-    // photograph. The tab's other `info` issue is unreachable for a third reason:
-    // `locallyExcluded` needs a `disabledTaskIds` or `disabledEventIds` entry, and no lab
-    // environment declares either. Closing any of these three is a `tests/view-lab/world/` edit,
-    // which selects the whole corpus — a cost this frame does not need to incur to photograph the
-    // surface it is registered for.
+    // The first frame of this tab, and it is registered before the change that re-skins it (issue
+    // 1517), so the conversion has a before to be compared against.
     query: { system: 'lab-herbalism' },
     steps: [
       'Gathering',
@@ -11516,18 +8008,8 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '#environment-tab-validation' },
     ],
     expectView: 'environment-edit',
-    // The ROUTE survives a tab click that did nothing, and every other environment editor case
-    // proves that by opening a different tab of this same route. Without this assertion a strip
-    // rename would publish the Overview tab under a name promising the validation one — the
-    // `manager-import-report` failure, on a screen whose whole subject is the panel this names.
-    //
-    // The PANEL HOOK, not a class: `data-environment-tab` is the site contract every tab in this
-    // editor carries, and the surface's `hookAttrs` seam is what preserves a site's own hooks
-    // through an adoption. A conversion of this tab onto `EditorValidationSurface` keeps it by
-    // passing it as the root hook, exactly as the recipe editor's tab passes `data-recipe-tab`.
-    // Naming a class of the CURRENT markup instead would fail the capture job WHOLE the moment
-    // that markup is replaced — and a capture that fails whole publishes nothing, for every case
-    // in the run.
+    // The route survives a tab click that did nothing, and every other environment editor case
+    // proves that by opening a different tab of this same route.
     expectSelector: '[data-environment-tab="validation"]',
     kinds: ['manager', 'environments'],
     sourceMatches: [
@@ -11562,20 +8044,14 @@ export const VIEW_LAB_CASES = Object.freeze([
     reaches: 'beyond',
     smokeLabels: [],
     query: {},
-    // THE ONLY STATE THAT PROVES THE LOOP CLOSES (issue 1373). Adopting a world Tool used to
-    // write a membership record the Tool Rules list could not read, so the row stayed a ghost
-    // and the button looked inert. `hb-tool-mortar` is a world entity whose only membership is
-    // Herbalism, so in Smithing it starts unadopted - which is why the filter has to be widened
-    // to `All world tools` before there is anything to press.
+    // The only state that proves the loop closes (issue 1373).
     steps: [
       { selector: '#manager-nav-tool-rules' },
       { selector: '[data-tool-membership-option="all"]' },
       { selector: '[data-tool-add-to-system="hb-tool-mortar"]' },
     ],
     expectView: 'tools',
-    // A MEMBER ROW, named by the control only a member renders. `data-tool-add-to-system` and
-    // `data-tool-edit-rules` are the two halves of one `{#if entry.member}`, so asserting the
-    // second is asserting the first is gone.
+    // A member row, named by the control only a member renders.
     expectSelector:
       '.manager-tools-row[data-manager-tool-id="hb-tool-mortar"] [data-tool-edit-rules]',
     expectContained: [
@@ -11596,12 +8072,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-jewelry' },
     steps: [{ selector: '#manager-nav-tool-rules' }],
     expectView: 'tools',
-    // THE TWO-BUTTON BRANCH, NAMED (issue 1373). This case has always landed on it and never
-    // said so, which is what let its one-CTA twin go unnoticed: `lab-jewelry` holds no tools of
-    // its own while the world holds twelve, so the panel offers the near route — switch the
-    // membership filter in place — as its primary and the world catalogue as the fallback. The
-    // primary renders only when `ghostRows.length > 0`, and its count is in its own hook, so
-    // asserting the hook is asserting the branch.
+    // The two-button branch, named (issue 1373).
     expectSelector: '[data-tool-empty-browse-world]',
     expectContained: [
       {
@@ -11622,31 +8093,12 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Tool zero state on a world with no Tools at all 1280x720',
     reaches: 'beyond',
     smokeLabels: [],
-    // THE ONE-CTA BRANCH, WHICH IS THE STATE A NEW WORLD IS ACTUALLY IN (issue 1373).
-    //
-    // The panel has two honest answers and they are different sizes: switch the membership filter
-    // in place, which needs something adoptable to switch TO, and leave for the world catalogue,
-    // which is the only route when the world holds none either. `manager-tool-zero-state-empty-
-    // library-1280x720` always reaches the FIRST — `lab-jewelry` has no tools and the world has
-    // twelve — so the second branch, which is what a GM sees the first time they open Tool Rules
-    // in a world they just installed Fabricate into, was drawn by nothing.
-    //
-    // `noTools` IS THE WHOLE MECHANISM AND IT ALREADY EXISTED, so this needs no fixture change:
-    // the flag empties the world corpus, every system's own library and the flat roster together,
-    // which is what makes `ghostRows` empty and takes the primary off the panel. `world-tool-
-    // catalogue-empty` is the same flag one screen away, photographing the catalogue that has
-    // nothing to offer.
-    //
-    // NO `system` QUERY: with every library emptied the default system reaches the same state, so
-    // pinning one would state a dependency the case does not have.
+    // The one-cta branch, which is the state A new world is actually in (issue 1373).
     query: { noTools: '1' },
     steps: [{ selector: '#manager-nav-tool-rules' }],
     expectView: 'tools',
     expectSelector: '[data-tool-library-empty]',
-    // THE REMAINING ROUTE, INSIDE THE PANEL. There is no `expect` verb for an absence, so what
-    // this can assert is that the panel rendered and that its ONE action is the catalogue link;
-    // the sibling case above asserts the other branch's pair, and the two together are what make
-    // "which branch is this" a question the registry answers rather than one a reader guesses.
+    // The remaining route, inside the panel.
     expectContained: [
       {
         container: '[data-tool-library-empty]',
@@ -11663,27 +8115,15 @@ export const VIEW_LAB_CASES = Object.freeze([
     // BEYOND: the live smoke walks no widened Tool rules list on a system holding none.
     reaches: 'beyond',
     smokeLabels: [],
-    // WHAT PRESSING THE ZERO STATE'S PRIMARY ROUTE ACTUALLY DRAWS (issue 1373), and until this
-    // case it was unproducible. `manager-tool-zero-state-empty-library-1280x720` above ends at
-    // the panel and asserts the button EXISTS; nothing anywhere pressed it. The list body gated
-    // its zero state on this system's own adopted Tools rather than on the cohort the segment
-    // selects, so the button set a filter whose result the panel then hid — the ghost rows were
-    // derived, counted, sorted and paged, and thrown away by one boolean. The maintainer found
-    // that by hand on a real world, through a surface that had passed every gate.
-    //
-    // `lab-jewelry` is the same system its sibling above uses and for the same reason: it holds
-    // `tools: []` while the lab world holds twelve world Tools, so it lands in the panel with
-    // something to widen TO.
+    // What pressing the zero state's primary route actually draws (issue 1373), and until this case
+    // it was unproducible.
     query: { system: 'lab-jewelry' },
     steps: [
       { selector: '#manager-nav-tool-rules' },
       { selector: '[data-tool-empty-browse-world]' },
     ],
     expectView: 'tools',
-    // A NON-MEMBER ROW CARRYING ITS ONE ACTION. `data-tool-add-to-system` and
-    // `data-tool-edit-rules` are the two halves of one `{#if entry.member}`, so naming the first
-    // inside a row marked `absent` states both that the row rendered and that it rendered as a
-    // Tool this system has not adopted — which is the whole point of the widened cohort.
+    // A non-member row carrying its one action.
     expectSelector: '.manager-tools-row[data-tool-row-member="absent"] [data-tool-add-to-system]',
     expectContained: [
       {
@@ -11700,13 +8140,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Tool zero state, membership widened to all 1280x720',
     reaches: 'beyond',
     smokeLabels: [],
-    // THE SECOND ROUTE TO THE SAME STATE, AND IT IS NOT INFERABLE FROM THE FIRST (issue 1373).
-    // The maintainer reported two symptoms — the button did nothing AND the middle segment did
-    // nothing — and they are separate call sites: the segment sets the membership filter
-    // directly, while the button sets it from INSIDE the panel the filter was supposed to leave.
-    // A GM who reads `All world tools (12)` in the toolbar and clicks it never touches the
-    // button at all, so a case covering only the button would leave that route photographed by
-    // nothing.
+    // The second route to the same state, AND it is not inferable from the first (issue 1373).
     query: { system: 'lab-jewelry' },
     steps: [
       { selector: '#manager-nav-tool-rules' },
@@ -11725,25 +8159,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [...TOOL_LIST_MATCHES],
   }),
   managerCase({
-    // THE INHERITING STATE OF THE RULES EDITOR (issue 1373), and the only frame that shows it.
-    //
-    // `beyond` with no smoke label, for the same reason its sibling adoption case is: the live
-    // smoke walks no world-Tool adoption, and a MIGRATED Tool is `Overridden` on all four
-    // sections by construction — `migrateToolRequirementSections` records every existing
-    // system's own value as its own override, so every other Tool frame in this registry shows
-    // the override face. Adopting `hb-tool-mortar` into Smithing is what produces a membership
-    // record that inherits every section, and opening its rules is what photographs the
-    // `Inheriting` pill, the `World default: …` line and the read-only world value beneath it.
-    //
-    // IT LANDS ON `Requirements`, NOT ON THE DEFAULT `Breakage` TAB, and that is the point of the
-    // frame rather than a detail of it. `prerequisites` and `bonus` are the two sections that
-    // joined `TOOL_SECTIONS` at `1.31.0`, and they are the two the editor got wrong: `breakage`
-    // only ever LOOKED inherited because adoption used to copy the world value onto the in-system
-    // record, so a frame of the Breakage tab could not tell a union read from a raw one. The
-    // Requirements tab's two cards can — the lab world authors a world `prerequisites` and
-    // `bonus` for `hb-tool-mortar` precisely so they resolve to something a screenshot can read —
-    // and the effective-rules rail beside them states all FOUR sections in the same frame, so the
-    // inheriting breakage face is not lost by moving tab.
+    // The inheriting state of the rules editor (issue 1373), and the only frame that shows it.
     id: 'manager-tool-rules-inheriting-1280x720',
     label: 'Manager — Tool rules inheriting the world defaults 1280x720',
     reaches: 'beyond',
@@ -11763,24 +8179,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/tools\/ToolInheritCard\.svelte$/],
   }),
   managerCase({
-    // A NON-MEMBER TOOL, SELECTED (issue 1373).
-    //
-    // The reference's own tool-rules frame is in exactly this state - its inspector shows
-    // `Mining Pick`, a `No rules here` pill and a pinned `Add Mining Pick to Mythwright Forge`
-    // - and no frame in this registry reached it. Both halves were implemented and neither was
-    // photographable: `data-tool-inspector-no-rules` and `data-tool-inspector-add` render only
-    // for a world Tool the selected system has no rules record for, which needs the membership
-    // filter widened AND the ghost row clicked rather than its own `Add to system` button.
-    //
-    // WHAT IT CATCHES. The panel is fed a DIFFERENT prop from a member's (`unadopted`, a world
-    // entry, against `tool`, a system record), so every regression in that branch is invisible
-    // to the member frames: an empty panel where a Tool was clicked, a `Enabled here` pill over
-    // rules that do not exist, a missing CTA, a rules list captioned `Effective rules here`
-    // rather than `What it would inherit here`, and - since this round - the `Inheritance`
-    // region wrongly rendering for a Tool with nothing to inherit through.
-    //
-    // It clicks the ROW rather than the row's `Add to system`: pressing that button adopts the
-    // Tool and destroys the state this case exists to photograph.
+    // A non-member tool, selected (issue 1373).
     id: 'manager-tool-non-member-selected-1280x720',
     label: 'Manager — Tool rules, non-member Tool selected 1280x720',
     reaches: 'beyond',
@@ -11801,23 +8200,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [...TOOL_LIST_MATCHES],
   }),
   managerCase({
-    // FILTERED TO NOTHING (issue 1373), and the state that let a whole hero panel ship green.
-    //
-    // No case in this registry has ever typed a query into this list, so the `filteredTools
-    // .length === 0` branch was drawn by nothing. What shipped there passed an `icon` and a
-    // `title` and no `filtered`, which took `EmptyState`'s CENTRAL hero treatment - a 44px
-    // inset, a 46px glyph tile and a 13px serif heading - where the reference draws one dashed
-    // box around a single 11.5px sentence. Every parity pass on this screen had reported the
-    // list complete.
-    //
-    // WHAT IT CATCHES. The panel's whole composition (no icon, no title, one sentence), the
-    // dashed-box geometry the `filtered` variant now states from `proto:2545`, and the copy -
-    // which names the FILTER rather than the search, because three controls narrow this list
-    // and only one of them is the query.
-    //
-    // The query is deliberately a string no fixture Tool can contain, rather than a plausible
-    // one: a case that reaches its state only while the fixture happens not to hold a matching
-    // name is a case that silently stops testing the moment a Tool is added.
+    // Filtered to nothing (issue 1373), and the state that let a whole hero panel ship green.
     id: 'manager-tool-rules-filtered-empty-1280x720',
     label: 'Manager — Tool rules filtered to nothing 1280x720',
     reaches: 'beyond',
@@ -11834,16 +8217,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [...TOOL_LIST_MATCHES],
   }),
   managerCase({
-    // THE `Overriding` MEMBERSHIP FILTER (issue 1373).
-    //
-    // Three segments narrow this list and only two of them were ever drawn: every case that
-    // touches the filter clicks `all`, so the third branch of `filteredRows` - the one that
-    // keeps a row only when its world join reports an overridden section - was unphotographed
-    // end to end, including the toolbar state that says which segment is live.
-    //
-    // WHAT IT CATCHES. The selected segment's own paint on the third position; the row set the
-    // branch produces; and the per-row `Overrides ...` sentence, which is the only thing on the
-    // screen that can disagree with the filter that selected the row.
+    // The `Overriding` membership filter (issue 1373).
     id: 'manager-tool-rules-overriding-filter-1280x720',
     label: 'Manager — Tool rules filtered to overriding 1280x720',
     reaches: 'beyond',
@@ -11856,27 +8230,15 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectView: 'tools',
     // The track's `data-tool-membership-filter` stamps `true` rather than the live value since
     // issue 1515 put this control on the shared segmented primitive, so readiness is the third
-    // segment being LIT - the class the primitive derives from its `value` prop, which is the one
-    // reading the component has to re-render to satisfy. `input:checked` would report the click
-    // itself rather than the state it produced.
+    // segment being lit - the class the primitive derives from its `value` prop, which is the one
+    // reading the component has to re-render to satisfy.
     expectSelector: '[data-tool-membership-option="over"].is-active',
     position: { width: 1280, height: 720 },
     kinds: ['manager', 'tools'],
     sourceMatches: [...TOOL_LIST_MATCHES],
   }),
   managerCase({
-    // THE SORT ROW, DRIVEN (issue 1373).
-    //
-    // `SORT BY [Name] [Asc]` has only ever been photographed at its defaults, so neither the
-    // flipped glyph and label of the direction toggle nor the membership-first ordering of the
-    // `In this system` key was drawn by any frame. Both are a control's ONLY changed state:
-    // the toggle swaps its icon and its word together, and a swap that changed one and not the
-    // other would look correct in every existing frame.
-    //
-    // TWO VERBS, because the two halves of the row are two different controls: `select` on the
-    // native key picker and a click on the direction button. The order matters only in that
-    // both are applied before the frame, and the resulting list is sorted by membership,
-    // descending - the exact ordering no other case produces.
+    // The sort row, driven (issue 1373).
     id: 'manager-tool-rules-sorted-desc-1280x720',
     label: 'Manager — Tool rules sorted by membership descending 1280x720',
     reaches: 'beyond',
@@ -11895,34 +8257,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [...TOOL_LIST_MATCHES],
   }),
   managerCase({
-    // A SELECTED ROW UNDER THE POINTER (issue 1373), which is how a live cascade defect stayed
+    // A selected row under the pointer (issue 1373), which is how a live cascade defect stayed
     // invisible through three parity passes.
-    //
-    // `[data-manager-view='tools'] .manager-tools-row:hover` was (0,4,0) and the selected-row
-    // rule is (0,3,1), so hover won: crossing the row a GM had just chosen repainted it from
-    // the accent fill to the pane's next rung and took the selection marking away. Nothing in
-    // the registry could report it, because no frame had a pointer resting on a row.
-    //
-    // THE LAST STEP IS THE HOVER, and it is a click rather than a verb of its own. Playwright's
-    // click moves the virtual mouse to the element's centre and LEAVES IT THERE - nothing in
-    // the runner moves it again, and `frame.screenshot()` does not - so the element a case
-    // clicks last is the element the frame photographs hovered. Every existing frame in this
-    // registry already carries that state on whatever it clicked last; this is the first case
-    // that depends on it, so it is stated rather than assumed. Adding a `hover` verb to the
-    // runner would say it more plainly, at the cost of making `view-lab-screenshots.mjs` a
-    // changed file and therefore selecting a full surface-coverage capture on every future
-    // touch of it.
-    //
-    // It clicks the LAST row, not the first: the first is already selected by the view's own
-    // auto-select on mount, so clicking it would prove nothing about a selection made under a
-    // pointer that stayed put.
-    //
-    // AND THE ASSERTION CARRIES `:hover`, which is what stops this case being vacuous. The frame
-    // it publishes is, by design, indistinguishable from the resting one — that IS the repair —
-    // so a case that only asserted `.is-selected` would go on passing if the pointer stopped
-    // arriving, and would then publish a resting frame as evidence of a hovered state.
-    // `document.querySelector` evaluates `:hover` against the real pointer, so the runner's own
-    // presence check is the proof.
     id: 'manager-tool-rules-row-hovered-1280x720',
     label: 'Manager — Tool rules selected row under the pointer 1280x720',
     reaches: 'beyond',
@@ -11942,24 +8278,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [...TOOL_LIST_MATCHES],
   }),
   managerCase({
-    // THE BREAKAGE-MODE CARD'S OVERRIDDEN FACE (issue 1373).
-    //
-    // The card renders one of three source states at a time and every frame in this registry
-    // shows the same one: the lab world authors a world break mode, no lab system authors its
-    // own, so `breakageSource` is `world` and the pill reads `World default` everywhere. The
-    // `system` state - the amber `Overridden here` pill beside a THIRD selected segment - was
-    // reachable by one click and drawn by nothing.
-    //
-    // WHAT IT CATCHES. The tri-state's selected-segment paint on a position no other frame
-    // uses; the warning-toned pill; and the knock-on the whole list takes, since a check-driven
-    // authority re-labels every row's breakage chip.
-    //
-    // THE THIRD STATE, `Fabricate default`, IS NOT REACHABLE HERE and is deliberately not
-    // faked. It requires the WORLD to have authored no break mode at all, and the lab world
-    // authors one on purpose so that the World breakage card has a selected segment to draw.
-    // One world corpus serves every frame, so the two states are mutually exclusive by
-    // construction rather than by omission; `world-scope-tool-breakage-authority.test.js`
-    // covers that branch of `breakModeSourcePill` instead.
+    // The breakage-mode card's overridden face (issue 1373).
     id: 'manager-tool-rules-breakage-overridden-1280x720',
     label: 'Manager — Tool rules breakage mode overridden here 1280x720',
     reaches: 'beyond',
@@ -11976,23 +8295,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [...TOOL_LIST_MATCHES],
   }),
   managerCase({
-    // THE EDITOR'S RAIL, SCROLLED (issue 1373).
-    //
-    // The rail has five regions and every editor frame in this registry photographs the first
-    // two. `HOW PLAYERS SEE IT`, `PREVIEW AS` and `REQUIRED FOR` sit below the fold at every
-    // height the registry captures, so three regions - the player tile with its broken-copy
-    // switch, the actor selector with its resolved-prerequisite readout, and the list of what
-    // in this system requires the Tool - shipped unphotographed.
-    //
-    // WHAT IT CATCHES. Each of those three resolves values the rules cards do not: the uses
-    // pill and the broken-copy note come from `projectToolPlayerPreview`, the usability row from
-    // a live prerequisite evaluation, and `REQUIRED FOR` from a store projection over recipes
-    // and gathering tasks. A defect in any of them - a mis-toned pill, an empty `Required for`
-    // over a Tool four recipes require, a usability sentence that stopped resolving - is
-    // currently reported by nothing at all.
-    //
-    // `scroll` on `[data-tool-required-for]`, the LAST region: bringing it into view brings the
-    // two above it with it, and it is a stable container rather than leaf content.
+    // The editor's rail, scrolled (issue 1373).
     id: 'manager-tool-editor-rail-scrolled-1280x720',
     label: 'Manager — Tool rules editor rail scrolled 1280x720',
     smokeLabels: [],
@@ -12013,22 +8316,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
   }),
   managerCase({
-    // THE EDITOR WITH UNSAVED CHANGES (issue 1373).
-    //
-    // Every other editor frame photographs a CLEAN draft, where `Save rules` is disabled - so
-    // the screen's primary action has only ever been captured switched off, and a review that
-    // reads it as "a dim ghost, lower in emphasis than the two secondary buttons" is reading
-    // the only state a frame could show. The `Unsaved` chip has the same problem.
-    //
-    // WHAT IT CATCHES. The enabled primary's own paint and its rank against the two secondaries;
-    // the dirty chip; and - because the step that dirties the draft is the breakage choice - the
-    // `Limited uses` face of the radio group with its uses stepper, which is the state the
-    // registry could not otherwise reach on the default fixture. That last one is load-bearing
-    // this round: `Unlimited uses` and `Limited uses` are one `breakage.mode` split into two
-    // authored answers, and a frame that shows only one of the two cannot see them diverge.
-    //
-    // The step clicks the LABEL, never the `input` inside it: a radio card's input is overlaid
-    // by its own label, so a click aimed at the input is intercepted.
+    // The editor with unsaved changes (issue 1373).
     id: 'manager-tool-editor-dirty-1280x720',
     label: 'Manager — Tool rules editor with unsaved changes 1280x720',
     smokeLabels: [],
@@ -12049,14 +8337,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
   }),
   managerCase({
-    // THE OVERVIEW FRAME IS GONE BECAUSE THE OVERVIEW TAB IS (issue 1373). The system Tool rules
-    // editor's tabs are `Breakage · Requirements · Validation`; identity is world scope's, and
-    // `#tool-tab-overview` no longer exists to click, so a case pointed at it would fail its
-    // `expectView` rather than photograph anything.
-    //
-    // The slot photographs the tab's CLOSING state instead — the `Stop using this Tool here`
-    // callout, which is system scope's counterpart to the world entry's `Delete` and which no
-    // other frame reaches: 03 and 06 capture the same tab from the top, above the fold.
+    // The overview frame is gone because the overview tab is (issue 1373).
     id: 'manager-tool-parity-02-remove-1280x720',
     label: 'Manager — Tool parity 02 remove from system 1280x720',
     smokeLabels: ['manager-tool-parity-02-remove-1280x720'],
@@ -12084,12 +8365,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     // The Tool Studio stress states live on the Runework fixture system — see the tool library
     // note in labContent.js for why not the default system.
     query: { system: 'lab-runework' },
-    // A long DISPLAY LABEL, authored on the fixture rather than typed: the field is the one
-    // the smoke fills, and an authored value reaches the same overflow without a keystroke.
-    //
-    // NO TAB STEP. The field used to be on an `Overview` tab this case clicked; the system rules
-    // editor has no such tab (issue 1373), and the per-system label OVERRIDE the field became
-    // opens the `Breakage` tab, which is where the editor already lands.
+    // A long display label, authored on the fixture rather than typed: the field is the one the
+    // smoke fills, and an authored value reaches the same overflow without a keystroke.
     steps: [
       { selector: '#manager-nav-tool-rules' },
       {
@@ -12119,14 +8396,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectView: 'tool-edit',
     position: { width: 1280, height: 720 },
     kinds: ['manager', 'tools'],
-    // THE STRIP IS CLAIMED HERE (issue 1373). `tools/ToolEditorTabs.svelte` used to be swallowed
-    // by the ten LIST cases' `tools/` directory glob, so a change to the tab list or either badge
-    // published ten frames of the screen the strip is not on. This is the frame that shows it at
-    // rest, on the tab the editor opens.
-    //
-    // AND THE RAIL. `tools/ToolBehaviorPreview.svelte` was in the same position: the world entry's
-    // two preview frames claim it and the SYSTEM editor's copy of it was reached only through that
-    // same glob, so a change confined to the preview left every system frame of it stale.
+    // The strip is claimed here (issue 1373).
     sourceMatches: [
       ...TOOL_EDITOR_SHELL_MATCHES,
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolBreakageTab\.svelte$/,
@@ -12162,9 +8432,8 @@ export const VIEW_LAB_CASES = Object.freeze([
       // The repair set IS a list of `RecipeIngredientOption` rows at system scope too, and this
       // frame is the only one that photographs them there (issue 1373, round 6).
       /^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeIngredientOption\.svelte$/,
-      // The summary sentence's own module, claimed by name since the list cases stopped
-      // swallowing the whole `tools/` directory (issue 1373). It is the POPULATED sentence here
-      // and the empty one on `world-tool-entry-on-break-repair-empty`, which are its two arms.
+      // The summary sentence's own module, claimed by name since the list cases stopped swallowing
+      // the whole `tools/` directory (issue 1373).
       /^src\/ui\/svelte\/apps\/manager\/tools\/toolRepairSummary\.js$/,
     ],
   }),
@@ -12187,10 +8456,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     expectView: 'tool-edit',
     kinds: ['manager', 'tools'],
-    // THE CARD ITSELF IS CLAIMED HERE (issue 1373, maintainer round 2). This is the only frame
-    // in the registry that photographs the replacement tile at SYSTEM scope, and it claimed the
-    // tab that mounts the card rather than the card — so a change confined to
-    // `ToolReplacementTarget` published the world entry's frame and left the system one stale.
+    // The CARD itself is claimed here (issue 1373, maintainer round 2).
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolBreakageTab\.svelte$/,
@@ -12238,11 +8504,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectView: 'tool-edit',
     position: { width: 1280, height: 720 },
     kinds: ['manager', 'tools'],
-    // NO `ToolInheritCard` CLAIM HERE, and that is a choice rather than an omission: this case
+    // No `ToolInheritCard` claim here, and that is a choice rather than an omission: this case
     // opens the Anvil, whose two sections are the canonical empty, so both cards draw their
     // off-state sentence and neither shows the inherit row the card's head is spent on.
-    // `manager-tool-prerequisites-selected-1280x720` is the system-scope frame that does, and it
-    // claims the card.
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/ToolEditView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolRequirementsTab\.svelte$/,
@@ -12253,25 +8517,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Tool requirements, prerequisites with a selection 1280x720',
     smokeLabels: [],
     reaches: 'beyond',
-    // THE STATE NO FRAME PHOTOGRAPHED (issue 1373, maintainer round 5). The prerequisite list is
-    // the tab's other library list, and until this case existed the registry contained no frame
-    // that drew it at all — let alone one with a row selected.
-    // `manager-tool-parity-04-requirements-1280x720` opens the Anvil, whose two sections are the
-    // canonical empty, so it photographs two off-switches and no decision;
-    // `manager-tool-bonus-hand-typed-1280x720` opens the stylus, whose prerequisites are off by
-    // design so its bonus card fits one 720px frame; and `world-tool-entry-requirements` opens
-    // the hammer, which carries a world-default bonus and no prerequisites. So the list's rows,
-    // its checkbox and its selected fill were unphotographable, which is how a bespoke row with
-    // its own metrics, its own fill and its own selected treatment survived beside the shared
-    // one the section below it draws.
-    //
-    // WHAT IT CATCHES that nothing else can: the row losing its geometry (the sheet's joined
-    // cell blocks are anchored on the LIST class, so a rename silently draws a row with no box
-    // at all), the checked box painting the wrong ink or overflowing its square, the selected
-    // ROW painting the option-card treatment's leading accent bar, and either of the two retired
-    // headings coming back. `rw-tool-caliper` carries one of the world's five prerequisites, so
-    // the frame shows a checked row against four unchecked ones in the same picture — which is
-    // the only way a selected-state regression is visible rather than merely absent.
+    // The state no frame photographed (issue 1373, maintainer round 5).
     query: { system: 'lab-runework' },
     steps: [
       { selector: '#manager-nav-tool-rules' },
@@ -12307,17 +8553,12 @@ export const VIEW_LAB_CASES = Object.freeze([
       // The row both of this tab's lists draw (issue 1373, round 5), and the checkbox the
       // prerequisite list trails on it.
       /^src\/ui\/svelte\/apps\/manager\/ModifierLibraryRow\.svelte$/,
-      // Deliberately NO pattern for `components/SelectionCheckbox.svelte`, for the reason
+      // Deliberately no pattern for `components/SelectionCheckbox.svelte`, for the reason
       // `manager-setup-first-run` records: it is a broad signal, `selectRenderFileCases`
-      // `continue`s on one BEFORE consulting any case's `sourceMatches`, and such an entry would
-      // be unreachable. This case is reached through `BROAD_SIGNAL_CASE_OVERRIDES` instead.
-      //
-      // The card whose eyebrow, title and description line this frame heads both sections with.
+      // `continue`s on one before consulting any case's `sourceMatches`, and such an entry would be
+      // unreachable.
       /^src\/ui\/svelte\/apps\/manager\/tools\/ToolInheritCard\.svelte$/,
-      // AND THE TAB STRIP, on the one system frame that draws its REQUIREMENTS badge (issue
-      // 1373). The badge is suppressed at zero by the primitive's own rule, and every other
-      // editor frame opens a Tool whose requirement count is zero, so this is the frame that
-      // shows a strip with a count on it.
+      // AND the tab strip, on the one system frame that draws its requirements badge (issue 1373).
       ...TOOL_EDITOR_SHELL_MATCHES,
     ],
   }),
@@ -12326,25 +8567,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Tool requirements, hand-typed bonus 1280x720',
     smokeLabels: [],
     reaches: 'beyond',
-    // THE VALUE THE LIBRARY DOES NOT CONTAIN (issue 1373, maintainer round 3). Replacing a free
-    // text field with a pick list makes every expression a GM already typed unrepresentable, and
-    // the honest failure mode — highlighting nothing, then dropping the value on the next save —
-    // is invisible in a screenshot because a list with nothing selected looks like a list.
-    //
-    // `rw-tool-stylus` carries `+2`, a flat bonus no world modifier expresses, so this frame is
-    // that record's own row at the head of the list: selected, showing the value, and saying
-    // where it came from. It needs no fixture of its own — the stylus has carried that bonus
-    // since the Tool corpus was seeded, and nothing could render it until now.
-    //
-    // IT IS ALSO THE SYSTEM-SCOPE TWIN OF THE WHOLE SECTION (`proto:2886`-`2905`). The stylus is
-    // a MEMBER of a world Tool record — the world-scope pass lifts every in-system tool into one
-    // — so this is the overriding face, with the inherit switch on the card head and the
-    // section's own enable switch as the first row of the body, and it is the only frame that
-    // shows the modifier list at that scope. `manager-tool-parity-04-requirements-1280x720`
-    // opens the Anvil, whose two sections are the canonical empty, so it photographs two
-    // off-switches and no decision at all — which is how a free-text bonus field survived two
-    // parity rounds here. The stylus's prerequisites are off, which is what keeps the bonus
-    // card's head, its eyebrow and its rows in one 720px frame with no scroll step.
+    // The value the library does not contain (issue 1373, maintainer round 3).
     query: { system: 'lab-runework' },
     steps: [
       { selector: '#manager-nav-tool-rules' },
@@ -12383,16 +8606,10 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '#tool-tab-validation' },
     ],
     expectView: 'tool-edit',
-    // THE TAB HAD A CASE AND NO ASSERTION (issue 1373). `expectView: 'tool-edit'` is satisfied by
-    // the editor on ANY tab, so this case would have photographed the Breakage tab under the
-    // Validation tab's name had the click failed — and that is not a hypothetical failure mode
-    // here: the strip's ids moved in this same issue when `Overview` was retired. Four separate
-    // defects accumulated inside this surface unseen, which is what an unasserted frame buys.
+    // The tab had A case AND no assertion (issue 1373).
     expectSelector: '[data-tool-validation-tab]',
-    // THE SURFACE'S THREE PARTS, each inside the region that owns it: the summary medallion, the
-    // counts rail beside it, and a real check row in the group below. A frame proving only the
-    // wrapper would pass over a surface that had rendered its head and no rows, which is the
-    // shape a projection fault arrives in.
+    // The surface's three parts, each inside the region that owns it: the summary medallion, the
+    // counts rail beside it, and a real check row in the group below.
     expectContained: [
       {
         container: '[data-tool-validation-tab]',
@@ -12424,9 +8641,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // The Tool Studio stress states live on the Runework fixture system — see the tool library
     // note in labContent.js for why not the default system.
     query: { system: 'lab-runework' },
-    // The blocking Validation state. Un-checking the tool's single prerequisite leaves
-    // prerequisites ENABLED with nothing chosen, which persistence can never hold (the
-    // normalizer clamps `enabled` off on an empty id list) and only the editor draft can.
+    // The blocking Validation state.
     steps: [
       { selector: '#manager-nav-tool-rules' },
       {
@@ -12441,12 +8656,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '#tool-tab-validation' },
     ],
     expectView: 'tool-edit',
-    // THE BLOCKED ROW ITSELF, not the tab (issue 1373). This case walks four steps to reach a
-    // draft state persistence cannot hold, and `expectView` is satisfied by the editor on any
-    // tab with the prerequisite still ticked — so every one of those four steps could have
-    // failed quietly and the frame would have published the all-clear surface under the name of
-    // the blocking one. `.is-block` is the class the blocking status writes and `BLOCKS ENABLE`
-    // is the only pill that renders on it, so this is the corpus's one frame of that word.
+    // The blocked row itself, not the tab (issue 1373).
     expectSelector: '[data-tool-validation-tab] .manager-recipe-val-row.is-block',
     expectContained: [
       {
@@ -12496,17 +8706,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectView: 'tools',
     position: { width: 680, height: 700 },
     kinds: ['manager', 'tools', 'responsive'],
-    // TWO CLAIMS REMOVED HERE, AND NEITHER WAS ROUTING (issue 1373). This case is the LIST at
-    // 680px — its steps are one rail click and its `expectView` is `tools` — so it renders
-    // `ToolsBrowserView` and the `ToolBrowserInspector` rail beside it, and nothing else. It
-    // claimed `scoped/ScopedEntityPreview.svelte` on the reasoning that the Tool editor's rail
-    // renders through it, and `scoped/ScopedValidationTab.svelte` on the reasoning that both
-    // validation tabs are callers of it. Both are true of the EDITOR and neither is true of this
-    // frame, so a change to either published a 680px photograph of a list that cannot contain it.
-    //
-    // `manager-tool-editor-rail-scrolled-1280x720` and `world-tool-entry-player-preview` claim
-    // the preview shell; `manager-essence-edit-validation` and `world-tool-entry-validation`
-    // claim the validation shell. Every one of those four frames draws the file it names.
+    // Two claims removed here, AND neither was routing (issue 1373).
     sourceMatches: [...TOOL_LIST_MATCHES],
   }),
   managerCase({
@@ -12546,25 +8746,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: ['manager-knowledge-learned-lost-copy'],
     reaches: 'exact',
     query: { system: 'lab-herbalism' },
-    // The same character on the other tab, and the only frame that renders a learned ROW.
-    // Two of her entries name a book she no longer holds, so they fall to the
-    // DEFINITION-name rung; the other three have no source at all and split three ways —
-    // auto-learn, a labelled GM grant and a label-less one (issue 1289) — which is what
-    // makes this one frame the evidence that the three read as different rows. Every
-    // source-less row carries the no-refund clause, because no source copy means no learn
-    // budget to give back.
-    //
-    // `sourceMatches` names the knowledge component DIRECTORY as well as the view root:
-    // the rows are drawn by `KnowledgeLearnedRow.svelte`, and before this the directory
-    // pattern appeared only on `manager-knowledge-narrow`, which takes no actor and no tab
-    // step and therefore opens on Recipe items with no learned row in frame at all.
-    //
-    // It also names `SvelteCraftingSystemManagerApp.svelte.js`: the `granted`/`grantedBy`
-    // allowlist that `_collectKnowledgeLearnedEntries` hands to the row ladder lives there,
-    // has no unit coverage, and this frame is its only evidence, so a later edit that drops
-    // `granted` from the allowlist must recapture this case rather than fail silently. That
-    // file is broad, so this case will also select on unrelated edits to it — an accepted
-    // trade for closing the silent-regression gap (issue 1289).
+    // The same character on the other tab, and the only frame that renders a learned row.
     steps: [
       'Crafting',
       { selector: '#manager-crafting-nav-knowledge' },
@@ -12605,9 +8787,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: ['manager-knowledge-delete-armed'],
     reaches: 'exact',
     query: { system: 'lab-herbalism' },
-    // Delete armed to its confirm face. This is Fabricate's own two-step arm, not a Foundry
-    // dialog, so one click reaches it — and the un-armed sibling rows in the same frame are the
-    // evidence, since exactly one arm token exists at a time.
+    // Delete armed to its confirm face.
     steps: [
       'Crafting',
       { selector: '#manager-crafting-nav-knowledge' },
@@ -12693,20 +8873,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     id: 'manager-import-report',
     label: 'Manager — Import report',
     smokeLabels: ['manager-import-report'],
-    // The uploaded payload is a REAL export envelope, because `validateImportData` rejects
-    // anything else. This case spent increment 2 at `window` behind a blocker comment naming the
-    // step vocabulary and the missing `DialogV2` — both of which this branch had already removed.
-    // The actual blocker was the fixture: the payload was `{name, components, recipes}` with no
-    // `system` key, so validation errored, `renderSystemImportDialog` returned `null`, and the
-    // frame published the plain systems browser under the name "Import report".
-    //
-    // It stayed invisible because `ui.notifications.error` was a no-op in the shim. Production
-    // said "Invalid file: Missing required 'system' field" and nothing carried it. The shim now
-    // routes notifications to `console`, so this exact defect fails the capture instead of
-    // retitling it — see `tests/view-lab/foundry/installFoundryShim.js`.
-    //
-    // The system id must be NEW: `importFromPackData` reports an existing one as
-    // `summary.system.skipped`, which is an info toast and an early `null` return, not a report.
+    // The uploaded payload is a real export envelope, because `validateImportData` rejects anything
+    // else.
     reaches: 'exact',
     query: { dialog: 'open' },
     steps: [
@@ -12722,12 +8890,7 @@ export const VIEW_LAB_CASES = Object.freeze([
             name: 'Imported Forge',
             summary: 'A system that arrived by file.',
             enabled: true,
-            // Dangling `originItemUuid`s on purpose. The report's subject is
-            // `summary.unresolvedReferences` — a reference the importer could not bind — and the
-            // ordinary way to produce them is the ordinary way people hit this screen: export from
-            // one world, import into another that does not have the items. A payload whose every
-            // reference resolves renders the modal's EMPTY state, which is a real state but not
-            // the one this frame is named for.
+            // Dangling `originItemUuid`s on purpose.
             components: [
               {
                 id: 'imp-emberglass',
@@ -12748,10 +8911,7 @@ export const VIEW_LAB_CASES = Object.freeze([
             componentCategories: [],
             itemTags: [],
           },
-          // No recipes. One was authored here and the importer counted it as a FAILED recipe — it
-          // contributed nothing to this modal (the report's subject is unresolved references, not
-          // failed records) while leaving a knowingly-invalid record in a fixture, which is the
-          // defect class this branch spent its length removing.
+          // No recipes.
           recipes: [],
           gatheringEnvironments: [],
           gatheringConfig: {},
@@ -12760,11 +8920,8 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '.application.dialog button[data-action="ok"]' },
     ],
     expectView: 'systems',
-    // The systems browser is what sits UNDERNEATH the report, so `expectView` alone cannot tell
-    // the two apart. A GROUP rather than the modal root: `[data-import-report]` renders whether or
-    // not anything was reported, because `buildImportReportContent` always returns an object and
-    // the modal has an explicit empty state — so it would pass on the very "Everything resolved"
-    // frame the dangling references in this payload exist to avoid.
+    // The systems browser is what sits underneath the report, so `expectView` alone cannot tell the
+    // two apart.
     expectSelector: '[data-import-report-group]',
     kinds: ['manager', 'systems'],
     sourceMatches: [
@@ -12777,24 +8934,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     id: 'manager-import-folder-mapping',
     label: 'Manager — Import folder mapping',
     smokeLabels: ['manager-import-folder-mapping'],
-    // The one case on this branch whose blocker is a MISSING VERB rather than a fixture shape.
-    // `ImportFolderMappingModal` opens on exactly one path — `dropComponent(data)` calls
-    // `services.collectImportFolderGroups(data)` and opens the modal only when the returned plan
-    // carries `groups.length`. That is a DRAG-DROP: it needs a `DataTransfer` carrying a Foundry
-    // folder or compendium-pack payload dispatched at the components drop target, which the
-    // runner's click / select / fill / scroll / upload vocabulary cannot express. A `drop` verb is
-    // the work, and it is real work rather than a line: the payload has to satisfy
-    // `resolveDropData` and the collector has to walk a folder tree the lab world does not model.
-    //
-    // Left deliberately on the components browser rather than the default systems screen, so the
-    // frame is at least about the surface the drop lands on.
-    //
-    // Its PNG is byte-identical to `manager-components-normal` — same app, query, steps and
-    // geometry — and that is stated rather than dressed up. While the modal is unreachable this
-    // case's value is its `sourceMatches`, not its picture: it is what selects a frame when
-    // `ImportFolderMappingModal.svelte` changes, and no other case matches that file. The dedup
-    // guard exempts `window` cases precisely so a case can admit it falls short instead of being
-    // given an invented difference to look distinct.
+    // The one case on this branch whose blocker is a missing verb rather than a fixture shape.
     reaches: 'window',
     query: {},
     steps: [{ selector: '#manager-nav-component-rules' }],
@@ -12853,40 +8993,14 @@ export const VIEW_LAB_CASES = Object.freeze([
       CRAFTING_SHARED,
       /^src\/ui\/svelte\/stores\/craftingStore/,
       /^src\/ui\/svelte\/apps\/FabricateAppRoot\.svelte$/,
-      // The bar this frame draws, named EXPLICITLY as of issue 1500. It used to arrive here for
-      // free: it lived under `components/`, and a broad signal selects the representative pair,
-      // of which this is one. Moving it to `apps/` took it out of both legs of
-      // `BROAD_SIGNAL_PATTERN`, so without this pattern a change to a 506-line screen region
-      // would publish only the frame that opens its picker and never the frame that draws it
-      // closed — which is where its own 17 scoped rules are visible. (18 until issue 1514 moved
-      // the contextual stamina track onto the shared fill bar and its fill rule went with it.)
+      // The bar this frame draws, named explicitly as of issue 1500. It used to arrive here for
+      // free: it lived under `components/`, and a broad signal selects the representative pair, of
+      // which this is one.
       /^src\/ui\/svelte\/apps\/ActorSelectTopBar\.svelte$/,
       PLAYER_VIEW_STATE,
     ],
   }),
-  // THE PRIMITIVE'S FIRST PLAYER-WINDOW FRAME (issue 1475). Every other player case draws the
-  // actor picker CLOSED, where the conversion is a class list; the whole of what changed is in the
-  // OPEN panel, and until this case there was no frame anywhere in the registry that photographed
-  // `SearchablePopover` outside the manager at all.
-  //
-  // `reaches: 'beyond'` + `smokeLabels: []`: the live smoke opens no actor picker, so there is no
-  // counterpart to fall short of, and a `beyond` case must claim zero labels.
-  //
-  // `sourceMatches` names BOTH `FabricateAppRoot` and the bar itself, and the pairing is mechanical
-  // rather than editorial. Until issue 1500 the bar lived under `src/ui/svelte/components/`, which
-  // `BROAD_SIGNAL_PATTERN` claims through its directory leg, so `selectRenderFileCases` never
-  // consulted any case's `sourceMatches` for it — a pattern naming it would have been
-  // configuration that could not fire, and it was routed here by `BROAD_SIGNAL_CASE_OVERRIDES`
-  // instead. That move put it under `apps/`, where it matches NEITHER leg, so the override became
-  // the dead configuration and this pattern became the live one. The routing outcome is unchanged;
-  // only the table it comes from is. `FabricateAppRoot` stays because it is the surface that
-  // places the bar, and a change that moved it is a change this frame answers for.
-  //
-  // The selector asserts the three facts the conversion is: the panel is a CHILD OF THE
-  // APPLICATION FRAME (it was absolutely positioned inside the bar before, and a portal that
-  // failed to land would leave it there), it carries the primitive's own namespace root, and it
-  // holds the primitive's option rows. A frame in which the click opened nothing, or opened an
-  // unstyled panel outside the frame, fails the capture rather than publishing.
+  // The primitive's first player-window frame (issue 1475).
   playerCase({
     id: 'player-actor-picker',
     label: 'Player app — Actor picker',
@@ -12913,13 +9027,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { tab: 'inventory' },
     steps: [],
     kinds: ['player', 'inventory'],
-    // `ComponentSourcesBar` NAMED EXPLICITLY (issue 1513), the repair issue 1500 made for
-    // `ActorSelectTopBar` on the same measurement. The bar's `showSourcesBar` is
-    // `isCrafting || isInventory || isAlchemy`, so it draws in THREE tabs while its only routing
-    // was `CRAFTING_SHARED` — a crafting-directory pattern that cannot reach an inventory or
-    // alchemy frame. A change to the bar therefore published nothing of the two tabs it also
-    // renders in. The pattern is exact rather than a directory leg, because the rest of
-    // `apps/crafting/` is genuinely not this frame's subject.
+    // `ComponentSourcesBar` named explicitly (issue 1513), the repair issue 1500 made for
+    // `ActorSelectTopBar` on the same measurement.
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/inventory\//,
       /^src\/ui\/svelte\/stores\/inventoryStore/,
@@ -12932,28 +9041,15 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Player app — Inventory page size list',
     smokeLabels: [],
     reaches: 'beyond',
-    // THE PAIR TO `manager-recipes-bulk-edit-check-tier` (issue 1504), and the half that proves an
-    // ABSENCE: this list is drawn at `showTick={false}`, and the ticked frame beside it is the only
-    // way to read that the gutter is GONE rather than merely empty. It is also the narrowest panel
-    // the primitive draws — a two-digit list is all a per-page control has to offer — so it is
-    // the frame that shows the shared panel's 240px floor overridden rather than inherited.
-    //
-    // And it is the frame that establishes the app-drawn option list in the PLAYER window, which
-    // is now one of four: issue 1511 converted the app's own six selects and registered three of
-    // them open beside this one. The panel is portaled onto `.fabricate-app` rather than
-    // `.fabricate-manager` in all four — a different host, a different set of per-site trigger
-    // rules, and the one place a manager-only cascade repair is invisible.
-    //
-    // ONE STEP, and it is the trigger. Five inventory cases raise the page size to reach a card,
-    // so each of them drives straight THROUGH this state; this case stops in it, which is also why
-    // it claims `beyond` and no smoke label — the smoke never rests on an open list either.
+    // The pair to `manager-recipes-bulk-edit-check-tier` (issue 1504), and the half that proves an
+    // absence: this list is drawn at `showTick={false}`, and the ticked frame beside it is the only
+    // way to read that the gutter is gone rather than merely empty.
     query: { tab: 'inventory' },
     steps: [{ selector: '.inventory-grid-pagination [data-pagination-size]' }],
-    // THREE claims, in the shape `player-actor-picker` uses for the same mechanism: the panel is a
-    // CHILD OF THE APPLICATION FRAME (a portal that failed to land would leave it in the pager row,
-    // under the grid's own overflow), it is the UNTICKED configuration, and it holds the option
-    // rows. The `:not()` is the half that matters — a caller that lost `showTick={false}` draws a
-    // tick gutter with every other claim here still true.
+    // Three claims, in the shape `player-actor-picker` uses for the same mechanism: the panel is a
+    // child of the application frame (a portal that failed to land would leave it in the pager row,
+    // under the grid's own overflow), it is the unticked configuration, and it holds the option
+    // rows.
     expectSelector:
       '.fabricate-app > .fabricate-select-popover:not(.fabricate-select-popover-ticked) ' +
       '[data-popover-option="75"]',
@@ -12973,20 +9069,10 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Player app — Inventory sort list',
     smokeLabels: [],
     reaches: 'beyond',
-    // THE TICKED HALF OF THE PLAYER WINDOW'S PAIR (issue 1511). The frame directly above draws the
-    // same primitive at `showTick={false}`, and the two are read together: this is the frame in
-    // which the tick GUTTER exists at all under `.fabricate-app`, so a regression in that column's
-    // inset or in the selected row's ink is legible here and in no other player frame.
-    //
-    // ONE STEP, and it is the TRIGGER's own hook rather than the wrapper's. `data-inventory-sort`
-    // rides onto the button through `triggerData`, which is the identity handle the conversion
-    // moved down one element on purpose: a hook left on the surviving caption wrapper would still
-    // resolve and would open nothing.
+    // The ticked half of the PLAYER window's pair (issue 1511).
     query: { tab: 'inventory' },
     steps: [{ selector: '[data-inventory-sort]' }],
-    // The portal, the TICKED configuration and a row that is not the current value. `quantity` is
-    // the middle of three sort keys and the resting selection is `name`, so a list that rendered
-    // only its own value would fail this selector rather than pass it narrowly.
+    // The portal, the ticked configuration and a row that is not the current value.
     expectSelector:
       '.fabricate-app > .fabricate-select-popover.fabricate-select-popover-ticked ' +
       '[data-popover-option="quantity"]',
@@ -13004,10 +9090,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: ['player-salvage'],
     reaches: 'exact',
     query: { tab: 'inventory' },
-    // The PROGRESSIVE salvage body with its reorderable stage list — the counterpart's own
+    // The progressive salvage body with its reorderable stage list — the counterpart's own
     // condition (`[data-inventory-salvage-panel="progressive"]` +
-    // `[data-progressive-stage-reorderable]`). Filtered rather than paged to: the grid holds ~24
-    // cards per page and a fixture that adds one would silently move this card off page one.
+    // `[data-progressive-stage-reorderable]`).
     steps: [
       { selector: '.inventory-filters input', fill: 'Cracked Alembic' },
       {
@@ -13021,37 +9106,9 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/inventory\//,
       /^src\/ui\/svelte\/stores\/inventoryStore/,
     ],
-    // THE PER-STAGE COMPLICATION BAND (issue 1286) IS ASSERTED HERE RATHER THAN GIVEN ITS OWN
-    // CASE, and the reason is mechanical: `SalvageProgressiveBody` passes `complications` on
-    // every render (`resolved ? 'resolved' : 'forecast'`) rather than behind an opt-in, so this
-    // frame ALREADY draws the band. A second case would have had to repeat this case's query and
-    // steps exactly, and identical inputs produce a byte-identical PNG — a duplicate frame
-    // published under a second name, which is what `no two cases claiming exact reach produce the
-    // same frame` exists to stop being done deliberately. What the band actually lacked was an
-    // ASSERTION: `expectSelector` is the only claim the capture driver checks before it
-    // photographs, and this case had none at all.
-    //
-    // Three claims, of which the second is the one that is easy to lose:
-    //
-    //   1. stage 2 (`hb-salv-alembic-r2`, Ground Reagent) carries the band in its FORECAST tense,
-    //      naming `hb-comp-dust-cloud` — the row's copy, not merely a container;
-    //   2. stage 1 (`hb-salv-alembic-r1`, Empty Vial) carries NO band. Its absence is invisible in
-    //      a screenshot review and is the whole rule: the row-structure flip is
-    //      gated on the band having CONTENT for that stage rather than on the extension being
-    //      passed, and a presence gate would re-skin every progressive stage row in every world —
-    //      including the overwhelming majority whose components author no complications;
-    //   3. `hb-comp-dust-spoiled` appears NOWHERE. It is `gmOnly`, it is enabled for salvage, and
-    //      it fires on this very component, so it is the disclosure guarantee in the one frame a
-    //      player reads.
-    //
-    // The reorderable stage list this case is named for is unaffected: the band is drawn INSIDE
-    // the stage row, so the counterpart's own condition still holds around it.
-    // The SUBJECT is stage 1, not the panel, and that is forced rather than stylistic: claim 2 is
-    // an absence INSIDE a row, and writing it as `:has(row:not(:has(band)))` nests one `:has()`
-    // inside another, which Chromium rejects outright as an invalid selector — the case then dies
-    // at capture with a SyntaxError rather than failing an assertion. Hanging claims 1 and 3 off
-    // the panel as an ancestor and letting stage 1 be the subject keeps all three claims with no
-    // `:has()` inside any other `:has()`.
+    // The per-stage complication band (issue 1286) is asserted here rather than given its own case,
+    // and the reason is mechanical: `SalvageProgressiveBody` passes `complications` on every render
+    // (`resolved ?
     expectSelector:
       '[data-inventory-salvage-panel="progressive"]' +
       ':has([data-progressive-stage="hb-salv-alembic-r2"] ' +
@@ -13068,8 +9125,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     reaches: 'exact',
     query: { tab: 'inventory' },
     // `[data-inventory-salvage-body="no-check"]`: Simple salvage mode with no authored roll
-    // formula, so every result is recovered outright. Smithing authors no `salvageCraftingCheck`
-    // at all, which is exactly that pair — `(mode: 'simple', checkUsable: false)`.
+    // formula, so every result is recovered outright.
     steps: [
       { selector: '.inventory-filters input', fill: 'Longsword' },
       {
@@ -13090,10 +9146,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: ['player-salvage-tools'],
     reaches: 'exact',
     query: { tab: 'inventory' },
-    // The pre-roll required-tool disclosure with BOTH states in one frame: the Forge Tongs the
+    // The pre-roll required-tool disclosure with both states in one frame: the Forge Tongs the
     // target actor holds (available) and the Anvil it does not (unavailable), which also disables
-    // the pre-roll action. Availability is scoped to the target salvage actor, so this card is
-    // stocked on the mule rather than on the smith who owns the whole toolset.
+    // the pre-roll action.
     steps: [
       { selector: '.inventory-filters input', fill: 'Field Toolchest' },
       {
@@ -13114,10 +9169,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: ['player-inventory-multi-system'],
     reaches: 'exact',
     query: { tab: 'inventory' },
-    // One physical stack registered as a component in TWO systems must collapse to a SINGLE card
+    // One physical stack registered as a component in two systems must collapse to a single card
     // counted once, carrying the system-selector drop-down that re-scopes the whole detail body.
-    // Both halves of the Air Shard declare the same `originItemUuid`, which is the collapse key,
-    // and both are salvageable so each option carries its affordance suffix.
     steps: [
       { selector: '.inventory-filters input', fill: 'Air Shard' },
       {
@@ -13135,25 +9188,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     id: 'player-salvage-misconfigured',
     label: 'Player app — Salvage misconfigured',
     smokeLabels: ['player-salvage-misconfigured'],
-    // WINDOW, not exact, and the gap is specific: this frame renders the misconfigured salvage
-    // body for the `routedNoFormula` reason, where the smoke's counterpart renders it for
-    // `simpleMultiGroup`. The body dispatches on that reason and its copy differs.
-    //
-    // The Simple reason is unreachable from FIXTURE DATA twice over, which is why no amount of
-    // authoring closes it:
-    //
-    //   1. `_normalizeSalvage`'s Simple success-first retain-one clamp runs on every save AND
-    //      inside `initialize()`, so a planted multi-group Simple config self-heals before
-    //      anything can render it.
-    //   2. Even past the clamp, `InventoryListingBuilder` hard-hides a `simpleMultiGroup`
-    //      component from a NON-GM viewer through `hiddenEntityIds` — and every player frame
-    //      renders as a non-GM viewer by design.
-    //
-    // The smoke reaches it by pushing a surplus result group onto the live, already-normalized
-    // system in memory after boot and remounting the tab. That is a `call`-style hook in the lab's
-    // boot sequence (`tests/view-lab/world/labWorld.js`), not a fixture. Until then this proves
-    // the panel's misconfigured PATH — and `routedNoFormula` is the one misconfiguration a
-    // persisted world can actually hold.
+    // Window, not exact, and the gap is specific: this frame renders the misconfigured salvage body
+    // for the `routedNoFormula` reason, where the smoke's counterpart renders it for
+    // `simpleMultiGroup`.
     reaches: 'window',
     query: { tab: 'inventory' },
     steps: [
@@ -13170,43 +9207,15 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/stores\/inventoryStore/,
     ],
   }),
-  // ─── Bulk salvage / bulk destroy (issue 859) ──────────────────────────────────────────────────
-  //
-  // Every card named below sits on PAGE ONE of the 25-per-page grid, verified by rendering rather
+  // Every card named below sits on page one of the 25-per-page grid, verified by rendering rather
   // than inferred: the listing sorts A→Z over the whole roster, so page-1 membership is fragile and
-  // is exactly what the six existing inventory cases narrow with a search box to avoid. A search
-  // filter cannot be used here — bulk selection needs SEVERAL cards on screen at once, and a filter
-  // narrow enough to guarantee one card's position removes the others. Page size is the fallback if
-  // that ever stops holding (`chooseSelectOption` on the grid pager's `[data-pagination-size]` at
-  // `'75'`, which the five cases below already do), and no case needs it today.
-  //
-  // ONE STATE THIS SET DELIBERATELY DOES NOT PHOTOGRAPH, recorded here rather than left as an
-  // unexplained absence:
-  //
-  //   - `running`. The lab's `Roll` is seeded and SYNCHRONOUS, so a run completes before the frame
-  //     is taken. Reaching it would need a harness hook that stalls the `salvageComponents` seam
-  //     mid-run. Its markup is pinned by a mounted component test instead. (It is visible BEHIND
-  //     the standing prompt in `player-inventory-bulk-roll-prompt`, which is incidental.)
-  //
-  // The other two absences this comment used to record — a broken-but-salvageable QUEUE row and the
-  // post-run REPORT — were fixture gaps, not design decisions, and both are now captured below.
-  // Each needed one change in `tests/view-lab/world/labActors.js`: the queue row needed something in
-  // the world that is broken AND salvageable at once (`BROKEN_STACKS`), and the report needed a run
-  // that can COMPLETE — every salvageable stack here is a single unit, so the engine's consume step
-  // always takes its `item.delete()` branch and the duck-typed item had no such method
-  // (`installDeleteSemantics`), which failed every subject with an error.
+  // is exactly what the six existing inventory cases narrow with a search box to avoid.
   playerCase({
     ...BULK_DEFAULTS,
     id: 'player-inventory-bulk-mixed',
     label: 'Player app — Inventory bulk selection (mixed)',
-    // THE HEADLINE FRAME: one plain click, then three shift-clicks, and the panel partitions the
+    // The headline frame: one plain click, then three shift-clicks, and the panel partitions the
     // result into a queue, a best-case yield and a blocked list.
-    //
-    // The four cards are chosen so the frame carries every partition rule at once rather than one
-    // per frame: Air Shard is salvageable and multi-system (so its row names the ACTING system),
-    // Cracked Alembic is progressive (so it can only ever be Possible), Bent Clasp is blocked on a
-    // GM misconfiguration and Field Toolchest on a missing tool — the two blocked reasons whose
-    // copy differs most.
     steps: [
       // PLAIN, not shift: this is the card the first shift-click must PROMOTE. Selecting it here
       // is what makes the promotion assertion below mean something.
@@ -13215,24 +9224,9 @@ export const VIEW_LAB_CASES = Object.freeze([
       SHIFT_CLICK('lab-jewelry:jw-bent-clasp'),
       SHIFT_CLICK('lab-smithing:sm-toolchest'),
     ],
-    // ONE selector carrying TWO assertions, because the driver takes one and the frame has to
+    // One selector carrying two assertions, because the driver takes one and the frame has to
     // answer for both. Scoped to the app root, which is the only common ancestor of the grid and
-    // the panel:
-    //
-    //   1. THE PROMOTION. The plain-clicked card must carry the bulk-selected marker. It is in the
-    //      selection only because the first shift-click pulled it in, so a promotion that stopped
-    //      working would publish a three-card selection under a case whose count line says four —
-    //      and every other assertion here would still pass.
-    //   2. BOTH CERTAINTIES in the yield aggregate. The preview's whole job is to distinguish what
-    //      the batch WILL return from what it MIGHT, and a rule that collapsed one into the other
-    //      renders a plausible list of the wrong colour.
-    //
-    // What it deliberately does NOT assert is the routed "up to" affix. That affix needs a
-    // component name whose aggregate is `0 < guaranteed < quantity`, and no lab selection produces
-    // one: the guaranteed set here is {Whetstone} and the possible set is {Empty Vial, Ground
-    // Reagent, Frostcap Mushroom}, which do not intersect — and the world's only ROUTED salvage
-    // config (`rw-slag`) is deliberately held by nobody. Stated rather than asserted, because a
-    // selector for an element the fixtures cannot produce is a case that can never be captured.
+    // the panel.
     expectSelector:
       '.fabricate-app-shell' +
       `:has(${CARD('lab-smithing:sm-air-shard')}[data-inventory-card-bulk-selected="true"])` +
@@ -13243,13 +9237,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     ...BULK_DEFAULTS,
     id: 'player-inventory-bulk-mixed-narrow',
     label: 'Player app — Inventory bulk selection (narrowest window)',
-    // The same selection at the NARROWEST window the app permits. `SvelteFabricateApp` clamps to
-    // `MIN_WINDOW_WIDTH = 1024` in `_updatePosition`, which both `setPosition()` and a drag-resize
-    // go through, so this is the real floor rather than a chosen size — 900 is refused by the
-    // harness's own geometry gate before anything renders.
-    //
-    // `.inventory-view-container` measures roughly 938px inside the supported 1024px floor, so the
-    // shared 960px query now stacks this frame and the computed-layout expectation proves it.
+    // The same selection at the narrowest window the app permits.
     steps: [
       { selector: CARD_BUTTON('lab-smithing:sm-air-shard') },
       SHIFT_CLICK('lab-herbalism:hb-cracked-alembic'),
@@ -13268,16 +9256,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     ...BULK_DEFAULTS,
     id: 'player-inventory-bulk-none-salvageable',
     label: 'Player app — Inventory bulk selection with nothing salvageable',
-    // The EMPTY state, and the only frame that proves the footer's asymmetry: Salvage is withheld
+    // The empty state, and the only frame that proves the footer's asymmetry: Salvage is withheld
     // because there is nothing to salvage, while Destroy stays live because destroy is not gated on
     // salvageability at all — it deletes whole stacks including blocked rows.
-    //
-    // Three ordinary stacks carrying no salvage config, across two systems, with the Empty Vial
-    // also backing a herbalism TOOL so the grid selection is not three interchangeable ore cards.
-    // The `essence` and `recipeItem` reasons would have made a richer list and are NOT reachable
-    // from a case: `view-lab-fixture-identifiers.test.js` validates every `data-inventory-card`
-    // value against a set built as `<system>:<component>`, which the two composite card kinds
-    // (`essence:…`, `recipeitem:…`) are not in. They are covered by the store's own unit tests.
     steps: [
       { selector: CARD_BUTTON('lab-smithing:sm-coal') },
       SHIFT_CLICK('lab-smithing:sm-copper-ore'),
@@ -13292,21 +9273,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       ':has([data-inventory-bulk-salvage][disabled])' +
       ':has([data-inventory-bulk-destroy]:not([disabled]))',
   }),
-  // ONE FRAME PER SALVAGE RESOLUTION MODE, plus one carrying all three at once.
-  //
-  // The mode is a property of the SYSTEM, not the component, so each of these selects from a
-  // different crafting system: Karrun Forgecraft is `simple` (and authors no salvage check at
-  // all, so it is the no-roll case), Ashfall Runework is `routed`, Sablewright Herbalism is
-  // `progressive`. Sablewright Jewellers is also routed but authors no check — that is the
-  // MISCONFIGURED fixture, covered by `player-salvage-misconfigured`, and it is deliberately
-  // not one of these.
-  //
-  // A single shift-click is a legal one-row bulk selection (the promotion only fires when a
-  // DIFFERENT card is already inspected), which is what lets each mode be shown alone rather
-  // than competing with two others in the same queue.
-  //
-  // Each raises the page size first: the grid is 25 per page and these cards are spread across
-  // the alphabet, so page-one membership is not something to assume.
+  // One frame per salvage resolution mode, plus one carrying all three at once.
   playerCase({
     ...BULK_DEFAULTS,
     id: 'player-inventory-bulk-mode-simple',
@@ -13342,28 +9309,8 @@ export const VIEW_LAB_CASES = Object.freeze([
       ...chooseSelectOption('.inventory-grid-pagination [data-pagination-size]', '75'),
       SHIFT_CLICK('lab-herbalism:hb-cracked-alembic'),
     ],
-    // Progressive is the one mode that honours a player's saved stage order, so this is also
-    // the frame that carries the footer's reorder note.
-    //
-    // AND THE "WHAT COULD GO WRONG" BLOCK (issue 1286), asserted here rather than in a case of
-    // its own. The block renders whenever a queued entry publishes a forecast, and the Cracked
-    // Alembic's stages produce Ground Reagent and Frostcap Mushroom — the world's two
-    // complication-bearing components — so this frame already draws it. A separate case would
-    // have repeated these steps exactly and published the same PNG twice.
-    //
-    // THE POSITIONS ARE PINNED BY VALUE, and the gap between them is the claim. `position`
-    // counts EVERY stage in the player's order, not the complication-bearing ones: the alembic's
-    // authored stages are Empty Vial (1, authors none), Ground Reagent (2) and Frostcap Mushroom
-    // (3), so the rows are numbered 2 and 3 with 1 absent. A dense 1..N would name rows the
-    // single-item panel does not have, and only a value assertion can tell the two apart.
-    //
-    // THE ORDER NOTE IN ITS MIDDLE STATE, and the value is asserted rather than the presence.
-    // Nothing has reordered this list, so a player who MAY arrange it and has not is reading the
-    // GM's order — but not a pinned one, which this very frame proves is granted (the footer's
-    // own reorder note is above). `arrangeable` is that third state: the card names the GM as the
-    // order's author AND the affordance that replaces it, because `orderIsPlayers` alone is FALSE
-    // here and a card saying nothing would leave the numbers below counting against an order it
-    // never named. The `players` half is `player-inventory-bulk-complications-reordered`.
+    // Progressive is the one mode that honours a player's saved stage order, so this is also the
+    // frame that carries the footer's reorder note.
     expectSelector:
       '[data-inventory-bulk-panel="preview"]' +
       ':has([data-inventory-bulk-queue-row="lab-herbalism:hb-cracked-alembic"])' +
@@ -13383,10 +9330,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     ...BULK_DEFAULTS,
     id: 'player-inventory-bulk-all-modes',
     label: 'Player app — Inventory bulk salvage across all three resolution modes',
-    // One of each, in one queue, across three systems — the case the other three exist to be
-    // read against. It is also the only frame where the aggregate yield sums contributions
-    // from three differently-resolved ladders, which is where same-named components from
-    // different systems would collapse if the preview keyed on name rather than id.
+    // One of each, in one queue, across three systems — the case the other three exist to be read
+    // against.
     steps: [
       ...chooseSelectOption('.inventory-grid-pagination [data-pagination-size]', '75'),
       SHIFT_CLICK('lab-smithing:sm-longsword'),
@@ -13399,56 +9344,14 @@ export const VIEW_LAB_CASES = Object.freeze([
       ':has([data-inventory-bulk-queue-row="lab-runework:rw-slag"])' +
       ':has([data-inventory-bulk-queue-row="lab-herbalism:hb-cracked-alembic"])',
   }),
-  // THE ONE COMPLICATION STATE NO EXISTING FRAME REACHES (issue 1286).
-  //
-  // Every other player complication surface this feature ships is already photographed, because
-  // both progressive bodies pass the band on every render and the bulk block draws itself
-  // whenever a queued entry publishes a forecast — so `player-salvage`,
-  // `player-crafting-progressive*` and `player-inventory-bulk-mode-progressive` all show the new
-  // markup and now assert it. The forecast NUMBERED AGAINST THE PLAYER'S OWN ORDER is the
-  // exception: it needs a stage list the player has actually rearranged, and no case had ever
-  // moved a SALVAGE stage.
+  // The one complication state no existing frame reaches (issue 1286).
   playerCase({
     ...BULK_DEFAULTS,
     id: 'player-inventory-bulk-complications-reordered',
     label: 'Player app — Inventory bulk complications, reordered stage list',
-    // The order note and the renumbering are ONE fact and are photographed together, because
-    // neither means anything alone: the note is the sentence that makes the numbers readable
-    // ("the roll walks the list in this order"), and the numbers are what the sentence is about.
-    //
-    // The sequence: inspect the Cracked Alembic, open its salvage panel, move its FIRST stage
-    // down one, then shift-click a second card to enter a bulk selection — which promotes the
-    // inspected card into it, so the queue holds both.
-    //
-    // The move is what makes the provenance `players`. It is derived from the rendered order
-    // DIFFERING from the authored one, never from `allowPlayerResultReorder`: a player who may
-    // arrange the list and has not is reading the GM's, and `player-inventory-bulk-mode-progressive`
-    // is the frame that pins that permission alone leaves the card in its `arrangeable` state.
-    //
-    // ONE GROUP, so this frame shows the `players` state alone rather than beside a GM-ordered
-    // one. The second queued card is the Air Shard, which salvages under SMITHING — `simple`, no
-    // stages, and therefore no forecast and no card. A frame holding both provenances at once is
-    // unreachable in this world for the fixture reason spelled out below, so the per-card claim
-    // is carried by the mounted suite instead.
-    //
-    // The renumbering is the assertion, and it is arithmetic rather than decoration. Authored,
-    // the alembic's stages are Empty Vial (1), Ground Reagent (2), Frostcap Mushroom (3) and the
-    // complication rows sit at 2 and 3. After the first stage moves down the order is Ground
-    // Reagent, Empty Vial, Frostcap Mushroom — so the SAME two rows are numbered 1 and 3, the gap
-    // has moved to 2, and a block that had re-derived its positions from its own row list rather
-    // than reading them off the entry would print 1 and 2 both before and after.
-    //
-    // The Air Shard is the second card for the reason `player-inventory-bulk-report` picks it: it
-    // is salvageable and page-one, and it salvages under SMITHING, which is `simple` and has no
-    // stages at all. So the queue is two rows and the block is exactly ONE group — which is also
-    // the strongest available claim that the block groups by queued ENTRY rather than by queue
-    // row. A two-group frame is unreachable and that is a fixture fact rather than an oversight:
-    // progressive is a per-SYSTEM mode, herbalism is the world's only progressive system, and it
-    // holds exactly two salvageable components — this one, and the Air Shard's herbalism half,
-    // which is never the acting participation of the collapsed multi-system card.
-    //
-    // NO PAGE-SIZE STEP, deliberately: both of these cards are page-one at the default 25, which
-    // `player-inventory-bulk-roll-prompt` and `-report` already rely on with the same pair.
+    // The order note and the renumbering are one fact and are photographed together, because
+    // neither means anything alone: the note is the sentence that makes the numbers readable ("the
+    // roll walks the list in this order"), and the numbers are what the sentence is about.
     steps: [
       { selector: CARD_BUTTON('lab-herbalism:hb-cracked-alembic') },
       { selector: '.inventory-detail-tab[data-inventory-detail-tab="salvage"]' },
@@ -13470,16 +9373,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     ...BULK_DEFAULTS,
     id: 'player-inventory-bulk-tools-blocked',
     label: 'Player app — Inventory bulk selection blocked on missing tools',
-    // `toolsUnavailable` is the one blocked reason a player can ACT on, and the only one whose copy
+    // `toolsUnavailable` is the one blocked reason a player can act on, and the only one whose copy
     // is data-driven — "Needs {tools}", filled from the row's own missing-tool names through a
-    // locale-correct list format rather than a hand-joined comma list. It is worth its own frame
-    // beside `-mixed` because there it competes with a second blocked row: here it is the only one,
-    // above a queue that is still running, which is the other half of the claim (a blocked row
-    // skips itself; it does not stop the batch).
-    //
-    // The Field Toolchest is stocked on Vosk, who carries the tongs its salvage names and not the
-    // anvil — tool availability is scoped to the target salvage actor, so this is the one card in
-    // the world that can reach the reason.
+    // locale-correct list format rather than a hand-joined comma list.
     steps: [
       { selector: CARD_BUTTON('lab-smithing:sm-toolchest') },
       SHIFT_CLICK('lab-smithing:sm-air-shard'),
@@ -13494,97 +9390,47 @@ export const VIEW_LAB_CASES = Object.freeze([
     ...BULK_DEFAULTS,
     id: 'player-inventory-bulk-roll-prompt',
     label: 'Player app — Inventory bulk roll prompt',
-    // ONE prompt for the whole batch — the answer to the issue's own open question, and the state
-    // acceptance 4 is about. `dialog: 'open'` leaves it standing and unanswered, which is the only
-    // way to photograph one: the lab's default `enter` presses the footer's default button and the
-    // dialog is gone long before the capture.
-    //
-    // The batch prompts at all only because the Cracked Alembic's system authors a usable
-    // progressive salvage formula — the service computes `anyCheckUsable` and never opens a modal
-    // when nothing in the selection could roll. The Air Shard beside it salvages under smithing,
-    // which authors no salvage check, so the frame is also the honest picture of a MIXED batch:
-    // one prompt covering an item that rolls and an item that does not.
+    // One prompt for the whole batch — the answer to the issue's own open question, and the state
+    // acceptance 4 is about.
     query: { tab: 'inventory', dialog: 'open' },
     steps: [
       { selector: CARD_BUTTON('lab-herbalism:hb-cracked-alembic') },
       SHIFT_CLICK('lab-smithing:sm-air-shard'),
       { selector: '[data-inventory-bulk-salvage]' },
     ],
-    // Held to the PROMPT's own element, never to the tab. A dialog is a SIBLING of the application
-    // window, so `expectTab` is satisfied by an inventory tab with nothing over it — which is
-    // exactly the screen a prompt that never opened would publish. The subject strip is what
-    // distinguishes the bulk dialog from the single-subject one: `promptCheckRoll` renders no
-    // `__subjects` at all, so this cannot be satisfied by the wrong prompt either.
+    // Held to the prompt's own element, never to the tab.
     expectSelector: '.application.dialog .fabricate-roll-prompt__subjects',
-    // It keeps the shared inventory `sourceMatches` and does NOT add
-    // `apps/crafting/rollPrompt.js`, which builds the dialog. Declaring it would be more accurate
-    // as a mapping — but `view-lab-cases.test.js` treats any case matching `apps/crafting` as a
-    // CRAFTING case and pins their number, so an inventory case reaching into that folder is
-    // counted as one and the census fails. `player-crafting-roll-prompt` already claims the file,
-    // so the change still selects a frame of a roll prompt; it selects the single-subject one.
+    // It keeps the shared inventory `sourceMatches` and does not add `apps/crafting/rollPrompt.js`,
+    // which builds the dialog.
   }),
   playerCase({
     ...BULK_DEFAULTS,
     id: 'player-inventory-bulk-destroy-confirm',
     label: 'Player app — Inventory bulk destroy confirmation',
-    // The confirmation for the destructive half, standing unanswered. It names BOTH numbers — the
-    // component count and the unit count — because destroy takes whole stacks, and "3 components"
-    // alone would hide how much is actually about to go. The second paragraph is the consequence
-    // sentence that could not fit a button label, which is the whole reason this action confirms
-    // through a dialog rather than an armed button.
+    // The confirmation for the destructive half, standing unanswered.
     query: { tab: 'inventory', dialog: 'open' },
     steps: [
       { selector: CARD_BUTTON('lab-herbalism:hb-cracked-alembic') },
       SHIFT_CLICK('lab-smithing:sm-air-shard'),
       { selector: '[data-inventory-bulk-destroy]' },
     ],
-    // Same failure mode as the roll prompt, and the same answer: hold it to the confirm's own COPY.
-    // `p + p` is the two-paragraph body — the removal sentence and the "nothing is recovered"
-    // rule — under a yes/no button pair, which no other dialog reachable from this tab renders.
+    // Same failure mode as the roll prompt, and the same answer: hold it to the confirm's own copy.
     expectSelector: '.application.dialog:has(button[data-action="yes"]) .dialog-content p + p',
   }),
   playerCase({
     ...BULK_DEFAULTS,
     id: 'player-inventory-bulk-broken-queued',
     label: 'Player app — Inventory bulk broken but salvageable',
-    // ACCEPTANCE 3, and the most-argued behaviour in the whole feature: brokenness is about
-    // USABILITY and does not gate salvage, so a broken row belongs in the QUEUE beside its
-    // certainty chip and not in the blocked list. `bulkBlockedReasonFor` omits `broken` on purpose;
-    // this is the frame that shows it was omitted on purpose rather than by oversight.
-    //
-    // The Longsword is the world's one broken stack (`BROKEN_STACKS` in `labActors.js`, which
-    // records why it and not another). Smithing authors no salvage check, so its row carries a
-    // GUARANTEED chip — and the danger chip sits beside that rather than replacing it, which is the
-    // arrangement the assertion below is built to be the only match for.
-    //
-    // The Cracked Alembic is plain-clicked first for two reasons: a shift-click is what ENTERS a
-    // bulk selection at all, and its row is the unbroken, rolled control the broken one is read
-    // against — two rows, two certainties, one danger chip. Name-sorted, so it renders above.
-    //
-    // THE ONLY CASE IN THE SET THAT PAGES, and the reason is measured rather than assumed: the grid
-    // sorts A→Z over all 50 cards at 25 per page, and the Longsword sorts 31st — page TWO. Every
-    // other bulk case's cards happen to sit on page one, which is why the block comment above names
-    // this exact step as the standing fallback. Raising the page size is preferred over navigating
-    // to page two because the only OTHER salvageable card there is none: the world's four remaining
-    // salvage configs all sort onto page one, so a page-two selection could pair the broken row
-    // with nothing but blocked ones, and the unbroken queue row this frame reads against would be
-    // unreachable. It is the first step so the two card clicks land on a settled grid.
+    // Acceptance 3, and the most-argued behaviour in the whole feature: brokenness is about
+    // usability and does not gate salvage, so a broken row belongs in the queue beside its
+    // certainty chip and not in the blocked list.
     steps: [
       ...chooseSelectOption('.inventory-grid-pagination [data-pagination-size]', '75'),
       { selector: CARD_BUTTON('lab-herbalism:hb-cracked-alembic') },
       SHIFT_CLICK('lab-smithing:sm-longsword'),
     ],
-    // ONE queue row carrying BOTH pills, which is the whole claim in one selector. The three ways
-    // this could go wrong each publish a plausible screen that a looser selector accepts:
-    //   - the row falls into the blocked list (`[data-inventory-bulk-blocked-row]`), which is the
-    //     regression this behaviour is most likely to grow, and any panel-level selector matches
-    //     the resulting frame;
-    //   - the danger chip REPLACES the certainty chip instead of joining it, which a selector
-    //     naming only the danger pill matches;
-    //   - the danger chip renders elsewhere in the panel — the report's `failed` outcome pill is
-    //     the same tone — which a bare `.manager-chip.is-danger` matches.
-    // Requiring both pills on the same `[data-inventory-bulk-queue-row]` refuses all three. Only a
-    // queued, guaranteed, broken row can satisfy it.
+    // One queue row carrying both pills, which is the whole claim in one selector. The three ways
+    // this could go wrong each publish a plausible screen that a looser selector accepts.
     expectSelector:
       '[data-inventory-bulk-panel="preview"]' +
       ' [data-inventory-bulk-queue="preview"]' +
@@ -13599,27 +9445,12 @@ export const VIEW_LAB_CASES = Object.freeze([
     // What a finished batch says it did — the state the whole panel exists to arrive at, and the
     // only one that shows a per-item outcome, a per-item rolled total, and the two aggregates
     // ("added to your pack" / "not recovered") the player actually reads.
-    //
-    // The SAME two cards as `player-inventory-bulk-roll-prompt`, minus its `dialog: 'open'`. That
-    // pairing is deliberate: the two frames are the same batch either side of one gesture, so the
-    // report can be read as the answer to the prompt above it. The lab's default dialog answer is
-    // `enter`, which presses the button Foundry marks default — Roll, for a check prompt — so the
-    // batch proceeds and the panel lands on its report without the case doing anything special.
-    // (`confirmDialog` defaults to **No**, which is why the destroy half cannot be photographed
-    // this way and is not attempted here.)
-    //
-    // It is also a MIXED batch by construction, which is the interesting report rather than the
-    // trivial one: `view-lab-roll.test.js` pins that exactly one of these two subjects has a usable
-    // salvage check, so one row can carry a rolled total and one cannot.
     steps: [
       { selector: CARD_BUTTON('lab-herbalism:hb-cracked-alembic') },
       SHIFT_CLICK('lab-smithing:sm-air-shard'),
       { selector: '[data-inventory-bulk-salvage]' },
     ],
-    // The panel STATE plus the report's own subject list. The state alone is not enough: the panel
-    // reports `report` for a run that threw as well as one that ran, and an error report renders a
-    // banner over no subjects at all. Naming the subject list means the frame has to contain the
-    // per-item outcomes it is published for.
+    // The panel state plus the report's own subject list.
     expectSelector:
       '[data-inventory-bulk-panel="report"] [data-inventory-bulk-subjects] [data-inventory-bulk-subject]',
   }),
@@ -13630,10 +9461,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     reaches: 'exact',
     query: { tab: 'gathering' },
     // The counterpart's own sequence — select an environment, open the Events tab, wait on
-    // `[data-gathering-event-section]` — on the world's only environment that HAS an Events tab.
-    // The tab is mounted only at the `full` event-visibility tier, which smithing alone carries
-    // (see `systemRules` in `world/labContent.js`): the fixture previously authored an invalid
-    // `'gm'` tier that resolved to the restrictive default, so the tab existed nowhere.
+    // `[data-gathering-event-section]` — on the world's only environment that has an Events tab.
     steps: [
       { selector: '.gathering-env-card[data-environment-id="sm-env-mine"]' },
       { selector: '[data-gathering-detail-tab="events"]' },
@@ -13647,10 +9475,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: ['player-gathering-task-ready'],
     reaches: 'exact',
     query: { tab: 'gathering' },
-    // The counterpart's condition is a selected task whose attempt is NOT blocked
-    // (`[data-gathering-attempt-blocked="false"]`). Frostmark Ridge rather than the default
-    // Sunlit Grove: the grove links a scene, so every task there is SCENE_TOKEN_BLOCKED for an
-    // actor with no token on it.
+    // The counterpart's condition is a selected task whose attempt is not blocked
+    // (`[data-gathering-attempt-blocked="false"]`).
     steps: [
       { selector: '.gathering-env-card[data-environment-id="hb-env-ridge"]' },
       { selector: '.gathering-task-row[data-task-id="hb-task-ridgemoss"] .gathering-task-summary' },
@@ -13662,20 +9488,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     id: 'player-gathering-after-success',
     label: 'Player app — Gathering after success',
     smokeLabels: ['player-gathering-after-success'],
-    // The gather runs end to end and the frame SAYS SO: "Nodes available: 2/3" against the ready
+    // The gather runs end to end and the frame says so: "Nodes available: 2/3" against the ready
     // state's 3/3, from a run the manager recorded as `succeeded`. Verified live.
-    //
-    // Old Karrun Mine rather than the ridge every other gathering case uses, and that is the
-    // substance of this entry rather than a detail. A resolved, non-timed gather leaves NO mark on
-    // the gathering surface unless the system runs a resource economy — no node pool and no
-    // stamina means the same environment, the same rows and the same inspector before and after,
-    // so the frame would be a duplicate of `player-gathering-task-ready` under a second name,
-    // which is worse than an honest window-reach frame. The mine is the one gathering environment
-    // that carries a live pool, because it is the one no other captured frame reads: switching
-    // herbalism's economy on would have put a node line into all five herbalism gathering frames.
-    //
-    // The pool depletes `onSuccess`, so the count is evidence of the SUCCESS and not merely of the
-    // attempt. See `sm-task-prospect` in `world/labContent.js`.
     reaches: 'exact',
     query: { tab: 'gathering' },
     steps: [
@@ -13692,10 +9506,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: ['player-gathering-tool-blocked'],
     reaches: 'exact',
     query: { tab: 'gathering' },
-    // A selected task whose attempt IS blocked, on the tool reason specifically: Cut Icecap
-    // Fronds requires the herbalist's glass alembic, and the gathering actor is the smith who
-    // carries none of Idrin's glassware. The row shows the missing-tools callout chip and the
-    // attempt renders `[data-gathering-attempt-blocked="true"]`.
+    // A selected task whose attempt is blocked, on the tool reason specifically: Cut Icecap Fronds
+    // requires the herbalist's glass alembic, and the gathering actor is the smith who carries none
+    // of Idrin's glassware.
     steps: [
       { selector: '.gathering-env-card[data-environment-id="hb-env-ridge"]' },
       { selector: '.gathering-task-row[data-task-id="hb-task-icecap"] .gathering-task-summary' },
@@ -13709,9 +9522,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: ['player-gathering-timed-ready'],
     reaches: 'exact',
     query: { tab: 'gathering' },
-    // A TIMED task before it has been started: attempt unblocked, and the requirements panel
-    // names the six hours the attempt will wait rather than resolving on the spot. The pair with
-    // `player-gathering-timed-active` below is the whole point of the timed path.
+    // A timed task before it has been started: attempt unblocked, and the requirements panel names
+    // the six hours the attempt will wait rather than resolving on the spot.
     steps: [
       { selector: '.gathering-env-card[data-environment-id="hb-env-ridge"]' },
       { selector: '.gathering-task-row[data-task-id="hb-task-slowbloom"] .gathering-task-summary' },
@@ -13725,11 +9537,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: ['player-gathering-timed-active'],
     reaches: 'exact',
     query: { tab: 'gathering' },
-    // The SAME task after its attempt has been started. A timed attempt creates a waiting run
-    // instead of resolving, so the row flips to blocked on DUPLICATE_ACTIVE_RUN and the attempt
-    // reads `[data-gathering-attempt-blocked="true"]` — reached by actually pressing Attempt, as
-    // the counterpart does, not by planting a run. The timed start posts no chat card, so it
-    // clears the console-error gate that still holds `player-gathering-after-success`.
+    // The same task after its attempt has been started.
     steps: [
       { selector: '.gathering-env-card[data-environment-id="hb-env-ridge"]' },
       { selector: '.gathering-task-row[data-task-id="hb-task-slowbloom"] .gathering-task-summary' },
@@ -13756,12 +9564,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: ['player-gathering-realm-locked'],
     reaches: 'exact',
     query: { tab: 'gathering' },
-    // The one environment-card state selection cannot reach: a locked teaser, greyed, with the
-    // lock overlay and the "not in current realm" header alert. The Deepvault requires a realm
-    // nobody is in, so the listing answers NO_CURRENT_REALM and returns identity only. It sorts
-    // last, so scroll it into view — `frame.screenshot()` does not scroll nested overflow
-    // containers, and a card that never scrolled in is simply absent from the frame while every
-    // assertion still passes.
+    // The one environment-card state selection cannot reach: a locked teaser, greyed, with the lock
+    // overlay and the "not in current realm" header alert.
     steps: [{ selector: '.gathering-env-card.is-locked', scroll: true }],
     kinds: ['player', 'gathering'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/gathering\//],
@@ -13790,10 +9594,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [CRAFTING_SHARED, /^src\/ui\/svelte\/stores\/craftingStore/],
   }),
   // The Crafting header withholds "Ready to craft" and leads the blocking callout with the
-  // authority's own reason. `ledger-missing` is unreachable now that the ledger is provisioned
-  // automatically, but `active-gm-missing`, `recovery-required` and `claim-held` all still
-  // happen, and before this the header said Ready and then failed. The lab reaches the state by
-  // withholding the ledger, which `labWorld.js` keys on `journalCaseState` for ANY tab.
+  // authority's own reason.
   playerCase({
     id: 'player-crafting-authority-blocked',
     label: 'Player app — Crafting blocked by the run authority',
@@ -13815,28 +9616,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Player app — Crafting category filter list',
     smokeLabels: [],
     reaches: 'beyond',
-    // THE FULL-WIDTH PANEL, and the only player option list with a SENTINEL row (issue 1511).
-    // Every other converted player trigger hugs its own value; this one spans the browse column,
-    // so it is the single frame in which the caller's own `maxWidth` is doing work — without it
-    // the panel drops at the `inline` rung's 240px ceiling under a trigger far wider than that,
-    // which is the defect the primitive's own band table records.
-    //
-    // `__unchanged__` is the handle the empty-string "All categories" row carries. It is the row a
-    // driver most needs to be able to click and the one a truthiness test would leave unaddressed,
-    // so asserting it here is what keeps the sentinel's identity handle photographed rather than
-    // merely unit-tested.
-    //
-    // ONE WIDTH, AND THE OTHER END OF THE RANGE IS ACCEPTED IN WRITING RATHER THAN PHOTOGRAPHED.
-    // At 1100px the browse column is the grid's `minmax(280px, 1fr)` left track; at the supported
-    // 1024px window floor `CraftingView` reflows to a single ~906px column, so the trigger and
-    // therefore this panel span it. That is not a second BEHAVIOUR to photograph, it is the same
-    // one at a wider trigger: `anchoredPopover` resolves `clamp(max(triggerWidth, minWidth),
-    // minWidth, maxWidth)` and writes the answer as a width and as both bounds, and the caller's
-    // ceiling is set above both ends of that range for exactly this reason (see
-    // `FILTER_PANEL_MAX_WIDTH` in `RecipeBrowser.svelte`). The resolution is measured in Chromium
-    // by `tests/components/select-popover-width.test.js` and the wiring — that dropping the
-    // ceiling reds — by `tests/components/recipe-browser-mounted.test.js`, so a 1024px sibling
-    // frame would depict the layout's reflow rather than anything about this control.
+    // The full-width panel, and the only player option list with a sentinel row (issue 1511).
     query: { tab: 'crafting' },
     position: { width: 1100, height: 760 },
     steps: [{ selector: '[data-crafting-category-filter]' }],
@@ -13854,51 +9634,18 @@ export const VIEW_LAB_CASES = Object.freeze([
   playerCase({
     id: 'player-crafting-sources-picker',
     label: 'Player app — Crafting component sources picker',
-    // THE PANEL TWENTY-SEVEN FRAMES CLAIM AND NONE OPENS (issue 1513). `ComponentSourcesBar` is
-    // matched by `CRAFTING_SHARED`, so every crafting case reports SATISFIED for a change to it —
-    // and in all twenty-seven the picker is CLOSED, because no case's steps have ever named
-    // `data-crafting-sources-add`. That is the View Lab's quieter false positive: a case that
-    // NAMES the changed file computes its expectation from the same selection the pattern
-    // produced, so the evidence set looks fuller than an unregistered window's while showing none
-    // of the state that moved.
-    //
-    // The twenty-seven claims are NOT narrowed by this case. The closed avatar row is honestly
-    // drawn in all of them and the change that follows moves it too; this frame is the state they
-    // cannot reach, not a correction to what they show.
-    //
-    // ONE STEP, and it is the trigger. The panel's options are `store.available`, which resolves
-    // through the same `getBarSelectableActors` the actor bar's own picker lists — the picker
-    // `player-actor-picker` photographs with rows in it — so this panel opens over a populated
-    // list rather than over its no-owned-actors line.
-    //
-    // `reaches: 'beyond'`, `smokeLabels: []`: the live smoke opens no sources picker, so there is
-    // no counterpart to fall short of, and a `beyond` case must claim zero labels.
+    // The panel twenty-seven frames claim AND none opens (issue 1513).
     reaches: 'beyond',
     smokeLabels: [],
     query: { tab: 'crafting' },
     steps: [{ selector: '[data-crafting-sources-add]' }],
-    // THE PORTALED FORM, as of the phase that routed this control onto the shared picker. The
-    // panel was a `position: absolute` child of the bar and this selector began
-    // `[data-crafting-sources]`; it is now `SearchablePopover`'s panel, portaled to the
-    // application root and therefore OUTSIDE the bar's subtree entirely, so an ancestor-scoped
-    // assertion could not match it and would fail the capture WHOLE rather than publish. What
-    // survives the move is the caller's own two hooks: `popoverClass` puts
-    // `crafting-sources-popover` on the portaled panel and `optionClass` puts
-    // `crafting-source-option` on the primitive's row, so the frame still asserts THIS panel
-    // rather than whichever picker happens to be open.
-    //
-    // AND IT TAKES `...ANCHORED_POPOVER_SOURCES` NOW, which it deliberately did not before. The
-    // panel is measured, clamped and portaled by that seam from this commit forward, so a
-    // regression in the pass is visible here — which is the membership test the array's own
-    // failure text states, read the right way round.
+    // The portaled form, as of the phase that routed this control onto the shared picker.
     expectSelector:
       '.fabricate-picker-popover.crafting-sources-popover ' +
       '.manager-travel-popover-options .crafting-source-option',
     kinds: ['player', 'crafting'],
-    // `apps/crafting/ComponentSourcesBar.svelte` NAMED EXPLICITLY rather than left to
-    // `CRAFTING_SHARED`. The shared pattern already admits it, so this entry changes no selection
-    // — it states which file this frame is evidence ABOUT, which is what the other two repairs in
-    // this commit give `player-inventory` and `player-alchemy-workbench`.
+    // `apps/crafting/ComponentSourcesBar.svelte` named explicitly rather than left to
+    // `CRAFTING_SHARED`.
     sourceMatches: [
       CRAFTING_SHARED,
       /^src\/ui\/svelte\/apps\/crafting\/ComponentSourcesBar\.svelte$/,
@@ -13937,22 +9684,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     id: 'player-crafting-run-summary',
     label: 'Player app — Crafting run summary',
     smokeLabels: ['player-crafting-run-summary'],
-    // The counterpart's condition is the right column having SWAPPED to the run summary —
+    // The counterpart's condition is the right column having swapped to the run summary —
     // `[data-crafting-run-summary]`, which `CraftingView` renders only once `lastRollResult`
-    // carries an entry for the selected recipe. A REFUSAL notifies and records nothing; since
-    // issue 1648 a resolved failed check records its outcome too, so the summary is reached by
-    // any craft that RAN — and this case reaches it with one that completes successfully.
-    //
-    // Smelt Iron Ingot, and a CHECKED recipe on purpose: this craft now ROLLS. The shim used to
-    // install `Roll` as a plain object, so `evaluateCheckRoll` short-circuited on its own
-    // `typeof !== 'function'` guard and passed the check without rolling; since
-    // `tests/view-lab/foundry/labRoll.js` it evaluates `1d20 + @abilities.int.mod` off the seeded
-    // stream, whose first d20 on any page is a 20, for a total of 23 against a threshold of 12.
-    // The margin is a property of the FIXTURE and the seed, not a guarantee — see
-    // `tests/view-lab-roll.test.js`, which pins the composed invariant so a seed or threshold
-    // change fails there by name rather than surfacing here as a mystery frame diff.
-    // The smoke's ROUTED craft is reachable in principle now too, and remains uncaptured only
-    // because no case asks for it.
+    // carries an entry for the selected recipe.
     reaches: 'exact',
     query: { tab: 'crafting' },
     steps: [
@@ -13967,18 +9701,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     id: 'player-crafting-roll-result',
     label: 'Player app — Crafting roll result',
     smokeLabels: ['player-crafting-roll-result'],
-    // The counterpart's condition is the RollResultBox inside the run summary, scrolled into
-    // frame: `[data-crafting-run-summary] [data-recipe-section="roll-result"]`.
-    //
-    // A different recipe from `player-crafting-run-summary`, so the pair is two crafts rather than
-    // one craft photographed twice — and the scroll brings the DETAIL column's own copy of the box
-    // into frame beside the summary's, which is the whole point of a case named for the box rather
-    // than for the panel.
-    //
-    // The box carries no rolled total in either frame, and that is production's shape rather than
-    // a lab gap: `CraftingEngine`'s success return is `{success, results, message}`, and
-    // `RollResultBox` reads `result.total`/`result.checkResult.total`/`items`/`awardedResults`,
-    // none of which that return carries. The smoke's counterpart shows the same header and message.
+    // The counterpart's condition is the RollResultBox inside the run summary, scrolled into frame:
+    // `[data-crafting-run-summary] [data-recipe-section="roll-result"]`.
     reaches: 'exact',
     query: { tab: 'crafting' },
     steps: [
@@ -13998,34 +9722,6 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: ['player-crafting-roll-prompt'],
     // The interactive check roll prompt, standing and unanswered, with the `playerPicks` modifier
     // fieldset issue 855 adds.
-    //
-    // Unreachable until the shim grew a real `Roll` CLASS: `evaluateCheckRoll` returns
-    // `engine: false` on `typeof globalThis.Roll !== 'function'` BEFORE it calls `options.prompt`,
-    // so with the old two-static object installed no crafting, salvage or alchemy prompt could open
-    // in this harness at all. See `tests/view-lab/foundry/labRoll.js`.
-    //
-    // `dialog: 'open'` leaves it unanswered, which is the only way to photograph one — the lab's
-    // default `enter` presses the footer's default button and the dialog closes long before the
-    // capture. The craft's promise therefore never settles, and the frame is the prompt over a
-    // mid-craft crafting tab, which is the honest picture of this state rather than a contrivance.
-    //
-    // `hb-r-stillroom` belongs to the world's only system on the `playerPicks` combination rule,
-    // over a check that actually rolls a formula — `CraftingEngine._buildInteractiveModifierChoice`
-    // requires all of interactive, an authored (post-shim) formula, `playerPicks` and a
-    // two-or-more eligible set, so no other fixture reaches the fieldset. The formula line reads
-    // `1d20 + 3 + (modifier)[Modifiers]`: the deferred branch appends a neutral trailing slot
-    // rather than a number, because the value is a selection nobody has made.
-    //
-    // RE-AIMED AGAIN by issue 1094. The gate above used to require the retired roll-formula
-    // placeholder to be PRESENT in the formula, which is why this fixture carried one; the
-    // placeholder is gone and the gate now asks whether the check has a formula at all.
-    //
-    // RE-AIMED by issue 1055, and the aim moved for a reason worth recording. The rule used to be
-    // a per-RECIPE override on this recipe; a recipe can no longer override the system's rule at
-    // all, so it now lives on `lab-herbalism` itself (`labContent.js`). The system is UNBOUNDED,
-    // so `buildCheckModifierChoice` clamps `maxPicks` to the three eligible modifiers and the
-    // fieldset renders as a MULTI-pick checkbox group legended "Pick up to 3" — the control this
-    // change introduces, rather than the pick-one radio group it generalizes.
     reaches: 'exact',
     query: { tab: 'crafting', dialog: 'open' },
     steps: [
@@ -14033,10 +9729,9 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '.crafting-recipe-row[data-recipe-id="hb-r-stillroom"]' },
       { selector: '[data-crafting-craft][data-crafting-craft-disabled="false"]' },
     ],
-    // The dialog is a SIBLING of the application window, so the app's own route is satisfied by the
+    // The dialog is a sibling of the application window, so the app's own route is satisfied by the
     // crafting tab with nothing over it — precisely the screen a prompt that never opened would
-    // publish. The FIELDSET is what this case is named for, so that is what it is held to, not
-    // merely `.application.dialog`.
+    // publish.
     expectSelector: '.application.dialog .fabricate-roll-prompt__modifiers',
     kinds: ['player', 'crafting'],
     sourceMatches: [
@@ -14052,18 +9747,10 @@ export const VIEW_LAB_CASES = Object.freeze([
     id: 'player-crafting-essence-alternative',
     label: 'Player app — Crafting essence alternative',
     smokeLabels: ['player-crafting-essence-alternative'],
-    // The counterpart's condition is an OPEN alternatives radiogroup — `.crafting-alt-option` rows
-    // under `[data-recipe-section="alternatives"]` — one of whose options is an ESSENCE, so the
-    // option card draws the shared art tile in its GLYPH face, `[data-medallion="glyph"]`, rather
-    // than an item image. It drew a crafting essence thumbnail until issue 1506 retired both
-    // crafting tiles into that one primitive; the state the case selects for is unchanged.
-    //
-    // It previously borrowed `player-crafting-essence-ingredient`'s recipe and published a
-    // byte-identical frame under a second name. That recipe cannot reach this state: its essence
-    // requirement is its own single-option group, and `IngredientOptionSelector` branches on the
-    // OPTION's `isEssence`, so an essence in a group of its own renders a rail tile and opens the
-    // essence pool instead. Quench in Fire-Bearing Stock puts the component and the essence in ONE
-    // group, which is the only arrangement that puts an essence inside the chooser.
+    // The counterpart's condition is an open alternatives radiogroup — `.crafting-alt-option` rows
+    // under `[data-recipe-section="alternatives"]` — one of whose options is an essence, so the
+    // option card draws the shared art tile in its glyph face, `[data-medallion="glyph"]`, rather
+    // than an item image.
     reaches: 'exact',
     query: { tab: 'crafting' },
     steps: [
@@ -14087,19 +9774,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     id: 'player-crafting-essence-legacy',
     label: 'Player app — Crafting essence legacy',
     smokeLabels: ['player-crafting-essence-legacy'],
-    // WINDOW, and unreachable from fixture data. The legacy surface is the IoTable's own
+    // Window, and unreachable from fixture data. The legacy surface is the IoTable's own
     // `[data-io-group="essences"]` group, which renders only from a set-level
-    // `ingredientSet.essences` map. The lab seeds raw recipes into `game.settings`, and
-    // `RecipeManager.initialize()` MIGRATES a stored set-level essence map into a first-class
-    // essence group — verified: the set comes back with `essences: {}` and a uuid-named essence
-    // group, so the frame shows the requirement rail rather than the legacy rows. The smoke's
-    // counterpart escapes the migration only because it is authored through `createRecipe` after
-    // initialize; reproducing that needs a post-init authoring hook in `world/labWorld.js`.
-    //
-    // Re-verified against the current tree: `migrateEssencesToIngredientGroups` runs over the
-    // persisted `recipes` setting and is guarded only on the map being non-empty, so there is no
-    // authored shape that both carries a set-level essence map and survives boot. Fixture work
-    // cannot close this one; a post-init `createRecipe` in the lab's boot sequence can.
+    // `ingredientSet.essences` map.
     reaches: 'window',
     query: { tab: 'crafting' },
     steps: [],
@@ -14122,14 +9799,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: ['player-crafting-essence-shopping'],
     // The counterpart's condition is an essence tile inside the shopping list's acquire card:
     // `[data-shopping-acquire-components] [data-medallion="glyph"]`, reached by pressing a recipe
-    // row's cart button. (Issue 1506 retired the crafting essence thumb into the shared art
-    // tile, so the smoke waits on that tile's glyph face rather than on a class of its own.)
-    //
-    // Rivet Chainmail Shirt rather than the previously-selected Deepbind, because the card lists
-    // what is MISSING and Deepbind's essences are fully fundable — adding it produced "0 missing
-    // components" and no acquire card at all. Chainmail's Fire requirement can never be funded
-    // (60 needed against 46 held across every carrier), so the card renders both an item row and
-    // the essence row this frame exists for.
+    // row's cart button.
     reaches: 'exact',
     query: { tab: 'crafting' },
     steps: [
@@ -14147,13 +9817,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Player app — Crafting slot rail',
     smokeLabels: ['player-crafting-slot-rail'],
     // The counterpart's three programmatic assertions, all reproduced: the rail's slot states are
-    // exactly `['choice:partial', 'essence:short', 'fixed:met']` and exactly ONE chooser is open.
-    // Verified live against this recipe.
-    //
-    // The rail's three states cannot co-occur by accident — each needs its own engineering, which
-    // is why this is an authored recipe rather than a re-selection of an existing one. See
-    // `sm-r-tidebound` in `world/labContent.js` for what each group is doing and why `partial`
-    // needs an unsatisfiable choice and `short` needs an essence with no carrier at all.
+    // exactly `['choice:partial', 'essence:short', 'fixed:met']` and exactly one chooser is open.
     reaches: 'exact',
     query: { tab: 'crafting' },
     steps: [
@@ -14170,10 +9834,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     reaches: 'exact',
     query: { tab: 'crafting' },
     // The counterpart's three assertions, all reproduced: a rail whose tag tile has no item image
-    // to borrow renders its own GLYPH and never Foundry's `item-bag.svg`; every group is fixed, so
-    // it is the world's only rail with no chooser open. Verified live —
-    // `glyphTiles: 1, bagImages: 0, openChoosers: 0`. The recipe is filtered to rather than paged
-    // to: the browser holds 12 rows a page and this one sorts onto page two.
+    // to borrow renders its own glyph and never Foundry's `item-bag.svg`; every group is fixed, so
+    // it is the world's only rail with no chooser open.
     steps: [
       { selector: '.crafting-browser-search input', fill: 'Refine Silver' },
       { selector: '.crafting-recipe-row[data-recipe-id="sm-r-silver-ingot"]' },
@@ -14198,14 +9860,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     reaches: 'exact',
     query: { tab: 'crafting' },
     // "Pick for me" restoring the resolver's suggestion after the player has trimmed it — the
-    // counterpart's own sequence. The two trims are the PRECONDITION, not decoration: with every
-    // carrier already at maximum the wand writes the allocation the panel is already showing, so
-    // pressing it would change nothing on screen.
-    //
-    // The recipe is the one whose Fire requirement can never be fully funded (60 needed, 46 held
-    // across every carrier). That is the only arrangement in which the wand is photographable at
-    // all: it renders while a requirement is short, so a fundable one makes the control vanish
-    // the instant it is pressed.
+    // counterpart's own sequence.
     steps: [
       { selector: '.crafting-browser-search input', fill: 'Rivet Chainmail' },
       { selector: '.crafting-recipe-row[data-recipe-id="sm-r-chainmail"]' },
@@ -14228,11 +9883,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: ['player-crafting-essence-pool-shared'],
     reaches: 'exact',
     query: { tab: 'crafting' },
-    // The shared-pool proof: TWO essence requirements in one set, funded from ONE dual carrier.
-    // Zeroing the single-essence carriers and raising Steel Ingot (2 Earth + 2 Fire) to ×2 leaves
-    // Fire fully delivered and Earth short FROM THE SAME UNITS — which a per-group disjoint draw
-    // could not produce at all. Verified live: `met|partial` meters, one recap row, and two
-    // contribution chips on the dual carrier.
+    // The shared-pool proof: two essence requirements in one set, funded from one dual carrier.
     steps: [
       { selector: '.crafting-recipe-row[data-recipe-id="sm-r-deepbind"]' },
       {
@@ -14285,13 +9936,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: ['player-crafting-progressive'],
     // The reorderable stage list at rest — `[data-recipe-section="progressive-stages"]` with its
     // grips, ordinals, per-stage difficulty and "Reached at ≥N" thresholds, and the chevron box
-    // rendered whether or not anything has moved. Verified live: 3 rows, 3 grips, 3 move controls,
-    // thresholds ≥1 / ≥3 / ≥7 ascending.
-    //
-    // Progressive is a per-SYSTEM resolution mode, so this needs a progressive system the PLAYER
-    // can see. Herbalism is the world's progressive system and it is knowledge-gated; the crafting
-    // actor learns exactly the two recipes below and nothing else. See `LEARNED_RECIPES` in
-    // `world/labActors.js` for why a sixth crafting system was rejected instead.
+    // rendered whether or not anything has moved.
     reaches: 'exact',
     query: { tab: 'crafting' },
     steps: [
@@ -14304,24 +9949,11 @@ export const VIEW_LAB_CASES = Object.freeze([
       CRAFTING_PROGRESSIVE,
       /^src\/ui\/svelte\/stores\/craftingStore/,
     ],
-    // The crafting half of the per-stage complication band (issue 1286), asserted on the frame
-    // that already draws it for the same reason `player-salvage` is: `ProgressiveBody` passes
-    // `complications="forecast"` unconditionally, so all four `player-crafting-progressive*`
-    // frames render the band, and a fifth case sharing this case's query and steps would publish
-    // a byte-identical PNG under a second name.
-    //
-    // CRAFTING IS FORECAST-ONLY, and the tense token here is the assertion of it. The fired
-    // record is defined on the salvage RUN record and the immediate crafting path writes no run,
-    // so `CraftingListingBuilder` marks nothing fired and no crafting stage can ever claim a
-    // complication happened. A `fired`/`resolved` tense appearing on this surface would be the
-    // panel inventing a resolution.
-    //
-    // Addressed by COMPLICATION id and never by stage id: `hb-r-stillroom`'s result entries
-    // author no explicit ids, so `_normalizeRecipeResult` mints a fresh one on every lab boot and
-    // a `[data-progressive-stage="…"]` selector could never be written for this recipe. (The
-    // salvage cases can use stage ids because `CRACKED_ALEMBIC_STAGE_IDS` authors them.) The
-    // `gmOnly` exclusion is pinned here too — the redaction is per-activity, and
-    // `hb-comp-dust-spoiled` is enabled for crafting as well as salvage.
+    // The crafting half of the per-stage complication band (issue 1286), asserted on the frame that
+    // already draws it for the same reason `player-salvage` is: `ProgressiveBody` passes
+    // `complications="forecast"` unconditionally, so all four `player-crafting-progressive*` frames
+    // render the band, and a fifth case sharing this case's query and steps would publish a
+    // byte-identical PNG under a second name.
     expectSelector:
       '[data-recipe-mode="progressive"]' +
       ':has([data-recipe-section="progressive-stages"] ' +
@@ -14333,11 +9965,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     id: 'player-crafting-progressive-reordered',
     label: 'Player app — Crafting progressive reordered',
     smokeLabels: ['player-crafting-progressive-reordered'],
-    // The SAME list after one downward move, which is the counterpart's own sequence and the only
+    // The same list after one downward move, which is the counterpart's own sequence and the only
     // state in which two of its invariants stop being vacuous: the live region is empty until a
     // move announces, and the authored thresholds ascend by construction until one is re-derived.
-    // Verified live — the region reads "Empty Vial moved to position 2 of 3" and the thresholds
-    // re-rank to ≥2 / ≥3 / ≥7 rather than carrying their old values with the rows.
     reaches: 'exact',
     query: { tab: 'crafting' },
     steps: [
@@ -14356,11 +9986,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     id: 'player-crafting-progressive-fixed',
     label: 'Player app — Crafting progressive fixed',
     smokeLabels: ['player-crafting-progressive-fixed'],
-    // The GM-ordered variant, on its own recipe because the state is a RECIPE flag:
-    // `allowPlayerResultReorder` defaults true, so an explicit false has to be authored to reach
-    // it at all. Verified live against the counterpart's whole report — 3 fixed rows, 0 grips,
-    // 0 move controls, 3 ordinals, 3 difficulty chips, the "Order set by the GM" line present,
-    // and no live region for an order that cannot change.
+    // The GM-ordered variant, on its own recipe because the state is a recipe flag:
+    // `allowPlayerResultReorder` defaults true, so an explicit false has to be authored to reach it
+    // at all.
     reaches: 'exact',
     query: { tab: 'crafting' },
     steps: [
@@ -14380,10 +10008,6 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: ['player-crafting-progressive-stacked'],
     // The shared 960px boundary makes the smoke counterpart's stacked condition reachable at
     // production's 1024px player-window floor: the named container is roughly 938px wide there.
-    //
-    // The smoke still forces its shell to 780px by clearing the production minimum, but both walks
-    // now render the same single-column progressive layout with full-width stage rows. Keep the
-    // 1024px geometry here so the lab proves that production's supported floor reaches that state.
     reaches: 'exact',
     query: { tab: 'crafting' },
     steps: [
@@ -14417,11 +10041,6 @@ export const VIEW_LAB_CASES = Object.freeze([
     // The discipline chooser, reached exactly as the counterpart reaches it: the world remembers a
     // chosen discipline, so the tab opens on the workbench and "Switch discipline"
     // (`[data-alchemy-switch]`) is what returns to the chooser.
-    //
-    // It needed a SECOND alchemy-mode system to exist at all — `needsChooser` is
-    // `systems.length > 1 && !activeSystemId`, so with one discipline this is not a state the app
-    // can be driven into. `lab-tidewrack` supplies it, and the same `systems.length > 1` also
-    // flips `canSwitch`, which is what puts the control this case clicks on the workbench frames.
     reaches: 'exact',
     query: { tab: 'alchemy' },
     steps: [{ selector: '[data-alchemy-switch]' }],
@@ -14474,17 +10093,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Player app — Journal sort list',
     smokeLabels: [],
     reaches: 'beyond',
-    // THE PANEL THAT HAS TO ESCAPE ITS COLUMN (issue 1511). The journal's two list regions sit in
-    // an overflow-clipped half-height column, and that container is the one the deleted
-    // `.fabricate-app select:focus-visible` rule named as the reason its ring was INSET rather
-    // than outset. The retirement argument covers the ring, not the portal, so this frame is the
-    // one that proves the walk: the panel is a child of the application frame rather than of the
-    // column it drops out of, and a portal that failed to land would be clipped away here first.
-    //
-    // `[data-journal-sort="active"]` rather than the bare hook, because this component renders
-    // TWICE on one screen — Active Runs above History — and the hook's value is what tells the two
-    // triggers apart. The bare form would resolve to the first match by accident rather than by
-    // statement.
+    // The panel that has to escape its column (issue 1511).
     query: { tab: 'journal' },
     steps: [{ selector: '[data-journal-sort="active"]' }],
     expectSelector:
@@ -14512,14 +10121,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     id: 'fabricate-journal-craft-detail',
     label: 'Player app — Journal craft detail',
     smokeLabels: ['fabricate-journal-craft-detail'],
-    // The counterpart's condition is a HISTORY crafting run selected, so the run-detail
-    // recorded stage facts (`[data-stage-fact]`) are on screen — a different article
-    // from the one `fabricate-journal` shows, which is the default ACTIVE run. With empty steps
-    // this case published that same default frame under a second name.
-    //
-    // The multi-step succeeded run rather than the single-step one: its detail carries the step
-    // rail as well as the requirements card, so the two journal frames differ in structure and not
-    // only in which row is lit.
+    // The counterpart's condition is a history crafting run selected, so the run-detail recorded
+    // stage facts (`[data-stage-fact]`) are on screen — a different article from the one
+    // `fabricate-journal` shows, which is the default active run.
     reaches: 'exact',
     query: { tab: 'journal' },
     steps: [
@@ -14539,15 +10143,7 @@ export const VIEW_LAB_CASES = Object.freeze([
   ...journalLifecycleCases(),
   ...journalHistoryBatchCases(),
   ...journalHistoryDataCases(),
-  // ───────────────────────────────────────────────────────────────────────────────────────────────
-  // Coverage matrix — states the live smoke does NOT photograph.
-  //
-  // Everything above mirrors a smoke frame, which makes the smoke the ceiling on coverage. It is
-  // not a complete one: the smoke walks one system per screen, so whole rendering paths — the two
-  // routed resolution modes, two of the three visibility modes, Foundry's light theme — never
-  // appear in any frame it produces. These cases carry `reaches: 'beyond'` and no `smokeLabels`,
-  // which is the registry's way of saying "no smoke counterpart exists to compare against".
-  // ───────────────────────────────────────────────────────────────────────────────────────────────
+  // Coverage matrix — states the live smoke does not photograph.
 
   managerCase({
     id: 'coverage-mode-routed-ingredients-results',
@@ -14591,24 +10187,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: [],
     reaches: 'beyond',
     query: { system: 'lab-runework' },
-    // Scrolls to its own named subject. Issue 975 gave Runework's check two authored
-    // triggers, and a populated trigger card is tall enough to push the outcome-tier
-    // table towards the fold — so without an anchor this case would drift into
-    // photographing a panel that no longer contains the table it is named for.
-    //
-    // The anchor is a ROW OF THAT TABLE, not `[data-routed-tiers]`: that attribute
-    // wraps `CheckRecipeTiers` — the recipe-tiers card — while the outcome-tier table
-    // is the following unhooked section, so anchoring there would frame a card this
-    // case is not photographing and would break the moment that fixture gains content.
-    // `rw-ruined` is the LAST tier in Runework's `relativeOutcomes`, and
-    // `scrollIntoViewIfNeeded` lands its anchor near the BOTTOM edge, so the whole
-    // table sits above it in frame.
-    //
-    // IT IS ALSO THE BAND STRIP'S ONLY EVIDENCE, and the only frame in the registry that
-    // shows a NAMED label on the strongest band (issue 1096). Its sibling
-    // `manager-checks-section-badged-and-dotted` blanks the top tier's name to raise
-    // `unnamedOutcome`, so its top band is captioned with nothing — which is how a band-name
-    // contrast regression on exactly that band reached a published frame set unseen.
+    // Scrolls to its own named subject.
     steps: [
       'Checks',
       { selector: '#manager-checks-nav-crafting' },
@@ -14620,18 +10199,10 @@ export const VIEW_LAB_CASES = Object.freeze([
     // fails here rather than publishing a frame of the table alone.
     expectSelector: '.fabricate-manager [data-band-strip-band]',
     kinds: ['manager', 'checks', 'resolution-mode'],
-    // Deliberately NO pattern for `components/ThresholdBandStrip.svelte`, for the reason
-    // `manager-gathering-economy-actors` records about `Stepper`: `BROAD_SIGNAL_PATTERN`
-    // matches `^src/ui/svelte/components/` and `selectRenderFileCases` `continue`s on a
-    // broad-signal file BEFORE consulting any case's `sourceMatches`, so such an entry would
-    // be unreachable.
-    //
-    // A change to the strip PRIMITIVE used to publish the representative set alone, neither
-    // frame of which draws a band strip. It now additionally publishes THIS case and
-    // `manager-checks-simple-two-band-strip` through `BROAD_SIGNAL_CASE_OVERRIDES` (issue
-    // 1378), which names both because the strip's two importers are its two MODES: this is
-    // the routed one, and the simple one owns the draggable handle. The pattern below still
-    // publishes this case when the editor — where the band colours are chosen — changes.
+    // Deliberately no pattern for `components/ThresholdBandStrip.svelte`, for the reason
+    // `manager-gathering-economy-actors` records about `Stepper`: `BROAD_SIGNAL_PATTERN` matches
+    // `^src/ui/svelte/components/` and `selectRenderFileCases` `continue`s on a broad-signal file
+    // before consulting any case's `sourceMatches`, so such an entry would be unreachable.
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\//],
   }),
   managerCase({
@@ -14640,26 +10211,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: [],
     reaches: 'beyond',
     query: { system: 'lab-runework' },
-    // THE FRAME THAT SHOWS THE WHOLE RAMP (issue 1096). The band ramp has five tones and every
-    // routed check in the fixture world has THREE tiers, so until this case the two ends of the
-    // ramp — the tones a four- or five-tier check reaches and a three-tier one skips — appeared
-    // in no frame at all. A five-band strip is also the only count at which "one tone per band"
-    // and "a tone reused" look different.
-    //
-    // It reaches five tiers by DRIVING the editor rather than by seeding a fifth system: the
-    // fixture world's `ROUTED_CHECK` is read by the salvage routing rows, the section badge
-    // count and both player routed-crafting cases, so widening it would rewrite frames that are
-    // not about this. Two `Add outcome tier` clicks and four typed fields cost nothing outside
-    // case.
-    //
-    // The two new tiers are given DCs OUTSIDE the authored −5/0/+5 span. A new outcome is born
-    // at `dc: 0`, which ties Standard's lower edge, and the strip refuses to draw a tied edge as
-    // a clean seam — so without these the case would photograph the non-contiguous fallback note
-    // and be named for a strip it never rendered.
-    //
-    // `:nth-match()` is Playwright's, not CSS's: the two new rows carry `randomID()` ids, so
-    // there is no stable per-row hook to aim at and position in the authored table is the only
-    // address they have.
+    // The frame that shows the whole ramp (issue 1096).
     steps: [
       'Checks',
       { selector: '#manager-checks-nav-crafting' },
@@ -14685,16 +10237,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     // the dynamic branch to fall short of.
     reaches: 'beyond',
     smokeLabels: [],
-    // Criterion 14's subject: the dynamic-DC macro card, which is the ONE shipped consumer this
-    // change converted from a hand-rolled `use:dragDrop` div onto the shared `ItemDropZone`. The
-    // drop zone renders only under `dcMode: 'dynamic'`.
-    //
-    // The mode is reached by CLICKING rather than by authoring, which is the same choice
-    // `manager-checks-crafting-modifier-max-picks` records and for the same reason: `dcMode`
-    // lives on the SHARED frozen `SIMPLE_CHECK` that five lab systems declare, so authoring
-    // `dynamic` there would turn every one of their recipes' `DC 15` pills into `Dynamic DC` and
-    // move a dozen already-captured frames to photograph one card. The Checks editor stages into a
-    // draft, so the click reaches the same rendered state without persisting anything.
+    // Criterion 14's subject: the dynamic-DC macro card, which is the one shipped consumer this
+    // change converted from a hand-rolled `use:dragDrop` div onto the shared `ItemDropZone`.
     query: { system: 'lab-alchemy' },
     steps: [
       'Checks',
@@ -14705,17 +10249,10 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectView: 'checks-crafting',
     kinds: ['manager', 'checks'],
     sourceMatches: [
-      // `ItemDropZone` is deliberately NOT claimed here (issue 1509), and the deletion changes no
+      // `ItemDropZone` is deliberately not claimed here (issue 1509), and the deletion changes no
       // routing: the pattern that used to sit on this line was on the removal-only
       // `BROAD_SHADOWED_SOURCE_MATCHES` register precisely because the file was already a broad
-      // signal, so `selectRenderFileCases` never read it. The move to `components/` keeps it
-      // broad, and the primitive's evidence comes from its own override.
-      //
-      // Whether this case should JOIN that override was adjudicated NO. The override's four
-      // frames already draw the primitive's closed `state` set — the create prompt, the linked
-      // tile, the unlinked prompt and the missing face — and the dynamic-DC card renders the
-      // unlinked prompt among them. A fifth frame of a face already photographed is cost without
-      // evidence.
+      // signal, so `selectRenderFileCases` never read it.
       /^src\/ui\/svelte\/apps\/manager\/checks\/SimpleCraftingCheckEditor\.svelte$/,
       /^src\/utils\/macroReference\.js$/,
     ],
@@ -14727,11 +10264,10 @@ export const VIEW_LAB_CASES = Object.freeze([
     // fixture world authors none — so the populated list has never been photographed at all.
     reaches: 'beyond',
     smokeLabels: [],
-    // THE ROW TREATMENT, which is what issue 1096 changed here: the recipe-tier list was the
-    // last consumer of `.manager-checks-outcome-table` on The roll, drawing boxed inputs in a
-    // grid with a column-header row, while the prototype draws the same list as the Outcomes
-    // screen draws its tiers. An EMPTY list photographs the dashed control and nothing else,
-    // so the case adds two rows to reach the state it is named for.
+    // The row treatment, which is what issue 1096 changed here: the recipe-tier list was the last
+    // consumer of `.manager-checks-outcome-table` on The roll, drawing boxed inputs in a grid with
+    // a column-header row, while the prototype draws the same list as the Outcomes screen draws its
+    // tiers.
     query: {},
     steps: [
       'Checks',
@@ -14755,31 +10291,22 @@ export const VIEW_LAB_CASES = Object.freeze([
   managerCase({
     id: 'manager-checks-crafting-tier-step',
     label: 'Manager — Checks crafting tier-step triggers',
-    // BEYOND the smoke. The capture walk never AUTHORS a trigger — it adds one, drives the
-    // controls and removes it again to leave the Checks draft clean — so there is no
-    // counterpart frame of a populated trigger list to fall short of.
+    // Beyond the smoke.
     reaches: 'beyond',
     smokeLabels: [],
-    // Runework is the only fixture check carrying authored triggers, and the only crafting
-    // check with named outcome tiers — which is what makes the `target` mode's tier select
-    // renderable at all. A second case rather than a scroll step on the sibling above: that
-    // one is named for the outcome-tier TABLE and photographs the top of the same panel, so
-    // scrolling it down to the trigger card would move it off its own subject.
+    // Runework is the only fixture check carrying authored triggers, and the only crafting check
+    // with named outcome tiers — which is what makes the `target` mode's tier select renderable at
+    // all.
     query: { system: 'lab-runework' },
     steps: [
       'Checks',
       { selector: '#manager-checks-nav-crafting' },
       { selector: '#checks-section-triggers' },
-      // The list COLLAPSES (issue 1096), so the subject of this case — the tier-step row — is
-      // not in the document until its trigger is opened. Clicking the head is what a GM does
-      // and is the only way to reach it; without this step the case would fail rather than
-      // quietly photograph a fold, because the anchor below resolves to nothing.
+      // The list collapses (issue 1096), so the subject of this case — the tier-step row — is not
+      // in the document until its trigger is opened.
       { selector: '[data-trigger-disclosure="rw-trig-step-up"]' },
-      // Anchored on a NAMED trigger's own tier-step row, never on "the row's last control":
-      // which control that is depends on the mode, so a mode change would silently move the
-      // anchor. `scrollIntoViewIfNeeded` lands it near the bottom edge, so anchoring the
-      // second (and last) authored trigger frames both cards — the collapsed one above and
-      // this one's expanded body — rather than one card and a fold.
+      // Anchored on a named trigger's own tier-step row, never on "the row's last control": which
+      // control that is depends on the mode, so a mode change would silently move the anchor.
       { selector: '[data-trigger="rw-trig-step-up"] [data-trigger-tier-step]', scroll: true },
     ],
     expectView: 'checks-crafting',
@@ -14793,11 +10320,9 @@ export const VIEW_LAB_CASES = Object.freeze([
   managerCase({
     id: 'manager-checks-crafting-trigger-break-tools',
     label: 'Manager — Checks crafting trigger break-tools card',
-    // BEYOND the smoke, and a state NO other frame reaches: breaking tools is authored on a
-    // trigger only while the SYSTEM's tool-breakage authority is check-driven, and every
-    // fixture system rests on `toolSpecific`. Without this case the card that issue 1096 gave
-    // that effect — a bordered card with a wrench, a sentence and a switch, where a two-word
-    // pill used to sit — is in no published frame at all.
+    // Beyond the smoke, and a state no other frame reaches: breaking tools is authored on a trigger
+    // only while the system's tool-breakage authority is check-driven, and every fixture system
+    // rests on `toolSpecific`.
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-runework' },
@@ -14821,13 +10346,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['manager', 'checks'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\/CheckTriggers\.svelte$/],
   }),
-  // ── The outcome simulator and the odds histogram (issue 1097) ────────────────────────
-  //
-  // All four cases select an ACTOR first, and that is not decoration. Every lab system's
-  // check formula carries `@abilities.int.mod`, so under the resting "No actor" selection
-  // the formula does not reduce to a number, the simulator renders its unresolved warning
-  // and the histogram abstains — which is a real state, and one of these cases photographs
-  // it deliberately, but it is not the state the other three are named for.
+  // All four cases select an actor first, and that is not decoration.
   managerCase({
     id: 'manager-checks-crafting-simulator-rolled',
     label: 'Manager — Checks crafting outcome preview, rolled',
@@ -14842,11 +10361,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       'Checks',
       { selector: '#manager-checks-nav-crafting' },
       ...previewAsActor('lab-actor-idrin'),
-      // NO DISCLOSURE STEP. These two panels were collapsible when this case was written and
-      // are not any more: issue 1096's rail is a flat `.manager-kicker` heading over a bare
-      // card, on the Tool Studio's inspector convention, so the body is always in the
-      // document and a click on a chevron that no longer exists would fail the capture job
-      // WHOLE and publish nothing at all.
+      // No disclosure step.
       { selector: '[data-checks-simulator-roll]' },
       { selector: '[data-checks-simulator-readout]', scroll: true },
     ],
@@ -14887,11 +10402,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-runework' },
-    // The formula is TYPED rather than authored, for the reason
-    // `manager-checks-crafting-dynamic-dc` records: the fixture check is shared, so
-    // authoring `2d20` there would move every already-captured Runework frame to
-    // photograph one panel. The Checks editor stages into a draft, so the typed formula
-    // reaches the rendered state without persisting anything.
+    // The formula is typed rather than authored, for the reason
+    // `manager-checks-crafting-dynamic-dc` records: the fixture check is shared, so authoring
+    // `2d20` there would move every already-captured Runework frame to photograph one panel.
     steps: [
       'Checks',
       { selector: '#manager-checks-nav-crafting' },
@@ -14914,10 +10427,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — Checks crafting odds histogram (progressive award count)',
     reaches: 'beyond',
     smokeLabels: [],
-    // Herbalism is the world's ONLY progressive system, so it is the only route where a
-    // histogram bucketed by award count exists at all. Its check carries the authored
-    // preview sandbox (`progressive.preview.difficulties`) that supplies the order — see
-    // `PROGRESSIVE_CHECK` in `tests/view-lab/world/labContent.js` for why those four numbers.
+    // Herbalism is the world's only progressive system, so it is the only route where a histogram
+    // bucketed by award count exists at all.
     query: { system: 'lab-herbalism' },
     steps: [
       'Checks',
@@ -14926,10 +10437,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-checks-odds-state="enumerated"]', scroll: true },
     ],
     expectView: 'checks-crafting',
-    // A BUCKET THAT MUST EXIST, not merely a bar. `award-0` is the reachable award of
-    // nothing, and it is the half of the rule a histogram is most likely to drop by
-    // treating "awarded nothing" as "no outcome": anchoring on it means a build that
-    // stopped listing it fails here instead of publishing a three-bar frame that looks fine.
+    // A bucket that must exist, not merely a bar.
     expectSelector: '.fabricate-manager [data-checks-odds-row="award-0"]',
     kinds: ['manager', 'checks'],
     // NO entry for `src/systems/progressiveCheckSandbox.js`, deliberately: `isUiFile` admits
@@ -14959,11 +10467,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectView: 'checks-crafting',
     expectSelector: '.fabricate-manager [data-simple-band-strip] [data-band-strip-handle]',
     kinds: ['manager', 'checks'],
-    // The strip's SIMPLE mode, and one of the two frames `BROAD_SIGNAL_CASE_OVERRIDES` names for
-    // `components/ThresholdBandStrip.svelte` (issue 1378). No `sourceMatches` pattern for the
-    // strip here, and none is possible: `BROAD_SIGNAL_PATTERN` matches `^src/ui/svelte/components/`
-    // and `selectRenderFileCases` `continue`s before consulting any case. The override is the seam
-    // — see `coverage-mode-routed-check-checks`, which is the routed half of the same pair.
+    // The strip's simple mode, and one of the two frames `BROAD_SIGNAL_CASE_OVERRIDES` names for
+    // `components/ThresholdBandStrip.svelte` (issue 1378).
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\/SimpleCraftingCheckEditor\.svelte$/],
   }),
   managerCase({
@@ -14974,22 +10479,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // at all.
     reaches: 'beyond',
     smokeLabels: [],
-    // THE DEAD END THAT WAS FIXED (issue 1097 follow-up, maintainer report). `Add outcome tier`
-    // used to be the last child of `.manager-checks-tier-list`, which only renders when at least
-    // one tier exists — so a zero-tier routed check displayed "No outcome tiers yet. Add the
-    // tiers this check routes results into." and offered nothing to press. Every frame in the
-    // registry photographed a POPULATED table, so the dead end was invisible to capture and its
-    // repair is invisible without this.
-    //
-    // Reached by SWITCHING ALCHEMY TO TIERED rather than by deleting Runework's three tiers or
-    // by seeding a sixth system. `lab-alchemy` carries the shared frozen `SIMPLE_CHECK`, which
-    // authors no `routed` block at all, so `tiered` is the one route in this world where zero
-    // tiers is the check's own resting state rather than the residue of three delete clicks —
-    // and it is the second of the two states the fix's own comment names. It costs one click
-    // and no fixture change: seeding `checkMode: 'tiered'` on the fixture instead would flip
-    // every already-captured alchemy frame off the Simple two-slot Results editor
-    // `labContent.js` records as load-bearing, and raise a permanent no-tiers validation warning
-    // on the Validation frames.
+    // The dead end that was fixed (issue 1097 follow-up, maintainer report).
     query: { system: 'lab-alchemy' },
     steps: [
       'Checks',
@@ -15000,10 +10490,8 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-add-outcome-tier]', scroll: true },
     ],
     expectView: 'checks-crafting',
-    // THE FIX ITSELF, as a selector: the add control has to be a SIBLING of the empty sentence,
-    // which is what taking it out of the list's `{#if}` made it. Anchoring on either hook alone
-    // would pass on the broken markup — the sentence rendered fine before, and the control still
-    // exists whenever a tier does — so the sibling combinator is the assertion, not decoration.
+    // The fix itself, as a selector: the add control has to be a sibling of the empty sentence,
+    // which is what taking it out of the list's `{#if}` made it.
     expectSelector: '.fabricate-manager [data-outcomes-empty] ~ [data-add-outcome-tier]',
     kinds: ['manager', 'checks'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\/CraftingCheckEditor\.svelte$/],
@@ -15015,16 +10503,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // counterpart frame.
     reaches: 'beyond',
     smokeLabels: [],
-    // THE STATE THE OFF SWITCH EXISTS FOR. Alchemy `checkMode: 'none'` used to render a
-    // read-only "resolves without a check" notice and NO Active card at all — the studio said
-    // the mode required the check and offered no way to change that. It is now the OFF state of
-    // an optional check: the shared switched-off panel with its `Turn this check on` action, and
-    // a live Active switch in the rail reading off.
-    //
-    // `lab-tidewrack` rather than `lab-alchemy`, and PERSISTED rather than clicked. Tidewrack is
-    // the world's `checkMode: 'none'` alchemy system, so this is its resting state — clicking
-    // `lab-alchemy`'s toggle would reach the same panel but photograph it wearing an `Unsaved`
-    // chip, which is a picture of the staging lifecycle rather than of the off state.
+    // The state the off switch exists for.
     query: { system: 'lab-tidewrack' },
     steps: ['Checks', { selector: '#manager-checks-nav-crafting' }],
     expectView: 'checks-crafting',
@@ -15042,12 +10521,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // no counterpart frame to fall short of.
     reaches: 'beyond',
     smokeLabels: [],
-    // A CARD NO FRAME REACHED. `data-alchemy-behaviour` renders only for a system whose
-    // resolution mode is `alchemy`, and only on On failure — every other crafting route draws
-    // the two-toggle `data-failure-consumption` list there instead. `lab-alchemy` is the
-    // world's alchemy system with a check mode set, so it is the only route to this card, and
-    // its intro sentence (corrected in issue 1097 to name The roll section rather than pointing
-    // "above" at a card this screen no longer shows beside it) is what the frame is evidence for.
+    // A CARD no frame reached.
     query: { system: 'lab-alchemy' },
     steps: [
       'Checks',
@@ -15057,15 +10531,11 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     expectView: 'checks-crafting',
     // The card, which is the subject and exists in no other state — not one of its toggles.
-    // A deeper anchor would fail the capture job WHOLE, and publish nothing, the day a flag is
-    // added or renamed inside a card whose SENTENCE is what this frame is about.
     expectSelector: '.fabricate-manager [data-alchemy-behaviour]',
     kinds: ['manager', 'checks'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\/ChecksView\.svelte$/],
   }),
-  // Player recipe detail, one per resolution mode. Each mode draws a DIFFERENT body — the routed
-  // ones a route rail, progressive a stage rail, simple a plain ingredient list — so the four
-  // frames together are the only side-by-side evidence that a change to one did not move another.
+  // Player recipe detail, one per resolution mode.
   playerCase({
     id: 'coverage-mode-simple-detail',
     label: 'Coverage — simple recipe detail',
@@ -15076,13 +10546,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['player', 'crafting', 'resolution-mode'],
     sourceMatches: [CRAFTING_SHARED, CRAFTING_SIMPLE],
   }),
-  // KNOWN GAP — no `coverage-mode-progressive-detail`. The only progressive system in the fixture
-  // is `lab-herbalism`, which is knowledge-gated on purpose (that is what makes the Books & Scrolls
-  // and Knowledge rails exist at all), so a player who has learned nothing sees none of its recipes
-  // and there is no row to click. Closing this properly means either granting the lab player
-  // knowledge — which changes the recipe list in EVERY existing player frame — or adding a sixth,
-  // progressive-and-global system. Both are larger than the frame is worth right now; the
-  // progressive AUTHORING path is covered by `manager-recipe-edit-results-progressive`.
+  // Known gap — no `coverage-mode-progressive-detail`.
   playerCase({
     id: 'coverage-mode-routed-ingredients-detail',
     label: 'Coverage — routedByIngredients recipe detail',
@@ -15150,61 +10614,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/system\//,
     ],
   }),
-  // Foundry's LIGHT application theme. Everything else in this registry renders `theme-dark`,
-  // because that is what the smoke world is configured for — but a GM is free to run light, and
-  // these two frames are the only guard over that cascade.
-  //
-  // A CORRECT frame here still looks DARK. Read this before filing one as broken.
-  //
-  //   1. The theme really does apply. Foundry themes by body class (`Game##configureUI` adds
-  //      `theme-light`), and `configureLabPage` in `tests/view-lab/foundryFrame.js` reproduces
-  //      that on `document.body`. Recorded evidence: the published light frame's header bar
-  //      samples rgb(51,51,51) where the dark frames do not. That is a sample from a FRAME —
-  //      drawn with the 14.365 harvested chrome (`tests/view-lab/chrome-provenance.json`) — and
-  //      not a source reading, so nothing in the tree carries that number. Re-check it the way
-  //      it was taken: render the pair (`node scripts/view-lab-screenshots.mjs apps
-  //      coverage-theme-light-player,coverage-theme-light-manager`) and sample the header bar
-  //      of the PNGs in `ui-screenshot-artifact/apps/`.
-  //   2. Foundry's light theme keeps a DARK window header: `.window-header .window-title` is
-  //      `--color-light-1` under both themes, because neither theme block redefines that token.
-  //      That one was probed in core's `css/foundry2.css` at 14.361 (see the caveat below).
-  //   3. Fabricate is theme-invariant at BOTH roots, and the pair needs both because the two
-  //      windows are built differently. The player window root `.fabricate.fabricate-app` sets
-  //      `background: var(--fab-bg-1)`, `color: var(--fab-text)` and `color-scheme: dark`. The
-  //      manager window root `.fabricate.crafting-system-manager` sets only `font-family` and
-  //      makes its `.window-content` transparent; the paint comes from `.fabricate-manager`
-  //      inside it (`color: var(--fab-text)`, `background: var(--fab-bg-1)`,
-  //      `color-scheme: dark`). All seven `[data-fabricate-theme]` palettes in
-  //      `styles/fabricate.css` are dark, and the module sheet loads at `layer(modules)`, which
-  //      outranks core's `layer(applications)`, so core's light parchment never paints.
-  //
-  // So light differs from dark in the window header bar, and that is what this pair covers.
-  //
-  // It also covers a heading-colour leak, which it did not when this comment was first written.
-  // The paragraph here used to say the mechanism was INHERITANCE and that the leak lived "on the
-  // surfaces no Fabricate root colour reaches". That reading was wrong, and it was wrong in the
-  // direction that hides the defect: it sent a reader up the ancestor chain looking for a missing
-  // Fabricate colour, when nothing up that chain was missing one. Both headline headings did
-  // inherit `--fab-text` correctly, and both still rendered `#111111`.
-  //
-  // The `NOT VERIFIED` note that followed it asked the right question, and the answer is yes.
-  // Core's `@layer elements.typography` sets `color` on the heading ELEMENT — `h1`/`h2` take
-  // `--color-text-emphatic`, `h3` takes `--color-text-primary` — and a declaration matching the
-  // element beats an inherited value from any ancestor, however near. Under `theme-light` those
-  // resolve to `--color-dark-1`/`--color-dark-2`, so the headings went dark-on-dark. Core ships
-  // an antidote (`body.game .app h1,…,h6 { color: inherit }`) but scopes it to the ApplicationV1
-  // `.app` class, which no Fabricate window carries.
-  //
-  // Issue 972 fixed that with a `.fabricate :where(.window-content) h1,…,h6` normalization in
-  // `styles/fabricate.css`, so these two frames now guard a cascade that is actually correct.
-  // What makes them worth keeping is that they are still the only frames rendered under
-  // `theme-light`: the normalization is what stops core's theme reaching a heading, and if it
-  // regresses, this pair is where it shows.
-  //
-  // The general lesson survives its wrong example. When a Fabricate surface takes a Foundry
-  // colour, check for a rule matching the ELEMENT before walking the ancestor chain — proximity
-  // is no defence, and an ancestor that looks correct proves nothing about what the element
-  // itself matched.
+  // Foundry's light application theme.
   playerCase({
     id: 'coverage-theme-light-player',
     label: 'Coverage — player app in Foundry light-theme chrome, dark Fabricate surfaces',
@@ -15228,7 +10638,6 @@ export const VIEW_LAB_CASES = Object.freeze([
   }),
   // Feature toggles that remove UI. `multiStepRecipes: false` (the jewellers) drops the step rail
   // and the Multi-step chip from the recipe editor; `experimental: '0'` drops the Graph rail entry.
-  // Both were only ever photographed in their ON state on the player side.
   managerCase({
     id: 'coverage-multistep-off-recipe-editor',
     label: 'Coverage — multi-step disabled recipe editor',
@@ -15254,15 +10663,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['player', 'crafting', 'settings'],
     sourceMatches: [CRAFTING_SHARED],
   }),
-  // Issue 1198 — the player companion surface. What a Core frame can show here is bounded and
-  // worth stating: the rail entry (icon, verbatim provider label, active state, ordering AFTER
-  // Core's own tabs), the panel's geometry, no horizontal overflow, the pointer hit-test on the
-  // new rail control, and Core's own fault state. Everything inside a healthy panel is the
-  // companion's, which Core neither authors nor can photograph in production.
-  //
-  // `reaches: 'beyond'` with no smoke labels, for the reason the honesty contract wants stated:
-  // the live smoke walk has no companion installed and no player-extension screen at all, so
-  // there is no counterpart these frames could fall short of.
+  // Issue 1198 — the player companion surface.
   playerCase({
     id: 'player-test-companion-surface',
     label: 'Player app — navigation surface from a TEST companion',
@@ -15270,9 +10671,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     reaches: 'beyond',
     query: { tab: PLAYER_EXTENSION_ROUTE, playerProvider: '1' },
     steps: [],
-    // The MOUNTED STAMP, not the panel element. The stamp is written imperatively on a
-    // successful mount and cleared the moment the mount is disposed, so a companion that failed
-    // to mount fails the capture here instead of publishing an empty panel that looks fine.
+    // The mounted stamp, not the panel element.
     expectSelector: '[data-player-extension-mounted="downtime"]',
     expectAttributes: [
       // A provider tab's `accessibleName` REPLACES the visible label as the control's accessible
@@ -15283,8 +10682,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: PLAYER_EXTENSION_RAIL_BUTTON, name: 'aria-controls', value: 'player-nav-panel' },
     ],
     // The seam adds a control to an existing fixed grid, so the pointer contract is photographed
-    // rather than assumed. `expectClick` establishes hit-testability ONLY: the lab stubs the
-    // tab-select callback and the app's render, so a click changes nothing in the frame.
+    // rather than assumed.
     expectCenterHit: PLAYER_EXTENSION_RAIL_BUTTON,
     expectClick: PLAYER_EXTENSION_RAIL_BUTTON,
     expectNoHorizontalOverflow: ['.fabricate-app-content', '.fabricate-app-nav'],
@@ -15330,9 +10728,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     reaches: 'beyond',
     query: { tab: PLAYER_EXTENSION_ROUTE, playerProvider: '1', playerProviderFault: '1' },
     steps: [],
-    // The whole decision in one selector: the faulted surface's rail entry SURVIVES, the active
-    // tab does not move, and Core renders its own error state in the panel. Dropping the entry
-    // and teleporting the user to Crafting is the behaviour this frame exists to disprove.
+    // The whole decision in one selector: the faulted surface's rail entry survives, the active tab
+    // does not move, and Core renders its own error state in the panel.
     expectSelector: `.fabricate-app-shell:has(${PLAYER_EXTENSION_RAIL_BUTTON}[aria-selected="true"]) [data-player-extension-fault="downtime"]`,
     // Core's own diagnostic copy, rendered rather than merely present in the DOM. It names the
     // provider that failed and nothing else: no product name, no offer, no call to action.
@@ -15343,19 +10740,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: PLAYER_EXTENSION_SOURCES,
   }),
 
-  // ── THE THREE GM CANVAS WINDOWS (issue 1520) ──────────────────────────────────────────────────
-  //
   // Registered before the design-system adoption that re-skins them, and the ordering is not a
-  // preference. Measured before these cases existed: a diff touching all three of these roots
-  // selected exactly one case, `fabricate-app-shell`, through the `selected.size === 0` fallback
-  // at the end of `mapChangedFilesToCases`; the evidence matcher then computed its expectation
-  // from the SAME selector, found that id in it, and reported `check-screenshots` SATISFIED. The
-  // gate could not fail, and the frame it passed on was the player crafting window.
-  //
-  // Every frame below is a WHOLE WINDOW at its declared size — 420x620, 480x680, 560x680 — and
-  // `assertWindowGeometry` fails the capture when the rendered box is not that size. That is what
-  // lets the phase which splits the shared size floor off `.fabricate-app` measure these windows
-  // rather than inspect them.
+  // preference.
   browserCase({
     id: 'interactables-browser-tools',
     label: 'Interactable browser — Tools tab, populated',
@@ -15367,12 +10753,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // The populated list, not merely the window: an empty `fab-ib-list` renders the "No tools in
     // this system." branch, which is a different screen wearing the same chrome.
     expectSelector: '.fabricate-interactable-browser .fab-ib-list .fab-ib-row',
-    // THE NARROWEST WINDOW IN THE REGISTRY GATES ITS OWN SPILL (issue 1520 review). At 420px the
-    // filter bar holds two controls side by side and every row holds a thumbnail, a label and two
-    // icon buttons, so a control that stops shrinking puts a horizontal scrollbar in a window a
-    // GM cannot widen far. The bar is the specific risk the root is included for: it is pulled to
-    // the window edge with a negative inline margin exactly equal to this column's padding, so an
-    // over-wide control inside it spills past the padding box rather than into it.
+    // The narrowest window in the registry gates its own spill (issue 1520 review).
     expectNoHorizontalOverflow: ['.fabricate-interactable-browser', '.fab-ib-list'],
     kinds: ['canvas', 'interactables'],
     sourceMatches: [
@@ -15381,25 +10762,12 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
   }),
   browserCase({
-    // THE WINDOW'S SECOND TAB, WHICH NOTHING PHOTOGRAPHED (issue 1520 review). The two cases
-    // beside this one both rest on the Tools tab, and the panels are an `{#if}`/`{:else}` pair
-    // rather than a shown/hidden pair — so `fab-ib-panel-tasks` was not merely off screen, it was
-    // UNRENDERED in every frame of this window. That matters beyond completeness: this phase
-    // re-skins that panel (row actions to the shared icon button, opacity mutes to inked ones,
-    // row radii onto the ladder), and its leaf-icon fallback is the ONE place in the window that
-    // renders at all, because every tool row is unconditionally a thumbnail.
-    //
-    // It is also the shape the requirement this change AUTHORED forbids: a window is registered
-    // in the View Lab before a change re-skins it, and a re-skinned panel with zero frames is
-    // that rule failing on the change that wrote it.
+    // The window's second tab, which nothing photographed (issue 1520 review).
     id: 'interactables-browser-tasks',
     label: 'Interactable browser — Gathering tasks tab, populated',
     reaches: 'beyond',
     smokeLabels: [],
-    // ONE STEP, and it is the tab button's own id rather than a positional `:nth-child`. The
-    // tablist is hand-rolled here — this phase deliberately did not convert it, because a roving
-    // tabindex driving two `aria-controls` panels is a keyboard contract rather than a radio
-    // group — so the id is the stable handle, and it is pinned by the window's residue census.
+    // One step, and it is the tab button's own id rather than a positional `:nth-child`.
     steps: [{ selector: '#fab-ib-tab-tasks' }],
     // SCOPED INSIDE THE PANEL, not to the list class the Tools frame also matches: the whole
     // claim of this case is that the OTHER branch rendered, and `.fab-ib-list .fab-ib-row` alone
@@ -15418,23 +10786,14 @@ export const VIEW_LAB_CASES = Object.freeze([
     reaches: 'beyond',
     smokeLabels: [],
     steps: [
-      // The system is CHOSEN rather than inherited. `pickDefaultSystemId` picks the first system
-      // carrying sources, so leaving it implicit would tie this frame to the fixture's ordering,
-      // and a re-ordering would silently move the frame to another system's library.
-      //
-      // TWO STEPS, because the picker is `components/Select.svelte` now (issue 1520) and there
-      // is no `<select>` left to issue `selectOption` against — the trigger is clicked by the
-      // stable hook it carries on `Select`'s `triggerData`, and the row by its own
-      // `data-popover-option` identity handle inside the portalled panel.
+      // The system is chosen rather than inherited.
       ...chooseSelectOption(
         '[data-interactable-browser-system]',
         'lab-smithing',
         '.fabricate-interactable-browser-app'
       ),
       // "Forge" matches exactly one smithing Tool — `sm-tool-tongs`, "Forge Tongs" — so the
-      // filtered list is ONE row rather than a shorter version of the same list. The field is
-      // `ManagerSearchField` now; the hook rides its `inputAttrs`, because the rest spread
-      // belongs to the `<label>` and cannot reach the input.
+      // filtered list is one row rather than a shorter version of the same list.
       { selector: '[data-interactable-browser-search]', fill: 'Forge' },
     ],
     expectSelector: '.fabricate-interactable-browser .fab-ib-list .fab-ib-row',
@@ -15448,10 +10807,7 @@ export const VIEW_LAB_CASES = Object.freeze([
   configCase({
     id: 'interactables-config-configured',
     label: 'Interactable config — configured gathering-task interactable',
-    // `window`, not `exact`. The three labels below are three distinct smoke conditions — the
-    // resource node LINKED, the node UNLINKED, and the identity section expanded on a configured
-    // interactable — and one resting frame is none of them exactly. It is the same window in the
-    // same configured state, which is what `window` means.
+    // `window`, not `exact`.
     reaches: 'window',
     smokeLabels: [
       'interactable-config-linked',
@@ -15460,10 +10816,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     query: { interactable: 'configured' },
     steps: [],
-    // Both halves matter. The `:not(...)` proves this is NOT the unconfigured panel — which
-    // renders the same window with the same chrome — and the pressed node-link toggle proves the
-    // gathering-task Resource node section reached its LINKED state, the condition the smoke's
-    // own `interactable-config-linked` frame is taken at.
+    // Both halves matter.
     expectSelector:
       '.fabricate-interactable-config:not(:has([data-interactable-needs-config])) ' +
       '[data-interactable-node-section] [data-interactable-node-link][aria-pressed="true"]',
@@ -15506,25 +10859,13 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-interactable-identity-toggle]' },
       { selector: '[data-interactable-identity-system]' },
     ],
-    // THE ONE FRAME THAT PROVES THE PORTAL RESOLVES (issue 1520), and the `>` is the whole
-    // assertion. `resolveOverlayHost` walks `closest` for `.fabricate-manager` / `.fabricate-app`
-    // and `portal` does a bare `appendChild`, so a panel that found its window is a DIRECT CHILD
-    // of the frame element and a panel that did not is a direct child of `<body>`. The two are
-    // indistinguishable in a resting frame — the panel is not open — and nearly
-    // indistinguishable in an open one, because the fallback still draws the panel where its
-    // trigger is; what it loses is the window's stacking and its clip, plus a `console.error` per
-    // scroll tick. That is the exact defect adopting `.fabricate-app` at the frame exists to
-    // prevent, arriving through the conversion meant to modernise the control, and no other case
-    // in this registry opens a portalled surface in one of these three windows.
+    // The one frame that proves the portal resolves (issue 1520), and the `>` is the whole
+    // assertion.
     expectSelector:
       '.fabricate-interactable-config-app > .fabricate-select-popover [data-popover-option]',
     kinds: ['canvas', 'interactables'],
-    // THE POSITIONING SEAM BELONGS IN HERE, and its absence was a routing gap rather than a
-    // judgement (issue 1520 review round 2). This case rests on an OPEN, measured, clamped and
-    // portalled panel, which is exactly the membership rule `ANCHORED_POPOVER_SOURCES` documents
-    // — so a change to that pass could regress this frame while publishing thirteen others that
-    // could not show it. The width finding this round answers came from measuring THIS frame and
-    // was fixed in that seam, so the gap was load-bearing rather than tidy.
+    // The positioning seam belongs in here, and its absence was a routing gap rather than a
+    // judgement (issue 1520 review round 2).
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/InteractableConfigRoot\.svelte$/,
       /^src\/ui\/InteractableConfigApp\.svelte\.js$/,
@@ -15535,24 +10876,13 @@ export const VIEW_LAB_CASES = Object.freeze([
     id: 'interactables-manager-list',
     label: 'Manage Interactables — populated scene list',
     // `window`: the smoke's list is its own two Azure Grove interactables, and this one carries a
-    // third with a resolving Tile marker and a locked state, plus a fourth whose marker does NOT
-    // resolve and which is disabled, so every badge the row can draw is photographed. Same
-    // window, same populated condition, different rows.
+    // third with a resolving Tile marker and a locked state, plus a fourth whose marker does not
+    // resolve and which is disabled, so every badge the row can draw is photographed.
     reaches: 'window',
     smokeLabels: ['interactables-manager-list'],
     steps: [],
-    // A row WITH its actions, so a list that renders names but loses its per-row controls fails
+    // A row with its actions, so a list that renders names but loses its per-row controls fails
     // here rather than publishing as a healthy list.
-    //
-    // AND THE `missing` MARKER IS IN THE FRAME, asserted through `:has()` on the list rather than
-    // on a row, because the claim is about the list holding such a row at all (issue 1520 review).
-    // `markerTone` routes `missing` to `danger` — the largest of its three tone changes, and the
-    // only one that paints an alarm colour — and until the fixture gained an unresolvable marker
-    // no frame in this registry could show it. A fixture uuid that started resolving, or a row
-    // dropped from the seeder, would leave that tone unphotographed again with every assertion
-    // above still green; this fails the capture WHOLE instead, and publishes nothing. The Foundry
-    // smoke makes the same assertion over its own world, which is why the two lists differ in
-    // rows and agree on what a list has to be able to show.
     expectSelector:
       '.fabricate-interactables-manager-body ' +
       '.fab-im-list:has([data-interactable-manager-chip-marker="missing"]) .fab-im-row ' +
@@ -15571,15 +10901,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [
       { selector: '[data-interactable-manager-promote-toggle]' },
       // The one selection the panel cannot make for itself: the system and the source both
-      // auto-pick through their own effects, and the region does not. Without it the panel
-      // photographs with its confirm button disabled, which is the panel before it is usable
-      // rather than the panel.
-      //
-      // TWO STEPS for the reason the browser's system picker takes two (issue 1520): the region
-      // picker is `components/Select.svelte`, so there is no `<select>` to issue `selectOption`
-      // against. The old form addressed it POSITIONALLY — `label.fab-im-field:first-of-type
-      // select` — which would have silently moved to another picker had the panel's field order
-      // changed; the hook names the control instead.
+      // auto-pick through their own effects, and the region does not.
       ...chooseSelectOption(
         '[data-interactable-manager-region]',
         'deep-gate',
@@ -15598,21 +10920,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
   }),
   interactablesManagerCase({
-    // THE WIDEST TRIGGER IN THE THREE WINDOWS, WITH ITS PANEL OPEN (issue 1520 review round 2).
-    //
-    // The Manage panel's promote card states `width: 100%` on its select triggers, and at this
-    // window's 560px that is a 508px control — the worst case of the three, and no frame in the
-    // registry reached it. `interactables-manager-promote` opens this same picker and CLICKS
-    // THROUGH it, so its frame rests on a closed control; the review round that measured a 340px
-    // panel under a 450px trigger had to measure it on the config window because this one could
-    // not be photographed at all.
-    //
-    // The steps are the promote case's own, minus its second: the toggle and the region trigger
-    // are both already proven to resolve there, so this case adds a state rather than a new
-    // locator. `expectSelector` names `deep-gate` for the same reason — it is the row that case
-    // clicks — and the `>` is the portal assertion the config window's open-panel frame carries,
-    // which is what makes a `<body>`-hosted fallback fail the capture rather than photograph as
-    // a healthy panel.
+    // The widest trigger in the three windows, with its panel open (issue 1520 review round 2).
     id: 'interactables-manager-region-open',
     label: 'Manage Interactables — promote region picker open under a full-width trigger',
     // `beyond`: the smoke opens the promote card but never rests on one of its panels, so there
@@ -15638,9 +10946,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manage Interactables — scene with no interactables',
     reaches: 'window',
     smokeLabels: ['interactables-manager-empty'],
-    // A world whose scene carries no `fabricate.interactable` behaviour at all. It is a world
-    // FLAG rather than a seeded state because the panel scans whatever the active scene carries:
-    // "nothing on this scene" is a property of the world, not of which behaviour a case opens.
+    // A world whose scene carries no `fabricate.interactable` behaviour at all.
     query: { noInteractables: '1' },
     steps: [],
     expectSelector: '.fabricate-interactables-manager-body .fab-im-list-section .fab-im-empty',
@@ -15652,12 +10958,7 @@ export const VIEW_LAB_CASES = Object.freeze([
   }),
 ]);
 
-/**
- * Normalize a changed-file path to repository-relative POSIX form.
- *
- * @param {string} filePath Path from a diff.
- * @returns {string} Normalized path.
- */
+/** Normalize a changed-file path to repository-relative POSIX form. */
 export function normalizePath(filePath) {
   return String(filePath ?? '')
     .trim()
@@ -15665,12 +10966,7 @@ export function normalizePath(filePath) {
     .replace(/^\.\//, '');
 }
 
-/**
- * Whether one path can change what a window looks like.
- *
- * @param {string} filePath Repository-relative path.
- * @returns {boolean} True for render-affecting paths.
- */
+/** Whether one path can change what a window looks like. */
 export function isUiFile(filePath) {
   return UI_PATH_PATTERN.test(normalizePath(filePath));
 }
@@ -15678,9 +10974,6 @@ export function isUiFile(filePath) {
 /**
  * Whether a changed set requires screenshot evidence at all. A `lang/`-only change does not — but a
  * `lang/` change alongside a render file does, which is why this tests the whole set.
- *
- * @param {string[]} files Changed paths.
- * @returns {boolean} True when evidence is required.
  */
 export function hasUiChanges(files = []) {
   const normalized = files.map((file) => normalizePath(file));
@@ -15691,50 +10984,8 @@ export function hasUiChanges(files = []) {
 }
 
 /**
- * Split a render's console errors into the ones a case DECLARED it would produce and the ones it
+ * Split a render's console errors into the ones a case declared it would produce and the ones it
  * did not.
- *
- * ── WHY A CASE MAY DECLARE AN ERROR AT ALL ─────────────────────────────────────────────────────
- *
- * `view-lab-screenshots.mjs` fails a render on ANY console error, and that gate is why the lab is
- * trusted: a frame rendered over a thrown handler looks exactly like a frame rendered over a
- * working one, and one such frame published as evidence is worth less than no frame. It has to
- * stay the default.
- *
- * But a handful of states this registry photographs ARE a refusal, and the refusal is the subject.
- * `manager-recipes-blocked-enable-flash` presses a switch the activation gate rejects, and
- * `adminStore.js` reports that rejection with `console.error` before it hands the message to the
- * view's flash. The error is the state working correctly. Nothing is broken, nothing is being
- * tolerated, and lowering the store's log level to accommodate a screenshot harness would be a
- * production change made for the lab's convenience — exactly backwards.
- *
- * So a case may name what it expects, by pattern, and NOTHING else changes: an error no pattern
- * names is fatal exactly as before.
- *
- * ── AND WHY AN UNUSED ALLOWANCE IS ALSO FATAL ──────────────────────────────────────────────────
- *
- * This returns `unusedAllowances` as well, and the caller throws on it. A declared pattern that
- * matched nothing is not harmless: it means the case no longer reaches the refusal it is named
- * for — the recipe was completed, the gate was moved, the message was reworded — and the frame it
- * publishes is the resting screen under a case named for the alert. That is the failure mode
- * `BROAD_SIGNAL_CASE_OVERRIDES` records above as the one this repository keeps meeting:
- * unreachable configuration looks identical to working configuration.
- *
- * Requiring the match turns the allowance into an ASSERTION. The field does not merely permit the
- * error, it demands it, which is the only form in which "this case photographs a refusal" is
- * checkable at all.
- *
- * THE `g` FLAG IS STRIPPED BEFORE MATCHING, and that is a correctness fix rather than tidiness.
- * `RegExp#test` on a global pattern advances `lastIndex` and resumes from it on the next call, so
- * an allowance that matched the first message would start mid-string on the second and could miss
- * — surfacing as an "unused allowance" failure on a case that did produce its error, which reads
- * as a fixture regression and is not one. The original is kept for the message, so a report still
- * names the pattern the case actually declared.
- *
- * @param {string[]} messages Console errors collected during the render, in order.
- * @param {RegExp[]} [allowed] The case's `allowedConsoleErrors`.
- * @returns {{unmatched: string[], unusedAllowances: string[]}} Fatal messages, and the declared
- *   patterns nothing matched.
  */
 export function partitionConsoleErrors(messages = [], allowed = []) {
   const patterns = [...allowed].map((pattern) => ({
@@ -15772,9 +11023,6 @@ export function getCaseById(id) {
 /**
  * Resolve a case's human-facing label. Wired into the S3 publish path so the PR body's alt text
  * comes from this registry rather than from the legacy `VIEW_RECIPES` table.
- *
- * @param {string} id Case id.
- * @returns {string|null} Label, or null when the id is unknown.
  */
 export function labelForCaseId(id) {
   return getCaseById(id)?.label ?? null;
@@ -15783,30 +11031,6 @@ export function labelForCaseId(id) {
 /**
  * The sentence a published frame carries beneath it, or the empty string for a frame that needs
  * none.
- *
- * ## Why any frame needs one
- *
- * A published frame is a bare image in a PR body on a PUBLIC repository, and a reader has nothing
- * but the picture. Most frames need nothing: they show the shipped Manager, and what they show is
- * what a GM would see.
- *
- * The COMPANION frames are the exception. Core's World-nav seam is a public API that a separate
- * module implements, and this repository cannot depend on the module that implements it — so the
- * lab registers a stand-in of its own, with invented tabs (`Ledger Administration`, `Crew`,
- * `Writs`) and an invented character. That is deliberate: naming them after the real companion's
- * tabs would make a Core-seam frame read as evidence about a module Core cannot see. But it also
- * means the frame shows a screen that exists nowhere, in a picture that looks exactly like a
- * feature — and a reader who knows the product is MORE likely to be misled by it, not less,
- * because they know those tabs are not in either the free module or the premium one.
- *
- * ## Derived from the case rather than hand-tagged
- *
- * A frame needs this note exactly when it asked the lab to register the stand-in, which is a fact
- * already on the case: the `downtimeProvider` and `playerProvider` query parameters are what turn
- * it on. Reading them means a frame added later gets the note without anyone remembering to.
- *
- * @param {string} id Case id.
- * @returns {string} The note, or `''`.
  */
 export function evidenceNoteForCaseId(id) {
   const query = getCaseById(id)?.query ?? {};
@@ -15814,12 +11038,7 @@ export function evidenceNoteForCaseId(id) {
   return standIn ? STAND_IN_COMPANION_NOTE : '';
 }
 
-/**
- * What that note says, verbatim.
- *
- * It names the FILE rather than describing the situation, because the one question a reader has —
- * *is this real?* — is answered by being able to go and look.
- */
+/** What that note says, verbatim. */
 export const STAND_IN_COMPANION_NOTE =
   'The companion tabs in this frame come from a stand-in registered by `tests/view-lab/mount.js` so that Core can photograph its own companion seam. They are not a shipped Fabricate surface and appear in neither the free module nor Fabricate Premium.';
 
@@ -15827,66 +11046,11 @@ export function fallbackCase() {
   return getCaseById(FALLBACK_CASE_ID);
 }
 
-// ───────────────────────────────────────────────────────────────────────────────────────────────
-// Surface coverage — what a change the registry CANNOT attribute captures.
-//
-// The old answer was every publishable case, and it was the wrong shape of honest. A change to the
-// fixture world or the capture driver genuinely can move any frame, so the selection had to be
-// wide; but 246 frames is not evidence a person reads, it is a directory they scroll. In practice
-// it bought nothing and cost twenty-five minutes, and its real effect was to make the whole
-// per-PR capture feel expensive enough to want switched off.
-//
-// What such a change actually has to prove is that the LAB still works: that it boots, mounts both
-// applications, and still navigates to and photographs every ROUTE AND TAB. It does not have to
-// re-answer "does the Recipe Studio's blocked bulk-edit banner still look right" — nothing in that
-// frame is under test, and the frame that would show a regression in it is selected by the files
-// that draw it. So the widening target is one frame per SURFACE, and the states of a surface are
-// captured when the files governing their behaviour or presentation change.
-//
-// SURFACE MEANS ROUTE-OR-TAB, AND THAT IS NARROWER THAN "SCREEN". Say it exactly, because the
-// looser word is the one a future reader will lean on. A route's own internal tabs are NOT
-// separately covered: the Recipe editor's Results tab, the Tool editor's Requirements tab and the
-// Tags studio's second tab all fold into their route's single frame, because nothing a case
-// declares distinguishes them — reaching them is a `steps` click, and `steps` is the axis this
-// key deliberately collapses. Adding a sub-tab axis would mean adding a field to ~250 cases and
-// is not done here.
-//
-// The exposure this accepts, stated plainly, is therefore two things. A fixture edit that changes
-// only a DETAILED state — one recipe's tools, one actor's broken stack — moves a frame nobody
-// photographs on that PR. So does one that breaks a sub-tab WITHIN a covered route. Both land
-// unphotographed until the next PR touching the surface they belong to. That is the same bargain
-// every other narrowing here already makes (a `sourceMatches` change selects its own cases, not
-// the corpus).
-//
-// What is NOT accepted is silence at the route level: every route and every tab is still
-// photographed, so a fixture edit that breaks the lab, breaks a window, or stops a ROUTE rendering
-// at all still reds this PR rather than the next one.
-// ───────────────────────────────────────────────────────────────────────────────────────────────
+// Surface coverage — what a change the registry cannot attribute captures.
 
 /**
- * The SURFACE a case photographs — the screen you can navigate to, as distinct from the state you
+ * The surface a case photographs — the screen you can navigate to, as distinct from the state you
  * can drive that screen into.
- *
- * Derived from what a case already declares, so a case added tomorrow is classified without anyone
- * remembering to classify it:
- *
- *   - the MANAGER's surface is `expectView`, the route the capture asserts it reached. That is the
- *     manager's own notion of "which screen am I on", already gated (`view-lab-cases.test.js`
- *     checks every value against the app's real view ids), so keying on it cannot invent a screen
- *     the app does not have;
- *   - the PLAYER app's surface is `query.tab`, which is the same fact for a window whose screens
- *     are tabs;
- *   - the Foundry application THEME joins the key, because `theme-light` is a different cascade
- *     rather than a different state of one — it is the only thing the `coverage-theme-light-*`
- *     pair exists to photograph, and folding it into its dark twin would drop the only two frames
- *     rendered under it.
- *
- * A case that declares NEITHER route nor tab is its own surface, keyed by id. That is the
- * fail-safe direction: an unclassifiable case is always captured rather than silently represented
- * by a frame of some other screen.
- *
- * @param {object} viewCase A registry case.
- * @returns {string} Its surface key.
  */
 export function labSurfaceKey(viewCase) {
   const surface = canvasSurfaceOf(viewCase);
@@ -15894,59 +11058,19 @@ export function labSurfaceKey(viewCase) {
   return `${viewCase.app}|${surface || viewCase.id}|${theme}`;
 }
 
-/**
- * The route-or-tab half of the surface key, per window family.
- *
- * Split out of {@link labSurfaceKey} when the three canvas windows arrived (issue 1520), because
- * the two-way ternary it replaced answered `query.tab` for them — which none of them declares —
- * and every canvas case therefore fell to the id fallback and became ITS OWN surface. That is the
- * fail-safe direction and it is not wrong, but it is not true either: coverage would have held a
- * frame of the browser's filtered state and of the manager's promote panel as though each were a
- * screen you can navigate to.
- *
- * Each canvas window IS one screen. There is no route to name, and the browser's two
- * `role="tab"` panels are exactly the sub-tabs this key already folds into their screen (see the
- * header above: the Recipe editor's Results tab and the Tags studio's second tab fold the same
- * way). So the window is the surface, and the app id — already the first term of the key — is
- * what says which.
- *
- * @param {object} viewCase A registry case.
- * @returns {string|undefined} Its route or tab, or the single-screen sentinel.
- */
+/** The route-or-tab half of the surface key, per window family. */
 function canvasSurfaceOf(viewCase) {
   if (viewCase.app === MANAGER) return viewCase.expectView;
   if (rendersInCanvasWindow(viewCase)) return SINGLE_SCREEN_SURFACE;
   return viewCase.query?.tab;
 }
 
-/**
- * The surface term for a window that has exactly one screen.
- *
- * A constant rather than the app id repeated, because the app id is already the key's first term;
- * repeating it would read as though the two terms could disagree.
- */
+/** The surface term for a window that has exactly one screen. */
 const SINGLE_SCREEN_SURFACE = 'window';
 
 /**
- * Which of two cases is the better photograph OF ITS SURFACE, rather than of a state that surface
+ * Which of two cases is the better photograph of its surface, rather than of a state that surface
  * can be driven into. Lower sorts first.
- *
- * Three facts, in order, all read off the case itself:
- *
- *   1. it renders at its app's default geometry. A 680px or stacked case is a responsive state,
- *      and a narrow frame is a poor look at a screen whose ordinary width is 1280;
- *   2. no dialog is open over it. A modal covers the screen it is asked to represent;
- *   3. fewest steps. The least-driven state of a surface is the closest thing it has to a resting
- *      one — which is why almost every surface's representative comes out as its own `*-normal`
- *      frame without that string being mentioned anywhere.
- *
- * Ties break on registry order at the call site, so the choice is total and stable: the same
- * registry always yields the same coverage set, and a reviewer diffing two runs sees frames move
- * only when the registry moved them.
- *
- * @param {object} a One case.
- * @param {object} b Another case on the same surface.
- * @returns {number} Negative when `a` is the better representative.
  */
 function compareSurfaceRepresentative(a, b) {
   const offDefault = (viewCase) => {
@@ -15965,11 +11089,7 @@ function compareSurfaceRepresentative(a, b) {
   );
 }
 
-/**
- * One publishable case per surface, in registry order.
- *
- * @returns {object[]} The coverage set.
- */
+/** One publishable case per surface, in registry order. */
 function chooseSurfaceRepresentatives() {
   const order = new Map(VIEW_LAB_CASES.map((viewCase, index) => [viewCase.id, index]));
   const bySurface = new Map();
@@ -15982,26 +11102,15 @@ function chooseSurfaceRepresentatives() {
 }
 
 /**
- * One frame of every surface the lab renders: the capture a change whose reach cannot be
- * attributed selects.
- *
- * DERIVED, never listed. A hand-written list would be correct on the day it was written and wrong
- * the first time a screen was added — and wrong in the silent direction, since the new screen
- * would simply have no coverage frame and nothing would say so.
- *
- * @type {readonly object[]}
+ * One frame of every surface the lab renders: the capture a change whose reach cannot be attributed
+ * selects.
  */
 export const LAB_SURFACE_CASES = Object.freeze(chooseSurfaceRepresentatives());
 
 /** @type {readonly string[]} */
 export const LAB_SURFACE_CASE_IDS = Object.freeze(LAB_SURFACE_CASES.map((viewCase) => viewCase.id));
 
-/**
- * The cases a set of RENDER files selects, by the `sourceMatches` patterns each case declares.
- *
- * @param {string[]} renderFiles Normalized paths that {@link isUiFile} accepts.
- * @returns {Set<string>} Selected case ids. Empty when nothing matched.
- */
+/** The cases a set of render files selects, by the `sourceMatches` patterns each case declares. */
 function selectRenderFileCases(renderFiles) {
   const selected = new Set();
   let sawBroadSignal = false;
@@ -16020,43 +11129,7 @@ function selectRenderFileCases(renderFiles) {
   return selected;
 }
 
-// ───────────────────────────────────────────────────────────────────────────────────────────────
 // Diff-aware selection, for the lab inputs whose diff can be attributed.
-//
-// Adding two cases used to select the whole corpus, when the honest answer is those two. The
-// selector had the diff available and did not use it. It does now — for this registry and for the
-// actor fixture — but only for a change it can PROVE is confined to one region of the file, and it
-// proves that against that file's own text.
-//
-// The whole design is one question: when do we widen back to surface coverage? The answer is "at
-// the first sign of anything we do not fully understand", which here means:
-//
-//   - no patch, an empty patch, or a patch that is not a unified diff;
-//   - a hunk header that does not parse, or a body line whose marker is not ` `, `+`, `-` or `\`;
-//   - a hunk whose content cannot be LOCATED AT ALL in the file that will render — see
-//     {@link regionsTouchedByHunk} for the two ways that happens. Content found in SEVERAL places
-//     is located, not unlocated: it answers with the union of those places, which contains
-//     whichever one the edit really was (issue 1127);
-//   - that file's own text not parsing into regions;
-//   - a changed line outside every region — in this registry a shared helper, a pattern constant,
-//     a case factory or `mapChangedFilesToCases` itself, any of which can move every frame.
-//
-// The one thing DELIBERATELY not widened for is a blank or comment-only line. A comment cannot
-// change a pixel, and a 181-frame, twenty-minute capture to answer a typo fix is exactly the cost
-// this narrowing exists to remove.
-//
-// WHAT IT REFUSES TO DO IS TRUST THE HUNK HEADER'S LINE NUMBERS, and that is issue 1049's
-// correction. The first version seeded a cursor from `@@ … +N` and checked each line against
-// `sourceLines[cursor - 1]`, which is right only when the patch and the checkout are the same
-// revision — and in CI they systematically are not. `pr-screenshots.yml` runs on `pull_request`, so
-// the workspace is the MERGE commit while GitHub's `patch` field describes the PR HEAD; any PR
-// whose base moved the file it patches verifies against shifted lines, fails at the first
-// comparison, and silently pays the full coverage capture. Worse, a shifted patch that happens to
-// land on a verbatim twin of its own content verifies against the WRONG occurrence and attributes
-// the change to a case it does not touch — publishing a frame under a name it does not show, which
-// is strictly worse than over-capturing. The header must still PARSE, because that is the signal
-// the input is a unified diff at all; its numbers are read by nothing.
-// ───────────────────────────────────────────────────────────────────────────────────────────────
 
 /** `  managerCase({` / `  playerCase({` — an element of the array, at Prettier's two-space indent. */
 const CASE_OPEN_PATTERN = /^ {2}[A-Za-z]\w*\(\{$/;
@@ -16066,25 +11139,12 @@ const CASE_CLOSE_LINE = '  }),';
 const CASE_ID_PATTERN = /^ {4}id: '([^']+)',$/;
 const ARRAY_OPEN_PREFIX = 'export const VIEW_LAB_CASES';
 const ARRAY_CLOSE_LINE = ']);';
-/**
- * `@@ -old,count +new,count @@`, matched for its SHAPE alone.
- *
- * The new-file start is deliberately NOT captured. It was, and reading it is the defect above; a
- * pattern that no longer offers the number is what stops the next reader reaching for it.
- */
+/** `@@ -old,count +new,count @@`, matched for its shape alone. */
 const HUNK_HEADER_PATTERN = /^@@ -\d+(?:,\d+)? \+\d+(?:,\d+)? @@/;
 /** A line that cannot change a rendered frame: blank, a `//` comment, or inside a block comment. */
 const INERT_LINE_PATTERN = /^\s*(\/\/|\/?\*)/;
 
-/**
- * Memoize a zero-argument function, INCLUDING a null result.
- *
- * `value ??= compute()` cannot: a parse that legitimately returns null is indistinguishable from
- * one that has not run, so an unparseable file would be re-read and re-parsed on every call.
- *
- * @param {Function} compute The value to produce once.
- * @returns {Function} The memoized accessor.
- */
+/** Memoize a zero-argument function, including a null result. */
 function memoized(compute) {
   let cell = null;
   return () => {
@@ -16093,20 +11153,7 @@ function memoized(compute) {
   };
 }
 
-/**
- * One file's source, by line.
- *
- * Reading a file is the only way to know where its regions SIT, and it is safe here for a reason
- * worth stating: the read is not trusted. Each hunk is located by finding its own content in what
- * is read back, so a patch describing a revision this checkout does not have anchors nowhere and
- * widens to everything rather than mis-attributing.
- *
- * Every accessor below is memoized and lazy, so the no-patch path stays free of I/O — the ordinary
- * selection remains a pure function of its arguments — and it never shells out to git.
- *
- * @param {URL|string} fileUrl The file to read.
- * @returns {string[]} Its lines; empty when it cannot be read.
- */
+/** One file's source, by line. */
 function readSourceLines(fileUrl) {
   try {
     return readFileSync(fileURLToPath(fileUrl), 'utf8').split('\n');
@@ -16123,12 +11170,7 @@ const mountSourceLines = memoized(() =>
   readSourceLines(new URL(`../../${LAB_MOUNT_PATH}`, import.meta.url))
 );
 
-/**
- * The `VIEW_LAB_CASES` array's body, with the file line number its first line has.
- *
- * @param {string[]} sourceLines This file, by line.
- * @returns {{firstLineNumber: number, lines: string[]}|null} The body, or null when not found.
- */
+/** The `VIEW_LAB_CASES` array's body, with the file line number its first line has. */
 function registryArrayBody(sourceLines) {
   const start = sourceLines.findIndex((line) => line.startsWith(ARRAY_OPEN_PREFIX));
   if (start === -1) return null;
@@ -16137,22 +11179,7 @@ function registryArrayBody(sourceLines) {
   return { firstLineNumber: start + 2, lines: sourceLines.slice(start + 1, end) };
 }
 
-/**
- * The 1-based, inclusive line span of every case literal in the array, keyed by case id.
- *
- * Line-level rather than a brace count, because a brace count over raw text is wrong here: this
- * registry is full of regular-expression literals whose character classes and quantifiers carry
- * unbalanced `[`, `]` and `{`, and tokenising JavaScript to avoid that is far more machinery than
- * the question deserves. Prettier already guarantees the shape this reads — one element per
- * `  factory({` line, closed by `  }),` — and the id it extracts is checked against {@link caseIds},
- * so a file whose text stops matching what it exports parses to null and widens to everything.
- *
- * Lines BETWEEN elements (section banners, the `...journalBlindRunCases()` spread) belong to no
- * region on purpose: the spread is a call to shared code, and a change to it must widen.
- *
- * @param {string[]} sourceLines This file, by line.
- * @returns {{key: string, start: number, end: number}[]|null} Regions, or null when unparseable.
- */
+/** The 1-based, inclusive line span of every case literal in the array, keyed by case id. */
 function parseCaseLineRegions(sourceLines) {
   const body = registryArrayBody(sourceLines);
   if (!body) return null;
@@ -16202,26 +11229,7 @@ function rendersInCanvasWindow(viewCase) {
   return CANVAS_APPS.includes(viewCase.app);
 }
 
-/**
- * The render files that read an actor's owned recipe-item copies or learned recipes.
- *
- * Real paths, and probes rather than a list of case ids: a case is asked whether ITS OWN
- * `sourceMatches` claims one of them. That is the drift defence. `sourceMatches` already declares
- * which render files a case is evidence about, and `tests/view-lab-source-coverage.test.js` fails
- * at authoring time when a component inside a mounted window is claimed by no case — so a case that
- * can show the Knowledge surface has already had to say so, in the field the registry ALREADY gates
- * for completeness. Keying on `kinds` instead would need a hand-listed set of nav selectors to
- * police, which is the hand-maintained list this whole table refuses.
- *
- * `ItemPageInspector.svelte` is here because two cases render it in a captured frame today —
- * `manager-books-scrolls-normal` draws the aside's empty branch and `manager-books-scrolls-item`
- * its populated one — and `manager-system-edit-normal` declares it in `sourceMatches` too:
- * honouring a case's own declaration costs one frame and removes the need to second-guess it.
- *
- * Exported so `tests/view-lab-cases.test.js` can check THESE strings resolve to tracked files,
- * rather than a hand-written copy of them. A copy would keep a renamed component's probe looking
- * guarded while the live probe went dead — the mirror-rot this file guards everywhere else.
- */
+/** The render files that read an actor's owned recipe-item copies or learned recipes. */
 export const ACTOR_KNOWLEDGE_RENDER_FILES = Object.freeze([
   'src/ui/svelte/apps/manager/KnowledgeView.svelte',
   'src/ui/svelte/apps/manager/BooksScrollsView.svelte',
@@ -16243,22 +11251,6 @@ function rendersOwnedKnowledge(viewCase) {
 /**
  * The four per-actor fixture tables in `labActors.js`, each with the predicate deciding which
  * frames can render what it feeds.
- *
- * `INVENTORIES` and `BROKEN_STACKS` are player-only because no manager surface renders a component
- * stack: the manager's only walk of `actor.items` (`_collectKnowledgeOwnedCopies`) keeps just the
- * items matching a recipe-item definition, so a component stack or a `toolBroken` flag reaches no
- * manager frame.
- *
- * `RECIPE_ITEM_COPIES` and `LEARNED_RECIPES` add the Knowledge surface, which reads both ends of
- * them — roster meta, tab badges, both tabs, the owned-copy row's uses/inert/spent chips, the
- * learned row's source ladder — and `ItemPageInspector`'s learned-by stat on Books & Scrolls.
- *
- * EVERY player case is in both, and that is not conservatism for its own sake: `labWorld.js` seeds
- * `lastComponentSources` with all three actors, so `ComponentSourcesBar` draws every roster
- * portrait and the crafting, inventory and alchemy listings are computed from all three
- * inventories, while recipe visibility for the knowledge-gated system is evaluated over the
- * crafting actor plus every component-source actor. There is no player frame a change to one
- * actor's holdings provably cannot reach.
  */
 const LAB_ACTOR_FIXTURE_TABLES = Object.freeze({
   INVENTORIES: rendersOwnedComponents,
@@ -16276,47 +11268,7 @@ const TABLE_OPEN_PATTERN = /\{$/;
 /** The line closing a top-level fixture table: `};`, or `});` for an `Object.freeze` wrapper. */
 const TABLE_CLOSE_PATTERN = /^\}\)?;$/;
 
-/**
- * The 1-based, inclusive span of each fixture table in `labActors.js`.
- *
- * Column-anchored, like {@link parseCaseLineRegions} and for the same reason: Prettier guarantees a
- * top-level `const NAME = ` opens at column zero and its statement closes at column zero, and
- * anything cleverer would have to tokenise JavaScript to survive the fixture's own braces. A table
- * this cannot find parses to null and widens to everything, so a rename fails safe — and
- * `tests/view-lab-cases.test.js` asserts all four names are still there, so it fails loudly too.
- *
- * The parse is then self-checked TWICE, which is this parser's counterpart to
- * {@link parseCaseLineRegions}' cross-check of every key against `caseIds` — the structural
- * self-check without which a plausible authoring produces a plausible-looking wrong answer. Both
- * checks defend the same assumption from opposite ends, and neither subsumes the other.
- *
- * The assumption is that a table's opening line OPENS it. The close search takes the first
- * column-zero `};` AFTER that line, so a table authored on ONE line — `const BROKEN_STACKS =
- * Object.freeze({ 'lab-actor-brenna': ['sm-longsword'] });`, 78 columns and therefore a line
- * Prettier will not break at `printWidth: 100` — skips past its own close and swallows whatever is
- * declared next. Nothing downstream would notice: `regionsTouchedAt` takes the FIRST region
- * containing a line, so the swallowed lines answer under the swallower's key. Measured on this
- * fixture, with `BROKEN_STACKS` written that way and neither check here: a `RECIPE_ITEM_COPIES`
- * patch selects the 64 player frames and NONE of the ten Knowledge and Books & Scrolls frames it is
- * evidence for — a silent wrong narrowing, which is the one outcome this whole table is built to
- * make unreachable. So the assumption is checked DIRECTLY: an opener ends in `{`, and anything else
- * — a one-liner's `});` most of all — is not a parse.
- *
- * Checking the consequence as well is not belt-and-braces. Overlapping spans catch a swallow only
- * when what got swallowed is another TABLE, which is true of today's fixture by layout accident: a
- * `const SOMETHING = {…};` declared between two tables would be swallowed with no two spans
- * overlapping at all. And the direct check alone would leave `regionsTouchedAt`'s first-match
- * lookup merely believed to be unambiguous rather than shown to be: disjoint spans are what make
- * the region containing a line the ONLY region containing it. Overlapping spans are therefore not a
- * parse either, and a non-parse widens to everything.
- *
- * Exported for `tests/view-lab-cases.test.js`, which drives both refusals from synthetic line
- * arrays. It is already a pure function of an injected `string[]`, so testing it takes no file, no
- * path injection and no second copy of the walk — only the export.
- *
- * @param {string[]} sourceLines That fixture, by line.
- * @returns {{key: string, start: number, end: number}[]|null} Regions, or null when unparseable.
- */
+/** The 1-based, inclusive span of each fixture table in `labActors.js`. */
 export function parseLabActorTableRegions(sourceLines) {
   const regions = [];
   for (const key of Object.keys(LAB_ACTOR_FIXTURE_TABLES)) {
@@ -16343,37 +11295,8 @@ export function parseLabActorTableRegions(sourceLines) {
 const labActorLineRegions = memoized(() => parseLabActorTableRegions(labActorSourceLines()));
 
 /**
- * The regions of `tests/view-lab/mount.js` whose readership is NARROWER than the whole corpus,
- * each with the predicate deciding which frames read what that region produces.
- *
- * Four are player-only (issue 1198) and two are canvas-only (issue 1520). The table was named
- * `PLAYER_MOUNT_REGIONS` while every key answered `rendersInPlayerWindow`; it is
- * `MOUNT_REGIONS` now, because a canvas key inside a table called PLAYER would be a name
- * asserting something false about its own contents — the exact mirror-rot this file polices
- * everywhere else.
- *
- * Each entry is a derivation rather than a convenience:
- *
- *   - `player-extension-params` — the three companion query params. Nothing but `mountPlayerApp`
- *     reads them, and only a player frame carries a nav rail to put a provider tab in.
- *   - `lab-player-provider` — the stand-in companion provider. It is registered with the PLAYER
- *     registry, whose surface-id namespace is disjoint from the Manager's.
- *   - `player-settle-stores` — the store-quiescence wait. It watches six names the player service
- *     bag declares and the Manager's `_buildServices()` does not declare at all, so `watched` is
- *     empty on every manager frame and the block cannot move one.
- *   - `mount-player-app` — the player window's whole mount path.
- *   - `canvas-mount-params` — the `interactable` and `noInteractables` query params. Neither is
- *     read anywhere but `mountCanvasApp` and the world build it drives, and neither the player
- *     window nor the Manager mounts a canvas window at all.
- *   - `mount-canvas-app` — the three canvas windows' whole mount path, table included.
- *
- * They are MARKED regions rather than whole functions on purpose. Three of the six edits this
- * attribution exists for land inside functions the other windows also run — `readParams` twice
- * and `settle` — so keying on those functions would claim a readership the file does not have,
- * and a later edit to a manager param would then select the player frames and silently publish no
- * evidence for the manager frames it moved. Marking the blocks keeps every declared region's
- * readership true, and a hunk landing outside every marker widens to surface coverage, which is
- * the fail-safe default.
+ * The regions of `tests/view-lab/mount.js` whose readership is narrower than the whole corpus, each
+ * with the predicate deciding which frames read what that region produces.
  */
 const MOUNT_REGIONS = Object.freeze({
   'player-extension-params': rendersInPlayerWindow,
@@ -16390,24 +11313,7 @@ const MOUNT_REGION_OPEN_PREFIX = '// view-lab-region:';
 /** The line closing one: `// view-lab-region:end`. */
 const MOUNT_REGION_CLOSE = `${MOUNT_REGION_OPEN_PREFIX}end`;
 
-/**
- * The 1-based, inclusive span of each marked region in `tests/view-lab/mount.js`.
- *
- * Marker-anchored rather than column-anchored, unlike {@link parseCaseLineRegions} and
- * {@link parseLabActorTableRegions}, because three of the six regions are BLOCKS INSIDE a function
- * the other windows run too — see {@link MOUNT_REGIONS} for why that has to be so. A marker
- * is a comment, so `isInertSourceLine` skips it: moving or re-wording one can never itself be the
- * change a hunk is attributed on.
- *
- * Self-checked the way its two siblings are, and for the same reason — a plausible authoring must
- * not produce a plausible-looking wrong answer. Every declared key must be opened exactly once and
- * closed; a marker naming a key this table does not declare, a nested or unclosed region, or a
- * close with nothing open, is not a parse. A non-parse widens to everything, so every refusal
- * fails safe, and `tests/view-lab-cases.test.js` drives each of them from synthetic line arrays.
- *
- * @param {string[]} sourceLines That file, by line.
- * @returns {{key: string, start: number, end: number}[]|null} Regions, or null when unparseable.
- */
+/** The 1-based, inclusive span of each marked region in `tests/view-lab/mount.js`. */
 export function parseMountRegions(sourceLines) {
   const regions = [];
   let open = null;
@@ -16454,13 +11360,7 @@ function patchLines(patch) {
   return lines;
 }
 
-/**
- * Split a unified diff into hunks, each reduced to its body.
- *
- * @param {string} patch A unified diff.
- * @returns {{marker: string, text: string}[][]|null} Hunk bodies, or null when the patch cannot be
- *   interpreted.
- */
+/** Split a unified diff into hunks, each reduced to its body. */
 function parseHunks(patch) {
   const hunks = [];
   let body = null;
@@ -16472,8 +11372,7 @@ function parseHunks(patch) {
       continue;
     }
     // Anything before the first hunk header is either a `diff --git` / `index` / `---` / `+++`
-    // preamble or not a diff at all. GitHub's `patch` field carries no preamble, so rather than
-    // guess which it is, refuse: an unparseable patch is a full capture, not a wrong one.
+    // preamble or not a diff at all.
     if (!body) return null;
     if (raw.startsWith('\\')) continue; // `\ No newline at end of file`
     // A blank context line is emitted as a bare space, but tools that strip trailing whitespace
@@ -16485,13 +11384,7 @@ function parseHunks(patch) {
   return hunks.length > 0 ? hunks : null;
 }
 
-/**
- * Every 0-based offset at which a sequence of lines occurs, in file order.
- *
- * @param {string[]} sourceLines The file, by line.
- * @param {string[]} sequence The lines to find, in order.
- * @returns {number[]} Offsets; empty when the file does not contain the sequence.
- */
+/** Every 0-based offset at which a sequence of lines occurs, in file order. */
 function anchorOffsets(sourceLines, sequence) {
   const offsets = [];
   for (let offset = 0; offset + sequence.length <= sourceLines.length; offset += 1) {
@@ -16500,25 +11393,7 @@ function anchorOffsets(sourceLines, sequence) {
   return offsets;
 }
 
-/**
- * The regions one hunk touches, read from ONE candidate anchor.
- *
- * `cursor` is the new-file line the next context or added line occupies. A REMOVED line has no
- * position of its own, so it is attributed to the line that now occupies its place — inside the
- * same region for any edit within one, and outside every region (so: everything) for a removal at
- * a region boundary.
- *
- * A hunk can STRADDLE a region boundary — a changed line inside a case literal and another in the
- * shared code after it — so this reports both halves rather than collapsing to the wider one. That
- * is the same correction the three levels above it carry: the answer for a straddling hunk is the
- * region it touched TOGETHER WITH the widening, never the widening alone.
- *
- * @param {{marker: string, text: string}[]} hunk One hunk body.
- * @param {number} offset The 0-based source line its first new-file line sits at.
- * @param {{key: string, start: number, end: number}[]} regions The file's regions.
- * @returns {{keys: Set<string>, unattributable: boolean}} The regions its changed lines sit in,
- *   and whether any changed line sat outside every region.
- */
+/** The regions one hunk touches, read from one candidate anchor. */
 function regionsTouchedAt(hunk, offset, regions) {
   const keys = new Set();
   let unattributable = false;
@@ -16534,45 +11409,7 @@ function regionsTouchedAt(hunk, offset, regions) {
   return { keys, unattributable };
 }
 
-/**
- * The regions one hunk touches, located by CONTENT.
- *
- * The hunk's context and added lines are exactly the lines that must exist, in that order, in the
- * file the producer will render — so they are the anchor, and the header's line numbers are never
- * consulted. Four outcomes, two of which widen:
- *
- *   - an EMPTY sequence — a hunk carrying no context and no additions, which `-U0` produces — has
- *     nothing to anchor against, and "matches everywhere" is not an attribution;
- *   - NO occurrence — the patch describes content this checkout does not have, exactly as an
- *     unverifiable patch always did;
- *   - ONE occurrence — that is the anchor, and attribution proceeds from it;
- *   - SEVERAL occurrences — the hunk is attributed at each, and the answer is their UNION. The
- *     repetition is real, not theoretical: 76 distinct seven-line windows recur in this registry,
- *     one `sourceMatches` block recurs fourteen times verbatim, and the three `currency-*` cases
- *     share a byte-identical tail.
- *
- * The union is sound, and the argument is one sentence: the anchor sequence is the content that
- * must EXIST in the file that will render, so wherever the edit actually landed, that place is one
- * of the matched offsets — and a set containing every candidate therefore contains the true one.
- * It is exact when the anchor is unique and a superset when it is not, which is the same direction
- * of error the widened answer makes, at a fraction of the cost. Taking the FIRST candidate
- * instead would attribute a change to whichever twin came earlier in the file; that is the silent
- * misattribution this rule still makes unreachable (issue 1127).
- *
- * The rule this replaced widened whenever two candidates disagreed. Of the 3,740 lines inside a
- * case literal, a single-line edit with git's three lines of context anchors uniquely at 3,489
- * (93.3%) and was ambiguous at 251 (6.7%) — but that measurement understates what it cost, because
- * the ambiguity is not randomly distributed. Applying the SAME edit to a family of sibling cases is
- * one of the commonest registry changes there is, and byte-identical siblings are precisely what
- * makes an anchor ambiguous. PR #1125 added four lines to three sibling case literals and captured
- * 209 frames in 28 minutes for want of three.
- *
- * @param {{marker: string, text: string}[]} hunk One hunk body.
- * @param {string[]} sourceLines The file that will render, by line.
- * @param {{key: string, start: number, end: number}[]} regions That file's regions.
- * @returns {{keys: Set<string>, unattributable: boolean}} The regions its candidate locations sit
- *   in, and whether any candidate reached beyond them.
- */
+/** The regions one hunk touches, located by content. */
 function regionsTouchedByHunk(hunk, sourceLines, regions) {
   const sequence = hunk.filter(({ marker }) => marker !== '-').map(({ text }) => text);
   if (sequence.length === 0) return { keys: new Set(), unattributable: true };
@@ -16584,10 +11421,8 @@ function regionsTouchedByHunk(hunk, sourceLines, regions) {
     anchored = true;
     const touched = regionsTouchedAt(hunk, offset, regions);
     // A candidate that lands outside every region — a shared factory, a section banner, the
-    // selection machinery itself — can move any frame, and the true edit may be that candidate,
-    // so it has to widen. It no longer DISCARDS its siblings to do so: a widening candidate
-    // contributes coverage while the candidates that did land in a region contribute their
-    // regions, and the answer is both.
+    // selection machinery itself — can move any frame, and the true edit may be that candidate, so
+    // it has to widen.
     unattributable ||= touched.unattributable;
     for (const key of touched.keys) keys.add(key);
   }
@@ -16595,29 +11430,7 @@ function regionsTouchedByHunk(hunk, sourceLines, regions) {
   return { keys, unattributable: unattributable || !anchored };
 }
 
-/**
- * The regions of one file a patch is confined to.
- *
- * Shared by every patch-attributed input rather than written once per input: `scripts/**` is
- * analysed by SonarCloud's Automatic Analysis, which counts duplication and ignores
- * `sonar.cpd.exclusions`, so a second copy of the walk would fail the gate as well as being a
- * second place for the anchoring rule to drift.
- *
- * REPORTS unattributability rather than RETURNING it, and that distinction is the whole reason
- * this returns a pair. A patch can be part attributable and part not — one hunk inside a case
- * literal, one hunk in the shared factory above it, which is exactly the shape of "add a case and
- * touch the constant it uses". While the unattributable answer was the whole corpus, discarding
- * the attributed half on the way out was harmless, because the corpus contained it. Surface
- * coverage does not: it holds one frame per surface and would drop the very case the patch edited,
- * publishing a capture that shows everything except the change. So the halves are kept apart here
- * and UNIONED by the caller.
- *
- * @param {string|undefined} patch The unified diff for that file, if the caller supplied one.
- * @param {Function} readSource The file that will render, read lazily.
- * @param {Function} readRegions Its regions, parsed lazily.
- * @returns {{keys: Set<string>, unattributable: boolean}} The regions located, and whether any
- *   part of the patch reached beyond them.
- */
+/** The regions of one file a patch is confined to. */
 function touchedRegionKeys(patch, readSource, readRegions) {
   const nothingLocated = { keys: new Set(), unattributable: true };
   if (typeof patch !== 'string' || patch.trim() === '') return nothingLocated;
@@ -16640,14 +11453,6 @@ function touchedRegionKeys(patch, readSource, readRegions) {
 
 /**
  * Widen a located selection by surface coverage when part of the change could not be attributed.
- *
- * The union, in one place, so every attribution path widens the same way: what WAS located is
- * kept, and coverage is added for the part that was not. Replacing rather than unioning is the
- * defect this function exists to prevent — see {@link touchedRegionKeys}.
- *
- * @param {Set<string>} ids The case ids that were attributed.
- * @param {boolean} unattributable Whether any part of the change reached beyond them.
- * @returns {Set<string>} The selection.
  */
 function widenedByCoverage(ids, unattributable) {
   if (!unattributable) return ids;
@@ -16657,83 +11462,7 @@ function widenedByCoverage(ids, unattributable) {
 
 /**
  * Lab inputs whose blast radius is narrower than surface coverage, with the predicate — over a
- * case's OWN declared fields — that decides which frames can render them.
- *
- * The default for a lab input is surface coverage (see {@link mapChangedFilesToCases}); this table
- * is the exception list, and an entry earns its place only when the narrowing can be DERIVED. A
- * hand-maintained list of case ids would drift the moment a case is added, and would drift silently
- * — the failure being a PR that renders no evidence for the frames it moved.
- *
- * An entry narrows on one of two axes. A WHOLE-FILE entry states one `selects` predicate: whatever
- * the file produces reaches the same frames however it is edited. A REGION entry declares
- * `sourceLines`, `regions` and `selectsRegion` instead, and narrows only when the supplied diff is
- * confined to a region whose readership is known — so it narrows nothing at all without a patch.
- *
- * `labRunStates.js` qualifies whole-file. Its whole output lands in two places: the three per-actor
- * run containers (`flags.fabricate.fabricate.craftingRuns`, `.salvageRuns`,
- * `flags.fabricate.gatheringRuns` — see `labFlags.js` `RUN_CONTAINER_PATHS`) and the
- * `gatheringBlindRuns` world setting that `labWorld.js` writes from `buildLabBlindRunSecret`. Both
- * are read only by the PLAYER window: the Journal (`apps/journal/**` is the run browser in its
- * entirety), the Crafting tab's `RunSummaryPanel` and the status badge its browse rows draw — a
- * `Chip` since issue 1506 retired the crafting status component into it — and the Gathering tab's
- * in-flight task rows. The manager is the GM's system-configuration window — it renders systems,
- * recipes, components, tools and environments out of `game.settings`, and reads no actor run flag
- * anywhere in `src/ui/svelte/apps/manager/**`. So the predicate is `app === PLAYER`: a fact each
- * case already states about itself, which a new player case inherits for free and a new manager
- * case cannot accidentally claim.
- *
- * `labActors.js` qualifies per REGION and not whole-file, because the file is two things at once.
- * Its four per-actor fixture tables feed surfaces whose readership can be read off the render path
- * ({@link LAB_ACTOR_FIXTURE_TABLES}); everything else in it — `ACTOR_DEFINITIONS`, `ownedItem`,
- * `recipeItemCopy`, `installToObject`, `installDeleteSemantics`, `buildLabActors`,
- * `buildDocumentIndex` and any symbol added later — sits outside every region and keeps the
- * coverage default. `buildDocumentIndex` is the clearest reason that has to be so: it builds
- * the uuid table `fromUuid` resolves against, and the manager resolves through it everywhere
- * (`BooksScrollsView`, `ItemPageInspector`, `SystemEditView`, `EnvironmentSummaryInspector`,
- * `GatheringEventEditView`, `RecipeBooksScrollsTab`, `SimpleCraftingCheckEditor`, the knowledge
- * studio). `ACTOR_DEFINITIONS` is deliberately on the everything side too: an actor's name and
- * portrait are not confined to the surfaces that read its holdings — `ActorSelectTopBar` draws them
- * on every player frame, and the manager draws them in the Knowledge roster, the Gathering → Travel
- * party rows and cards, the grant-access roster and the stamina roster. Its blast radius is the
- * corpus, which is what the default is for.
- *
- * Per-ACTOR selection is not offered, and that is a measured refusal rather than an omission: three
- * cases in the whole registry name an actor id at all, the `manager-knowledge-*` frames that click
- * `[data-knowledge-actor="…"]`. Every player frame mounts `ActorSelectTopBar` for the default
- * crafting actor, the lab's component-source set is the whole roster, and both the listing and the
- * recipe-visibility computation read every source actor's items — so a per-actor selector would be
- * a hand-maintained id list wearing derived clothing, and its wrong answers would be silent.
- *
- * Two fixture modules were considered and DELIBERATELY left on everything:
- *
- *   - `labFlags.js` — not a fixture at all but Foundry's flag semantics, `getFlag` included. Every
- *     Fabricate read normalises through it (see that file's own header), so `getProperty` returning
- *     the wrong thing renders a pristine, unworn, un-learned, unbroken world on EVERY screen.
- *   - `labContent.js` — measured rather than assumed, and the suspicion holds: `buildLabContent`
- *     seeds `craftingSystems`, `recipes`, `gatheringEnvironments` and `gatheringConfig`, which is
- *     the definition set BOTH windows render, and it owns the five `lab-*` system ids that 51 cases
- *     name in `query.system`. It is the broadest input the lab has.
- *
- * `viewLabLayoutAssertion.js` also qualifies whole-file. Every path through the helper validates
- * only cases carrying `expectLayout`, so that case-owned field derives its complete readership.
- *
- * `mount.js` qualifies per REGION for the same reason `labActors.js` does — it is several things
- * at once — but its regions are MARKED rather than found by column, because three of the six are
- * blocks inside functions the other windows run. See {@link MOUNT_REGIONS}. Everything else in
- * the file — the determinism styles, the chrome-font gate, the lab-induced-clipping measurement,
- * `boot`, `mountAppFor`, `borrowInstance`, `mountManagerApp`, the shared half of `readParams` and
- * the shared half of `settle` — sits outside every region and keeps the coverage default, which
- * is right: a frame of any window renders through all of it.
- *
- * `labInteractables.js` qualifies WHOLE-FILE, and the narrowing is structural rather than
- * argued (issue 1520). Everything it produces lands in two places on the lab scene: the region's
- * `behaviors` collection and the scene's `tiles`. Nothing outside the three canvas windows reads
- * either — the Manager's only scene read is `readSceneRegions(game.scenes.current)`, which
- * projects a region's `uuid`, `name` and `color` and never touches its behaviours, and the player
- * window reads no scene at all. That is WHY the fixture attaches its behaviours to the ONE region
- * `labWorld.js` already declares instead of adding more: a second region would appear in the
- * Manager's Travel → Map Region Links frames and make this predicate false, silently. The
- * fixture's own header records that constraint so the two cannot drift apart.
+ * case's own declared fields — that decides which frames can render them.
  */
 const ATTRIBUTED_LAB_INPUTS = Object.freeze([
   Object.freeze({
@@ -16774,27 +11503,13 @@ function casesSelecting(selects) {
   );
 }
 
-/**
- * The cases a change to THIS FILE selects, given the PR's patch for it.
- *
- * There is nothing to map afterwards: a case literal's region key IS the case id, so a hunk
- * confined to one selects exactly that case.
- *
- * @param {string|undefined} patch The unified diff for this file, if the caller supplied one.
- * @returns {Set<string>} Selected ids.
- */
+/** The cases a change to this file selects, given the PR's patch for it. */
 function casesFromRegistryPatch(patch) {
   const { keys, unattributable } = touchedRegionKeys(patch, registrySourceLines, caseLineRegions);
   return widenedByCoverage(keys, unattributable);
 }
 
-/**
- * The cases a REGION-attributed lab input selects: the union of what each touched region feeds.
- *
- * @param {string|undefined} patch The unified diff for that input, if the caller supplied one.
- * @param {object} attribution Its {@link ATTRIBUTED_LAB_INPUTS} entry.
- * @returns {Set<string>} Selected ids.
- */
+/** The cases a REGION-attributed lab input selects: the union of what each touched region feeds. */
 function casesFromRegionPatch(patch, attribution) {
   const { keys, unattributable } = touchedRegionKeys(
     patch,
@@ -16809,39 +11524,19 @@ function casesFromRegionPatch(patch, attribution) {
   return widenedByCoverage(ids, unattributable);
 }
 
-/**
- * The cases ONE lab input selects.
- *
- * @param {string} file A normalized path matching {@link LAB_INFRASTRUCTURE_PATTERN}.
- * @param {Map<string, string>} patchByPath Patches by path.
- * @returns {Set<string>} Selected ids.
- */
+/** The cases one lab input selects. */
 function selectLabInputCases(file, patchByPath) {
   if (file === REGISTRY_PATH) return casesFromRegistryPatch(patchByPath.get(file));
   const attribution = ATTRIBUTED_LAB_INPUTS.find((entry) => entry.path === file);
-  // The DEFAULT, and the fail-safe: an input nobody has attributed — a new file under
-  // `tests/view-lab/`, the fixture assembler, the Foundry shim — reaches further than this
-  // registry can say, and resolves to surface coverage. See {@link mapChangedFilesToCases} for
-  // why that has to be the default.
+  // The default, and the fail-safe: an input nobody has attributed — a new file under
+  // `tests/view-lab/`, the fixture assembler, the Foundry shim — reaches further than this registry
+  // can say, and resolves to surface coverage.
   if (!attribution) return new Set(LAB_SURFACE_CASE_IDS);
   if (attribution.regions) return casesFromRegionPatch(patchByPath.get(file), attribution);
   return casesSelecting(attribution.selects);
 }
 
-/**
- * The union of what every lab input in a changed set selects.
- *
- * A plain union, with no early exit. It used to bail out with the unattributable sentinel the
- * moment one input produced it, which discarded whatever the inputs before it had attributed —
- * harmless only while that sentinel meant the whole corpus, which contained them. It resolves to
- * surface coverage now, which does not, so bailing out would drop a co-changed case's own frame:
- * a PR editing one case literal AND the mount page would publish coverage and no frame of the
- * case it edited.
- *
- * @param {string[]} labInputs Normalized lab-input paths.
- * @param {Map<string, string>} patchByPath Patches by path.
- * @returns {Set<string>} Selected ids.
- */
+/** The union of what every lab input in a changed set selects. */
 function selectAllLabInputCases(labInputs, patchByPath) {
   const selected = new Set();
   for (const file of labInputs) {
@@ -16860,52 +11555,7 @@ function normalizePatches(patches) {
   return byPath;
 }
 
-/**
- * Map a changed-file set onto the cases that should be captured.
- *
- * A change to the lab's own inputs — the fixture world, the page that mounts it, the Foundry shim,
- * this registry — selects SURFACE COVERAGE ({@link LAB_SURFACE_CASES}: one frame of every route
- * and tab the lab renders) unless it is one of the few inputs whose reach can be derived (see
- * {@link ATTRIBUTED_LAB_INPUTS} and {@link casesFromRegistryPatch}).
- *
- * That default is the rule that stops the harness lying about its riskiest change. Every frame
- * renders from one fixture world, so an edit to `labContent.js` can reflow any of them — and none
- * of those paths is a render file, so `isUiFile` rejects them and the selection came back EMPTY.
- * The PRs most able to invalidate the corpus were precisely the PRs that selected no evidence and
- * passed green. Verified before that rule existed:
- *   mapChangedFilesToCases(['tests/view-lab/world/labContent.js']) -> []
- *
- * The coverage set is what that rule costs now. It used to be the whole corpus, and it stopped
- * being worth its price: 246 frames is not evidence anyone reads, and a twenty-five minute job on
- * every lab-infrastructure PR is the thing that makes per-PR capture look optional. Coverage keeps
- * the property that matters — no lab-input change can select NOTHING, and none can leave a screen
- * unphotographed — while leaving each surface's detailed states to the files that draw them.
- *
- * Narrowing BELOW coverage is allowed in exactly one direction: an input may select fewer frames
- * only when the registry can show its work from what the cases declare about themselves, or from a
- * diff it has checked against the file that will render. Everything unmapped or unparseable
- * resolves to coverage; a diff whose content is AMBIGUOUS selects the union of the places it could
- * be, which is a superset of the truth rather than a guess at it.
- *
- * ONE PROPERTY IS GONE, and it is worth recording rather than discovering. This function answers
- * for BOTH the producer (`pr-screenshots.yml`) and the gate (`check-screenshots` in `ci.yml`), from
- * the same `pulls/{n}/files` payload — but from two independently-computed merge commits, so a
- * `main` that moves between them can leave one side able to anchor a hunk and the other not. While
- * the widened answer was the whole corpus, any such disagreement resolved to a SUPERSET of whatever
- * the other side chose, and the gate's overlap test could not fail for that reason. Coverage is not
- * a superset, so the two can now disagree disjointly in principle. In practice the gate only arms
- * when a render file changed, and a render file's selection is patch-independent and therefore
- * common to both sides — so reaching the hole needs an armed gate whose render files select no case
- * at all, on top of an anchoring disagreement. Unioning rather than replacing (above) narrows it
- * further. Accepted, not overlooked.
- *
- * @param {string[]} files Changed paths.
- * @param {object} [options] Selection inputs beyond the file list.
- * @param {Record<string, string>} [options.patches] Unified diffs by path, as GitHub's
- *   `pulls/{n}/files` endpoint returns them in each entry's `patch` field. Only this file's patch
- *   is read. Supplying none is always safe: it selects more frames, never fewer.
- * @returns {object[]} Cases to capture, in registry order.
- */
+/** Map a changed-file set onto the cases that should be captured. */
 export function mapChangedFilesToCases(files = [], { patches } = {}) {
   const normalized = files.map((file) => normalizePath(file)).filter(Boolean);
   const labInputs = normalized.filter((file) => LAB_INFRASTRUCTURE_PATTERN.test(file));
@@ -16916,26 +11566,13 @@ export function mapChangedFilesToCases(files = [], { patches } = {}) {
   );
 
   if (labInputs.length === 0 && renderFiles.length === 0) {
-    // Nothing here renders, so there is no frame to select — a lang-only change included. The
-    // MIXED case (a `lang/` edit shipping alongside render files) never reaches this branch at all,
-    // because those render files put `renderFiles.length` above zero and selection proceeds below;
-    // callers test `hasUiChanges` over the whole set for that distinction.
-    //
-    // This previously read `normalized.some(isLang) ? [] : []` — a ternary whose branches were
-    // identical, guarding a distinction that had already been made two lines above. It selected
-    // nothing either way, so it was dead, and the comment above it described a fallback return the
-    // code did not perform.
+    // Nothing here renders, so there is no frame to select — a lang-only change included.
     return [];
   }
 
-  // A UNION at every level, never a replacement. Five levels carry it — one candidate anchor, a
+  // A union at every level, never a replacement. Five levels carry it — one candidate anchor, a
   // hunk's candidates, a patch's hunks, an input's patch, and a change's inputs — and this is the
-  // last of them. Every one used to short-circuit on unattributability, which was
-  // safe only because the answer then was the whole corpus — a superset of every selection it
-  // discarded. Surface coverage is a superset of nothing: it holds one frame per surface, not
-  // the detailed state a render file or a case literal selects. Widening now ADDS coverage to what
-  // was attributed rather than replacing it, so a PR that edits one case and also touches shared
-  // code publishes coverage AND the frame of the case it edited.
+  // last of them.
   const selected = selectRenderFileCases(renderFiles);
   for (const id of selectAllLabInputCases(labInputs, normalizePatches(patches))) selected.add(id);
   if (selected.size === 0) selected.add(FALLBACK_CASE_ID);
@@ -16943,11 +11580,7 @@ export function mapChangedFilesToCases(files = [], { patches } = {}) {
   return VIEW_LAB_CASES.filter((viewCase) => selected.has(viewCase.id) && viewCase.publish);
 }
 
-/**
- * Every case that publishes, for a full capture run.
- *
- * @returns {object[]} Publishable cases.
- */
+/** Every case that publishes, for a full capture run. */
 export function publishableCases() {
   return VIEW_LAB_CASES.filter((viewCase) => viewCase.publish);
 }

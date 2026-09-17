@@ -1,77 +1,15 @@
-/**
- * The visual-parity SPEC and FIXTURE schema, and the checks that keep both honest.
- *
- * Screen-agnostic on purpose: nothing here knows what a "checks studio" is. A spec names a
- * prototype, a closed set of screens, and the regions to measure on each; a fixture is what
- * the extractor writes and the comparator reads.
- *
- * The three rules encoded here are the ones a parity gate loses first, and each of them was
- * paid for:
- *
- * 1. **A closed set of screens.** Without it a fixture that covers two screens out of six
- *    reads as coverage while gating a third of the surface, which is the failure that lets
- *    visual drift ship in the first place. Every declared screen must own at least one
- *    region, and every region must belong to a declared screen — both directions, because
- *    either one alone narrows silently.
- * 2. **An exemption must carry a written reason.** An exemption is a claim that a difference
- *    is intentional. Unreasoned, it is indistinguishable from a value someone deleted to make
- *    the run green, which is how a parity gate stops gating without anyone noticing.
- * 3. **An exemption must name a property the region actually measures.** Otherwise a region
- *    can drop the property and keep the exemption, and the pair reads as covered.
- * 4. **A per-region value cannot see a RELATIONSHIP between two regions.** Every region on a
- *    screen can measure exactly right and still sit in the wrong place relative to its
- *    neighbour, because an inset applied by an ancestor moves a whole subtree and changes
- *    none of its own computed values. `alignments` is the rule for that class, and it is
- *    DERIVED from the prototype rather than declared: a group asserts a shared edge only
- *    where the prototype actually shares one.
- */
+/** The visual-parity spec and fixture schema, and the checks that keep both honest. */
 
 /** The shortest reason that can plausibly say WHY. Shorter than this is a placeholder. */
 export const MINIMUM_REASON_LENGTH = 40;
 
-/**
- * How far apart two edges may sit and still be "the same edge".
- *
- * This is NOT a tolerance band on a measured value — those are forbidden here, because they
- * are the beginning of a gate that cannot fail. It is the resolution of the question being
- * asked: two boxes laid out by independent rules land on fractional device pixels, and a
- * shared edge is a claim about layout intent rather than about a float. Half a pixel is an
- * order of magnitude below the smallest spacing token this design system owns (4px), so no
- * spacing mistake can hide under it — the inset that motivated the rule was 12px.
- */
+/** How far apart two edges may sit and still be "the same edge". */
 export const EDGE_TOLERANCE_PX = 0.5;
 
-/**
- * The edges a group may be asserted on.
- *
- * `top` joined `left` and `right` at issue 1371: two cards drawn SIDE BY SIDE in one grid row
- * share a top edge, and that is the same claim about layout intent the horizontal edges make,
- * not the vertical-rhythm question this list still excludes. It is the edge an ancestor's inset
- * moves when the inset is a `margin-top` or a row gap, and the reference's component rules
- * editor draws exactly that shape — a Category card beside a Tags card, tops level.
- *
- * `bottom` is deliberately still absent: two cards in a row legitimately end at different
- * heights because their CONTENT differs, so a shared bottom edge is a fact about the world's
- * data rather than about the design.
- */
+/** The edges a group may be asserted on. */
 export const ALIGNABLE_EDGES = Object.freeze(['left', 'right', 'top']);
 
-/**
- * The CLOSED locator vocabulary.
- *
- * A locator is a CSS selector string, or a list of steps drawn from these operations. It is
- * DATA rather than an expression, and that is a security property as much as a readability
- * one: locators used to be JavaScript source reconstituted in the page with `new Function`, so
- * a fixture could express anything a script can. Data that selects, walks and filters cannot.
- *
- * - `select`   `{ css }`                  — every descendant matching a CSS selector.
- * - `children` `{}`                       — the element children of the current nodes.
- * - `where`    `{ tag, text, rect, style, styleNot, has, childCount, leaf }` — filter.
- * - `at`       `{ index }`                — one candidate, negative counting from the end.
- * - `child`    `{ index }`                — each node's nth child, negative from the end.
- * - `parent`   `{ times }`                — walk up.
- * - `sibling`  `{ offset }`               — walk sideways, negative for previous.
- */
+/** The closed locator vocabulary. */
 export const LOCATOR_OPS = Object.freeze([
   'select',
   'children',
@@ -95,16 +33,7 @@ export const WHERE_KEYS = Object.freeze([
   'leaf',
 ]);
 
-/**
- * Validate one locator's shape.
- *
- * A malformed step is worse than a missing one: `STEPS[step.op]` would throw deep inside the
- * page, and an unknown `where` key would filter nothing at all and quietly widen the locator.
- *
- * @param {string|object[]} locator The locator to check.
- * @param {string} label What to call it in a message.
- * @returns {string[]} Problems, empty when the locator is usable.
- */
+/** Validate one locator's shape. */
 export function locatorProblems(locator, label) {
   if (typeof locator === 'string') {
     return locator.trim().length === 0 ? [`${label}: the CSS selector is empty`] : [];
@@ -141,15 +70,7 @@ export function locatorProblems(locator, label) {
   return problems;
 }
 
-/**
- * Property groups a region may ask for, keyed by name.
- *
- * A region declares GROUPS rather than properties so that adding a region cannot quietly
- * record a narrower property set than its siblings. A spec may replace or extend this.
- *
- * `gap` covers BOTH axes deliberately: `columnGap` alone cannot see a stacking gutter, and a
- * stray row gap is exactly the kind of dead space a reader notices and a fixture does not.
- */
+/** Property groups a region may ask for, keyed by name. */
 export const DEFAULT_PROPERTY_GROUPS = {
   surface: ['backgroundColor'],
   border: ['borderTopWidth', 'borderTopStyle', 'borderTopColor', 'borderTopLeftRadius'],
@@ -159,29 +80,15 @@ export const DEFAULT_PROPERTY_GROUPS = {
   gap: ['columnGap', 'rowGap'],
   size: ['width', 'height'],
   blockSize: ['height'],
-  // A Font Awesome (or other icon-font) GLYPH. Narrower than `type` on purpose: an icon's
-  // weight and transform come from the icon font's own sheet, which neither side owns and a
-  // markup harness usually does not load, so recording them compares the harness to itself.
+  // A Font Awesome (or other icon-font) glyph.
   glyph: ['color', 'fontSize'],
-  // A PAINTED MARKER THAT MOVES NO GEOMETRY. `box-shadow` was in no group at all, so an
-  // `inset 2px 0 0 0 var(--fab-accent)` rule on a roster row was invisible to `compare` — and
-  // because the row is a landmark either way, `inventory` was silent on it too. That is how an
-  // invented membership marker on the world catalogue's system roster survived four approvals
-  // (issue 1371). A shadow is the ONE way to paint a rule, a glow or a lift without changing a
-  // single measured box, which is exactly what makes it worth measuring.
+  // A painted marker that moves no geometry.
   shadow: ['boxShadow'],
-  // The SCROLLER's own paint. Host chrome (Foundry's, in this repo) can leak a scrollbar
-  // colour through a pane nothing ever selected a token for, and it draws as two full-height
-  // rules at the pane's edges that no named region is looking at.
+  // The scroller's own paint.
   scroll: ['scrollbarColor', 'scrollbarWidth'],
 };
 
-/**
- * Validate a spec's shape before either tool acts on it.
- *
- * @param {object} spec Loaded spec module.
- * @returns {string[]} Problems, empty when the spec is usable.
- */
+/** Validate a spec's shape before either tool acts on it. */
 export function validateSpec(spec) {
   const problems = [];
   if (!Array.isArray(spec?.screens) || spec.screens.length === 0) {
@@ -212,16 +119,7 @@ export function validateSpec(spec) {
   return problems;
 }
 
-/**
- * Every alignment group names declared regions, on one screen, on edges that exist.
- *
- * The same-screen rule is the one that matters: a group whose members are measured on
- * different screens would compare two boxes that were never on screen together, and produce a
- * confident number about nothing.
- *
- * @param {object} spec Loaded spec module.
- * @returns {string[]} Problems, empty when every group is usable.
- */
+/** Every alignment group names declared regions, on one screen, on edges that exist. */
 export function alignmentProblems(spec) {
   const problems = [];
   const byName = new Map((spec?.regions ?? []).map((region) => [region.name, region]));
@@ -267,29 +165,14 @@ export function alignmentProblems(spec) {
   return problems;
 }
 
-/**
- * Which of the asked-for edges a set of boxes actually shares.
- *
- * @param {Record<string, {left: number, right: number}>} edges Region name → its box edges.
- * @param {string[]} sides Edges to test.
- * @returns {Record<string, boolean>} Side → whether every box agrees on it.
- */
+/** Which of the asked-for edges a set of boxes actually shares. */
 export function sharedEdges(edges, sides) {
   const shared = {};
   for (const side of sides) shared[side] = edgeSpread(edges, side).delta <= EDGE_TOLERANCE_PX;
   return shared;
 }
 
-/**
- * The widest disagreement about one edge, and who is at each end of it.
- *
- * Naming both ends is what makes the report actionable: "these two do not line up" is a fact
- * about a pair, and a report that named only the group would send a reader to measure it again.
- *
- * @param {Record<string, {left: number, right: number}>} edges Region name → its box edges.
- * @param {string} side Edge to test.
- * @returns {{delta: number, low: string, high: string, values: Record<string, number>}} Spread.
- */
+/** The widest disagreement about one edge, and who is at each end of it. */
 export function edgeSpread(edges, side) {
   const values = Object.fromEntries(Object.entries(edges).map(([name, box]) => [name, box[side]]));
   const entries = Object.entries(values).sort((left, right) => left[1] - right[1]);
@@ -303,13 +186,7 @@ export function edgeSpread(edges, side) {
   };
 }
 
-/**
- * Both directions of the coverage rule.
- *
- * @param {string[]} screens Declared closed set.
- * @param {{name: string, screen: string}[]} regions Regions to check.
- * @returns {string[]} Problems, empty when every screen is measured.
- */
+/** Both directions of the coverage rule. */
 export function coverageProblems(screens, regions) {
   const problems = [];
   const measured = new Set(regions.map((region) => region.screen));
@@ -330,12 +207,7 @@ export function coverageProblems(screens, regions) {
   return problems;
 }
 
-/**
- * Every exemption names a real region, a real measured property, and a stated reason.
- *
- * @param {object} fixture Fixture as written by the extractor.
- * @returns {string[]} Problems, empty when every exemption is well formed.
- */
+/** Every exemption names a real region, a real measured property, and a stated reason. */
 export function exemptionProblems(fixture) {
   const problems = [];
   for (const [name, region] of Object.entries(fixture?.regions ?? {})) {
@@ -355,21 +227,7 @@ export function exemptionProblems(fixture) {
   return problems;
 }
 
-/**
- * Whether two computed values say the same thing.
- *
- * Exactly ONE normalisation, and it is a CSS fact rather than a tolerance: on a grid or flex
- * container `column-gap: normal` IS zero — the initial value computes to `normal` and lays out
- * as 0 — so a fixture recording `normal` and a sheet declaring `0` describe one gutter.
- * Nothing else is normalised. A tolerance band on colours or lengths is the beginning of a
- * gate that cannot fail; the ONE exception is declared per property and reported rather than
- * suppressed — see `classifyDifference` below.
- *
- * @param {string} property CSS property name.
- * @param {string} actual Subject's computed value.
- * @param {string} expected Prototype's recorded value.
- * @returns {boolean} True when they agree.
- */
+/** Whether two computed values say the same thing. */
 export function sameComputedValue(property, actual, expected) {
   if (property === 'columnGap' || property === 'rowGap') {
     const zero = (value) => (value === 'normal' ? '0px' : value);
@@ -379,50 +237,14 @@ export function sameComputedValue(property, actual, expected) {
 }
 
 /**
- * THE CEILING ON A DECLARED TOLERANCE, and it is deliberately below the smallest thing a
- * design decides.
- *
- * The published spacing scale steps in 4px and the type ladder in half-points, so any real
- * decision is at least 0.5px apart. A tolerance at or above that could absorb one, which is the
- * gate-that-cannot-fail this whole file is written against. Half a pixel is refused rather than
- * accepted so the boundary itself is not a judgement call.
+ * The ceiling on A declared tolerance, and it is deliberately below the smallest thing a design
+ * decides.
  */
 export const MAX_TOLERANCE_PX = 0.5;
 
 const LENGTH = /^-?\d+(?:\.\d+)?px$/;
 
-/**
- * Classify one property's difference: the same, ROUNDING, or drift.
- *
- * ── Why a tolerance exists here at all, after this file spent a round refusing one ─────────
- *
- * The two documents express the same type ramp in different UNITS. The prototype writes
- * absolute pixels (`font:600 11.5px`) and this product writes `rem` against a 16px root, so
- * `0.72rem` computes to `11.52px` and `0.53rem` to `8.496px`. Twenty-eight lines of one review
- * were `11.52 !== 11.5`, `9.504 !== 9.5`, `13.504 !== 13.5`, `8.496 !== 8.5` — sub-hundredth
- * differences that no GM can see, that no edit can close without abandoning `rem`, and that a
- * reader has to re-derive as noise every round.
- *
- * Three things keep this from becoming the tolerance band the README refuses:
- *
- *  1. It is DECLARED PER PROPERTY IN THE SPEC, with a stated reason, and validated like an
- *     exemption. There is no default and no harness-wide band: a spec that declares none gets
- *     the exact-equality gate it had.
- *  2. It is CAPPED at `MAX_TOLERANCE_PX`, an order below the smallest step any published scale
- *     takes, so it cannot absorb a decision.
- *  3. It is REPORTED, not suppressed. A rounding line prints its own delta in its own block, so
- *     "28 lines are unit conversion" stays a visible claim someone can check rather than a
- *     silence. An exemption that hides is the defect the exemption rules exist against.
- *
- * Both values must be plain `px` lengths. A keyword, a colour or a multi-part value is never
- * rounding, whatever the property, because there is no delta to be under a tolerance.
- *
- * @param {string} property CSS property name.
- * @param {string} actual Subject's computed value.
- * @param {string} expected Prototype's recorded value.
- * @param {Record<string, {px: number, reason: string}>} tolerances Spec's declared tolerances.
- * @returns {{verdict: 'same'|'rounding'|'drift', delta?: number, px?: number}} The verdict.
- */
+/** Classify one property's difference: the same, rounding, or drift. */
 export function classifyDifference(property, actual, expected, tolerances = {}) {
   if (sameComputedValue(property, actual, expected)) return { verdict: 'same' };
   const tolerance = tolerances[property];
@@ -433,15 +255,7 @@ export function classifyDifference(property, actual, expected, tolerances = {}) 
   return { verdict: 'rounding', delta, px: tolerance.px };
 }
 
-/**
- * Every declared tolerance names a property something measures, is under the cap, and says why.
- *
- * The same three rules an exemption answers to, for the same reason: a tolerance nobody can
- * read the reason for is indistinguishable from a gate somebody quietly widened.
- *
- * @param {object} spec Loaded spec module.
- * @returns {string[]} Problems, empty when every tolerance is well formed.
- */
+/** Every declared tolerance names a property something measures, is under the cap, and says why. */
 export function toleranceProblems(spec) {
   const problems = [];
   const groups = { ...DEFAULT_PROPERTY_GROUPS, ...spec?.propertyGroups };

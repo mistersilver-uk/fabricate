@@ -2,28 +2,6 @@
 /**
  * Regenerates Fabricate's icon catalogue from the Font Awesome bundle a Foundry install ships,
  * intersected with the names Font Awesome publishes in its free release.
- *
- * The catalogue is committed rather than built, because CI has no Foundry install to read. This
- * script exists so that regenerating it is reproducible instead of archaeological: run it against
- * the Foundry version whose bundle the catalogue should describe.
- *
- *   node scripts/generate-icon-catalogue.mjs \
- *     "C:/Program Files/Foundry Virtual Tabletop/resources/app/public/fonts/fontawesome"
- *
- * The argument is the bundled `fontawesome` directory, or the `all.min.css` inside it. Pass
- * `--check` to compare against the committed file without writing, which is what a maintainer
- * runs after a Foundry upgrade to find out whether the bundle moved.
- *
- * THE FREE INTERSECTION. Foundry ships Font Awesome Pro under its own commercial licence, and the
- * licence it ships alongside it (`public/fonts/fontawesome/LICENSE.txt`) says Pro icons "may not
- * be used, re-packaged, or referenced in code by third party package developers" without a Pro
- * licence of their own. A catalogue of names IS a reference in code, so this generator keeps only
- * the glyphs Foundry's bundle can draw whose names Font Awesome also publishes for free, and
- * records only those free names. See the header it emits for the full reasoning.
- *
- * `@fortawesome/fontawesome-free` is a devDependency and a NAME ORACLE only: it is read here at
- * generation time and by the licensing guard in tests/iconCatalogueGenerator.test.js. Nothing
- * under `src/` imports it and no file from it is ever shipped, so Fabricate distributes no font.
  */
 
 import fs from 'node:fs';
@@ -76,16 +54,7 @@ export function resolveFreeStylesheetPath() {
   return path.join(path.dirname(manifest), 'css', 'all.min.css');
 }
 
-/**
- * How to name a Font Awesome release in prose.
- *
- * Foundry 13's rebuild strips the `/*! Font Awesome … *\/` banner, so its bundle states an edition
- * and a major through its `font-family` literal but no patch version at all. Naming that release
- * `Pro null` would read as a parse failure rather than as the measurement it is.
- *
- * @param {{ edition: string, version: string|null, major?: number|null }} release
- * @returns {string}
- */
+/** How to name a Font Awesome release in prose. */
 function releaseLabel(release) {
   if (release.version !== null && release.version !== undefined) {
     return `${release.edition} ${release.version}`;
@@ -119,9 +88,7 @@ export function freeIconNamesFrom(cssText, source = 'The stylesheet') {
     );
   }
   return {
-    // Narrowed to the documented pair. `parseFontAwesomeRelease` also reports the major it read
-    // and the evidence it read it from, which the smoke arms need and a committed constant does
-    // not — carrying them here would put them in the generated file by accident.
+    // Narrowed to the documented pair.
     release: { edition: release.edition, version: release.version },
     names: new Set(parseIconGlyphRules(cssText).flatMap((rule) => rule.names)),
   };
@@ -184,10 +151,7 @@ export function intersectWithFreeIconNames(definitions, freeNames) {
 }
 
 // The catalogue's row encoding. One entry per line as `iconCode|label|alias,alias`, with the alias
-// field omitted when a glyph has no other names. See the emitted header for why the entries are a
-// text blob rather than one object literal each. The emitted module spells these delimiters
-// literally in its own parser; the round-trip test in tests/iconCatalogueGenerator.test.js is what
-// holds the two halves of the grammar together.
+// field omitted when a glyph has no other names.
 const ROW_DELIMITER = '\n';
 const FIELD_DELIMITER = '|';
 const ALIAS_DELIMITER = ',';
@@ -400,12 +364,7 @@ function resolveBundle(argument) {
   return { bundleRoot, stylesheet, webfonts: path.join(bundleRoot, 'webfonts') };
 }
 
-/**
- * Everything the emitted module reports about the bundle it was measured from.
- *
- * The bundle counts describe what Foundry can DRAW and stay whole; `offeredGlyphs` is the only one
- * narrowed by the free intersection, so the header can say both numbers and the gap between them.
- */
+/** Everything the emitted module reports about the bundle it was measured from. */
 function measureBundle({ foundryVersion, rules, definitions, offered, brandCodepoints, classic }) {
   return {
     foundryVersion,
@@ -446,11 +405,7 @@ function main() {
       `Foundry ${foundryVersion} / Font Awesome ${releaseLabel(release)} yielded no icon glyph rules.`
     );
   }
-  // Grouped by CODEPOINT, not by rule. Foundry 13.351 declares 762 of its codepoints in more than
-  // one rule (`.fa-adjust` and `.fa-circle-half-stroke` are separate blocks naming one drawing), so
-  // building per rule would emit one glyph as several entries, none listing the others as an alias
-  // — and an exclusion that catches one of those names would leave the identical drawing offered
-  // under another. That is the one invariant the curation rests on.
+  // Grouped by codepoint, not by rule.
   const definitions = buildIconCatalogueFromRules({ rules, classicCodepoints, brandCodepoints });
 
   const { release: freeRelease, names: freeNames } = readFreeIconNames();

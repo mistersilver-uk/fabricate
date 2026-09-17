@@ -1,22 +1,4 @@
-/**
- * Build-output gate for issue #150.
- *
- * The GM-only crafting-system-manager subtree is deferred behind a dynamic
- * import() in src/main.js so non-GM players never download/parse it at module
- * init. This gate proves the split survived the build: the eager entry
- * (dist/main.js) must NOT carry the manager marker, and exactly the manager
- * lives in a separate on-demand chunk instead.
- *
- * Run this AFTER `npm run build` (it reads dist/), never as a `node --test`
- * unit test — `npm test` has no build step, so a dist-reading node test would
- * false-pass on a stale dist/ or hard-fail on a clean checkout.
- *
- * MARKER. The marker is the window-id STRING LITERAL
- * `fabricate-crafting-system-manager` (SvelteCraftingSystemManagerApp.svelte.js).
- * vite.config.js builds with minify + mangle, so identifiers such as
- * `CraftingSystemManagerRoot` are renamed in dist/ and cannot be asserted on.
- * The string literal survives mangling and is unique to the manager subtree.
- */
+/** Build-output gate for issue #150. */
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -25,11 +7,7 @@ import { argv, exit } from 'node:process';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const MANAGER_MARKER = 'fabricate-crafting-system-manager';
 
-/**
- * Recursively collect every emitted `.js` path under a dist directory.
- * @param {string} dir absolute directory to walk
- * @returns {string[]} absolute `.js` file paths
- */
+/** Recursively collect every emitted `.js` path under a dist directory. */
 function collectJsFiles(dir) {
   const found = [];
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -43,11 +21,7 @@ function collectJsFiles(dir) {
   return found;
 }
 
-/**
- * Verify the manager subtree split out of the eager entry.
- * @param {string} distDir absolute dist/ directory
- * @returns {{ ok: boolean, errors: string[], eagerEntry: string, chunkFiles: string[] }}
- */
+/** Verify the manager subtree split out of the eager entry. */
 export function verifyManagerChunkSplit(distDir) {
   const errors = [];
   const mainPath = join(distDir, 'main.js');

@@ -1,54 +1,4 @@
-/**
- * The STRUCTURAL INVENTORY: the complement to the computed-style comparison.
- *
- * ## The gap this closes, stated as the defect it is
- *
- * `compare.mjs` measures the computed styles of regions that exist on BOTH sides. That shape
- * of gate is structurally incapable of seeing absence: a region the subject does not have is
- * either not in the map (so nothing is asserted) or reports as one missing selector, and a
- * region NOBODY NAMED is invisible either way. The nine `roll` regions of this repository's
- * own fixture all measured card chrome and tier rows and reported **no drift** while a whole
- * callout card was missing from the screen, two controls sat in the wrong card, and every tier
- * row was missing its drag handle.
- *
- * **A parity gate that only measures what both sides have will always report green on
- * something one side is missing.** The danger-family sweep is the same idea for colour — it
- * catches a colour on a region nobody thought to name. This is that complement for structure.
- *
- * ## What it asserts
- *
- * The prototype's own element tree is ENUMERATED (not mapped by hand) into an ordered list of
- * landmarks, and the subject is enumerated by the SAME classifier. Then, one-directionally:
- *
- * 1. every prototype CARD has a subject counterpart, under the same card ancestry, in the
- *    same relative order;
- * 2. every prototype LABEL (a card title, a micro-label, a control's visible name) appears
- *    inside the subject's counterpart card — a label found in a DIFFERENT card is reported as
- *    misplaced rather than as missing, which is what names a control that moved;
- * 3. every prototype GLYPH (a Font Awesome icon name) appears inside the counterpart card —
- *    which is what names a missing affordance such as a drag handle.
- *
- * ## Why it degrades usefully instead of demanding a 1:1 node map
- *
- * A hand-maintained map of every node would rot faster than the screen changes, and diffing
- * text nodes would fail on every piece of world data on screen. So:
- *
- * - The classifier is PRESENTATION-DERIVED, never class-derived. The prototype is a
- *   styled-components document whose every element is `class="sc"`; the subject wears semantic
- *   classes. Nothing but computed style, tag name, Font Awesome icon name and visible text
- *   crosses between them.
- * - Only LANDMARKS are enumerated. Prose (over `MAX_LABEL_LENGTH` characters) is skipped
- *   entirely, so the pass never diffs a sentence.
- * - Text is normalised, and DIGIT RUNS COLLAPSE TO `#`, so `Outcomes · 5 tiers` and
- *   `Outcomes · 3 tiers` are one landmark. A count is data; the sentence around it is design.
- * - Roll-data paths (`@abilities.int.mod`) and text with no letters are skipped: those are
- *   world content, and a gate that failed on them would fail on every world.
- * - The assertion is ONE-DIRECTIONAL. Subject landmarks with no prototype counterpart are
- *   reported as extras and never fail: the product legitimately says more than a mockup does.
- *
- * What survives all of that is exactly the class of defect the tool exists for: a missing
- * CARD, a control in the WRONG PARENT, and a missing AFFORDANCE.
- */
+/** The structural inventory: the complement to the computed-style comparison. */
 
 import { locatorProblems } from './schema.js';
 
@@ -59,14 +9,9 @@ export const MAX_LABEL_LENGTH = 40;
 export const MINIMUM_REASON_LENGTH = 40;
 
 /**
- * The ENUMERATOR itself lives in `page-runtime.js`, because it runs inside the measured
- * document and both documents are enumerated by that one function — which is what makes "the
- * prototype and the subject were read the same way" a fact rather than a hope. It used to live
- * here as a SOURCE STRING reconstituted in the page with `new Function`; nothing crosses that
- * boundary as text any more.
- *
- * What stays here is the part that runs in Node: the thresholds, the comparison, and the rules
- * that keep an exemption honest.
+ * The enumerator itself lives in `page-runtime.js`, because it runs inside the measured document
+ * and both documents are enumerated by that one function — which is what makes "the prototype and
+ * the subject were read the same way" a fact rather than a hope.
  */
 
 /** The thresholds the classifier uses, exported so a spec can state its own. */
@@ -93,17 +38,7 @@ function indexByTitle(cards) {
   return index;
 }
 
-/**
- * Compare one screen's two inventories.
- *
- * ONE-DIRECTIONAL by design: every prototype landmark must have a subject counterpart, and a
- * subject landmark with no prototype counterpart is an EXTRA rather than a failure. A mockup
- * is a smaller document than a product, and a gate that failed on the difference would be
- * unusable within a day.
- *
- * @param {object} options Screen name, both inventories, and the exemption map.
- * @returns {{failures: string[], extras: string[]}} Findings.
- */
+/** Compare one screen's two inventories. */
 export function compareInventories({ screen, prototype, subject, exemptions = {} }) {
   const failures = [];
   const extras = [];
@@ -169,9 +104,8 @@ export function compareInventories({ screen, prototype, subject, exemptions = {}
     highWater = Math.max(highWater, entry.position);
   }
 
-  // Where each subject landmark actually lives, so a missing one can be reported as MISPLACED
-  // when it exists somewhere else. This is the assertion that names a control moved into the
-  // wrong card, which is invisible to any per-region measurement.
+  // Where each subject landmark actually lives, so a missing one can be reported as MISPLACED when
+  // it exists somewhere else.
   const homeOf = new Map();
   for (const card of subject.cards) {
     for (const label of card.labels) {
@@ -236,17 +170,8 @@ export function compareInventories({ screen, prototype, subject, exemptions = {}
     }
   }
 
-  // ── AN EXTRA CARD IS DRIFT (and a silent EXTRAS list is how it stays invisible) ──────
-  //
-  // The one-directional rule below — a product legitimately says more than a mockup — is
-  // true of LEAF CONTENT and false of CARDS. A card is a claim about the shape of the
-  // screen: a wrapper the product invented, with a title and a description the design never
-  // wrote, changes what a GM reads before they read anything inside it. Reporting one and
-  // passing is exactly how a `Check triggers` wrapper card nobody designed survived a
-  // `triggers: 0` run.
-  //
-  // So a subject-only CARD fails, and the escape hatch is an exemption with a stated reason
-  // — a decision someone made — rather than a default nobody chose.
+  // The one-directional rule below — a product legitimately says more than a mockup — is true of
+  // leaf content and false of cards.
   const prototypeTitles = new Set(prototype.cards.map((card) => card.title));
   for (const card of subject.cards) {
     if (prototypeTitles.has(card.title)) continue;
@@ -265,17 +190,7 @@ export function compareInventories({ screen, prototype, subject, exemptions = {}
   return { failures, extras };
 }
 
-/**
- * Every inventory exemption names a landmark the PROTOTYPE actually has, and says why.
- *
- * The second half is what stops an exemption outliving the difference it excused: once the
- * prototype stops drawing that landmark, the exemption is a claim about nothing and the run
- * fails until someone deletes it.
- *
- * @param {object} exemptions Exemption map, key → reason.
- * @param {Set<string>} observedKeys Every key this run's prototype inventories can produce.
- * @returns {string[]} Problems, empty when every exemption is well formed.
- */
+/** Every inventory exemption names a landmark the prototype actually has, and says why. */
 export function inventoryExemptionProblems(exemptions = {}, observedKeys = new Set()) {
   const problems = [];
   for (const [key, reason] of Object.entries(exemptions)) {
@@ -296,13 +211,7 @@ export function inventoryExemptionProblems(exemptions = {}, observedKeys = new S
   return problems;
 }
 
-/**
- * Every landmark key one screen's prototype inventory can produce.
- *
- * @param {string} screen Screen name.
- * @param {object} inventory Prototype inventory for that screen.
- * @returns {string[]} Keys.
- */
+/** Every landmark key one screen's prototype inventory can produce. */
 export function observableKeys(screen, inventory, subject = null) {
   const keys = [];
   // A SUBJECT-only card's key is observable too, or an `extra-card` exemption would always
@@ -320,22 +229,7 @@ export function observableKeys(screen, inventory, subject = null) {
   return keys;
 }
 
-/**
- * An inventory root is one locator, or a declared SET of them under `parts`.
- *
- * The set exists because the two documents do not always have one element covering the same
- * ground: this prototype's screen root is a `display: contents` wrapper around the header band
- * AND the body grid, while the product draws the header band, the content column and the
- * inspector as siblings of a body grid that also holds the navigation rail the prototype's root
- * excludes. Enumerating one of the three reported the other two's landmarks as absent.
- *
- * A set is DATA, exactly as a locator is, and each part is checked as one — an empty set, or a
- * part that is not a usable locator, fails here rather than at walk time.
- *
- * @param {string|object[]|{parts: unknown[]}} root Declared root.
- * @param {string} label Human label for the problem message.
- * @returns {string[]} Problems, empty when the root is usable.
- */
+/** An inventory root is one locator, or a declared SET of them under `parts`. */
 export function inventoryRootProblems(root, label, pane) {
   if (!root || !Object.hasOwn(root, 'parts')) return locatorProblems(root, label);
   if (!Array.isArray(root.parts) || root.parts.length === 0) {
@@ -344,12 +238,7 @@ export function inventoryRootProblems(root, label, pane) {
   const problems = root.parts.flatMap((part, index) =>
     locatorProblems(part, `${label} part ${index}`)
   );
-  // A SET HAS NO "the root", SO ITS PANE CANNOT BE DERIVED. The classifier takes the card
-  // ratio from the first ancestor of the root that has a box, which for a set would silently
-  // mean the first PART's — and this product's header band is 1398px wide against the content
-  // column's 878px, so declaring the parts in one order rather than another would move the card
-  // floor from 527px to 839px without saying a word. That is the same silent re-calibration the
-  // declared pane exists to end, so a set must state its pane rather than inherit one.
+  // A SET has no "the root", so its pane cannot be derived.
   if (!pane) {
     problems.push(
       `${label}: a root SET must declare its pane — with no single root there is no box to ` +
@@ -360,12 +249,7 @@ export function inventoryRootProblems(root, label, pane) {
 }
 
 /**
- * The COVERAGE rule, restated for the inventory: every declared screen owns a root on both
- * sides. Without it a structural pass that reached two screens out of six would read as
- * coverage in exactly the way the region map already can.
- *
- * @param {object} spec Loaded spec module.
- * @returns {string[]} Problems, empty when every screen is rooted.
+ * The coverage rule, restated for the inventory: every declared screen owns a root on both sides.
  */
 export function inventoryCoverageProblems(spec) {
   const problems = [];

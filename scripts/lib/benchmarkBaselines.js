@@ -1,23 +1,4 @@
-/**
- * Reading, writing and DIFFING the committed class-1 baselines (issue 1071).
- *
- * These live in a library rather than in `scripts/benchmark-performance.mjs` because
- * `tests/benchmark-baseline-drift.test.js` imports them, and the repository's ESLint rules
- * forbid a `scripts/` entry point from exporting anything (`unicorn/no-exports-in-scripts`) —
- * a CLI that is also a module has two contracts and only one of them gets maintained.
- *
- * ## The three kinds of drift, reported separately
- *
- * They have three different fixes, so folding them into one "baseline changed" line would make
- * the common case unactionable:
- *
- * - A changed **fixture checksum** means the GENERATOR moved. Every count in the file moved with
- *   it, and the fix is a deliberate re-record with an explanation.
- * - A changed **count** means the CODE UNDER MEASUREMENT moved. This is the regression guard
- *   firing, and it is the case worth reading closely.
- * - An added or removed **case** means the REGISTRY moved, and the baseline simply needs
- *   regenerating.
- */
+/** Reading, writing and diffing the committed class-1 baselines (issue 1071). */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -57,13 +38,7 @@ export function writeBaseline(profile, payload) {
   return path;
 }
 
-/**
- * Drift in the fixture IDENTITY: the harness version, the seed, or a corpus checksum.
- *
- * @param {object} baseline
- * @param {object} measured
- * @returns {string[]}
- */
+/** Drift in the fixture identity: the harness version, the seed, or a corpus checksum. */
 function diffFixtureIdentity(baseline, measured) {
   const drift = [];
   if (baseline.harnessVersion !== measured.harnessVersion) {
@@ -80,14 +55,7 @@ function diffFixtureIdentity(baseline, measured) {
   return drift;
 }
 
-/**
- * Drift in one case's COUNTS — the regression guard firing.
- *
- * @param {string} id
- * @param {object} before
- * @param {object} after
- * @returns {string[]}
- */
+/** Drift in one case's counts — the regression guard firing. */
 function diffCounts(id, before, after) {
   const drift = [];
   for (const key of new Set([...Object.keys(before), ...Object.keys(after)])) {
@@ -98,13 +66,7 @@ function diffCounts(id, before, after) {
   return drift;
 }
 
-/**
- * Drift in the case REGISTRY and in each shared case's counts.
- *
- * @param {object} baselineCases
- * @param {object} measuredCases
- * @returns {string[]}
- */
+/** Drift in the case registry and in each shared case's counts. */
 function diffCases(baselineCases, measuredCases) {
   const drift = [];
   const baselineIds = new Set(Object.keys(baselineCases));
@@ -122,13 +84,7 @@ function diffCases(baselineCases, measuredCases) {
   return drift;
 }
 
-/**
- * Diff a freshly measured class-1 payload against its committed baseline.
- *
- * @param {object|null} baseline
- * @param {object} measured
- * @returns {string[]} Human-readable drift lines; empty means clean.
- */
+/** Diff a freshly measured class-1 payload against its committed baseline. */
 export function diffAgainstBaseline(baseline, measured) {
   if (!baseline) return ['no committed baseline (run with --update-baselines)'];
   return [
@@ -138,9 +94,8 @@ export function diffAgainstBaseline(baseline, measured) {
 }
 
 /**
- * The instruction a drift failure must carry, so nobody has to find `benchmarks/README.md`
- * before they can act on a red test.
- * @type {string}
+ * The instruction a drift failure must carry, so nobody has to find `benchmarks/README.md` before
+ * they can act on a red test.
  */
 export const BASELINE_REFRESH_HINT =
   'If the change is intended, re-record in the SAME pull request with ' +

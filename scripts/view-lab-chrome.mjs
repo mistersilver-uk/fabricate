@@ -1,16 +1,5 @@
 #!/usr/bin/env node
-/**
- * View Lab window-chrome cache CLI: `harvest` / `verify` / `status` / `clean`.
- *
- * The chrome the View Lab draws is Foundry's, harvested into the gitignored `.foundry-chrome/`
- * from Foundry the maintainer already licensed: by default the release archive
- * `npm run test:foundry:up` caches under `.foundry-e2e/cache/`, or with `--from-dir` an unpacked
- * desktop installation. See `scripts/lib/foundryChromeCache.js` for the licensing posture and for
- * why only an archive harvest may write provenance; nothing this command writes is ever committed.
- *
- *   node scripts/view-lab-chrome.mjs harvest [--force] [--write-provenance]
- *   node scripts/view-lab-chrome.mjs harvest --from-dir "C:\\Program Files\\Foundry Virtual Tabletop"
- */
+/** View Lab window-chrome cache CLI: `harvest` / `verify` / `status` / `clean`. */
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -33,21 +22,10 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 /** Flags that set a boolean, mapped to the field each one writes. */
 const BOOLEAN_FLAGS = Object.freeze({ force: 'force', 'write-provenance': 'writeProvenance' });
 
-/**
- * Flags that carry a value, mapped to the field each one writes. Both forms are accepted —
- * `--flag=value` and two argv entries — because a Windows installation path contains spaces, so
- * `--from-dir "C:\Program Files\..."` has to work.
- */
+/** Flags that carry a value, mapped to the field each one writes. */
 const VALUE_FLAGS = Object.freeze({ 'foundry-version': 'version', 'from-dir': 'fromDir' });
 
-/**
- * Apply one `--flag` argument.
- *
- * @param {object} args The accumulating argument object, mutated in place.
- * @param {string} raw The argv entry, `--flag` or `--flag=value`.
- * @returns {string|null} The flag still awaiting a value from the next argv entry, or null.
- * @throws {Error} On an unrecognised flag, rather than silently ignoring it.
- */
+/** Apply one `--flag` argument. */
 function applyFlag(args, raw) {
   const [flag, value] = raw.slice(2).split(/=(.*)/s);
   if (flag in BOOLEAN_FLAGS) {
