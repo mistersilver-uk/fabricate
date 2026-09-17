@@ -1,36 +1,23 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  The manager's ONE essence chip (issue 1371 r18-colour, maintainer ruling M29): an essence drawn
-  as a chip, in the colour the world Essence Catalogue gave it, carrying its glyph and — where the
-  caller has one — its quantity.
+  The manager's ONE essence chip: an essence drawn as a chip, in the colour the world Essence
+  Catalogue gave it, carrying its glyph and — where the caller has one — its quantity.
 
-  WHAT IT OWNS. `Chip` owns the chip: the pill, the scales, the tones, and since this revision the
-  `tint`. What no primitive owned was the mapping from an ESSENCE to that chip, so every site wrote
-  its own: the glyph fallback, the `{name} {quantity}` a screen reader and a tooltip both read, the
-  count, and — the half every site forgot — the colour. The maintainer's third live test found the
-  rules library's row chips, the rules editor's tiles and the inspector's essence line all grey
-  while the world bulk panel alone drew the colour. This component is that mapping written once:
-  a caller hands it the essence row a projection already publishes and gets the reference's essence
-  dot (`proto:5502`) with nothing to restate.
+  `Chip` owns the chip itself, `tint` included. What no primitive owned was the MAPPING from an
+  essence to that chip, so every site wrote its own glyph fallback, `{name} {quantity}` name, count
+  and — the half every site forgot — colour, which is how three surfaces came to draw grey chips
+  while the world bulk panel drew the colour. This is that mapping, written once.
 
-  IT IS A COMPOSITION, NOT A SECOND CHIP. Everything a caller can say to `Chip` — `density`, `tag`,
-  `class`, every `data-*` hook, `title` — it can say here, and it lands on the same element;
-  `manager-layout.test.js`'s hand-rolled-chip ratchet is what stops a second pill from existing,
-  and this file carries no chip geometry of its own for exactly that reason. The one style it
-  declares is the count's face: the reference draws a row's essence count in the mono numerals
-  every count in the manager uses, and `Chip`'s own `mono` would put the NAME in that face too.
+  IT IS A COMPOSITION, NOT A SECOND CHIP. Everything a caller can say to `Chip` it can say here and
+  it lands on the same element, and this file carries no chip geometry of its own — which is what
+  `manager-layout.test.js`'s hand-rolled-chip ratchet polices. The one style it declares is the
+  count's face, because `Chip`'s own `mono` would put the NAME in that face too.
 
-  Props:
-   - essence: `{id, name, icon?, colorToken?, quantity?}` — a row of `component.essences` as the
-     row projection publishes it, or a definition from the essence roster. `icon` falls back to
-     the shared essence glyph and `colorToken` to no tint, so an essence with no authored colour
-     is the untinted chip and never an error.
-   - quantity: overrides `essence.quantity`. A finite number renders the count; anything else
-     omits it, so a roster chip is a name alone.
-   - showName: draws the essence's name before the count (the inspector's run); off by default,
-     because a row's badge carries the name in its accessible name and its tooltip only.
-   - density / tag / class: forwarded to `Chip`.
-  Every other attribute is forwarded through the rest spread.
+  Props: essence (`{id, name, icon?, colorToken?, quantity?}`, a row the projection publishes or a
+  roster definition; `icon` falls back to the shared glyph and `colorToken` to no tint, so an
+  uncoloured essence is the untinted chip and never an error); quantity (overrides
+  `essence.quantity`; a non-finite value omits the count, so a roster chip is a name alone);
+  showName (off by default — a row's badge carries the name in its accessible name and tooltip);
+  density / tag / class, forwarded to `Chip`, as is every other attribute.
 -->
 <script>
   import Chip from '../../../components/Chip.svelte';
@@ -56,8 +43,7 @@
     const number = Number(raw);
     return Number.isFinite(number) ? number : null;
   });
-  // The accessible name pairs the two facts the chip states, in the order the reference's own
-  // `title` does (`e.name + ' ' + qty`, `proto:5501`).
+  // Pairs the two facts the chip states, in the order the reference's own `title` does.
   const accessibleName = $derived(count === null ? name : `${name} ${count}`);
 </script>
 
@@ -79,9 +65,8 @@
 >
 
 <style>
-  /* Numerals are mono everywhere in the manager, at the face's 500 rung: `proto:5502` draws the
-     count in `var(--mono)` and this repo's mono ships 400/500. Declared on the COUNT alone so a
-     chip that also shows the name keeps the name in the chip's own face. */
+  /* Numerals are mono everywhere in the manager. Declared on the COUNT alone, so a chip that also
+     shows the name keeps the name in the chip's own face. */
   .fab-essence-chip-count {
     font-family: var(--fab-font-mono);
     font-variant-numeric: tabular-nums;

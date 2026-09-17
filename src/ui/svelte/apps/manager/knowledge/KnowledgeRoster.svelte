@@ -1,20 +1,11 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  The Knowledge surface's searchable character roster (issue 785). Player
-  characters only — the same roster the Access surface uses — with no
-  show-NPCs toggle; an NPC's knowledge state stays reachable through the
-  `game.fabricate.resetActorKnowledge` API.
+  The Knowledge surface's searchable character roster: player characters only, the same roster the
+  Access surface uses, with no show-NPCs toggle — an NPC's knowledge state stays reachable through
+  the `game.fabricate.resetActorKnowledge` API. Each row is a REAL button carrying the portrait, the
+  name and an "N item(s) · M learned" meta line, or a dimmed "Nothing tracked".
 
-  Each row is a REAL button carrying the actor's portrait (`Avatar`, 34px, round,
-  decorative `alt=""` because the name is adjacent text), the name, and an
-  "N item(s) · M learned" meta line. A character with nothing tracked renders a
-  dimmed "Nothing tracked" meta instead.
-
-  Props:
-   - characters: already-filtered roster rows.
-   - totalCount: unfiltered roster size (drives the empty-vs-no-match branch).
-   - selectedActorId, searchTerm.
-   - onSearch(term), onSelect(actorId).
+  Props: characters (already filtered), totalCount (unfiltered, drives empty-vs-no-match),
+  selectedActorId, searchTerm, onSearch(term), onSelect(actorId).
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
@@ -50,9 +41,8 @@
   class="manager-knowledge-roster"
   aria-label={text('FABRICATE.Admin.Manager.Knowledge.RosterLabel', 'Characters')}
 >
-  <!-- The `flex: 0 0 auto` roster override is authored against
-       `.manager-knowledge-roster .manager-search`, alongside the Access roster's
-       identical one, so this needs no class of its own. -->
+  <!-- The `flex: 0 0 auto` override is authored against `.manager-knowledge-roster .manager-search`,
+       beside the Access roster's identical one, so this needs no class of its own. -->
   <ManagerSearchField
     value={searchTerm}
     onInput={(next) => onSearch(next)}
@@ -89,10 +79,8 @@
         )}
       />
     {:else}
-      <!-- Plain button stack rather than a list/listitem pairing: the row IS the
-           control, and a `<button role="listitem">` both loses its button semantics
-           and makes its `aria-pressed` selection state unsupported. The section's
-           own `aria-label` names the group. -->
+      <!-- A plain button stack, not list/listitem: `<button role="listitem">` loses its button
+           semantics and its `aria-pressed`. The section's own `aria-label` names the group. -->
       <div class="manager-knowledge-roster-list">
         {#each characters as character (character.id)}
           <button

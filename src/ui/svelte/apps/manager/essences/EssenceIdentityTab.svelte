@@ -1,24 +1,15 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  The essence editor's IDENTITY tab (issue 1036): icon, name, description, colour palette,
-  and the Enabled row.
+  The essence editor's IDENTITY tab: icon, name, description, colour palette and the Enabled row.
 
-  ── THE COLOUR PALETTE IS INLINE, AND IT HAS A NO-COLOUR CELL ─────────────────────
-  The shipped editor reached "no colour" only through a separate Clear button beside a
-  popover TRIGGER. The prototype shows the palette itself, inline — so it is rendered
-  through `ManagerColorPopover`'s gated `layout="inline"` mode with `allowNone`, because an
-  inline palette WITHOUT that cell would be a one-way door: once a colour is chosen there
-  would be no route back to the accent default. Both props are off by default, so the
-  environments biome popover and the character-modifier picker are untouched.
+  THE COLOUR PALETTE IS INLINE AND HAS A NO-COLOUR CELL, rendered through
+  `ManagerColorPopover`'s gated `layout="inline"` with `allowNone`, because an inline palette
+  without that cell is a one-way door: once a colour is chosen there is no route back to the accent
+  default. Both props are off by default, so the biome popover and the modifier picker are
+  untouched. Unset is a FIRST-CLASS state, not a failure — an essence with no colour renders in the
+  theme accent — so the palette marks the No-colour cell rather than falsely marking a hue.
 
-  Unset is a FIRST-CLASS state, not a failure. An essence with no colour renders in the
-  theme accent, which is what every essence rendered as before issue 917, so the palette
-  marks the No-colour cell rather than falsely marking Sage.
-
-  ── THE ENABLED ROW IS `ToggleCard` ───────────────────────────────────────────────
-  Its shape is exactly icon · title · sub-line · switch, which is this row. A blocking
-  validation issue does NOT disable the switch: the prototype's subtitle asserts a gate this
-  change does not implement, and that copy is dropped.
+  THE ENABLED ROW IS `ToggleCard`, whose shape is exactly icon · title · sub-line · switch. A
+  blocking validation issue does NOT disable the switch: that gate is not implemented here.
 -->
 <script>
   import Field from '../../../components/Field.svelte';
@@ -55,13 +46,10 @@
 <div class="manager-essence-tab-stack" data-essence-tab-panel="identity">
   <section class="manager-edit-card">
     <div class="manager-essence-edit-grid">
-      <!-- THE CONTROL HALF of the validation row action (issue 1517). The `icon` blocker is
-           about the chosen GLYPH, and the two controls that change it — the tile's reset overlay
-           and the picker beneath it — are this panel's, so the panel is the destination and
-           `essenceStudio.js` addresses it as `essence-icon`. A panel is not natively focusable,
-           so it declares BOTH the tabindex that makes the focus real and the attribute that
-           tells Foundry the window is focused; without the second, Space pauses the game and
-           the arrows pan the canvas. -->
+      <!-- THE CONTROL HALF of the validation row action. Two controls change the glyph — the
+           tile's reset overlay and the picker — so the PANEL is the destination. A panel is not
+           natively focusable, so it declares the tabindex that makes focus real AND the attribute
+           telling Foundry the window is focused; without the second, Space pauses the game. -->
       <div
         class="manager-essence-icon-panel"
         data-validation-target="essence-icon"
@@ -71,24 +59,18 @@
         <span class="manager-essence-field-label"
           >{text('FABRICATE.Admin.Manager.Essence.Icon', 'Icon')}</span
         >
-        <!-- The large tile. It carries the essence's own colour, so the GM sees the choice
-             they just made rather than a preview in the theme accent.
+        <!-- The large tile, carrying the essence's own colour so the GM sees the choice they made
+             rather than a preview in the theme accent.
 
-             SQUARE, not block (issue 1036, maintainer round 3). The round-2 `block` filled
-             the column WIDTH and kept `size` only as its height, so a widened column
-             stretched the tile into a rectangle. The maintainer's note is that the icon must
-             read as a square: `size={124}` alone sets both dimensions, and the column below
-             is narrowed to that same 124px so the picker
-             row shrinks to fit beneath the tile rather than hanging past it. `glyph`
-             stays: at the shared 0.9rem (~14px) default the flame was a speck in a 124px
-             tile, and the prototype's flame fills roughly a third of the tile's edge.
+             SQUARE, not block: `block` filled the column WIDTH and kept `size` as its height, so a
+             widened column stretched the tile into a rectangle. `size` alone sets both dimensions,
+             and the column below is narrowed to match so the picker row shrinks to fit beneath it.
+             `glyph` stays, because at the shared default the flame was a speck in a 124px tile.
 
-             The RESET is an OVERLAY on the tile now (maintainer feedback), not a second
-             control beside the picker: `Medallion` is a closed leaf with no slot, so this
-             wrapper gives the reset something to position against. It is invisible until the
-             tile is hovered or the button itself takes keyboard focus — `:focus-visible`
-             keeps it keyboard-reachable independent of hover, which a hover-only reveal would
-             have made unreachable without a pointer. -->
+             The RESET is an OVERLAY on the tile, not a second control beside the picker, and this
+             wrapper is what it positions against, `Medallion` being a closed leaf with no slot. It
+             is invisible until the tile is hovered or the button takes keyboard focus —
+             `:focus-visible` keeps it reachable without a pointer. -->
         <div class="manager-essence-icon-tile">
           <Medallion icon={normalizedIcon} tint={colorToken || ''} size={124} glyph={44} />
           <IconButton
@@ -115,9 +97,8 @@
       <div class="manager-essence-core-fields">
         <Field as="label" for="manager-essence-edit-name">
           <span>{text('FABRICATE.Admin.Manager.Essence.Name', 'Name')}</span>
-          <!-- `data-validation-target` is the CONTROL half of the validation row action
-               (issue 1517): the `name` blocker addresses this input by this exact value, and
-               `validationFocus.js` resolves, focuses and marks it. -->
+          <!-- The CONTROL half of the validation row action: the `name` blocker addresses this
+               input by this exact value, which `validationFocus.js` resolves and focuses. -->
           <input
             id="manager-essence-edit-name"
             data-validation-target="essence-name"
@@ -148,9 +129,8 @@
     </div>
   </section>
 
-  <!-- THE CONTROL HALF for the `colour` row (issue 1517). The palette is an inline grid of
-       swatches rather than one control, so the CARD is the destination — the same set-level rule
-       the icon panel above follows — and `essenceStudio.js` addresses it as `essence-colour`. -->
+  <!-- THE CONTROL HALF for the `colour` row. The palette is a grid of swatches rather than one
+       control, so the CARD is the destination, by the same rule the icon panel follows. -->
   <section
     class="manager-edit-card"
     data-manager-essence-colour
@@ -185,9 +165,8 @@
       onClear={() => onColourChange('')}
       onChange={(next) => onColourChange(next?.colorToken || '')}
     />
-    <!-- No colour-NAME copy here (maintainer feedback): naming the swatch was overhead the
-         palette already carries visually, across every theme and colour combination. The
-         Authored/Unset sentence stays — it names no colour, only whether one is set. -->
+    <!-- No colour-NAME copy: naming the swatch is overhead the palette already carries visually.
+         The Authored/Unset sentence stays, naming only whether a colour is set. -->
     <p
       class="manager-muted manager-essence-colour-state"
       data-essence-colour-state={colorToken || 'none'}
@@ -232,14 +211,11 @@
     gap: var(--fab-space-3);
   }
 
-  /* The ONLY definition of this block. A global twin declared the same properties at equal
-     specificity, which makes which one wins a cascade coin-toss rather than a decision, so
-     it was retired and its `min-width: 0` folded in here.
+  /* The ONLY definition of this block: a global twin declared the same properties at equal
+     specificity, making the winner a coin-toss rather than a decision.
 
-     `align-items: stretch` (issue 1036). The tile is now a fixed 124px SQUARE and the column
-     is narrowed to that same 124px, so stretch makes the actions row beneath fill the
-     column too — the picker shrinks to the tile's width and shares its edges rather than
-     the picker's natural width hanging off the right of the narrower tile. */
+     `align-items: stretch`, because the tile is a fixed square and the column is narrowed to
+     match, so the actions row fills the column instead of hanging off the tile's right. */
   .manager-essence-icon-panel {
     display: flex;
     flex-direction: column;
@@ -248,35 +224,21 @@
     min-width: 0;
   }
 
-  /* The tile wrapper `Medallion` needs because it is a closed leaf with no slot (maintainer
-     feedback): the reset now overlays the tile instead of sitting beside the picker as a
-     second control, and `position: relative` is what an absolutely-positioned overlay
-     positions against. */
+  /* The wrapper `Medallion` needs, being a closed leaf with no slot: `position: relative` is what
+     the reset overlay positions against. */
   .manager-essence-icon-tile {
     position: relative;
   }
 
-  /* Hidden by default. Revealed on tile HOVER and on button FOCUS independently — never
-     folded into one `:hover, :focus` rule — because a hover-only reveal is unreachable
-     without a pointer and `:focus-visible` (not `:focus`) keeps a stray mouse-click focus
-     from pinning it open outside keyboard use. Hidden with `opacity` + `pointer-events`,
-     NOT `visibility: hidden`: `visibility: hidden` removes the button from the tab order, so
-     a keyboard user could never focus it and the `:focus-visible` reveal below could never
-     fire — the exact catch-22 this design exists to avoid. `opacity: 0` keeps it focusable;
-     `pointer-events: none` stops the invisible corner intercepting a click until revealed.
+  /* Hidden by default, revealed on tile HOVER and on button FOCUS independently — never folded
+     into one rule — because a hover-only reveal is unreachable without a pointer, and
+     `:focus-visible` rather than `:focus` keeps a stray click from pinning it open. Hidden with
+     `opacity` + `pointer-events`, NOT `visibility: hidden`, which removes the button from the tab
+     order so the `:focus-visible` reveal could never fire.
 
-     The reset control is an `<IconButton>` as of issue 1422, so the CHILD half of each
-     selector is `:global` while the tile keeps its scoping — the tile is still an element
-     this component writes, and globalising it too would let these rules escape into any
-     other component that happens to draw a tile. Specificity is unchanged by construction:
-     Svelte compiled the scoped descendant to
-     `.manager-essence-icon-tile.svelte-<hash> .manager-essence-icon-reset:where(.svelte-<hash>)`,
-     and `:where()` contributes nothing, so (0,3,0) then and (0,3,0) now.
-
-     Unlike `GatheringEconomyView.svelte`'s pair, this one failed LOUDLY: the class token
-     appears nowhere on an element this component still writes, so the compiler pruned all
-     three selectors and `lint:svelte:warnings` named them. A repair verified only against
-     that gate would have missed the other file entirely. */
+     The reset is an `<IconButton>`, so the CHILD half of each selector is `:global` while the tile
+     keeps its scoping — globalising both would let these rules escape to any component drawing a
+     tile. Specificity is unchanged, because Svelte compiles a scoped descendant with `:where()`. */
   .manager-essence-icon-tile :global(.manager-essence-icon-reset) {
     position: absolute;
     top: var(--fab-space-1);

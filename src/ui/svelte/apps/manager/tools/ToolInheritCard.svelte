@@ -1,101 +1,42 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  ONE BEHAVIOUR SECTION OF THE SYSTEM TOOL RULES EDITOR, AS A CARD (issue 1373).
+  ONE BEHAVIOUR SECTION OF THE SYSTEM TOOL RULES EDITOR, AS A CARD, whose header states four
+  things at once: what the section is, whether this system INHERITS the world Tool's answer or
+  OVERRIDES it, what the world's answer is, and the switch that moves between the two. The screen
+  shipped four bare headings with no inheritance affordance at all, while the rules LIST one route
+  away already advertised `Inherits world defaults`. There are FOUR such sections across two tabs,
+  so the card is a component and the two tabs are its callers.
 
-  == WHY THIS COMPONENT EXISTS AT ALL ========================================================
-  The design draws every behaviour section of this editor as a bordered, filled card whose
-  header states four things at once: what the section is, whether this system INHERITS the
-  world Tool's answer or OVERRIDES it, what the world's answer actually is, and the switch that
-  moves between the two. The screen shipped four bare headings on the page background with the
-  controls loose beneath them and no inheritance affordance anywhere — a screen that could not
-  express the model it sits on, while the rules LIST one route away already advertised
-  `Inherits world defaults` and `What it would inherit here`.
+  THE SWITCH IS THE SHARED `InheritRow`, NOT A SECOND ONE, rendered with `section` (one row),
+  `stateChip={false}` (this card carries the state pill in its own title line) and `headings` (its
+  default head is the section NAME, which this card's `<h3>` already says). Its layout inside this
+  head lives in `styles/fabricate.css`, not here: Svelte stamps its hash only on elements a
+  component itself writes, so a scoped rule could not reach `InheritRow`'s elements at all. That
+  rule puts the row on `display: contents`, which is how the switch lands on the title line.
 
-  There are FOUR such sections (`breakage`, `onBreak`, `prerequisites`, `bonus`), across two
-  tabs. Four copies of this markup is the `.svelte` duplication a reviewer catches and the
-  Sonar gate does not, so the card is a component and the two tabs are its callers.
+  INHERITING HIDES THE CONTROLS, AND THAT IS A TRUTH CLAIM. While a section inherits, the body is
+  the world value, read only — not "the controls, disabled": `data-models/spec.md`
+  `## CraftingSystem` requirement 36 keeps the IN-SYSTEM record authoritative, so a control a GM
+  could still reach would let this system diverge from a default the pill claims it follows.
 
-  == THE SWITCH IS THE SHARED `InheritRow`, NOT A SECOND ONE =================================
-  `scoped/InheritRow` is the shipped inherit control for all six scoped-entity editors. It is
-  rendered here with `section` (one row, not the whole set), `stateChip={false}` (this card
-  carries the state pill in its own title line, and two pills a line apart saying the same
-  thing is the duplication that flag exists to avoid) and `headings` (its default head is the
-  section NAME, which this card's own `<h3>` already says; the head states the world default
-  instead). Those are the essence rules editor's own three props, used the same way.
+  THE LOCAL SWITCH IS NOT A NEW `inherited` SECTION. `InheritRow` renders exactly the sections the
+  descriptor declares, and those names are the membership record's `inherit` KEYS. The per-system
+  display label is an override with no such key — stored as a value or not stored at all — so
+  adding it would mint an inherit flag the model does not hold and put a label row on the WORLD
+  editors too. The card writes that switch itself, inside `InheritRow`'s OWN element tree so the
+  head's `display: contents` grid rule places it identically, with ON meaning OVERRIDDEN.
 
-  Its layout inside this head is done in `styles/fabricate.css`, not here: Svelte stamps its
-  scoping hash only on the elements a component itself writes, so a scoped rule in this file
-  could not reach `InheritRow`'s `.manager-scoped-inherit-*` elements at all. The rule there
-  puts the row on `display: contents` so its three children become grid items of this head —
-  which is how the switch lands on the title line rather than under it.
-
-  == INHERITING HIDES THE CONTROLS, AND THAT IS A TRUTH CLAIM ================================
-  While a section inherits, the body is the world value, read only. It is not "the controls,
-  disabled": `## CraftingSystem` requirement 36 keeps the IN-SYSTEM record authoritative, so a
-  control a GM could still reach would let this system diverge from a world default the pill is
-  simultaneously claiming it follows. The editor's own toggle handler keeps the in-system record
-  equal to the world value for as long as the switch is on, so the claim stays true.
-
-  Props:
-   - section: the world-default section this card governs. Also its `data-tool-rule-card` value.
-   - icon / title / subtitle: the card's own heading. `subtitle` is the descriptive line shown
-     when the card carries NO inherit affordance; an inheritable card states the world default
-     there instead, through `InheritRow`'s head.
-   - eyebrow: an uppercase micro-label ABOVE the title (issue 1373, maintainer round 2). The
-     design heads each Requirements section with a short WORD over a sentence-case TITLE -
-     `Prerequisites` over `Character prerequisites` (`proto:2324`), `Bonus` over `Bonus to the
-     check` (`proto:2350`), and the same anatomy again at system scope (`proto:2860`,
-     `proto:2886`). Ours had the two inverted: the sentence, uppercased, as the only heading.
-     Supplying an eyebrow also puts the title into the design's `600 13px` sans rather than the
-     display face, because the uppercase kicker treatment now belongs to the line above it.
-     Empty by default, so the Breakage tab's four cards are unchanged.
-   - control: an OPTIONAL snippet rendered on the header row, at its right edge. The design puts
-     each section's own enable switch there rather than on a second heading row inside the body
-     (`proto:2325`, `proto:2351`). A card that CAN inherit already spends that slot on the
-     inherit switch - a different question, and two identical switches one line apart is the
-     confusion this card's head was built to avoid - so its caller keeps the enable switch as
-     the first row of the body and passes no `control`. See `ToolRequirementsTab`.
-   - flush: draw no border, no radius, no fill and no horizontal padding, so a caller can stack
-     several sections inside ONE card with a rule between them. The design draws the whole
-     Requirements tab as a single `padding: 15px` card whose two sections are separated by
-     `margin-top: 15px; padding-top: 14px; border-top: 1px solid var(--border)` (`proto:2322`,
-     `proto:2349`); a card per section put three nested edges where the design draws one.
-   - headingStyle: `'title'` — the system rules editor's sentence-case bold, and the default —
-     or `'kicker'`, the uppercase micro-label the WORLD entry sets every card heading in.
-     The two design frames genuinely differ here, and mounting this card unchanged put two
-     heading idioms on one world screen (issue 1373). It is the CALLER's answer rather than a
-     scope test in here, on the same argument as `ToolBehaviorPreview`'s copy overrides.
-   - inheritable: whether this `(tool, system)` pair has a world membership record to inherit
-     through. `false` for a pre-migration in-system Tool with no world half, which has nothing
-     to inherit FROM — the card then renders its controls with no switch and no pill, exactly
-     as the screen did before.
-   - inherited: the membership record's `inherit` map, passed straight through.
-   - fact: what the section resolves to while inheriting — `{icon, title, subtitle, value}`.
-   - hint: whether the inset row carries the long "Flip the switch" sentence. The design states
-     it once per tab, on the first inheriting card, and states the short form on the rest.
-   - disabled: while the editor is saving.
-   - onToggle(section, nextInherit): the switch.
-   - children: the section's controls, rendered ONLY when the section is overridden.
-   - localInherit: `null` for a real world-default SECTION, which resolves its state through
-     `inherited` and renders the shared `InheritRow`. A boolean for a card whose overridable
-     fact is NOT in the membership record's `inherit` map — today exactly one, the per-system
-     DISPLAY LABEL, whose "inheriting" state is simply that no override is stored. See the
-     paragraph below.
-   - toggleLabel: the accessible name of the local switch. Ignored for a section card, which
-     takes `InheritRow`'s own.
-
-  == THE LOCAL SWITCH, AND WHY IT IS NOT A NEW `inherited` SECTION ============================
-  `InheritRow` renders exactly the sections `scopedStudio`'s descriptor declares for the entity
-  type, and it is right to: those names are the membership record's `inherit` KEYS, read by the
-  resolver. The per-system display label is an override with no such key — it is stored as a
-  value or not stored at all — so adding `label` to that descriptor would mint an inherit flag
-  the model does not hold and would put a label row on the WORLD scoped editors too.
-
-  The card therefore writes the switch itself, in `InheritRow`'s OWN element tree
-  (`.manager-scoped-inherit-row` > `.manager-scoped-inherit-head` > `.manager-scoped-inherit-label`
-  plus a bare `StatusToggle`) so the head's `display: contents` grid rule in
-  `styles/fabricate.css` places it identically. Same idiom, same pixels, same polarity — ON is
-  OVERRIDDEN — without a second inherit vocabulary underneath it.
+  Props: section (also its `data-tool-rule-card` value); icon / title / subtitle, where `subtitle`
+  is the line shown when the card carries NO inherit affordance; eyebrow, an uppercase micro-label
+  ABOVE the title, which also puts the title into the design's sans rather than the display face;
+  control, an OPTIONAL snippet on the header row, which a card that CAN inherit never passes,
+  because that slot is already the inherit switch and two identical switches one line apart is the
+  confusion this head was built to avoid; flush, which draws no box so a caller can stack sections
+  inside ONE card; headingStyle, the CALLER's answer rather than a scope test in here;
+  inheritable, `false` for a pre-migration Tool with no world half to inherit FROM; inherited;
+  fact, what the section resolves to while inheriting; hint, the long sentence the design states
+  once per tab; disabled; onToggle(section, nextInherit); children, rendered ONLY when overridden;
+  localInherit, `null` for a real world-default SECTION and a boolean for the display-label card;
+  and toggleLabel, ignored for a section card, which takes `InheritRow`'s own.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
@@ -119,10 +60,8 @@
     disabled = false,
     localInherit = null,
     toggleLabel = '',
-    // Whether `World default: {value}` lower-cases the value it interpolates. True for a rule
-    // ("World default: unlimited uses"), which reads as a sentence; false for a card whose
-    // world value is a PROPER NOUN — the display-label card states a Tool's actual name, and
-    // "World default: anvil" is a different word from the one on the world record.
+    // Whether `World default: {value}` lower-cases what it interpolates: true for a rule, which
+    // reads as a sentence, and false for a PROPER NOUN such as a Tool's actual name.
     lowercaseFact = true,
     headingStyle = 'title',
     onToggle = () => {},
@@ -176,19 +115,15 @@
       </p>
     {/if}
     <div class="manager-tool-rule-card-title">
-      <!-- `manager-kicker` is the shipped uppercase micro-label class and rides the SAME `<h3>`
-           rather than replacing it with a paragraph: the card's heading is a heading in both
-           faces, and only its treatment differs. -->
+      <!-- `manager-kicker` rides the SAME `<h3>` rather than replacing it with a paragraph: the
+           card's heading is a heading in both faces, and only its treatment differs. -->
       <h3 class={headingStyle === 'kicker' ? 'manager-kicker' : ''}>
         {#if icon}<i class={icon} aria-hidden="true"></i>{/if}{title}
       </h3>
       {#if inheritable}
-        <!-- THE DESIGN'S OWN TWO FAMILIES (issue 1373). `proto:4912` builds this pill from
-             `--info-soft` / `--info-border` / `--info-text` while it is inheriting and from
-             the WARNING family once it is overridden. The Tool Rules list inspector one
-             column over already reads that string; this card read `neutral` / `accent`, so
-             one model wore two colour vocabularies on two screens a click apart, and neither
-             of ours said what the design says. -->
+        <!-- THE DESIGN'S OWN TWO FAMILIES: the info family while inheriting and the WARNING
+             family once overridden. The list inspector one column over already reads that pair,
+             so a `neutral` / `accent` pill here put one model in two colour vocabularies. -->
         <Chip
           tone={isInherited ? 'info' : 'warning'}
           data-tool-rule-chip={isInherited ? 'inheriting' : 'overridden'}
@@ -230,18 +165,11 @@
 
   {#if isInherited}
     <div class="manager-tool-rule-card-inherited" data-tool-rule-inherited={section}>
-      <!-- BARE GLYPH, INFO TONE. The rail's rule rows one column over draw a bordered tile in
-           the ACCENT hue, and that contrast is the point: an accent-toned mark in a tile is a
-           fact this system authored, while the cooler informational globe with no tile is the
-           reference's mark for a value that came from somewhere else. Ours drew a tan globe,
-           the same hue as the value beside it (issue 1373).
-
-           AND IT IS THE `rule` DENSITY, WHICH ALREADY EXISTED. `proto:2700` draws this inset
-           at `gap: 10px; padding: 11px 13px; background: var(--bg1); border-radius: 10px` over
-           a `600 11.5px` title and a `400 9.5px` note in the subtle ink - which is the variant
-           `IconFactRow` shipped for the two Tool rails, value for value. Taking the default
-           missed five of its six, and the FILL by a rung: the design recesses this well below
-           the card holding it, and the default row raises it. -->
+      <!-- BARE GLYPH, INFO TONE, and the contrast is the point: an accent-toned mark in a tile is
+           a fact this system authored, where the cooler informational glyph with no tile is the
+           mark for a value that came from somewhere else. AND IT IS THE `rule` DENSITY, the
+           variant `IconFactRow` shipped for the two Tool rails: the default missed five of its
+           six values, and the FILL by a rung, raising a well the design recesses. -->
       <IconFactRow
         icon="fas fa-globe"
         tone="info"
@@ -266,33 +194,18 @@
 </section>
 
 <style>
-  /* -- THE EYEBROW FACE (issue 1373, maintainer round 2, E3) ------------------------------
-     The head is a two-column grid in `styles/fabricate.css`, and its rows are placed there by
-     rule rather than by source order. Adding a third line therefore has to re-place all of them
-     from here, under a modifier class so the four Breakage cards - which pass no eyebrow - are
-     untouched. Every rule below is anchored on two classes this component writes, which puts it
-     at (0,4,0) against the sheet's (0,2,0) and (0,3,0), so none of it depends on injection
-     order. `:global()` marks the elements `InheritRow` and `StatusToggle` write.
-
-     Row 1 is the eyebrow, row 2 the title line, row 3 the descriptive line - the subtitle at
-     world scope, `InheritRow`'s `World default:` head at system scope. The head's one control
-     spans all three, which is where the design centres it (`proto:2323`). */
-  /* -- AND ITS TYPE IS THE SHARED CLASS'S, NOT A THIRD COPY OF IT (issue 1373) -----------
-     `proto:2324` states every section eyebrow on this tab as `font: 700 8.5px var(--sans);
-     letter-spacing: .11em; text-transform: uppercase; color: var(--subtle)`, and `proto:2860`
-     states the system twin identically. So does every other eyebrow the reference draws: it
-     is `.manager-kicker`'s value, not this card's.
-
-     THIS BLOCK USED TO RESTATE IT, and so did two more sites, while the shared class went on
-     rendering 11.52px untracked in the muted ink everywhere nobody had patched — which put
-     `PREREQUISITES` and `LINKED ITEM` at two sizes on one screen, one tab apart. The class
-     carries the reference's type at the source now, and this block keeps only the GRID
-     PLACEMENT the three-row head needs.
-
-     Leaving even one type declaration here would have made that source fix unreachable rather
-     than merely redundant: the sheet is imported at `layer(modules)` and this block is
-     injected unlayered, so an unlayered declaration beats a layered one at ANY specificity —
-     silently, with no error and no failing test to say so. */
+  /* THE EYEBROW FACE. The head is a two-column grid in `styles/fabricate.css` whose rows are
+     placed by rule rather than source order, so a third line has to re-place all of them from
+     here, under a modifier class that leaves the eyebrow-less cards untouched. Every rule is
+     anchored on two classes this component writes, which puts it at (0,4,0) against the sheet's
+     (0,2,0) and (0,3,0), so none of it depends on injection order. Row 1 is the eyebrow, row 2 the
+     title line, row 3 the descriptive line, and the head's one control spans all three. */
+  /* AND ITS TYPE IS THE SHARED CLASS'S, NOT A THIRD COPY OF IT. This block used to restate the
+     reference's eyebrow value, and so did two more sites, while `.manager-kicker` went on
+     rendering something else everywhere nobody had patched — which put two eyebrows at two sizes
+     on one screen. Leaving even one type declaration here would make the source fix UNREACHABLE
+     rather than redundant: the sheet is imported at `layer(modules)` and this block is injected
+     unlayered, which beats it at ANY specificity, silently. */
   .manager-tool-rule-card.has-eyebrow .manager-tool-rule-card-eyebrow {
     grid-column: 1;
     grid-row: 1;
@@ -300,11 +213,9 @@
     margin: 0;
   }
 
-  /* THE HEAD'S OWN RHYTHM (round 5). `proto:2323` gives the header row `gap: 11px` — the sheet's
-     `--fab-space-3` column gap already — and `proto:2324` puts `margin-top: 3px` under the
-     eyebrow and NOTHING between the title and the description. The sheet's uniform 2px row gap
-     cannot say that, so the has-eyebrow face zeroes it and the title states its own step: 3px
-     rounds to the 4px scale's `--fab-space-1`, which is the nearest rung. */
+  /* THE HEAD'S OWN RHYTHM: a step under the eyebrow and NOTHING between the title and the
+     description, which the sheet's uniform row gap cannot say — so the has-eyebrow face zeroes
+     that gap and the title states its own step. */
   .manager-tool-rule-card.has-eyebrow .manager-tool-rule-card-head {
     row-gap: 0;
   }
@@ -328,10 +239,8 @@
     grid-row: 1 / -1;
   }
 
-  /* THE TITLE IS THE SENTENCE AND THE EYEBROW IS THE WORD. `proto:2324` sets the title at
-     `600 13px var(--sans); color: var(--text)`, which is 0.82rem against the 16px root - not
-     the serif display face the sheet gives a bare rule card, and not the uppercase kicker the
-     world entry gives one, because the kicker treatment has moved to the line above. */
+  /* THE TITLE IS THE SENTENCE AND THE EYEBROW IS THE WORD: not the serif display face the sheet
+     gives a bare rule card, and not the uppercase kicker, which has moved to the line above. */
   .manager-tool-rule-card.has-eyebrow .manager-tool-rule-card-title h3 {
     color: var(--fab-text);
     font-family: var(--fab-font-sans);
@@ -341,10 +250,8 @@
     text-transform: none;
   }
 
-  /* -- THE FLUSH FACE ---------------------------------------------------------------------
-     No box of its own, so the caller's single card is the only edge on the tab. The head and
-     body keep their VERTICAL rhythm and lose their horizontal inset, which the containing card
-     supplies once instead of once per section. */
+  /* THE FLUSH FACE: no box of its own, so the caller's single card is the only edge on the tab,
+     and the horizontal inset is the containing card's once rather than each section's. */
   .manager-tool-rule-card.is-flush {
     border: 0;
     border-radius: 0;
@@ -355,9 +262,8 @@
     padding: 0;
   }
 
-  /* `proto:2323` closes the header row with `margin-bottom: 9px`, which is the 4px scale's
-     `--fab-space-2`. The head has no bottom padding in this face, so the body's top padding IS
-     that gap, and it was `--fab-space-3` — a third over the reference on both sections. */
+  /* The head has no bottom padding in this face, so the body's top padding IS the header row's
+     closing gap. */
   .manager-tool-rule-card.is-flush .manager-tool-rule-card-inherited,
   .manager-tool-rule-card.is-flush .manager-tool-rule-card-body {
     padding: var(--fab-space-2) 0 0;
