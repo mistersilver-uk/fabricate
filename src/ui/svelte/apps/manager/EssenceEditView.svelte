@@ -1,54 +1,23 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  THE SYSTEM ESSENCE RULES EDITOR (issues 1036 and 1372).
+  The system essence rules editor (issues 1036 and 1372) — the system-scope half of the essence
+  model: a world record holds the identity, and this screen holds what that essence does on craft in
+  ONE system. Everything visual belongs to the tab bodies under `essences/` and the shared cards
+  under `scoped/`; here are the draft, the dirty computation, the save and the two async
+  resolutions the tabs cannot do for themselves.
 
-  It is the system-scope half of the essence model: a world record holds the essence's identity
-  and every crafting system that has the essence resolves the same one, and THIS screen holds what
-  that essence does on craft in ONE system.
-
-  ── IT HAS TWO SHAPES, AND THE FORK IS "IS THERE A SHARED DEFINITION" ─────────────
-  `rulesMode` is `scopedKnown && !isNew` — the world catalogue holds this essence, so there IS a
-  record that owns its identity. Then the editor is the two-tab rules screen: `Essence rules` and
-  `Validation`, and the rules tab is the shared-definition callout, the per-system enable switch,
-  the two behaviour cards each carrying its own inherit switch, and the copy-to-other-systems
-  action.
-
-  Otherwise — a CREATE draft, or a world corpus that cannot answer — it is the shipped three-tab
-  editor with its Identity tab. That is not a hedge: a create draft's in-system record is the only
-  record there is, so there is no shared layer for an identity edit to contradict, and the moment
-  it is saved the world corpus answers for it and it is the rules screen forever after.
-
-  ── IDENTITY IS NOT EDITABLE FROM A SYSTEM, AND THE ABSENCE IS THE FEATURE ────────
-  `ui-integration/spec.md` `### GM World Essence Screens` requirement 10. A name, glyph, colour or
-  description edited here would rename the essence in every other system holding it, from a screen
-  titled with one of them. The route to those fields is the callout's `Edit shared definition`,
-  which opens the world essence entry editor — the surface that owns them — and it is the ONLY
-  route this screen offers to them.
-
-  ── THIS COMPONENT IS THE EDITOR'S DRAFT OWNER AND ITS FORM ───────────────────────
-  Everything visual belongs to the tab bodies under `essences/` and the shared cards under
-  `scoped/`; what is here is the draft, the dirty computation, the save, and the two async
-  resolutions the tabs cannot do for themselves (the macro's display name, and the
-  `type !== 'script'` check on a dropped macro).
-
-  ── EVERY TAB PROP MUST ALSO BE FORWARDED HERE ────────────────────────────────────
-  This file is the essence equivalent of the `RecipeEditView` wrapper: a prop a tab declares
-  but this file does not pass silently takes its default, which for an editor means "renders
-  as if nothing were authored". Adding a field to a tab means adding it here too.
-
-  ── THE FORM ID IS A CONTRACT ─────────────────────────────────────────────────────
-  `id="manager-essence-edit-form"` is what the manager root's header Save button — now the
-  shared `ComponentEditorHeader`, wearing this studio's own hooks — submits through
-  `form="manager-essence-edit-form"`. Both halves must survive verbatim: drop either and
-  Save silently stops working. The header renders in the SHELL's action bar, not here,
-  which is why this file does not import it.
-
-  ── WHAT IS BUFFERED AND WHAT IS NOT ──────────────────────────────────────────────
-  The in-system record's fields — including `enabled` — accumulate in this draft and land on
-  Save. The MEMBERSHIP writes do not: adding this essence to the system and switching a section
-  between inherited and overridden are actions on a world-scope record this draft does not
-  describe, and each lands immediately, exactly as `### Scoped entity editor patterns`
-  requirement 14 states for the world entry editors.
+  Invariants:
+  - It has TWO SHAPES and the fork is "is there a shared definition": `rulesMode` is
+    `scopedKnown && !isNew`, giving the two-tab rules screen; otherwise the three-tab editor with
+    its Identity tab, because a create draft's in-system record is the only record there is.
+  - IDENTITY IS NOT EDITABLE FROM A SYSTEM (`ui-integration/spec.md`, `### GM World Essence Screens`
+    requirement 10): a field edited here would rename the essence in every other system holding it,
+    so the callout's `Edit shared definition` is this screen's only route to those fields.
+  - EVERY TAB PROP MUST ALSO BE FORWARDED HERE, or the tab silently takes its default, which for an
+    editor renders as if nothing were authored.
+  - `id="manager-essence-edit-form"` is a contract: the manager root's header Save submits through
+    `form="manager-essence-edit-form"`, and dropping either half stops Save working silently.
+  - The in-system record's fields, `enabled` included, accumulate in this draft and land on Save;
+    the MEMBERSHIP writes do not, as `### Scoped entity editor patterns` requirement 14 states.
 -->
 <script>
   import EssenceEditorTabs from './essences/EssenceEditorTabs.svelte';
@@ -101,15 +70,13 @@
     onDirtyChange = () => {},
     onDraftChange = () => {},
     onImportSourceDrop = null,
-    // The clipboard seam for the linked source's copy-uuid action (issue 1036, maintainer
-    // round 2). Null-by-default rather than a no-op: `ItemDropZone` renders the copy button
-    // only when it is given a handler, so an absent seam hides the control instead of
-    // shipping one that silently does nothing.
+    // The clipboard seam for the linked source's copy-uuid action. Null-by-default rather than a
+    // no-op: `ItemDropZone` renders the copy button only when it is given a handler, so an absent
+    // seam hides the control instead of shipping one that silently does nothing.
     onCopySourceUuid = null,
-    // THE ROUTE OUT TO THE SHARED DEFINITION (issue 1372, maintainer parity round 7). A page
-    // cannot navigate, so the shell supplies this and it opens `world-essence-entry` on this
-    // essence. Null-by-default for the same reason as the clipboard seam above: the callout
-    // hides the exit rather than shipping a button that does nothing.
+    // The route out to the shared definition (issue 1372). A page cannot navigate, so the shell
+    // supplies this and it opens `world-essence-entry`. Null-by-default for the same reason as
+    // the clipboard seam above.
     onOpenSharedDefinition = null,
   } = $props();
 
@@ -118,21 +85,18 @@
   let name = $state('');
   let description = $state('');
   let icon = $state(DEFAULT_ESSENCE_ICON);
-  // The optional per-essence colour (issue 917). '' is the first-class "unset" state: the
-  // essence then renders in the theme accent, which is what every essence rendered as
-  // before, so an unauthored system needs no migration.
+  // The optional per-essence colour (issue 917). '' is the first-class "unset" state: the essence
+  // then renders in the theme accent, which is what every essence rendered as before, so an
+  // unauthored system needs no migration.
   let colorToken = $state('');
   let enabled = $state(true);
   let propertyMacroUuid = $state('');
   let sourceComponentId = $state('');
   let sourceTouched = $state(false);
-  // ── THE COLOUR LATCH (issue 1371 r19-store2, Foundry integrator round 5) ──────────────────
-  // `colorToken` is seeded from the `essence` prop, and since M29 that prop carries the WORLD
-  // essence colour overlaid over this system's own row. Sending it unconditionally therefore
-  // persisted the world's colour onto the in-system row on every save — including on the rules
-  // screen, where there is no colour control at all — destroying the row's own value silently and
-  // durably. The latch is `sourceTouched`'s twin: only a GM edit of the colour sends it. CLEARING
-  // sets the latch too, so "clearing an authored colour persists as null" survives.
+  // THE COLOUR LATCH. `colorToken` is seeded from a prop that carries the WORLD colour overlaid
+  // over this system's row (M29), so sending it unconditionally persisted the world's colour on
+  // every save. Only a GM edit sends it, and CLEARING sets the latch too, so clearing an authored
+  // colour still persists as null.
   let colourTouched = $state(false);
   let saveFailed = $state(false);
   let macroWarning = $state('');
@@ -142,12 +106,9 @@
   let lastDirty = $state(false);
   let lastDraftSignature = $state('');
 
-  // ── THE WORLD-SCOPE JOIN ────────────────────────────────────────────────────────────────
-  // Every one of these is guarded on `scopedKnown`, which is false for an unreadable corpus, for
-  // a new draft, and for an essence the world catalogue does not hold — the last being an
-  // ordinary state, because the in-system array still decides its own rows while
-  // `## CraftingSystem` requirement 36 holds. In every one of those the editor renders exactly as
-  // it did before this change.
+  // THE WORLD-SCOPE JOIN, every part guarded on `scopedKnown` — false for an unreadable corpus, a
+  // new draft, and an essence the world catalogue does not hold, the last being ordinary while
+  // `## CraftingSystem` requirement 36 holds. In each the editor renders as it did.
   const activeSystemId = $derived(String(systemId || ''));
   const worldEntry = $derived(
     essence?.id ? ((scope?.entries ?? []).find((entry) => entry.id === essence.id) ?? null) : null
@@ -164,21 +125,14 @@
     (Array.isArray(systems) ? systems : []).find((system) => system?.id === activeSystemId)?.name ||
       activeSystemId
   );
-  // AN ABSENT `inherit` KEY READS AS INHERITING, matching `isSectionInherited`. So the lock is on
-  // by default for a member, which is the correct default: a fresh membership record inherits
-  // every section, and an editor that presented an edit affordance for it would offer to change
-  // a value the system does not own.
+  // AN ABSENT `inherit` KEY READS AS INHERITING, matching `isSectionInherited`, so the lock is on
+  // by default: a fresh membership record inherits every section.
   const lockedSections = $derived({
     effectSource: scopedKnown && member && inheritedMap.effectSource !== false,
     macro: scopedKnown && member && inheritedMap.macro !== false,
   });
-  // ── WHAT THE WORLD DEFAULT ACTUALLY IS, resolved once and read by BOTH halves ───────────
-  // The note under an inherit row and the locked tile beneath it must name the SAME thing, and
-  // before issue 1372 neither named the world default: the note read `effectSource` as a scalar
-  // and answered `''` for a block, printing "The world default is unset" over a tile naming a
-  // value, while the tile itself rendered the DRAFT's own source under a `World default` pill.
-  // Both were invisible while every membership record was fully overriding, because a locked card
-  // could not be reached at all - which is why the lab world now seeds one inheriting section.
+  // WHAT THE WORLD DEFAULT ACTUALLY IS, resolved once and read by BOTH halves: the note under an
+  // inherit row and the locked tile beneath it must name the SAME thing (issue 1372).
   const worldSourceReferent = $derived(
     essenceEffectSourceReferent(worldEntry?.defaults?.effectSource)
   );
@@ -193,7 +147,7 @@
       : null
   );
   // The world default's macro, and NOT `macroName`: that state resolves the DRAFT's uuid, so an
-  // inheriting system whose own stored macro differs would have shown its own macro's name in a
+  // inheriting system whose own stored macro differs would show its own macro's name in a
   // sentence about the world's.
   const worldMacroUuid = $derived(
     typeof worldEntry?.defaults?.macro === 'string' ? worldEntry.defaults.macro.trim() : ''
@@ -241,8 +195,8 @@
   const sharedWithCount = $derived(Math.max(0, (Number(worldEntry?.membershipCount) || 0) - 1));
 
   const isNew = $derived(!essence?.id);
-  // THE FORK. See the header note: a shared definition exists, so identity is not this screen's
-  // to edit and the rules screen is what renders.
+  // THE FORK. See the header: a shared definition exists, so identity is not this screen's to
+  // edit and the rules screen is what renders.
   const rulesMode = $derived(scopedKnown && !isNew);
   const editorTabs = $derived(rulesMode ? ESSENCE_RULES_TABS : ESSENCE_EDITOR_TABS);
   const editorTabIds = $derived(editorTabs.map((tab) => tab.id));
@@ -284,8 +238,8 @@
     propertyMacrosEnabled: showPropertyMacroUi,
     effectTransferEnabled: showSourceUi,
     // The five system-scope checks are armed ONLY when the world corpus can answer them.
-    // `membershipKnown: false` is what keeps the shipped seven-check tab byte-identical for an
-    // essence the world catalogue does not hold.
+    // `membershipKnown: false` keeps the shipped seven-check tab byte-identical for an essence
+    // the world catalogue does not hold.
     membershipKnown: scopedKnown,
     member,
     enabledHere: enabled !== false,
@@ -294,15 +248,15 @@
     resolvedMacro: propertyMacroUuid || worldDefaultNames.macro,
     componentCarrierCount: essence?.componentUsageCount || 0,
     systemName,
-    // `null` while resolution is still in flight, which PASSES: a spinner must not read as
-    // a defect. Only a proven miss reports `false`.
+    // `null` while resolution is still in flight, which PASSES: a spinner must not read as a
+    // defect. Only a proven miss reports `false`.
     macroResolved: propertyMacroUuid ? !macroMissing : null,
     sourceState: draftSummary.sourceState,
     componentUsageCount: essence?.componentUsageCount || 0,
     recipeUsageCount: essence?.recipeUsageCount || 0,
   });
-  // The tab badge's two numbers, from the SAME pure evaluator the Validation tab renders,
-  // so the badge and the tab can never disagree about how many issues there are.
+  // The tab badge's two numbers, from the SAME pure evaluator the Validation tab renders, so the
+  // badge and the tab can never disagree about how many issues there are.
   const validationCounts = $derived(
     essenceEditorValidation(draftSummary, validationContext).counts
   );
@@ -323,23 +277,18 @@
     saveFailed = false;
     macroWarning = '';
     // THE FIRST TAB OF WHICHEVER SET IS RENDERING. A fixed `'identity'` would open the rules
-    // screen on a tab its own strip does not contain, and the panel would render the
-    // validation fallback under a strip showing `Essence rules` as selected.
+    // screen on a tab its own strip does not contain.
     activeTab = editorTabs[0].id;
     lastEssenceId = nextEssenceId;
   });
 
-  // THE STRIP AND THE PANEL CANNOT DISAGREE. `rulesMode` can flip after mount — the world corpus
-  // is published asynchronously and an editor opened before it arrives starts on the create
-  // editor's tab set — and the seed effect above only re-runs when the ESSENCE changes, so
-  // without this the strip would render `Essence rules | Validation` with neither selected while
-  // the panel rendered whichever body the stale token happened to reach.
+  // THE STRIP AND THE PANEL CANNOT DISAGREE: `rulesMode` can flip after mount, and the seed effect
+  // above only re-runs when the ESSENCE changes.
   $effect(() => {
     if (editorTabs.some((tab) => tab.id === activeTab)) return;
     activeTab = editorTabs[0].id;
   });
 
-  // ── THE VALIDATION ROW ACTION (issue 1517) ──────────────────────────────────────────────
   // The tab labels the announcement names, by tab id. It covers BOTH tab sets, because a row's
   // route is resolved against whichever set is live and either screen can be the destination.
   const ISSUE_TAB_LABELS = {
@@ -348,36 +297,26 @@
     rules: { key: 'FABRICATE.Admin.Manager.Essence.Tabs.Rules', fallback: 'Essence rules' },
   };
 
-  // This editor's own root, so `focusValidationTarget` resolves a `data-validation-target`
-  // inside THIS editor rather than anywhere in the manager window.
+  // This editor's own root, so `focusValidationTarget` resolves a `data-validation-target` inside
+  // THIS editor rather than anywhere in the manager window.
   let editorRoot = $state(null);
 
-  // WHAT THE LIVE REGION SAYS: the ACTION'S OUTCOME, not a count. Activating a row action
-  // changes no tally, so a count-subjected region would recite an unchanged number at the
-  // moment a GM most needs to know where they landed.
+  // WHAT THE LIVE REGION SAYS: the ACTION'S OUTCOME, not a count. Activating a row action changes
+  // no tally, so a count-subjected region would recite an unchanged number at the moment a GM
+  // most needs to know where they landed.
   let issueAnnouncement = $state('');
 
-  // The destination TAB PANEL, and it is the focus fallback for a route-only row (issue 1517).
-  // Four of this editor's checks are about the RECORD rather than one control, so they route
-  // and address nothing; the panel is where their action lands.
+  // The destination TAB PANEL, and the focus fallback for a route-only row (issue 1517). Four of
+  // this editor's checks are about the RECORD rather than one control, so they route and address
+  // nothing; the panel is where their action lands.
   let tabPanel = $state(null);
 
   /**
-   * Deep-link from a validation issue: switch to the tab that hosts the gap, THEN move focus to
-   * the offending control.
-   *
-   * THE ORDER IS THE MECHANISM, not a preference. The route is set synchronously and FIRST, so
-   * Svelte has flushed it and the destination panel exists by the time the focus helper's
-   * `queueMicrotask` runs its query. Everything after that — the panel fallback for a route-only
-   * row, the sentence, and the delay that queues it behind the focus utterance — belongs to
-   * `validationAnnouncement.js`, which owns it for all five hosts.
-   *
-   * The route is checked against the LIVE tab set rather than a fixed list, because this editor
-   * renders two — a stale route from the other set must not select a tab the strip does not
-   * contain, which is the state the reconciliation effect above exists to prevent.
-   *
-   * @param {string} targetTab the ROUTE the row carries.
-   * @param {string} [focusTarget] the CONTROL's `data-validation-target` value, if it named one.
+   * Deep-link from a validation issue: switch tab, THEN move focus. THE ORDER IS THE MECHANISM —
+   * the route is set synchronously and FIRST, so the destination panel exists by the time the focus
+   * helper's `queueMicrotask` runs its query, and everything after that is
+   * `validationAnnouncement.js`'s. The route is checked against the LIVE tab set rather than a
+   * fixed list, because this editor renders two shapes.
    */
   function selectIssue(targetTab, focusTarget) {
     const route = editorTabIds.includes(targetTab) ? targetTab : null;
@@ -395,8 +334,8 @@
   }
 
   // The macro's display NAME, resolved cancellably. The `cancelled` latch inside
-  // `resolveMacroName` is what stops a slow lookup of the OLD uuid landing after a fast
-  // lookup of the new one and naming a macro that is no longer linked.
+  // `resolveMacroName` stops a slow lookup of the OLD uuid landing after a fast lookup of the new
+  // one and naming a macro that is no longer linked.
   $effect(() => {
     const uuid = propertyMacroUuid;
     return resolveMacroName(uuid, ({ name: resolved, missing }) => {
@@ -469,9 +408,8 @@
       enabled: enabled !== false,
     };
     // THE COLOUR IS SENT ONLY WHEN IT WAS EDITED HERE, or on a create draft where every field is
-    // this screen's to author. See `colourTouched`: the seed is the M29-overlaid projection, so an
-    // unconditional send writes the WORLD colour onto the system's own row. Clearing sets the
-    // latch, so an authored colour cleared to nothing still persists as `null`.
+    // this screen's to author — see `colourTouched`. Clearing sets the latch, so an authored
+    // colour cleared to nothing still persists as `null`.
     if (isNew || colourTouched) updates.colorToken = normalizeEssenceColorToken(colorToken);
     if (showPropertyMacroUi) updates.propertyMacroUuid = propertyMacroUuid || null;
     if (showSourceUi && (isNew || sourceTouched)) {
@@ -497,16 +435,14 @@
       colorToken: normalizeEssenceColorToken(colorToken),
       enabled: enabled !== false,
       propertyMacroUuid: propertyMacroUuid || null,
-      // The RESOLVED macro name, not the uuid. `draftSignature` already re-fires on
-      // `macroName`, so the summary was recomputed every time the name resolved and then
-      // emitted without it — and the manager root's live preview, having nothing else to
-      // pass, printed "Runs Macro.lab-aether-binding" where the design shows "Runs Ember
-      // Infusion". It is empty while resolution is in flight, and
-      // `projectEssenceBehaviourFacts` falls back to "the linked property macro" then.
+      // The RESOLVED macro name, not the uuid. `draftSignature` already re-fires on `macroName`,
+      // so the summary was recomputed every time the name resolved and then emitted without it,
+      // and the manager root's live preview printed the uuid. It is empty while resolution is in
+      // flight, and `projectEssenceBehaviourFacts` falls back to "the linked property macro".
       macroName,
-      // The two derived capability facts the preview, the tab badge and the row all read.
-      // Named exactly as `adminStore._buildEssenceCards` emits them, so the live draft and
-      // a persisted card are interchangeable everywhere they are consumed.
+      // The two derived capability facts the preview, the tab badge and the row all read. Named
+      // exactly as `adminStore._buildEssenceCards` emits them, so the live draft and a persisted
+      // card are interchangeable everywhere they are consumed.
       hasEffectTransfer: showSourceUi && sourceStateId !== 'none',
       hasPropertyMacro: showPropertyMacroUi && Boolean(propertyMacroUuid),
       sourceComponentId: showSourceUi ? sourceComponentId || '' : '',
@@ -543,9 +479,9 @@
     );
   }
 
-  // A throw is a failure exactly as a `false` return is, so both mark the draft failed in
-  // their own branch. The save is still awaited exactly once — an extra async hop here
-  // would move the failure notice a microtask later than the mounted route tests observe it.
+  // A throw is a failure exactly as a `false` return is, so both mark the draft failed in their
+  // own branch. The save is still awaited exactly once — an extra async hop would move the failure
+  // notice a microtask later than the mounted route tests observe it.
   async function handleSave(event) {
     event.preventDefault();
     if (!validName || saving) return;
@@ -569,9 +505,9 @@
   }
 
   // The `type !== 'script'` rejection. It is HERE and not in the drop predicate: a payload's
-  // `type` is the document NAME (`'Macro'`), and the macro's own type needs `await
-  // fromUuid`, which a synchronous predicate cannot do. `evaluateMacroDrop` fails OPEN when
-  // there is no resolver, so the View Lab and mounted tests can still author a link.
+  // `type` is the document NAME (`'Macro'`), and the macro's own type needs `await fromUuid`,
+  // which a synchronous predicate cannot do. `evaluateMacroDrop` fails OPEN when there is no
+  // resolver, so the View Lab and mounted tests can still author a link.
   async function handleMacroDrop(data) {
     macroWarning = '';
     const uuid = resolveDropUuid(data);
@@ -601,27 +537,21 @@
   bind:this={editorRoot}
 >
   <!--
-    ONE HEAD ELEMENT, AND IT IS LOAD-BEARING RATHER THAN TIDINESS.
-
-    `styles/fabricate.css:1655` gives this route's `<main>` `grid-template-rows: auto minmax(0,
-    1fr)` — EXACTLY TWO rows, the tab strip and the form. A third child of `<main>` lands in an
-    implicit third row and the form then overlaps the tab strip: measured in the View Lab, the tab
-    button was visible, enabled and stable and every click on it was intercepted by
-    `<form id="manager-essence-edit-form">`, which is a screen a GM cannot change tabs on. The
+    ONE HEAD ELEMENT, AND IT IS LOAD-BEARING. `styles/fabricate.css` gives this route's `<main>`
+    `grid-template-rows: auto minmax(0, 1fr)` — exactly two rows, the tab strip and the form. A
+    third child lands in an implicit third row and the form then overlaps the tab strip: measured
+    in the View Lab, every click on a visible, enabled tab button was intercepted by the form. The
     wrapper keeps the grid at two children whatever this head grows to carry.
   -->
   <!--
-    THE ROW ACTION'S LIVE REGION, and it is HOSTED HERE rather than in the validation surface
-    for a reason that is not stylistic (issue 1517). Activating a row action sets `activeTab` to
-    another value, which unmounts the whole validation panel — live region included — in the
-    same update that was supposed to announce. So the element carrying `aria-live` is ALWAYS in
-    the DOM, outside the `{#if activeTab}` chain below, with its own `{#if}` INSIDE it.
+    THE ROW ACTION'S LIVE REGION, hosted here rather than in the validation surface (issue 1517):
+    activating a row action sets `activeTab` to another value, which unmounts the whole validation
+    panel — live region included — in the same update that was supposed to announce. So the element
+    carrying `aria-live` is ALWAYS in the DOM, outside the `{#if activeTab}` chain, with its own
+    `{#if}` inside it.
 
-    A THIRD CHILD OF THIS `<main>` DOES NOT BREAK THE TWO-ROW GRID the note above describes:
-    `.visually-hidden` is `position: absolute`, so this element is out of flow and takes no grid
-    track. The head wrapper below is still what keeps the IN-FLOW children at two.
-
-    It wears the shipped `.visually-hidden` utility, rooted at the MODULE, and is addressed by a
+    A third child of this `<main>` does not break the two-row grid above: `.visually-hidden` is
+    `position: absolute`, so it is out of flow and takes no grid track. It is addressed by a
     `data-` hook rather than a class, so it joins no pinned class family.
   -->
   <div class="visually-hidden" role="status" aria-live="polite" data-essence-issue-announcement>
@@ -679,14 +609,12 @@
           {#if rulesMode}
             <!-- WHAT THIS SCREEN DOES NOT OWN, STATED FIRST, with the one route to it.
 
-               The callout names the world record, not this system's projection of it (issue
-               1654): `1.34.0` merges equivalent world essences and neither `icon` nor
-               `description` is in its equivalence key, so one world entity can back N in-system
-               records whose icons differ, and a pill reading `World definition` must not caption
-               a per-system glyph. `colorToken` is the one field the world overlay already carries
-               into the in-system projection (maintainer ruling M29), so `tint` keeps reading it.
-               The in-system fallbacks are unreachable from inside the `scopedKnown` guard and are
-               kept only so the expression states its own answer. -->
+               The callout names the WORLD record, not this system's projection of it (issue 1654):
+               `1.34.0` merges equivalent world essences and neither `icon` nor `description` is in
+               its equivalence key, so one world entity can back N in-system records whose icons
+               differ, and a pill reading `World definition` must not caption a per-system glyph.
+               `colorToken` is the one field the world overlay already carries into the in-system
+               projection (M29), so `tint` keeps reading it. -->
             <SharedDefinitionCallout
               name={worldEntry?.entity?.name ?? essence?.name ?? ''}
               icon={normalizeEssenceIcon(
@@ -718,9 +646,9 @@
             />
 
             {#if member}
-              <!-- THE PER-SYSTEM ENABLE SWITCH, ON ITS OWN CARD. It used to share a grey slab
-                 with the remove action and both inherit toggles, unlabelled, so the loudest
-                 switch on the screen said only `Off` and never what it was off FOR. -->
+              <!-- THE PER-SYSTEM ENABLE SWITCH, ON ITS OWN CARD. It used to share a grey slab with
+                 the remove action and both inherit toggles, unlabelled, so the loudest switch on
+                 the screen said only `Off` and never what it was off FOR. -->
               <ToggleCard
                 icon=""
                 title={formatted(
@@ -743,14 +671,10 @@
                 onToggle={(next) => (enabled = next !== false)}
               />
             {:else}
-              <!-- THE BLOCK STATE. No membership record means nothing in this system reads any
-                 of the values below, so the editor says so and offers the one action that
-                 changes it.
-
-                 WARNING STANDS (issue 1505). The tone union widened to six and the default
-                 became neutral, so every site was re-read against the specimen's rule. This one
-                 is a conditional the GM can still resolve, on this record, right now — which is
-                 what warning names. -->
+              <!-- THE BLOCK STATE. No membership record means nothing in this system reads any of
+                 the values below, so the editor says so and offers the one action that changes it.
+                 WARNING stands (issue 1505): this is a conditional the GM can resolve, on this
+                 record, right now — which is what warning names. -->
               <Callout
                 tone="warning"
                 text={formatted(
@@ -814,8 +738,8 @@
           />
 
           {#if rulesMode && member}
-            <!-- REUSE. A one-time clone into another system's own rules, never a live link,
-               and the sentence beside the button says so. -->
+            <!-- REUSE. A one-time clone into another system's own rules, never a live link, and
+               the sentence beside the button says so. -->
             <CopyRulesCard
               {systems}
               currentSystemId={activeSystemId}
@@ -850,8 +774,8 @@
 </main>
 
 <style>
-  /* The `auto` grid row this route declares, holding the tab strip. See the note in the markup:
-     a third child of `<main>` lands in an implicit row and the form overlaps the strip. */
+  /* The `auto` grid row this route declares, holding the tab strip. See the note in the markup: a
+     third child of `<main>` lands in an implicit row and the form overlaps the strip. */
   .manager-essence-edit-head {
     display: flex;
     flex-direction: column;
@@ -859,9 +783,9 @@
     min-width: 0;
   }
 
-  /* The rules tab's own stack. The behaviour cards arrive inside `EssenceOnCraftTab`'s stack,
-     so this one spaces the callout, the enable card, that group and the reuse card by the same
-     step — one ladder down the page rather than two that happen to agree. */
+  /* The rules tab's own stack. The behaviour cards arrive inside `EssenceOnCraftTab`'s stack, so
+     this one spaces the callout, the enable card, that group and the reuse card by the same step —
+     one ladder down the page rather than two that happen to agree. */
   .manager-essence-rules-stack {
     display: flex;
     flex-direction: column;
@@ -869,9 +793,8 @@
     min-width: 0;
   }
 
-  /* Route-level placement — the two-track template and the route's own overflow — is
-     GLOBAL (`.fabricate-manager[data-manager-view="essence-edit"] .manager-main`), because
-     a scoped child block cannot reach a shell container rule. What is scoped here is only
+  /* Route-level placement — the two-track template and the route's own overflow — is GLOBAL,
+     because a scoped child block cannot reach a shell container rule. What is scoped here is only
      what belongs to the tab body itself. */
   .manager-essence-tab-panel {
     min-height: 0;

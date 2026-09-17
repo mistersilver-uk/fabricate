@@ -1,21 +1,13 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  The live-validated "add a vocabulary entry" form, extracted from VocabularyPanel
-  (issue 771) so it can be REUSED by the folder-aware import mapping row: both the Tags
-  & Categories panel and the import mapping's inline "＋ New" creation share ONE
-  validation machine (`describeInput` → tone/message/blocked), one normalizer, and one
-  success/failure feedback path, rather than two drifting copies.
+  The live-validated "add a vocabulary entry" form, extracted from `VocabularyPanel` (issue 771) so
+  the import mapping's inline "＋ New" shares ONE validation machine (`describeInput` →
+  tone/message/blocked), one normalizer and one feedback path rather than two drifting copies.
+  Everything vocabulary-specific stays a prop, and the markup preserves `VocabularyPanel`'s exact
+  classes so both callers style identically. It emits the normalized value (and trimmed icon, when
+  shown) to `onAdd`; an `onAdd` returning `false` renders the failure feedback and keeps focus.
 
-  Everything vocabulary-specific stays a prop: the live hint machine (`describeInput`),
-  the value normalizer (`normalize`), the optional per-entry icon field (`showIcon`),
-  and the localized labels. Emits the normalized value (and trimmed icon, when shown) to
-  `onAdd`; an `onAdd` that returns `false` renders the failure feedback and keeps focus.
-  The markup preserves VocabularyPanel's exact classes so both callers style identically.
-
-  The icon field is the shared searchable `IconPicker` (issue 878), the same control the
-  gathering time-of-day / weather / biome fields use — not a free-text Font Awesome class
-  box. It stays UNSET until the GM picks one (the trigger previews `defaultIcon`), so an
-  untouched form still emits an empty icon and the row falls back to the default.
+  The icon field is the shared `IconPicker` (issue 878), not a free-text class box, and stays UNSET
+  until the GM picks one, so an untouched form emits an empty icon and the row falls back.
 -->
 <script>
   import Field from '../../components/Field.svelte';
@@ -27,10 +19,8 @@
     inputLabel = '',
     inputPlaceholder = '',
     addLabel = '',
-    // Live hint machine: (rawValue) => { tone: 'info'|'success'|'danger'|'', message, blocked }.
-    // `blocked` refuses submit; `tone` drives the hint styling and icon.
+    // `(rawValue) => { tone, message, blocked }`; `blocked` refuses submit, `tone` styles the hint.
     describeInput = () => ({ tone: '', message: '', blocked: false }),
-    // Normalizes the raw input to the value handed to onAdd.
     normalize = (value) => String(value || '').trim(),
     successFeedback = () => '',
     addFailedFeedback = '',
@@ -49,11 +39,9 @@
 
   const liveHint = $derived(describeInput(inputValue));
 
-  // Focus on the next microtask rather than `await tick()`: tick waits for Svelte's
-  // full reactive flush, landing focus() one microtask after the surrounding state
-  // mutations — later than the two ticks tests (and Foundry's app lifecycle) await
-  // after a form submit. queueMicrotask runs after this batch's effect schedule, so
-  // bind:this is current without adding await depth.
+  // `queueMicrotask` rather than `await tick()`: tick waits for the full reactive flush and lands
+  // focus one microtask after the surrounding mutations, later than the two ticks tests and
+  // Foundry's app lifecycle await after a submit.
   function focusAfterUpdate(element) {
     queueMicrotask(() => element?.focus?.());
   }
@@ -109,11 +97,8 @@
       />
     </Field>
     {#if showIcon}
-      <!--
-        A `<div>`, not a `<label>`: the control is a button that opens the icon popover,
-        and a button is not a labelable element, so a wrapping label would name nothing.
-        The picker carries its own accessible name through `buttonTitle`.
-      -->
+      <!-- A `<div>`, not a `<label>`: the control is a button, which is not a labelable element,
+        so a wrapping label would name nothing. `buttonTitle` carries the accessible name. -->
       <Field as="div" class="manager-vocabulary-icon-field" data-vocabulary-add-icon="">
         <span>{iconLabel}</span>
         <IconPicker

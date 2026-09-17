@@ -1,30 +1,7 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  The manager's ONE no-state primitive: one dashed panel, one rounded icon tile, a serif
-  title, a capped body line and an optional way out. Matched to the reference prototype
-  (padding 44px 20px · 1.5px dashed · radius 12px · no fill · 9px gap · 46px tile holding
-  an 18px subtle glyph · 13px/600 serif title · 11px/1.5 subtle body).
-
-  Every manager "nothing here" message renders through this component — a central panel,
-  or `compact` for a sidebar, popover or inline one. There is no shared `.manager-empty`
-  CSS class for a screen to hand-roll markup against any more: the appearance lives in
-  this file's scoped `<style>`, so a site that does not import this component gets no
-  empty-state styling at all. That is deliberate. It also keeps required-screenshot
-  detection honest: `VIEW_RECIPES` in `scripts/ui-pr-screenshot-evidence.mjs` maps changed
-  FILE PATHS to views, so a tweak here matches only the recipes that name this component
-  instead of the broad `theme-or-global-ui` recipe a global-sheet edit triggers.
-
-  The `.manager-empty` class name is retained (not renamed) because the smoke harness and
-  several mounted tests locate the panel by it, and because a handful of LAYOUT-CONTEXT
-  rules still legitimately live in `styles/fabricate.css` — an ancestor cannot be reached
-  from a scoped block, so a rule like
-  `.manager-task-required-tools-scroll > .manager-empty { flex; width; min-height }` stays
-  global. Those rules own only how the panel is placed by its container, never how it
-  looks.
-
-  The DOM shape is part of the contract: the icon, title and body rules are written as
-  `> div > i` / `h3` / `p` descendants of an inner stack `<div>`, so the wrapper cannot be
-  flattened without silently dropping the icon tile and the stack gap.
+  The manager's one no-state primitive: one dashed panel, one rounded icon tile, a serif title, a
+  capped body line and an optional way out, matched to the reference prototype. Every manager
+  "nothing here" message renders through it, and the player window's `PlayerViewState` composes it.
 
   Props:
    - icon: Font Awesome classes for the glyph (omit for a panel with no tile).
@@ -63,40 +40,15 @@
      CTA, or a docs link. It is the way out of the dead end, so it belongs inside the
      panel rather than beside it.
 
-  A component wearing `.manager-*` classes belongs under `apps/manager/` (not the
-  import-free `components/` leaf directory), which is why it lives here.
-
-  THIS BLOCK USED TO REFUSE THE PLAYER APP, TWICE, AND BOTH REFUSALS ARE RETIRED (issue 1514).
-  It said the player window's own empties were "a different area shell with their own scoped
-  styles" and so "NOT this primitive's remit". The player window renders this component now:
-  `apps/PlayerViewState.svelte` composes it for the no-actor and empty branches of all five
-  player views, which is the second application to draw it.
-
-  The claim was never about a directory, and that is why it could be overturned by a caller
-  rather than by a move. Everything this component looks like lives in the scoped `<style>`
-  below, and every token it reads is declared on `:root` — so it SELF-PAINTS, and a surface
-  outside `.fabricate-manager` gets the same panel the manager gets. The `.manager-*` class
-  names are a naming convention retained for the locators above, not an area binding. What a
-  docblock refusing a caller states is a fact about the tree at the time it was written; the
-  change that adds the caller restates it, in the commit that falsifies it.
-
-  One thing the refusal was right about survives, and is stated as the rule it actually is: a
-  caller that needs this panel to FILL a region owns that fill itself. `contextClass` puts the
-  rule in the global sheet, which is the wrong answer for a player screen — `PlayerViewState`
-  declares the `height: 100%` centred fill in its own scoped block and nests this panel inside
-  it, and the empties still hand-rolled in `salvage-empty`, `alchemy-*-empty` and
-  `inventory-detail-empty-note` convert on the same terms as they are reached — all three of
-  those families are gone as of the inventory phase, each caller keeping only the fill or the
-  centring its own container needed.
-
-  ONE MEASURED LIMIT OF `note`, recorded because a caller was refused on it. The variant
-  declares `place-items: start` and `text-align: left` on ITSELF, so a caller cannot restore a
-  centred line through a wrapper: an inherited `text-align` loses to the variant's own
-  declaration. `InventoryGrid`'s "No items match the current filters." is the shipped instance
-  — a full-width centred 13px sentence standing in for the whole card grid — and it stays
-  hand-rolled for that reason rather than becoming a 10px line in the top-left corner of a
-  630px-tall empty column. A centred one-line form would close it; `filtered` centres but keeps
-  the dashed panel, which is the box the frame-move rule forbids.
+  Invariants:
+  - The DOM shape is part of the contract: the icon, title and body rules are written as
+    `> div > i` / `h3` / `p` descendants of an inner stack `<div>`, so the wrapper cannot be
+    flattened without silently dropping the icon tile and the stack gap.
+  - There is no shared `.manager-empty` appearance class to hand-roll markup against: the appearance
+    lives in this file's scoped `<style>`, which also keeps required-screenshot detection honest,
+    since `VIEW_RECIPES` maps changed FILE PATHS to views. The class NAME is retained because the
+    smoke harness and several mounted tests locate the panel by it. It SELF-PAINTS: every token is
+    declared on `:root`, so a surface outside `.fabricate-manager` gets the same panel.
 -->
 <script>
   let {
@@ -115,19 +67,9 @@
     children = undefined,
   } = $props();
 
-  // Spread so the hook is genuinely absent when unset, rather than an empty attribute a
-  // selector would still match.
-  //
-  // `dataValue || true` COERCES A BARE HOOK TO `="true"`, and an explicit `dataValue=""` at a
-  // call site does not change that — the empty string is falsy, so it takes the same branch as
-  // no value at all. Measured at issue 1514: 61 hook-bearing call sites of this component and
-  // `Callout` render `="true"`, 45 of them passing no `dataValue` and 16 passing `""`, and the
-  // markup every one of them replaced wrote the attribute BARE, as `=""`. Nothing breaks,
-  // because every shipped reader is a presence selector — which is precisely why the drift is
-  // invisible and why it is written down here rather than left to be re-discovered at a call
-  // site. `components/Kicker.svelte` and `components/Notice.svelte` are the two primitives that
-  // pass `dataValue` through as written, and closing this would mean changing THIS line rather
-  // than any caller, which moves 61 rendered attributes across the manager in one edit.
+  // Spread, so an unset hook is absent rather than an empty attribute a selector would match.
+  // `dataValue || true` COERCES A BARE HOOK TO `="true"` and an explicit `dataValue=""` does not
+  // change that (issue 1514); every shipped reader is a presence selector, so nothing breaks.
   const hookAttributes = $derived(dataAttr ? { [dataAttr]: dataValue || true } : {});
 </script>
 
@@ -158,25 +100,10 @@
 </div>
 
 <style>
-  /* Theme-root tokens ONLY. NO scoped `<style>` may reference `--fab-manager-*`, or any other
-     custom property `styles/fabricate.css` declares inside `.fabricate-manager`, from ANY
-     directory — a component is placed in a directory, not in a DOM subtree, so its scoped CSS
-     cannot guarantee where its host renders, and `tests/token-generation-gate.test.js` reds the
-     reference wherever it is written. Outside the manager —
-     `.fabricate-app`, `.fabricate-admin`, `.fabricate-interactables-manager` — such a
-     property is not in scope, the declaration becomes invalid at computed-value time and
-     the colour silently falls back to inheritance. Nothing fails; it just looks wrong, and
-     the trigger is exactly the reuse this primitive exists to enable. Every token below is
-     declared in `:root` or in all seven `.fabricate[data-fabricate-theme="…"]` blocks,
-     which every Fabricate surface carries. */
-  /* The no-state panel, matched to the reference prototype:
-       padding 44px 20px · 1.5px dashed · radius 12px · no fill · 9px stack gap
-     Height is padding-driven, as in the prototype — the old 220px floor made every empty
-     state taller than its design. */
+  /* Theme-root tokens only — design-system spec, *The token namespace is one generation and names
+     its purpose*. The no-state panel is padding-driven, as in the prototype; the old 220px floor
+     made every empty state taller than its design. */
   .manager-empty {
-    /* Declared here rather than leaned on: `.fabricate-manager * { box-sizing }` covers
-       every current consumer, but an area-agnostic primitive that a container widens to
-       `width: 100%` must not depend on the host area for its padding model. */
     box-sizing: border-box;
     display: grid;
     place-items: center;
@@ -195,10 +122,6 @@
     min-width: 0;
   }
 
-  /* A 46px rounded tile holding an 18px glyph in the SUBTLE tone — the prototype's icon is
-     both smaller and dimmer than a heading. It previously rendered at 1.55rem in the full
-     text colour, which read as the loudest thing in an otherwise quiet panel. Spacing comes
-     from the stack gap, not a margin. */
   .manager-empty > div > i {
     display: inline-flex;
     align-items: center;
@@ -211,10 +134,6 @@
     font-size: 18px;
   }
 
-  /* Serif title at the prototype's 13px/600 in the secondary tone, over an 11px body in the
-     subtle tone capped at 280px so the sentence wraps into a readable column instead of
-     spanning a wide pane. Matches the Tool Studio's type scale rather than the ambient ~1rem
-     the old 0.98rem heading approximated. */
   .manager-empty h3 {
     margin: 0;
     color: var(--fab-text-secondary);
@@ -224,9 +143,6 @@
     line-height: 1.25;
   }
 
-  /* `overflow-wrap` is carried here for every consumer rather than by a `.manager-muted`
-     class a few sites used to add by hand: an unbreakable token (a long item name, a
-     pasted uuid) otherwise overflows the 280px cap. */
   .manager-empty p {
     max-width: 280px;
     margin: 0;
@@ -236,10 +152,6 @@
     overflow-wrap: break-word;
   }
 
-  /* The sidebar / inline scale of the same vocabulary: same dashed panel, tile and type,
-     just less furniture. A roster column, a dropdown popover or an inline card cannot
-     afford the 44px hero padding, and the alternative — a bare sentence — is what made
-     these states look unrelated to each other in the first place. */
   .manager-empty.is-compact {
     padding: var(--fab-space-4) var(--fab-space-3);
   }
@@ -259,21 +171,9 @@
     font-size: 12px;
   }
 
-  /* The ONE-LINE variant (issue 1286): `display:flex; align-items:center; gap:10px;
-     padding:14px 16px` with a 13px glyph, taken from the prototype's own empty. Two
-     declarations do the work, and BOTH are required — `is-compact` already makes the panel
-     smaller and would have been the cheap answer:
-
-       1. the inner stack flips from a column to a ROW, so the glyph sits beside the
-          sentence instead of above it;
-       2. the 46px icon TILE is released — width, height, radius, fill and all — into a
-          bare glyph. `is-compact` only shrinks the tile to 32px, which is a third tile
-          size, not the absence of one.
-
-     Written AFTER `.is-compact` so a caller that (wrongly) set both still gets the row.
-     The dashed edge, the border radius and the type stay exactly the shared panel's: this
-     is one vocabulary at a second density, which is the whole reason it is a variant here
-     rather than a hand-rolled dashed div in the section that needs it. */
+  /* The ONE-LINE variant (issue 1286): the stack flips to a ROW and the tile is RELEASED into a
+     bare glyph, where `is-compact` only shrinks it to a third tile size. Written AFTER
+     `.is-compact` so a caller that wrongly set both still gets the row. */
   .manager-empty.is-inline {
     display: flex;
     align-items: center;
@@ -296,9 +196,6 @@
     font-size: 13px;
   }
 
-  /* The 280px column cap is a HERO-panel rule: it exists so a centred sentence wraps into a
-     readable measure. On one line it would clip the sentence into a narrow column beside
-     the glyph, which is the opposite of what this variant is for. */
   .manager-empty.is-inline p {
     max-width: none;
     font-size: 11.5px;
@@ -354,28 +251,10 @@
     font-size: 10px;
   }
 
-  /* The line itself, at the popover's scale rather than the panel family's. `proto:2262` is
-     `500 10px var(--sans)`: a sentence in the list's own voice, quieter than the rows it
-     stands in for. The serif face the hero title carries is deliberately dropped — a serif
-     heading is the loudest thing in a 228px panel.
-
-     ── THE INK IS THE MUTED TONE, NOT THE SUBTLE ONE THE REFERENCE STATES (issue 1514) ──────
-     `proto:2262` says `var(--subtle)` and this variant shipped it. At 10px that is SMALL TEXT,
-     and the default `fabricate` theme composites the subtle token — an alpha over the surface,
-     not an opaque value — to 3.69:1 on `--fab-surface` and 3.50:1 on `--fab-surface-soft`,
-     under the 4.5:1 small-text floor `openspec/specs/design-system/spec.md` states for a mark
-     this size. The muted tone measures 5.42:1 and 5.00:1 at the same two grounds, and clears
-     the floor in all seven palettes (the worst is `ironblood-forge` at 5.19:1 and 4.77:1).
-
-     It is corrected on the VARIANT rather than at a call site because the reference's figure is
-     wrong for every caller of it, not for one: the alpha tokens are what make it wrong, and
-     SIX of the seven palettes state `muted` and `subtle` as alphas over the surface. ONE
-     palette hid it, not four — `mythwright` alone states those two tones as opaque hues, and
-     it is the only palette of the seven in which the subtle tone clears the floor at all,
-     reading 5.28:1 from the SAME declaration. A single passing outlier is what the specimen's
-     figure was set from. Every palette, that one included, states `disabled` as an alpha,
-     which is why `is-filtered` below fails the floor in all seven; it is corrected on the same
-     measurement and the same reasoning. */
+  /* The line at the popover's scale, with the hero title's serif face deliberately dropped. THE
+     INK IS THE MUTED TONE, NOT THE SUBTLE ONE THE REFERENCE STATES (issue 1514): at this size the
+     mark is SMALL TEXT, and in six of seven palettes the subtle tone composites under the 4.5:1
+     floor `openspec/specs/design-system/spec.md` states. */
   .manager-empty.is-note h3 {
     color: var(--fab-text-muted);
     font-family: var(--font-primary);
@@ -384,10 +263,6 @@
     line-height: 1.4;
   }
 
-  /* The optional second line — the travel-actor picker names a module setting here — kept at
-     the same quiet scale so a two-line note is one voice rather than a heading over a body.
-     The ink is declared here rather than inherited: `.manager-empty p` above paints the subtle
-     tone for the HERO panel, whose 11px sentence is not this one. */
   .manager-empty.is-note p {
     max-width: none;
     color: var(--fab-text-muted);
@@ -396,40 +271,10 @@
     line-height: 1.4;
   }
 
-  /*
-    Filtered to nothing is not an error and does not want the full empty-panel apparatus
-    (a 46px icon, an <h3>, a paragraph). One dashed panel says it in a sentence, and the
-    Clear-filters button — which the prototype has no equivalent of, and which is kept —
-    is the way out of it.
-
-    ── THE FIGURES ARE THE REFERENCE'S NOW (issue 1373) ────────────────────────────────
-    `proto:2545` states this state exactly, and it is the only design source there is for
-    it: `padding: 26px; text-align: center; border: 1px dashed var(--border);
-    border-radius: 10px; font: 400 11.5px var(--sans); color: var(--disabled)`.
-
-    What this variant shipped agreed with none of it — a 40px inset, the STRONGER border
-    colour, the base panel's 12px corner and 1.5px edge, and a 12.8px sentence — so the
-    "quieter" panel was in fact both larger and higher-contrast than the reference's, and
-    on the one screen whose reference frame we hold it was drawn at nearly twice the
-    height. The values are corrected on the VARIANT rather than route-scoped for the
-    reason `contextClass` gives two blocks up: appearance belongs to this file, and a
-    layered global rule could not reach an unlayered scoped block in any case. Every
-    caller of `filtered` gets the reference's own treatment, which is the point of a
-    shared variant.
-
-    26px has no step on the 4px spacing scale and takes the nearest, 24.
-
-    ── THE ONE FIGURE OF THE REFERENCE'S THIS VARIANT DOES NOT TAKE (issue 1514) ──────────
-    `proto:2545` inks this sentence `var(--disabled)`. Measured on the default `fabricate`
-    theme, whose three text tones are ALPHAS rather than opaque values, that composites to
-    2.66:1 on `--fab-surface` and 2.58:1 on `--fab-surface-soft` at 11.5px — small text, and
-    a long way under the 4.5:1 floor. It is the worst reading in the family and it is the
-    reference's own value, so the deviation is stated here rather than route-scoped: the ink
-    moves to `--fab-text-muted`, which reads 5.42:1 and 5.00:1 at the same two grounds and
-    clears the floor in all seven palettes. Everything else of `proto:2545` — the 24px inset,
-    the 1px edge, the 10px corner and the 11.5px sentence — is unchanged, and `is-note` above
-    carries the same correction on the same measurement.
-  */
+  /* Filtered to nothing is not an error and does not want the full empty-panel apparatus. The
+     figures are the reference's, corrected on the VARIANT rather than route-scoped; the one NOT
+     taken is the ink, which composites to 2.66:1 at this size — `is-note` above carries the same
+     correction on the same measurement. */
   .manager-empty.is-filtered {
     align-content: center;
     padding: var(--fab-space-6);

@@ -1,31 +1,18 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  One vocabulary tab of the Tags & Categories screen: a description, a live-validated
-  add form (wrapped in its own card, with an optional per-category icon field), a
-  search + entry-count row, and the row grid with per-category icons and an inline
-  delete-confirm strip.
+  One vocabulary tab of the Tags & Categories screen: a description, a live-validated add form, a
+  search and entry-count row, and the row grid with per-category icons and an inline delete-confirm
+  strip. A row's icon IS the shared searchable `IconPicker` trigger (issue 878), and choosing an
+  option commits immediately.
 
-  A row's icon IS the shared searchable `IconPicker` trigger (issue 878) — clicking it
-  opens the same popover the gathering time-of-day, weather and biome icon fields use,
-  and choosing an option commits immediately. It replaced a click-to-expand strip that
-  asked the GM to type a raw Font Awesome class and press "Save icon".
+  Extracted when the screen gained its THIRD vocabulary (issue 676) and redesigned into a tabbed
+  screen (issue 689): the three tabs are structurally identical over independent vocabularies, so a
+  third copy-paste block would have been ~50 duplicated lines, over Sonar's new-code budget.
 
-  Extracted when the screen gained its THIRD vocabulary (component categories, issue
-  676) and redesigned into a tabbed screen (issue 689). Recipe categories, component
-  categories, and item tags are structurally identical tabs over independent
-  vocabularies, so a third copy-paste block would have been ~50 duplicated lines —
-  over Sonar's 3% new-code duplication budget, which does not honour cpd exclusions.
-
-  Everything vocabulary-SPECIFIC is a prop: the reserved/locked row is optional
-  (`lockedRow`), the live hint machine is injected (`describeInput`), icons are opt-in
-  (`showIcon`), and the row `data-` attribute name is caller-chosen (`rowAttr`) so
-  each tab keeps its own distinct test hook rather than three tabs colliding on one.
-
-  Two of those knobs are per-ROW rather than per-panel (issue 1392), because they vary row by
-  row on one surface: `row.confirmTokens` is the second number a kind's confirm sentence states,
-  and `row.silentlyDeletable` is the predicate ALL THREE renderings of the one-click delete read.
-  Both default to today's rendering, so the two shipped call sites are byte-identical. See
-  `confirmSentence` and `isSilentlyDeletable` below.
+  Everything vocabulary-SPECIFIC is a prop — the reserved row (`lockedRow`), the live hint machine
+  (`describeInput`), icons (`showIcon`) and the row hook name (`rowAttr`), so three tabs do not
+  collide on one selector. Two knobs are per-ROW rather than per-panel (issue 1392), because they
+  vary row by row on one surface: `row.confirmTokens` and `row.silentlyDeletable`. Both default to
+  today's rendering, so the two shipped call sites are byte-identical.
 -->
 <script>
   import Chip from '../../components/Chip.svelte';
@@ -67,9 +54,8 @@
     onRemove = () => {},
     // Per-category icon (issue 689): opt-in for the two category tabs.
     showIcon = false,
-    // A fixed, non-editable accent tile for vocabularies that carry no persisted
-    // per-row icon (the tag tab). Rows still get the same 34x34 leading tile as the
-    // category tabs — decorative only, so no add-form icon field and no click-to-edit.
+    // A fixed, non-editable accent tile for a vocabulary with no persisted per-row icon: the same
+    // leading tile as the category tabs, decorative only.
     decorativeIcon = '',
     iconLabel = '',
     defaultIcon = 'fas fa-folder',
@@ -79,15 +65,10 @@
     confirmRemoveLabel = '',
     cancelRemoveLabel = '',
     onSetIcon = () => {},
-    // ── THE SEARCH IS LIFTED (issue 1438) ────────────────────────────────────────────────
-    // Tags, recipe categories and component categories are three MUTUALLY EXCLUSIVE branches
-    // of one tabbed surface, so switching vocabulary tab unmounts this panel outright, and so
-    // does leaving the Tags & Categories route. Each caller therefore binds its OWN slot:
-    // "herb" names a tag and nothing in the category vocabulary next door.
-    //
-    // `pendingRemovalId` below is deliberately NOT lifted. It is an ARMED destructive
-    // confirmation against one row in one sitting, and an arm that outlives its surface is a
-    // delete the GM did not re-confirm.
+    // THE SEARCH IS LIFTED (issue 1438), and each caller binds its OWN slot, because the three
+    // vocabularies are mutually exclusive branches of one tabbed surface and "herb" names a tag
+    // and nothing next door. `pendingRemovalId` below is deliberately NOT lifted: an armed
+    // destructive confirmation that outlives its surface is a delete the GM did not re-confirm.
     browserState = $bindable(null),
   } = $props();
 
@@ -106,16 +87,12 @@
   const filteredRows = $derived((rows || []).filter((row) => matchesSearch(row)));
   const hasQuery = $derived(Boolean(normalizedSearchTerm));
   const customRowCount = $derived((rows || []).length);
-  // The count is the whole vocabulary (custom rows plus the reserved General row),
-  // independent of the search query — it reports the library size, not the filter.
-  // General is counted even in the state where it is deliberately NOT listed (see
-  // `showLockedRow`), which is what keeps this chip, the tab badge and the inspector's
-  // at-a-glance tile reporting the same number (issue 878).
+  // The whole vocabulary, independent of the search query: it reports the library size, not the
+  // filter, and counts General even where it is deliberately not listed, which is what keeps this
+  // chip, the tab badge and the inspector's tile on one number (issue 878).
   const entryCount = $derived(customRowCount + (lockedRow ? 1 : 0));
-  // A reserved vocabulary with no custom entries now sits at exactly one entry as its
-  // resting state, so "1 entries" stopped being a rare edge and became the first thing
-  // a GM reads on this screen. The singular follows the `UsageCountSingular` precedent
-  // directly above, and incidentally fixes the one-tag tag vocabulary too.
+  // A reserved vocabulary with no custom entries rests at exactly one, so "1 entries" is the
+  // first thing a GM reads here. The singular follows the `UsageCountSingular` precedent above.
   const entriesLabel = $derived(
     entryCount === 1
       ? text('FABRICATE.Admin.Manager.TagsCategories.EntriesCountSingular', '1 entry')
@@ -124,13 +101,10 @@
           entryCount
         )
   );
-  // The reserved row exists to distinguish custom entries from the fallback bucket, so
-  // it only earns a slot once there is something to distinguish it FROM. With no
-  // GM-defined entries it was a lone immovable row that could not be renamed, deleted,
-  // re-iconed or acted on in any way, occupying the space where the onboarding guidance
-  // belongs — so below one custom entry the empty-state card names and explains General
-  // instead, and the row appears alongside the first category the GM adds (issue 878).
-  // Keyed on the UNFILTERED custom count: a search miss must not make General blink out.
+  // The reserved row distinguishes custom entries from the fallback bucket, so it earns a slot
+  // only once there is something to distinguish it FROM; below one custom entry the empty-state
+  // card names and explains General instead (issue 878). Keyed on the UNFILTERED custom count, so
+  // a search miss cannot make General blink out.
   const showLockedRow = $derived(Boolean(lockedRow) && customRowCount > 0);
   // A query with no surviving rows is a search miss; a genuinely empty vocabulary
   // (no custom rows and no query) is the onboarding state. They render differently.
@@ -163,23 +137,13 @@
     );
   }
 
-  // ── TWO PER-ROW FACTS, EACH DEFAULTING TO TODAY'S RENDERING (issue 1392) ───────────────
-  //
-  // This primitive is shared by every vocabulary surface at either scope, and the world-scope
-  // screen needs a confirm that states a SECOND number and a one-click predicate that is
-  // strictly NARROWER than the reference count alone. Both are per-ROW data rather than
-  // per-panel copy, because both vary row by row on one surface; both are optional and default
-  // to exactly what the two shipped call sites render today.
+  // TWO PER-ROW FACTS, EACH DEFAULTING TO TODAY'S RENDERING (issue 1392): the world-scope screen
+  // needs a confirm stating a SECOND number and a one-click predicate strictly NARROWER than the
+  // reference count. Both are per-ROW because both vary row by row on one surface.
 
-  /**
-   * The confirm sentence, with `{name}` and `{count}` plus whatever second number the row
-   * carries.
-   *
-   * `row.confirmTokens` is merged OVER the two defaults rather than replacing them, so a caller
-   * supplying one extra token still gets the shipped pair. Substituted by split/join rather than
-   * `String#replace`, because a replacement value containing `$&` would otherwise be interpreted
-   * as a back-reference.
-   */
+  /** The confirm sentence. `row.confirmTokens` is merged OVER the two defaults rather than
+      replacing them, and substitution is split/join rather than `String#replace`, because a value
+      containing `$&` would otherwise read as a back-reference. */
   function confirmSentence(row) {
     const tokens = { name: row.name, count: row.totalUsage || 0, ...(row.confirmTokens || {}) };
     let sentence = removeConfirmHint;
@@ -190,17 +154,11 @@
   }
 
   /**
-   * Whether this row deletes in ONE CLICK, and it is derived ONCE.
-   *
-   * All THREE renderings of that affordance read this: the gate in `requestRemove`, the usage
-   * chip (whose else-branch is the muted `Unused` chip) and the delete control's destructive
-   * tone. Leaving any of them keyed on `row.totalUsage` while the gate reads this would let a
-   * surface state one thing and do another — a row labelled `Unused` under a red one-click
-   * delete that then opens a confirm strip naming four crafting systems.
-   *
-   * The default is `(row.totalUsage || 0) === 0`, which makes the predicate exactly
-   * `!(row.totalUsage > 0)` for a caller that passes neither: the two shipped call sites pass
-   * `totalUsage` and never this field, and render byte-identically.
+   * Whether this row deletes in ONE CLICK, derived ONCE, because all THREE renderings of that
+   * affordance read it — the gate in `requestRemove`, the usage chip and the delete control's tone.
+   * Any of them left keyed on `row.totalUsage` would let a surface state one thing and do another.
+   * The default makes the predicate exactly `!(row.totalUsage > 0)`, so the two shipped call sites
+   * render byte-identically.
    */
   function isSilentlyDeletable(row) {
     return typeof row?.silentlyDeletable === 'boolean'
@@ -210,9 +168,7 @@
 
   function requestRemove(row) {
     if (!row || row.locked) return;
-    // Entries nothing references AND whose deletion rewrites nothing delete in one click,
-    // matching the prototype's affordance. Everything else opens the confirm strip, which
-    // states what the deletion changes.
+    // Everything else opens the confirm strip, which states what the deletion changes.
     if (!isSilentlyDeletable(row)) {
       pendingRemovalId = row.id;
     } else {
@@ -230,11 +186,9 @@
   }
 </script>
 
-<!-- `label || undefined` rather than `label`, the guarded spelling `IconButton` and
-     `SelectionCheckbox` ship. `label` defaults to the empty string, and an EMPTY `aria-label` is
-     not the same as no `aria-label`: it REPLACES the accessible name with nothing rather than
-     leaving the element to take one from anything else. Omitting the attribute leaves the element
-     with no name, which is the honest state for a caller that passed none. -->
+<!-- `label || undefined`, the guarded spelling `IconButton` and `SelectionCheckbox` ship: an EMPTY
+     `aria-label` REPLACES the accessible name with nothing, where omitting the attribute leaves
+     the element to take one from elsewhere. -->
 <section class="manager-vocabulary-panel" aria-label={label || undefined}>
   <p class="manager-vocabulary-desc manager-muted">{hint}</p>
 
@@ -274,16 +228,9 @@
           <span class="manager-vocabulary-icon is-locked-icon" aria-hidden="true"
             ><i class="fas fa-lock"></i></span
           >
-          <!--
-            The reserved row carries its name ALONE, so it sits at the same height as every
-            custom row (the grid is `align-items: start`, so a second line of copy would
-            make this the one card that sticks out). The explanatory sentence was inlined
-            and ellipsised to buy that height, but at real column widths it truncated to
-            "Built…" — one word, beside untruncated custom rows, reading as breakage rather
-            than as brevity. The `Locked` chip already states the row cannot be edited, the
-            inspector's help panel explains the fallback in full, and the sentence survives
-            as the row's tooltip (issue 878).
-          -->
+          <!-- The reserved row carries its name ALONE, so it sits at the same height as every
+            custom row; ellipsised inline, the explanatory sentence truncated to one word beside
+            untruncated neighbours. It survives as the row's tooltip (issue 878). -->
           <div class="manager-vocabulary-main is-inline" title={lockedFallbackHint}>
             <strong>{lockedRow.name}</strong>
           </div>
@@ -361,15 +308,10 @@
         contextClass="manager-vocabulary-empty-panel"
       />
     {:else if showEmpty}
-      <!--
-        This card is the ONLY place a reserved vocabulary's General bucket appears while
-        no custom entry exists, so it carries the whole explanation ("Only General so
-        far" + what falls under it) and answers the entry chip's count of 1 above it.
-        It is the full dashed panel, not the compact one: the compact variant existed
-        purely because General used to render as a row directly above it, and shrinking
-        the only thing in an otherwise empty list is the opposite of what that traded
-        for. Tags reach the same card by genuinely having nothing at all (issue 878).
-      -->
+      <!-- The ONLY place a reserved vocabulary's General bucket appears while no custom entry
+        exists, so it carries the whole explanation and answers the entry chip's count of 1. The
+        full dashed panel, not the compact one, which existed only because General used to render
+        as a row directly above it (issue 878). -->
       <EmptyState
         icon={emptyIcon}
         title={emptyTitle}

@@ -1,20 +1,17 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  The GM recipe library (issue 643): filter bar → collapsible category groups →
-  rich rows → pager, with the shell's own `.manager-inspector` column carrying the
-  selected-recipe inspector (this view does NOT nest a second inspector grid — that
-  overflows `.manager-recipe-row` at the smoke harness's 1280px width and
-  `assertManagerLayoutStable()` throws).
+  The GM recipe library (issue 643): filter bar, collapsible category groups, rich rows, pager,
+  with the shell's own `.manager-inspector` column carrying the selected-recipe inspector. All
+  list mechanics — filter, sort, group, paginate and the per-row derivations — live in the pure
+  `recipeBrowserModel.js`; this component only renders.
 
-  Row ARIA is chosen, not inherited: a card row has no columns, so the rows are a
-  real `<ul role="list">` of `<li>` cards rather than the former table / row / cell
-  roles with `columnheader` spans. The class names (`manager-recipes-table`,
-  `manager-recipe-row`, `manager-recipe-identity`, `manager-recipe-status`) are
-  FROZEN — the smoke harness's overflow check pins them and FAILS OPEN, so a rename
-  silently stops measuring the row rather than failing.
-
-  All list mechanics (filter / sort / group / paginate + the per-row derivations)
-  live in the pure `recipeBrowserModel.js`; this component only renders.
+  Invariants:
+  - This view does NOT nest a second inspector grid: that overflows `.manager-recipe-row` at the
+    smoke harness's 1280px width and `assertManagerLayoutStable()` throws.
+  - Row ARIA is chosen, not inherited: a card row has no columns, so the rows are a real
+    `<ul role="list">` of `<li>` cards rather than table / row / cell roles.
+  - The class names `manager-recipes-table`, `manager-recipe-row`, `manager-recipe-identity` and
+    `manager-recipe-status` are FROZEN — the smoke harness's overflow check pins them and FAILS
+    OPEN, so a rename silently stops measuring the row rather than failing.
 -->
 <script>
   import Chip from '../../components/Chip.svelte';
@@ -62,83 +59,50 @@
     onEditRecipe = () => {},
     onToggleEnabled = () => {},
     onToggleLocked = () => {},
-    // Told AFTER the toolbar's Clear has emptied the selection (issue 1157). The clear stays
-    // this browser's — the selection is its state — but the FEEDBACK cannot be: emptying the
-    // selection unmounts the bulk panel and the Clear button that was pressed, so the
-    // announcement and the focus hop belong to something that outlives both. Optional, so a
-    // standalone mount clears exactly as it did.
+    // Told AFTER the toolbar's Clear has emptied the selection (issue 1157). The clear stays this
+    // browser's, but the FEEDBACK cannot be: emptying the selection unmounts the bulk panel and
+    // the Clear button that was pressed. Optional, so a standalone mount clears as it did.
     onSelectionCleared = null,
-    // The filter / sort / group / paginate view-state (issue 643). The manager root
-    // LIFTS this up (a single `$state` object) and binds it here so it survives the
-    // editor round-trip: opening a recipe unmounts this browser, and remounting it
-    // with the controls reset to defaults threw away the page, filters, sort and
-    // grouping the GM left. When unbound — the isolated mounted tests — the local
-    // fallback below keeps every control reactive in-component.
+    // The filter / sort / group / paginate view-state (issue 643), lifted by the manager root as
+    // a single `$state` object and bound here so it survives the editor round-trip. Unbound — the
+    // isolated mounted tests — the local fallback below keeps every control reactive.
     browserState = $bindable(null),
   } = $props();
 
   let ownBrowserState = $state(createRecipeBrowserState());
-  // The active view-state: the root's lifted object when bound, else the local
-  // fallback. Both are `$state` proxies, so nested writes (`ui.statusFilter = …`)
-  // are reactive AND, when bound, propagate back to the root so the state persists.
+  // The root's lifted object when bound, else the local fallback. Both are `$state` proxies, so
+  // nested writes are reactive and, when bound, propagate back to the root.
   const ui = $derived(browserState ?? ownBrowserState);
 
-  // Switching system resets the CATEGORY filter and the group/page position — a
-  // recipe category names a vocabulary the new system does not share, so carrying it
-  // over filters the new library down to nothing. Mirrors ComponentsBrowserView. The
-  // status/lock filters are NOT reset: enabled and locked mean the same thing in every
-  // system, so they are preferences like sort/page-size, not a stale vocabulary. The
-  // search term is not preserved here at all, and that asymmetry is deliberate rather than an
-  // omission: it is cleared by the STORE, on a system switch and on leaving this library's
-  // route scope alike (issue 1462), because it is the one control here whose effect is not
-  // confined to this browser — an active term also changes counts on screens that render no
-  // search box for it, and page, filters, sort, grouping and collapse do not. So returning
-  // from the editor restores every one of those and leaves the search box empty.
-  //
-  // The sentinel is `ui.systemId`, PERSISTED on the lifted browser state — NOT a
-  // component-local `$state`. A local sentinel re-initialised to '' on every mount, so
-  // returning from an editor (a remount with the system unchanged) was misread as a
-  // system switch and wiped the page/filters/collapse this object otherwise preserves
-  // (issue 806). The equality early-return means writing `ui.systemId` back inside the
-  // same effect does not loop — it mirrors the `model.pageIndex` sync effect below.
+  // Switching system resets the CATEGORY filter and the group/page position, because a category
+  // names a vocabulary the new system does not share; status and lock are preferences and are not
+  // reset. The search term is the STORE's to clear, on a system switch and on leaving this route
+  // alike (issue 1462), because an active term also changes counts on screens with no search box.
+  // The sentinel is `ui.systemId`, PERSISTED on the lifted state rather than a component-local
+  // `$state`, which re-initialises to '' on every mount and made returning from an editor read as
+  // a system switch (issue 806); the equality early-return keeps the write from looping.
   $effect(() => {
     if (selectedSystemId === ui.systemId) return;
     ui.categoryFilter = 'all';
     ui.pageIndex = 0;
     ui.collapsedCategories = new Set();
-    // The bulk selection is scoped to the selected system — its ids name recipes the new
-    // system does not have — so a switch clears it, and the root discards the staged draft
-    // when the count reaches zero (issue 1010). Mirrors ComponentsBrowserView.
+    // The bulk selection is scoped to the selected system, so a switch clears it and the root
+    // discards the staged draft when the count reaches zero (issue 1010).
     ui.bulkSelectedRecipeIds = new Set();
     ui.systemId = selectedSystemId;
   });
 
-  // The blocked-enable flash. Enabling is GATED (an incomplete recipe is refused),
-  // and this view CLAIMS the refusal message by handing the store an `onBlocked`
-  // sink: the store then SUPPRESSES its Foundry notification, so the GM is never told
-  // the same thing twice — once here and once in a toast behind a maximised window.
-  // The error is never surfaced from inside this component — it has no Foundry
-  // notification path at all — which is what makes the seam stubbable in a mounted
-  // test and keeps the suppression invariant enforceable.
-  //
-  // TWO PARTS SINCE ISSUE 1515, because the vehicle is a `<Notice>` and its specimen draws a
-  // `title` naming what happened over a quieter `detail` saying why. The store hands the sink
-  // both — `localizeRecipeActivationParts` builds each half from its own material rather than
-  // cutting the one-line message at a colon a translation is free to move — and the one-line
-  // string stays the fallback for any refusal that is not an activation error (a persistence
-  // failure, or a raw `error.message`), which carries no name/reasons split to make.
+  // The blocked-enable flash. This view CLAIMS the refusal message through the store's `onBlocked`
+  // sink, so the store SUPPRESSES its own Foundry notification and the GM is not told twice; the
+  // error is never surfaced from inside this component, which is what keeps that seam stubbable.
+  // TWO PARTS since issue 1515, because `Notice` draws a `title` over a quieter `detail`, and each
+  // half is built from its own material rather than cut at a colon a translation may move.
   let flashTitle = $state('');
   let flashDetail = $state('');
 
-  // A REFUSAL COUNTER, WHICH THE SHARED NOTICE MAKES NECESSARY (issue 1515). `Notice` owns its
-  // own dismissal — `library.html:1079` declares `dismissable` as a boolean with no caller to
-  // tell, so the component simply leaves the DOM — and this view's message is not always new.
-  // Clearing the term and setting it again inside ONE toggle is a single batched update, so the
-  // `{#if}` never goes false and the same component instance survives with `dismissed` still
-  // true: refuse, dismiss, refuse the same recipe again, and the second refusal would be
-  // silent. Keying the block on a counter that rises on every refusal is what makes each one a
-  // new notice, which is the behaviour the bespoke strip had for free by clearing the caller's
-  // own state on dismissal.
+  // A REFUSAL COUNTER, WHICH THE SHARED NOTICE MAKES NECESSARY (issue 1515): clearing the term and
+  // setting it again is ONE batched update, so the `{#if}` never goes false and a dismissed
+  // instance survives, making the second refusal silent. Keying on a rising counter fixes that.
   let flashToken = $state(0);
 
   function handleToggleEnabled(recipe) {
@@ -153,10 +117,10 @@
     });
   }
 
-  // Defaults are load-bearing for the smoke harness: it waits for a VISIBLE row and
-  // throws "Manager rendered no table rows" on zero. Groups start EXPANDED, the
-  // status and lock filters start at `all`, and the page size exceeds the fixture
-  // recipe count. Those defaults now live in `createRecipeBrowserState()`.
+  // Defaults are load-bearing for the smoke harness: it waits for a VISIBLE row and throws
+  // "Manager rendered no table rows" on zero. Groups start EXPANDED, the status and lock filters
+  // start at `all`, and the page size exceeds the fixture recipe count. They live in
+  // `createRecipeBrowserState()`.
   const model = $derived(
     buildRecipeBrowserModel(recipes || [], {
       status: ui.statusFilter,
@@ -175,12 +139,10 @@
     if (model.pageIndex !== ui.pageIndex) ui.pageIndex = model.pageIndex;
   });
 
-  // ── Bulk selection (issue 1010) ──────────────────────────────────────────────────
-  // `pageIds` is the set of RENDERED row ids, NOT `model.page`: with grouping on (the
-  // default) a COLLAPSED group renders no rows at all, so a naive page list would let the
-  // toolbar's tri-state box select rows the GM cannot see and report a count exceeding the
-  // visible ones. `filteredIds` is the whole filtered set, which the results link reaches
-  // and the page box deliberately cannot.
+  // Bulk selection (issue 1010). `pageIds` is the set of RENDERED row ids, NOT `model.page`: with
+  // grouping on, a COLLAPSED group renders no rows at all, so a naive page list would let the
+  // tri-state box select rows the GM cannot see. `filteredIds` is the whole filtered set, which
+  // the results link reaches and the page box deliberately cannot.
   const bulkSelectedIds = $derived(ui.bulkSelectedRecipeIds ?? new Set());
   const filteredIds = $derived(model.filtered.map((recipe) => recipe.id));
   const pageIds = $derived(
@@ -194,16 +156,16 @@
     })
   );
 
-  // The SAME condition the markup renders a group's rows under, read once so the two can
-  // never drift: an ungrouped run is always rendered, a grouped one only while expanded.
+  // The SAME condition the markup renders a group's rows under, read once so the two can never
+  // drift: an ungrouped run is always rendered, a grouped one only while expanded.
   function isGroupRendered(group) {
     const grouped = ui.groupByCategory && showRecipeCategories && !!group.category;
     return !grouped || isExpanded(group.category);
   }
 
-  // A delete, an unlink or a store refresh must never leave a phantom id in the count or
-  // in an `Apply`. Only assigned when something actually dropped — the pruned set is a
-  // subset, so equal sizes mean an identical set — so this cannot loop.
+  // A delete, an unlink or a store refresh must never leave a phantom id in the count or in an
+  // `Apply`. Only assigned when something actually dropped — the pruned set is a subset, so equal
+  // sizes mean an identical set — so this cannot loop.
   $effect(() => {
     const current = ui.bulkSelectedRecipeIds ?? new Set();
     if (current.size === 0) return;
@@ -215,9 +177,8 @@
   });
 
   // Every mutation assigns a NEW Set rather than mutating in place: the reactive unit is
-  // `ui.bulkSelectedRecipeIds`, not the Set, so an in-place mutation compiles, runs, and
-  // silently stops the bound lifted state propagating back to the manager root — the rule
-  // `toggleGroup` below already documents for `collapsedCategories`.
+  // `ui.bulkSelectedRecipeIds`, not the Set, so an in-place mutation compiles, runs, and silently
+  // stops the bound lifted state propagating back to the manager root.
   function toggleRecipeBulkSelected(id) {
     ui.bulkSelectedRecipeIds = toggleRecipeSelection(bulkSelectedIds, id);
   }
@@ -314,18 +275,10 @@
     return `manager-recipe-group-${category || 'all'}`;
   }
 
-  // The header says BOTH numbers, because either one alone lies (issue 676).
-  // `buildRecipeBrowserModel` groups the PAGE, so counting `model.filtered` would put
-  // "12 recipes" above the three rows page 2 renders — but counting only the page put
-  // "Alchemy · 25 recipes" above page 1 of a 282-strong Alchemy bucket, which says the
-  // bucket holds 25. So a partially-shown group reads "25 of 282 recipes": `group.total`
-  // is the category's size across the FILTERED list (the model computes it from the same
-  // filtered rows it paged, so an active filter is always respected).
-  //
-  // A group shown WHOLE says it once — "25 recipes", not "25 of 25". Grouping is on by
-  // default and most libraries fit one page, so the "of" form would otherwise be pure
-  // noise on the common case. The plural agrees with the TOTAL, which is >= 2 whenever
-  // the "of" form is used, so "1 of 282 recipes" is the only singular that reaches it.
+  // The header says BOTH numbers, because either alone lies (issue 676): the model groups the
+  // PAGE, so `model.filtered` over-counts and the page alone under-counts. A partially-shown group
+  // reads "25 of 282 recipes" against `group.total`, the category's size across the FILTERED list;
+  // a group shown WHOLE says it once, and the plural agrees with the TOTAL.
   function groupCountText(group) {
     const count = (group?.recipes || []).length;
     const total = group?.total ?? count;
@@ -355,12 +308,9 @@
     ui.collapsedCategories = next;
   }
 
-  // The four row states, localized. Both authoring states read ONE predicate —
-  // `recipe.enableBlocked`, "would activation refuse this recipe?" (issue 1010) — so the
-  // pilled rows, the bulk panel's pre-flight count and the set-apply write are the same
-  // set by construction. Off + blocked means enabling would be REFUSED, so the row says
-  // so rather than merely "incomplete"; on + blocked is unfinished work with nothing
-  // being refused. The labels are unchanged.
+  // The four row states. Both authoring states read ONE predicate, `recipe.enableBlocked` (issue
+  // 1010), so the pilled rows, the bulk panel's pre-flight count and the set-apply write are the
+  // same set by construction.
   const STATUS_LABELS = {
     disabled: ['FABRICATE.Admin.Manager.StatusDisabled', 'Disabled'],
     locked: ['FABRICATE.Admin.Manager.Recipe.LockedLabel', 'Locked'],
@@ -375,12 +325,11 @@
     });
   }
 
-  // The I/O readout (issue 643 §9): always "N in"; "N out" ONLY in simple and
-  // progressive — a tier- or set-keyed mode has no single outputs number, so it
-  // reports the RESULT-GROUP count with a routing glyph instead.
+  // The I/O readout (issue 643 §9): always "N in"; "N out" ONLY in simple and progressive — a
+  // tier- or set-keyed mode has no single outputs number, so it reports the RESULT-GROUP count
+  // with a routing glyph instead.
   function groupsText(count) {
-    // "1 groups" is not a sentence. The singular is its own key, as GroupCount /
-    // GroupCountOne already are.
+    // "1 groups" is not a sentence. The singular is its own key.
     return count === 1
       ? text('FABRICATE.Admin.Manager.Recipe.CountResultGroupsOne', '1 group')
       : format('FABRICATE.Admin.Manager.Recipe.CountResultGroups', '{count} groups', { count });
@@ -405,11 +354,10 @@
       : text('FABRICATE.Admin.Manager.Recipe.SingleStep', 'Single step');
   }
 
-  // The five check states. `none` is the one WARNING: a system that cannot roll for
-  // this recipe is a thing the GM must be able to scan a library for, and the old em
-  // dash + ban glyph said nothing at all. `ingredients` is its neutral sibling — a
-  // routedByIngredients system resolves off the ingredient set that was used, so no
-  // check is a working configuration, not a gap.
+  // The five check states. `none` is the one WARNING: a system that cannot roll for this recipe
+  // is a thing the GM must be able to scan a library for. `ingredients` is its neutral sibling —
+  // a routedByIngredients system resolves off the ingredient set that was used, so no check is a
+  // working configuration, not a gap.
   const CHECK_PILLS = {
     dc: ['FABRICATE.Admin.Manager.Recipe.CheckDc', 'DC {dc}', 'fas fa-dice-d20'],
     dynamic: ['FABRICATE.Admin.Manager.Recipe.CheckDynamic', 'Dynamic DC', 'fas fa-dice-d20'],
@@ -424,7 +372,7 @@
       'fas fa-code-branch',
     ],
     // A check the GM SWITCHED OFF, distinct from one the system cannot roll. Same neutral
-    // treatment as `progressive`/`ingredients`: it is a working configuration, not a fault.
+    // treatment as `progressive` and `ingredients`: a working configuration, not a fault.
     checkOff: ['FABRICATE.Admin.Manager.Recipe.CheckOff', 'Check off', 'fas fa-power-off'],
     none: ['FABRICATE.Admin.Manager.Recipe.CheckNone', 'No check', 'fas fa-triangle-exclamation'],
   };
@@ -444,8 +392,8 @@
     ],
   };
 
-  // The check pill is projected by the store (`recipe.checkSummary`) — the row cannot
-  // resolve `checkTierId` → a tier DC, nor the system's mode, on its own.
+  // The check pill is projected by the store (`recipe.checkSummary`) — the row cannot resolve
+  // `checkTierId` to a tier DC, nor the system's mode, on its own.
   function checkPill(recipe) {
     const summary = recipe?.checkSummary || { kind: 'none', dc: null };
     const [labelKey, fallback, icon] = CHECK_PILLS[summary.kind] || CHECK_PILLS.none;
@@ -464,42 +412,25 @@
 </script>
 
 <!--
-  There is ONE page header, and the shell owns it. This view used to render a SECOND
-  one — kicker + "Recipe library" + a second subtitle — directly under the shell's
-  breadcrumb / "Recipes" / subtitle / Create block: ~74px of duplicated chrome saying
-  what the breadcrumb and the titlebar's gold system badge already said.
+  There is ONE page header, and the shell owns it.
 -->
 <main class="manager-main" aria-label={text('FABRICATE.Admin.Manager.Nav.Recipes', 'Recipes')}>
   <!--
-    THE BLOCKED-ENABLE NOTICE, WHICH IS THE SHARED PRIMITIVE NOW (issue 1515).
-
-    It still REPLACES the Foundry notification — the store suppresses its own toast while this
-    view owns the message through the `onBlocked` sink — so it is the only place a GM is told
-    why the switch did not move, and it still does not auto-hide.
-
-    TWO THINGS CHANGED, and both are the design system's rulings rather than preferences.
-    `openspec/specs/design-system/spec.md` routes a strip carrying `role="alert"` to a BLOCKING
-    notice, which is the one form that keeps the role, and it fixes a browse screen's element
-    order: a blocking notice sits between the page header and the filter bar. This route has no
-    per-view page header, so that position is the first child of the content region. The bespoke
-    toast that floated bottom-centre over the list is therefore retired, along with the four
-    `.manager-recipe-flash*` rules that painted it: a notice is a bar in the page's own flow, and
-    a second geometry for the same meaning is exactly what the primitive exists to remove.
-
-    THE SLOT IS UNCONDITIONAL AND THE NOTICE INSIDE IT IS NOT. `.manager-main` is a grid whose
-    tracks this route names explicitly, so a CONDITIONAL direct child would move the collapsing
-    `minmax(0, 1fr)` onto a different child in each state — the defect
-    `assertOneTrackPerGridChild` names on three other routes. An empty slot is a zero-height
-    `auto` row, and the sheet gives it its inset only when it holds a notice.
+    THE BLOCKED-ENABLE NOTICE (issue 1515). It REPLACES the Foundry notification, so it is the only
+    place a GM is told why the switch did not move, and it does not auto-hide.
+    `openspec/specs/design-system/spec.md` routes a `role="alert"` strip to a BLOCKING notice and
+    fixes its position; this route has no page header, so that is the content region's first child.
+    THE SLOT IS UNCONDITIONAL AND THE NOTICE INSIDE IT IS NOT: a CONDITIONAL direct child of
+    `.manager-main` would move the collapsing `minmax(0, 1fr)` between children, which is what
+    `assertOneTrackPerGridChild` names. An empty slot is a zero-height `auto` row.
   -->
   <div class="manager-recipe-notice">
     {#key flashToken}
       {#if flashTitle}
-        <!-- NO `icon`, DELIBERATELY (issue 1515). `Notice` ships a per-tone default glyph and the
-             danger tone's default IS the specimen's danger mark; passing one here re-stated the
-             primitive's own choice from a call site, which is the drift the default exists to
-             prevent. The prop stays for the two accent callers whose glyph the specimen does not
-             declare. -->
+        <!-- NO `icon`, DELIBERATELY (issue 1515): `Notice` ships a per-tone default glyph and the
+             danger tone's default IS the specimen's danger mark, so passing one here re-stated the
+             primitive's own choice from a call site. The prop stays for the two accent callers
+             whose glyph the specimen does not declare. -->
         <Notice
           blocking
           tone="danger"
@@ -513,10 +444,9 @@
     {/key}
   </div>
 
-  <!-- `tabindex="-1"` makes this landmark a FOCUS TARGET without making it a tab stop
-       (issue 1157) — see the twin note in `EssenceBrowserView`. The manager root lands the
-       keyboard here when an action empties the bulk selection and unmounts the panel that
-       was acted on, addressing it through `data-recipe-toolbar`. -->
+  <!-- `tabindex="-1"` makes this landmark a FOCUS TARGET without making it a tab stop (issue
+       1157) — see the twin note in `EssenceBrowserView`. The manager root addresses it through
+       `data-recipe-toolbar`. -->
   <ManagerToolbar
     class="manager-recipe-toolbar"
     tabindex="-1"
@@ -563,15 +493,8 @@
       />
     </div>
 
-    <!--
-      Row two carries the category FILTER together with the two VIEW controls — how the
-      list is grouped, and how it is ordered — on a single tighter row (issue 643). The
-      category select used to sit on row one, where it wrapped below search/status/lock
-      and pushed the grouping and sorting controls onto a third line; keeping all three
-      here stops that unnecessary break. The view controls are separated from the filter
-      by a rule and each is titled by an uppercase micro-label that precedes its control
-      and never wraps ("Sort by" broke onto two lines in the flagship frame otherwise).
-    -->
+    <!-- Row two carries the category FILTER with the two VIEW controls on one tighter row (issue
+      643), separated by a rule and each titled by a micro-label that never wraps. -->
     <div class="manager-recipe-filter-row is-secondary">
       {#if showRecipeCategories}
         <!-- Bare: the `aria-label` is the select's accessible name. -->
@@ -665,11 +588,7 @@
           </button>
         </Chip>
       {/each}
-      <!--
-        The count is quiet right-aligned metadata, not a control: a bordered mono chip
-        read as something to press. It reports the page WINDOW ("1–5 of 12"), because
-        "5 of 12" never told the GM which page they were looking at.
-      -->
+      <!-- The count is quiet right-aligned metadata, not a control, and reports the page WINDOW. -->
       <span class="manager-recipe-count" data-recipe-count>
         {format('FABRICATE.Admin.Manager.Recipe.CountRange', '{start}–{end} of {total}', {
           start: model.rangeStart,
@@ -680,16 +599,10 @@
     </div>
 
     <!--
-      The multi-select row is the LAST row of the toolbar, immediately above the list —
-      the same third-row-then-list order the Component Studio shipped (issue 1010). It is
-      a row of THIS toolbar, not a sticky bar of its own over the list, so it inherits the
-      toolbar's own metrics instead of declaring a second register.
-
-      Every prop below is an OVERRIDE: the shared primitive's row class and its five
-      `data-*` hooks default to the Component Studio's strings so that studio's smoke
-      selectors, view-lab cases and mounted assertions kept working through the
-      extraction. This studio must name its own, or both browsers would answer to one set
-      of hooks.
+      The multi-select row is the LAST row of THIS toolbar (issue 1010), not a sticky bar of its
+      own, so it inherits the toolbar's metrics rather than declaring a second register. Every prop
+      below is an OVERRIDE: the primitive's row class and five `data-*` hooks default to the
+      Component Studio's strings, so both browsers would otherwise answer to one set.
     -->
     <BulkSelectionToolbar
       rowClass="manager-recipe-filter-row"
@@ -722,9 +635,8 @@
         )}
       />
     {:else if model.filtered.length === 0}
-      <!-- A filtered-to-nothing library is not an error state and does not want the
-           full empty-panel apparatus: one dashed panel says it, and the Clear-filters
-           button is the way out. -->
+      <!-- A filtered-to-nothing library is not an error state and does not want the full
+           empty-panel apparatus: one dashed panel says it, and Clear filters is the way out. -->
       <EmptyState
         filtered
         hint={text(
@@ -738,16 +650,9 @@
       </EmptyState>
     {:else}
       <div class="manager-recipes-table">
-        <!--
-          The column header sits ABOVE the whole list (issue 643): below the filter bar
-          and above the first category group / first row. It labels the row's real
-          regions — the identity, then the right cluster's Requirements (the I/O readout),
-          Check pill and Status switch — and shares the cluster's fixed column template
-          with every row, so the labels line up with the cells beneath them. The lock and
-          edit are icon controls with no header. It is `aria-hidden` (the rows carry their
-          own labels) and hides at the stacked breakpoint, where a column header over a
-          stack of cards means nothing (see `.manager-recipe-table-head` in fabricate.css).
-        -->
+        <!-- The column header sits ABOVE the whole list (issue 643) and shares the cluster's fixed
+          column template with every row, so the labels line up. `aria-hidden`, because the rows
+          carry their own labels, and hidden at the stacked breakpoint. -->
         <div class="manager-recipe-table-head" aria-hidden="true">
           <span class="manager-recipe-head-identity"
             >{text('FABRICATE.Admin.Manager.Recipe.Column.Recipe', 'Recipe')}</span
@@ -759,8 +664,8 @@
             <span class="manager-recipe-head-cell fab-truncate is-check"
               >{text('FABRICATE.Admin.Manager.Recipe.Column.Check', 'Check')}</span
             >
-            <!-- STATUS spans both the lock and the enable-toggle columns: lock and
-                 enable are both status controls, so the header sits over the pair. -->
+            <!-- STATUS spans both the lock and the enable-toggle columns: lock and enable are both
+                 status controls, so the header sits over the pair. -->
             <span class="manager-recipe-head-cell fab-truncate is-status"
               >{text('FABRICATE.Admin.Manager.Recipe.Column.Status', 'Status')}</span
             >
@@ -785,11 +690,8 @@
                 {#each group.recipes as recipe (recipe.id)}
                   {@const io = ioReadout(recipe)}
                   {@const check = checkPill(recipe)}
-                  <!--
-                    `.is-bulk-selected` is a DIFFERENT question from `.is-selected` —
-                    "this row is in the set an Apply will write to" versus "you are
-                    here" — and a row can carry both (issue 1010).
-                  -->
+                  <!-- `.is-bulk-selected` is a DIFFERENT question from `.is-selected`, and a row
+                    can carry both (issue 1010). -->
                   <li
                     class={`manager-recipe-row ${isSelectedRecipe(recipe) ? 'is-selected' : ''} ${recipe.enabled === false ? 'is-off' : ''}`}
                     class:is-bulk-selected={bulkSelectedIds.has(recipe.id)}
@@ -853,10 +755,9 @@
                         </span>
                       </span>
 
-                      <!-- The DC is the archetypal numeric in this row, so the pill
-                           takes the mono face (`is-mono`, tabular figures) when it
-                           carries a number. The word-only kinds (Dynamic DC,
-                           Progressive, the em dash) stay in the UI face. -->
+                      <!-- The DC is the archetypal numeric in this row, so the pill takes the mono
+                           face (`is-mono`, tabular figures) when it carries a number. The word-only
+                           kinds stay in the UI face. -->
                       <Chip
                         class={`manager-recipe-check is-${check.kind}`}
                         mono={check.kind === 'dc'}
@@ -890,13 +791,8 @@
                         ></i>
                       </IconButton>
 
-                      <!--
-                        No "On"/"Off" text IN THE ROW. The track colour already carries
-                        the state, the `aria-label` names it for assistive tech, and the
-                        row's Disabled pill says it in words — a third copy on every row
-                        cost ~30px of the description. (The label stays everywhere else
-                        in the manager, where a switch has no pill beside it.)
-                      -->
+                      <!-- No "On"/"Off" text IN THE ROW: the track carries the state, `aria-label`
+                        names it, and the Disabled pill says it in words. -->
                       <span class="manager-recipe-status">
                         <StatusToggle
                           on={recipe.enabled !== false}
@@ -911,13 +807,8 @@
                         />
                       </span>
 
-                      <!--
-                        The row's single Edit affordance (issue 643), styled to match the
-                        Books & Scrolls row edit pencil. Duplicate and Delete stay
-                        inspector-only — three ghost icons on every row turned it into a
-                        toolbar and truncated the description; a single edit pencil next to
-                        the enable switch is the row's primary action and does not.
-                      -->
+                      <!-- The row's single Edit affordance (issue 643); Duplicate and Delete stay
+                        inspector-only, or the row reads as a toolbar. -->
                       <IconButton
                         class="manager-recipe-edit"
                         data-recipe-edit={recipe.id}
@@ -933,23 +824,14 @@
                       </IconButton>
 
                       <!--
-                        The bulk selection box (issue 1010), AFTER the Edit pencil and
-                        INSIDE this cluster as its last cell — not a row-level sibling, or
-                        the `--fab-recipe-col-select` track appended to
-                        `--fab-recipe-cluster-cols` would have nothing to place. Trailing
-                        placement is also what lets that track be APPENDED: the column
-                        header's four explicit `grid-column` placements survive an append
-                        and would every one of them break on a prepend.
-
-                        `SelectionCheckbox` renders NO `<button>`, which is load-bearing
-                        here: the Foundry smoke walk reaches Edit through
-                        `[data-recipe-edit]` and the row through `.manager-recipe-identity`,
-                        and a selection control that answered to a looser row-button
-                        selector would start intercepting those clicks.
-
-                        This cluster is a `<div>`, so the primitive renders its own
-                        `<label>` (`wrapper="label"`); without it the visible box would have
-                        no label association and no click target.
+                        The bulk selection box (issue 1010), INSIDE this cluster as its last cell:
+                        a row-level sibling would leave the appended select track nothing to place,
+                        and trailing placement is what lets it be APPENDED at all, since the column
+                        header's four explicit `grid-column` placements would break on a prepend.
+                        `SelectionCheckbox` renders NO `<button>`, which is load-bearing: a
+                        selection control answering to a looser row-button selector would intercept
+                        the smoke walk's Edit and row clicks. The cluster is a `<div>`, so the
+                        primitive renders its own `<label>` for the association and click target.
                       -->
                       <SelectionCheckbox
                         size="lg"
