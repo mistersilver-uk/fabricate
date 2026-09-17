@@ -1,38 +1,14 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  The Component `How players see it` rail (issue 1371, maintainer parity round 4) —
-  `proto:985-1020` on the world entry, `proto:1467-1500` on the system rules editor.
+  The Component `How players see it` rail (issue 1371) — `proto:985-1020` on the world entry,
+  `proto:1467-1500` on the system rules editor.
 
-  == ONE RAIL, TWO SCREENS (issue 1371 r18-list, maintainer ruling M27) =====================
-  The reference draws the two rails from ONE template: the entry's binds `d.en.pv` and the rules
-  editor's binds `d.pr.pv`, and nothing else differs. The rules editor used to draw a rail of its
-  own — a 64px medallion in a 90px box, a sans name, iconed micro chips — and the maintainer's
-  live test found the two "using a different layout", which is exactly what a second
-  implementation of one template does over time. So this file is the rail on BOTH screens, and
-  the editor renders it in place of its own markup. `scope` is what the two screens say
-  differently: the scope sentence under the head and the aside's accessible name. Everything the
-  scope does not change is stated once, here, and cannot be restated somewhere else.
-
-  The file keeps its name. Renaming it would touch the world entry, its suites and the naming
-  gate that counts `World…` children for a change that moves no pixel, and the rail was the
-  entry's first; the header records that it is no longer ONLY the entry's.
-
-  == IT IS THE GRID'S SECOND COLUMN, NOT A CHILD OF THE SCROLLER =============================
-  The page places it; this file only says what is in it. Round 3 nested the rail inside the
-  Definition tab's scrolling panel, so scrolling to the systems card left it blank, and the
-  Validation tab had no rail at all.
-
-  == `HOW PLAYERS SEE IT`, NOT `WORLD RECORD` ================================================
-  The rail answers one question — what a player meets in their inventory — so it draws an
-  inventory TILE with the quantity badge, the resolved category, the effective tag chips and
-  the art note, then what USES the component and what PRODUCES it. Round 3 drew the world
-  DEFAULTS list, which is the same three values the cards beside it already author.
-
-  == THE LIVE FOOTER IS THE SHELL'S TRAILING SNIPPET ========================================
-  `ScopedEntityPreview` draws its own `liveNote` region ABOVE the fact groups and the reference
-  draws it BELOW them, so this rail passes no `liveNote` and renders the strip as the trailing
-  snippet instead. It keeps the shell's own class and hook, so the shipped rule that paints it
-  and every selector naming it still resolve.
+  ONE RAIL, TWO SCREENS (M27), from one template; the editor's second implementation had already
+  drifted into a different layout. `scope` is the only thing the two screens say differently.
+  It is the GRID'S SECOND COLUMN, not a child of the scroller, which went blank on scroll. It
+  answers `HOW PLAYERS SEE IT`, not `World record`, so it draws the inventory tile, what USES the
+  component and what PRODUCES it. The live footer is the shell's TRAILING snippet, because
+  `ScopedEntityPreview` draws `liveNote` above the fact groups and the reference draws it below.
 -->
 <script>
   import Chip from '../../../components/Chip.svelte';
@@ -45,19 +21,15 @@
     icon = 'fas fa-cube',
     categoryLabel = '',
     tags = [],
-    // THE ESSENCES A PLAYER MEETS (issue 1371 r18-entry, maintainer ruling M31): chip rows
-    // `{id, name, icon?, colorToken?, quantity}[]` from `componentEssenceChips`, over the map each
-    // screen states — the world entry passes its draft's world map, the rules editor the map this
-    // system resolves. Empty by default, so a caller that passes nothing renders byte for byte
-    // what it did.
+    // THE ESSENCES A PLAYER MEETS (M31): chip rows from `componentEssenceChips`, over the map
+    // each screen states — the entry its draft's world map, the editor the map this system
+    // resolves. Empty by default, so a caller that passes nothing renders what it did.
     essences = [],
     linked = true,
     factGroups = [],
     text = (key, fallback) => fallback,
-    // THE SCOPE THE RAIL SPEAKS FOR (issue 1371 r18-list, M27): `world` is the catalogue entry's
-    // reading — `Across every system that has rules for it.` — and `system` is the rules editor's,
-    // `What a player sees in {system}.` (`proto:1487`), naming the system through `systemLabel`.
-    // `world` by default, so the entry passes nothing and renders byte for byte what it did.
+    // THE SCOPE THE RAIL SPEAKS FOR (M27): `world` is the entry's reading and `system` the rules
+    // editor's, `What a player sees in {system}.` (`proto:1487`). `world` by default.
     scope = 'world',
     systemLabel = '',
   } = $props();
@@ -71,10 +43,8 @@
           'How this component reaches the world'
         )
   );
-  // `{system}` is substituted here rather than by a caller-supplied formatter: the two screens
-  // that render this rail each carry the same four-line `replaceAll` helper, and a rail that took
-  // a third copy as a prop would be asking every caller to agree on an interpolation contract for
-  // one token.
+  // `{system}` is substituted here rather than by a caller-supplied formatter: a third copy of
+  // the same four-line helper would make every caller agree an interpolation contract for one token.
   const scopeNote = $derived(
     systemScope
       ? text(
@@ -112,10 +82,8 @@
           {:else}
             <i class={icon} aria-hidden="true"></i>
           {/if}
-          <!-- THE STATUS BADGE IS THE ONE STATE A PLAYER-FACING TILE CANNOT HIDE. `proto:992`
-               draws a badge slot on the tile and leaves it empty for a healthy record; the state
-               that HAS to be on the tile is the one that explains a missing picture, which is a
-               record with no linked item at all. -->
+          <!-- THE STATUS BADGE IS THE ONE STATE A PLAYER-FACING TILE CANNOT HIDE (`proto:992`):
+               the one that explains a missing picture, a record with no linked item at all. -->
           {#if !linked}
             <span class="manager-component-entry-preview-status" data-scoped-entry-preview-status
               >{text('FABRICATE.Admin.Manager.Scoped.List.SourceUnlinked', 'No source item')}</span
@@ -135,10 +103,8 @@
             {/each}
           </div>
         {/if}
-        <!-- THE ESSENCE RUN, under the tags, on the tag run's own layout rule: one shared essence
-             chip per contributed essence, named and counted, in the essence's colour (M29). It is
-             the one behaviour fact a player-facing tile states — a recipe's essence requirement is
-             what these values satisfy — and it is drawn from the same map the card beside it
+        <!-- THE ESSENCE RUN, under the tags and on the tag run's layout rule (M29): the one
+             behaviour fact a player-facing tile states, drawn from the map the card beside it
              authors, so the preview follows the draft. -->
         {#if essences.length > 0}
           <div class="manager-component-entry-preview-tags" data-scoped-entry-preview-essences>

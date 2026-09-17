@@ -262,12 +262,10 @@ test('the ledger reports the two figures epic 1656 tracks', (t) => {
   // `migrateRecipeForModeChange` and `remapWorldScopeIdentityFlags.js` -- on top of the figure
   // main carries.
   //
-  // 116/120 here: on top of everything main now carries, the issue-1681 sweep of the 15 manager
-  // sub-folders takes six more units under the file threshold on comment lines alone --
-  // `essences/EssenceBrowserInspector.svelte`, `essences/EssenceBulkEditPanel.svelte`,
-  // `essences/essenceStudio.js`, `tools/ToolBehaviorPreview.svelte`,
-  // `tools/ToolBrowserInspector.svelte` and `tools/toolStudio.js`. None of it is debt
-  // discharged: the code is what it was, and only the measurement moved.
-  assert.equal(files, 116, 'oversized files');
+  // 117/120 here: on top of everything main now carries, the scoped-pages sweep takes five more
+  // `.svelte` files under the threshold on comment lines alone. Regenerated from the merged tree
+  // rather than reconciled by hand -- these counts are derived, so picking a side of the conflict
+  // would have pinned a figure no tree actually has.
+  assert.equal(files, 111, 'oversized files');
   assert.equal(keys.length - files, 120, 'oversized functions');
 });
