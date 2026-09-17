@@ -1129,6 +1129,19 @@ When a value is picked the search is replaced by the subject cell at its fixed w
 The control that converts a standalone row into a choice group and the control that adds an alternative to an existing group MUST open the SAME menu, with the same options in the same order, because both answer the same question: what kind is the next alternative.
 That menu lists the offered kinds for the row’s context, each with its kind tint, and choosing one appends an EMPTY ROW OF THAT KIND rather than a blank the GM has to interpret.
 
+The offered subset belongs to the SURFACE and not to the row, and the kind select, the convert menu and the set's adders MUST all state the same subset.
+A downtime activity awards what a patron can hand over, so it offers `component`, `currency` and `knowledge` — teaching a recipe is a reward a patron can give.
+A gathering task offers `component` and `currency` alone: it hands over material the character carried back, and neither recipe knowledge nor a completed activity is something a wilderness task produces.
+A row that offers a kind its surface cannot award is authoring that validation has to reject later.
+
+A `currency` row on the RESULT side opens a body for what the reward is CALLED and why the player gets it, because an amount of a currency states a quantity and no meaning.
+Both fields are OPTIONAL and the row is complete without them.
+The body states what the player will see, and where neither field is filled it says so plainly rather than showing an empty preview.
+NO OTHER KIND opens this body: a component, an essence and a piece of recipe knowledge each name a record whose own name is the label, and a second name for them would be two names for one thing.
+
+An adder is named for WHAT IT ADDS rather than for the kinds it offers — `Alternative` inside a choice group, `Ingredient` in an ingredient set, `Result` in a result set — and it opens the same kind menu the convert control opens.
+Naming the adders after the kinds would state the menu's own list twice.
+
 #### Scenario: The same authoring surface is used for results
 
 - **WHEN** the row is rendered in a result context
@@ -1158,6 +1171,18 @@ That menu lists the offered kinds for the row’s context, each with its kind ti
 - **WHEN** a step lists requirements of several kinds
 - **THEN** each row leads with its kind-tinted chip
 - **AND** a tag row is purple, distinguishing the one abstract kind from the concrete ones
+
+#### Scenario: A GM awards a sum of money for a stated reason
+
+- **WHEN** a GM sets a result row's kind to currency
+- **THEN** the row opens a body for what the reward is called and why it is given
+- **AND** the row is complete whether or not either field is filled
+
+#### Scenario: A gathering task offers fewer kinds than a downtime activity
+
+- **WHEN** a result row is rendered inside a gathering task
+- **THEN** its kind select offers component and currency alone
+- **AND** its convert menu and the set's adder offer that same subset
 
 ### Requirement: Simple and alchemy carry a reserved failure set
 
@@ -1260,6 +1285,84 @@ A mode change that would reduce the permitted cardinality MUST state what it wil
 - **WHEN** two check outcome tiers should produce the same reward
 - **THEN** both tiers name the same result set
 - **AND** the group is not duplicated to serve them
+
+### Requirement: A result-side choice group states who chooses and how many it awards
+
+A choice group in a RESULT set carries two settings its ingredient-side twin does not, and both belong to the GROUP rather than to its rows.
+An ingredient-side group is always one-of and always the crafter's decision, so neither setting has anything to select there and an ingredient-side group MUST NOT render either one.
+Offering a choice the model does not have is worse than offering none.
+
+THE CHOOSER names who picks the alternative, and it has exactly two values: the PLAYER chooses, or the ROLL decides.
+It MUST be a segmented control and MUST NOT be a toggle.
+Both values are live behaviour and neither is the absence of the other, so a two-state switch would state one of them as an off position it does not have.
+It sits in the group HEADER because it governs the whole bundle, and a copy on each row would invite a reader to set it per alternative.
+
+The chooser decides which controls the rows carry, and the surface MUST show only the ones the current value can fire.
+Under `rolled` the group states its SELECTION EXPRESSION in the header and each alternative carries a RANGE cell naming the values that select it.
+Under player-chooses both are hidden, because a range with no roll behind it is authoring that can never fire.
+The rows are otherwise the same row in both states: only the range cell appears and disappears.
+
+A range cell and an amount are different facts and MUST stay separately controlled.
+The range says WHICH alternative the roll selects; the amount says HOW MANY of it are awarded, and keeps the fixed-or-rolled control every result amount carries.
+
+THE AWARD MODE states how many alternatives the group hands over, and it is a closed set of three operations rather than one mode with a flag:
+
+- `any one of` awards exactly one.
+- `up to N` awards a SUBSET: no alternative twice, and an N above the alternative count awards all of them.
+- `draw N` repeats a SELECTION: the same alternative MAY come up more than once, and the award count is N whatever the alternative count is.
+
+Up-to and draw MUST NOT be collapsed into one mode.
+They differ in whether a selection repeats, which is the distinction a GM is authoring, and a single mode with a repeat flag hides it behind a setting.
+`up to N` is a CEILING and not a quota: fewer is a legal outcome, and a two-alternative group set to up-to-three is authored rather than invalid.
+
+N takes the SAME fixed-or-rolled control a result amount takes — a stepper, or the shared expression control — switched in place in one slot.
+A rolled N states its expression and NO resolved value, for the reason a rolled amount does: the header has no actor in scope.
+
+REPLACEMENT belongs to `draw N` alone and MUST NOT render under the other two modes.
+It is only meaningful where a selection repeats, and a setting with no behaviour behind it invites a GM to hunt for a difference that does not exist.
+It defaults to WITHOUT replacement, and it states its own current value rather than being read as a checked or unchecked box.
+A draw of N above the alternative count exhausts the bundle rather than erroring.
+
+A draw is ROLLED by definition, so `draw N` pins the chooser and hides it rather than leaving a player-chooses draw authorable, and pins N to its rolled form.
+
+The group header reads LEFT TO RIGHT as one sentence — award mode, N, replacement, chooser — with a help line beneath it restating the resolved behaviour in prose.
+Four controls in a row are read faster as a sentence than as a form.
+
+A container-level group adder MUST NOT exist.
+A set's adders create ROWS, and a group is always something an existing row BECAME, reached through the convert control that row already carries.
+An "add group" button beside "add result" would ask a GM to state what the alternatives are before stating what the first one replaces, and would leave two paths to one construct.
+
+The persisted shape of the chooser, the award mode, N and replacement is out of scope for this capability and is specified by the data model.
+
+#### Scenario: A GM lets the dice decide which reward is awarded
+
+- **WHEN** a GM sets a result-side choice group's chooser to rolled
+- **THEN** the group states its selection expression in its header
+- **AND** each alternative carries the range cell that names the values selecting it
+
+#### Scenario: A GM offers the player a choice of two rewards
+
+- **WHEN** a GM sets that same group's chooser back to player-chooses
+- **THEN** the selection expression and every range cell are hidden
+- **AND** each alternative keeps its own fixed-or-rolled amount
+
+#### Scenario: A reward hands over more than one alternative
+
+- **WHEN** a GM sets a result-side group to up to N
+- **THEN** the header states N through the same fixed-or-rolled control an amount uses
+- **AND** the group renders no replacement setting
+
+#### Scenario: A reward repeats a selection
+
+- **WHEN** a GM sets a result-side group to draw N
+- **THEN** the group states its replacement setting, defaulting to without
+- **AND** the chooser is pinned to rolled rather than offered
+
+#### Scenario: A GM authors an ingredient-side choice group
+
+- **WHEN** a choice group is rendered inside an ingredient set
+- **THEN** it renders neither a chooser nor an award mode
+- **AND** it resolves as one-of, decided by the crafter
 
 ### Requirement: Every select renders the app’s own option list
 
