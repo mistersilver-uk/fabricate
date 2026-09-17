@@ -1,33 +1,15 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  RECIPE DIFFICULTY TIERS — named difficulties a recipe can pick, each with its own DC.
+  RECIPE DIFFICULTY TIERS — named difficulties a record can pick, each with its own DC, used by
+  the simple check in static DC mode and the routed check in relative type only. Controlled.
 
-  Used by the simple check (static DC mode) and the routed check (relative type only).
-  Controlled: reads `tiers` + `defaultDc` (which seeds a new tier's DC) and emits the next
-  `tiers` array through `onChange`.
+  IT IS A LIST OF ROWS in the same shape the Outcomes screen draws its outcome tiers, rendering
+  the SAME `.manager-checks-tier-*` contract as `CraftingCheckEditor`; the column-header row goes
+  with the table, one text field and one number needing none once labelled.
 
-  ## It is a LIST OF ROWS, not a table (issue 1096)
-
-  The prototype draws it in exactly the shape the Outcomes screen draws its outcome tiers: a
-  46px row on `--fab-bg-0` carrying a drag handle, the name field, a `DC` micro label, a 28px
-  stepper pill and a subtle danger remove button, with a full-width dashed `Add difficulty
-  tier` under the list rather than a button in the card head. So this renders the SAME
-  `.manager-checks-tier-*` contract as `CraftingCheckEditor`, and the column-header row goes
-  with the table: the prototype has no column headers, and a two-column table of one text
-  field and one number does not need them once each control is labelled.
-
-  ## The handle DRAGS (issue 1096)
-
-  The prototype draws a grip on every row, and a handle that does not reorder is a promise
-  the surface does not keep — so the order is authored here rather than the glyph being
-  decoration. It is real: `tiers` is an ordered array, the recipe editor's tier picker lists
-  it in that order, and nothing else derives from the positions, so a move is a plain array
-  reorder with no other consequence.
-
-  Drag is the pointer half. The grip is also a real BUTTON that moves its row with the arrow
-  keys, because HTML5 drag-and-drop has no keyboard path at all and reordering would
-  otherwise be mouse-only. The prototype draws one affordance, so this is one affordance
-  that answers both inputs rather than a grip plus a visible chevron rocker.
+  THE HANDLE DRAGS, a handle that does not reorder being a promise the surface does not keep. The
+  grip is ALSO a real BUTTON that moves its row with the arrow keys, HTML5 drag-and-drop having
+  no keyboard path: one affordance answers both inputs.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
@@ -38,9 +20,8 @@
   let {
     tiers = [],
     defaultDc = 0,
-    // Whether the DC a tier carries anchors the OUTCOME BANDS (routed, relative) or simply
-    // replaces the base DC (simple). One card, two true sentences; a single sentence would
-    // be wrong on one of the two screens that render it.
+    // Whether a tier's DC anchors the OUTCOME BANDS or simply replaces the base DC. One card,
+    // two true sentences; one sentence would be wrong on one of the two screens.
     anchorsBands = false,
     onChange = () => {},
   } = $props();
@@ -57,8 +38,8 @@
 
   const list = $derived(Array.isArray(tiers) ? tiers : []);
 
-  // Named once: the row's micro label, the stepper's accessible name, and the `{label}` slot
-  // in the shared `Decrease {label}` / `Increase {label}` adjunct strings all read it.
+  // Named once: the row's micro label, the stepper's accessible name and the shared adjunct
+  // strings' `{label}` slot all read it.
   const dcLabel = $derived(text('FABRICATE.Admin.Manager.Checks.Crafting.TierDc', 'DC'));
 
   function addTier() {
@@ -73,10 +54,8 @@
     onChange(list.filter((tier) => tier.id !== id));
   }
 
-  // ── Reordering ────────────────────────────────────────────────────────────────────
-  //
-  // `dragIndex` is the row under the pointer, and it is `$state` rather than a plain local
-  // because the row it names paints itself as travelling.
+  // `dragIndex` is the row under the pointer, `$state` because the row it names paints itself
+  // as travelling.
   let dragIndex = $state(-1);
 
   /** Move one row, clamped. A move to where it already is emits nothing. */
@@ -103,8 +82,7 @@
 </script>
 
 <!-- The title and its description STACK, which is what the wrapping element is for: the head
-     is a flex row, and the routed editor's inline variant (`is-inline`) is the exception
-     rather than the default. Without it the description sets beside the title. -->
+     is a flex row, and the routed editor's `is-inline` variant is the exception. -->
 <div class="manager-checks-card-head">
   <div>
     <h3 class="manager-checks-card-title">
@@ -142,9 +120,9 @@
       )}
     >
       {#each list as tier, index (tier.id)}
-        <!-- The ROW is the drag source and the drop target; the grip is the handle a
-             pointer grabs it by. `ondragover` must preventDefault or the drop never
-             fires — that is the HTML5 contract, not a workaround. -->
+        <!-- The ROW is the drag source and the drop target; the grip is the handle a pointer grabs
+             it by. `ondragover` must preventDefault or the drop never fires — the HTML5 contract,
+             not a workaround. -->
         <div
           class={`manager-checks-tier-row ${dragIndex === index ? 'is-dragging' : ''}`}
           role="listitem"
@@ -181,19 +159,14 @@
             value={tier.name || ''}
             oninput={(event) => updateTier(tier.id, { name: event.currentTarget.value })}
           />
-          <!-- The prototype labels the number in the ROW rather than in a column header, so
-               the label goes where the header was and the row stays self-describing with no
-               header row above it. It is `aria-hidden` because the stepper already carries
-               the same word as its own accessible name; announcing it twice would be worse
-               than not announcing it here at all. -->
+          <!-- The number is labelled in the ROW rather than in a column header, so the row stays
+               self-describing with no header row above it. `aria-hidden`, because the stepper already
+               carries the same word as its own accessible name. -->
           <span class="manager-checks-tier-unit" aria-hidden="true">{dcLabel}</span>
-          <!-- `fill`, so the stepper takes the row's pinned track and its 28px height rather
-               than sitting in it as a narrower inline island. No `allowUnset`: a tier's DC
-               has no absent state — 0 is a real DC — and the `data-*` hook rides
-               `inputProps` onto the real `<input>`.
-
-               `min={0}`: 0 is a real DC but -1 is not, and a tier's DC starts at 0, so
-               without the clamp one click of the live `−` adjunct commits a negative DC. -->
+          <!-- `fill`, so the stepper takes the row's pinned track and height rather than sitting in it
+               as a narrower inline island. No `allowUnset`: a tier's DC has no absent state, 0 being a
+               real DC, and the `data-*` hook rides `inputProps` onto the real `<input>`. `min={0}`
+               because -1 is not a DC, and without the clamp one click of the `−` adjunct commits one. -->
           <div class="manager-checks-tier-stepper is-narrow">
             <Stepper
               fill

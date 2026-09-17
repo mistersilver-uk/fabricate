@@ -1,26 +1,20 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
 
-  // CORE-FALLBACK ONLY (issue 1213). This strip is the preview's own navigation and nothing
-  // else: a registered provider's tabs are the Manager rail's Downtime sub-items, so provider
-  // mode renders no strip at all. That is why there is no `coreFallback` prop any more, why
-  // every label goes through `localize` — Core's four are lang keys, a provider's labels are
-  // final display text this component never sees — and why the padlocks are unconditional.
+  // CORE-FALLBACK ONLY: a registered provider's tabs are the rail's Downtime sub-items, so provider
+  // mode renders no strip. Hence no `coreFallback` prop, unconditional `localize` (Core's four are
+  // lang keys; a provider's final text never reaches here) and unconditional padlocks.
   let { tabs = [], activeTabId = 'tracking', onSelect = () => {} } = $props();
 
-  // The roving `tabindex` needs a tab stop that always EXISTS. Binding it to `activeTabId`
-  // alone makes EVERY button `-1` whenever that id names no rendered tab, which takes the
-  // whole strip out of the Tab order. `aria-selected` deliberately STAYS bound to
-  // `activeTabId`: the APG's fallback governs which button is the tab stop, never which tab
-  // reports as selected, and announcing a selection the panel does not show would be worse.
+  // The roving `tabindex` needs a tab stop that always EXISTS: bound to `activeTabId` alone every
+  // button goes `-1` when that id names no rendered tab. `aria-selected` STAYS bound to it, because
+  // the APG's fallback governs the tab stop, never which tab reports as selected.
   const focusableTabId = $derived(
     tabs.some((tab) => tab.id === activeTabId) ? activeTabId : (tabs[0]?.id ?? null)
   );
 
-  // Which tab's tooltip is showing. The tooltips are emitted OUTSIDE the tablist (see the
-  // note there), so `:focus-within` on a shared wrapper can no longer drive them and the
-  // association is carried explicitly. Unlike the player rail's visually-hidden tooltips,
-  // these are visible on hover and focus, so the parenting fix could not be markup-only here.
+  // Which tab's tooltip is showing. They are emitted OUTSIDE the tablist, so `:focus-within` on a
+  // shared wrapper cannot drive them and the association is carried explicitly.
   let describedTabId = $state(null);
 
   function describe(tabId) {
@@ -96,18 +90,12 @@
     {/each}
   </div>
 
-  <!-- The `aria-describedby` targets, emitted as SIBLINGS of the tablist rather than inside
-       it. A `tablist`'s only permitted owned role is `tab`, so a `tooltip` child is unallowed
-       content that axe-core's `aria-required-children` reports, and a screen reader deriving
-       "tab N of M" from the owned children can count the extra nodes. Nothing is lost by
-       moving them: an IDREF resolves document-wide, not within the referring element's
-       subtree, so each button's declared association is unchanged.
-
-       Position is unchanged too — these were ALREADY laid out against the card, which is the
-       `position: relative` ancestor, not against the tab they belong to. What the move does
-       break is `:focus-within` on the old per-tab wrapper, because these tooltips are VISIBLE
-       on hover and focus rather than visually hidden like the player rail's. That association
-       is now carried explicitly by `describedTabId`. -->
+  <!-- The `aria-describedby` targets, emitted as SIBLINGS of the tablist: a `tablist`'s only
+       permitted owned role is `tab`, so a `tooltip` child is unallowed content that
+       `aria-required-children` reports and a "tab N of M" count can include. An IDREF resolves
+       document-wide, so each button's declared association is unchanged, and position is unchanged
+       too — these were already laid out against the card. Only `:focus-within` on the old per-tab
+       wrapper breaks, which `describedTabId` now carries explicitly. -->
   {#each tabs as tab (tab.id)}
     <span
       id={`world-downtime-tooltip-${tab.id}`}
@@ -120,17 +108,10 @@
 </div>
 
 <style>
-  /* The host states no inset of its own, so each of its rows carries its own — see the note
-     in `WorldDowntimeExtensionHost`. This card is the preview's LAST row and needs a bottom
-     gutter.
-
-     `position: relative` makes the CARD the tooltip's containing block rather than the tab
-     it belongs to, which is what bounds a tooltip to the pane. See the tooltip note below.
-
-     The connected-studio card is a ROW: identity on the left, the tab strip at the right end,
-     both centred against each other. It reads completely differently as a column — every
-     padding, radius and colour can match while the card says something else — which is why
-     the parity spec measures `display`/`flex-direction`/`align-items` here at all. */
+  /* The host states no inset, so each row carries its own; this card is the LAST row and needs a
+     bottom gutter. `position: relative` makes the CARD the tooltip's containing block rather than
+     the tab, which is what bounds a tooltip to the pane. The card is a ROW — identity left, strip
+     at the right end — which is why the parity spec measures `display`/`flex-direction` here. */
   .downtime-tab-card {
     position: relative;
     display: flex;
@@ -147,9 +128,8 @@
     background: var(--fab-bg-2);
   }
 
-  /* `1 1 240px` rather than `1`: it is what carries the strip onto its own line when the
-     card runs out of room, which is the narrow fallback the design's fixed canvas never
-     needed and an ApplicationV2 window does. */
+  /* `1 1 240px` rather than `1`: it carries the strip onto its own line when the card runs out of
+     room, the narrow fallback a fixed canvas never needed and an ApplicationV2 window does. */
   .downtime-connected-studio {
     display: flex;
     min-width: 0;
@@ -183,8 +163,7 @@
     color: var(--fab-accent);
   }
 
-  /* No `justify-content`: the identity block beside it takes `flex: 1`, which is what puts
-     the strip at the card's right end the way the design draws it. */
+  /* No `justify-content`: the identity block's `flex: 1` is what puts the strip at the right end. */
   .downtime-tabs {
     display: flex;
     flex-wrap: wrap;
@@ -220,11 +199,9 @@
   }
 
   /*
-    Lock colour tracks CURRENCY, not lockedness: the design paints the current tab's padlock
-    with the accent and drops the other three to subtle, so a locked idle tab stops shouting
-    as loudly as the selected one. This padlock is deliberately self-coloured — it is one of
-    the twelve glyphs the design colours on the `<i>` — so it does NOT follow the button's
-    hover, which is why there is no hover rule here even though the label has one.
+    Lock colour tracks CURRENCY, not lockedness: the current tab's padlock takes the accent and the
+    rest drop to subtle. Self-coloured on the `<i>`, so it does NOT follow the button's hover —
+    which is why there is no hover rule here even though the label has one.
   */
   .downtime-tab-lock {
     font-size: 7px;
@@ -236,16 +213,10 @@
   }
 
   /*
-    THE TOOLTIP IS BOUNDED BY THE CARD, not centred on its own tab.
-
-    A tab-centred tooltip overhangs its tab by half its own width, and the design puts this
-    strip at the card's RIGHT end — so the last tab's tooltip hung past the pane and the View
-    Lab's own layout assertion failed the whole route with `[data-world-downtime-host]
-    overflows horizontally`. Anchoring to the card's right edge with `max-width: 100%` makes
-    overflow unrepresentable rather than merely unlikely at the width somebody measured.
-
-    It sits ABOVE the card: this strip only ever renders in Core's fallback, where the card is
-    the pane's last row.
+    THE TOOLTIP IS BOUNDED BY THE CARD, not centred on its own tab: a tab-centred tooltip overhangs
+    by half its width, and the strip sits at the card's RIGHT end, so the last tab's tooltip hung
+    past the pane and failed the View Lab's layout assertion. Anchoring to the card's right edge
+    with `max-width: 100%` makes overflow unrepresentable. It sits ABOVE the card, the pane's last row.
   */
   .downtime-tab-tooltip {
     position: absolute;

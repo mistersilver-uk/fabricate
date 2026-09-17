@@ -1,15 +1,10 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  Ingredient-sets section for a single recipe scope (recipe-level for single-step
-  recipes, or one step for multi-step). Renders the list of sets via
-  RecipeIngredientSetCard and owns the set-level add/remove, forwarding every edit
-  upward as a whole replacement array via `onChange(nextSets)`. The parent maps
-  that to the scope patch (`{ ingredientSets: nextSets }`), and the store
-  normalizes through `Recipe.fromJSON` (assigning ids to new sets/groups). So new
-  sets/groups/options are appended id-less; nothing here hand-assigns ids.
-
-  `idPrefix` namespaces the `data-recipe-section` marker so single-step vs.
-  per-step instances are distinguishable in tests.
+  Ingredient-sets section for a single recipe scope (the recipe, or one step). It owns the
+  set-level add/remove and forwards every edit upward as a whole replacement array via
+  `onChange(nextSets)`; the store normalizes through `Recipe.fromJSON`, so new sets, groups and
+  options are appended id-less and nothing here hand-assigns an id. `idPrefix` namespaces the
+  `data-recipe-section` marker per instance.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
@@ -22,17 +17,13 @@
     essenceOptions = [],
     itemTags = [],
     currencyUnits = [],
-    // Whether the system's currency feature is enabled. Gates the "Add cost" affordances
-    // and the read-only rendering of existing currency requirements; forwarded to every
-    // set card, or it silently drops to its default.
+    // Whether the system's currency feature is enabled, gating the "Add cost" affordances and
+    // the read-only rendering of existing currency requirements. Forwarded to every set card.
     currencyEnabled = true,
     showSetName = true,
-    // Whether this system's mode allows more than one ingredient set (i.e. NOT
-    // simple/progressive, which are structurally 1×1, and NOT alchemy, which forces
-    // a single set). Gates the "Add ingredient set" affordance in the single-set
-    // (chromeless) view — the ONLY promotion path to a multi-set recipe now that the
-    // Simple/Complex toggle is gone (issue 643). Complexity itself is EMERGENT from
-    // the set count, never a stored toggle.
+    // Whether this system's mode allows more than one ingredient set — not simple/progressive,
+    // which are structurally 1×1, and not alchemy, which forces one. It gates the "Add ingredient
+    // set" affordance, the ONLY promotion path to a multi-set recipe.
     canAddSet = false,
     onChange = () => {},
     idPrefix = '',
@@ -43,36 +34,30 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  // Generate an id eagerly at add time (rather than at save normalization) so a
-  // new set is immediately routable in the Results tab.
+  // An id eagerly at add time, so a new set is immediately routable in the Results tab.
   function newId() {
     const random = globalThis.foundry?.utils?.randomID;
     return typeof random === 'function' ? random() : Math.random().toString(36).slice(2, 12);
   }
 
-  // The default display name for an unnamed set ("Set 1", "Set 2", …) — shown in
-  // the editable name field (so usable unnamed sets are not hidden behind a
-  // placeholder) and read-only in check mode.
+  // The default display name for an unnamed set, in the editable field so an unnamed set is
+  // not hidden behind a placeholder, and read-only in check mode.
   function defaultSetName(index) {
     return `${text('FABRICATE.Admin.Manager.Recipe.SetLabel', 'Set')} ${index + 1}`;
   }
 
   const sets = $derived(Array.isArray(ingredientSets) ? ingredientSets : []);
 
-  // Rendering complexity is EMERGENT from structure (issue 643): a recipe renders as
-  // multi-set ONLY when it holds more than one set. A single set (or none yet) renders
-  // CHROMELESS — its requirements sit directly on the tab background with no "Set 1"
-  // bounding box. There is no stored Simple/Complex flag driving this any more.
+  // Rendering complexity is EMERGENT from structure, with no stored Simple/Complex flag: a
+  // single set (or none yet) renders CHROMELESS, its requirements on the tab background.
   const effectiveComplex = $derived(sets.length > 1);
 
-  // Simple mode shows exactly one chromeless set bound to the first set. If none
-  // exists yet, synthesize an empty placeholder for editing; the first edit writes
-  // the whole single-element array back so the scope materializes a real set.
+  // Simple mode binds one chromeless set to the first, synthesizing an empty one when absent;
+  // the first edit writes the single-element array back and materializes a real set.
   const simpleSet = $derived(sets[0] || { ingredientGroups: [] });
 
-  // Materialize the single Simple set with a stable id (eager, like addSet), so it
-  // is immediately routable in the Results tab. Spread the existing set so its
-  // id/unknown fields survive; only mint a fresh id when none exists yet.
+  // Materialize the single Simple set with an eager id so it is immediately routable, spreading
+  // the existing set so its id and unknown fields survive.
   function updateSimpleSet(nextSet) {
     const base = sets[0] || {};
     onChange([{ ...base, ...nextSet, id: base.id || nextSet?.id || newId() }]);
@@ -90,13 +75,10 @@
     onChange(sets.filter((_, i) => i !== index));
   }
 
-  // Duplicate a set to speed up routed-by-ingredient recipes where alternatives
-  // differ by only a requirement or two. Deep-clone via JSON so the copy shares no
-  // references with the original, then re-mint the set + group ids (groups carry
-  // ids; options do not). The routing assignment that ties a set to a result group
-  // (`resultGroupId`/`resultMapping`) is dropped so the copy starts unassigned —
-  // it is meant to be edited and re-routed, not to silently share the original's
-  // output. The copy is inserted right after the original so it reads as related.
+  // Duplicate a set, for routed-by-ingredient recipes whose alternatives differ by a requirement
+  // or two. Deep-cloned so the copy shares no reference, with the set and group ids re-minted and
+  // the routing assignment DROPPED, so the copy starts unassigned rather than silently sharing
+  // the original's output. It is inserted right after the original so it reads as related.
   function duplicateSet(index) {
     const source = sets[index];
     if (!source) return;
@@ -116,10 +98,8 @@
 
 <section class="manager-recipe-ingredients-section" data-recipe-section={`${idPrefix}ingredients`}>
   {#if !effectiveComplex}
-    <!-- A single ingredient set (or none authored yet) renders CHROMELESS: the
-         requirements sit directly on the tab background with no "Set 1" box. The
-         "Add ingredient set" button below is the only way to promote to a multi-set
-         recipe, so it shows only where the mode allows more than one set. -->
+    <!-- A single set, or none yet, renders CHROMELESS. The "Add ingredient set" button below
+         is the only promotion path, so it shows only where the mode allows more than one. -->
     <div class="manager-recipe-ingredient-set-simple">
       <RecipeIngredientSetCard
         set={simpleSet}

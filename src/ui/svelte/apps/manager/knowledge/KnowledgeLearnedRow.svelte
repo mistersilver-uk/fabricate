@@ -1,39 +1,16 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  One recipe the selected character has learned (issue 785). Learned entries are
-  INDEPENDENT of currently-owned copies — the two lists are never coupled — so a
-  row can name a source copy that no longer exists.
+  One recipe the selected character has learned. Learned entries are INDEPENDENT of currently-owned
+  copies, so a row can name a source copy that no longer exists; the source line resolves through
+  `knowledgeStudio.learnedRecipeSource`'s ladder. `sourceLineParts` carries ONE arm per kind, which
+  is correctness, not style: on the "Learned from {source}" default a labelled grant would assert a
+  book that does not exist and a label-less one would trail off after "Learned from ".
 
-  The source line resolves through the projection's ladder: a still-owned copy's
-  name, else the member recipe-item DEFINITION name (the rung that satisfies the
-  survives-source-deletion requirement), else the trailing uuid segment, else — for a
-  null source — a GM grant (with or without a label) or "Learned by crafting" for the
-  auto-learn entries `learnRecipeOnCraft` writes.
+  The label is UNTRUSTED — `learnedRecipes` is a public flag — so it renders as its own text node
+  BETWEEN the translated fragments. `String.prototype.replace` and Foundry's `Localization#format`
+  both interpret `$&`, `` $` `` and `$'` in the REPLACEMENT, letting foreign text decide what the GM's
+  audit line says; splitting on the placeholder cannot, and Svelte escapes each fragment.
 
-  `sourceLineParts` carries ONE arm per kind, and that is a correctness rule rather
-  than a style: with the granted kinds falling to the "Learned from {source}" default
-  a labelled grant would read "Learned from <label>", asserting a book that does not
-  exist, and a label-less grant would read "Learned from " with nothing after it.
-
-  The label is UNTRUSTED — the `learnedRecipes` flag is public, so any module can
-  write `grantedBy` — and it is therefore rendered as its own text node between the
-  translated fragments, never substituted into them. `String.prototype.replace` and
-  Foundry's `Localization#format` both interpret `$&`, `` $` `` and `$'` IN THE
-  REPLACEMENT, so a label of `` $` `` renders the prefix twice and `$'` renders
-  nothing: foreign text deciding what the GM's audit line says. Splitting on the
-  placeholder cannot do that, and Svelte escapes each fragment.
-
-  When the erase frees no budget, the reason is a trailing clause on that SAME line
-  rather than a second sub-label. The old pair stated one fact twice — the source
-  line's "(copy no longer owned)" was itself the cause of a separate "Frees no slot".
-  The clause stays cause-specific because the three causes are not interchangeable:
-  `_freeLearnBudgetForEntry` frees budget only when the source copy is still owned
-  AND its definition carries a learn cap, so a row can be refund-less while its copy
-  is present, and claiming "no owned copy" there would be false.
-
-  Props:
-   - learned: a projected row from `knowledgeStudio.projectLearnedRecipeRow`.
-   - armedToken, onErase(recipeId), onArm(token), onDisarm(token).
+  Props: learned (a projected row), armedToken, onErase(recipeId), onArm(token), onDisarm(token).
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
@@ -49,9 +26,8 @@
     NO_REFUND_NO_SOURCE,
     NO_REFUND_UNCAPPED,
   } from './knowledgeStudio.js';
-  // The two granted keys are declared beside the contract that produces the entries
-  // they describe, not restated here: `lang/en.json`'s orphan gate needs one `src/**`
-  // reference and a second copy of the strings would be a mirror with no guard.
+  // Declared beside the contract that produces the entries, not restated: the orphan gate needs one
+  // `src/**` reference, and a second copy would be a mirror with no guard.
   import { GRANTED_SOURCE_MESSAGE_KEYS } from '../../../../../systems/companionContract.js';
 
   let {
@@ -63,8 +39,7 @@
   } = $props();
 
   const eraseToken = $derived(`erase:${learned?.recipeId || ''}`);
-  // Split ONCE per row rather than in the markup: `{@const}` is only legal as a
-  // block's immediate child, and the fragments are read three times.
+  // Split ONCE per row: `{@const}` is legal only as a block's child, and these are read three times.
   const sourceParts = $derived(learned ? sourceLineParts(learned) : whole(''));
 
   function text(key, fallback) {
@@ -72,10 +47,8 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  // `split`/`join`, never `String.prototype.replace`: `replace` interprets `$&`,
-  // `` $` ``, `$'` and `$1` in the REPLACEMENT, so a value containing one of them
-  // rewrites the sentence instead of appearing in it. Nothing here interprets a
-  // pattern, so a `$` is just a `$`.
+  // `split`/`join`, never `replace`, which interprets `$&`, `` $` ``, `$'` and `$1` in the
+  // REPLACEMENT — a value carrying one would rewrite the sentence instead of appearing in it.
   function fill(value, data) {
     return Object.entries(data).reduce(
       (result, [name, replacement]) => result.split(`{${name}}`).join(String(replacement)),
@@ -83,10 +56,8 @@
     );
   }
 
-  // A translated sentence split around its one placeholder, so the caller can render
-  // the value as its OWN text node instead of substituting it into the sentence. A
-  // translation that drops the placeholder yields an empty `after` and the value is
-  // omitted rather than appended somewhere the translator did not put it.
+  // A sentence split around its one placeholder, so the value renders as its OWN text node. A
+  // translation dropping the placeholder yields an empty `after` and the value is omitted.
   function around(template, placeholder, value) {
     const [before, ...rest] = template.split(placeholder);
     const after = rest.join(placeholder);
@@ -98,8 +69,7 @@
     return { before: line, value: '', after: '' };
   }
 
-  // ONE arm per kind. The `LearnedFrom` default is the arm for the three uuid-bearing
-  // rungs ONLY — see the header for what it renders when a granted kind reaches it.
+  // ONE arm per kind; the `LearnedFrom` default serves the three uuid-bearing rungs ONLY.
   function sourceLineParts(row) {
     if (row.sourceKind === LEARNED_SOURCE_AUTO_LEARN) {
       return whole(
@@ -123,12 +93,9 @@
     );
   }
 
-  // The meta icon is derived from the SAME kind the line is, because a book glyph
-  // beside a line whose whole point is that no book was involved contradicts the line
-  // it decorates — and "grant" against "crafting" would otherwise be the only
-  // difference between the two, at muted 0.62rem. `fa-hand-holding` is a Font Awesome
-  // FREE name and is deliberately not an award, medal or trophy: the contract chose
-  // COMPANION over AWARDS, and a reward glyph would re-narrow the grant to one caller.
+  // Derived from the SAME kind the line is: a book glyph beside a line whose point is that no book
+  // was involved contradicts what it decorates. `fa-hand-holding` is a Font Awesome FREE name and
+  // deliberately not an award or trophy, which would re-narrow the grant to one caller.
   function sourceIcon(row) {
     const granted =
       row.sourceKind === LEARNED_SOURCE_GRANTED ||
@@ -136,14 +103,9 @@
     return granted ? 'fas fa-hand-holding' : 'fas fa-book';
   }
 
-  // The refund clause is appended to the source line rather than rendered as its own
-  // sub-label, because the old pair restated one fact twice: "(copy no longer owned)"
-  // WAS the cause of "Frees no slot".
-  //
-  // It stays cause-specific rather than collapsing to one string. Under
-  // `NO_REFUND_UNCAPPED` the source copy is still owned — the row above names it — so
-  // "no owned copy to refund" would be false there; the reason is that the book carries
-  // no learn limit at all. Keys are static literals so the lang gates see every leaf.
+  // Appended to the source line rather than a second sub-label, and cause-specific rather than one
+  // string: under `NO_REFUND_UNCAPPED` the copy is still owned, so "no owned copy to refund" would
+  // be false. Keys are static literals so the lang gates see every leaf.
   function refundClause(row) {
     if (row.noRefundReason === NO_REFUND_NOT_OWNED) {
       return text('FABRICATE.Admin.Manager.Knowledge.NoRefundNotOwned', 'no owned copy to refund');

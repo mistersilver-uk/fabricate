@@ -1,26 +1,17 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  Shared progressive award-mode selector. Progressive resolution spends the check
-  value against each result's difficulty, in order; the award mode decides how the
-  spend stops:
-    - equal:   award each result while the value covers its full difficulty.
-    - partial: like equal, but the first result the value can't fully cover is
-               still awarded, then awarding stops.
-    - exceed:  award each result only while the value strictly exceeds its difficulty.
-  Consumed by ResolutionModeService's progressive branch. Used by the crafting,
-  salvage, and gathering progressive check editors so the vocabulary stays one.
-
-  Controlled: renders `value` (the award mode) and emits the next mode via onChange.
-  Rendered through the shared `RadioCardGroup` primitive (issue 855) so the three
-  modes read as the same icon-tile radio cards as every other manager choice.
+  Shared progressive award-mode selector. Progressive resolution spends the check value against
+  each result's difficulty in order: `equal` awards each result the value covers in full,
+  `partial` also awards the first it cannot, and `exceed` requires the value to clear each
+  difficulty. Used by all three progressive check editors, so the vocabulary stays one, and
+  controlled through the shared `RadioCardGroup` primitive.
 -->
 <script>
   import RadioCardGroup from '../../../components/RadioCardGroup.svelte';
 
   let { value = 'equal', name = 'progressive-award-mode', onChange = () => {} } = $props();
 
-  // The icons are the comparison each mode makes against a result's difficulty:
-  // equal spends up to it, partial overshoots into one result, exceed must clear it.
+  // The icons are the comparison each mode makes against a result's difficulty.
   const OPTIONS = [
     {
       value: 'equal',
