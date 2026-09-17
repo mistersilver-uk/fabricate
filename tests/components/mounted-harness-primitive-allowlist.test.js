@@ -376,8 +376,8 @@ const QUOTED = /'([\w./@-]+)'/g;
  * reads a component's source to assert on its text — `component-identity-strip-mounted`
  * does exactly this for `ComponentEditView.svelte` — mentions the path without compiling
  * anything, and treating that as a compile made the guard demand primitives the suite can
- * never render. The mirror image is just as wrong: `manager-mounted` registers the shared
- * leaves by BARE NAME through `sharedComponentNames` and interpolates them into a template,
+ * never render. The mirror image is just as wrong: `manager-mounted` used to register the shared
+ * leaves by BARE NAME and interpolate them into a template (it derives its tree since issue 1669),
  * so a path-only match saw those as uncompiled. Between them, those two false readings are
  * why `Stepper` was excluded from the allowlist and why the issue 772 primitives could not
  * be added at all.
@@ -515,6 +515,11 @@ test('every hand-rolled mount harness names the shared primitives its tree rende
     const suite = readRepoFile(suitePath);
     // A suite that compiles nothing cannot hang on a missing component. Matched as a CALL, so a
     // suite that only names the helper in prose is not read as compiling anything.
+    //
+    // `manager-mounted` left this population at issue 1669 and that is a narrowing rather than a
+    // gap: it DERIVES its tree from the root's import closure, so it has no list to omit from,
+    // and `assertCompiledSvelteClosure` in `tests/helpers/manager/managerCompile.js` re-walks the
+    // graph in its `before` hook and throws by name if the two ever disagree.
     if (!suite.includes('writeCompiledSvelte(') && !suite.includes('compiledModules')) continue;
 
     const compiled = new Set(compiledPathsOf(suite));

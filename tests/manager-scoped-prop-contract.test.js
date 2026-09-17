@@ -30,11 +30,12 @@
  *
  * ── CLAUSE (d) IS A DESIGN CONSTRAINT, NOT A HANG DETECTOR ──────────────────────────────
  *
- * `tests/components/manager-mounted.test.js` copies plain `.js` dependencies verbatim from a
- * hand-written array with no validator, and its `.svelte` closure walk follows `.svelte`
- * specifiers only. A missing raw module there is LOUD rather than silent — the suite dies in
- * its `before` hook with `ERR_MODULE_NOT_FOUND` naming the module — so this clause is not
- * there to convert a hang into a failure. It is there because "the root gains no import" is
+ * `tests/components/manager-mounted.test.js` DERIVES the plain `.js` dependencies it copies from
+ * the root's own import closure (issue 1669, `tests/helpers/manager/managerCompile.js`), so a raw
+ * module the root gains cannot go missing there at all; before that it copied them from a hand
+ * list, and an omission died loudly in `before` with `ERR_MODULE_NOT_FOUND`. Either way this
+ * clause is not there to convert a hang into a failure. It is there because "the root gains no
+ * import" is
  * the design constraint that keeps this change a wiring change: the seam is three `$derived`
  * bundles over state the shell already holds, and the moment it needs a new module it has
  * become something else.
