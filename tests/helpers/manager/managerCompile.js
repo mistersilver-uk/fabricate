@@ -25,6 +25,16 @@ export const MANAGER_ROOT = 'src/ui/svelte/apps/manager/CraftingSystemManagerRoo
  * The specifier may hold no whitespace and comments are blanked before matching, because prose in
  * this tree spells import-shaped sentences: unguarded, one of them resolved to a five-line path.
  */
+/**
+ * Order the closure deterministically. `sort()` with no comparator coerces to string and compares
+ * UTF-16 units, which is what these paths want, but leaving it implicit reads as an oversight and
+ * trips the bug rule that cannot tell a string array from a numeric one.
+ */
+function comparePaths(a, b) {
+  if (a < b) return -1;
+  return a > b ? 1 : 0;
+}
+
 const RELATIVE_SPECIFIER = /(?:\bfrom|\bimport)\s*\(?\s*['"](\.[^'"\s]+)['"]/g;
 
 /**
@@ -71,7 +81,9 @@ export function deriveManagerModuleClosure(rootPath = MANAGER_ROOT) {
         'broken, so the tree it would compile cannot be trusted'
     );
   }
-  return { components: components.sort(), modules: modules.sort() };
+  components.sort(comparePaths);
+  modules.sort(comparePaths);
+  return { components, modules };
 }
 
 /** Compile one component into the temp tree, recording that it was written. */
