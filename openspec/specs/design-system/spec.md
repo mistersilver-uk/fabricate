@@ -1116,11 +1116,17 @@ The any-of / all-of control is RIGHT-ALIGNED with the row’s quantity rather th
 A unit renders to the RIGHT of the stepper it qualifies and never beneath the value’s name.
 A unit is a property of the amount, not of the thing: `currency` has one, and an `essence` amount is a bare number with no unit at all.
 
-A RESULT amount is either a fixed positive integer or a ROLLED expression, and the row toggles between the two in place.
+An AMOUNT on either side of a recipe is either a fixed positive integer or a ROLLED expression, and the row toggles between the two in place.
+The fixed-or-rolled control is a property of the ROW and not of the side it sits on.
+A craft that consumes a variable quantity is as authorable as one that produces one — a forge that eats `1d4` charcoal, a harvest that yields `2d6` — and a row offering the toggle on one side only would be two rows wearing one name, which is the drift this primitive exists to end.
+The shipped result side offers it today and the shipped ingredient side does not; closing that is a migration rather than a second control.
 Authoring has no previewed actor, so the rolled form shows NO resolved value: a number there would be fiction.
 The same expression control resolves against an actor wherever a real one is in scope, such as a player-side preview, and the presence of a resolved value is therefore a property of the surface rather than of the control.
 The rolled form is the shared expression control: dice plus optional actor data paths.
 The toggle selects which control occupies the quantity slot and MUST NOT be modelled as a third kind of quantity, so the amount keeps one meaning and one position in the row.
+Where a rolled amount resolves is a property of the SIDE: an ingredient amount resolves before the craft, because what it resolves to is what the crafter must hold, and a result amount resolves when the craft is awarded.
+Both resolve once per craft and neither is re-rolled while it is being read.
+The persisted shape of an amount is out of scope for this capability and is specified by the data model.
 
 A row with a kind but no value MUST render the catalogue search IN PLACE OF the subject cell, and that search is the only element in the row permitted to stretch, because it is the one thing the row is waiting for.
 The lead chip stays untinted until a value resolves, and the quantity and convert controls remain live so a GM can set an amount before choosing the thing.
@@ -1153,6 +1159,12 @@ Naming the adders after the kinds would state the menu's own list twice.
 - **WHEN** a GM adds a second tag to a tag row
 - **THEN** the row renders both as removable chips followed by the adder
 - **AND** the any-of / all-of control appears, having been absent while one tag was held
+
+#### Scenario: An ingredient is consumed in a variable quantity
+
+- **WHEN** a GM sets an ingredient row amount to rolled
+- **THEN** the row renders the shared expression control in its quantity slot
+- **AND** it shows no resolved value, exactly as a result amount does
 
 #### Scenario: A GM adds a requirement before choosing what it is
 
