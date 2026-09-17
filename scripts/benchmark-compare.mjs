@@ -1,38 +1,5 @@
 #!/usr/bin/env node
-/**
- * `npm run benchmark:compare` — diff two class-2 run records (issue 1071).
- *
- * ## It refuses more often than it reports, on purpose
- *
- * The tool REFUSES to diff two runs whose `nodeVersion`, `cpuModel` or `arch` differ, and says
- * which. A cross-machine millisecond ratio is not a weak number, it is a wrong one, and once
- * printed it gets pasted into an issue where nobody can see where it came from. Refusing is the
- * only behaviour that cannot mislead.
- *
- * ## What it prints
- *
- * A median RATIO with an IQR band, never absolute milliseconds. `> 1.00` is slower. A band
- * straddling 1.0 means the two runs did not separate and the honest reading is "no measured
- * difference", which the output says in those words rather than leaving a 3% ratio to be
- * over-read.
- *
- * ## The A/B procedure this consumes
- *
- * Same machine, alternating, at least 5 reps each:
- *
- *   git worktree add ../base origin/main && (cd ../base && npm ci)
- *   for i in 1 2 3; do
- *     (cd ../base && npm run benchmark:performance -- --reps=5)
- *     npm run benchmark:performance -- --reps=5
- *   done
- *   npm run benchmark:compare -- ../base/.benchmarks/runs/<base>.json .benchmarks/runs/<cand>.json
- *
- * Interleaving the two checkouts is what keeps a background process or a thermal ramp from
- * landing entirely on one side.
- *
- * Usage:
- *   npm run benchmark:compare -- <baseline-run.json> <candidate-run.json>
- */
+/** `npm run benchmark:compare` — diff two class-2 run records (issue 1071). */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -47,13 +14,7 @@ function readRunRecord(path) {
   return record;
 }
 
-/**
- * Every `<profile>/<caseId>` pair present in BOTH records, plus the ones present in only one.
- *
- * @param {object} baseline
- * @param {object} candidate
- * @returns {{shared: string[][], baselineOnly: string[], candidateOnly: string[]}}
- */
+/** Every `<profile>/<caseId>` pair present in both records, plus the ones present in only one. */
 function alignCases(baseline, candidate) {
   const flatten = (record) => {
     const map = new Map();

@@ -1,32 +1,12 @@
 /**
- * foundry-test-run.mjs
+ * Playwright smoke test that verifies Fabricate loads correctly in a live Foundry VTT instance and
+ * exercises core crafting flows, from the setup page through world launch, fixture seeding, the
+ * captured manager and crafting walks, and the terminal console-error check.
  *
- * Playwright smoke test that verifies Fabricate loads correctly in a live
- * Foundry VTT instance and exercises core crafting flows:
- *
- *   1. Opens the Foundry setup page.
- *   2. Accepts the first-run license page if shown.
- *   3. Logs in as admin.
- *   4. Launches the fabricate-smoke-ci world.
- *   5. Confirms the Fabricate module is active (game.modules check via console).
- *   6. Creates test actors and items with inventories.
- *   7. Creates a crafting system with components and recipes.
- *   8. Screenshots the Recipe Manager (systems, items, recipes tabs).
- *   9. Opens the Crafting App and verifies recipes are listed.
- *  10. Crafts a Healing Potion and verifies inventory changes.
- *  11. Fails if any runtime console errors were captured.
- *
- * Artifacts written to test-results/:
- *   summary.json          — machine-readable pass/fail + error list
- *   console.log           — full browser console output
- *   screenshot-*.png      — screenshots at key checkpoints
- *
- * Usage: node scripts/foundry-test-run.mjs
- *
- * Environment variables:
- *   FOUNDRY_ADMIN_KEY     — admin password (default: fabricate-test-admin)
- *   FOUNDRY_URL           — base URL (default: http://localhost:30100)
- *   FOUNDRY_SCREENSHOT_HEAD_SHA — optional exact-head override (defaults to git HEAD)
+ * Writes `test-results/summary.json` (machine-readable verdict and error list), `console.log` and
+ * `screenshot-*.png`. Run as `node scripts/foundry-test-run.mjs`; `FOUNDRY_ADMIN_KEY`,
+ * `FOUNDRY_URL` and `FOUNDRY_SCREENSHOT_HEAD_SHA` override the admin password, the base URL and
+ * the exact-head stamp.
  */
 
 import { chromium } from 'playwright';
@@ -62,9 +42,8 @@ import {
 } from './lib/foundryTourSuppression.js';
 import { deriveRunIdentity, reconcileFoundryEndpoint } from './lib/foundryRunIdentity.js';
 // The setup -> license -> auth -> launch -> join path lives in scripts/lib/foundryBrowserBoot.js so
-// the narrow V13 arm (scripts/foundry-version-assert.mjs) can boot a Foundry page WITHOUT importing
-// this file, which exports nothing and runs `main()` on import. Reporting is injected, so this
-// harness keeps recording its `results.steps[]` entries and screenshots exactly as before.
+// the narrow V13 arm (scripts/foundry-version-assert.mjs) can boot a Foundry page without importing
+// this file, which exports nothing and runs `main()` on import.
 import {
   acceptLicenseIfPresent as acceptLicenseIfPresentShared,
   authenticateIfRequired as authenticateIfRequiredShared,
@@ -73,9 +52,7 @@ import {
   joinWorldSession as joinWorldSessionShared,
   launchWorld as launchWorldShared
 } from './lib/foundryBrowserBoot.js';
-// The rail's (id, label) pairs (issue 1362). Both this harness and
-// `tests/foundry-manager-rail-hooks.test.js` read them from one place, so a relabel
-// cannot update the harness and leave the component behind, or the reverse.
+// The rail's (id, label) pairs (issue 1362).
 import {
   MANAGER_SYSTEM_RAIL_ENTRIES,
   MANAGER_WORLD_SCOPED_RAIL_ENTRIES,
@@ -85,13 +62,9 @@ import { isCanvasReadyForScene } from './lib/foundryCanvasReadiness.js';
 import { resolveSmokeProfile } from './lib/foundryRunBudget.js';
 import { resolveScreenshotHeadSha } from './ui-pr-screenshot-evidence.mjs';
 
-// A browser/page teardown at the very end of a long headless run (the Chromium being
-// killed while a final screenshot click is still in flight) can leave a FLOATING page
-// promise that rejects AFTER the run's verdict is already recorded in summary.json. Node's
-// default unhandled-rejection handling would then flip a PASSED smoke to exit 1 — a false
-// red that blocks the beta publish. The run already tolerates this class for its flaky last
-// (Journal) step; extend that tolerance to the process so a late teardown rejection is
-// swallowed. Any OTHER unhandled rejection still fails fast, as before.
+// A browser/page teardown at the very end of a long headless run (the Chromium being killed while a
+// final screenshot click is still in flight) can leave a floating page promise that rejects AFTER
+// the run's verdict is already recorded in summary.json.
 process.on('unhandledRejection', (reason) => {
   const message = reason instanceof Error ? reason.message : String(reason);
   if (isTransientPageTeardown(message)) {
@@ -106,11 +79,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
 const RESULTS_DIR = join(ROOT, 'test-results');
 
-// Self-derive the endpoint so a standalone `test:foundry:run` (invoked as its own process
-// after `test:foundry:up`) targets the SAME per-worktree port up bound, instead of the old
-// fixed :30100 (issue #827). No free-port scan here — up.mjs also uses identity.port
-// directly without scanning, so deriving it the same way keeps them in agreement. When the
-// parent pipeline set FOUNDRY_URL/FOUNDRY_HOST_PORT, those win by env inheritance.
+// Self-derive the endpoint so a standalone `test:foundry:run` (invoked as its own process after
+// `test:foundry:up`) targets the same per-worktree port up bound, instead of the old fixed :30100
+// (issue #827).
 const FOUNDRY_URL = reconcileFoundryEndpoint({
   url: process.env.FOUNDRY_URL,
   hostPort: process.env.FOUNDRY_HOST_PORT,
@@ -119,19 +90,7 @@ const FOUNDRY_URL = reconcileFoundryEndpoint({
 const ADMIN_KEY = process.env.FOUNDRY_ADMIN_KEY ?? 'fabricate-test-admin';
 const WORLD_ID = 'fabricate-smoke-ci';
 
-// Smoke profile selector. Four profiles:
-//   - `rc`   release-candidate happy path: real Foundry boot, fixture creation,
-//            one gathering success, craft a Healing Potion, console-error
-//            health. Minimal screenshot budget. Used by the CI workflow.
-//   - `ci`   alias for `rc`; kept for one release for back-compat.
-//   - `full` (default) every phase, full screenshot regen. Local + scheduled
-//            visual-regression workflow.
-//   - `screenshots` (issue #826) real-Foundry PR evidence, SCOPED: same rendering
-//            path and screenshot budget as `full`, but captures only the labels a
-//            PR's changed files affect (`FOUNDRY_SCREENSHOT_TARGET_LABELS`, fed from
-//            `mapChangedFilesToViews`) and skips a view-bearing phase whose labels are
-//            all off-target. It runs the SCREENSHOT phases but NOT the full-only
-//            behavioral assert phases — so `rc`/`ci`/`full` truth values are untouched.
+// Smoke profile selector. Four profiles.
 const RAW_SMOKE_PROFILE = String(process.env.FOUNDRY_SMOKE_PROFILE ?? 'full').toLowerCase();
 // `resolveSmokeProfile` replicates the exact normalization RAW_SMOKE_PROFILE feeds
 // (nullish-default `'full'`, lowercase, `'ci'` → `'rc'`); shared with the parent
@@ -141,12 +100,7 @@ const RUN_SCREENSHOT_PHASES = SMOKE_PROFILE === 'full' || SMOKE_PROFILE === 'scr
 const RUN_FULL_ONLY_BEHAVIORS = SMOKE_PROFILE === 'full';
 const RUN_FULL_ONLY_GATHERING_STATES = SMOKE_PROFILE === 'full';
 
-// The scoped `screenshots` profile target set (issue #826). A comma/whitespace-
-// separated list of smoke labels — exactly the `smokeLabels` of the views
-// `mapChangedFilesToViews(changedFiles)` returns — supplied via
-// `FOUNDRY_SCREENSHOT_TARGET_LABELS` or `--target-labels=<csv>`. When empty (a bare
-// `test:foundry:screenshots` debug run) the profile captures the FULL label set, so
-// scoping never silently drops evidence when the wiring is absent.
+// The scoped `screenshots` profile target set (issue #826).
 function readScreenshotTargetLabels(argv = process.argv.slice(2), env = process.env) {
   const FLAG = '--target-labels';
   let csv = '';
@@ -160,34 +114,19 @@ function readScreenshotTargetLabels(argv = process.argv.slice(2), env = process.
 }
 
 const SCREENSHOT_TARGET_LABELS = readScreenshotTargetLabels();
-// Scoping is active only under `screenshots` AND when a non-empty target set was
-// supplied. `rc`/`ci`/`full` never see it (dead condition), so their captured-frame
-// set and phase execution are provably unchanged.
+// Scoping is active only under `screenshots` AND when a non-empty target set was supplied.
 const SCREENSHOT_SCOPING_ACTIVE = SMOKE_PROFILE === 'screenshots' && SCREENSHOT_TARGET_LABELS.size > 0;
 
 /**
- * Whether the given view-bearing phase must run for this invocation. Always true
- * except under an actively-scoped `screenshots` run, where a phase whose labels are
- * all off-target is skipped. Inert (returns true) for `rc`/`ci`/`full`.
- * @param {string} phase
- * @returns {boolean}
+ * Whether the given view-bearing phase must run for this invocation. Always true except under an
+ * actively-scoped `screenshots` run, where a phase whose labels are all off-target is skipped.
  */
 function shouldRunScreenshotPhase(phase) {
   if (!SCREENSHOT_SCOPING_ACTIVE) return true;
   return isPhaseNeededForTargets(phase, SCREENSHOT_TARGET_LABELS);
 }
 
-/**
- * Whether a skippable Phase-D0 capture SECTION must run (issue #826 increment 2).
- * ALWAYS true for `rc`/`ci`/`full` (scoping inactive) — so every section body is
- * DEAD CODE under those profiles and the walk is byte-behaviour-identical by
- * construction; the section skips exist ONLY on an actively-scoped `screenshots`
- * run, where a section whose mapped labels are all off-target is skipped along with
- * its expensive navigate+settle work. The always-run D0 spine (manager open + system
- * select + fixture seeding + currency config) is NOT a section, so it never skips.
- * @param {string} sectionName
- * @returns {boolean}
- */
+/** Whether a skippable Phase-D0 capture section must run (issue #826 increment 2). */
 function shouldRunScreenshotSection(sectionName) {
   if (!SCREENSHOT_SCOPING_ACTIVE) return true;
   const needed = isD0SectionNeededForTargets(sectionName, SCREENSHOT_TARGET_LABELS);
@@ -197,11 +136,8 @@ function shouldRunScreenshotSection(sectionName) {
   return needed;
 }
 
-// Exact set of screenshot labels the `rc` profile captures. Every other
-// `screenshot(page, label)` call is a no-op under `rc` (the surrounding
-// behavioral assertions still run). The on-failure capture is taken
-// directly by `page.screenshot({ path: ... 'screenshot-failure.png' })`
-// in the catch block, not via `screenshot()`, so it always survives.
+// Exact set of screenshot labels the `rc` profile captures. Every other `screenshot(page, label)`
+// call is a no-op under `rc` (the surrounding behavioral assertions still run).
 const RC_SCREENSHOT_BUDGET = new Set([
   'world-loaded',
   'fabricate-app-shell',
@@ -210,12 +146,9 @@ const RC_SCREENSHOT_BUDGET = new Set([
   'crafter-post-craft-inventory'
 ]);
 
-// R2 (#750): the two 7-theme sweeps (`captureManagerThemes` +
-// `captureAlchemyThemes`) produce 14 `*-theme-<id>` frames that NOTHING asserts
-// and that `scripts/ui-pr-screenshot-evidence.mjs` VIEW_RECIPES deliberately
-// does not map. They are OFF by default; opt in to regenerate them with
-// `FOUNDRY_SMOKE_THEMES=1` (or `--themes`). Restoring the sweeps costs ~5-8s and
-// 14 PNGs, so keep them off unless you are specifically auditing theme fidelity.
+// R2 (#750): the two 7-theme sweeps (`captureManagerThemes` + `captureAlchemyThemes`) produce 14
+// `*-theme-<id>` frames that nothing asserts and that `scripts/ui-pr-screenshot-evidence.mjs`
+// VIEW_RECIPES deliberately does not map.
 const CAPTURE_THEME_SWEEPS =
   ['1', 'true', 'yes'].includes(String(process.env.FOUNDRY_SMOKE_THEMES ?? '').toLowerCase())
   || process.argv.slice(2).includes('--themes');
@@ -229,21 +162,7 @@ const waivedConsoleErrors = [];
 /** @type {string[]} */
 const consoleLog = [];
 
-/**
- * Read the extra console-error waiver patterns for this run.
- *
- * Accepts either the `--allowed-console-error-patterns <csv>` (or `=<csv>`) CLI
- * flag — used on direct `node scripts/foundry-test-run.mjs` invocation and in
- * tests — or the `FOUNDRY_ALLOWED_CONSOLE_ERROR_PATTERNS` env var, which is how
- * the value reaches this script through `foundry-test.mjs` (the orchestrator
- * forwards `process.env` but not extra argv) from `foundry-integration.yml`.
- * These are APPENDED to the in-source `ignoredErrorPatterns` defaults, never a
- * replacement; the value is empty when neither is set.
- *
- * @param {string[]} [argv=process.argv.slice(2)]
- * @param {NodeJS.ProcessEnv} [env=process.env]
- * @returns {string}
- */
+/** Read the extra console-error waiver patterns for this run. */
 function readAllowedConsoleErrorPatternsCsv(argv = process.argv.slice(2), env = process.env) {
   const FLAG = '--allowed-console-error-patterns';
   for (let i = 0; i < argv.length; i++) {
@@ -257,14 +176,8 @@ function readAllowedConsoleErrorPatternsCsv(argv = process.argv.slice(2), env = 
 const ALLOWED_CONSOLE_ERROR_PATTERNS_CSV = readAllowedConsoleErrorPatternsCsv();
 
 /**
- * Echo every waived console error to $GITHUB_STEP_SUMMARY for audit. A waiver
- * must never be silent: the CI log records which known-benign errors were
- * admitted this run. Best-effort — a missing/unwritable summary file never
- * fails the run, and nothing is written when no error was waived or the env
- * var is unset (local runs).
- *
- * @param {string[]} waived
- * @returns {Promise<void>}
+ * Echo every waived console error to $GITHUB_STEP_SUMMARY for audit. A waiver must never be silent:
+ * the CI log records which known-benign errors were admitted this run.
  */
 async function echoWaivedConsoleErrorsToStepSummary(waived) {
   const summaryPath = process.env.GITHUB_STEP_SUMMARY;
@@ -312,10 +225,9 @@ const viewTimings = [];
 let lastViewMarkAt = performance.now();
 
 /**
- * Record the time taken to reach a captured view, attributed to `label`, and
- * reset the stopwatch for the next view. Called from `screenshot()` after a
- * frame is actually written (never for an rc no-op).
- * @param {string} label
+ * Record the time taken to reach a captured view, attributed to `label`, and reset the stopwatch
+ * for the next view. Called from `screenshot()` after a frame is actually written (never for an rc
+ * no-op).
  */
 function markViewTiming(label) {
   const now = performance.now();
@@ -328,9 +240,8 @@ function markViewTiming(label) {
 }
 
 /**
- * Begin a phase stopwatch. If another phase is already running it ends
- * automatically — phases are sequential, never nested.
- * @param {string} name
+ * Begin a phase stopwatch. If another phase is already running it ends automatically — phases are
+ * sequential, never nested.
  */
 function startPhase(name) {
   if (currentPhase) endPhase();
@@ -340,9 +251,7 @@ function startPhase(name) {
   lastViewMarkAt = performance.now();
 }
 
-/**
- * End the current phase and push its duration into `phaseTimings`.
- */
+/** End the current phase and push its duration into `phaseTimings`. */
 function endPhase() {
   if (!currentPhase) return;
   phaseTimings.push({
@@ -354,11 +263,7 @@ function endPhase() {
 }
 
 /**
- * Format a list of timing entries as an aligned stdout table so slow
- * phases are obvious in CI logs. Accepts any `{ phase, durationMs }[]`
- * so it can render boot timings, phase timings, or the combined list.
- * @param {Array<{ phase: string, durationMs: number }>} timings
- * @returns {string}
+ * Format a list of timing entries as an aligned stdout table so slow phases are obvious in CI logs.
  */
 function formatTimingsTable(timings) {
   if (timings.length === 0) return '';
@@ -378,13 +283,8 @@ function formatTimingsTable(timings) {
 }
 
 /**
- * Render the slowest captured views as an aligned stdout table (R3, #750).
- * Only the top `limit` are shown — enough to spot where the D0 walk spends its
- * time — with each view's phase for context. Returns '' when nothing was
- * captured (e.g. the rc profile skips the screenshot phases).
- * @param {Array<{ label: string, phase: string, durationMs: number }>} timings
- * @param {number} [limit=12]
- * @returns {string}
+ * Render the slowest captured views as an aligned stdout table (R3, #750). Only the top `limit` are
+ * shown — enough to spot where the D0 walk spends its time — with each view's phase for context.
  */
 function formatSlowestViewsTable(timings, limit = 12) {
   if (timings.length === 0) return '';
@@ -405,17 +305,7 @@ function formatSlowestViewsTable(timings, limit = 12) {
   return lines.join('\n');
 }
 
-/**
- * Take a screenshot with an auto-incrementing numeric prefix. Under the
- * `rc` profile, only labels in `RC_SCREENSHOT_BUDGET` are captured; under an
- * actively-scoped `screenshots` run only labels in the PR's target set are captured;
- * all other labels are no-ops (the surrounding assertions still run). Because scoping
- * only FILTERS which labels are written — never reorders the walk — a captured view's
- * frames keep their relative capture order, so `collect`'s `candidates[0]` still picks
- * the intended (first-captured) frame.
- * @param {import('playwright').Page} page
- * @param {string} label
- */
+/** Take a screenshot with an auto-incrementing numeric prefix. */
 async function screenshot(page, label, options = {}) {
   if (SMOKE_PROFILE === 'rc' && !RC_SCREENSHOT_BUDGET.has(label)) return;
   if (SCREENSHOT_SCOPING_ACTIVE && !SCREENSHOT_TARGET_LABELS.has(label)) return;
@@ -435,17 +325,8 @@ async function screenshot(page, label, options = {}) {
 }
 
 /**
- * A UI-triggered craft / immediate-d100 gather now opens the interactive roll
- * prompt (a Foundry DialogV2 carrying `.fabricate-roll-prompt`). When present:
- * capture it as evidence, click Roll to dismiss it, and wait for it to detach so
- * the caller's subsequent `assertNoScreenshotOverlays` / state waits do not trip
- * on the dialog overlay. Returns true when a dialog was handled, false otherwise
- * (e.g. a timed task that resolves without a roll) — the short presence timeout
- * makes the no-dialog case a cheap no-op.
- *
- * @param {import('playwright').Page} page
- * @param {string} label Screenshot label for the captured prompt.
- * @returns {Promise<boolean>}
+ * A UI-triggered craft / immediate-d100 gather now opens the interactive roll prompt (a Foundry
+ * DialogV2 carrying `.fabricate-roll-prompt`).
  */
 async function handleRollPromptIfPresent(page, label) {
   const dialog = page
@@ -457,9 +338,8 @@ async function handleRollPromptIfPresent(page, label) {
     return false;
   }
   await screenshot(page, label);
-  // The confirm button is "Normal" for a d20 check (Advantage/Normal/Disadvantage)
-  // or "Roll" for a non-d20 / d100 check (single button). Click whichever proceeds
-  // without advantage; never Advantage/Disadvantage.
+  // The confirm button is "Normal" for a d20 check (Advantage/Normal/Disadvantage) or "Roll" for a
+  // non-d20 / d100 check (single button).
   const rollBtn = dialog
     .locator(
       'button[data-action="normal"], button[data-action="roll"], button:has-text("Normal"), button:has-text("Roll")'
@@ -471,13 +351,9 @@ async function handleRollPromptIfPresent(page, label) {
 }
 
 /**
- * Re-theme the live, Foundry-mounted Fabricate surface exactly as the theme
- * setting's onChange (applyFabricateTheme) does: set the theme attribute on the
- * document element and every `.fabricate` root. This re-themes the real app via
- * its own CSS tokens — not a mock — so the resulting screenshot is the genuine
- * manager under that theme.
- * @param {import('playwright').Page} page
- * @param {string} themeId
+ * Re-theme the live, Foundry-mounted Fabricate surface exactly as the theme setting's onChange
+ * (applyFabricateTheme) does: set the theme attribute on the document element and every
+ * `.fabricate` root.
  */
 async function applyManagerTheme(page, themeId) {
   await page.evaluate(({ id, attr }) => {
@@ -488,10 +364,8 @@ async function applyManagerTheme(page, themeId) {
 }
 
 /**
- * Capture the currently-open manager view under every Fabricate theme, then
- * restore the default theme so later Phase D0 captures stay unthemed. Labels:
- * `manager-theme-<themeId>` (full profile only; this runs inside Phase D0).
- * @param {import('playwright').Page} page
+ * Capture the currently-open manager view under every Fabricate theme, then restore the default
+ * theme so later Phase D0 captures stay unthemed.
  */
 async function captureManagerThemes(page) {
   // R2 (#750): opt-in only — these 14 theme frames are unasserted and unmapped.
@@ -503,10 +377,7 @@ async function captureManagerThemes(page) {
   await applyManagerTheme(page, DEFAULT_FABRICATE_THEME);
 }
 
-// Recipes now nests inside the gated Crafting nav group (issue 511). Clicking the
-// Crafting parent from a non-crafting route routes straight to Recipes and expands
-// the group; from a crafting child route (e.g. recipe-edit) it only expands, so
-// always follow with the Recipes sub-item to land on the recipes browser.
+// Recipes now nests inside the gated Crafting nav group (issue 511).
 async function openManagerCraftingSection(page, subitemId, managerView) {
   await page.locator(railSelector('manager-nav-crafting')).click();
   const subitem = page.locator(`.fabricate-manager #manager-crafting-nav-${subitemId}`).first();
@@ -518,24 +389,7 @@ async function openManagerCraftingSection(page, subitemId, managerView) {
     .waitFor({ state: 'visible', timeout: 5_000 });
 }
 
-/**
- * Select one of the open Checks activity route's five sections (issue 1096).
- *
- * The strip is `The roll / Outcomes / Triggers / Modifiers / On failure`, and ONE section's
- * content is in the DOM at a time — so a control that used to sit further down one scrolling
- * activity page (the trigger card, the failure-consumption policy, the check-modifier
- * catalogue) is reached by selecting the section that OWNS it, not by scrolling to it.
- *
- * The wait is on the strip reporting the selection rather than on whatever the section
- * contains: the strip is what owns which section renders, so a caller's own next assertion
- * stays the thing that fails when the content is missing.
- *
- * The strip is a tab strip, so it is addressed by its `data-` hook the way every other tab
- * strip in this walk is; the rail sub-items above are addressed by id, the way every other
- * rail group in this walk is. Both hooks are shipped for this harness.
- * @param {import('playwright').Page} page
- * @param {string} section
- */
+/** Select one of the open Checks activity route's five sections (issue 1096). */
 async function openChecksSection(page, section) {
   const button = page
     .locator(`.fabricate-manager [data-checks-section-button="${section}"]`)
@@ -548,27 +402,7 @@ async function openChecksSection(page, section) {
     .waitFor({ state: 'visible', timeout: 5_000 });
 }
 
-/**
- * Open a Checks Studio ACTIVITY route, and optionally one of its sections (issue 1096).
- *
- * Checks used to be one rail button holding four `data-checks-tab-button` tabs. Those four are
- * now rail ROUTES under an expandable Checks group, and the tab strip they lived in is gone
- * from the product — so every walk that reaches a checks surface navigates the group.
- *
- * The parent click is part of the navigation rather than a nicety: the submenu is only in the
- * DOM while the group is expanded, and a freshly mounted manager renders it collapsed.
- * Activating the parent expands the group AND routes to its first available child, so the
- * sub-item click that follows is what selects the activity — the same two-step shape
- * `openManagerCraftingSection` uses for the Crafting group.
- *
- * Pass `section` for an activity route; omit it for Validation, which renders no strip. Naming
- * the landing section is worth doing even when it is the default one: the strip keeps its
- * selection across route changes, so an unnamed section makes a frame depend on wherever an
- * earlier step in the same manager session happened to leave it.
- * @param {import('playwright').Page} page
- * @param {string} activity crafting | salvage | gathering | validation
- * @param {string} [section]
- */
+/** Open a Checks Studio activity route, and optionally one of its sections (issue 1096). */
 async function openChecksActivity(page, activity, section = '') {
   await page.locator(railSelector('manager-nav-checks')).click();
   const navItem = page.locator(`.fabricate-manager #manager-checks-nav-${activity}`).first();
@@ -585,13 +419,8 @@ async function openChecksActivity(page, activity, section = '') {
   if (section) await openChecksSection(page, section);
 }
 
-// Return to the recipes browser (via the Crafting group) and open the named
-// recipe's editor, waiting for the recipe-edit route. Consolidates the
-// "return then open recipe X" sequence the recipe-editor captures repeat.
-//
-// Each recipe row carries its own Edit pencil again (issue 643), matching the Books &
-// Scrolls row edit affordance — the primary way a GM opens the editor. Click it directly
-// (Duplicate / Delete stay inspector-only), then wait for the recipe-edit route.
+// Return to the recipes browser (via the Crafting group) and open the named recipe's editor,
+// waiting for the recipe-edit route.
 async function openManagerRecipeEditor(page, recipeName) {
   await openManagerCraftingSection(page, 'recipes', 'recipes');
   await page
@@ -604,11 +433,8 @@ async function openManagerRecipeEditor(page, recipeName) {
     .waitFor({ state: 'visible', timeout: 5_000 });
 }
 
-// The rail's "All crafting systems" back-link is INERT on the systems browser itself
-// (issue 643): there is nowhere to go back to, so it renders disabled. Click it only
-// when it is live; a disabled link means the manager is ALREADY at the system library
-// — which is the destination — so treat that as success rather than hanging on a dead
-// control. Returns whether a live click was issued, for callers that need to know.
+// The rail's "All crafting systems" back-link is inert on the systems browser itself (issue 643):
+// there is nowhere to go back to, so it renders disabled.
 async function returnToSystemLibrary(page) {
   const link = page.locator('.fabricate-manager .manager-scope-return').first();
   if ((await link.count()) === 0) return false;
@@ -618,12 +444,8 @@ async function returnToSystemLibrary(page) {
 }
 
 /**
- * Open a recipe, switch to its Results tab, wait for a mode-specific content marker
- * to be VISIBLE, and capture the frame. Extracted so every Results-tab capture (issue
- * 643) reuses one open→click→wait→assert→screenshot span rather than repeating it —
- * the smoke script's `scripts/*.mjs` duplication counts against the SonarCloud gate.
- * `contentSelector` is scoped under the visible Results tab, so a still-hidden or
- * empty tab never yields a green frame.
+ * Open a recipe, switch to its Results tab, wait for a mode-specific content marker to be VISIBLE,
+ * and capture the frame.
  */
 async function captureRecipeResultsTab(page, recipeName, label, contentSelector) {
   await openManagerRecipeEditor(page, recipeName);
@@ -638,12 +460,8 @@ async function captureRecipeResultsTab(page, recipeName, label, contentSelector)
 }
 
 /**
- * Drive the manager's persistent nav rail to the selected system's Edit route and
- * bring the multi-step-recipes feature tile into frame. The tile's toggle is the
- * surface the issue-710 collapse captures exercise (turning multi-step recipes off
- * opens the collapse confirm dialog when authored multi-step recipes exist). Returns
- * the multiStepRecipes tile locator so the caller can read its toggle state.
- * @param {import('playwright').Page} page
+ * Drive the manager's persistent nav rail to the selected system's Edit route and bring the
+ * multi-step-recipes feature tile into frame.
  */
 async function openManagerMultiStepFeatureTile(page) {
   await page.locator('.fabricate-manager .manager-nav-button[data-nav-system-edit]').first().click();
@@ -658,14 +476,8 @@ async function openManagerMultiStepFeatureTile(page) {
 }
 
 /**
- * Capture the currently-open player Alchemy workbench under every Fabricate
- * theme, then restore the default theme. `applyManagerTheme` stamps the theme
- * attribute on the document element AND every `.fabricate` root — which includes
- * the shared player app — so it re-themes the live workbench via its own CSS
- * tokens, not a mock. Labels: `player-alchemy-theme-<themeId>` (full profile
- * only). These are EXTRA evidence and are intentionally NOT mapped in
- * VIEW_RECIPES, exactly like the `manager-theme-*` frames.
- * @param {import('playwright').Page} page
+ * Capture the currently-open player Alchemy workbench under every Fabricate theme, then restore the
+ * default theme.
  */
 async function captureAlchemyThemes(page) {
   // R2 (#750): opt-in only — these theme frames are unasserted and unmapped.
@@ -677,28 +489,12 @@ async function captureAlchemyThemes(page) {
   await applyManagerTheme(page, DEFAULT_FABRICATE_THEME);
 }
 
-/**
- * Normalize text for stable UI matching.
- * @param {unknown} value
- * @returns {string}
- */
+/** Normalize text for stable UI matching. */
 function normalizeText(value) {
   return String(value ?? '').trim().toLowerCase();
 }
 
-/**
- * Name whatever modal is currently covering the interface, or return null when nothing is.
- *
- * PURELY DIAGNOSTIC — only ever called on a failure path to enrich an error message, never
- * to decide whether a step passed. That separation is deliberate: the previous attempt at
- * this made a positive assertion out of "is the Items tab selected", and its selector did
- * not match on Foundry 14, so it failed a run whose sidebar was open, populated and
- * perfectly healthy (issue #996). A diagnostic that is wrong costs a confusing sentence; an
- * assertion that is wrong costs a red release.
- *
- * @param {import('playwright').Page} page
- * @returns {Promise<string|null>}
- */
+/** Name whatever modal is currently covering the interface, or return null when nothing is. */
 async function describeBlockingOverlay(page) {
   try {
     return await page.evaluate(() => {
@@ -720,51 +516,10 @@ async function describeBlockingOverlay(page) {
   }
 }
 
-/**
- * Stop Foundry's New User Experience tours ever starting, for the whole browser
- * context.
- *
- * WHY this is seeded pre-boot rather than dismissed reactively. `NewUserExperienceManager
- * #initialize()` is called by `Game#setupGame()` on the line AFTER `Hooks.callAll("ready")`,
- * and its `#showNewWorldTour()` starts `core.welcome` whenever the world looks new and the
- * tour's status is UNSTARTED. That start is delayed by an async chain — a scene-creation
- * round trip, a hardcoded 1s `setTimeout`, then a 1s `canvas.animatePan` — so the tour opens
- * a couple of seconds AFTER `ready`, which is past every one-shot `Tour.activeTour.exit()`
- * the harness performs. It then sits there, modal, for the rest of the run.
- *
- * That is not cosmetic. Playwright's `click({ force: true })` skips actionability CHECKS but
- * still dispatches at the element's coordinates, so the tour overlay swallows the click: the
- * Items sidebar tab never activates and the injected `button[data-fabricate-action="craft"]`
- * stays hidden, failing Phase E with a message that reads like a Fabricate UI defect. Beta
- * runs #141 and #149 both died this way; #144 did not, because the timing differed (issue
- * #993).
- *
- * `core.tourProgress` is registered `{scope: "client"}`, so `ClientSettings` writes it
- * straight to `window.localStorage` under the dotted setting id, `JSON.stringify`d
- * (`#setClient` -> `#cleanJSON`, which for a plain `Object`-typed setting is just
- * `JSON.stringify`). Seeding it in an init script therefore lands before any Foundry code
- * runs, and `ToursCollection#register` calls `tour._reloadProgress()` as it registers each
- * tour, so the seeded index is picked up at construction with no hook ordering to get right.
- * `addInitScript` re-runs on every navigation in the context, so it survives the
- * module-activation `page.reload()` too.
- *
- * Any `stepIndex` other than `-1` defeats the UNSTARTED check. `0` is used rather than
- * `Tour#complete()` deliberately: `complete()` persists progress but can also open the
- * "suggested next tour" `DialogV2.confirm` — `core.welcome` suggests `core.uiOverview` — which
- * would replace one blocking overlay with another.
- *
- * Verified against `client/nue/nue-manager.mjs`, `client/nue/tour.mjs`,
- * `client/nue/tours-collection.mjs` and `client/helpers/client-settings.mjs` in both the
- * 13.351 and 14.365 builds; this subsystem is unchanged between them.
- *
- * @param {import('playwright').BrowserContext} context
- */
+/** Stop Foundry's New User Experience tours ever starting, for the whole browser context. */
 async function suppressFoundryTours(context) {
-  // The body is inlined rather than passed by reference because `addInitScript` serializes
-  // the function to run in the page, where this module's imports do not exist. The shape it
-  // writes is `withSuppressedTours` in scripts/lib/foundryTourSuppression.js, which IS unit
-  // tested — `tests/foundry-tour-suppression.test.js` pins the two against each other so this
-  // copy cannot drift silently.
+  // The body is inlined rather than passed by reference because `addInitScript` serializes the
+  // function to run in the page, where this module's imports do not exist.
   await context.addInitScript(
     ({ key, tourIds, stepIndex }) => {
       try {
@@ -814,16 +569,8 @@ function withDeadline(promise, ms, label) {
 }
 
 /**
- * Wait until an in-page `predicate` returns truthy, polling on animation frames
- * so a settled layout is detected as soon as it quiesces instead of always
- * paying a fixed wait (R4, #750). On timeout it falls back to a capped fixed
- * wait, so a predicate bug degrades to the harness's previous fixed pacing
- * rather than hanging or racing ahead. Predicates that need cross-poll state
- * stash it on `window` and are reset by the caller before the first poll.
- * @param {import('playwright').Page} page
- * @param {Function} predicate
- * @param {unknown} arg
- * @param {{ timeout?: number, fallbackMs?: number }} [options]
+ * Wait until an in-page `predicate` returns truthy, polling on animation frames so a settled layout
+ * is detected as soon as it quiesces instead of always paying a fixed wait (R4, #750).
  */
 async function waitForSettled(page, predicate, arg, { timeout = 1500, fallbackMs = 500 } = {}) {
   try {
@@ -834,13 +581,8 @@ async function waitForSettled(page, predicate, arg, { timeout = 1500, fallbackMs
 }
 
 /**
- * Settle the Crafting System Manager frame after a resize: wait for the app's
- * measured geometry to REACH the requested size and hold steady across a few
- * animation frames, then return. Replaces the fixed 500ms wait (R4, #750) with
- * an event-driven predicate whose fallback preserves the old timing.
- * @param {import('playwright').Page} page
- * @param {{ width: number, height: number }} size
- * @param {{ timeout?: number, fallbackMs?: number }} [options]
+ * Settle the Crafting System Manager frame after a resize: wait for the app's measured geometry to
+ * reach the requested size and hold steady across a few animation frames, then return.
  */
 async function waitForManagerGeometrySettled(page, { timeout = 1500, fallbackMs = 500 } = {}) {
   await page.evaluate(() => { delete window.__fabGeomSettle; }).catch(() => {});
@@ -891,15 +633,8 @@ async function waitForManagerGeometrySettled(page, { timeout = 1500, fallbackMs 
 }
 
 /**
- * Settle the manager after an in-frame navigation (system-identity click,
- * return-to-library, scope-select) that re-renders the nav rail. Waits for the
- * nav labels to render and the frame's geometry + nav-item count to hold steady
- * across several animation frames. Replaces the fixed 750ms identity settles
- * (R4, #750); the caller's own subsequent explicit content/nav waits remain the
- * real correctness gate, so this only trims the settle buffer. The capped
- * fallback preserves the old 750ms pacing if the predicate never quiesces.
- * @param {import('playwright').Page} page
- * @param {{ timeout?: number, fallbackMs?: number }} [options]
+ * Settle the manager after an in-frame navigation (system-identity click, return-to-library,
+ * scope-select) that re-renders the nav rail.
  */
 async function settleManagerNav(page, { timeout = 2000, fallbackMs = 750 } = {}) {
   await page.evaluate(() => { delete window.__fabNavSettle; }).catch(() => {});
@@ -1128,24 +863,7 @@ async function captureStableManagerView(page, { width, height, layout, label, se
   await screenshot(page, label);
 }
 
-/**
- * The Component Studio's bulk-edit surface, as data (issues 772 / 1010).
- *
- * Every selector, the layout pin and the row-selection strategy live here rather than inside
- * `captureBulkEditFrame`, which is what lets the Recipe Studio share that scaffold instead of
- * copying it. `tests/screenshot-capture-scoping.test.js` pins each field PER STUDIO — under
- * parameterisation an assertion made against the scaffold body alone would pass because the
- * literal it looks for can no longer appear there, whatever the walk actually does.
- *
- * `selectRows` is POSITIONAL here, and that is a property of the fixture rather than a default:
- * these frames need any two component rows, none of which carries state the walk must single
- * out. The Recipe Studio's blocked frame does, and pins its rows by name instead.
- *
- * The selection control is an `<input type="checkbox">` whose real input is 1px and transparent
- * behind a painted box, so the wrapping LABEL is the click target. It is deliberately NOT a
- * `<button>` — which is why this walk's `.manager-component-row … button:has(i.fa-pen)` Edit
- * selectors still resolve to exactly one control per row.
- */
+/** The Component Studio's bulk-edit surface, as data (issues 772 / 1010). */
 const COMPONENT_BULK_EDIT_STUDIO = Object.freeze({
   // The browser surface is unchanged by the selection — the list, the row and the row identity
   // are all still on screen, and only the RAIL swapped the inspector for the panel — so this
@@ -1167,16 +885,7 @@ const COMPONENT_BULK_EDIT_STUDIO = Object.freeze({
   },
 });
 
-/**
- * The Recipe Studio's bulk-edit surface (issue 1010) — the same shape, none of the same hooks.
- *
- * `selectRows` is supplied PER CALL rather than defaulted, because one of the three recipe
- * frames is about a specific row: `manager-recipes-bulk-edit-blocked` must select the seeded
- * off-and-un-enableable recipe, which is what makes the panel's blocked count non-zero and the
- * warning Callout render at all. A positional pick would stage Enable over two ordinary recipes
- * and publish a frame with no Callout in it — passing every guard the scaffold has, because two
- * rows would still be selected and the count readout would still be visible.
- */
+/** The Recipe Studio's bulk-edit surface (issue 1010) — the same shape, none of the same hooks. */
 const RECIPE_BULK_EDIT_STUDIO = Object.freeze({
   layout: 'recipes normal',
   noun: 'recipe',
@@ -1190,17 +899,7 @@ const RECIPE_BULK_EDIT_STUDIO = Object.freeze({
   clearSelector: '.fabricate-manager [data-recipe-clear-selection]',
 });
 
-/**
- * Tick the two rows whose NAMES are given, in order.
- *
- * The smoke's recipes are seeded by `createRecipe` and carry generated ids, so the id-pinning the
- * View Lab's cases use is not available here; the authored name is the stable handle. Fails loudly
- * on a name that matches no row rather than degrading to whatever happened to be first, which is
- * the whole reason this exists as an alternative to the positional strategy.
- *
- * @param {...string} names Authored recipe names, in click order.
- * @returns {(rows: import('playwright').Locator, studio: object) => Promise<void>}
- */
+/** Tick the two rows whose names are given, in order. */
 function selectRecipeRowsByName(...names) {
   return async (rows, studio) => {
     for (const name of names) {
@@ -1213,39 +912,10 @@ function selectRecipeRowsByName(...names) {
   };
 }
 
-/**
- * Issue 1504 — choose an option from a shared `<Select>`, the way a GM does.
- *
- * `locator.selectOption` is Playwright's `<select>`-only API: it throws on any other element,
- * so every one of these call sites broke the moment its control stopped drawing the operating
- * system's drop-down. The replacement is the two clicks a GM actually performs — the trigger,
- * then the row — and it is the same idiom `scripts/lib/viewLabCases.js` uses for a converted
- * picker.
- *
- * THE PANEL IS ADDRESSED FROM THE PAGE, NEVER FROM THE TRIGGER'S CONTAINER, and that is the one
- * thing a reader must not "tidy". `SearchablePopover` portals its panel to the nearest
- * `.fabricate-manager` / `.fabricate-app` root, so it leaves the trigger's subtree entirely: a
- * `bulkPanel.locator('[role="option"]')` — the obvious narrowing — matches nothing at all and
- * fails as a 30s actionability timeout rather than as a missing option. `.fabricate-select-popover`
- * is the primitive's own panel class, which is specific enough to never match another picker's
- * rows while still being reachable from wherever the portal put it.
- *
- * Two ways to name the row, because the call sites need both. `value` addresses it by the option's
- * own identity handle, `[data-popover-option="…"]`, which every rendered row carries — the
- * empty-string sentinel included, as `__unchanged__`. `index` is POSITIONAL over the rendered
- * rows and exists for the two bulk-edit axes whose real options are world vocabulary this smoke
- * does not author: index 1 is the first row after the `Leave unchanged` sentinel, whatever the
- * world has named it.
- *
- * @param {import('playwright').Page} page The page, which is where the portaled panel lives.
- * @param {import('playwright').Locator} trigger The control's own trigger, by its `data-*` hook.
- * @param {{value?: string, index?: number}} option The row to choose.
- */
+/** Issue 1504 — choose an option from a shared `<Select>`, the way a GM does. */
 async function chooseSelectOption(page, trigger, option) {
-  // NAMING NEITHER ROW IS A CALLER'S DEFECT, and it is refused here rather than carried into
-  // Playwright. `option.index` of `undefined` fails the positional bounds check below (every
-  // comparison with `undefined` is false), so the call fell through to `rows.nth(undefined)` and
-  // surfaced as a Playwright type error whose text says nothing about the step that wrote it.
+  // Naming neither row is A caller's defect, and it is refused here rather than carried into
+  // Playwright.
   if (option.value === undefined && !Number.isInteger(option.index)) {
     throw new Error(
       'chooseSelectOption was given neither a `value` nor an integer `index`, so it names no row. '
@@ -1275,73 +945,14 @@ async function chooseSelectOption(page, trigger, option) {
   await rows.nth(option.index).click();
 }
 
-/**
- * Choose one segment of a `SegmentedControl`, by its `optionDataAttr` value.
- *
- * The LABEL is the click target, never the radio inside it. `SegmentedControl.svelte` renders a
- * real `<input type="radio">` per segment and then hides it — 1x1, `clip: rect(0 0 0 0)` — behind
- * the visible `<span class="manager-segment-label">`, and an absolutely-positioned child of a
- * `justify-content: center` flex container takes its static position at that container's CENTRE.
- * So the radio's 1px box sits directly under the middle of the span, and Playwright refuses the
- * click with "<span class="manager-segment-label">Lock</span> intercepts pointer events" — it does
- * not fall back to the label, it times out after 30s and fails the step. `optionDataAttr` is
- * stamped on the wrapping `<label>`, which is both hittable and the control a GM actually presses,
- * so the bare attribute selector is the correct target and the ` input` suffix is always wrong.
- *
- * This exists as a named helper because the trap is invisible at the call site: `[…="lock"] input`
- * reads like the more precise selector and is the one that cannot work. `scripts/lib/viewLabCases.js`
- * targets these same two controls the same way (`{ selector: '[data-recipe-bulk-status-option="enable"]' }`).
- *
- * `waitFor` before the click so a genuinely missing segment reports as a missing segment rather
- * than as a 30s actionability timeout — the failure mode that hid this defect in the first place.
- *
- * @param {import('playwright').Locator} scope The container holding the control.
- * @param {string} optionDataAttr The `optionDataAttr` the control was rendered with.
- * @param {string} value The segment's option value.
- */
+/** Choose one segment of a `SegmentedControl`, by its `optionDataAttr` value. */
 async function clickSegment(scope, optionDataAttr, value) {
   const segment = scope.locator(`label[${optionDataAttr}="${value}"]`).first();
   await segment.waitFor({ state: 'visible', timeout: 5_000 });
   await segment.click();
 }
 
-/**
- * Issue 772 / 1010 — capture ONE state of a manager browser's BULK EDIT rail panel.
- *
- * SIX frames share this scaffold — three per studio — because each panel has more axes than one
- * photograph can hold. A STAGED axis control and its `Unchanged` face are mutually exclusive
- * states of the same control, so the pristine draft can never appear in the same frame as a
- * staged one; the Component Studio's Progressive DC section renders only on a progressive system,
- * and the Recipe Studio's blocked-enable Callout only over a selection containing a refused
- * recipe. Only `stage` and `selectRows` differ between them, so the selection, the panel/inspector
- * assertions, the capture and the teardown live here once. A fresh sibling copy per frame — or
- * per studio — would also trip Sonar's new-code duplication gate, which counts `scripts/` and
- * ignores `cpd.exclusions`.
- *
- * NET-ZERO by construction. `stage` drives the SHIPPED controls only — seeding the selection or
- * the draft through `page.evaluate` would touch `game.` / settings / flags, the Foundry
- * content-signal shape these frames deliberately avoid, and would photograph a state no GM can
- * actually reach. Apply is NEVER pressed, so not one component and not one recipe is written, and
- * the `finally` clears the selection so every following capture sees the single-row inspector it
- * expects.
- *
- * A failed CLEAR is recorded as its own failed step rather than swallowed: it leaves the rail
- * showing the bulk panel for every following frame in the section, which is silent evidence
- * corruption. It is RECORDED, not thrown, because throwing from this `finally` would both mask an
- * in-flight capture error and abort the rest of the section — and a recorded failure is already
- * fatal to the run (`evaluateSmokeOutcome` treats step failures as non-waivable) while leaving
- * the remaining frames to be captured.
- *
- * @param {import('playwright').Page} page
- * @param {{steps: {step: string, passed: boolean, error?: string}[]}} results
- * @param {{
- *   studio: object,
- *   stepName: string,
- *   label: string,
- *   selectRows?: (rows: import('playwright').Locator, studio: object) => Promise<void>,
- *   stage: (bulkPanel: import('playwright').Locator) => Promise<void>
- * }} options
- */
+/** Issue 772 / 1010 — capture one state of a manager browser's bulk edit rail panel. */
 async function captureBulkEditFrame(page, results, { studio, stepName, label, selectRows, stage }) {
   const pickRows = selectRows ?? studio.selectRows;
   try {
@@ -1352,9 +963,8 @@ async function captureBulkEditFrame(page, results, { studio, stepName, label, se
     await pickRows(rows, studio);
     const bulkPanel = page.locator(studio.panelSelector).first();
     await bulkPanel.waitFor({ state: 'visible', timeout: 5_000 });
-    // The panel REPLACES the single-row inspector rather than sitting beside it, so the
-    // inspector's absence is half of what the frame is evidence for. Without this a rail that
-    // rendered both would photograph as a success.
+    // The panel replaces the single-row inspector rather than sitting beside it, so the inspector's
+    // absence is half of what the frame is evidence for.
     if (await page.locator(studio.displacedInspectorSelector).count() > 0) {
       throw new Error(`The ${studio.noun} bulk panel mounted alongside the inspector it replaces.`);
     }
@@ -1388,25 +998,9 @@ async function captureBulkEditFrame(page, results, { studio, stepName, label, se
 }
 
 /**
- * Issue 801 — capture a GM library's grouped-category CONTINUATION frame: seed one
- * category large enough to span a page boundary, shrink the pager to page size 10, advance
- * to the continuation page (the category's remaining slice, "N of M", at the head), and
- * screenshot. The seeded rows are torn down afterward so no downstream frame sees them, and
- * the page size is reset FIRST — while the seeded rows still keep the pager on screen — so a
- * shrink-to-10 can never leak into a downstream frame even if the capture threw after the
- * shrink. Guarded so a hiccup records a failed step rather than aborting the phase.
- *
- * The recipe and component libraries share this exact scaffold; only the seed/cleanup
- * callbacks, the nav + group selectors, the settle timings, and the label differ, so they
- * are passed in. Preserves each browser's original order of operations and timings verbatim.
- *
- * @param {import('playwright').Page} page
- * @param {{steps: {step: string, passed: boolean, error?: string}[]}} results
- * @param {{
- *   seed: () => Promise<*>, hasSeed: (handle: *) => boolean, cleanup: (handle: *) => Promise<void>,
- *   openBrowser: () => Promise<void>, settle: () => Promise<void>, settleAfterReset: () => Promise<void>,
- *   groupCountSelector: string, layout: string, label: string, stepName: string, failMessage: string
- * }} options
+ * Issue 801 — capture a GM library's grouped-category continuation frame: seed one category large
+ * enough to span a page boundary, shrink the pager to page size 10, advance to the continuation
+ * page (the category's remaining slice, "N of M", at the head), and screenshot.
  */
 async function captureGroupedContinuationFrame(page, results, options) {
   const {
@@ -1431,12 +1025,7 @@ async function captureGroupedContinuationFrame(page, results, options) {
   } finally {
     const sizeReset = page.locator('.fabricate-manager [data-pagination-size]').first();
     if (await sizeReset.count() > 0) {
-      // NARROWED, not removed (issue 1504). The bare `.catch(() => {})` this replaces swallowed
-      // EVERY failure of the reset, so a page size left at 10 would silently re-page every
-      // following frame in the section. It cannot simply be dropped either: this runs in a
-      // `finally`, where throwing would mask the capture error that brought us here. So the
-      // failure is REPORTED and the walk continues, which is the same bargain the bulk-edit
-      // teardown below strikes for the same reason.
+      // Narrowed, not removed (issue 1504).
       try {
         await chooseSelectOption(page, sizeReset, { value: '25' });
       } catch (error) {
@@ -1451,28 +1040,7 @@ async function captureGroupedContinuationFrame(page, results, options) {
   }
 }
 
-/**
- * Issue 806 — the editor round-trip preservation frame for the recipe library. Opening a
- * recipe editor unmounts the browser and returning remounts it; the persisted `systemId`
- * sentinel now stops that remount being misread as a system switch, so the page, filters
- * and per-category collapse the GM left are preserved rather than wiped.
- *
- * The frame demonstrates it with the two round-trip-lost fields that fit a small fixture:
- * a NON-DEFAULT category filter (a visible chip + a filtered single-group list) and a
- * COLLAPSED category group, both set BEFORE opening the editor and photographed AFTER
- * returning. Opening the editor from a collapsed group is impossible from the browser (a
- * collapsed group renders no rows), so the recipe is SELECTED into the shared shell
- * inspector first — the selection survives the collapse, so the inspector's Edit action
- * drives the round-trip without a visible row. Page-index preservation is bound by the
- * mounted tests, not this frame, to keep the smoke fixture small.
- *
- * Seeded rows are torn down and the category filter reset afterwards so no downstream frame
- * inherits them. Guarded so a hiccup records a failed step rather than aborting the phase.
- *
- * @param {import('playwright').Page} page
- * @param {{steps: {step: string, passed: boolean, error?: string}[]}} results
- * @param {{systemId: string}} craftingSetup
- */
+/** Issue 806 — the editor round-trip preservation frame for the recipe library. */
 async function captureRecipeEditorRoundtrip(page, results, craftingSetup) {
   const CATEGORY = 'Roundtrip Brews';
   let ids = [];
@@ -1534,11 +1102,10 @@ async function captureRecipeEditorRoundtrip(page, results, craftingSetup) {
       throw new Error(`Expected the collapsed group to survive the round-trip; aria-expanded=${stillCollapsed}`);
     }
 
-    // The collapsed single-category group renders ZERO rows on purpose, so
-    // `assertManagerLayoutStable` (which throws "Manager rendered no table rows" when no
-    // row and no edit-form is present) does not apply here — the recipe-item validation
-    // and recipe-editor tab captures skip it for the same reason. Settle explicitly (we
-    // lose `captureStableManagerView`'s internal settle) and guard overlays only.
+    // The collapsed single-category group renders zero rows on purpose, so
+    // `assertManagerLayoutStable` (which throws "Manager rendered no table rows" when no row and no
+    // edit-form is present) does not apply here — the recipe-item validation and recipe-editor tab
+    // captures skip it for the same reason.
     await settleManagerNav(page);
     await page.waitForTimeout(200);
     await assertNoScreenshotOverlays(page);
@@ -1566,11 +1133,7 @@ async function captureRecipeEditorRoundtrip(page, results, craftingSetup) {
   }
 }
 
-/**
- * Assert manager table rows and summary regions do not horizontally overflow.
- * @param {import('playwright').Page} page
- * @param {string} label
- */
+/** Assert manager table rows and summary regions do not horizontally overflow. */
 async function assertManagerLayoutStable(page, label) {
   const metrics = await withDeadline(page.evaluate(() => {
     const selectors = [
@@ -1589,10 +1152,7 @@ async function assertManagerLayoutStable(page, label) {
       '.manager-components-list',
       '.manager-component-row',
       '.manager-component-identity',
-      // The essence library's list container and its selecting button (issue 1036). Both
-      // are what the View Lab essence steps click through, so both are pinned by
-      // `MANAGER_SURFACE_EXPECTED_SELECTORS` — and a pinned selector this list does not
-      // MEASURE is a guard that can never fire.
+      // The essence library's list container and its selecting button (issue 1036).
       '.manager-essences-table',
       '.manager-essence-row',
       '.manager-essence-identity',
@@ -1600,10 +1160,7 @@ async function assertManagerLayoutStable(page, label) {
       '.manager-gathering-task-row',
       '.manager-gathering-event-row',
       '.manager-tools-row',
-      // GM Knowledge surface (issue 785). Both row classes are measured so the narrow
-      // (~880px) band — where three columns still hold and the detail pane is at its
-      // narrowest — is covered for horizontal overflow, and the owned-copy row is what
-      // `MANAGER_SURFACE_EXPECTED_SELECTORS` pins for `knowledge normal` / `narrow`.
+      // GM Knowledge surface (issue 785).
       '.manager-knowledge-copy-row',
       '.manager-knowledge-learned-row',
       '[data-manager-tool-id]',
@@ -1649,11 +1206,8 @@ async function assertManagerLayoutStable(page, label) {
     throw new Error(`Manager horizontal overflow at ${label}: ${JSON.stringify(overflowing.slice(0, 5))}`);
   }
 
-  // Fail LOUD when a per-surface critical class is renamed/removed: the overflow
-  // pass above only measures what it FINDS, so a selector that matches nothing is
-  // silently uncovered. `expected` is the pinned critical selector(s) this exact
-  // surface must render (empty for surfaces with no stable row/edit-form marker,
-  // which still rely on the global row/edit-form backstop below).
+  // Fail loud when a per-surface critical class is renamed/removed: the overflow pass above only
+  // measures what it finds, so a selector that matches nothing is silently uncovered.
   assertExpectedSelectorsPresent(metrics, expectedSelectorsForManagerSurface(label), label);
 
   const rowCount = metrics.filter(metric =>
@@ -1689,24 +1243,7 @@ async function assertManagerLayoutStable(page, label) {
   }
 }
 
-/**
- * Assert at least one recipe row is actually REACHABLE — a pointer hit-test, not a
- * DOM count.
- *
- * `assertManagerLayoutStable` measures horizontal overflow and counts rows it FINDS in
- * the DOM, so it passed cleanly on a 900px library that rendered no row a GM could see
- * or click (issue 643): the stacked body squeezed `.manager-table-scroll` to ~24px and
- * the inspector's background painted over the rows, while every row was still in the
- * DOM at its full 76px. Only a hit-test fails on that, so this is the check that the
- * narrow library is usable at all.
- *
- * The rows legitimately sit below the fold once the body stacks, so the first row is
- * scrolled into view before the test — "reachable after a scroll" is the contract,
- * "already on screen" is not.
- *
- * @param {import('playwright').Page} page
- * @param {string} label
- */
+/** Assert at least one recipe row is actually reachable — a pointer hit-test, not a DOM count. */
 async function assertRecipeRowsHittable(page, label) {
   const report = await withDeadline(page.evaluate(() => {
     const rows = Array.from(document.querySelectorAll('.manager-recipe-row'));
@@ -1731,32 +1268,8 @@ async function assertRecipeRowsHittable(page, label) {
 }
 
 /**
- * Assert the player's progressive stage list is SOUND — the checks no unit test can make
- * (issue 651).
- *
- * Every one of these fails only against real Foundry CSS + a real layout engine:
- *
- *  - **Chevrons are not cropped.** The crafting app has no icon-button primitive, so a
- *    bare `<button>` inherits Foundry core's fixed `.app button` height and centred
- *    content. The component resets that (`height: auto` + a 34px `min-height`), and a
- *    mounted test cannot see the regression because happy-dom computes no cascade.
- *  - **The two chevrons stay adjacent.** Foundry's `.app button` margin, if it leaks past
- *    the reset, spaces them apart and can push them off the row.
- *  - **The live region is INVISIBLE.** The visually-hidden utility was `.fabricate-manager`-
- *    scoped only, so the region — copied from the GM pattern — would paint as visible text
- *    under the list until the player app was covered too. It is now one `.fabricate
- *    .visually-hidden` rule reaching both (issue 1501). Only meaningful once the region
- *    HAS text, which is why the caller announces a move first.
- *  - **Thresholds ascend.** Budget is spent top-down, so a row reached at a LOWER value
- *    than the row above it is impossible. This is the carried-threshold defect, visible
- *    without knowing the fixture — but ONLY after a reorder: at rest the builder's
- *    authored thresholds are ascending by construction, so the check is vacuous there.
- *
- * @param {import('playwright').Page} page
- * @param {string} label
- * @param {object} [options]
- * @param {boolean} [options.expectAnnouncement] require the live region to carry text
- *   (pass `true` only after a move has been made).
+ * Assert the player's progressive stage list is sound — the checks no unit test can make (issue
+ * 651).
  */
 async function assertProgressiveStageListSound(page, label, { expectAnnouncement = false } = {}) {
   const report = await withDeadline(page.evaluate(() => {
@@ -1848,13 +1361,7 @@ async function assertProgressiveStageListSound(page, label, { expectAnnouncement
   return report;
 }
 
-/**
- * Click a target only if it is present, swallowing transient failures. For
- * non-essential pointer-exercise interactions whose availability depends on a
- * manager UI still in flux — never hangs on a missing element, never fails the run.
- * @param {import('playwright').Locator} locator
- * @param {object} [options]
- */
+/** Click a target only if it is present, swallowing transient failures. */
 async function softClick(locator, options = {}) {
   if (await locator.count() === 0) return;
   await locator.first().click(options).catch(() => {});
@@ -1878,18 +1385,7 @@ async function assertPointerTarget(page, locator, targetSelector, label) {
   }
 }
 
-/**
- * Open a requirement-rail slot's chooser only if it is not already open (issue
- * 917). `RequirementTile` is a real disclosure — its button reports its own
- * state via `aria-expanded` — and clicking a tile that is ALREADY open now
- * COLLAPSES it rather than being a no-op, because the rail's `openSlotId` is a
- * single toggled key (`craftingStore.svelte.js`). Focus auto-advance already
- * opens the first unsatisfied openable slot the moment a recipe is selected, so
- * a blind click right after selection frequently lands on an already-open tile
- * and closes the very chooser the walk is about to assert against. Read the
- * tile's own reported state and click only when it says closed.
- * @param {import('playwright').Locator} slotLocator
- */
+/** Open a requirement-rail slot's chooser only if it is not already open (issue 917). */
 async function ensureSlotOpen(slotLocator) {
   await slotLocator.waitFor({ state: 'visible', timeout: 8_000 });
   if (await slotLocator.getAttribute('aria-expanded') === 'true') return;
@@ -2462,14 +1958,7 @@ function assertHorizontalContainment(parent, child, label) {
   }
 }
 
-// THREE, not four. Issue 1373 retired the editor's `Overview` tab: at SYSTEM scope a crafting
-// system authors no identity, so the linked-Item card and the description moved to the world Tool
-// entry that owns them, and the display label became an override card on Breakage. The strip is
-// `Breakage · Requirements · Validation`, which is what the design draws.
-//
-// The count is asserted rather than left open because this check exists to prove every tab is
-// MEASURABLE and horizontally contained — a strip that rendered one tab would satisfy a loop over
-// whatever it found. `screenshot-capture-scoping.test.js` pins the message, so both move together.
+// Three, not four.
 function assertToolStudioTabContainment(report) {
   if (!report?.manager || !report?.tabs || report?.tabButtons?.length !== 3) {
     throw new Error(`Tool editor must render three measurable tabs: ${JSON.stringify(report)}`);
@@ -2565,11 +2054,7 @@ function managerSystemRowSelector(systemId) {
   return `.fabricate-manager .manager-system-row[data-system-id="${systemId}"]`;
 }
 
-/**
- * Exercise manager pointer targets without triggering destructive actions.
- * @param {import('playwright').Page} page
- * @param {string} systemId
- */
+/** Exercise manager pointer targets without triggering destructive actions. */
 async function exerciseManagerPointerTargets(page, systemId) {
   const search = page.locator('.fabricate-manager input[type="search"]').first();
   await search.fill('forge');
@@ -2582,9 +2067,8 @@ async function exerciseManagerPointerTargets(page, systemId) {
   await page.locator('.fabricate-manager .manager-filter select').first().selectOption('all');
 
   await page.locator(`${managerSystemRowSelector(systemId)} .manager-system-identity`).first().click();
-  // Breadcrumb / scope / header pointer targets only exist in certain navigation
-  // states (e.g. inside a system sub-view). Trial-click them when present so the
-  // exercise never hangs on a missing target and never mutates navigation.
+  // Breadcrumb / scope / header pointer targets only exist in certain navigation states (e.g.
+  // inside a system sub-view).
   await softClick(page.locator('.fabricate-manager .manager-breadcrumbs button:has-text("The Herbalist")'), { trial: true });
   await softClick(page.locator('.fabricate-manager .manager-breadcrumbs button:has-text("Crafting Systems")'), { trial: true });
   await softClick(page.locator('.fabricate-manager .manager-scope-return'), { trial: true });
@@ -2597,11 +2081,7 @@ async function exerciseManagerPointerTargets(page, systemId) {
   }
 }
 
-/**
- * Select the smoke test crafting system in Manager.
- * @param {import('playwright').Page} page
- * @param {string} systemId
- */
+/** Select the smoke test crafting system in Manager. */
 async function selectSmokeSystemInManager(page, systemId) {
   const row = page.locator(managerSystemRowSelector(systemId)).first();
   await row.waitFor({ state: 'visible', timeout: 10_000 });
@@ -2622,9 +2102,8 @@ async function seedSmokeGatheringLibrary(page, craftingSetup) {
       .filter(entry => !ids.has(String(entry?.id || '')));
     config.systems[sysId] = {
       ...systemConfig,
-      // System-level GatheringRules: a non-'never' reveal policy is required for
-      // the blind environment card to surface the "(x/y)" discovered teaser.
-      // There is no environment-level reveal override — reveal is system-scoped.
+      // System-level GatheringRules: a non-'never' reveal policy is required for the blind
+      // environment card to surface the "(x/y)" discovered teaser.
       rules: {
         ...(systemConfig.rules || {}),
         revealPolicy: 'onAttempt'
@@ -2659,20 +2138,7 @@ async function seedSmokeGatheringLibrary(page, craftingSetup) {
             enabled: true
           }]
         },
-        // Player-gathering scenario library tasks. Each player environment fixture
-        // below picks exactly one of these via compositionMode 'manual' +
-        // enabledTaskIds (issue 1315: force add composes nothing in manual mode, so
-        // the pick has to live on the enabled list manual actually reads). None of
-        // these tasks declares a `biomes` constraint, so under automatic composition
-        // every one of them would match — and compose into — every environment at
-        // once; manual's picked-list-only rule is what keeps each fixture isolated to
-        // its one scenario. region 'meadowlands' keeps them out of the Azure Grove /
-        // GM fixtures' OWN picks (northreach / no region), which are manual too and
-        // name their own ids explicitly; no weather/timeOfDay constraint keeps them
-        // available. Library tasks are d100 drop-row gathers —
-        // the per-scenario "state" (success / scene-block / tool-block / timed /
-        // empty / blind) comes from the environment config or the drop-rate, since
-        // progressive/check/catalyst/failure task resolution no longer exists.
+        // Player-gathering scenario library tasks.
         {
           id: 'smoke-meadow-herbs', name: 'Gather Meadow Herbs',
           description: 'Pick fresh herbs from the open meadow.',
@@ -2749,29 +2215,13 @@ async function seedSmokeGatheringLibrary(page, craftingSetup) {
     };
     await game.settings.set('fabricate', 'gatheringConfig', config);
 
-    // Tools are SYSTEM-OWNED (the `craftingSystems` setting). The Tools manager
-    // (`getSystem(id).tools` → `enterToolsDraft`) and the gathering tool gate read
-    // tools from the crafting system, NOT from gatheringConfig (the 0.7.0
-    // reconciliation only runs at world-load, not after a later seed). Persist the
-    // seeded library tools onto the crafting system so the Tools view renders the
-    // row and tool-blocked gathering tasks resolve their requirement.
+    // Tools are system-owned (the `craftingSystems` setting).
     await game.fabricate.getCraftingSystemManager()?.updateSystem?.(sysId, {
       tools: Array.isArray(config.systems?.[sysId]?.tools) ? config.systems[sysId].tools : []
     });
 
-    // Seed two environment-store fixtures so the player Gathering tab frame
-    // exercises both the locked teaser path and the blind chip + "(x/y)"
-    // discovered suffix:
-    //  - smoke-blind-grove   : enabled + selectionMode 'blind'. With the
-    //    system rules.revealPolicy === 'onAttempt' above, its card shows the
-    //    mask chip and the "(discovered/total)" suffix.
-    //  - smoke-locked-hollow : enabled === false. For non-GM players this would
-    //    render as a greyed locked teaser; the smoke run is GM, so it renders as
-    //    a full listing (locked teasers are player-only and unit-test-covered).
-    // Idempotent: the function runs twice in Phase D0, so skip ids already
-    // present in the store. Imagery MUST use Foundry-core icon paths that exist
-    // in the smoke Foundry version — a missing path 404s on every render and
-    // trips the console-error gate (these reuse icons proven to load in-run).
+    // Seed two environment-store fixtures so the player Gathering tab frame exercises both the
+    // locked teaser path and the blind chip + "(x/y)" discovered suffix.
     const environmentStore = game.fabricate.getGatheringEnvironmentStore?.();
     if (environmentStore) {
       const existingIds = new Set((environmentStore.list?.() || []).map(env => String(env?.id || '')));
@@ -2807,47 +2257,7 @@ async function seedSmokeGatheringLibrary(page, craftingSetup) {
   }, { sysId: craftingSetup.systemId, componentMap: craftingSetup.componentMap });
 }
 
-/**
- * Seed the craft-execution coverage fixtures for issue #489.
- *
- * These are ALWAYS-RUN (rc/ci included): the crafts, tool breakages, salvage,
- * and negative gating below are cheap `page.evaluate` calls with no screenshots,
- * so they maximise CI coverage without materially moving the rc budget. Because
- * crafting resolution mode is a SYSTEM-level property (`getMode(recipe)` reads
- * `system.resolutionMode`), each mode needs its own system:
- *
- *  - "Smoke Simple Forge"        — `simple` mode; hosts the simple craft, both
- *                                  tool-breakage recipes (`breakageChance` +
- *                                  `limitedUses`), the negative tool-gating
- *                                  recipe, and a `salvageResolutionMode: 'simple'`
- *                                  salvageable component.
- *  - "Smoke Ingredient Router"   — `routedByIngredients`; a recipe with TWO
- *                                  ingredient sets mapping to DIFFERENT result
- *                                  groups (proves set→group routing).
- *  - "Smoke Check Router"        — `routedByCheck` with a deterministic
- *                                  `1d20 + 20` → Masterwork routed check and a
- *                                  recipe with TWO result groups on different
- *                                  tiers (proves tier→group routing, not the
- *                                  single-group exemption).
- *  - "Smoke Progressive Forge"   — `progressive` with a `1d20 + 20` progressive
- *                                  check; a low-difficulty result awarded in a
- *                                  single deterministic advance.
- *
- * It also seeds a guaranteed-success (`dropRate: 100`) gather task + scene-less
- * environment under the EXISTING Arcane Forge system so one execute-and-assert
- * gather can run under rc/ci via `startGatheringAttempt` (no UI / roll prompt).
- *
- * The crafter's inventory is topped up with each recipe's ingredients, the two
- * breakable tools (the `limitedUses` chisel pre-seeded to `maxUses - 1` so a
- * single craft crosses the threshold), and the salvageable component — every
- * inventory copy carries `flags.core.sourceId` so the engine matches it to the
- * managed component.
- *
- * @param {import('playwright').Page} page
- * @param {{ systemId: string, componentMap: Record<string,string> }} craftingSetup
- * @param {string} crafterId
- * @returns {Promise<object>} Fixture ids (systems, recipes, world items, tools, gather refs).
- */
+/** Seed the craft-execution coverage fixtures for issue #489. */
 async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
   return await page.evaluate(async ({ arcaneSystemId, mysticHerbComponentId, crafterId }) => {
     const csm = game.fabricate.getCraftingSystemManager();
@@ -2879,23 +2289,12 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       { name: 'Smoke Copper Coil', img: 'icons/commodities/metal/fragments-steel-barbed.webp' },
       { name: 'Smoke Bronze Coil', img: 'icons/commodities/metal/ingot-engraved-silver.webp' },
       { name: 'Smoke Filigree', img: 'icons/commodities/metal/ingot-gold.webp' },
-      // simple system — the requirement-rail / shared essence pool fixtures (issue 917).
-      // Before this the world seeded ZERO essence-carrying components, so every essence
-      // frame photographed `have: 0` and a shared pool could not be shot at all.
-      //
-      // Two DUAL-essence carriers plus one single-essence contrast carrier fund the pool.
-      // Their per-unit yields (set below, after the essence library exists) are chosen so
-      // the two-requirement recipe is CONTENDED: `Smoke Tide Essence` can only be met by
-      // spending BOTH duals, which under the old per-group disjoint draw would leave the
-      // Star requirement short — so the frame proves D-ESS joint crediting rather than
-      // showing two trivially-met bars.
+      // Simple system — the requirement-rail / shared essence pool fixtures (issue 917).
       { name: 'Smoke Duskcrystal', img: 'icons/magic/water/barrier-ice-crystal-wall-faceted-blue.webp' },
       { name: 'Smoke Tidebloom', img: 'icons/commodities/flowers/lotus-white.webp' },
       { name: 'Smoke Starmote', img: 'icons/commodities/materials/bowl-powder-teal.webp' },
-      // The FIXED (non-selectable) requirement every new rail recipe opens with, so each
-      // rail frame shows a met fixed tile beside the states actually under test. It is a
-      // dedicated component rather than a reused plank so the plank budget the execution
-      // asserts spend down (5 planks, exactly consumed) is not disturbed.
+      // The fixed (non-selectable) requirement every new rail recipe opens with, so each rail frame
+      // shows a met fixed tile beside the states actually under test.
       { name: 'Smoke Runeplate', img: 'icons/commodities/metal/ingot-stack-steel.webp' },
       // routedByIngredients system
       { name: 'Smoke Ingot A', img: 'icons/commodities/metal/ingot-engraved-silver.webp' },
@@ -2906,22 +2305,15 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       { name: 'Smoke Bar', img: 'icons/commodities/metal/ingot-plain-steel.webp' },
       { name: 'Smoke Masterwork Blade', img: 'icons/weapons/swords/sword-guard-blue.webp' },
       { name: 'Smoke Standard Blade', img: 'icons/weapons/swords/greatsword-blue.webp' },
-      // progressive system — THREE result stages with DISTINCT difficulties (issue 651).
-      // Distinct is the point: the player stage list shows a cumulative "Reached at >=N"
-      // per row, and equal difficulties would make a carried/stale threshold invisible.
-      // The long name is deliberate — it is the stacked frame's ellipsis subject.
+      // Progressive system — three result stages with distinct difficulties (issue 651).
       { name: 'Smoke Clay', img: 'icons/commodities/stone/clay-grey.webp' },
-      // Issue 675: the progressive-salvage subject. Breaking it down spends ONE roll
-      // down the same three stages the progressive craft awards, so its reorderable
-      // stage list is the player salvage surface's headline frame.
+      // Issue 675: the progressive-salvage subject.
       { name: 'Smoke Cracked Amphora', img: 'icons/containers/kitchenware/vase-clay-painted-blue-gold.webp' },
       { name: 'Smoke Brick', img: 'icons/commodities/stone/masonry-bricks-brown.webp' },
       { name: 'Smoke Kiln-Fired Ceramic Roofing Tile', img: 'icons/commodities/stone/paver-tile-blue.webp' },
       { name: 'Smoke Glazed Amphora', img: 'icons/containers/kitchenware/jug-clay-brown.webp' },
-      // Issue 766: ONE physical world item registered as a salvageable component in TWO
-      // crafting systems (the simple forge and the progressive forge). A single crafter
-      // copy of it must collapse to ONE inventory card carrying a system selector — the
-      // reported "same item shows twice, once per system" defect and its fix.
+      // Issue 766: one physical world item registered as a salvageable component in two crafting
+      // systems (the simple forge and the progressive forge).
       { name: 'Smoke Air Shard', img: 'icons/commodities/gems/pearl-turquoise.webp' }
     ];
     const createdItems = await Item.createDocuments(
@@ -2978,9 +2370,7 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       // two systems, one collapsed card.
       'Smoke Air Shard'
     ]);
-    // Issue 766: Smoke Air Shard salvage in the SIMPLE forge (simple mode, yields Smoke
-    // Shard). Its progressive-forge participation (below) salvages differently, so the
-    // collapsed card's two participations carry genuinely distinct salvage surfaces.
+    // Issue 766: Smoke Air Shard salvage in the simple forge (simple mode, yields Smoke Shard).
     await csm.updateItem(simpleSystemId, simpleMap['Smoke Air Shard'], {
       salvage: {
         enabled: true,
@@ -3004,19 +2394,9 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       // Issue 765: unlock explicit multi-step authoring so the simple system can host
       // a stepped recipe (the player-crafting-multistep screenshot subject).
       features: { multiStepRecipes: true, essences: true },
-      // Issue 917: authored tag vocabulary for 'Smoke Sigil Etching' (acceptance
-      // criterion 5). `_validateTagPlaceholders` rejects a recipe whose tag match
-      // names anything outside `system.itemTags`, so the tag must be registered here
-      // for the recipe to persist at all. No component registered in this system is
-      // ever given this tag, so the requirement stays authored-but-unmatched — the
-      // whole point of the fixture.
+      // Issue 917: authored tag vocabulary for 'Smoke Sigil Etching' (acceptance criterion 5).
       itemTags: ['smoke-voidbound'],
-      // Three authored essences (issue 917). `colorToken` is a BARE `--fab-tag-*` key —
-      // never a hex and never the `--fab-tag-` prefix — because the normalizer strips the
-      // prefix and every tinted surface composes `var(--fab-tag-<token>)` itself. Two
-      // distinct tokens are what make the shared-pool frame legible: each meter, glyph and
-      // contribution chip carries its own tint, so a reader can tell which carrier unit
-      // funded which requirement.
+      // Three authored essences (issue 917).
       essenceDefinitions: [
         {
           id: 'smoke-star-essence',
@@ -3033,11 +2413,7 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
           colorToken: 'lavender'
         },
         {
-          // Deliberately carried by NOTHING in the world. It is the only way to shoot a
-          // zero-delivered (danger) essence tile at rest: a carried essence always ends up
-          // partly delivered, because the resolver's suggestion allocates every carrier it
-          // can, and clearing the whole allocation makes the store fall back to that same
-          // suggestion (an empty map re-reads the baked craftability).
+          // Deliberately carried by nothing in the world.
           id: 'smoke-ember-essence',
           name: 'Smoke Ember Essence',
           description: 'Authored essence with no carrier in the world — the short-tile fixture.',
@@ -3056,12 +2432,8 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
           onBreak: { mode: 'flagBroken' }
         },
         {
-          // limitedUses: applyUsage increments FIRST, then evaluateBreakage compares
-          // post-increment `timesUsed >= maxUses`. The assertion crafts this recipe
-          // `maxUses` (2) times — the first craft (timesUsed 1 < 2) does NOT break,
-          // the second (timesUsed 2 >= 2) crosses the threshold and breaks. This
-          // "craft maxUses times" variant avoids pre-seeding the double-nested
-          // `flags.fabricate.fabricate.toolUsage` accessor from item-creation data.
+          // LimitedUses: applyUsage increments first, then evaluateBreakage compares post-increment
+          // `timesUsed >= maxUses`.
           id: chiselToolId,
           label: 'Smoke Chisel',
           enabled: true,
@@ -3080,22 +2452,7 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
         }
       ]
     });
-    // Issue 917: per-unit essence yields on the pool's carriers. This MUST run after the
-    // `essenceDefinitions` write above — `_normalizeComponent` filters the map against the
-    // system's `validEssenceIds`, so an id authored before its definition exists is
-    // silently dropped. `essences` on the managed COMPONENT is the field the resolver
-    // reads (`resolveItemEssences` falls back to it for every inventory copy matched by
-    // `flags.core.sourceId`), so no per-item essence flag is seeded: the flag path is read
-    // through `getFabricateFlag(item, 'essences')`, which resolves the DOUBLE-nested
-    // `flags.fabricate.fabricate.essences`, and a single-nested seed would be a silent
-    // no-op.
-    //
-    // The numbers are the fixture's whole point. Against `Smoke Tidecore Tempering`
-    // (Star 2 + Tide 3 in ONE set) the only Tide sources are the two duals, totalling
-    // exactly 3 — so a disjoint per-group draw spends both on Tide and leaves Star with
-    // just the Starmote's 1 of the 2 it needs (infeasible), while the block's joint
-    // crediting funds both from the same two units (feasible). The contended pool is what
-    // the `-essence-pool-shared` frame photographs.
+    // Issue 917: per-unit essence yields on the pool's carriers.
     const simpleCarrierEssences = {
       'Smoke Duskcrystal': { 'smoke-star-essence': 2, 'smoke-tide-essence': 2 },
       'Smoke Tidebloom': { 'smoke-star-essence': 1, 'smoke-tide-essence': 1 },
@@ -3119,10 +2476,7 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
         }]
       }
     });
-    // Issue 777: required-tools salvage subject. Simple no-check salvage (same shape as
-    // Smoke Relic) with `toolIds` naming two library tools — the Mallet the crafter holds
-    // (available) and the Anvil it does not (unavailable) — so the player-salvage-tools
-    // frame shows both availability states and the disabled pre-roll action in one panel.
+    // Issue 777: required-tools salvage subject.
     await csm.updateItem(simpleSystemId, simpleMap['Smoke Toolchest'], {
       salvage: {
         enabled: true,
@@ -3195,9 +2549,7 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
     });
     await rm.updateRecipe(negativeToolRecipe.id, { toolIds: [anvilToolId] });
 
-    // Multi-option ingredient recipe (issue #552): a component OR authored essence
-    // choice. The held component keeps the recipe selectable while the essence option
-    // deterministically exercises its distinctive authored glyph.
+    // Multi-option ingredient recipe (issue #552): a component OR authored essence choice.
     const multiOptionRecipe = await rm.createRecipe({
       name: 'Smoke Weave Filigree',
       description: 'Simple-mode craft with one component-or-essence ingredient choice (issue #552).',
@@ -3243,37 +2595,20 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
         ingredientGroups: [{
           id: 'smoke-star-essence-group',
           name: 'Star Essence',
-          // 6, not the pre-917 3: the world now HOLDS 4 Star (2 + 1 + 1 across the three
-          // carriers), and a need of 3 would clear the shopping-list shortage this recipe
-          // is also the fixture for — `player-crafting-essence-shopping` waits on an
-          // acquire row that would then never render. 6 keeps the shortage AND makes this
-          // the single-requirement pool frame: a partly-funded meter with real numbers
-          // instead of the 0/3 every essence frame photographed before.
+          // 6, not the pre-917 3: the world now holds 4 Star (2 + 1 + 1 across the three carriers),
+          // and a need of 3 would clear the shopping-list shortage this recipe is also the fixture
+          // for — `player-crafting-essence-shopping` waits on an acquire row that would then never
+          // render.
           options: [{ quantity: 1, match: { type: 'essence', essenceId: 'smoke-star-essence', amount: 6 } }]
         }]
       }],
       resultGroups: [{ name: 'Draught', results: [{ componentId: simpleMap['Smoke Toy'], quantity: 1 }] }]
     });
 
-    // ── Issue 917 requirement-rail fixtures ─────────────────────────────────
-    // Three recipes, each authored for ONE rendered state the redesign has to prove and
-    // that no existing fixture can reach. All are display-only: no execution assert
-    // crafts them, and none is craftable, so they add no consumption anywhere.
-    //
-    // THE NAMES ARE LOAD-BEARING. The player recipe browser sorts A→Z and pages at 12,
-    // and the walk's mode-based selection (`selectCraftingRecipeByMode`) only iterates the
-    // rows currently in the DOM — i.e. page one. Page one presently ends at 'Smoke Carve
-    // Toy', so a fixture named 'Smoke Bind…' or 'Smoke Etch…' would displace it and
-    // silently re-point `player-crafting-ingredient-routed`, `-routed-by-check` and the
-    // craft that produces `-run-summary`/`-roll-result` at an UNCRAFTABLE display fixture.
-    // These three names sort at positions ~20-22, so page one is unchanged. Every capture
-    // below reaches its recipe through the browser SEARCH, which collapses the list to one
-    // row, so their own page position never matters.
+    // Three recipes, each authored for one rendered state the redesign has to prove and that no
+    // existing fixture can reach.
 
-    // (1) The rail's three states in one frame. Author order is load-bearing — the rail
-    // auto-advances to the FIRST unsatisfied openable slot, so the choice group must
-    // precede the essence group for the alternatives chooser (rather than the pool) to be
-    // the one open chooser in the shot.
+    // (1) The rail's three states in one frame.
     await rm.createRecipe({
       name: 'Smoke Runestaff Binding',
       description: 'Requirement rail: a met fixed slot, an unchosen choice slot, and a short essence slot.',
@@ -3288,9 +2623,7 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
             options: [{ quantity: 1, match: { type: 'component', componentId: simpleMap['Smoke Runeplate'] } }]
           },
           {
-            // Two alternatives the crafter holds NEITHER of. An untouched choice whose
-            // group already resolves satisfied renders MET, so an unaffordable pair is the
-            // only way to shoot the "unchosen → accent, never danger" state.
+            // Two alternatives the crafter holds neither of.
             id: 'smoke-rail-binding',
             name: 'Binding',
             options: [
@@ -3308,25 +2641,7 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       resultGroups: [{ name: 'Runestaff', results: [{ componentId: simpleMap['Smoke Filigree'], quantity: 1 }] }]
     });
 
-    // (2) The shared pool. TWO essence requirements in ONE set (sibling groups, each a
-    // single essence option) beside a fixed group, so the same selection also supplies the
-    // consumption-plan frame: a fixed row, an essence-carrier row and a "still to choose"
-    // line, all at once.
-    //
-    // Issue 917 review: `player-crafting-consumption-plan` and `player-crafting-essence-
-    // pool-shared` were captured on this SAME recipe at the SAME store state, differing
-    // only by `scrollIntoViewIfNeeded` — a no-op frame if the plan panel is already in
-    // view at the capture size. `smoke-shared-fitting` is an unaffordable pair (neither
-    // option held, same pattern as `smoke-rail-binding` above), so it stays PARTIAL —
-    // "unchosen" — for the life of both captures. It never contributes a plan row (an
-    // untouched choice contributes only to `pending`), so it does not disturb the
-    // existing `rows`/`carrierRows` assertions below, but it DOES put a non-essence
-    // requirement on the consumption plan's "still to choose" line — evidence the
-    // essence-pool panel (which shows only essence carriers) never renders at all. (The
-    // tile reports its CHOSEN OPTION's name there, not the authored group label, so the
-    // pending line names 'Smoke Anvil' rather than 'Fitting' — verified against a live
-    // run.) That is what makes the two frames prove different things instead of the same
-    // state twice.
+    // (2) The shared pool.
     await rm.createRecipe({
       name: 'Smoke Tidecore Tempering',
       description: 'Shared essence pool: two requirements in one set funded jointly from dual carriers.',
@@ -3363,11 +2678,8 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       resultGroups: [{ name: 'Tidecore', results: [{ componentId: simpleMap['Smoke Filigree'], quantity: 1 }] }]
     });
 
-    // (3) The item-bag defect (acceptance criterion 5). The tag names nothing any seeded
-    // component carries, so the tile has no inventory item to borrow an image from and
-    // must render its glyph. Both of this set's groups are single-option and
-    // non-essence, so the rail offers NO openable slot at all — which is also the only
-    // fixture in the world that photographs the rail with every chooser closed.
+    // (3) The item-bag defect (acceptance criterion 5). The tag names nothing any seeded component
+    // carries, so the tile has no inventory item to borrow an image from and must render its glyph.
     await rm.createRecipe({
       name: 'Smoke Sigil Etching',
       description: 'Tag requirement with nothing matching in inventory: the tile must render a glyph, not the item bag.',
@@ -3391,14 +2703,7 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       resultGroups: [{ name: 'Sigil', results: [{ componentId: simpleMap['Smoke Filigree'], quantity: 1 }] }]
     });
 
-    // Explicit multi-step simple recipe (issue 765): the reported defect. Its sets
-    // live on steps[] with empty top-level arrays, so the step-aware listing
-    // projection must surface each step's materials, evaluate the first step's
-    // craftability, and resolve PRODUCES from the TERMINAL step. Checks stay off
-    // (the simple system has no authored formula), so no check card renders — the
-    // player-crafting-multistep screenshot subject. Additive: no execution assert
-    // consumes it. Step 1 consumes held planks (craftable/available); step 2's
-    // dowel is the intermediate, and the final product is the crate.
+    // Explicit multi-step simple recipe (issue 765): the reported defect.
     const multiStepRecipe = await rm.createRecipe({
       name: 'Smoke Raise Tent',
       description:
@@ -3552,11 +2857,7 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
         'Smoke Brick',
         'Smoke Kiln-Fired Ceramic Roofing Tile',
         'Smoke Glazed Amphora',
-        // Issue 675: the ONLY progressive-salvage fixture in the repo. Before it there
-        // was none anywhere — `Smoke Relic` is a SIMPLE-mode salvage with no check
-        // formula (so it renders the no-check body) and `Iron Ore` is seeded for the
-        // component EDITOR, not player inventory — so the player salvage surface's
-        // headline feature, the reorderable stage list, had no capturable frame.
+        // Issue 675: the ONLY progressive-salvage fixture in the repo.
         'Smoke Cracked Amphora',
         // Issue 766: the SAME world item already registered in the simple forge — so one
         // owned copy resolves to a component in both systems and collapses to one card.
@@ -3564,10 +2865,8 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       ],
       1
     );
-    // `registerComponents` applies ONE difficulty to every name, so re-stamp the three
-    // result stages individually. Difficulties 1/4/9 give ascending `equal`-mode
-    // thresholds of >=1, >=5, >=14 — far enough apart that a wrong (e.g. carried) value
-    // is obvious in a screenshot without knowing the fixture.
+    // `registerComponents` applies one difficulty to every name, so re-stamp the three result
+    // stages individually.
     const progressiveStageDifficulty = {
       'Smoke Brick': 1,
       'Smoke Kiln-Fired Ceramic Roofing Tile': 4,
@@ -3590,10 +2889,8 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
         // single advance awards it (progressive is budget-vs-difficulty, not tiered).
         progressive: { rollFormula: '1d20 + 20', awardMode: 'equal' }
       },
-      // Issue 675 — SALVAGE'S OWN mode and check block, authored independently of the
-      // recipe's above. This is exactly the pair a projection that read `craftingCheck`
-      // instead of `salvageCraftingCheck` would confuse: the award modes differ
-      // (`partial` vs `equal`), so a wrong read renders visibly wrong thresholds.
+      // Issue 675 — salvage's own mode and check block, authored independently of the recipe's
+      // above.
       salvageResolutionMode: 'progressive',
       salvageCraftingCheck: {
         enabled: true,
@@ -3631,10 +2928,8 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
         ]
       }
     });
-    // Issue 766: Smoke Air Shard salvage in the PROGRESSIVE forge (simple mode here for a
-    // deterministic capture, yielding Smoke Brick). Its simple-forge participation yields
-    // Smoke Shard — so the collapsed card's System selector switches between two genuinely
-    // different salvage surfaces, proving the whole body re-scopes to the chosen system.
+    // Issue 766: Smoke Air Shard salvage in the progressive forge (simple mode here for a
+    // deterministic capture, yielding Smoke Brick).
     await csm.updateItem(progressiveSystemId, progressiveMap['Smoke Air Shard'], {
       salvage: {
         enabled: true,
@@ -3665,10 +2960,9 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       }]
     });
 
-    // Flag-OFF sibling (issue 651): the same three stages with the GM's reorder
-    // permission withheld, so the player stage list renders its fixed state (no grips,
-    // no move buttons, ordinals + difficulty retained, "Order set by the GM" line).
-    // Default-true means the ONLY way to shoot that state is to author an explicit false.
+    // Flag-OFF sibling (issue 651): the same three stages with the GM's reorder permission
+    // withheld, so the player stage list renders its fixed state (no grips, no move buttons,
+    // ordinals + difficulty retained, "Order set by the GM" line).
     await rm.createRecipe({
       name: 'Smoke Kiln Firing',
       description: 'progressive: stage order fixed by the GM (allowPlayerResultReorder: false).',
@@ -3692,24 +2986,12 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       ...invCopies('Smoke Plank', 5),                 // simple(1) + breakage(1) + limitedUses(2) crafts; negative consumes none
       ...invCopies('Smoke Mallet', 1),                // breakageChance tool
       ...invCopies('Smoke Chisel', 1),                // limitedUses tool (broken by crafting maxUses times)
-      // TWO copies (issue 675), not one. The always-run `exec-salvage-run` step calls
-      // engine.salvage() on this and CONSUMES a copy, and it runs in a different
-      // Playwright phase from the player-app capture — so ordering the capture ahead of
-      // it is not viable. With one copy the Inventory tab has no salvageable row left to
-      // photograph. That step asserts only `result.success`, `results != null` and
-      // `shardAfter > shardBefore`, and nothing repo-wide counts Smoke Relic, so a second
-      // copy is inert. The player-salvage capture below does NOT commit a salvage; if it
-      // ever does, this must become 3.
+      // Two copies (issue 675), not one.
       ...invCopies('Smoke Relic', 2),                 // salvageable component
       ...invCopies('Smoke Toolchest', 1),             // issue 777: required-tools salvage subject
       ...invCopies('Smoke Copper Coil', 1),           // multi-option recipe alternative A (#552)
       ...invCopies('Smoke Bronze Coil', 1),           // multi-option recipe alternative B (#552)
-      // Issue 917 — the shared essence pool's ledger, in DELIBERATE quantities. One unit
-      // of each carrier: `_initialRemaining` keys the ledger by item and reads
-      // `system.quantity`, so N copies would render N identically-named carrier rows
-      // rather than one row of N. With Star 2/Tide 2 + Star 1/Tide 1 + Star 1 the world
-      // holds Star 4 and Tide 3 — exactly the Tide the two-requirement recipe needs, which
-      // is what makes its pool contended rather than comfortably over-funded.
+      // Issue 917 — the shared essence pool's ledger, in deliberate quantities.
       ...invCopies('Smoke Duskcrystal', 1),           // dual carrier (Star 2, Tide 2)
       ...invCopies('Smoke Tidebloom', 1),             // dual carrier (Star 1, Tide 1)
       ...invCopies('Smoke Starmote', 1),              // single-essence contrast carrier (Star 1)
@@ -3726,10 +3008,9 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       ...invCopies('Smoke Air Shard', 1)              // multi-system collapse subject (#766)
     ]);
 
-    // ── 7. Always-run guaranteed-success gather (Arcane Forge, scene-less) ──
-    // A dropRate:100 d100 task under a scene-less manual environment so the
-    // rc/ci gather-inventory-delta assertion via startGatheringAttempt is
-    // deterministic (no scene gate, no tool gate, no roll prompt).
+    // A dropRate:100 d100 task under a scene-less manual environment so the rc/ci
+    // gather-inventory-delta assertion via startGatheringAttempt is deterministic (no scene gate,
+    // no tool gate, no roll prompt).
     const rcGatherTaskId = 'smoke-rc-forage';
     const config = foundry.utils.deepClone(game.settings.get('fabricate', 'gatheringConfig') || {});
     config.systems = config.systems || {};
@@ -3764,11 +3045,10 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
     await game.settings.set('fabricate', 'gatheringConfig', config);
 
     const environmentStore = game.fabricate.getGatheringEnvironmentStore();
-    // rc/ci gather env: MANUAL composition picks ONLY the guaranteed task (issue
-    // 1315: manual composes exactly `enabledTaskIds`, so the id lives there rather
-    // than on a force list, which manual mode ignores) and NO events, so the
-    // always-run inventory-delta assertion cannot be perturbed by a hazardous event
-    // flipping the outcome.
+    // rc/ci gather env: manual composition picks ONLY the guaranteed task (issue 1315: manual
+    // composes exactly `enabledTaskIds`, so the id lives there rather than on a force list, which
+    // manual mode ignores) and no events, so the always-run inventory-delta assertion cannot be
+    // perturbed by a hazardous event flipping the outcome.
     const rcGatherEnvironment = await environmentStore.create({
       craftingSystemId: arcaneSystemId,
       name: 'Smoke RC Meadow',
@@ -3782,14 +3062,8 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
       biomes: ['forest'],
       enabledTaskIds: [rcGatherTaskId]
     });
-    // Full-profile hazard env: AUTOMATIC composition + matching region/biome, so it
-    // composes BOTH the guaranteed task and the seeded hazardous smoke-bramble-event.
-    // The env MUST carry a hazardous danger level: automatic event composition only
-    // includes events up to the env's danger rank (evaluateDangerField:
-    // eventRank <= dangerRank(envLevel)), so a default 'safe' env would never compose
-    // the hazardous (rank 2) event — mirroring the Azure Grove fixture's dangerTags.
-    // Scene-less so a headless GM can attempt it (Azure Grove's sceneUuid gate blocks
-    // every viewer). The hazard assertion forces the event dropRate to 100 to fire.
+    // Full-profile hazard env: automatic composition + matching region/biome, so it composes both
+    // the guaranteed task and the seeded hazardous smoke-bramble-event.
     const hazardEnvironment = await environmentStore.create({
       craftingSystemId: arcaneSystemId,
       name: 'Smoke Hazard Grove',
@@ -3844,36 +3118,7 @@ async function seedSmokeCraftExecutionFixtures(page, craftingSetup, crafterId) {
   });
 }
 
-/**
- * Seed the player-facing Alchemy workbench coverage fixtures (issue #543).
- *
- * Creates TWO enabled `resolutionMode: 'alchemy'` crafting systems so the shared
- * Fabricate app both surfaces the Alchemy tab (see `isAlchemyTabAvailable`: an
- * enabled alchemy system owning at least one recipe) AND renders the discipline
- * chooser (which only appears with more than one alchemy system):
- *
- *  - "Bubbling Cauldron" — reuses the EXISTING world items the crafter already
- *    owns (Mystic Herb, Empty Vial, Dragon Scale, seeded in Phase B) as managed
- *    components so the workbench inventory column shows owned, placeable
- *    components, plus two product components. Two valid alchemy recipes with
- *    DISTINCT ingredient signatures (Mystic Herb×2; Mystic Herb×1 + Empty Vial×1),
- *    each with one result group and `resultSelection.provider: 'ingredientSet'`,
- *    no steps.
- *  - "Herbalist's Table" — a second alchemy system with its own component +
- *    product and one valid recipe, enough to give the chooser a second card.
- *
- * Alchemy recipes are authored AFTER the owning system is switched to alchemy:
- * `createRecipe` runs activation validation under the system's resolution mode
- * (the alchemy rules require ingredient sets, result groups, the `ingredientSet`
- * provider and no explicit steps) plus a per-system signature-uniqueness check,
- * so an invalid shape or a colliding signature throws here instead of silently
- * producing a disabled recipe. Every create/register is asserted.
- *
- * @param {import('playwright').Page} page
- * @param {{ systemId: string, componentMap: Record<string,string> }} craftingSetup
- * @param {string} crafterId
- * @returns {Promise<object>} Alchemy fixture ids (systems, recipes, product items, component maps).
- */
+/** Seed the player-facing Alchemy workbench coverage fixtures (issue #543). */
 async function seedSmokeAlchemyFixtures(page, craftingSetup, crafterId) {
   return await page.evaluate(async ({ crafterId }) => {
     const csm = game.fabricate.getCraftingSystemManager();
@@ -3894,17 +3139,15 @@ async function seedSmokeAlchemyFixtures(page, craftingSetup, crafterId) {
       return item;
     };
 
-    // Product / second-system world items. Alchemy result groups reference managed
-    // components, so the products (and the second system's ingredient) must be
-    // registered components too. Non-SVG raster core icons per the fixture rule.
+    // Product / second-system world items. Alchemy result groups reference managed components, so
+    // the products (and the second system's ingredient) must be registered components too.
     const productSpecs = [
       { name: 'Elixir of Vigor', img: 'icons/consumables/potions/potion-tube-corked-red.webp' },
       { name: 'Verdant Tonic', img: 'icons/consumables/potions/flask-corked-blue.webp' },
       { name: 'Powdered Root', img: 'icons/consumables/plants/dried-herb-bundle-brown.webp' },
       { name: 'Soothing Balm', img: 'icons/consumables/potions/bottle-round-corked-red.webp' },
-      // Issue #752: the minimal alchemy-mode system's one signature — a reagent
-      // and the brew it renders into. Kept tiny so the manager alchemy-settings
-      // capture has a representative alchemy system without growing Phase C.
+      // Issue #752: the minimal alchemy-mode system's one signature — a reagent and the brew it
+      // renders into.
       { name: 'Smoke Bench Reagent', img: 'icons/consumables/plants/grass-leaves-green.webp' },
       { name: 'Smoke Bench Brew', img: 'icons/consumables/potions/bottle-conical-corked-blue.webp' }
     ];
@@ -4034,10 +3277,8 @@ async function seedSmokeAlchemyFixtures(page, craftingSetup, crafterId) {
       }]
     });
 
-    // ── System 3: Smoke Alchemy Bench (issue #752) ──────────────────────────
-    // The minimal alchemy-mode system whose Crafting → Settings surface the
-    // manager alchemy-settings capture photographs (demonstrating #736's #713
-    // half). Smallest viable config: one reagent, one product, one signature.
+    // The minimal alchemy-mode system whose Crafting → Settings surface the manager
+    // alchemy-settings capture photographs (demonstrating #736's #713 half).
     const bench = await csm.createSystem({
       name: 'Smoke Alchemy Bench',
       description: 'Issue #752: minimal alchemy-mode system for the manager alchemy-settings capture.'
@@ -4047,12 +3288,8 @@ async function seedSmokeAlchemyFixtures(page, craftingSetup, crafterId) {
     await csm.updateSystem(benchId, {
       resolutionMode: 'alchemy',
       enabled: true,
-      // `checkMode: 'simple'` is LOAD-BEARING for the manager alchemy-settings capture, not
-      // decoration. The capture photographs the Alchemy behaviour card, which `ChecksView`
-      // renders only inside the crafting route's ON FAILURE section. An alchemy system whose
-      // `alchemy.checkMode` is `none` reads as `routeIsOff`, and an off route collapses the
-      // section strip to `roll` alone — so with the default mode neither the section button the
-      // capture clicks nor the card it frames can ever render, and the step times out.
+      // `checkMode: 'simple'` is load-bearing for the manager alchemy-settings capture, not
+      // decoration.
       alchemy: {
         checkMode: 'simple',
         learnOnCraft: true,
@@ -4109,20 +3346,7 @@ async function seedSmokeAlchemyFixtures(page, craftingSetup, crafterId) {
   }, { crafterId });
 }
 
-/**
- * Execute and assert the issue #489 craft-execution coverage scenarios.
- *
- * Runs the crafts, tool breakages, salvage, negative gating, and the
- * guaranteed-success gather entirely via the runtime API (no UI/screenshots),
- * returning one `{ step, passed, error? }` record per scenario for the caller to
- * fold into `results.steps` (a failed record fails the run via the final
- * step-failure gate).
- *
- * @param {import('playwright').Page} page
- * @param {object} fixtures Result of {@link seedSmokeCraftExecutionFixtures}.
- * @param {string} crafterId
- * @returns {Promise<Array<{step: string, passed: boolean, error?: string}>>}
- */
+/** Execute and assert the issue #489 craft-execution coverage scenarios. */
 async function runCraftExecutionAsserts(page, fixtures, crafterId) {
   return await page.evaluate(async ({ fixtures, crafterId }) => {
     const steps = [];
@@ -4177,10 +3401,9 @@ async function runCraftExecutionAsserts(page, fixtures, crafterId) {
       record('exec-craft-routed-by-check', false, err.message);
     }
 
-    // ── routedByIngredients multi-set (chosen 2nd set's Amulet, NOT Ring) ────
-    // The chosen set (set B) maps to the Amulet group, which is resultGroups[1] —
-    // NOT the first group — so this fails against an "always emit resultGroups[0]"
-    // bug, proving set→group routing selects a non-index-0 group.
+    // The chosen set (set B) maps to the Amulet group, which is resultGroups[1] — NOT the first
+    // group — so this fails against an "always emit resultGroups[0]" bug, proving set→group routing
+    // selects a non-index-0 group.
     try {
       const ringBefore = countByName('Smoke Ring');
       const amuletBefore = countByName('Smoke Amulet');
@@ -4234,9 +3457,8 @@ async function runCraftExecutionAsserts(page, fixtures, crafterId) {
       record('exec-tool-breakage-chance', false, err.message);
     }
 
-    // ── limitedUses tool break at the maxUses threshold-crossing craft ───────
-    // maxUses is 2: craft twice. The first (post-increment timesUsed 1 < 2) must
-    // NOT break; the second (timesUsed 2 >= 2) crosses the threshold and breaks.
+    // MaxUses is 2: craft twice. The first (post-increment timesUsed 1 < 2) must NOT break; the
+    // second (timesUsed 2 >= 2) crosses the threshold and breaks.
     try {
       const recipe = rm.getRecipe(fixtures.simple.limitedUsesRecipeId);
       const first = await game.fabricate.craft(crafter, recipe, { componentSourceActors: [crafter] });
@@ -4326,25 +3548,8 @@ async function runCraftExecutionAsserts(page, fixtures, crafterId) {
 }
 
 /**
- * Full-profile-only gather assertions for issue #489: the seeded 0%-drop
- * ("empty") gather, the scene-blocked gather, and the hazardous "Bramble Snare"
- * event firing. These rely on fixtures seeded only under RUN_SCREENSHOT_PHASES
- * (`seedSmokeGatheringLibrary` + the player environment fixtures), so the caller
- * gates this behind the full profile.
- *
- * The hazardous-event gather runs against the scene-less "Smoke Hazard Grove"
- * environment, which composes the SAME seeded `smoke-bramble-event` by
- * condition/biome matching, rather than Azure Grove: Azure Grove carries a
- * `sceneUuid`, and the gathering scene-access gate (`createGatheringSceneAccess`)
- * blocks EVERY viewer — GM included — from attempting unless the linked scene is
- * the active scene with one of the actor's tokens on it, which a headless smoke
- * run cannot satisfy.
- *
- * @param {import('playwright').Page} page
- * @param {{ systemId: string }} craftingSetup
- * @param {{ environmentId: string, taskId: string }} gatherFixture Hazard env/task.
- * @param {string} crafterId
- * @returns {Promise<Array<{step: string, passed: boolean, error?: string}>>}
+ * Full-profile-only gather assertions for issue #489: the seeded 0%-drop ("empty") gather, the
+ * scene-blocked gather, and the hazardous "Bramble Snare" event firing.
  */
 async function runFullProfileGatherAsserts(page, craftingSetup, gatherFixture, crafterId) {
   return await page.evaluate(async ({ arcaneSystemId, hazardEnvironmentId, hazardTaskId, crafterId }) => {
@@ -4404,9 +3609,8 @@ async function runFullProfileGatherAsserts(page, craftingSetup, gatherFixture, c
 
     // ── hazardous "Bramble Snare" event fires (deterministic dropRate) ───────
     try {
-      // Force the seeded hazardous event to fire deterministically: raise its
-      // dropRate to 100 for this assertion (restored afterwards) so the d100
-      // event throw always lands.
+      // Force the seeded hazardous event to fire deterministically: raise its dropRate to 100 for
+      // this assertion (restored afterwards) so the d100 event throw always lands.
       const config = foundry.utils.deepClone(game.settings.get('fabricate', 'gatheringConfig') || {});
       const systemConfig = config.systems?.[arcaneSystemId] || {};
       const events = Array.isArray(systemConfig.events) ? systemConfig.events : [];
@@ -4454,11 +3658,7 @@ async function runFullProfileGatherAsserts(page, craftingSetup, gatherFixture, c
   });
 }
 
-/**
- * Exercise manager system edit controls without saving destructive changes.
- * @param {import('playwright').Page} page
- * @param {string} systemId
- */
+/** Exercise manager system edit controls without saving destructive changes. */
 async function exerciseManagerSystemEditPointerTargets(page, systemId) {
   if (await page.locator('.fabricate-manager #manager-system-name').count() === 0) {
     let editButton = page.locator(`${managerSystemRowSelector(systemId)} .manager-icon-button`).nth(0);
@@ -4481,21 +3681,16 @@ async function exerciseManagerSystemEditPointerTargets(page, systemId) {
   await page.locator('.fabricate-manager[data-manager-view="system-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
   await page.locator('.fabricate-manager #manager-system-name').first().fill('The Herbalist');
   await page.locator('.fabricate-manager #manager-system-description').first().fill('A field alchemy system for gathering herbs and brewing reliable remedies.');
-  // NOTE: the recipe-resolution-mode control moved off the system-edit view into
-  // the dedicated Crafting Settings section (`data-crafting-resolution-mode-option`
-  // in CraftingSettingsView) with the issue-511 Books & Scrolls refactor, so the
-  // old `data-system-resolution-mode-option` interaction that lived here is gone.
-  // The mode-change confirm flow is exercised where the control now lives.
+  // Note: the recipe-resolution-mode control moved off the system-edit view into the dedicated
+  // Crafting Settings section (`data-crafting-resolution-mode-option` in CraftingSettingsView) with
+  // the issue-511 Books & Scrolls refactor, so the old `data-system-resolution-mode-option`
+  // interaction that lived here is gone.
   await softClick(page.locator('.fabricate-manager [data-edit-control="advanced-options"] input'), { trial: true });
   await softClick(page.locator('.fabricate-manager [data-feature-key="gathering"] input'), { trial: true });
   await softClick(page.locator('.fabricate-manager .manager-header-actions .manager-button:has-text("Back to systems")'), { trial: true });
 }
 
-/**
- * Exercise manager environment browser pointer targets without mutating
- * environments.
- * @param {import('playwright').Page} page
- */
+/** Exercise manager environment browser pointer targets without mutating environments. */
 async function exerciseManagerEnvironmentPointerTargets(page) {
   await page.locator(railSelector('manager-nav-gathering')).click();
   await page.locator('.fabricate-manager .manager-environment-row').first().waitFor({ state: 'visible', timeout: 5_000 });
@@ -4525,15 +3720,11 @@ async function exerciseManagerEnvironmentPointerTargets(page) {
   await softClick(page.locator('.fabricate-manager .manager-header-actions .manager-button:has-text("Create environment")'), { trial: true });
 }
 
-/**
- * Dismiss global Foundry notifications that can cover screenshot targets.
- * @param {import('playwright').Page} page
- */
+/** Dismiss global Foundry notifications that can cover screenshot targets. */
 async function dismissFoundryNotifications(page) {
-  // Notifications are globally hidden via `installNotificationHidingCss()` at
-  // world-load, so this helper is largely defensive — kept in case the CSS is
-  // bypassed by a Foundry update or an in-test addStyleTag removal. No sleep:
-  // the DOM removal is synchronous from Playwright's perspective.
+  // Notifications are globally hidden via `installNotificationHidingCss()` at world-load, so this
+  // helper is largely defensive — kept in case the CSS is bypassed by a Foundry update or an
+  // in-test addStyleTag removal.
   await page.evaluate(() => {
     document
       .querySelectorAll('#notifications .notification, body > .notification, .notification')
@@ -4544,11 +3735,8 @@ async function dismissFoundryNotifications(page) {
 }
 
 /**
- * Inject a global stylesheet that hides Foundry's notification toasts so they
- * never overlay screenshots or block clicks. Called once per browser context
- * at world-load. Replaces a previous per-screenshot 300 ms `waitForTimeout`
- * that existed solely to let notifications fade out before capture.
- * @param {import('playwright').Page} page
+ * Inject a global stylesheet that hides Foundry's notification toasts so they never overlay
+ * screenshots or block clicks. Called once per browser context at world-load.
  */
 async function installNotificationHidingCss(page) {
   await page.addStyleTag({
@@ -4563,17 +3751,9 @@ async function installNotificationHidingCss(page) {
 }
 
 /**
- * Seed the pre-repair world state acceptance criterion 6c describes: an owned copy stamped with
- * a role flag naming the OLD id, the legacy flat scalar, one in-flight run of each kind at BOTH
- * flag depths, one recorded alchemy dead end, and the persisted re-key map that drives the
- * repair.
- *
- * The plan itself is computed by `scripts/lib/worldScopeIdentitySmoke.js` and unit-tested by
- * `tests/world-scope-identity-smoke-plan.test.js`; nothing here decides what to write or what to
- * expect. This function is the Foundry edge alone.
- *
- * @param {import('playwright').Page} page
- * @param {{systemId: string, actorId: string}} options
+ * Seed the pre-repair world state acceptance criterion 6c describes: an owned copy stamped with a
+ * role flag naming the old id, the legacy flat scalar, one in-flight run of each kind at both flag
+ * depths, one recorded alchemy dead end, and the persisted re-key map that drives the repair.
  */
 async function setupWorldScopeIdentityFixture(page, { systemId, actorId }) {
   const plan = planWorldScopeIdentitySmoke({
@@ -4621,16 +3801,7 @@ async function setupWorldScopeIdentityFixture(page, { systemId, actorId }) {
   );
 }
 
-/**
- * Run the REAL repair and assert every FLAG VALUE it must have rewritten.
- *
- * THE FLAG-VALUE ASSERTION IS WHAT CARRIES FALSIFIABILITY. Every resolution outcome on this
- * world stays green with `remapWorldScopeIdentityFlags` never written, because resolution falls
- * through to the source-reference tier this change does not touch.
- *
- * @param {import('playwright').Page} page
- * @param {{fixture: object}} options
- */
+/** Run the real repair and assert every FLAG value it must have rewritten. */
 async function verifyWorldScopeIdentityRemap(page, { fixture }) {
   const failures = await page.evaluate(async ({ fixture }) => {
     const { plan, actorId, itemId, namespace } = fixture;
@@ -4677,15 +3848,7 @@ async function verifyWorldScopeIdentityRemap(page, { fixture }) {
   }
 }
 
-/**
- * Remove every flag and setting the fixture wrote, restoring what was there before.
- *
- * The restore runs in a `finally` and must tolerate a `null` handle, because `setup` itself can
- * throw. The smoke world is REUSED across runs, so a skipped restore poisons every later run.
- *
- * @param {import('playwright').Page} page
- * @param {{fixture: object|null}} options
- */
+/** Remove every flag and setting the fixture wrote, restoring what was there before. */
 async function restoreWorldScopeIdentityFixture(page, { fixture }) {
   if (!fixture) return;
   await page.evaluate(async ({ fixture }) => {
@@ -4699,10 +3862,7 @@ async function restoreWorldScopeIdentityFixture(page, { fixture }) {
       const previous = (entry.key.startsWith('roles.') || entry.key === 'componentId'
         ? before.itemFlags
         : before.actorFlags)[entry.key];
-      // UNSET FIRST, ALWAYS. `Document#update`'s recursive merge never REMOVES a key, so writing
-      // the previous container back over a seeded one leaves every seeded run in it — and the
-      // smoke world is REUSED, so that residue outlives the run. Unsetting and then re-writing
-      // is the only sequence that leaves the world exactly as the fixture found it.
+      // Unset first, always.
       await document.unsetFlag(namespace, key);
       if (previous !== null && previous !== undefined) {
         await document.setFlag(namespace, key, previous);
@@ -4751,14 +3911,11 @@ async function setupToolStudioFixture(page, { systemId, recipeId }) {
     });
     if (!replacementSource) throw new Error('Tool Studio fixture could not create its replacement Item');
 
-    // Character prerequisites are WORLD scope (issue 1308/1311): the Tool Studio
-    // Requirements tab's `prerequisiteOptions` (`ToolRequirementsTab.svelte`, threaded
-    // through `ToolEditView`) reads `selectedCharacterPrerequisites`, which is
-    // `$viewState.worldCharacterPrerequisites` — the `characterLibraries` world setting's
-    // `characterPrerequisites` list — never `getSystem(id).characterPrerequisites`. The
-    // fixture below temporarily REPLACES that world list with the 5-row parity corpus and
-    // must restore the pre-fixture world list afterward, so what is captured here for
-    // restoration is the world list, not the system's (now-unused) legacy field.
+    // Character prerequisites are world scope (issue 1308/1311): the Tool Studio Requirements tab's
+    // `prerequisiteOptions` (`ToolRequirementsTab.svelte`, threaded through `ToolEditView`) reads
+    // `selectedCharacterPrerequisites`, which is `$viewState.worldCharacterPrerequisites` — the
+    // `characterLibraries` world setting's `characterPrerequisites` list — never
+    // `getSystem(id).characterPrerequisites`.
     const worldCharacterLibraries = game.settings.get('fabricate', 'characterLibraries') || {};
     const restore = {
       tools: clone(system.tools || []),
@@ -4883,9 +4040,8 @@ async function restoreToolStudioFixture(page, { systemId, recipeId, fixture }) {
       tools: fixture.tools,
       toolBreakage: fixture.toolBreakage,
     });
-    // Character prerequisites are WORLD scope; restore the pre-fixture world list rather
-    // than a system-scoped field (see the matching comment in `setupToolStudioFixture`).
-    // Read-modify-write so the world modifier library is not clobbered.
+    // Character prerequisites are world scope; restore the pre-fixture world list rather than a
+    // system-scoped field (see the matching comment in `setupToolStudioFixture`).
     await game.settings.set('fabricate', 'characterLibraries', {
       ...(game.settings.get('fabricate', 'characterLibraries') || {}),
       characterPrerequisites: fixture.characterPrerequisites,
@@ -4906,35 +4062,7 @@ async function restoreToolStudioFixture(page, { systemId, recipeId, fixture }) {
   }, { systemId, recipeId, fixture });
 }
 
-/**
- * Seed the GM Knowledge surface's runtime fixture (issue 785).
- *
- * The surface audits per-character RUNTIME knowledge, so the fixture is entirely
- * additive persisted world state: five NEW world Items registered as five NEW recipe
- * item definitions (one per cap profile), owned copies of each granted to real player
- * characters, and two seeded `learnedRecipes` entries. Nothing existing is mutated, so
- * `restoreKnowledgeFixture` is a pure teardown and the section is persisted-net-zero.
- *
- * The seeded copy states are the five renderable chip combinations plus the party-pool
- * hazard:
- *  - limited-use (3 uses, one spent)  → remaining-tone uses chip
- *  - uncapped                         → info "Unlimited" chip, Expend DISABLED
- *  - inert-but-not-spent (1 of 5, `inert: true`) → remaining chip PLUS the Inert chip.
- *    This is the state the `inert` merge-survival proof needs and the only one that
- *    can produce it (see `assertKnowledgeInertSurvivesExpend`).
- *  - spent (2 of 2, `inert: true`)    → danger "Spent" chip PLUS the Inert chip
- *  - `learnScope: 'total'` party-pool copy that is the SOURCE of a still-learned
- *    entry → raises the D8 ordering-hazard warning band.
- *
- * A grant-only access fixture actor carries a learned entry whose `sourceItemUuid`
- * dangles (its copy is gone) and NO owned copies, which gives both the "copy no longer
- * owned" source rung with its icon-led no-refund clause and a dashed empty tab state.
- * Its untouched siblings stay empty-inventory, which is what puts the dimmed "Nothing
- * tracked" row in the roster.
- *
- * @param {import('playwright').Page} page
- * @param {{systemId: string, recipeId: string, chipStatesActorId: string, partyPoolActorId: string}} options
- */
+/** Seed the GM Knowledge surface's runtime fixture (issue 785). */
 async function setupKnowledgeFixture(page, { systemId, recipeId, chipStatesActorId, partyPoolActorId }) {
   return page.evaluate(async ({ systemId, recipeId, chipStatesActorId, partyPoolActorId }) => {
     const clone = (value) => foundry.utils.deepClone(value);
@@ -5009,28 +4137,15 @@ async function setupKnowledgeFixture(page, { systemId, recipeId, chipStatesActor
     const definitionIds = [];
     const ownedByKey = {};
     const createdItems = new Map();
-    // PASS 1 — register the definitions and grant the owned copies while every
-    // definition's `recipeIds` is still EMPTY.
-    //
-    // This ordering is load-bearing, not stylistic. `RecipeItemLearningHook` listens on
-    // `createItem`, and for an uncapped book `caps.learn.consumeOnLearn` DEFAULTS TO
-    // TRUE (`learn.consumeOnLearn !== false`), so `learnRecipesFromOwnedItem` would
-    // learn the copy's recipes and then `item.delete()` the copy itself. Seeding
-    // membership first therefore destroyed the first granted copy outright (the later
-    // ones survived only because the recipe was by then already learned) and left an
-    // auto-learned entry behind on the holder that this fixture never cleaned up.
-    // With `recipeIds` empty, `_getRecipeItemDefinitions(recipe)` returns no member
-    // book for these definitions, so the hook finds zero learning candidates, emits no
-    // notification, and consumes nothing.
+    // PASS 1 — register the definitions and grant the owned copies while every definition's
+    // `recipeIds` is still empty.
     for (const [index, entry] of plan.entries()) {
       const { item: definition } = await csm.addRecipeItemFromUuid(systemId, sources[index].uuid);
       await csm.updateRecipeItemDefinition(systemId, definition.id, { caps: entry.caps });
       definitionIds.push(definition.id);
       // The owned copy claims its definition through the durable per-system roles map
-      // (`flags.fabricate.fabricate.roles.<systemId>.recipeItemDefinitionId`), which is
-      // tier 1 of `matchRecipeItemDefinition` — the same identity a real drag-to-actor
-      // copy resolves through. Built as an object literal rather than a dotted update
-      // path so nothing can mis-split on a key segment.
+      // (`flags.fabricate.fabricate.roles.<systemId>.recipeItemDefinitionId`), which is tier 1 of
+      // `matchRecipeItemDefinition` — the same identity a real drag-to-actor copy resolves through.
       const nested = { roles: { [systemId]: { recipeItemDefinitionId: definition.id } } };
       if (entry.usage) nested.recipeItemUsage = { ...entry.usage };
       const [owned] = await entry.holder.createEmbeddedDocuments('Item', [{
@@ -5092,11 +4207,8 @@ async function setupKnowledgeFixture(page, { systemId, recipeId, chipStatesActor
     return {
       definitionIds,
       recipeId,
-      // `deleteRecipeItemDefinition` NULLS `recipeItemId` / `linkedRecipeItemUuid` on
-      // every recipe the deleted definition claimed membership over. The fixture links
-      // its definitions to a real recipe (so the Type pill and "N recipes inside" read
-      // truthfully), so restore must not let that null-out land on the smoke world's
-      // recipe. Snapshot both link fields and repair them if it ever does.
+      // `deleteRecipeItemDefinition` nulls `recipeItemId` / `linkedRecipeItemUuid` on every recipe
+      // the deleted definition claimed membership over.
       recipeLinks: {
         recipeItemId: recipe.recipeItemId ?? null,
         linkedRecipeItemUuid: recipe.linkedRecipeItemUuid ?? null,
@@ -5113,30 +4225,7 @@ async function setupKnowledgeFixture(page, { systemId, recipeId, chipStatesActor
   }, { systemId, recipeId, chipStatesActorId, partyPoolActorId });
 }
 
-/**
- * Undo everything `setupKnowledgeFixture` created (issue 785).
- *
- * The seeded learned entries are removed with a real key DELETION via `unsetFlag`
- * (`flags.fabricate.fabricate.-=learnedRecipes`), NEVER a filtered `setFlag` map
- * rewrite: `Document#update`'s recursive merge never removes a key, so a rewritten map
- * leaves the seeded entry to resurrect on reload — leaving the section not net-zero and
- * poisoning every later smoke run's world, including unrelated PRs. Any pre-existing
- * map is written back only AFTER that deletion has landed.
- *
- * The owned copies are deleted BEFORE the learned entries so no budget-freeing path can
- * resolve a still-held source copy and decrement a party-pool key this fixture never
- * incremented.
- *
- * The companion-contract step's throwaway actor is deleted here too, and deleting the
- * DOCUMENT is what makes its granted entry go with it — a learned flag has no independent
- * existence. That is the whole reason the step creates its own actor rather than granting
- * onto a fixture character and undoing it: the only published undo is `resetActorKnowledge`,
- * which sweeps every learned id for the system, clears their discovery progress and
- * decrements learn budgets.
- *
- * @param {import('playwright').Page} page
- * @param {{systemId: string, fixture: object|null}} options
- */
+/** Undo everything `setupKnowledgeFixture` created (issue 785). */
 async function restoreKnowledgeFixture(page, { systemId, fixture }) {
   if (!fixture) return;
   await page.evaluate(async ({ systemId, fixture }) => {
@@ -5183,24 +4272,7 @@ async function restoreKnowledgeFixture(page, { systemId, fixture }) {
   }, { systemId, fixture });
 }
 
-/**
- * The single place the REAL Foundry `ObjectField` flag merge is exercised (issue 785).
- *
- * `_setRecipeItemUsage` writes `{ timesUsed }` ALONE, so only a usage-only write landing
- * on an already-`inert` document can prove that Foundry's recursive merge preserves the
- * sibling key. `_markRecipeItemInert` writes both keys in one payload and proves
- * nothing, and the unit suite's payload-level assertion cannot exercise the merge at all
- * (its `FakeDocument` is deliberately merge-blind).
- *
- * The copy MUST therefore be the inert-but-NOT-spent fifth state: a spent copy cannot be
- * expended and a still-capped copy carries no `inert`, so either would resolve to
- * `undefined === undefined` and pass unconditionally. That state is reachable from the
- * surface only because `canExpend` deliberately does not test `inert`, which this also
- * asserts.
- *
- * @param {import('playwright').Page} page
- * @param {object} fixture
- */
+/** The single place the real Foundry `ObjectField` flag merge is exercised (issue 785). */
 async function assertKnowledgeInertSurvivesExpend(page, fixture) {
   const { actorId, itemId } = fixture.ownedByKey.inert;
   const expend = page.locator(`.fabricate-manager [data-knowledge-expend="${itemId}"]`).first();
@@ -5225,16 +4297,7 @@ async function assertKnowledgeInertSurvivesExpend(page, fixture) {
   }
 }
 
-/**
- * Drive the GM Knowledge surface and capture its evidence frames (issue 785).
- *
- * Every frame is a genuinely distinct app state — a different roster selection, inner
- * tab, armed row, or manager width — because `collect` publishes one frame per view id
- * and a duplicate state would publish no new information.
- *
- * @param {import('playwright').Page} page
- * @param {{fixture: object}} options
- */
+/** Drive the GM Knowledge surface and capture its evidence frames (issue 785). */
 async function exerciseKnowledgeSurface(page, { fixture }) {
   const selectKnowledgeCharacter = async (actorId) => {
     await page.locator(`.fabricate-manager [data-knowledge-actor="${actorId}"]`).first().click();
@@ -5305,10 +4368,8 @@ async function exerciseKnowledgeSurface(page, { fixture }) {
   await assertNoScreenshotOverlays(page);
   await screenshot(page, 'manager-knowledge-empty-tab');
 
-  // (3) Learned recipes — the lost-copy source rung, and the icon-led no-refund clause
-  // that states D7's prohibition positively. The clause is nested INSIDE the source
-  // line (it replaced a separate sub-label that restated the source line's own cause),
-  // so assert the nesting rather than just its presence.
+  // (3) Learned recipes — the lost-copy source rung, and the icon-led no-refund clause that states
+  // D7's prohibition positively.
   await openKnowledgeTab('learnedRecipes');
   await page.locator('.fabricate-manager [data-knowledge-source="lostCopy"]').first()
     .waitFor({ state: 'visible', timeout: 5_000 });
@@ -5346,10 +4407,7 @@ async function exerciseKnowledgeSurface(page, { fixture }) {
   await assertNoScreenshotOverlays(page);
   await screenshot(page, 'manager-knowledge-delete-armed');
 
-  // (6) ~880px — deliberately ABOVE the 831px single-column collapse. That band is
-  // where three columns still hold and the detail pane is at its narrowest, so it is
-  // where the row action cluster actually risks clipping. Re-selecting the character
-  // first disarms the row, so the narrow frame shows the resting layout.
+  // (6) ~880px — deliberately above the 831px single-column collapse.
   await selectKnowledgeCharacter(fixture.chipStatesActorId);
   await page.locator(`.fabricate-manager [data-arm-token="${armToken}"][data-armed="false"]`).first()
     .waitFor({ state: 'visible', timeout: 5_000 });
@@ -5361,24 +4419,7 @@ async function exerciseKnowledgeSurface(page, { fixture }) {
   await setManagerWindowSize(page, { width: 1280, height: 900 });
 }
 
-/**
- * Create the throwaway actor the companion-contract step grants onto (issue 1289).
- *
- * A THROWAWAY, and never one of the fixture's own characters, because the only published
- * lever that would undo a grant is `resetActorKnowledge` — and that sweeps EVERY learned id
- * for the system, wipes the swept ids' discovery progress and decrements learn budgets. Run
- * against a fixture character it would silently destroy the seeded state the frames above
- * depend on, inside a section whose whole contract is that it is persisted-net-zero. A
- * document the section created is one the section can simply delete.
- *
- * Created AFTER the captures rather than in `setupKnowledgeFixture`, because a new player
- * character joins the Knowledge roster and would appear as an extra row in every frame this
- * section publishes. Its id is written into the fixture record the moment it exists, so
- * `restoreKnowledgeFixture` deletes it even if the verification below throws.
- *
- * @param {import('playwright').Page} page
- * @returns {Promise<string>} the created actor's id
- */
+/** Create the throwaway actor the companion-contract step grants onto (issue 1289). */
 async function createCompanionContractActor(page) {
   return page.evaluate(async () => {
     const types = Array.from(game.documentTypes?.Actor || []);
@@ -5390,29 +4431,7 @@ async function createCompanionContractActor(page) {
   });
 }
 
-/**
- * Prove `game.fabricate.api.COMPANION` in a REAL world (issue 1289, criterion 17).
- *
- * Three claims no unit test can make, because `src/main.js` cannot be imported under
- * `node --test` and every suite that pins it is therefore a text scan or a faithful copy:
- *
- *  1. The descriptor is actually PUBLISHED on the live global, and its version is a number.
- *  2. Every declared member resolves through its own declared `host` and `path` against the
- *     real facade and the real crafting engine — including the two rows that are not facade
- *     functions at all (a number on the descriptor, and a method on the object a `handle`
- *     accessor returns).
- *  3. A grant against a real Actor document and a real knowledge-mode crafting system
- *     succeeds, persists the four documented scalars through Foundry's own flag write, and a
- *     repeat answers `alreadyKnown` — which is the idempotency read going through the shared
- *     entry-boundary reader rather than a bare map index.
- *
- * The fixture characters' flags, their copies' learn counts and the world party-learn pool
- * are snapshotted around the whole step and compared, so a grant that reached anything other
- * than its own throwaway actor fails here rather than in some later run's unrelated frame.
- *
- * @param {import('playwright').Page} page
- * @param {{systemId: string, recipeId: string, fixture: object}} options
- */
+/** Prove `game.fabricate.api.COMPANION` in a real world (issue 1289, criterion 17). */
 async function verifyCompanionContract(page, { systemId, recipeId, fixture }) {
   return page.evaluate(async ({ systemId, recipeId, fixture }) => {
     const actorId = fixture.contractActorId;
@@ -5681,36 +4700,7 @@ async function withSingleToolClipboardWrite(page, expectedUuid, action) {
   }
 }
 
-// THE FOOT PAGER RENDERS ONLY WHERE THERE IS MORE THAN ONE PAGE (issue 1373).
-//
-// `PROTO-tool-rules.png` draws no bar under its list, so `ToolsBrowserView` moved from
-// `persistent` to `Pagination`'s `multiPageOnly` mode. This phase used to pin the footer's
-// geometry at eight rows AND at nine on an eight-row page, which asserted the exact opposite of
-// what now ships: at eight the bar is gone.
-//
-// SO PRESENCE IS AN ASSERTED OUTCOME HERE, not a precondition the helper skips past. Both
-// answers are checked at both dataset sizes rather than the absent case simply not being
-// looked at:
-//
-//  - eight rows, page size eight, ONE page  -> the bar must be ABSENT, and the phase fails if
-//    it is drawn. That is the assertion the prototype is about, so it has to be the one that
-//    can fail; a helper that returned early on a missing bar would pass identically against
-//    the `persistent` code this replaces.
-//  - nine rows, page size eight, TWO pages  -> the bar must be PRESENT and every geometry check
-//    below still applies to it verbatim, so the footer's full-width bottom-pinned construction,
-//    its control ordering, its scroll independence and its page-to-page stability are all still
-//    pinned exactly where they were.
-//
-// THE SLOT IS NOT THE BAR. `[data-tool-browser-pagination]` is the bottom-pinned layout div and
-// it renders whenever the selected COHORT is non-empty — not whenever the system has tools, which
-// is what it read before issue 1373 and which left it absent for a system holding none even once
-// the widened world list drew rows above it. What comes and goes inside it is
-// `.manager-pagination`, so presence is read from that, and reading the slot instead would be a
-// check that could never fail.
-//
-// It does NOT keep the list card from becoming `:last-child`, which is what this note used to
-// say. The slot is a sibling of `.manager-tools-main-content` rather than a child, so the card
-// is `:last-child` of that div either way and its `flex: 1 1 auto` never depended on the slot.
+// The foot pager renders ONLY where there is more than one page (issue 1373).
 async function assertToolLibraryPagination(page, {
   expectedTotal,
   expectedPage = 1,
@@ -5722,12 +4712,7 @@ async function assertToolLibraryPagination(page, {
   const list = browser.locator('[data-tool-library-scroll]');
   const slot = browser.locator('[data-tool-browser-pagination]');
   const footer = slot.locator('.manager-pagination');
-  // THE SELECTION INVARIANT IS AN IDENTITY, NOT A ROW POSITION. This used to read
-  // `.manager-tools-row:first-child`, which was only ever right while the library rendered in
-  // fixture-authored order; the shipped `SORT BY [Name] [Asc]` control (issue 1373) puts the
-  // Tool the walk selects in row six, so a first-child check would fail against a perfectly
-  // healthy pager. The caller says which Tool it selected and every page-1 call re-reads it, so
-  // a pager or a re-render that drops the selection still fails here.
+  // The selection invariant is an identity, NOT A row position.
   if (expectedPage === 1 && !selectedToolId) {
     throw new Error('Tool pagination page-1 checks need the Tool ID the walk selected');
   }
@@ -5769,10 +4754,8 @@ async function assertToolLibraryPagination(page, {
     const summary = pagination?.querySelector('[data-pagination-summary]');
     const nav = pagination?.querySelector('.manager-pagination-nav');
     // Still resolves after issue 1504 converted this control, and deliberately unchanged: the
-    // page-size hook rides across onto the `<Select>` TRIGGER through `triggerData`, so this
-    // reads a `<button role="combobox">` where it used to read a `<select>`. Nothing here cares
-    // — it is a rect and a document-order comparison — but the element is no longer what its
-    // name suggests, which is worth one sentence rather than a surprise.
+    // page-size hook rides across onto the `<Select>` trigger through `triggerData`, so this reads
+    // a `<button role="combobox">` where it used to read a `<select>`.
     const size = pagination?.querySelector('[data-pagination-size]');
     const rect = (node) => {
       const value = node?.getBoundingClientRect();
@@ -5851,11 +4834,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   if (visibleToolRowCount !== 8) {
     throw new Error(`Tool Studio parity library must render exactly 8 rows; found ${visibleToolRowCount}`);
   }
-  // NAME-ASCENDING, not authored order. The Tool Rules screen gained the design's
-  // `SORT BY [Name] [Asc]` control (issue 1373), and `sortKey`/`sortDirection` default to
-  // name/asc exactly as the design draws them. This list previously encoded the order the
-  // fixtures were authored in, which is what a screen with no sort control renders. Do not
-  // "restore" it: an authored-order library here now means the sort defaults regressed.
+  // Name-ascending, not authored order.
   const expectedToolNames = [
     "Alchemist's Supplies",
     'Arcane Forge',
@@ -5872,21 +4851,15 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   if (JSON.stringify(visibleToolNames) !== JSON.stringify(expectedToolNames)) {
     throw new Error(`Tool Studio parity library order drifted: ${JSON.stringify(visibleToolNames)}`);
   }
-  // AUTO-SELECTION IS A FIRST-RENDER FACT, so it is read here, before this walk touches the
-  // library at all. The effect behind it only re-fires when the inspected Tool leaves `tools`,
-  // so the same assertion made after a sort click - let alone after a selection click - would
-  // only prove that some selection survived, not that the screen made one for the GM on first
-  // paint. The first row is whatever the shipped default sort puts there, which is why the name
-  // comes out of the order constant above rather than being written in.
+  // Auto-selection is A first-render fact, so it is read here, before this walk touches the library
+  // at all.
   if (!(await visibleToolRows.first().evaluate((element) => element.classList.contains('is-selected')))) {
     throw new Error(
       `Tool Studio parity library did not automatically select its first row (${expectedToolNames[0]})`
     );
   }
   // Drive the direction toggle, so the constant above is a gate on a working sort rather than a
-  // record of whatever order the library happened to come back in. Descending must be the exact
-  // reverse, and toggling back must restore it — a control that renders but sorts nothing passes
-  // the first assertion and fails these two.
+  // record of whatever order the library happened to come back in.
   const sortDirectionToggle = await requireSingleLocator(
     manager.locator('[data-tool-sort-direction]'),
     'Tool Studio sort direction toggle'
@@ -5915,24 +4888,12 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   }
   const selectTarget = row.locator('.manager-tools-select-target');
   const enabledToggle = row.locator('.manager-tools-enabled-toggle');
-  // THE ROW'S EDIT CONTROL IS SELECTED BY ITS DATA HOOK, NOT BY A CLASS. Prototype parity
-  // (issue 1373) replaced the pen icon - a `.manager-icon-button`, the shared square glyph
-  // button - with the design's labelled `Edit rules` button, which renders
-  // `class="manager-tools-edit-rules" data-tool-edit-rules={entry.id}`. Classes churn under
-  // design-system refactors and this row has now lost two of them; `data-tool-edit-rules`
-  // is the hook the component states it exists to be selected by, and it carries the Tool's
-  // own id, so every later lookup in this phase is an identity lookup rather than a
-  // descendant-of-a-row lookup.
+  // The row's edit control is selected by its data hook, NOT by A class.
   const editButton = row.locator('[data-tool-edit-rules]');
   await assertPointerTarget(page, selectTarget, '.manager-tools-select-target', 'Tool row selection');
   await assertPointerTarget(page, enabledToggle, '.manager-tools-enabled-toggle', 'Tool enabled toggle');
   await assertPointerTarget(page, editButton, '[data-tool-edit-rules]', 'Tool Edit');
-  // ROW TWO IS ONLY HOW A SECOND TOOL IS PICKED, NOT HOW IT IS ADDRESSED. The walk reads
-  // the id off the second row once and resolves that Tool by identity everywhere after,
-  // including the 680px pass further down - which runs after the library has been emptied,
-  // repopulated and re-sorted twice. A positional re-read there silently retargets the
-  // moment a sort default, a page size or the membership filter moves the row, which is
-  // exactly the class of breakage the `:first-child` selection checks already cost a run.
+  // Row two is ONLY how A second tool is picked, NOT how it is addressed.
   const otherToolId = await visibleToolRows.nth(1).getAttribute('data-manager-tool-id');
   if (!otherToolId) throw new Error('Tool Studio alternate row has no Tool ID');
   const otherRow = manager.locator(`[data-manager-tool-id="${otherToolId}"]`);
@@ -5959,11 +4920,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
       }
     },
   );
-  // ONE SELECTED ROW, AND IT IS THE ONE THE WALK JUST CLICKED. `rowSelected` is an equality
-  // test, so the alternate row selected a moment ago has to have gone dark; this catches a
-  // library that lights a second row rather than moving the one selection. It is deliberately
-  // NOT a row-position check: under the shipped name-ascending default sort the parity fixture
-  // is row six, so asserting `:first-child` here would demand two rows be selected at once.
+  // One selected row, AND it is the one the walk just clicked.
   const selectedAfterParityClick = await visibleToolRows.evaluateAll((rows) => rows
     .filter((candidate) => candidate.classList.contains('is-selected'))
     .map((candidate) => candidate.dataset.managerToolId));
@@ -6017,11 +4974,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
       repairRequirements: [],
     },
   });
-  // `8 shown`, NOT `9 shown` (issue 1373). The count above the list states the PAGE, not the
-  // filter: it was fed the filtered length, so a two-page result read `9 shown` over eight rows
-  // while the pager immediately below it read `Showing 1-8 of 9` — two counts in one pane
-  // contradicting each other. The ninth Tool is still proved present, by
-  // `assertToolLibraryPagination`'s own `of 9` summary check on the very next line.
+  // `8 shown`, NOT `9 shown` (issue 1373).
   await manager.locator('[data-tool-result-count]').filter({ hasText: '8 shown' })
     .waitFor({ state: 'visible', timeout: 5_000 });
   await assertToolLibraryPagination(page, { expectedTotal: 9, expectedPage: 1, selectedToolId: fixture.toolId });
@@ -6205,32 +5158,18 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   });
   await requireSingleLocator(editorManager, 'current Tool Studio editor manager');
   const editor = await requireSingleLocator(editorManager.locator('[data-tool-edit-view]'), 'current Tool Studio editor');
-  // ── THE SYSTEM EDITOR AUTHORS NO IDENTITY, SO IT DRIVES NO ITEM DRAG (issue 1373) ────────
-  // An Item drop target, its copy-uuid action and the sidebar drag that exercised them are GONE
-  // from this walk because they are gone from this screen: a crafting system may not re-point
-  // which world Item a Tool IS. The capability moved whole to the world Tool entry, and the walk
-  // that exercises it belongs on the world screens with it. Recorded here rather than silently
-  // deleted, because the shape of what is missing is the point: this walk must never grow an
-  // identity edit back at system scope. Its hook names are deliberately NOT spelled out here —
-  // the guard that keeps them out reads this file as TEXT, so naming them in prose would trip it.
-  //
-  // The editor opens on `Breakage` — there is no `Overview` tab to click — and the per-system
-  // display-label OVERRIDE it still carries sits at the top of that tab, so the long-name stress
-  // frame needs no navigation of its own.
+  // An Item drop target, its copy-uuid action and the sidebar drag that exercised them are gone
+  // from this walk because they are gone from this screen: a crafting system may not re-point which
+  // world Item a Tool is.
   await resetToolStudioScroll(page);
   await assertToolStudioEditorLayout(page);
   await assertNoScreenshotOverlays(page);
   await assertSavedToolStudioCapture(editor, 'Tool rules editor opening');
   const enabledInSystem = editor.locator('[data-tool-enabled] .manager-status-toggle');
   await assertPointerTarget(page, enabledInSystem, '[data-tool-enabled]', 'Enabled in system');
-  // ── THE DISPLAY LABEL IS AN OVERRIDE, AND ITS FIELD IS ON THE OVERRIDING FACE ───────────
-  // The per-system display label is a `ToolInheritCard` like every other overridable fact on
-  // this tab (issue 1373): BLANK is the inheriting state, which renders the world name read-only
-  // on a globe row and no field at all, and the switch is what opens this system's own copy.
-  // So the walk flips the card before it types, and it flips it CONDITIONALLY - a fixture Tool
-  // that already carries a label, or one with no world membership to inherit through, is
-  // already showing its field, and a second click would put the card back to inheriting and
-  // fail the fill with nothing to type into.
+  // The per-system display label is a `ToolInheritCard` like every other overridable fact on this
+  // tab (issue 1373): blank is the inheriting state, which renders the world name read-only on a
+  // globe row and no field at all, and the switch is what opens this system's own copy.
   const labelCard = editor.locator('[data-tool-rule-card="label"]');
   await labelCard.waitFor({ state: 'visible', timeout: 5_000 });
   if ((await labelCard.getAttribute('data-tool-rule-state')) === 'inheriting') {
@@ -6251,23 +5190,8 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   await displayLabel.fill("Smith's Hammer");
   await saveToolStudioDraftIfDirty(editor);
 
-  // ── THE INHERIT SWITCH AND THE REMOVE CALLOUT ────────────────────────────────────────────
-  // Both are new controls on this tab and both are POINTER-TESTED rather than pressed, and the
-  // reason is different for each. The inherit switch is a world-scope WRITE that would rewrite
-  // this Tool's breakage to the world default and change every parity frame captured after it;
-  // the remove callout's button DELETES this system's rules record, which would end the walk.
-  // Their behaviour is covered by `tests/components/tool-studio-mounted.test.js`; what only a
-  // real browser can answer is whether they are hit-testable where they are drawn, which is
-  // exactly what these two assertions ask.
-  //
-  // THE SWITCH IS DRAWN ONLY WHERE THERE IS A WORLD RECORD TO INHERIT FROM. This fixture's Tools
-  // are created with `csm.upsertTool` and never enter the world catalogue, so the card resolves
-  // `local` and renders no switch at all — correctly. Waiting on it unconditionally is what this
-  // walk did first, and it timed out on a screen that was behaving exactly as designed.
-  //
-  // So the state decides which assertion runs, and BOTH branches assert: `local` must draw no
-  // switch, anything else must draw one that is hit-testable. Neither branch can pass by finding
-  // nothing, which is the failure a bare `if (count)` guard would have shipped.
+  // Both are new controls on this tab and both are pointer-tested rather than pressed, and the
+  // reason is different for each.
   const breakageCard = editor.locator('[data-tool-rule-card="breakage"][data-tool-rule-state]');
   if (await breakageCard.count() !== 1) {
     throw new Error('the Tool breakage section must state exactly one inheritance state');
@@ -6289,14 +5213,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
       'Tool breakage inherit switch',
     );
   }
-  // GATED ON THE SAME FACT AS THE SWITCH ABOVE, and for the same reason. `ToolBreakageTab.svelte`
-  // renders this callout under `{#if member}`: removing a Tool from a system means deleting its
-  // MEMBERSHIP record, and a pre-migration in-system Tool has none, so offering the action would
-  // be a button with nothing behind it. This fixture's Tools are made with `csm.upsertTool` and
-  // never enter the world catalogue, so `local` is the state it actually reaches.
-  //
-  // Both branches assert. Absent-when-local is the claim the component's own guard makes, so it
-  // is worth holding; present-and-hit-testable is what only a real browser can answer.
+  // Gated on the same fact as the switch above, and for the same reason.
   const removeCallout = editor.locator('[data-tool-remove-from-system]');
   if (breakageRuleState === 'local') {
     if (await removeCallout.count() !== 0) {
@@ -6476,13 +5393,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
   );
   await requireSingleLocator(editorManager, 'current check-driven Tool Studio editor manager');
   await requireSingleLocator(editor, 'current check-driven Tool Studio editor');
-  // A ROUND TRIP, because the editor now OPENS on Breakage. Issue 1373 retired the `Overview`
-  // tab, so re-entering the editor and clicking Breakage no longer changes anything, and
-  // `clickToolTabAndAssertEffect` correctly refuses to call that a working tab click — its whole
-  // job is to reject an assertion made from the tab it was already on.
-  //
-  // Going out to Requirements first restores a real transition and asserts twice instead of
-  // once: the leave and the return.
+  // A round trip, because the editor now opens on Breakage.
   await clickToolTabAndAssertEffect(
     page,
     editor,
@@ -6560,10 +5471,7 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
     'Strength 13 or higher',
     'Trained in Arcana',
   ];
-  // The row's NAME cell. It was a `<strong>` inside the retired `ChecklistCardRow`; since issue
-  // 1373's round 5 the prerequisite list draws the shared `ModifierLibraryRow`, whose name cell
-  // is `.manager-modifier-readonly-label`. A stale selector here matches nothing and the walk
-  // fails on an empty array, which reads as a data fault rather than a selector one.
+  // The row's name cell.
   const visiblePrerequisiteNames = await editor.locator('[data-tool-prerequisite-row] .manager-modifier-readonly-label').allTextContents();
   if (JSON.stringify(visiblePrerequisiteNames) !== JSON.stringify(expectedPrerequisiteNames)) {
     throw new Error(`Tool Studio parity prerequisite order drifted: ${JSON.stringify(visiblePrerequisiteNames)}`);
@@ -6693,15 +5601,10 @@ async function exerciseToolStudioPointerTargets(page, { systemId, recipeName, fi
     throw new Error('Recipe Tools policy-removal check unexpectedly dirtied the Recipe draft');
   }
 
-  // The trigger editor is the crafting route's TRIGGERS section (issue 1096). It used to be
-  // one card further down the crafting tab's single scrolling page; now only the selected
-  // section renders, so the section is navigated to rather than scrolled to.
+  // The trigger editor is the crafting route's triggers section (issue 1096).
   await openChecksActivity(page, 'crafting', 'triggers');
-  // Tier stepping is a per-trigger EFFECT (issue 975), not the check-wide
-  // natural-stepping toggle this walk used to round-trip, so exercising it
-  // means AUTHORING a trigger. Add one, drive its tier-step row, then remove it: the
-  // block returns to `{ triggers: [] }`, so the Checks draft is left exactly as clean as
-  // the old toggle round trip left it and the next navigation raises no discard prompt.
+  // Tier stepping is a per-trigger effect (issue 975), not the check-wide natural-stepping toggle
+  // this walk used to round-trip, so exercising it means authoring a trigger.
   const checksSave = page.locator('.fabricate-manager [data-checks-save]').first();
   const triggerCard = page.locator('.fabricate-manager [data-check-triggers]').first();
   await triggerCard.waitFor({ state: 'visible', timeout: 5_000 });
@@ -6821,9 +5724,7 @@ async function closeOpenApplications(page) {
 
       await Promise.allSettled(closePromises);
 
-      // ApplicationV2 registries can retain a stale instance after its close
-      // promise settles. Always sweep any close controls that remain in the DOM;
-      // when the registry close succeeded there is simply nothing left to click.
+      // ApplicationV2 registries can retain a stale instance after its close promise settles.
       document.querySelectorAll(selector).forEach(btn => {
         try { btn.click(); } catch { /* ignore */ }
       });
@@ -6863,37 +5764,7 @@ async function closeOpenApplications(page) {
   }
 }
 
-/**
- * Activate a scene and wait until the canvas has FINISHED drawing it.
- *
- * The single seam every scene switch in this harness goes through, so the readiness contract is
- * stated once. Do NOT call `scene.activate()` directly: activation only STARTS an async draw, and
- * a wait keyed on the scene id alone resolves partway through it, roughly sixty lines before the
- * canvas can accept a placeable document. `isCanvasReadyForScene` carries the verified Foundry
- * 14.365 draw ordering that makes `canvas.ready` the correct predicate and the scene id the wrong
- * one (issue #1010); `tests/foundry-canvas-readiness.test.js` pins both this call site count and
- * the predicate itself.
- *
- * Deliberately TOLERANT of the wait not resolving. `canvas.ready` never latches if a draw aborts
- * (a texture-load failure returns from `Canvas##draw` with `ready` still false), and a strictly
- * harder predicate must not newly fail a capture step that used to pass.
- *
- * That tolerance is exactly why callers must not depend on this for CORRECTNESS. It is a capture
- * aid — it stops a panel scanning the previous scene — not a safety barrier. Anything that would
- * be unsafe against a mid-draw canvas must be ordered so it cannot happen, not merely waited for;
- * see the placeable seeding in the Manage Interactables block for the worked example.
- *
- * The default timeout is sized for the FIRST draw of a session, which is far more expensive than
- * the ones after it: WebGL init, the BASIS transcoder, worker startup and a full asset load, on a
- * headless software renderer that logs GPU stalls. At 15s a real run overran it, the swallow let
- * the walk continue, and the resulting failure looked nothing like a timeout (issue #1010).
- *
- * @param {import('playwright').Page} page
- * @param {string} sceneId the scene to activate and draw
- * @param {object} [options]
- * @param {number} [options.timeout] milliseconds to wait for the draw to complete
- * @returns {Promise<void>}
- */
+/** Activate a scene and wait until the canvas has finished drawing it. */
 async function activateSceneAndAwaitCanvasReady(page, sceneId, { timeout = 90_000 } = {}) {
   if (!sceneId) return;
   await page.evaluate(async (id) => {
@@ -6910,17 +5781,11 @@ async function activateSceneAndAwaitCanvasReady(page, sceneId, { timeout = 90_00
   });
 }
 
-/**
- * Attach browser console capture to a Playwright page.
- * @param {import('playwright').Page} page
- * @param {RegExp[]} ignoredErrorPatterns
- */
+/** Attach browser console capture to a Playwright page. */
 function attachConsoleCapture(page, ignoredErrorPatterns = []) {
   page.on('console', msg => {
-    // Browser "Failed to load resource" console errors carry no URL in their
-    // text; the resource path lives in msg.location(). Append it so a bare 404
-    // can be traced to the exact asset in both console.log and the gate's
-    // consoleErrors list.
+    // Browser "Failed to load resource" console errors carry no URL in their text; the resource
+    // path lives in msg.location().
     const location = msg.type() === 'error' ? (msg.location()?.url || '') : '';
     const text = location ? `${msg.text()} (${location})` : msg.text();
     consoleLog.push(`[${msg.type()}] ${text}`);
@@ -6940,18 +5805,11 @@ function attachConsoleCapture(page, ignoredErrorPatterns = []) {
   page.on('pageerror', err => {
     const entry = `[pageerror] ${err.message}`;
     consoleLog.push(entry);
-    // The stack goes to the DIAGNOSTIC log only, never to consoleErrors — the gate matches its
-    // waiver patterns against the message, and widening what it sees would change which runs
-    // fail. Recorded because a `pageerror` from an un-awaited core promise (see
-    // CanvasDocumentMixin#_onCreate) carries no harness step to attribute it to, so a bare
-    // message leaves source archaeology as the only way to find the throwing call — which is
-    // exactly what diagnosing issue #1010 cost.
+    // The stack goes to the diagnostic log only, never to consoleErrors — the gate matches its
+    // waiver patterns against the message, and widening what it sees would change which runs fail.
     if (err.stack) consoleLog.push(`[pageerror-stack] ${err.stack}`);
-    // pageerror waiving is a deliberate existing capability (the Foundry
-    // canvas-artefact default filters pageerror entries too); an appended
-    // pattern extends it, it does not remove it. Route through the SAME
-    // classifier as the console handler so pageerror stays waivable and a
-    // non-matching pageerror is never silently swallowed.
+    // Pageerror waiving is a deliberate existing capability (the Foundry canvas-artefact default
+    // filters pageerror entries too); an appended pattern extends it, it does not remove it.
     if (classifyCapturedError(err.message, ignoredErrorPatterns).waived) {
       waivedConsoleErrors.push(`pageerror: ${err.message}`);
     } else {
@@ -6959,12 +5817,8 @@ function attachConsoleCapture(page, ignoredErrorPatterns = []) {
     }
   });
 
-  // Diagnostic only: a console 'error' is logged for failed resource loads but
-  // is not always paired with a usable URL. Record every failing HTTP response
-  // (4xx/5xx) and every network-level request failure with its URL into
-  // console.log so the source of a "Failed to load resource" is always
-  // traceable. These do NOT push to consoleErrors, so they never change the
-  // run's pass/fail — the console 'error' above remains the gate.
+  // Diagnostic only: a console 'error' is logged for failed resource loads but is not always paired
+  // with a usable URL.
   page.on('response', response => {
     const status = response.status();
     if (status >= 400) {
@@ -6980,10 +5834,8 @@ function attachConsoleCapture(page, ignoredErrorPatterns = []) {
 
 async function assertNoScreenshotOverlays(page, options = {}) {
   await dismissFoundryNotifications(page);
-  // A DialogV2 close() is an async fade-out: Foundry keeps the element in the DOM
-  // with a `minimizing` (and, on some builds, `minimized`) class while it animates
-  // away. Even though that dialog is already dismissed, it can still be visible
-  // in screenshots, so wait for visible overlays to clear before capturing.
+  // A DialogV2 close() is an async fade-out: Foundry keeps the element in the DOM with a
+  // `minimizing` (and, on some builds, `minimized`) class while it animates away.
   const OVERLAY_SELECTOR =
     '.dialog.application, .window-app.dialog, .application.dialog, .app.dialog, #notifications .notification';
   const visibleOverlayCount = async () =>
@@ -7049,12 +5901,8 @@ async function assertNoScreenshotOverlays(page, options = {}) {
       .catch(() => '');
     throw new Error(`Screenshot target is covered by ${count} modal or notification overlay(s). [${diag}]`);
   }
-  // Opt-in bleed-through guard: when the caller passes the set of Fabricate window
-  // ids it EXPECTS to be open for this capture, fail on any OTHER visible
-  // Fabricate-owned window. An ApplicationV2 close() is an async fade-out, so a
-  // window closed without awaiting its promise can linger behind the next capture
-  // (the issue-335 config window bled through behind the Manage panel). Default:
-  // no stray check (back-compat with every existing call site).
+  // Opt-in bleed-through guard: when the caller passes the set of Fabricate window ids it expects
+  // to be open for this capture, fail on any other visible Fabricate-owned window.
   const allowedIds = options?.allowFabricateWindowIds;
   if (Array.isArray(allowedIds)) {
     const allowSet = new Set(allowedIds);
@@ -7090,10 +5938,8 @@ const cleanup = {
   // (issue 643 §4b) — the only fixture that renders the recipe rail's ACCESS branch.
   restrictedSystemId: null,
   recipeIds: [],
-  // Issue #489 craft-execution coverage fixtures: dedicated per-mode crafting
-  // systems (simple / routedByIngredients / routedByCheck / progressive) and
-  // their world items. Recipes are pushed onto `recipeIds`; the rc-profile
-  // gather task/env live under the existing Arcane Forge system (cleaned with it).
+  // Issue #489 craft-execution coverage fixtures: dedicated per-mode crafting systems (simple /
+  // routedByIngredients / routedByCheck / progressive) and their world items.
   executionSystemIds: [],
   executionItemIds: []
 };
@@ -7130,42 +5976,11 @@ async function main() {
   // These in-source defaults stay in source, where their justification lives.
   const ignoredErrorPatternDefaults = [
     /favicon/i,
-    // The screenshot walk deliberately exercises the responsive Manager at
-    // these four evidence viewports. Foundry emits its own minimum-resolution
-    // warning even though the application remains usable and is the subject of
-    // the capture. Keep this waiver dimension-specific so an unexpected
-    // low-resolution run still fails the smoke.
-    //
-    // `1280px by 520px` is the short viewport the Tool Studio pagination
-    // assertions set themselves (`expectScrollable: true`) to prove the library
-    // footer stays reachable when the list must scroll. The harness chooses that
-    // height, so failing on Foundry's advisory about it fails the run for doing
-    // exactly what it was told — any scoped set including the Tool Studio parity
-    // walk tripped it (issue 881).
+    // The screenshot walk deliberately exercises the responsive Manager at these four evidence
+    // viewports.
     /Foundry Virtual Tabletop requires a screen resolution of 1366px by 768px or greater\..*display has a resolution of (?:1280px by 720px|1280px by 520px|900px by 700px|680px by 700px)\./i,
-    //
-    // NOTE (issue #1010): a `/reading 'OBJECTS'/` waiver used to sit here, described as a headless
-    // WebGL timing artifact. It was neither headless-specific nor unfixable — it was this harness
-    // waiting on the wrong thing, and the waiver hid a real defect for a year. It has been RETIRED
-    // rather than extended, and nothing replaces it. Do not re-add it, or a priority-renamed
-    // variant of it (v14 added an `INTERFACE` queue, which is why the same race started reporting
-    // `reading 'INTERFACE'` after the 14.365 bump), without first reading this:
-    //
-    // Both message forms come from exactly two lines of Foundry 14.365,
-    // `canvas.pendingRenderFlags[this.priority]` in `RenderFlags#set` and `RenderFlags#clear`
-    // (`client/canvas/interaction/render-flags.mjs`). `pendingRenderFlags` is a bare class field
-    // (`board.mjs:2518`) assigned only by `Canvas##activateTicker` (`board.mjs:2562`), through a
-    // `configurable: true` `defineProperty` that is thereafter only ever REDEFINED — teardown
-    // (`#deactivateTicker`) clears the queues rather than removing the property. So the property is
-    // undefined for exactly one window per page session: from load until the first scene finishes
-    // drawing past `board.mjs:1209`. The smoke world seeds no scene, so it boots down the
-    // `#drawBlank` path and that window stayed open until the harness's first `scene.activate()` —
-    // whereupon it created a Tile and two Regions straight into it, one `pageerror` each.
-    // `activateSceneAndAwaitCanvasReady` closes the window by construction, and after the first
-    // successful draw neither form can recur at all.
-    //
-    // If one of these messages ever comes back, that is a REGRESSION worth diagnosing, not noise
-    // to re-suppress: the `[pageerror-stack]` line now in console.log names the throwing call.
+    // Note (issue #1010): a `/reading 'OBJECTS'/` waiver used to sit here, described as a headless
+    // WebGL timing artifact.
   ];
 
   // APPEND any run-supplied patterns (--allowed-console-error-patterns / the
@@ -7185,21 +6000,18 @@ async function main() {
     consoleErrors: []
   };
 
-  // How the shared boot path (scripts/lib/foundryBrowserBoot.js) reports back into THIS harness's
-  // bookkeeping. The boot helpers know nothing about `results` or the screenshot budget; both are
-  // injected here, so the extraction that let the V13 arm reuse them changed no behaviour.
+  // How the shared boot path (scripts/lib/foundryBrowserBoot.js) reports back into this harness's
+  // bookkeeping.
   const bootReporter = createBootReporter({
     screenshot,
     recordStep: (step) => results.steps.push(step),
     log: (message) => process.stdout.write(message)
   });
 
-  // Issue #807: page.isClosed() is causation-blind (true for an intentional
-  // close OR a renderer crash), so a tolerated post-captures teardown could hide
-  // a real product OOM as an untraceable "transient". page 'crash' is
-  // Playwright's causation-bearing renderer-crash signal (OOM canonical). Flag
-  // it so a crash-flagged tolerated run stays exit 0 but is visibly
-  // rendererCrashed in summary.json — a truthful signal, not a red run.
+  // Issue #807: page.isClosed() is causation-blind (true for an intentional close OR a renderer
+  // crash), so a tolerated post-captures teardown could hide a real product OOM as an untraceable
+  // "transient". page 'crash' is Playwright's causation-bearing renderer-crash signal (OOM
+  // canonical).
   page.on('crash', () => {
     results.rendererCrashed = true;
     process.stderr.write('Renderer process crashed (page "crash" event).\n');
@@ -7240,9 +6052,8 @@ async function main() {
       reporter: bootReporter
     });
 
-    // Hide notification toasts globally — they otherwise overlay screenshots
-    // and force a per-screenshot dismiss + sleep dance. Behavioral assertions
-    // (e.g. `assertNoScreenshotOverlays`) still inspect the DOM defensively.
+    // Hide notification toasts globally — they otherwise overlay screenshots and force a
+    // per-screenshot dismiss + sleep dance.
     await installNotificationHidingCss(page);
 
     await screenshot(page, 'world-loaded');
@@ -7302,29 +6113,11 @@ async function main() {
     try {
       const createdDocs = await page.evaluate(async () => {
         // Clean up any stale test data from previous runs.
-        // 1. Clean stale crafting systems and their recipes first.
-        //    Filter by literal "Arcane Forge" name so we never delete user
-        //    state. The CI world (`fabricate-smoke-ci`) is wiped and
-        //    recopied by setup-data on every up, so this should be a no-op
-        //    in normal runs; the filter is belt-and-suspenders defence
-        //    against a partial mid-run crash that left a renamed system
-        //    around — those are still recoverable by the literal-name
-        //    rename-back at the end of Phase D0.
         const csm = game.fabricate.getCraftingSystemManager();
         const rm = game.fabricate.getRecipeManager();
         const environmentStore = game.fabricate.getGatheringEnvironmentStore?.();
 
         // Defensively clear all gathering environments before recreating fixtures.
-        // The CI world is meant to be wiped each run, but a reused (cached) Foundry
-        // container can resurrect a world's LevelDB state that the host-side wipe in
-        // foundry-setup-data.mjs misses. Stale environments authored by an older data
-        // model can lack a task source (e.g. compositionMode 'automatic' with no
-        // enabledTaskIds and no forcedTaskIds) and then fail validation on the FIRST
-        // create() in Phase C — its persist re-validates the whole list, including the
-        // stale invalid entries. We reset the raw setting directly (bypassing the
-        // store's list-validation, which would itself throw on those stale entries)
-        // and reload so the in-memory list matches. The CI world is smoke-owned and
-        // ephemeral, so clearing every environment here is safe.
         if (environmentStore) {
           try {
             await game.settings.set('fabricate', 'gatheringEnvironments', []);
@@ -7335,11 +6128,8 @@ async function main() {
         }
 
         const allSystems = csm.getSystems();
-        // The smoke creates "Arcane Forge" and RENAMES it to "The Herbalist's
-        // Compendium" mid-run (Phase D0). A run that crashes after the rename but
-        // before cleanup leaves an orphan under the renamed name, so purge BOTH
-        // names — otherwise duplicate same-named systems accumulate and the promote
-        // source picker can default to a tool-less duplicate.
+        // The smoke creates "Arcane Forge" and renames it to "The Herbalist's Compendium" mid-run
+        // (Phase D0).
         const staleSystemNames = new Set([
           'Arcane Forge', "The Herbalist's Compendium",
           // Issue #489 craft-execution coverage systems (deterministic names) so a
@@ -7423,15 +6213,6 @@ async function main() {
         const itemType = itemTypes.includes('loot') ? 'loot' : itemTypes[0] || 'loot';
 
         // Create world-level items (all as loot — type doesn't matter for crafting).
-        //
-        // Each carries a DESCRIPTION (issue 676). These items had none, so every frame
-        // of the component editor photographed its identity strip rendering "—" — the
-        // correct output for a description-less item, and therefore a frame that proved
-        // nothing about the surface whose whole premise is "name, image & description
-        // follow the linked item". The strip reads the LIVE document, so this is also
-        // what exercises that resolution rather than the registration-time snapshot.
-        // `system.description.value` is the dnd5e shape and is HTML, which is exactly
-        // what the plain-text extraction has to cope with.
         const describe = (html) => ({ description: { value: `<p>${html}</p>` } });
         const itemData = [
           { name: 'Iron Ore', type: itemType, img: 'icons/commodities/metal/ingot-worn-iron.webp',
@@ -7461,24 +6242,17 @@ async function main() {
           itemsByName[item.name] = { id: item.id, uuid: item.uuid };
         }
 
-        // Import the dnd5e "Starter Heroes" pack so demo actors use official,
-        // non-AI art shipped with the game system instead of bundled portraits.
-        // Each imported hero is tagged flags.fabricate.smokeSeed for the
-        // idempotent pre-clean above; sorting by name gives a deterministic
-        // crafter / travel-member assignment and a stable demo character.
+        // Import the dnd5e "Starter Heroes" pack so demo actors use official, non-AI art shipped
+        // with the game system instead of bundled portraits.
         const heroPack = game.packs.get('dnd5e.heroes')
           ?? game.packs.find(p => p.documentName === 'Actor' && /hero/i.test(p.metadata?.label ?? ''));
         if (!heroPack) {
           throw new Error('dnd5e Starter Heroes compendium (dnd5e.heroes) not found — cannot seed smoke actors.');
         }
         const heroIndex = await heroPack.getIndex();
-        // R1 (#750): TWO-ACTOR CONTRACT. Phase B references only actors[0]
-        // (crafter) and actors[1] (travelMember); importing the whole Starter
-        // Heroes pack cost ~30-45s for actors nothing asserts. Sort the INDEX by
-        // name first (the same order the post-import sort produced), then import
-        // just the first two character entries — this preserves the exact
-        // crafter / travel-member identity while skipping the rest. Raise this
-        // cap if a future step needs a third seeded hero.
+        // R1 (#750): two-actor contract. Phase B references only actors[0] (crafter) and actors[1]
+        // (travelMember); importing the whole Starter Heroes pack cost ~30-45s for actors nothing
+        // asserts.
         const sortedHeroEntries = Array.from(heroIndex)
           .slice()
           .sort((a, b) => String(a.name ?? '').localeCompare(String(b.name ?? ''), 'en'));
@@ -7521,20 +6295,16 @@ async function main() {
         const noneLevel = CONST.DOCUMENT_OWNERSHIP_LEVELS?.NONE ?? 0;
         await crafter.update({ ownership: { default: noneLevel, [gathererUser.id]: ownerLevel } });
         if (travelMember) await travelMember.update({ ownership: { default: noneLevel } });
-        // "Who controls this character" is a UNION of two independent routes: the
-        // viewer holds Foundry OWNER on the actor, OR the actor is that user's
-        // ASSIGNED character (`User#character`). The crafter covers the OWNER route
-        // (above). Nothing in the smoke world ever assigned a character, so the
-        // assigned route had no fixture at all — assign the travel member to the
-        // Observer, and the restricted recipe rail can render both sublines.
+        // "Who controls this character" is a union of two independent routes: the viewer holds
+        // Foundry OWNER on the actor, OR the actor is that user's assigned character
+        // (`User#character`).
         if (travelMember && observerUser) {
           await observerUser.update({ character: travelMember.id });
         }
         const userIds = users.map(user => user.id);
 
-        // Build inventory copies from world items
-        // Include flags.core.sourceId so the crafting engine can match
-        // embedded items back to world-level component UUIDs
+        // Build inventory copies from world items Include flags.core.sourceId so the crafting
+        // engine can match embedded items back to world-level component UUIDs
         const byName = (name) => {
           const item = items.find(i => i.name === name);
           if (!item) throw new Error(`Item "${name}" not found in created items`);
@@ -7548,10 +6318,8 @@ async function main() {
             flags: { core: { sourceId: item.uuid } }
           }));
 
-        // Crafter gets: 3x Mystic Herb, 3x Empty Vial, 1x Dragon Scale.
-        // The UI evidence phases share this actor and may stage one vial in another
-        // workflow. Keep two concrete copies for the final potion attempt so one
-        // can be consumed while a distinct physical copy remains the reusable Tool.
+        // Crafter gets: 3x Mystic Herb, 3x Empty Vial, 1x Dragon Scale. The UI evidence phases
+        // share this actor and may stage one vial in another workflow.
         await crafter.createEmbeddedDocuments('Item', [
           ...copies(byName('Mystic Herb'), 3),
           ...copies(byName('Empty Vial'), 3),
@@ -7678,14 +6446,8 @@ async function main() {
     startPhase('phase-C');
     process.stdout.write('Phase C: Creating crafting system and recipes...\n');
     try {
-      // Quickstart Step 2 evidence (full profile): the GM System Library before
-      // any system exists — the "No crafting systems yet" onboarding card with the
-      // primary "Create system" button. This is the only point in the run with a
-      // genuinely empty library; every later manager phase has the smoke system
-      // present. Defensively clear any systems left over from an aborted prior run
-      // so the empty state is deterministic, open the manager, capture, and close
-      // it before the smoke system is created below. Gated to the full profile
-      // like the other documentation captures; rc/ci skips it via screenshot().
+      // Quickstart Step 2 evidence (full profile): the GM System Library before any system exists —
+      // the "No crafting systems yet" onboarding card with the primary "Create system" button.
       if (RUN_SCREENSHOT_PHASES) {
         await page.evaluate(async () => {
           const csm = game.fabricate.getCraftingSystemManager();
@@ -7711,11 +6473,7 @@ async function main() {
       const craftingSetup = await page.evaluate(async ({ gathererUserId, crafterId, travelMemberId }) => {
         const csm = game.fabricate.getCraftingSystemManager();
 
-        // The WORLD currency ladder (issue 1278). One config for the whole world, which is what
-        // World > Currency edits and what every currency-enabled system spends against; a
-        // crafting system carries only `requirements.currency.enabled`. Seeded here rather than
-        // on the system so the recipe editor's currency-cost row has a unit to target — its
-        // `canAddCost` gate reads the world's units, not the system's.
+        // The world currency ladder (issue 1278).
         await game.settings.set('fabricate', 'currencyConfig', {
           spendStrategy: 'actorProperty',
           providerId: '',
@@ -7752,17 +6510,9 @@ async function main() {
         }
 
         await csm.updateSystem(systemId, {
-          // `routedByCheck` resolution allows multiple ingredient/result sets, so the
-          // recipe editor shows the "Add ingredient set" promotion affordance
-          // (recipeCanAddSet gates on a mode NOT in ['simple','progressive'] and not
-          // alchemy). Complexity is emergent from the set/group count — there is no
-          // Simple/Complex toggle. Under this system mode every recipe routes
-          // by the routed crafting-check outcome, and a single-result-group recipe is
-          // produced on any non-failure outcome (the single-group exemption). The
-          // authored `craftingCheck.routed.rollFormula` below means no missing-formula
-          // blocker. multiStepRecipes unlocks the step-mode toggle and the per-step
-          // duration controls; itemTags unlocks the tag-requirement picker;
-          // recipeCategories unlocks the category selector.
+          // `routedByCheck` resolution allows multiple ingredient/result sets, so the recipe editor
+          // shows the "Add ingredient set" promotion affordance (recipeCanAddSet gates on a mode
+          // NOT in ['simple','progressive'] and not alchemy).
           resolutionMode: 'routedByCheck',
           features: {
             essences: true,
@@ -7788,68 +6538,29 @@ async function main() {
               ]
             }
           },
-          // Crafting check with routed outcome tiers, so a check-routed recipe's
-          // result groups can be assigned outcome tiers (`checkOutcomeIds`). The
-          // success-filtered tiers ('Masterwork', 'Standard') feed the recipe
-          // editor's result-routing control AND the Validation tab's routed
-          // readiness warnings (issue 431 PR-2).
+          // Crafting check with routed outcome tiers, so a check-routed recipe's result groups can
+          // be assigned outcome tiers (`checkOutcomeIds`).
           craftingCheck: {
             enabled: true,
-            // Per-recipe check-modifier catalogue + default policy (issue 770). A
-            // crafting-owned aggregate appended to the crafting-check roll,
-            // authored at the top level of the crafting check (sibling of `routed`), so
-            // the Checks → Crafting tab renders the populated CraftingModifierCatalogueCard
-            // beside the failure-consumption card (screenshot evidence). Each expression
-            // resolves against the crafter's dnd5e roll data; the `highest` default policy
-            // picks the single largest of the two default-eligible modifiers. The `alch`
-            // entry is the one the Brew Healing Potion recipe override selects below.
+            // Per-recipe check-modifier catalogue + default policy (issue 770).
             checkModifiers: [
               { id: 'med', label: 'Medicine', icon: 'fas fa-staff-snake', expression: '@abilities.wis.mod' },
               { id: 'alch', label: 'Alchemy', icon: 'fas fa-flask', expression: '@abilities.int.mod' },
               { id: 'herb', label: 'Herbalism', icon: 'fas fa-seedling', expression: '@abilities.dex.mod' }
             ],
-            // `playerPicks` on the SYSTEM (issue 1055), and it must stay there or this seed stops
-            // working. A recipe can no longer override the combination rule — a recipe chooses
-            // WHICH modifiers apply, never HOW they combine — so the system is the only place the
-            // interactive rule can be authored. Under any other rule the roll resolves
-            // deterministically and the Phase-E interactive modifier fieldset, the capture this
-            // seed exists for, never opens.
+            // `playerPicks` on the system (issue 1055), and it must stay there or this seed stops
+            // working.
             defaultModifierPolicy: 'playerPicks',
             defaultModifierIds: ['med', 'herb'],
             // `maxModifierPicks: 2` — the size of the eligible set above, so it bounds nothing and
             // the prompt renders its MULTI-pick checkbox group ("Pick up to 2") rather than the
-            // historical pick-one radio group. That is the control this change introduces, so it
-            // is the one the smoke photographs against a real Foundry; a cap of 1 would reproduce
-            // the pre-change frame and prove nothing new.
-            //
-            // AUTHORED rather than left absent, even though absence is the UNLIMITED reading and
-            // would compute the same `maxPicks`. This seed is replayed into a world that has never
-            // run Fabricate, so `migrationVersion` is unset, `lastRunVersion` is `'0.0.0'` and
-            // `fabricate.initialize()` runs every migration over it — including 1.20.0's
-            // `migrateMaxModifierPicks`, which stamps `maxModifierPicks = 1` onto exactly this
-            // shape (a `playerPicks` system carrying no cap) to preserve the pre-1055 single pick.
-            // Left absent, this seed therefore photographed the pick-one radio group under the
-            // caption above. The stamp is conditional so a fixture can opt out by authoring a cap,
-            // and the View Lab's herbalism system does the same for the same reason
-            // (`tests/view-lab/world/labContent.js`).
+            // historical pick-one radio group.
             maxModifierPicks: 2,
             routed: {
               type: 'relative',
               // `1d20 + 20` (base total 21-40, plus a small ability mod) always meets the
               // Masterwork threshold, so the Phase-E Brew Healing Potion craft deterministically
-              // succeeds. The DETERMINISM ARGUMENT SURVIVES issue 1094's retirement of the
-              // roll-formula placeholder this formula used to carry: the resolved modifier
-              // scalar is now APPENDED as a flavoured term BEFORE the formula reaches Foundry's
-              // Roll, so the same numbers land in the same place. The SYSTEM's `playerPicks` rule
-              // offers the `med` and `herb` modifiers (starter-hero WIS and DEX mods, roughly
-              // -1..+3 each), and whatever the player leaves ticked the +20 base absorbs — which
-              // is what makes the choice photographable without making the craft flaky.
-              // `playerPicks` SUMS the selection (issue 1055) and the cap above admits the whole
-              // eligible set, so the worst case is both mods at once and the margin still holds.
-              // Before #431 the routed check was authored-only (never
-              // rolled); now that it is engine-evaluated a bare `1d20` vs dc 12 would fail the
-              // craft ~55% of the time (flaky smoke). The named tiers below are unchanged so
-              // the routed-check and validation-tab captures still render their authored outcomes.
+              // succeeds.
               rollFormula: '1d20 + 20',
               dc: 12,
               thresholdMode: 'meet',
@@ -7878,16 +6589,9 @@ async function main() {
             }
           },
           itemTags: ['rare', 'reagent', 'metallic'],
-          // Two authored recipe categories, so the library's group-by-category treatment
-          // is exercised with MORE THAN ONE group. A single "General" bucket proves
-          // nothing about grouping (issue 643).
-          //
-          // The key is `categories`, NOT `recipeCategories`: `_normalizeSystem` reads
-          // `system.categories` (CraftingSystemManager.js), while `recipeCategories` at
-          // system level is the FEATURE-FLAG BOOLEAN. One name, two meanings, and no
-          // alias between them — so the array seeded under the flag's name was silently
-          // discarded and this fixture had zero authored categories for as long as the
-          // seed has existed, leaving issue 643's grouping treatment unexercised.
+          // Two authored recipe categories, so the library's group-by-category treatment is
+          // exercised with more than one group. A single "General" bucket proves nothing about
+          // grouping (issue 643).
           categories: ['Alchemy', 'Smithing'],
           // Participation only. The unit LADDER is world scope since issue 1278 and is seeded
           // as the `currencyConfig` world setting below, which is what gives the currency-cost
@@ -7952,11 +6656,7 @@ async function main() {
           }
         });
 
-        // Iron Sword gets authored salvage results with `enabled` ABSENT (issue 676).
-        // This is the state decision 6 guarantees EVERY existing world will show — the
-        // per-component gate defaults false and no migration seeds it — so without this
-        // fixture no frame captures the collapsed/OFF salvage body at all: the rest of
-        // the fixture authors `enabled: true` throughout.
+        // Iron Sword gets authored salvage results with `enabled` absent (issue 676).
         await csm.updateItem(systemId, componentMap['Iron Sword'], {
           salvage: {
             ingredientQuantity: 1,
@@ -8000,24 +6700,7 @@ async function main() {
           description: 'Combine mystic herbs and an empty vial to create a healing draught.',
           craftingSystemId: systemId,
           img: 'icons/consumables/potions/bottle-round-corked-red.webp',
-          // NO per-recipe `craftingModifier` (issues 856, 1055). The interactive fieldset is
-          // reached through the SYSTEM's `playerPicks` rule above, which is the only place that
-          // rule can live now; a recipe persists a PICK and nothing else, and a pick is honoured
-          // only under `byRecipe`. Seeding one here would be inert data that reads as though it
-          // were driving the capture.
-          //
-          // The eligible modifiers ('med', 'herb') are therefore the system defaults, matching WIS
-          // (Medicine) and DEX (Herbalism), which resolve to different ability scores on the
-          // smoke's dnd5e Starter Hero so the frame shows two distinct value chips. The
-          // `1d20 + 20` formula (plus the appended modifier term) has large margin vs dc 5
-          // Masterwork, so the craft
-          // succeeds whichever boxes the player leaves ticked. This recipe is the one selected by
-          // Phase-E's `selectCraftingRecipeByMode('routedByCheck')` (first in DOM order,
-          // alphabetically before Forge Iron Sword), making it the evidence frame for the
-          // multi-pick prompt.
-          // Single result group → produced on any non-failure outcome. The Phase-E
-          // craft rolls `1d20 + 20` plus the appended modifier term (always Masterwork), so this craft
-          // deterministically succeeds and yields the single "Brewed Potion" group.
+          // No per-recipe `craftingModifier` (issues 856, 1055).
           ingredientSets: [{
             ingredientGroups: [
               {
@@ -8045,18 +6728,10 @@ async function main() {
           }]
         });
 
-        // Books & Scrolls fixture (issue 796): seed FIVE resolvable book/scroll recipe
-        // items and link them all to "Brew Healing Potion" so its Books & Scrolls editor
-        // tab renders the POPULATED auto-fill grid — the tiling + specificity-cascade
-        // evidence the empty "Not in any book or scroll" panel cannot show. Five cards
-        // wrap past the editor's ~four-track row, proving the grid fills the panel and
-        // wraps rather than stretching one card. Real world Items back each definition so
-        // `fromUuid` resolves a live thumb/name instead of the missing-state row. These
-        // are created AFTER the component-registration loop above, so they never enter
-        // `componentMap`. The `-` covers the (0,3,0) grid rule vs the shared flex rule.
-        // Every img below is a Foundry-core raster confirmed to resolve (no 404s in the
-        // smoke console-error gate); `blueprint-recipe-alchemical` is the shared default
-        // recipe image every recipe frame already loads.
+        // Books & Scrolls fixture (issue 796): seed five resolvable book/scroll recipe items and
+        // link them all to "Brew Healing Potion" so its Books & Scrolls editor tab renders the
+        // populated auto-fill grid — the tiling + specificity-cascade evidence the empty "Not in
+        // any book or scroll" panel cannot show.
         const bookItemType = worldItemByName['Mystic Herb']?.type || 'loot';
         const bookItems = await Item.createDocuments([
           { name: "Mythwright Crafter's Handbook", type: bookItemType, img: 'icons/sundries/books/book-tooled-eye-gold-red.webp' },
@@ -8104,13 +6779,11 @@ async function main() {
           }]
         });
 
-        // Showcase recipe whose single ingredient set exercises every requirement row
-        // type so the Ingredients tab renders: a plain component, an OR group (one
-        // group with two component options), a tag requirement, an essence requirement,
-        // and a currency cost.
-        // complex:true forces the full set-card render; allowIncomplete persists it as a
-        // structurally-valid editor shell. Single result group → produced on any
-        // non-failure outcome (single-group exemption); routed modes ignore resultSelection.
+        // Showcase recipe whose single ingredient set exercises every requirement row type so the
+        // Ingredients tab renders: a plain component, an OR group (one group with two component
+        // options), a tag requirement, an essence requirement, and a currency cost. complex:true
+        // forces the full set-card render; allowIncomplete persists it as a structurally-valid
+        // editor shell.
         const showcaseRecipe = await rm.createRecipe({
           name: 'Showcase Requirements',
           description: 'Demonstrates every ingredient requirement row: component, OR group, tag, essence, and currency cost.',
@@ -8147,12 +6820,8 @@ async function main() {
                   match: { type: 'tags', tags: ['reagent', 'rare'], tagMatch: 'any' }
                 }]
               },
-              // An essence requirement (issue 684): a first-class essence match (issue
-              // 649) with its own end-of-row Stepper. `verdant` is the derived id of the
-              // "Verdant" essence seeded on this system (the normalizer slugs the name via
-              // `_uniqueKey`). This row sits directly above the currency cost so the
-              // `manager-recipe-edit-ingredients-cost` capture — which scrolls the LAST
-              // (currency) row into view — shows BOTH the essence and currency rows.
+              // An essence requirement (issue 684): a first-class essence match (issue 649) with
+              // its own end-of-row Stepper.
               {
                 name: 'Verdant essence',
                 options: [{
@@ -8178,17 +6847,15 @@ async function main() {
           }]
         }, { allowIncomplete: true });
 
-        // Multi-step recipe so the Overview steps accordion shows the per-step duration
-        // controls (data-recipe-step-time chips + the duration editor). Each step owns its
-        // own ingredient sets, result groups, and timeRequirement.
+        // Multi-step recipe so the Overview steps accordion shows the per-step duration controls
+        // (data-recipe-step-time chips + the duration editor).
         const multiStepRecipe = await rm.createRecipe({
           name: 'Multi-Step Alloy',
           description: 'A two-step recipe to showcase the steps accordion and per-step durations.',
           craftingSystemId: systemId,
           img: 'icons/commodities/metal/ingot-stack-steel.webp',
-          // Each step has a single result group → produced on any non-failure outcome
-          // (the single-group exemption is evaluated per step); routed modes ignore
-          // `resultSelection`.
+          // Each step has a single result group → produced on any non-failure outcome (the
+          // single-group exemption is evaluated per step); routed modes ignore `resultSelection`.
           steps: [
             {
               name: 'Smelt Ore',
@@ -8229,15 +6896,8 @@ async function main() {
           ]
         }, { allowIncomplete: true });
 
-        // Check-routed recipe deliberately authored with MULTIPLE result groups and
-        // two routed-readiness gaps so the Validation tab shows BOTH new warnings
-        // (issue 431 PR-2). The warnings now gate on the SYSTEM mode (routedByCheck),
-        // not a per-recipe provider, and fire only for multi-result-group steps:
-        //  - 'Reject Pile' carries no assigned outcome tier (empty checkOutcomeIds) →
-        //    `unroutedResultGroup` (a result set the check can never route to);
-        //  - the system's 'Masterwork' success tier is produced by no group →
-        //    `unproducedOutcomeTier` (a check outcome that yields nothing).
-        // allowIncomplete keeps the gappy draft savable; routed modes ignore resultSelection.
+        // Check-routed recipe deliberately authored with multiple result groups and two
+        // routed-readiness gaps so the Validation tab shows both new warnings (issue 431 PR-2).
         const routedReadinessRecipe = await rm.createRecipe({
           name: 'Routed Check Readiness',
           description: 'A check-routed recipe with an unrouted result set and an unproduced outcome tier.',
@@ -8269,18 +6929,9 @@ async function main() {
           ]
         }, { allowIncomplete: true });
 
-        // ── Recipe-library row states (issue 643) ────────────────────────────────
-        // Every fixture recipe above is enabled, unlocked, complete and uncategorised,
-        // so the library's Disabled row, Locked row, "Can't enable" pill, empty-Produces
-        // danger row and category grouping had NEVER been photographed. These two seed
-        // the missing states rather than mutating a recipe another phase depends on.
-        //
-        // 'Temper a Blade' carries an ingredient set but NO result groups: structurally
-        // sound (an empty result group would fail structure — this omits the group entirely),
-        // so `validateStructure()` passes while `validate()` fails, which is exactly the
-        // `_isRecipeIncomplete` predicate. Being OFF, the row reads "Can't enable" — enabling
-        // it would be refused. The edits carry `allowIncomplete` because the merged recipe is
-        // still an incomplete shell.
+        // Every fixture recipe above is enabled, unlocked, complete and uncategorised, so the
+        // library's Disabled row, Locked row, "Can't enable" pill, empty-Produces danger row and
+        // category grouping had never been photographed.
         const incompleteRecipe = await rm.createRecipe({
           name: 'Temper a Blade',
           description: 'Re-harden a finished blade to raise its edge retention.',
@@ -8321,20 +6972,14 @@ async function main() {
         });
         await rm.updateRecipe(lockedRecipe.id, { locked: true, category: 'Smithing' });
 
-        // Spread the existing recipes across the two authored categories so the library
-        // renders THREE groups (Alchemy / General / Smithing), not one. `allowIncomplete`
-        // keeps a category edit from re-gating an already-savable draft on completeness.
+        // Spread the existing recipes across the two authored categories so the library renders
+        // three groups (Alchemy / General / Smithing), not one.
         await rm.updateRecipe(recipe1.id, { category: 'Smithing' }, { allowIncomplete: true });
         await rm.updateRecipe(recipe2.id, { category: 'Alchemy' }, { allowIncomplete: true });
         await rm.updateRecipe(multiStepRecipe.id, { category: 'Smithing' }, { allowIncomplete: true });
 
-        // ── Books & Scrolls recipe items (issue 797) ─────────────────────────────
-        // Two recipe items so the recipe-item editor's Validation tab can be captured in
-        // BOTH an all-clear and a mixed pass/block state. Arcane Forge leaves
-        // `visibilityMode` at its 'knowledge' default, so the mode-specific check row is
-        // `learnsValid`. The two linked world items are created HERE, AFTER the
-        // component-registration loop above, so they are NOT registered as components and
-        // do not disturb the components-browser frames.
+        // Two recipe items so the recipe-item editor's Validation tab can be captured in both an
+        // all-clear and a mixed pass/block state.
         const bookType = worldItemByName['Iron Ore']?.type || 'loot';
         const [tomeItem, scrollItem] = await Item.createDocuments([
           {
@@ -8356,24 +7001,13 @@ async function main() {
         const clearRecipeItem = (await csm.addRecipeItemFromUuid(systemId, tomeItem.uuid)).item;
         await csm.updateRecipeItemDefinition(systemId, clearRecipeItem.id, { recipeIds: [recipe2.id] });
 
-        // Mixed recipe item: the world item is linked, but NO recipe is linked, so
-        // `recipeLinked` BLOCKS while `itemLinked` and `learnsValid` pass. One frame then
-        // shows a PASS row AND a BLOCK row together with the blocked medallion and both
-        // non-zero count tiles (issue 797, decision 7). Left with its default empty
-        // `recipeIds`, so no update is needed.
+        // Mixed recipe item: the world item is linked, but no recipe is linked, so `recipeLinked`
+        // blocks while `itemLinked` and `learnsValid` pass.
         const mixedRecipeItem = (await csm.addRecipeItemFromUuid(systemId, scrollItem.uuid)).item;
 
         const environmentStore = game.fabricate.getGatheringEnvironmentStore();
-        // MANUAL composition (issue 1315): the `enabledTaskIds`/`enabledEventIds`
-        // below are the picked lists manual mode actually reads. At the point this
-        // fixture is created, `gatheringConfig` for this system holds no library
-        // tasks yet (the settings.set that seeds `smoke-forage-library` runs further
-        // down, once the library-owning fields it depends on exist), so automatic
-        // mode's match-the-library gate has nothing to match against and the
-        // environment would fail its "must have a task before enable" validation.
-        // Manual's gate only checks that the picked list is non-empty, so it needs
-        // no library at create time; by the time a player actually browses Azure
-        // Grove, the library (and the ids named here) exists and composes as picked.
+        // Manual composition (issue 1315): the `enabledTaskIds`/`enabledEventIds` below are the
+        // picked lists manual mode actually reads.
         const gatheringEnvironment = await environmentStore.create({
           craftingSystemId: systemId,
           name: 'Azure Grove',
@@ -8480,10 +7114,9 @@ async function main() {
                 breakage: { mode: 'limitedUses', maxUses: 5 },
                 onBreak: { mode: 'flagBroken' }
               }, {
-                // Deliberately unlabelled: a recipe references this tool so the
-                // recipe Tools tab proves the component-name fallback (an
-                // unlabelled tool must show the backing component's name, never a
-                // raw id).
+                // Deliberately unlabelled: a recipe references this tool so the recipe Tools tab
+                // proves the component-name fallback (an unlabelled tool must show the backing
+                // component's name, never a raw id).
                 id: 'smoke-unlabelled-tool',
                 label: '',
                 enabled: true,
@@ -8556,14 +7189,9 @@ async function main() {
         // recipe so the recipe Tools tab demonstrates the component-name fallback.
         await rm.updateRecipe(recipe2.id, { toolIds: ['smoke-unlabelled-tool'] });
 
-        // Seed one `fabricate.interactable` Region behaviour on the Azure Grove
-        // scene so the canvas interactable config panel (Link/Unlink toggle +
-        // node editor) gets screenshot coverage in Phase D0. It is bound to the
-        // reusable GM library gathering task (`smoke-forage-library`) and the
-        // Azure Grove environment, linked by default (taskNodeLink: 'linked',
-        // node: null). The synthetic sourceUuid mirrors buildInteractableSourceUuid
-        // (`Fabricate.<systemId>.gatheringTask.<taskId>`). The Region is embedded
-        // in the scene, so Phase F's scene cleanup removes it — no extra cleanup.
+        // Seed one `fabricate.interactable` Region behaviour on the Azure Grove scene so the canvas
+        // interactable config panel (Link/Unlink toggle + node editor) gets screenshot coverage in
+        // Phase D0.
         const interactableTaskId = 'smoke-forage-library';
         const [interactableRegion] = await azureGroveScene.createEmbeddedDocuments('Region', [{
           name: 'Fabricate Forage Node',
@@ -8585,12 +7213,9 @@ async function main() {
           behavior => behavior?.type === 'fabricate.interactable'
         ) ?? null;
 
-        // Seed an UNCONFIGURED `fabricate.interactable` (issue 342): a behaviour
-        // created with an EMPTY `system`, exactly like the native Region → Behaviors
-        // "+ Add Behavior → Fabricate Interactable" path. The schema `initial`s make
-        // it instantiate VALID (no DataModelValidationError) and born unconfigured +
-        // inert. The config panel's "Needs configuration" identity section is
-        // captured against this one. Embedded in the scene → cleaned up with it.
+        // Seed an unconfigured `fabricate.interactable` (issue 342): a behaviour created with an
+        // empty `system`, exactly like the native Region → Behaviors "+ Add Behavior → Fabricate
+        // Interactable" path.
         const [unconfiguredRegion] = await azureGroveScene.createEmbeddedDocuments('Region', [{
           name: 'Fabricate Unconfigured Node',
           shapes: [{ type: 'rectangle', x: 1600, y: 1000, width: 400, height: 400 }],
@@ -8600,63 +7225,40 @@ async function main() {
           behavior => behavior?.type === 'fabricate.interactable'
         ) ?? null;
 
-        // A dedicated system seeded into a deliberately BROKEN state so the GM
-        // system-overview view renders populated rows and the system-blocker
-        // banner shows (issue 429 PR-2). It carries BOTH:
-        //   - a live system-blocker: progressive resolution mode with no
-        //     progressive crafting check configured (blocks:'system'); and
-        //   - an entity-level issue: an incomplete recipe with no result group
-        //     (a recipe readiness issue that surfaces in the overview).
+        // A dedicated system seeded into a deliberately broken state so the GM system-overview view
+        // renders populated rows and the system-blocker banner shows (issue 429 PR-2). It carries
+        // both.
         const blockedSystem = await csm.createSystem({
           name: 'Broken Workshop',
           description: 'A system left in a broken state to demonstrate the system overview and the system-blocker banner.'
         });
         const blockedSystemId = blockedSystem.id;
-        // Register two managed components so the progressive components browser
-        // shows BOTH a set difficulty and an unset ("None") value, and so the
-        // difficulty editor card has a component to author against. Difficulty is
-        // assigned after the progressive mode switch (below).
+        // Register two managed components so the progressive components browser shows both a set
+        // difficulty and an unset ("None") value, and so the difficulty editor card has a component
+        // to author against.
         const blockedComponents = [];
         for (const blockedWorldItem of game.items.contents.slice(0, 2)) {
           const added = await csm.addItemFromUuid(blockedSystemId, blockedWorldItem.uuid);
           if (added?.item?.id) blockedComponents.push({ id: added.item.id, name: blockedWorldItem.name });
         }
-        // Progressive mode with NO progressive crafting check → blocks:'system'.
-        // The aggregator's `progressiveNoCheck` blocker only fires when
-        // `checksEnabled` is false, i.e. neither `features.craftingChecks` nor
-        // `craftingCheck.enabled` is set. A freshly-created system normalizes both
-        // to false, but disable the crafting check EXPLICITLY here so the blocker
-        // is guaranteed regardless of any future default change. Gathering is
-        // enabled so the broken system also carries a TASK-kind issue (below) that
-        // deep-links to its owning environment.
+        // Progressive mode with no progressive crafting check → blocks:'system'.
         await csm.updateSystem(blockedSystemId, {
           resolutionMode: 'progressive',
           features: { gathering: true, craftingChecks: false },
           craftingCheck: { enabled: false }
         });
-        // Give the first blocked component a usable progressive difficulty so the
-        // components column renders a value next to the second component's "None"
-        // (and the difficulty editor card opens with a seeded value). This clears
-        // the progressiveNoDifficulty blocker but leaves progressiveNoCheck, so the
-        // system-overview blocker captures below are unaffected.
+        // Give the first blocked component a usable progressive difficulty so the components column
+        // renders a value next to the second component's "None" (and the difficulty editor card
+        // opens with a seeded value).
         if (blockedComponents[0]) {
           await csm.updateItem(blockedSystemId, blockedComponents[0].id, { difficulty: 4 });
         }
-        // NOTE: progressive mode with no crafting check rejects recipe creation
-        // ("Progressive mode requires crafting checks enabled"), and a recipe created
-        // before the mode switch would be deleted by the (pre-migration-first)
-        // updateSystem. So the broken system carries no recipe; its overview rows are
-        // the system-level blocker (above) plus the stale gathering task (below) — which
-        // is exactly the populated state both captures need.
+        // Note: progressive mode with no crafting check rejects recipe creation ("Progressive mode
+        // requires crafting checks enabled"), and a recipe created before the mode switch would be
+        // deleted by the (pre-migration-first) updateSystem.
 
-        // Seed a gathering library task that will NOT match the environment's
-        // conditions/biome, then create a MANUAL environment that explicitly
-        // includes it. A manually-included-but-non-matching task is classified
-        // `includedNotMatching` (issue 1315: manual mode composes the picked list
-        // whether or not it matches, so this is information rather than a fault),
-        // which surfaces a `staleIncluded` TASK-kind issue in the overview —
-        // exercising the task/event deep-link (which must resolve to the OWNING
-        // environment id, not the task record id).
+        // Seed a gathering library task that will NOT match the environment's conditions/biome,
+        // then create a manual environment that explicitly includes it.
         const blockedConfig = game.settings.get('fabricate', 'gatheringConfig') || {};
         await game.settings.set('fabricate', 'gatheringConfig', {
           ...blockedConfig,
@@ -8687,13 +7289,7 @@ async function main() {
           enabledTaskIds: ['broken-stale-task']
         });
 
-        // A `visibilityMode: 'restricted'` system (issue 643 §4b). The recipe
-        // editor's context rail is MODE-CONDITIONAL: `restricted` shows who the
-        // recipe is granted to, `item`/`knowledge` shows the books teaching it. The
-        // smoke world had no restricted system, no access grant and no assigned
-        // character, so the access branch could not be captured at all — a run would
-        // silently screenshot the Books & Scrolls branch instead and the PR evidence
-        // would show the wrong rail.
+        // A `visibilityMode: 'restricted'` system (issue 643 §4b).
         const restrictedSystem = await csm.createSystem({
           name: 'Warded Athenaeum',
           description: 'A restricted system whose recipes are granted to named players and characters.'
@@ -8727,18 +7323,8 @@ async function main() {
             }]
           }]
         });
-        // Access-grid evidence (issue 796): the recipe editor's Access tab tiles the
-        // granted characters into the SAME fixed three-column grid as Books & Scrolls.
-        // The two NAMED characters below reach their controllers by DIFFERENT routes —
-        // the crafter via Foundry OWNER ownership, the travel member via `User#character`
-        // assignment — so the `controlledBy` union is exercised; but two cards fill only
-        // part of one row. Seed four more resolvable grant-only characters so the list
-        // holds six, wrapping the three-column grid to two rows and proving it fills the
-        // panel. They are `smokeSeed`-flagged so cleanup removes them and are never
-        // referenced by the craft/gather steps (which key off the crafter/travel ids).
-        // They also carry `smokeSeedRole = 'access-grant'` (#816) so grant-only
-        // actors are distinguishable from the two hero fixtures; cleanup still keys
-        // solely on `smokeSeed === true`, so both cohorts are torn down.
+        // Access-grid evidence (issue 796): the recipe editor's Access tab tiles the granted
+        // characters into the same fixed three-column grid as Books & Scrolls.
         const accessGrantType = game.actors.get(crafterId)?.type || 'character';
         const accessGrantActors = await Actor.createDocuments(
           ['Seraphine the Warded', 'Brother Alden', 'Initiate Kaelen', 'Mistweaver Vane'].map((name) => ({
@@ -8801,10 +7387,9 @@ async function main() {
       results.steps.push({ step: 'create-crafting-system', passed: true });
       process.stdout.write(`Phase C complete: System "${craftingSetup.systemId}" with ${craftingSetup.recipeIds.length} recipes.\n`);
 
-      // Issue #489: seed the craft-execution coverage fixtures (dedicated per-mode
-      // systems, tool-breakage recipes, a salvageable component, crafter inventory,
-      // and a guaranteed-success gather env/task). Always-run so the execute-and-
-      // assert scenarios in Phase E run under rc/ci too.
+      // Issue #489: seed the craft-execution coverage fixtures (dedicated per-mode systems,
+      // tool-breakage recipes, a salvageable component, crafter inventory, and a guaranteed-success
+      // gather env/task).
       let executionFixtures = null;
       try {
         process.stdout.write('  Seeding craft-execution coverage fixtures (#489)...\n');
@@ -8822,12 +7407,10 @@ async function main() {
         process.stderr.write(`Seeding craft-execution fixtures failed: ${err.message}\n`);
       }
 
-      // Issue #543: seed the player Alchemy workbench coverage fixtures (two
-      // enabled alchemy systems + valid recipes) so the shared app surfaces the
-      // Alchemy tab and its discipline chooser in Phase E. Screenshot-profile only
-      // — rc/ci never opens the player app's alchemy captures. Reuses the same
-      // cleanup arrays as the execution fixtures so the systems/products/recipes
-      // are torn down at the end of the run.
+      // Issue #543: seed the player Alchemy workbench coverage fixtures (two enabled alchemy
+      // systems + valid recipes) so the shared app surfaces the Alchemy tab and its discipline
+      // chooser in Phase E. Screenshot-profile only — rc/ci never opens the player app's alchemy
+      // captures.
       let alchemyFixtures = null;
       if (RUN_SCREENSHOT_PHASES) {
         try {
@@ -8853,10 +7436,7 @@ async function main() {
         }
       }
 
-      // Feature-gate negative test (toggle gathering off, assert button hides,
-      // toggle back on). Belongs in `full` only — `rc` proves the positive
-      // gathering path in Phase D2, which exercises the same feature flag from
-      // the on side.
+      // Feature-gate negative test (toggle gathering off, assert button hides, toggle back on).
       if (RUN_FULL_ONLY_BEHAVIORS) {
       try {
         const otherGatheringSystemsEnabled = await page.evaluate((systemId) => {
@@ -8899,20 +7479,11 @@ async function main() {
       }
 
       // Phase D0 renderer-teardown tolerance state (issue #807).
-      // `d0RequiredCapturesComplete` flips true only AFTER the last load-bearing
-      // D0 capture (manager-experimental-off), so a teardown BEFORE that milestone
-      // still fails loudly — those later frames were never captured and a PR
-      // relying on them must not go green. `d0TeardownTolerated` records that D0
-      // absorbed a post-milestone teardown so the Phase E entry guard can skip a
-      // dead page even when page.isClosed() reads false (a 'browser has been
-      // disconnected'-class teardown). Declared at this scope so both the D0 catch
-      // and the sibling Phase E block below can read them.
       let d0RequiredCapturesComplete = false;
       let d0TeardownTolerated = false;
-      // ── Phase D0: Screenshot Crafting System Manager ─────────────────────
-      // Gated behind RUN_SCREENSHOT_PHASES so the CI smoke profile skips the
-      // ~25 manager captures and pointer hit-tests; local `full` runs
-      // continue to regenerate them for visual verification.
+      // Gated behind RUN_SCREENSHOT_PHASES so the CI smoke profile skips the ~25 manager captures
+      // and pointer hit-tests; local `full` runs continue to regenerate them for visual
+      // verification.
       if (!RUN_SCREENSHOT_PHASES) {
         startPhase('phase-D0-skipped');
         process.stdout.write(`Phase D0: skipped (profile=${SMOKE_PROFILE}).\n`);
@@ -8996,12 +7567,7 @@ async function main() {
         if (navLabels.at(0) !== 'System Overview') {
           throw new Error(`Manager selected nav should keep System Overview first. Saw: ${navLabels.join(', ')}`);
         }
-        // THE MEMBERSHIP LOOP, BY ID AND THEN BY LABEL (issue 1362). It used to walk nine
-        // LABELS and test `navLabels.includes(...)`, which the world scoped-entity leaves
-        // broke twice over: `Components` stopped appearing at all, and `Tags & Categories`
-        // became an exact duplicate across the two rail scopes, so `includes` could no longer
-        // say WHICH one it had found. Resolving the entry by its stable id fixes identity;
-        // asserting its rendered label afterwards keeps the check on what a GM actually reads.
+        // The membership loop, by ID AND then by label (issue 1362).
         for (const entry of [...MANAGER_SYSTEM_RAIL_ENTRIES, ...MANAGER_WORLD_SCOPED_RAIL_ENTRIES]) {
           const button = page.locator(railSelector(entry.id));
           if (await button.count() === 0) {
@@ -9012,9 +7578,8 @@ async function main() {
             throw new Error(`Manager rail entry #${entry.id} should read "${entry.label}"; it reads "${rendered}".`);
           }
         }
-        // The rail's crafting-system card SELECTS (issue 643): it names the current system
-        // AND lists every other, so the GM can switch without a round trip through the
-        // system library. The old card could only name it.
+        // The rail's crafting-system card selects (issue 643): it names the current system AND
+        // lists every other, so the GM can switch without a round trip through the system library.
         const scopeSelectValue = await page
           .locator('.fabricate-manager .manager-scope-card [data-manager-scope-select]')
           .first()
@@ -9146,31 +7711,24 @@ async function main() {
           await csm.updateSystem(sysId, { features: { essences: true, gathering: true } });
         }, craftingSetup.systemId);
         await seedSmokeGatheringLibrary(page, craftingSetup);
-        // Travel route (#257): seed a region and an enabled party BEFORE the
-        // manager opens so the initial store refresh picks them up and the Travel
-        // route renders real content (a party row plus a current-region override)
-        // instead of the empty setup-checklist state. Seeding must precede the
-        // app .show() because entering the Travel tab does not itself re-read the
-        // party store. Idempotent across reruns: clears any prior party first.
+        // Travel route (#257): seed a region and an enabled party BEFORE the manager opens so the
+        // initial store refresh picks them up and the Travel route renders real content (a party
+        // row plus a current-region override) instead of the empty setup-checklist state.
         await page.evaluate(async ({ sysId, crafterId, travelMemberId, sceneId, regionId }) => {
           const realmStore = game.fabricate.getGatheringRealmStore?.();
           const partyStore = game.fabricate.getGatheringPartyStore?.();
           if (!realmStore || !partyStore) {
             throw new Error('Gathering realm/party stores unavailable for Travel seeding.');
           }
-          // Select the party actors by stable id (#816). The `smokeSeed` namespace
-          // is shared with grant-only Access-grid actors, so a name sort over that
-          // set could silently pick a grant actor; resolve the intended crafter and
-          // travel member from the ids the craft/gather steps already recorded.
+          // Select the party actors by stable id (#816).
           const crafter = game.actors.get(crafterId);
           const travelMember = travelMemberId ? game.actors.get(travelMemberId) : null;
           if (!crafter) {
             throw new Error('No smoke-seeded gathering actor found for Travel seeding.');
           }
-          // Travel & Realms is disabled by default (#286). Participation is a CRAFTING
-          // SYSTEM flag since #1282 — the realm library itself is world scope — so this is a
-          // system write, not a realm-store one. Enable it before the manager opens so the
-          // environment realm controls and the party override are live for the captures.
+          // Travel & Realms is disabled by default (#286). Participation is a crafting system flag
+          // since #1282 — the realm library itself is world scope — so this is a system write, not
+          // a realm-store one.
           const systemManager = game.fabricate.getCraftingSystemManager?.();
           await systemManager?.updateSystem?.(sysId, { gatheringRealmSettings: { enabled: true } });
           for (const party of partyStore.list()) {
@@ -9197,11 +7755,8 @@ async function main() {
           await partyStore.setEnabled(party.id, true);
           await partyStore.setCurrentRealmOverride(party.id, [realm.id]);
 
-          // Realm-lock evidence (#294): a second realm the party is NOT in, plus
-          // an environment that REQUIRES it. The player Gathering tab then shows a
-          // realm-locked environment card with the "Not in current realm" alert
-          // (LOCATION_BLOCKED for a party member; NO_CURRENT_REALM for a viewer
-          // with no party — either way the card locks). Idempotent across reruns.
+          // Realm-lock evidence (#294): a second realm the party is NOT in, plus an environment
+          // that requires it.
           const environmentStore = game.fabricate.getGatheringEnvironmentStore?.();
           if (environmentStore) {
             const hiddenVale = realmStore.list().find(r => r.name === 'Hidden Vale')
@@ -9271,10 +7826,8 @@ async function main() {
         }
         await assertManagerLayoutStable(page, 'system edit normal');
         await assertNoScreenshotOverlays(page);
-        // The pointer-target pass typed a name without saving, so the identity form is
-        // dirty (issue 767 now lights an Unsaved chip). Persist it so the settled
-        // "normal"/"narrow" frames show the clean form; saveSystemDetails awaits a
-        // refresh internally.
+        // The pointer-target pass typed a name without saving, so the identity form is dirty (issue
+        // 767 now lights an Unsaved chip).
         const systemNameField = page.locator('.fabricate-manager #manager-system-name').first();
         const saveDetailsButton = page
           .locator('.fabricate-manager .manager-edit-card-heading button[type="submit"]')
@@ -9294,11 +7847,9 @@ async function main() {
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-system-edit-narrow');
 
-        // --- Dirty identity form (issue 767) ---
-        // Type an un-saved name change so the identity form is dirty, then frame the
-        // identity card so the lit "Unsaved" chip beside "Save details" is captured.
-        // Captured BEFORE any Save/blur that would persist, so the changed state
-        // itself (not the clean form) reaches the PR evidence.
+        // --- Dirty identity form (issue 767) --- Type an un-saved name change so the identity form
+        // is dirty, then frame the identity card so the lit "Unsaved" chip beside "Save details" is
+        // captured.
         await setManagerWindowSize(page, { width: 1280, height: 820 });
         await systemNameField.fill('The Herbalist (unsaved edit)');
         await page
@@ -9312,10 +7863,9 @@ async function main() {
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-system-edit-dirty');
 
-        // Restore the persisted name so the identity form is clean again before the
-        // walk navigates away — otherwise the new route-exit guard would raise a
-        // discard dialog and block the remaining captures. Re-typing the saved value
-        // clears the dirty flag with no further persistence (identity-gated seeding).
+        // Restore the persisted name so the identity form is clean again before the walk navigates
+        // away — otherwise the new route-exit guard would raise a discard dialog and block the
+        // remaining captures.
         await systemNameField.fill('The Herbalist');
         await page
           .locator('.fabricate-manager [data-system-details-dirty]')
@@ -9367,21 +7917,11 @@ async function main() {
           await page.waitForTimeout(150);
         }
 
-        // --- World currency configuration (#393, rehomed by #1278, folded under Rules &
-        // Resources by #1311) ---
-        // The ladder is WORLD scope now, so this walks to World > Rules & Resources > Currency
-        // rather than a crafting system's Settings tab, and needs no participation toggle to
-        // get there: the page is ungated precisely so a GM can author the coins BEFORE any
-        // system enables them. Seed the dnd5e (actorProperty) ladder, then capture each spend
-        // strategy. The smoke world is dnd5e, so the actorInventory branch shows the
-        // no-provider callout (the pf2e provider grid needs a pf2e world, which the e2e
-        // fixtures do not ship).
-        //
-        // Currency is a Rules & Resources SUBITEM (`#manager-rules-nav-currency`), not the
-        // standalone top-level `#manager-world-nav-currency` item issue 1278 originally added —
-        // issue 1311 folded it under the same group as Modifiers and Character Prerequisites,
-        // and the walk is already on that route from the modifiers capture above (the Rules
-        // submenu stays expanded), so this only needs to select the sibling subitem.
+        // --- World currency configuration (#393, rehomed by #1278, folded under Rules & Resources
+        // by #1311) --- The ladder is world scope now, so this walks to World > Rules & Resources >
+        // Currency rather than a crafting system's Settings tab, and needs no participation toggle
+        // to get there: the page is ungated precisely so a GM can author the coins BEFORE any
+        // system enables them.
         await setManagerWindowSize(page, { width: 1280, height: 900 });
         await page.locator('.fabricate-manager #manager-rules-nav-currency').first().click();
         await page.waitForTimeout(300);
@@ -9407,11 +7947,9 @@ async function main() {
         await showCurrencyCard();
         await screenshot(page, 'currency-actor-property');
 
-        // THE SPEND STRATEGY IS THE APP'S OWN OPTION LIST (issue 1510), so `selectOption` — which
-        // is Playwright's `<select>`-ONLY API and THROWS on anything else — is replaced by the
-        // harness's own two-click drive. Each row is addressed by its `data-popover-option`
-        // handle rather than positionally, so a vocabulary change reads as a missing option
-        // rather than as a different strategy being chosen.
+        // The spend strategy is the app's own option list (issue 1510), so `selectOption` — which
+        // is Playwright's `<select>`-ONLY API and throws on anything else — is replaced by the
+        // harness's own two-click drive.
         const currencyStrategy = page.locator('.fabricate-manager [data-world-currency-strategy-select]').first();
         await chooseSelectOption(page, currencyStrategy, { value: 'macro' });
         await page.locator('.fabricate-manager [data-world-currency-macros]').first().waitFor({ state: 'visible', timeout: 5_000 });
@@ -9428,9 +7966,8 @@ async function main() {
         await chooseSelectOption(page, currencyStrategy, { value: 'actorProperty' });
         await page.waitForTimeout(300);
 
-        // ── D0 section: recipes / crafting (issue #826 scoped-skip guard) ──────
-        // Inert under rc/ci/full; skips the recipe + crafting captures on a scoped
-        // `screenshots` run whose target set touches none of them.
+        // Inert under rc/ci/full; skips the recipe + crafting captures on a scoped `screenshots`
+        // run whose target set touches none of them.
         if (shouldRunScreenshotSection('recipes')) {
         await setManagerWindowSize(page, { width: 1280, height: 820 });
         const recipeApiCount = await page.evaluate((sysId) => {
@@ -9446,40 +7983,16 @@ async function main() {
         await assertRecipeRowsHittable(page, 'recipes normal');
         await captureStableManagerView(page, { layout: 'recipes normal', label: 'manager-recipes-normal' });
 
-        // ---------------------------------------------------------------------
-        // Issue 1010 — the recipe browser's BULK EDIT rail panel, in its three frames. They
-        // sit here, immediately after the plain browser frame and BEFORE the narrow one, so
-        // `manager-recipes` keeps winning its own `candidates[0]` with
-        // `manager-recipes-normal` and every one of them is captured at the 1280x820 width
-        // the shared scaffold's `recipes normal` layout pin is measured against.
-        //
-        // See `captureBulkEditFrame` for the scaffold and `RECIPE_BULK_EDIT_STUDIO` for the
-        // hooks. Every frame clears its selection in a `finally`, so the narrow frame and
-        // the no-check frame below still measure the single-recipe rail they expect.
-        //
-        //  1. STAGED — a category and the Lock axis armed. Deliberately NOT the check tier
-        //     or the book run: Arcane Forge is `routedByCheck`, so whether it offers recipe
-        //     tiers at all is a property of its authored check rather than of this walk, and
-        //     a frame that asserts on a control the fixture may not render fails the walk
-        //     instead of photographing the panel. The View Lab's counterpart case stages all
-        //     five axes against a world authored for exactly that.
-        //  2. UNSTAGED — the pristine draft. Nothing is staged, so the ASSERTIONS are the
-        //     state: Apply inert, and the three `Unchanged` segments on their default face.
-        //  3. BLOCKED — Enable staged over a selection containing 'Temper a Blade', the
-        //     seeded off-and-incomplete recipe the activation gate refuses. This is the one
-        //     frame that shows the panel's pre-flight count and the row's own `Can't enable`
-        //     pill in one photograph, which is how the two are shown to read ONE predicate.
-        // ---------------------------------------------------------------------
+        // --------------------------------------------------------------------- Issue 1010 — the
+        // recipe browser's bulk edit rail panel, in its three frames.
         await captureBulkEditFrame(page, results, {
           studio: RECIPE_BULK_EDIT_STUDIO,
           stepName: 'recipes-bulk-edit',
           label: 'manager-recipes-bulk-edit',
           selectRows: selectRecipeRowsByName('Brew Healing Potion', 'Quench a Blade'),
           stage: async (bulkPanel) => {
-            // Index 1 is the first real option after the `Leave unchanged` sentinel, so a
-            // category is staged whatever vocabulary this world has authored. Rooted on the
-            // PAGE, not on `bulkPanel`: the option list is portaled out of the panel (issue
-            // 1504), so a panel-scoped row locator matches nothing.
+            // Index 1 is the first real option after the `Leave unchanged` sentinel, so a category
+            // is staged whatever vocabulary this world has authored.
             await chooseSelectOption(
               page,
               bulkPanel.locator('[data-recipe-bulk-category]').first(),
@@ -9518,10 +8031,7 @@ async function main() {
           studio: RECIPE_BULK_EDIT_STUDIO,
           stepName: 'recipes-bulk-edit-blocked',
           label: 'manager-recipes-bulk-edit-blocked',
-          // Pinned BY NAME, not positionally. 'Temper a Blade' is the only seeded recipe
-          // that is both off and un-enableable, so it is what makes the blocked count
-          // non-zero; a positional pick would stage Enable over two ordinary recipes and
-          // publish this frame with no Callout in it, passing every other guard here.
+          // Pinned by name, not positionally.
           selectRows: selectRecipeRowsByName('Temper a Blade', 'Quench a Blade'),
           stage: async (bulkPanel) => {
             await clickSegment(bulkPanel, 'data-recipe-bulk-status-option', 'enable');
@@ -9535,15 +8045,8 @@ async function main() {
           },
         });
 
-        // The rich recipe row (issue 643) is the highest horizontal-overflow risk in the
-        // manager: identity + I/O readout + check pill + lock + toggle + three actions on
-        // one line. Drive it at the narrow width too — assertManagerLayoutStable only
-        // flags what it FINDS, so a width nobody measures is coverage nobody has.
-        //
-        // And a row nobody can SEE is coverage nobody has either: the layout check counts
-        // DOM rows, so it passed on a 900px library that showed zero of them. The hit-test
-        // runs before the capture (and scrolls the first row into view, which is also the
-        // frame worth photographing at this width).
+        // The rich recipe row (issue 643) is the highest horizontal-overflow risk in the manager:
+        // identity + I/O readout + check pill + lock + toggle + three actions on one line.
         await setManagerWindowSize(page, { width: 900, height: 700 });
         await assertRecipeRowsHittable(page, 'recipes narrow');
         await captureStableManagerView(page, {
@@ -9552,12 +8055,9 @@ async function main() {
         });
         await setManagerWindowSize(page, { width: 1280, height: 820 });
 
-        // The row's "No check" warning pill fires when the SYSTEM has no usable crafting
-        // check (no authored rollFormula) — a system-level fact, so it cannot exist in the
-        // routed-check smoke system whatever a recipe is authored to do. Switch to the
-        // check-less "Smoke Simple Forge" through the rail's new system select (which also
-        // proves the select routes), photograph the warning row, and switch back. Guarded:
-        // a hiccup records a failed step rather than aborting the phase.
+        // The row's "No check" warning pill fires when the system has no usable crafting check (no
+        // authored rollFormula) — a system-level fact, so it cannot exist in the routed-check smoke
+        // system whatever a recipe is authored to do.
         const scopeSelect = page.locator('.fabricate-manager [data-manager-scope-select]').first();
         try {
           await scopeSelect.selectOption({ label: 'Smoke Simple Forge' });
@@ -9575,13 +8075,7 @@ async function main() {
           await openManagerCraftingSection(page, 'recipes', 'recipes');
         }
 
-        // Issue 801 — the grouped-category CONTINUATION frame for the recipe library. With
-        // "Group by category" ON the list is ordered category-major BEFORE pagination, so a
-        // category larger than the page renders contiguously across the boundary rather than
-        // as an alphabetical slice on every page. Seed one category ("Aaa Continuation",
-        // which sorts FIRST as recipes order categories plain-alphabetically) with 14 rows so
-        // it alone spans pages 1→2, then capture the continuation page. See
-        // captureGroupedContinuationFrame for the shared scaffold and teardown.
+        // Issue 801 — the grouped-category continuation frame for the recipe library.
         await captureGroupedContinuationFrame(page, results, {
           stepName: 'recipes-grouped-continuation',
           failMessage: 'Recipes grouped continuation capture failed',
@@ -9630,21 +8124,18 @@ async function main() {
         // (category filter + collapsed group) rather than resetting it on the remount.
         await captureRecipeEditorRoundtrip(page, results, craftingSetup);
 
-        // Crafting nav group expanded (Settings + Recipes + Books & Scrolls) and the
-        // Books & Scrolls recipe-item surface + the Settings placeholder. Guarded so a
-        // hiccup records a failed step rather than aborting the whole phase.
+        // Crafting nav group expanded (Settings + Recipes + Books & Scrolls) and the Books &
+        // Scrolls recipe-item surface + the Settings placeholder.
         try {
           await assertNoScreenshotOverlays(page);
           await screenshot(page, 'manager-crafting-group-expanded');
           await openManagerCraftingSection(page, 'books-scrolls', 'books-scrolls');
           await page.locator('.fabricate-manager [data-books-scrolls]').first()
             .waitFor({ state: 'visible', timeout: 5_000 });
-          // The Books & Scrolls management surface now lists the book/scroll recipe items
-          // seeded for "Brew Healing Potion" (issue 796) PLUS the two recipe items seeded
-          // for the Validation-tab captures (issue 797) — the all-clear "Tome of Brewing"
-          // and the mixed "Torn Recipe Scroll" — so it is deliberately POPULATED. It is
-          // still captured without the row-count heuristic (a filtered/empty state would
-          // still be valid) and never blocks the Crafting Settings capture that follows.
+          // The Books & Scrolls management surface now lists the book/scroll recipe items seeded
+          // for "Brew Healing Potion" (issue 796) plus the two recipe items seeded for the
+          // Validation-tab captures (issue 797) — the all-clear "Tome of Brewing" and the mixed
+          // "Torn Recipe Scroll" — so it is deliberately populated.
           await assertNoScreenshotOverlays(page);
           await screenshot(page, 'manager-books-scrolls-normal');
           await openManagerCraftingSection(page, 'settings', 'crafting-settings');
@@ -9660,12 +8151,9 @@ async function main() {
           process.stderr.write(`Crafting group surface capture failed: ${err.message}\n`);
         }
 
-        // Recipe-item editor → Validation tab (issue 797): brought to parity with the
-        // recipe editor's Validation tab (summary card + Passing/Blocking count tiles +
-        // grouped bordered rows with status pills). Captured in TWO states off the two
-        // recipe items seeded above: the all-clear "Tome of Brewing" and the mixed
-        // pass/block "Torn Recipe Scroll". Guarded so a hiccup records a failed step
-        // instead of aborting Phase D0.
+        // Recipe-item editor → Validation tab (issue 797): brought to parity with the recipe
+        // editor's Validation tab (summary card + Passing/Blocking count tiles + grouped bordered
+        // rows with status pills).
         try {
           const openRecipeItemValidation = async (recipeItemId) => {
             await openManagerCraftingSection(page, 'books-scrolls', 'books-scrolls');
@@ -9673,10 +8161,9 @@ async function main() {
             await page.locator('.fabricate-manager[data-manager-view="recipe-item-edit"]').first()
               .waitFor({ state: 'visible', timeout: 5_000 });
             await page.locator('.fabricate-manager [data-recipe-item-tab-button="validation"]').first().click();
-            // Wait on the summary card marker (the recipe-item editor is an edit-form
-            // view with no table rows, so `assertManagerLayoutStable` — which requires
-            // them — does not apply; the recipe-editor tab captures likewise use only the
-            // overlay guard).
+            // Wait on the summary card marker (the recipe-item editor is an edit-form view with no
+            // table rows, so `assertManagerLayoutStable` — which requires them — does not apply;
+            // the recipe-editor tab captures likewise use only the overlay guard).
             await page.locator('.fabricate-manager [data-recipe-item-tab="validation"] [data-recipe-item-validation-summary]').first()
               .waitFor({ state: 'visible', timeout: 5_000 });
             await assertNoScreenshotOverlays(page);
@@ -9691,22 +8178,15 @@ async function main() {
           process.stderr.write(`Recipe-item validation capture failed: ${err.message}\n`);
         }
 
-        // Recipes → open the editor so the Overview tab's identity card is captured
-        // (#387). Issue 676 deleted the right context rail: recipe-edit is a TWO-column
-        // route now, and the knowledge-gated recipe-item list moved to its own Books &
-        // Scrolls tab (captured in its own step below). This step therefore waits only
-        // on the always-present Overview identity card — waiting on the recipe-item
-        // section here would hang, and this wait is UNGUARDED, so it would abort the
-        // rest of Phase D0 rather than record one failed step.
+        // Recipes → open the editor so the Overview tab's identity card is captured (#387).
         await openManagerRecipeEditor(page, 'Brew Healing Potion');
         await page.locator('.fabricate-manager [data-recipe-section="identity"]').first().waitFor({ state: 'visible', timeout: 5_000 });
         await assertManagerLayoutStable(page, 'recipe edit normal');
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-recipe-edit-normal');
 
-        // Books & Scrolls tab: the knowledge-gated list of books teaching this recipe,
-        // plus its per-row unlink — the ONLY surface carrying either. Guarded so a
-        // hiccup records a failed step instead of aborting Phase D0.
+        // Books & Scrolls tab: the knowledge-gated list of books teaching this recipe, plus its
+        // per-row unlink — the ONLY surface carrying either.
         try {
           await page.locator('.fabricate-manager [data-recipe-tab-button="books-scrolls"]').first().click();
           await page.locator('.fabricate-manager [data-recipe-tab="books-scrolls"] [data-recipe-section="recipe-item"]').first()
@@ -9720,9 +8200,8 @@ async function main() {
           process.stderr.write(`Recipe books & scrolls capture failed: ${err.message}\n`);
         }
 
-        // Recipe Tools tab → this recipe references a deliberately-unlabelled tool,
-        // so the row must show the backing component's name (the fallback fix),
-        // never a raw id. Guarded so a hiccup records a failed step, not an abort.
+        // Recipe Tools tab → this recipe references a deliberately-unlabelled tool, so the row must
+        // show the backing component's name (the fallback fix), never a raw id.
         try {
           await page.locator('.fabricate-manager [data-recipe-tab-button="tools"]').first().click();
           await page.locator('.fabricate-manager [data-recipe-tab="tools"]').first().waitFor({ state: 'visible', timeout: 5_000 });
@@ -9735,13 +8214,7 @@ async function main() {
           process.stderr.write(`Recipe tools capture failed: ${err.message}\n`);
         }
 
-        // Showcase Requirements → Ingredients tab. The recipe has a SINGLE ingredient
-        // set, so it renders CHROMELESS (issue 643) — the requirement rows sit on the tab
-        // background with no "Set 1" box, above the full-width "Add ingredient set"
-        // promotion button. The tab is taller than the manager window, so ONE viewport
-        // frame cannot hold every row type (issue 684): this first frame, captured at the
-        // top of the tab, covers the component, OR-group and tag rows; the essence and
-        // currency-cost rows below the fold get their own scrolled frame immediately below.
+        // Showcase Requirements → Ingredients tab.
         await openManagerRecipeEditor(page, 'Showcase Requirements');
         await page.locator('.fabricate-manager [data-recipe-tab-button="ingredients"]').first().click();
         await page.locator('.fabricate-manager [data-recipe-tab="ingredients"]').first().waitFor({ state: 'visible', timeout: 5_000 });
@@ -9750,13 +8223,9 @@ async function main() {
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-recipe-edit-ingredients');
 
-        // Issue 684: the essence + currency-cost requirement rows sit BELOW the fold of
-        // the viewport-sized frame above, so they were cropped out of every published
-        // frame while the caption still claimed them. Split them into their own frame:
-        // scroll the currency-cost row (the LAST requirement, with the essence row
-        // directly above it) into view so both rows AND their shared end-of-row Steppers
-        // are on-screen, then capture. Inline like the first ingredients frame above — a
-        // hiccup fails the walk loudly rather than publishing a silently-cropped frame.
+        // Issue 684: the essence + currency-cost requirement rows sit below the fold of the
+        // viewport-sized frame above, so they were cropped out of every published frame while the
+        // caption still claimed them.
         const ingredientsTab = page.locator('.fabricate-manager [data-recipe-tab="ingredients"]').first();
         await ingredientsTab.locator('[data-recipe-option-currency]').first().scrollIntoViewIfNeeded();
         await ingredientsTab.locator('[data-recipe-option-essence]').first().waitFor({ state: 'visible', timeout: 5_000 });
@@ -9764,11 +8233,8 @@ async function main() {
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-recipe-edit-ingredients-cost');
 
-        // Return to the recipes browser, then open the check-routed recipe whose
-        // Validation tab carries both routed readiness warnings (issue 431 PR-2). The
-        // Ingredients capture stays on Showcase Requirements above; only this
-        // validation capture is repointed at the check-routed fixture so the published
-        // frame shows the unroutedResultGroup + unproducedOutcomeTier warning chips.
+        // Return to the recipes browser, then open the check-routed recipe whose Validation tab
+        // carries both routed readiness warnings (issue 431 PR-2).
         await openManagerRecipeEditor(page, 'Routed Check Readiness');
         await page.locator('.fabricate-manager [data-recipe-tab-button="validation"]').first().click();
         await page.locator('.fabricate-manager [data-recipe-tab="validation"]').first().waitFor({ state: 'visible', timeout: 5_000 });
@@ -9792,12 +8258,8 @@ async function main() {
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'manager-recipe-edit-multistep');
 
-        // Results-tab coverage (issue 643): the most mode-dependent tab previously had
-        // ZERO screenshot coverage — which is why the multi-step Results structural bug
-        // shipped unseen. Cover every resolution mode's Results shape.
-        //
-        // Routed-by-check: outcome-routed result sets (tier bands). In the same
-        // (Herbalist's Compendium) system as the Ingredients/Validation captures.
+        // Results-tab coverage (issue 643): the most mode-dependent tab previously had zero
+        // screenshot coverage — which is why the multi-step Results structural bug shipped unseen.
         await captureRecipeResultsTab(
           page,
           'Routed Check Readiness',
@@ -9815,23 +8277,11 @@ async function main() {
           '[data-recipe-section$="-results"]'
         );
 
-        // ── Multi-step visibility gating (issue 710) ────────────────────────────
-        // Two captures that demonstrate the collapse semantics of the feature: the
-        // confirm dialog that guards turning the multi-step feature OFF while multi-step
-        // recipes exist, and the COLLAPSED recipe editor the branch renders once it is
-        // off. Both toggle the multiStepRecipes feature on the current (Herbalist's
-        // Compendium) system, whose "Multi-Step Alloy" recipe carries authored steps.
-        //
-        // State restoration is MANDATORY: every earlier and later multistep capture
-        // asserts the ENABLED editor (steps accordion / per-step results), so the outer
-        // finally force-re-enables the feature through the API even if a UI step throws,
-        // and the whole span sits AFTER those enabled-state frames so a leaked disable
-        // can never rewrite them.
+        // Two captures that demonstrate the collapse semantics of the feature: the confirm dialog
+        // that guards turning the multi-step feature off while multi-step recipes exist, and the
+        // collapsed recipe editor the branch renders once it is off.
         try {
-          // (1) Disable-confirm, CANCELLED. Open the system Edit route, confirm the
-          // multi-step tile reads ON, click it OFF — which opens the collapse confirm
-          // dialog (services.confirmDialog) because "Multi-Step Alloy" has steps — and
-          // capture WITH THE DIALOG OPEN. Then take the 'no' path so nothing persists.
+          // (1) Disable-confirm, cancelled.
           const featureTile = await openManagerMultiStepFeatureTile(page);
           await featureTile.locator('.manager-status-toggle.is-on').first()
             .waitFor({ state: 'visible', timeout: 5_000 });
@@ -9842,12 +8292,9 @@ async function main() {
             .filter({ hasText: 'Existing multi-step recipes will run as one combined action' })
             .first();
           await disableDialog.waitFor({ state: 'visible', timeout: 10_000 });
-          // Load-bearing proof this is the branch's collapse confirm (not a generic
-          // prompt): its body copy AND its 'Disable' confirm button (issue 710's fix
-          // commit wired that label onto the yes action). DialogV2.confirm does NOT
-          // surface the service's top-level `title` in the window chrome (`.window-title`
-          // stays empty), so the identifying content asserted here is the warning body
-          // and the labelled action — exactly what a GM reads before confirming.
+          // Load-bearing proof this is the branch's collapse confirm (not a generic prompt): its
+          // body copy AND its 'Disable' confirm button (issue 710's fix commit wired that label
+          // onto the yes action).
           await disableDialog.getByText('Their steps are kept and restored').first()
             .waitFor({ state: 'visible', timeout: 5_000 });
           await disableDialog.locator('button[data-action="yes"]:has-text("Disable")').first()
@@ -9871,10 +8318,7 @@ async function main() {
         }
 
         try {
-          // (2) Collapsed editor. This time ACCEPT the confirm (the branch's 'Disable'
-          // button) so the feature actually turns off, then open "Multi-Step Alloy" and
-          // capture its Overview: the read-only collapsed-steps card + explanatory note
-          // that the branch renders in place of the editable steps accordion.
+          // (2) Collapsed editor.
           const featureTile = await openManagerMultiStepFeatureTile(page);
           await featureTile.locator('.manager-status-toggle.is-on').first()
             .waitFor({ state: 'visible', timeout: 5_000 });
@@ -9894,10 +8338,8 @@ async function main() {
           await openManagerRecipeEditor(page, 'Multi-Step Alloy');
           await page.locator('.fabricate-manager [data-recipe-tab="overview"]').first()
             .waitFor({ state: 'visible', timeout: 5_000 });
-          // Collapsed presentation: the read-only steps card + its note strip replace the
-          // editable accordion. Assert the collapsed card and note are present AND the
-          // editable steps accordion (data-recipe-section="steps") is GONE — the single
-          // combined-action presentation the branch renders while the feature is off.
+          // Collapsed presentation: the read-only steps card + its note strip replace the editable
+          // accordion.
           await page.locator('.fabricate-manager [data-recipe-section="collapsed-steps"]').first()
             .waitFor({ state: 'visible', timeout: 5_000 });
           await page.locator('.fabricate-manager [data-recipe-collapsed-note]').first()
@@ -9913,10 +8355,9 @@ async function main() {
           results.steps.push({ step: 'multistep-recipe-edit-collapsed', passed: false, error: err.message });
           process.stderr.write(`Multi-step collapsed-editor capture failed: ${err.message}\n`);
         } finally {
-          // MANDATORY restore: re-enable multi-step recipes (enabling never prompts) and
-          // verify the editable steps accordion is back so every later multistep frame —
-          // and every rerun — sees the enabled editor. Force it through the API too, so a
-          // failed UI step above still leaves the feature ON.
+          // Mandatory restore: re-enable multi-step recipes (enabling never prompts) and verify the
+          // editable steps accordion is back so every later multistep frame — and every rerun —
+          // sees the enabled editor.
           try {
             const featureTile = await openManagerMultiStepFeatureTile(page);
             if (await featureTile.locator('.manager-status-toggle.is-off').count() > 0) {
@@ -9938,10 +8379,8 @@ async function main() {
           }
         }
 
-        // Progressive: the ordered stage list + roll-budget info strip + read-only
-        // difficulty badge + keyboard move chevrons. In its own system, so switch to it
-        // through the existing selection helper (not a fresh open span) and restore the
-        // default system afterward. Guarded so a hiccup records a failed step.
+        // Progressive: the ordered stage list + roll-budget info strip + read-only difficulty badge
+        // + keyboard move chevrons.
         if (executionFixtures?.progressive?.systemId) {
           try {
             await returnToSystemLibrary(page);
@@ -9985,15 +8424,8 @@ async function main() {
           }
         }
 
-        // Warded Rite (restricted system) → the recipe editor's ACCESS tab: players with
-        // access, characters with access, and each character's "played by" subline. This
-        // is the ONLY capture of the restricted branch — every other recipe capture runs
-        // against Arcane Forge, whose visibility mode drives the Books & Scrolls branch
-        // instead. Issue 676 moved this out of the deleted context rail into a real tab,
-        // so the tab must be CLICKED first; the tab button only exists under the
-        // restricted mode, which is itself part of what this asserts. Guarded so a
-        // hiccup records a failed step instead of aborting the rest of Phase D0, and
-        // the system selection is restored either way.
+        // Warded Rite (restricted system) → the recipe editor's access tab: players with access,
+        // characters with access, and each character's "played by" subline.
         try {
           await returnToSystemLibrary(page);
           await selectSmokeSystemInManager(page, craftingSetup.restrictedSystemId);
@@ -10023,10 +8455,9 @@ async function main() {
         await openManagerCraftingSection(page, 'recipes', 'recipes');
         }
 
-        // ── D0 section: components + checks (issue #826 scoped-skip guard) ─────
-        // Re-enters via an absolute Components nav click, so it does not depend on
-        // the recipes section having run; net-zero (issue-800 restore + economy
-        // revert + system-switch re-selects all inline).
+        // Re-enters via an absolute Components nav click, so it does not depend on the recipes
+        // section having run; net-zero (issue-800 restore + economy revert + system-switch
+        // re-selects all inline).
         if (shouldRunScreenshotSection('components-checks')) {
         await setManagerWindowSize(page, { width: 1280, height: 820 });
         // Required sections establish their own scope. Optional recipe captures
@@ -10042,26 +8473,10 @@ async function main() {
         await captureStableManagerView(page, { layout: 'components normal', label: 'manager-components-normal' });
         process.stdout.write('  D0: components normal screenshotted\n');
 
-        // ---------------------------------------------------------------------
-        // Issue 772 — the components browser's BULK EDIT rail panel, in TWO of its three
-        // frames (see `captureComponentBulkEditFrame` for why one frame cannot carry the
-        // panel's four sections). Both of these run on the fully-seeded Arcane Forge, the
-        // only essence-enabled system with a manager walk position — and the one with a
-        // six-definition vocabulary, so the essence grid is at real density. Its resolution
-        // is `routedByCheck` on crafting, `routed` on salvage and the default `d100` on
-        // gathering, so `componentDifficultyAxisProgressive` is false here and the panel's
-        // Progressive DC section does NOT render; that fourth section is captured later in
-        // this phase, on the progressive system that already has a walk position.
-        //
-        //  1. STAGED — a category, one tag cycled to `add`, one to `remove`, and the
-        //     essence axis armed. This is the frame the prototype parity table compares.
-        //  2. UNSTAGED — the pristine draft a GM sees the instant a selection is made:
-        //     every axis chip on its "leave unchanged" face and Apply inert. It is the
-        //     ONLY evidence of that face, and the face matters because it is the sole
-        //     route to "clear essences on every selected component" (`Stepper` emits
-        //     nothing at the zero boundary). Re-selecting from a cleared rail rather than
-        //     un-staging also proves the discard-on-empty-selection effect in real Foundry.
-        // ---------------------------------------------------------------------
+        // --------------------------------------------------------------------- Issue 772 — the
+        // components browser's bulk edit rail panel, in two of its three frames (see
+        // `captureComponentBulkEditFrame` for why one frame cannot carry the panel's four
+        // sections).
         await captureBulkEditFrame(page, results, {
           studio: COMPONENT_BULK_EDIT_STUDIO,
           stepName: 'components-bulk-edit',
@@ -10108,9 +8523,7 @@ async function main() {
           stepName: 'components-bulk-edit-unstaged',
           label: 'manager-components-bulk-edit-unstaged',
           stage: async (bulkPanel) => {
-            // Nothing is staged here, deliberately — the ASSERTIONS are the state. A
-            // pristine draft can write nothing, so Apply must be inert, and the essence
-            // chip must read its unstaged face on a control that ARMS the axis.
+            // Nothing is staged here, deliberately — the assertions are the state.
             if (!await bulkPanel.locator('[data-component-bulk-apply]').first().isDisabled()) {
               throw new Error('Bulk edit Apply was live on a pristine draft with nothing staged.');
             }
@@ -10124,27 +8537,8 @@ async function main() {
           },
         });
 
-        // ---------------------------------------------------------------------
-        // Issue 800 — write-time RESOLUTION of source descriptions, in three frames.
-        //
-        // Source items live in a world compendium that is then LOCKED, because the
-        // locked case is the reported one and the one an item-driven walk cannot reach:
-        // `repairItemData`'s identity leg skips locked packs (it writes flags INTO pack
-        // items) while its description leg resolves them through `fromUuid`. A
-        // world-item fixture would pass green while the reported bug stayed broken.
-        //
-        // TWO source documents, deliberately: `addItemFromUuid` is an UPSERT keyed on
-        // source uuid, so registering the uuid already bound to Mystic Herb would take
-        // the `existing` branch, overwrite that component's name/img/description, and
-        // `save()` it — silently renaming Mystic Herb for every downstream screenshot
-        // while the "ingestion" frame proved nothing (the new-id guard would never
-        // fire). The second, UNBOUND document makes the lookup miss so the create
-        // branch runs and the frame demonstrates the write path it exists for.
-        //
-        // Frames: BEFORE (raw stored text, as an un-repaired world renders it),
-        // AFTER-Repair (the same component after the GM action), and AFTER-ingestion
-        // (a component registered fresh through the write path).
-        // ---------------------------------------------------------------------
+        // --------------------------------------------------------------------- Issue 800 —
+        // write-time resolution of source descriptions, in three frames.
         const enricher800 = await page.evaluate(async (sysId) => {
           const csm = game.fabricate.getCraftingSystemManager();
           const system = csm.getSystem(sysId);
@@ -10164,11 +8558,8 @@ async function main() {
           if (entries.length < 2) throw new Error('issue 800: dnd5e.items index too small');
           const [first, second] = entries;
 
-          // The label-less reference is the headline case (it resolves to the document's
-          // real NAME). The unresolvable one lands immediately before a full stop, which
-          // is the shape that used to render a stranded separator. The GM-gated span is
-          // the privacy scrub's only live-Foundry exercise — its text must never reach
-          // the inspector.
+          // The label-less reference is the headline case (it resolves to the document's real
+          // name).
           const GATED_SECRET = 'GM-ONLY-SECRET-800';
           const rawFor = (label) =>
             `${label}: @UUID[Compendium.dnd5e.items.Item.${first._id}], `
@@ -10333,9 +8724,7 @@ async function main() {
         await screenshot(page, 'manager-components-description-ingested');
         process.stdout.write('  D0: components description AFTER-INGESTION screenshotted\n');
 
-        // Restore the fixture. Every later frame in this run shares these components, so
-        // leaving Mystic Herb re-pointed at the smoke pack with a rewritten description —
-        // or leaving the ingested component in the browser — would silently corrupt them.
+        // Restore the fixture.
         await page.evaluate(async ({ sysId, ingestedId }) => {
           const csm = game.fabricate.getCraftingSystemManager();
           await csm.deleteItem(sysId, ingestedId);
@@ -10371,10 +8760,8 @@ async function main() {
         await screenshot(page, 'manager-component-edit-normal');
         process.stdout.write('  D0: component edit normal screenshotted\n');
 
-        // Component editor → salvage authoring section (per-component result
-        // groups, routed outcome routing, and DC override). Salvage is always on,
-        // and this system is in routed salvage mode, so the section renders with a
-        // populated outcome-routing table; scroll it into view to frame it (#436).
+        // Component editor → salvage authoring section (per-component result groups, routed outcome
+        // routing, and DC override).
         const salvageSection = page
           .locator('.fabricate-manager [data-component-edit-section="salvage"]')
           .first();
@@ -10390,12 +8777,7 @@ async function main() {
         await page.locator('.fabricate-manager[data-manager-view="components"]').first().waitFor({ state: 'visible', timeout: 5_000 });
         await componentSearch().fill('Iron Sword');
 
-        // The OFF salvage body (issue 676, AC4). Iron Sword has authored result groups
-        // with `enabled` absent — the accurate state decision 6 guarantees every
-        // existing world will show, and the one no other frame captures. Ruling A is
-        // what this photographs: the mode/DC/routing/reorder chrome is collapsed, but
-        // the result-group editor (and its add-group control, the only one in the
-        // codebase) is still there.
+        // The off salvage body (issue 676, AC4).
         await page.locator('.fabricate-manager .manager-component-row:has-text("Iron Sword") button:has(i.fa-pen)')
           .first().click();
         await page.locator('.fabricate-manager[data-manager-view="component-edit"]').first()
@@ -10414,12 +8796,8 @@ async function main() {
         await page.locator(railSelector('manager-nav-component-rules')).click();
         await page.locator('.fabricate-manager[data-manager-view="components"]').first().waitFor({ state: 'visible', timeout: 5_000 });
 
-        // Issue 764: the Simple-mode salvage editor at its one-success-group CAP. The two
-        // frames above are the ROUTED Arcane Forge salvage editor (multi-group + routing).
-        // Switch to the Simple Forge system and open Smoke Relic — a Simple-mode component
-        // with a single result group — so the frame shows the cap: the Add group control is
-        // HIDDEN and the required hint ("Simple mode uses a single result group") renders.
-        // Fails loudly by design (no guard): a missing hint means the cap regressed.
+        // Issue 764: the Simple-mode salvage editor at its one-success-group cap. The two frames
+        // above are the routed Arcane Forge salvage editor (multi-group + routing).
         await softClick(page.locator('.fabricate-manager .manager-scope-return'));
         await selectSmokeSystemInManager(page, executionFixtures.simple.systemId);
         await page.locator(railSelector('manager-nav-component-rules')).click();
@@ -10447,11 +8825,7 @@ async function main() {
         await page.locator(railSelector('manager-nav-component-rules')).click();
         await page.locator('.fabricate-manager[data-manager-view="components"]').first().waitFor({ state: 'visible', timeout: 5_000 });
 
-        // Checks → Gathering check editor (#437). The gathering check editor is
-        // keyed off the gathering ECONOMY resolution mode, so temporarily flip the
-        // economy to routed (the system carries a populated gatheringCraftingCheck.
-        // routed), capture the editor, then revert so downstream gathering captures
-        // keep the default d100 economy.
+        // Checks → Gathering check editor (#437).
         const prevGatheringMode = await page.evaluate(async (sysId) => {
           const economy = game.fabricate.getGatheringEconomy?.({ systemId: sysId }) || {};
           const prev = economy.resolutionMode || 'd100';
@@ -10485,11 +8859,8 @@ async function main() {
           await globalThis.__fabricateSmokeManagerApp?._adminStore?.refresh?.();
         });
 
-        // Checks → Validation route (#485): the per-check readiness checklist plus
-        // severity-grouped issues for the in-play subsystem checks. With the economy
-        // back to d100 the gathering check is omitted, so the rollup frames the
-        // crafting and salvage check sections. No section argument: Validation is the one
-        // route with no section strip — it is a rollup of the other three.
+        // Checks → Validation route (#485): the per-check readiness checklist plus severity-grouped
+        // issues for the in-play subsystem checks.
         await openChecksActivity(page, 'validation');
         await page.locator('.fabricate-manager [data-checks-panel="validation"]').first()
           .waitFor({ state: 'visible', timeout: 5_000 });
@@ -10500,17 +8871,11 @@ async function main() {
         await screenshot(page, 'manager-checks-validation');
         process.stdout.write('  D0: checks validation tab screenshotted\n');
 
-        // Checks → Crafting route, at the failure-consumption controls
-        // (issue #752 — evidence for #736's #712 half). The smoke system resolves
-        // routedByCheck, so the crafting route renders the routed CraftingCheckEditor;
-        // its failure-consumption controls are the ON FAILURE section (issue 1096).
-        // Guarded so a hiccup records a failed step, not an abort.
+        // Checks → Crafting route, at the failure-consumption controls (issue #752 — evidence for
+        // #736's #712 half).
         try {
-          // Land on `roll` FIRST and assert the editor there, then move to the section that
-          // owns the consumption card. The order is deliberate: the routed editor renders
-          // none of its own cards under `on-failure`, so its wrapper is present but empty
-          // there — asserting it visible on arrival is only meaningful on a section the
-          // editor actually draws into.
+          // Land on `roll` first and assert the editor there, then move to the section that owns
+          // the consumption card.
           await openChecksActivity(page, 'crafting', 'roll');
           const craftingCheckEditor = page
             .locator('.fabricate-manager [data-checks-panel="crafting"] [data-crafting-check-editor]')
@@ -10538,14 +8903,8 @@ async function main() {
           process.stderr.write(`Checks crafting consumption capture failed: ${err.message}\n`);
         }
 
-        // Checks → Crafting tab, scrolled to the check-modifier catalogue card (issue
-        // 770, re-aimed by issue 1055). The seed authors a populated catalogue (Medicine
-        // / Alchemy / Herbalism) on the `playerPicks` combination rule, so the frame
-        // shows the redesigned rows — IconPicker + label + the `@`-adorned expression
-        // field — plus the four-option rule group and the pick-cap field that the two
-        // SELECTING rules reveal, in its blank "Unlimited" state. A DEDICATED frame (not
-        // the failure-consumption one above, which the same route selects another section
-        // for) so both cards get exact, un-cropped evidence.
+        // Checks → Crafting tab, scrolled to the check-modifier catalogue card (issue 770, re-aimed
+        // by issue 1055).
         try {
           // The catalogue card is the crafting route's MODIFIERS section (issue 1096) — it
           // used to be the last card on the same scrolling page as the consumption policy,
@@ -10555,25 +8914,10 @@ async function main() {
             .locator('.fabricate-manager [data-checks-panel="crafting"] [data-crafting-modifier-catalogue]')
             .first();
           await modifierCard.waitFor({ state: 'visible', timeout: 5_000 });
-          // Scroll to the PICK-CAP field rather than the card top or the rule group: the
-          // card authors two things (issue 1055) — the four-option combination rule as a
-          // 2x2 RadioCardGroup (Add all / Highest / Recipe picks / Player picks), and,
-          // under the two rules that DEFER the selection, the `maxModifierPicks` cap.
-          // `scrollIntoViewIfNeeded` lands its anchor near the bottom edge, so anchoring
-          // the LOWER of the two frames both, with the IconPicker/label/@-expression rows
-          // above them for context. Anchoring the rule group would crop out the field
-          // whose appearance is the consequence of the selected rule.
-          //
-          // The FIELD, and a scroll rather than a click. Targeting a rule option's inner
-          // radio is the segmented-control interception trap, and
-          // `tests/screenshot-capture-scoping.test.js` bans that selector shape in this
-          // file generically — over the shape rather than over any literal attribute
-          // name, because this harness spells that family by interpolation. (The same
-          // shape is legal in `scripts/lib/viewLabCases.js`, which drives the rules:
-          // RadioCardGroup's radio is a visible in-flow control, and the ban there would
-          // be an over-ban.) Nothing here needs to press a rule card anyway — the seed
-          // authors `playerPicks` — and if that ever changes, `clickSegment()` targets
-          // the wrapping label, which is the safe route.
+          // Scroll to the pick-cap field rather than the card top or the rule group: the card
+          // authors two things (issue 1055) — the four-option combination rule as a 2x2
+          // RadioCardGroup (Add all / Highest / Recipe picks / Player picks), and, under the two
+          // rules that defer the selection, the `maxModifierPicks` cap.
           const maxPicksField = modifierCard.locator('[data-crafting-modifier-max-picks]').first();
           await maxPicksField.scrollIntoViewIfNeeded({ timeout: 5_000 }).catch(() => {});
           await assertNoScreenshotOverlays(page);
@@ -10588,10 +8932,8 @@ async function main() {
         await page.locator(railSelector('manager-nav-component-rules')).click();
         await page.locator('.fabricate-manager[data-manager-view="components"]').first().waitFor({ state: 'visible', timeout: 5_000 });
 
-        // Components → stacked. Earlier CI runs hung silently between this
-        // resize and the next screenshot for ~13 minutes. The withDeadline
-        // wrappers above now surface a hang here as a thrown error rather
-        // than an opaque job timeout.
+        // Components → stacked. Earlier CI runs hung silently between this resize and the next
+        // screenshot for ~13 minutes.
         await setManagerWindowSize(page, { width: 1000, height: 700 });
         process.stdout.write('  D0: components stacked resize complete\n');
         await assertManagerLayoutStable(page, 'components stacked');
@@ -10602,11 +8944,7 @@ async function main() {
 
         await setManagerWindowSize(page, { width: 1280, height: 820 });
 
-        // Issue 801 — the grouped-category CONTINUATION frame for the component library.
-        // Same shape as the recipe frame above (see captureGroupedContinuationFrame): seed
-        // one category ("Aaa Continuation", which sorts FIRST) with 14 rows so it alone spans
-        // pages 1→2 under a shrunk page, then capture the continuation page. Placed AFTER the
-        // stacked frame so the shrunk page size can never leak into an earlier capture.
+        // Issue 801 — the grouped-category continuation frame for the component library.
         const openComponentsBrowser = async () => {
           await page.locator(railSelector('manager-nav-component-rules')).click();
           await page.locator('.fabricate-manager[data-manager-view="components"]').first()
@@ -10667,16 +9005,12 @@ async function main() {
         }
         await captureStableManagerView(page, { layout: 'tags-categories normal', label: 'manager-tags-categories-normal' });
 
-        // Tags & Categories → Item tags panel, scrolled to its seeded rows
-        // (issue #752 — evidence for #735's row rendering). The smoke system seeds
-        // exactly three item tags (rare, reagent, metallic), so the Item tags
-        // vocabulary renders three [data-tag-id] rows. Guarded so a hiccup records
-        // a failed step rather than aborting the phase.
+        // Tags & Categories → Item tags panel, scrolled to its seeded rows (issue #752 — evidence
+        // for #735's row rendering).
         try {
-          // The issue-689 redesign is TABBED (one vocabulary at a time) and renames
-          // the tab "Component tags"; the pre-redesign screen stacks all three
-          // panels with the old "Item tags" label. Activate the tab when the tab
-          // bar exists, then accept either label.
+          // The issue-689 redesign is tabbed (one vocabulary at a time) and renames the tab
+          // "Component tags"; the pre-redesign screen stacks all three panels with the old "Item
+          // tags" label.
           const tagsTabButton = page
             .locator('.fabricate-manager [data-vocabulary-tab="tag"]')
             .first();
@@ -10741,10 +9075,9 @@ async function main() {
         }
         }
 
-        // ── D0 section: environments + gathering (issue #826 skip guard) ──────
-        // Enters via exerciseManagerEnvironmentPointerTargets, which itself clicks
-        // the Gathering nav first (absolute), and only browses/edits — the
-        // phase-E gathering fixtures were seeded earlier in the always-run spine.
+        // Enters via exerciseManagerEnvironmentPointerTargets, which itself clicks the Gathering
+        // nav first (absolute), and only browses/edits — the phase-E gathering fixtures were seeded
+        // earlier in the always-run spine.
         if (shouldRunScreenshotSection('gathering')) {
         await setManagerWindowSize(page, { width: 1280, height: 820 });
         await exerciseManagerEnvironmentPointerTargets(page);
@@ -10798,10 +9131,8 @@ async function main() {
         await page.locator('.fabricate-manager .manager-gathering-task-row:has-text("Forage Wild Herbs") [aria-label^="Edit"]').first().click();
         await page.locator('.fabricate-manager[data-manager-view="gathering-task-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
         // "Selected Drop Rule" only renders when a drop row is selected
-        // (CraftingSystemManagerRoot.svelte:2957 `{#if selectedGatheringDrop}`)
-        // and its i18n value is now "Selected Drop", so it isn't asserted here.
-        // "Final chance" was removed entirely. The remaining sections are the
-        // editor's stable scaffolding.
+        // (CraftingSystemManagerRoot.svelte:2957 `{#if selectedGatheringDrop}`) and its i18n value
+        // is now "Selected Drop", so it isn't asserted here.
         for (const expected of ['Task Identity', 'Task Availability', 'Drop Rules']) {
           if (await page.locator('.fabricate-manager').filter({ hasText: expected }).count() === 0) {
             throw new Error(`Manager gathering task editor is missing "${expected}".`);
@@ -10827,16 +9158,11 @@ async function main() {
         await page.locator('.fabricate-manager .manager-environment-row:has-text("Azure Grove") .manager-icon-button').nth(0).click();
         await page.locator('.fabricate-manager[data-manager-view="environment-edit"]').first().waitFor({ state: 'visible', timeout: 5_000 });
 
-        // The environment editor mounts the composition editor (tabs + inspector
-        // rail). Verify it renders the selected environment and screenshot it,
-        // then trial-click the Back button to confirm it's wired before
-        // navigating away via the side nav.
+        // The environment editor mounts the composition editor (tabs + inspector rail).
         await page.locator('.fabricate-manager .manager-environment-edit-view[data-environment-editor]').first()
           .waitFor({ state: 'visible', timeout: 10_000 });
-        // The environment editor header now follows the task/event convention:
-        // a static "Edit environment" title (the environment name lives in the
-        // identity card, not the header). Confirm the static header rendered, then
-        // verify the correct environment loaded via the identity name field.
+        // The environment editor header now follows the task/event convention: a static "Edit
+        // environment" title (the environment name lives in the identity card, not the header).
         await page.locator('.fabricate-manager .manager-title')
           .filter({ hasText: 'Edit environment' }).first()
           .waitFor({ state: 'visible', timeout: 5_000 });
@@ -10874,9 +9200,8 @@ async function main() {
         await page.locator('.fabricate-manager [data-environment-tab="overview"]').first()
           .waitFor({ state: 'visible', timeout: 5_000 });
 
-        // The "Back to environments" button runs through the unsaved-changes
-        // route-exit guard. Verify it's clickable, then navigate back via the
-        // side nav.
+        // The "Back to environments" button runs through the unsaved-changes route-exit guard.
+        // Verify it's clickable, then navigate back via the side nav.
         await softClick(page.locator('.fabricate-manager .manager-header-actions .manager-button:has-text("Back to environments")'), { trial: true });
         await page.locator('.fabricate-manager #manager-gathering-nav-environments').first().click();
         await page.locator('.fabricate-manager[data-manager-view="environments"]').first()
@@ -10964,8 +9289,7 @@ async function main() {
         await setManagerWindowSize(page, { width: 1280, height: 820 });
         const mapDestination = page.locator('.fabricate-manager #manager-travel-nav-map').first();
         // The View Lab long-label-focus case owns native Space activation and focus-visible
-        // evidence for this exact control. Use a targeted pointer transition here so the live
-        // Foundry capture isolates populated Map content from keyboard-focus timing.
+        // evidence for this exact control.
         await mapDestination.click();
         await page.locator('.fabricate-manager [data-travel-panel="map"]')
           .first().waitFor({ state: 'visible', timeout: 10_000 });
@@ -10999,9 +9323,8 @@ async function main() {
         await page.locator('.fabricate-manager .manager-body:not(.is-rail-collapsed)')
           .first().waitFor({ state: 'visible', timeout: 5_000 });
 
-        // World > Travel is UNGATED as of #1282: realms are world geography, so the entry
-        // stays put when the selected system opts OUT of Travel & Realms. This capture is what
-        // proves that — it used to prove the opposite, that the selected-system group vanished.
+        // World > Travel is ungated as of #1282: realms are world geography, so the entry stays put
+        // when the selected system opts out of Travel & Realms.
         try {
           await page.evaluate(async (systemId) => {
             await globalThis.__fabricateSmokeManagerApp?._adminStore?.setGatheringRealmsEnabled?.(
@@ -11039,15 +9362,11 @@ async function main() {
         await screenshot(page, 'manager-gathering-settings');
         }
 
-        // ── D0 section: Tool Studio (issue #784) ─────────────────────────────
-        // Screenshots-profile only scoping can run this section independently of all
-        // other D0 sections. Its setup snapshots every persisted writer it touches and
-        // the finally restore makes the section net-zero even when a capture fails.
+        // Screenshots-profile only scoping can run this section independently of all other D0
+        // sections.
         if (shouldRunScreenshotSection('tools')) {
-          // `runFixturedScreenshotSection` owns the setup → exercise → finally-restore
-          // scaffold this section and the Knowledge section below both need; only the
-          // callbacks differ. `rethrow` keeps this section's long-standing fail-loud
-          // behaviour: its walk carries behavioural assertions, not just captures.
+          // `runFixturedScreenshotSection` owns the setup → exercise → finally-restore scaffold
+          // this section and the Knowledge section below both need; only the callbacks differ.
           await runFixturedScreenshotSection({
             results,
             step: 'tool-studio-evidence',
@@ -11077,35 +9396,7 @@ async function main() {
           });
         }
 
-        // ── D0 section: world-scope identity-flag repair (issue 1363) ────────
-        // ACCEPTANCE CRITERION 6c, and the ONLY arm of criterion 6 that can fail on a live
-        // world. A stale `roles[<systemId>].componentId` names an id absent from the re-keyed
-        // candidate set, so tier 1 returns null and resolution falls through to the UNCHANGED
-        // source-reference tier — which means "owned copies still resolve", "a craft, a salvage
-        // and a gather succeed" and "every browser lists the same entities" are ALL TRUE with
-        // the repair never written. So this section asserts the FLAG VALUE ITSELF.
-        //
-        // Its fixture is purely ADDITIVE persisted state — one world setting and a handful of
-        // flags on ONE owned item and its actor — and the `finally` restore removes every one,
-        // so the section is net-zero even when it fails.
-        //
-        // `rethrow: true`, matching the Tool Studio section and NOT the Knowledge one. The
-        // shared scaffold reserves `false` for a purely EVIDENTIAL section, whose only cost on
-        // failure is its own frames; this section captures no frames at all and is pure
-        // behavioural assertion, so a failure here is a product regression that must abort the
-        // phase rather than be recorded and walked past.
-        // DELIBERATELY UNGATED by `shouldRunScreenshotSection`. Screenshot scoping decides which
-        // FRAMES a run captures, and this section captures none: it is acceptance criterion 6c's
-        // only runtime proof, and gating it on the `tools` token would skip the world-scope
-        // identity check in every scoped run that happens not to select a token unrelated to it.
-        //
-        // THE COST OF THAT PAIR IS STATED RATHER THAN LEFT TO BE DISCOVERED. Ungated plus
-        // `rethrow: true` means EVERY scoped screenshot run now pays this behavioural section, and
-        // a failure in it aborts the phase — costing every later section's frames, including ones
-        // the scoped run was invoked to capture. That is the deliberate trade: this is the only
-        // place the shipped flag repair is exercised against a live world, and a scoped run that
-        // silently skipped it would let a real regression reach `main` behind a green capture job.
-        // `craftingSetup` and `cleanup.crafterId` are both in scope for any run that reaches D0.
+        // Acceptance criterion 6c, and the ONLY arm of criterion 6 that can fail on a live world.
         {
           await runFixturedScreenshotSection({
             results,
@@ -11120,13 +9411,7 @@ async function main() {
           });
         }
 
-        // ── D0 section: GM Knowledge surface (issue 785) ─────────────────────
-        // Screenshots-profile scoping can run this section on its own. Its fixture is
-        // purely ADDITIVE persisted world state (new world Items, new recipe-item
-        // definitions, granted owned copies, two seeded learned entries) and the
-        // `finally` restore tears all of it down, so the section is net-zero even when
-        // a capture fails. `rethrow: false` because the section is evidential: losing
-        // its frames must not also cost every later D0 section's frames.
+        // Screenshots-profile scoping can run this section on its own.
         if (shouldRunScreenshotSection('knowledge')) {
           const knowledgeResult = await runFixturedScreenshotSection({
             results,
@@ -11160,20 +9445,14 @@ async function main() {
           }
         }
 
-        // ── D0 section: system-overview + interactables (issue #826) ─────────
-        // The sub-blocks switch systems / open independent apps and restore the
-        // smoke-system selection + active scene inline.
+        // The sub-blocks switch systems / open independent apps and restore the smoke-system
+        // selection + active scene inline.
         if (shouldRunScreenshotSection('overview-interactables')) {
 
-        // ── System Overview tabbed page + system-blocker banner (issue 429 PR-2) ─
-        // Select the deliberately-broken "Broken Workshop" system (progressive
-        // mode with no progressive check + an incomplete recipe) and capture:
-        //   (a) the System Overview page's Validation tab showing the kind-grouped
-        //       issue rows and the system-blocker callout; and
-        //   (b) the Settings tab showing the system-blocker banner above identity.
-        // Guarded so a failure records a failed step without aborting the phase.
-        // Returns to the smoke system's library afterwards so it does not leak the
-        // selected system into later phases.
+        // Select the deliberately-broken "Broken Workshop" system (progressive mode with no
+        // progressive check + an incomplete recipe) and capture: (a) the System Overview page's
+        // Validation tab showing the kind-grouped issue rows and the system-blocker callout; and
+        // (b) the Settings tab showing the system-blocker banner above identity.
         try {
           await setManagerWindowSize(page, { width: 1280, height: 900 });
           // Return to the system library, then select the broken system.
@@ -11185,9 +9464,8 @@ async function main() {
             .first().click();
           await page.waitForTimeout(500);
 
-          // (a) System Overview page — open the tabbed system-edit page, then switch
-          // to the Validation tab and wait on the grouped issue rows (not deep leaf
-          // content). The standalone overview route was folded into this tab.
+          // (a) System Overview page — open the tabbed system-edit page, then switch to the
+          // Validation tab and wait on the grouped issue rows (not deep leaf content).
           await page.locator('.fabricate-manager .manager-nav-button[data-nav-system-edit]').first().click();
           await page.locator('.fabricate-manager[data-manager-view="system-edit"]').first()
             .waitFor({ state: 'visible', timeout: 5_000 });
@@ -11206,11 +9484,9 @@ async function main() {
           if (await taskRow.locator('[data-overview-link="task"]').count() === 0) {
             throw new Error('System overview task row is missing its environment deep-link button.');
           }
-          // The validation tab is a kind-grouped LIST view (`.manager-system-overview-row`),
-          // not a table — assertManagerLayoutStable requires a table-row/edit-form
-          // selector and would throw "no table rows" here (as the gathering Settings
-          // form capture also skips it). The explicit issue-row + task-row waits above
-          // already prove the view is populated; assertNoScreenshotOverlays guards bleed.
+          // The validation tab is a kind-grouped list view (`.manager-system-overview-row`), not a
+          // table — assertManagerLayoutStable requires a table-row/edit-form selector and would
+          // throw "no table rows" here (as the gathering Settings form capture also skips it).
           await assertNoScreenshotOverlays(page);
           await screenshot(page, 'manager-system-overview');
 
@@ -11224,18 +9500,10 @@ async function main() {
           await assertNoScreenshotOverlays(page);
           await screenshot(page, 'manager-system-edit-blocked');
 
-          // (c) Progressive difficulty UI — this system is in progressive crafting
-          // mode, so its components browser badges each row's difficulty (a value for
-          // component 0, "None" for component 1) and the component editor's body
-          // exposes the staged Progressive difficulty control.
-          //
-          // Issue 676: difficulty was its own table COLUMN
-          // (`.manager-component-difficulty-cell`) until the browser was rebuilt as a
-          // LIST; it is now a row badge. The editor's difficulty control moved out of
-          // the deleted right-rail inspector into the single scrolling column but KEEPS
-          // its `data-component-edit-section="difficulty"` hook — this hard-wait is
-          // precisely why that hook was preserved rather than renamed.
-          // Guarded independently so a hiccup here does not fail the overview step.
+          // (c) Progressive difficulty UI — this system is in progressive crafting mode, so its
+          // components browser badges each row's difficulty (a value for component 0, "None" for
+          // component 1) and the component editor's body exposes the staged Progressive difficulty
+          // control.
           try {
             const blockedNames = craftingSetup.blockedComponentNames || [];
             await page.locator(railSelector('manager-nav-component-rules')).click();
@@ -11245,16 +9513,9 @@ async function main() {
             await assertNoScreenshotOverlays(page);
             await screenshot(page, 'manager-components-progressive');
 
-            // Issue 772 — the bulk panel's FOURTH section, Progressive DC, which the
-            // manager root gates on `componentDifficultyAxisProgressive` (crafting OR
-            // salvage OR gathering resolution being progressive). Broken Workshop is this
-            // world's progressive system and its components browser is already on screen,
-            // so this reuses an existing walk position rather than reconfiguring a system
-            // mid-walk. Two things ride along for free, both of which the panel's copy
-            // depends on and neither of which the Arcane Forge frames can show: this
-            // system authors NO item tags, so the empty-tags line is evidenced, and it has
-            // essences disabled, so the DC section sits above the fold instead of below a
-            // six-card essence grid.
+            // Issue 772 — the bulk panel's fourth section, Progressive DC, which the manager root
+            // gates on `componentDifficultyAxisProgressive` (crafting OR salvage OR gathering
+            // resolution being progressive).
             await captureBulkEditFrame(page, results, {
               studio: COMPONENT_BULK_EDIT_STUDIO,
               stepName: 'components-bulk-edit-progressive',
@@ -11274,9 +9535,8 @@ async function main() {
               },
             });
 
-            // Open the second ("None") component and stage a difficulty so the card,
-            // the Unsaved chip, and the editor Save flow are captured together. Save
-            // afterwards so the dirty draft does not trip the discard guard on exit.
+            // Open the second ("None") component and stage a difficulty so the card, the Unsaved
+            // chip, and the editor Save flow are captured together.
             if (blockedNames[1]) {
               await page.locator(`.fabricate-manager .manager-component-row:has-text(${JSON.stringify(blockedNames[1])}) button:has(i.fa-pen)`)
                 .first().click();
@@ -11312,13 +9572,9 @@ async function main() {
           await page.waitForTimeout(400);
         }
 
-        // ── Canvas interactable config panel (#302) ────────────────────────────
-        // Open the GM config panel for the seeded `fabricate.interactable` Region
-        // behaviour and capture its node section in both states: linked (shares the
-        // gathering task's node) and unlinked (its own independent node editor).
-        // The config app is independent of the manager window; both are closed by
-        // closeOpenApplications below. Guarded so a failure here records a failed
-        // step but does not abort the manager phase or later phases.
+        // Open the GM config panel for the seeded `fabricate.interactable` Region behaviour and
+        // capture its node section in both states: linked (shares the gathering task's node) and
+        // unlinked (its own independent node editor).
         try {
           const interactableRef = craftingSetup.interactable;
           if (!interactableRef?.sceneId || !interactableRef?.regionId || !interactableRef?.behaviorId) {
@@ -11352,10 +9608,9 @@ async function main() {
           await assertNoScreenshotOverlays(page);
           await screenshot(page, 'interactable-config-unlinked');
 
-          // ApplicationV2 close() is an async fade-out: AWAIT the actual close
-          // promise (not a fire-and-forget call) so the config window is fully
-          // gone before the Manage panel opens — otherwise it bleeds through
-          // behind the next capture.
+          // ApplicationV2 close() is an async fade-out: await the actual close promise (not a
+          // fire-and-forget call) so the config window is fully gone before the Manage panel opens
+          // — otherwise it bleeds through behind the next capture.
           await page.evaluate(async () => {
             const app = Object.values(ui.windows).find(w => w?.options?.id === 'fabricate-interactable-config');
             if (app?.close) await app.close();
@@ -11367,18 +9622,10 @@ async function main() {
           process.stderr.write(`Interactable config capture failed: ${err.message}\n`);
         }
 
-        // ── Canvas interactable config: source/identity section (issue 342) ────
-        // Capture the new Identity/source section in BOTH states:
-        //   (a) UNCONFIGURED — the prominent "Needs configuration" state on a
-        //       natively-added (empty-system) behaviour, born inert; and
-        //   (b) CONFIGURED — the collapsed "Change source" section expanded on a
-        //       fully-configured interactable (re-target affordance).
-        // Each AppV2 window is fully closed before the next opens (await close) so
-        // there is no bleed-through. Guarded so a failure records a failed step but
-        // does not abort the phase.
-        // Sweep EVERY interactable-config window fully closed (await each fade-out)
-        // and assert the root is gone, so no prior config panel bleeds into the next
-        // capture or is re-resolved as its root.
+        // Capture the new Identity/source section in both states: (a) unconfigured — the prominent
+        // "Needs configuration" state on a natively-added (empty-system) behaviour, born inert; and
+        // (b) configured — the collapsed "Change source" section expanded on a fully-configured
+        // interactable (re-target affordance).
         const closeAllConfigWindows = async () => {
           await page.evaluate(async () => {
             const apps = Object.values(ui.windows).filter(w => w?.options?.id === 'fabricate-interactable-config');
@@ -11432,15 +9679,11 @@ async function main() {
           process.stderr.write(`Interactable config source capture failed: ${err.message}\n`);
         }
 
-        // ── Manage Interactables panel (issue 335) ─────────────────────────────
-        // Open the GM-only Manage Interactables scene panel and capture: a
-        // POPULATED list spanning multiple marker-status variants (region-only
-        // gathering task + a real Tile marker + a missing marker) AND a Tool-type
-        // row, the dedicated EMPTY state (a scene with zero interactables), and the
-        // expanded Promote affordance with a POPULATED Source dropdown + visible
-        // action buttons. The config window from the previous block is swept
-        // (awaited close) FIRST so nothing bleeds through behind these captures.
-        // Guarded so a failure records a failed step without aborting later phases.
+        // Open the GM-only Manage Interactables scene panel and capture: a populated list spanning
+        // multiple marker-status variants (region-only gathering task + a real Tile marker + a
+        // missing marker) AND a Tool-type row, the dedicated empty state (a scene with zero
+        // interactables), and the expanded Promote affordance with a populated Source dropdown +
+        // visible action buttons.
         try {
           // Sweep any window left over from the config block before opening +
           // capturing, so a still-fading ApplicationV2 cannot bleed through.
@@ -11450,33 +9693,8 @@ async function main() {
 
           const interactableRef = craftingSetup.interactable;
 
-          // ORDER IS LOAD-BEARING: seed the placeables BEFORE the scene is viewed,
-          // then activate (issue #1010). Creating a placeable on a scene the canvas
-          // is CURRENTLY DRAWING throws out of core, un-awaited and un-caught, as a
-          // bare `pageerror` with no failing step:
-          //
-          //   Canvas##draw sets `scene._view` (board.mjs:1150) — which is what makes
-          //   `document.object` non-null — and only stands up the ticker queues at
-          //   `#activateTicker()` (1209), with `await #loadTextures()` (1191) in
-          //   between. A create landing in that gap reaches
-          //   `CanvasDocumentMixin#_onCreate`, which calls `object.draw()`; the draw
-          //   hits `canvas.pendingRenderFlags[priority]` while that field is still
-          //   the bare class declaration and throws `reading 'INTERFACE'`.
-          //
-          // Creating FIRST removes the race by construction rather than by timing: on
-          // a scene that has never been viewed, `_view` is null, so `_onCreate` finds
-          // no placeable and returns without drawing anything. The documents are then
-          // drawn by the LAYER pass (`Drawing the RegionLayer/TilesLayer canvas
-          // layer`), which core runs after `#activateTicker()`, so the queues exist.
-          // This is exactly why the interactables seeded during crafting setup have
-          // never thrown — they are created while their scene is inactive.
-          //
-          // Waiting for `canvas.ready` is NOT sufficient on its own here. The wait is
-          // bounded and tolerant, and the FIRST draw of a session is the expensive one
-          // (WebGL init, BASIS transcoder, 62 assets); when it overran the timeout the
-          // harness proceeded and created straight into the open window, which is what
-          // the readiness fix alone still failed on. Ordering does not depend on how
-          // long a draw takes.
+          // Order is load-bearing: seed the placeables BEFORE the scene is viewed, then activate
+          // (issue #1010).
           await page.evaluate(async ({ sceneId, systemId, toolId, taskId }) => {
             const scene = game.scenes.get(sceneId);
             if (!scene) return;
@@ -11527,11 +9745,8 @@ async function main() {
             taskId: 'smoke-forage-library'
           }).catch(() => {});
 
-          // NOW view the scene, with every placeable already on it, so the panel's
-          // scene-scan finds them. The readiness wait is still required for the
-          // CAPTURE to be correct — the panel scans `canvas.scene`, so opening it
-          // mid-draw scans the previous scene — but it is no longer what stands
-          // between the run and a `pageerror`.
+          // Now view the scene, with every placeable already on it, so the panel's scene-scan finds
+          // them.
           await activateSceneAndAwaitCanvasReady(page, interactableRef?.sceneId);
 
           await page.evaluate(() => game.fabricate.api.getInteractablesManagerAppClass().show());
@@ -11546,56 +9761,31 @@ async function main() {
             throw new Error(`Manage list shows only ${rowCount} row(s); expected at least 3 marker-status variants.`);
           }
           // The danger "missing" badge must be present so the danger-toned branch is exercised.
-          // The badge is a shared `<Chip>` now (issue 1520), so the state is read off the row's
-          // own `data-…-chip-marker` VALUE rather than off an `is-missing` class the chip does
-          // not emit — an attribute that cannot drift from the status it reports.
           if (await page.locator('.fabricate-interactables-manager [data-interactable-manager-chip-marker="missing"]').count() === 0) {
             throw new Error('Manage list is missing the danger marker badge variant.');
           }
           await assertNoScreenshotOverlays(page, { allowFabricateWindowIds: ['fabricate-interactables-manager'] });
           await screenshot(page, 'interactables-manager-list');
 
-          // Expand the Promote affordance and capture the source picker with a
-          // POPULATED Source dropdown (proving the Tool enumeration fix) and the
-          // Promote/Cancel action buttons in frame. Select Tool, then assert the
-          // Source <select> has at least one real (non-placeholder) option.
+          // Expand the Promote affordance and capture the source picker with a populated Source
+          // dropdown (proving the Tool enumeration fix) and the Promote/Cancel action buttons in
+          // frame.
           const promoteToggle = page.locator('.fabricate-interactables-manager [data-interactable-manager-promote-toggle]').first();
           await promoteToggle.waitFor({ state: 'visible', timeout: 10_000 });
           await promoteToggle.click();
           const promotePanel = page.locator('.fabricate-interactables-manager [data-interactable-manager-promote]').first();
           await promotePanel.waitFor({ state: 'visible', timeout: 10_000 });
 
-          // ── THREE REAL INTERACTIONS, NOT THREE `.value` WRITES (issue 1520) ─────────────
-          //
           // The three blocks this replaces were `page.evaluate` bodies that did
-          // `querySelectorAll('… .fab-im-promote select')` and then set `.value` on whatever
-          // they found. The promote panel's three pickers are `components/Select.svelte` now —
-          // a `<button>` trigger over a portalled listbox — so there is no `<select>` in this
-          // window at all, and every one of those blocks would have selected ZERO nodes and
-          // returned quietly. A substituted string would have left a GREEN walk that operated
-          // nothing: the first would have skipped the system pin, the second would have counted
-          // zero options and thrown a misleading "No-sources regression" error, and the third
-          // would have printed an empty diagnostic for it.
-          //
-          // Each is therefore driven the way a GM drives it — open the panel, click the row —
-          // and each FAILS LOUDLY when its target is absent, because a Playwright click on a
-          // locator matching nothing times out rather than resolving.
-          //
-          // The panel is portalled OUT of the trigger's subtree onto the window's frame, so its
-          // rows are addressed through `.fabricate-select-popover`, the primitive's own panel
-          // class, rather than through a selector inherited from the promote card.
+          // `querySelectorAll('… .fab-im-promote select')` and then set `.value` on whatever they
+          // found.
 
-          // Pin the crafting system that actually owns the seeded Tool. The panel defaults to
-          // the FIRST source-bearing system and a world can hold several (even same-named ones),
-          // so choosing it explicitly is what makes the Tool enumeration below deterministic.
+          // Pin the crafting system that actually owns the seeded Tool.
           await page.locator('.fabricate-interactables-manager [data-interactable-manager-system]').first().click();
           await page.locator(`.fabricate-select-popover [data-popover-option="${craftingSetup.systemId}"]`)
             .first().click({ timeout: 10_000 });
 
-          // Choose the Tool source type so the Source picker lists the system's tools. The
-          // three fieldsets are `SegmentedControl` tracks now, whose radio is visually hidden
-          // behind its `<label>` segment — so the SEGMENT is clicked, which is the element a
-          // pointer actually hits, instead of force-checking an input no user can reach.
+          // Choose the Tool source type so the Source picker lists the system's tools.
           await page.locator('.fabricate-interactables-manager [data-interactable-manager-source-type-option="tool"]')
             .first().click();
           await page.waitForTimeout(150); // let the $derived source list recompute
@@ -11639,12 +9829,9 @@ async function main() {
           await assertNoScreenshotOverlays(page, { allowFabricateWindowIds: ['fabricate-interactables-manager'] });
           await screenshot(page, 'interactables-manager-promote');
 
-          // The Manage panel is an ApplicationV2 SINGLETON: its instance lives in
-          // foundry.applications.instances (NOT ui.windows), and a bare show() only
-          // re-focuses an open window without rescanning a newly-activated scene. So
-          // FULLY close it (closeOpenApplications sweeps Fabricate AppV2 windows)
-          // before the empty-scene capture, forcing show() to build a fresh
-          // instance that scans the empty scene.
+          // The Manage panel is an ApplicationV2 singleton: its instance lives in
+          // foundry.applications.instances (NOT ui.windows), and a bare show() only re-focuses an
+          // open window without rescanning a newly-activated scene.
           await closeOpenApplications(page);
 
           // Empty-state capture: a scene with ZERO interactables exercises the
@@ -11661,10 +9848,9 @@ async function main() {
           // Registered for cleanup BEFORE activation, so a scene that is created but
           // fails to draw is still torn down by Phase F.
           if (emptySceneId) cleanup.sceneIds.push(emptySceneId);
-          // The panel scans `canvas.scene`; wait until the canvas has actually
-          // switched to the empty scene before opening (activation → canvas redraw
-          // is async), otherwise the panel scans the prior populated scene and the
-          // empty branch never renders.
+          // The panel scans `canvas.scene`; wait until the canvas has actually switched to the
+          // empty scene before opening (activation → canvas redraw is async), otherwise the panel
+          // scans the prior populated scene and the empty branch never renders.
           await activateSceneAndAwaitCanvasReady(page, emptySceneId);
           await page.evaluate(() => game.fabricate.api.getInteractablesManagerAppClass().show());
           await page.locator('.fabricate-interactables-manager').first().waitFor({ state: 'visible', timeout: 10_000 });
@@ -11675,10 +9861,9 @@ async function main() {
 
           await closeOpenApplications(page);
 
-          // Re-activate the original scene so later phases see the expected state,
-          // and leave it DRAWN rather than mid-draw: this block ends here, so an
-          // un-awaited redraw would otherwise run on underneath whatever phase
-          // follows.
+          // Re-activate the original scene so later phases see the expected state, and leave it
+          // drawn rather than mid-draw: this block ends here, so an un-awaited redraw would
+          // otherwise run on underneath whatever phase follows.
           await activateSceneAndAwaitCanvasReady(page, interactableRef?.sceneId);
 
           results.steps.push({ step: 'interactables-manager', passed: true });
@@ -11688,31 +9873,15 @@ async function main() {
         }
         }
 
-        // ── D0 section: import report + alchemy settings + experimental-off ───
-        // (issue #826 skip guard.) Each sub-block opens its own fresh manager /
-        // dialog session and self-restores (import "(Copy)" deletion; experimental
-        // features restored by the phase finally), so it is independent of prior
-        // sections and safe to skip as a unit.
+        // (issue #826 skip guard.)
         if (shouldRunScreenshotSection('import-alchemy-experimental')) {
-        // ── Post-import unresolved-reference report (#492, restyled in #877) ───
-        // The GM-facing import report is a manager modal that only appears AFTER an
-        // import, and only surfaces its "needs attention" list when the imported
-        // system carries references that cannot resolve in the target world. The
-        // default smoke performs no import, so `check-screenshots` has no frame to
-        // publish for the new report surface. This drives the REAL app-shell path
-        // (Import button → file-picker DialogV2 → CompendiumImporter → report) with
-        // a payload cloned from the live smoke system plus ONE component pointing at
-        // a foreign `Item.` UUID that cannot resolve here (and a unique name so the
-        // source+name matcher can't salvage it) → it lands in the report's
-        // `reported` list, giving a non-empty "needs attention" report. Imported in
-        // "copy" mode so it never skips and yields a throwaway "(Copy)" system that
-        // is deleted immediately after the capture. Fully self-contained + guarded:
-        // a hiccup records a failed step without aborting the phase.
+        // The GM-facing import report is a manager modal that only appears AFTER an import, and
+        // only surfaces its "needs attention" list when the imported system carries references that
+        // cannot resolve in the target world.
         try {
-          // Build the import file from the live smoke system so createSystem accepts
-          // it (this is the same round-trip the #492 unit tests cover), appending one
-          // deliberately-unresolvable component. Returns the JSON string to feed the
-          // native file input.
+          // Build the import file from the live smoke system so createSystem accepts it (this is
+          // the same round-trip the #492 unit tests cover), appending one deliberately-unresolvable
+          // component.
           const importReportJson = await page.evaluate((sysId) => {
             const csm = game.fabricate.getCraftingSystemManager();
             const source = csm.getSystem(sysId);
@@ -11720,14 +9889,8 @@ async function main() {
             delete payloadSystem.id; // copy mode strips ids anyway; be explicit
             const components = Array.isArray(payloadSystem.components) ? payloadSystem.components : [];
             const base = components[0] ? JSON.parse(JSON.stringify(components[0])) : {};
-            // The orphan is a CLONE of a real component, so it inherits that
-            // component's source references and MUST overwrite every one of them.
-            // These are the post-issue-560 names (`registeredItemUuid` /
-            // `originItemUuid` / `aliasItemUuids`); writing only the retired
-            // `sourceItemUuid` / `sourceUuid` / `fallbackItemIds` left the clone
-            // pointing at the SAME real Item as its base, so two components claimed
-            // one source, the import failed closed ("... is claimed by both ..."),
-            // and the report dialog this step waits for never rendered.
+            // The orphan is a clone of a real component, so it inherits that component's source
+            // references and must overwrite every one of them.
             const orphan = {
               ...base,
               id: 'smoke-import-report-orphan',
@@ -11793,9 +9956,7 @@ async function main() {
           // Prove the "needs attention" grouped cards rendered (the reported source item).
           await reportDialog.locator('[data-import-report-group]').first()
             .waitFor({ state: 'visible', timeout: 5_000 });
-          // The import fires info/warn toasts that can bleed over the dialog; clear
-          // them first. The report IS the intended overlay here, so — like the roll
-          // prompt capture — we deliberately do NOT run assertNoScreenshotOverlays.
+          // The import fires info/warn toasts that can bleed over the dialog; clear them first.
           await dismissFoundryNotifications(page);
           await screenshot(page, 'manager-import-report');
 
@@ -11822,15 +9983,8 @@ async function main() {
           await closeOpenApplications(page).catch(() => {});
         }
 
-        // ── Folder-aware import categorization mapping step (#771) ─────────────
-        // The mapping modal exists only AFTER a folder / whole-pack component drop
-        // and is not representable in any world DB (Class B). Drive a WORLD-folder
-        // drop of a parent folder holding two Item subfolders — one named to match an
-        // existing component category (pre-filled by match-by-name), one matching
-        // nothing (then Skipped) — and capture the populated mapping step with >=2
-        // rows. Fully self-contained: the created folders/items and any temporary
-        // category are removed after the capture, and the modal is dismissed WITHOUT
-        // committing, so no component is imported into the smoke system.
+        // The mapping modal exists only AFTER a folder / whole-pack component drop and is not
+        // representable in any world db (Class B).
         try {
           const mappingFixtures = await page.evaluate(async (sysId) => {
             const csm = game.fabricate.getCraftingSystemManager();
@@ -11934,13 +10088,9 @@ async function main() {
           await closeOpenApplications(page).catch(() => {});
         }
 
-        // Manager alchemy-settings capture (issue #752 — evidence for #736's #713
-        // half): the Crafting → Settings surface of an ALCHEMY-mode system (the
-        // minimal "Smoke Alchemy Bench" seeded in Phase C). The Crafting nav group
-        // requires experimental features, which are still enabled here — the
-        // experimental-off capture below is the last D0 action, and the phase's
-        // finally restores the world value. Self-contained fresh manager session,
-        // guarded so a hiccup records a failed step rather than aborting the phase.
+        // Manager alchemy-settings capture (issue #752 — evidence for #736's #713 half): the
+        // Crafting → Settings surface of an ALCHEMY-mode system (the minimal "Smoke Alchemy Bench"
+        // seeded in Phase C).
         const alchemyBenchSystemId = alchemyFixtures?.benchSystemId;
         if (alchemyBenchSystemId) {
           try {
@@ -11960,15 +10110,9 @@ async function main() {
             if (await page.locator('.fabricate-manager [data-crafting-resolution-mode-option="alchemy"].is-active').count() === 0) {
               throw new Error('Crafting settings did not render with alchemy as the selected resolution mode.');
             }
-            // Issue 713's behaviour flags render in the Checks view for an
-            // alchemy-mode system — capture there when the card exists so the
-            // frame demonstrates the flags; fall back to the settings surface
-            // on builds that predate the card.
-            //
-            // They are the crafting route's ON FAILURE section (issue 1096). The route's
-            // landing section shows the alchemy check-mode selector instead, and the card
-            // probe below is a soft `count()` guard — so without the section click this
-            // capture would degrade silently to a frame of the wrong card rather than fail.
+            // Issue 713's behaviour flags render in the Checks view for an alchemy-mode system —
+            // capture there when the card exists so the frame demonstrates the flags; fall back to
+            // the settings surface on builds that predate the card.
             await openChecksActivity(page, 'crafting', 'on-failure');
             await settleManagerNav(page);
             const alchemyBehaviourCard = page
@@ -11992,15 +10136,8 @@ async function main() {
           process.stderr.write('Manager alchemy-settings capture skipped: alchemy bench fixture not seeded.\n');
         }
 
-        // Manager experimental-off capture (issue #752 — evidence for #746): the
-        // selected-system rail with fabricate.experimentalFeatures DISABLED. On
-        // main this is the pre-fix state (Graph present, Crafting group absent);
-        // after #746 rebases the same frame shows the crafting group unconditional
-        // and the graph gone. The setting is WORLD-scoped, so this explicit
-        // false→capture is restored to previousExperimentalFeatures by the phase's
-        // finally. The assertion stays minimal (rail rendered, setting off) so it
-        // passes both before and after the fix. Guarded so a hiccup records a
-        // failed step rather than aborting the phase.
+        // Manager experimental-off capture (issue #752 — evidence for #746): the selected-system
+        // rail with fabricate.experimentalFeatures disabled.
         try {
           await closeOpenApplications(page);
           await page.evaluate(async () => {
@@ -12028,13 +10165,9 @@ async function main() {
           await assertManagerLayoutStable(page, 'experimental off');
           await assertNoScreenshotOverlays(page);
           await screenshot(page, 'manager-experimental-off');
-          // Milestone (issue #807): the last load-bearing D0 capture has landed.
-          // A renderer teardown AFTER this point is tolerable infra flake; before
-          // it is not (later frames would be genuinely missing). Deliberately NOT
-          // hoisted earlier — the motivating essence-edit interaction is the
-          // `manager-essence-edit-first-state` capture several captures upstream of
-          // this milestone, so a teardown truly on that click is PRE-milestone and
-          // still fails loudly, which is correct.
+          // Milestone (issue #807): the last load-bearing D0 capture has landed. A renderer
+          // teardown AFTER this point is tolerable infra flake; before it is not (later frames
+          // would be genuinely missing).
           d0RequiredCapturesComplete = true;
           process.stdout.write('  D0: experimental-off rail screenshotted\n');
           await closeOpenApplications(page);
@@ -12046,11 +10179,10 @@ async function main() {
         }
         }
 
-        // On a scoped `screenshots` run the experimental-off milestone capture (which
-        // sets d0RequiredCapturesComplete) may be skipped, so mark the D0 required
-        // captures complete here: every targeted D0 section has run by this point, so
-        // a later transient renderer teardown is the tolerable post-milestone class.
-        // Inert under rc/ci/full (the milestone is set by the real capture there).
+        // On a scoped `screenshots` run the experimental-off milestone capture (which sets
+        // d0RequiredCapturesComplete) may be skipped, so mark the D0 required captures complete
+        // here: every targeted D0 section has run by this point, so a later transient renderer
+        // teardown is the tolerable post-milestone class.
         if (SCREENSHOT_SCOPING_ACTIVE) {
           d0RequiredCapturesComplete = true;
         }
@@ -12067,12 +10199,7 @@ async function main() {
         results.steps.push({ step: 'screenshot-manager', passed: true });
         process.stdout.write('Phase D0 complete: Crafting System Manager screenshotted and hit-tested.\n');
       } catch (err) {
-        // Issue #807: tolerate-or-fail. A real (non-teardown) failure, or ANY
-        // teardown BEFORE the manager-experimental-off milestone, records a hard
-        // screenshot-manager failure and fails via the terminal
-        // evaluateSmokeOutcome (D0 no longer rethrows, so this single record is the
-        // whole story — it is never double-recorded as create-crafting-system in
-        // the Phase C catch).
+        // Issue #807: tolerate-or-fail.
         if (
           !shouldTolerateSmokeTeardown({
             message: err.message,
@@ -12082,11 +10209,8 @@ async function main() {
         ) {
           results.steps.push({ step: 'screenshot-manager', passed: false, error: err.message });
         } else {
-          // Post-milestone transient renderer/page teardown: the same infra class
-          // the Phase E Journal step and the unhandledRejection guard already
-          // absorb. Record the step SKIPPED (not failed) and do NOT rethrow, so it
-          // neither reds the run nor propagates into Phase C. d0TeardownTolerated
-          // lets the Phase E guard skip the now-dead page.
+          // Post-milestone transient renderer/page teardown: the same infra class the Phase E
+          // Journal step and the unhandledRejection guard already absorb.
           d0TeardownTolerated = true;
           results.steps.push({
             step: 'screenshot-manager',
@@ -12107,17 +10231,10 @@ async function main() {
 
       // ── Phase E: Craft an item ──────────────────────────────────────────────
       startPhase('phase-E');
-      // Issue #807: with the D0 rethrow removed, Phase E is now reachable after a
-      // tolerated D0 teardown. The shared app Phase E drives cannot open on a
-      // dead/torn-down page, so skip it. Keyed on d0TeardownTolerated AND
-      // page.isClosed?.() — a 'browser has been disconnected'-class teardown is
-      // predicate-matched yet can leave page.isClosed() false, so isClosed alone
-      // would let Phase E proceed and throw into the Phase C catch.
+      // Issue #807: with the D0 rethrow removed, Phase E is now reachable after a tolerated D0
+      // teardown. The shared app Phase E drives cannot open on a dead/torn-down page, so skip it.
       if (!shouldRunScreenshotPhase('phase-E')) {
-        // Scoped `screenshots` run whose target set has no phase-E (player/craft/
-        // journal) label. Phase E is the last view-bearing phase and nothing earlier
-        // depends on its side effects, so skipping it is safe and drops the largest
-        // off-target cost for a manager-only PR. Inert for rc/ci/full.
+        // Scoped `screenshots` run whose target set has no phase-E (player/craft/ journal) label.
         process.stdout.write('Phase E: skipped (screenshots scope has no phase-E labels).\n');
         results.steps.push({ step: 'craft-item-phase', passed: true, skipped: true });
       } else if (page.isClosed?.() || d0TeardownTolerated) {
@@ -12126,29 +10243,15 @@ async function main() {
       } else {
       process.stdout.write('Phase E: Crafting a Healing Potion...\n');
       try {
-        // The "Craft Item" and "Gathering" sidebar actions both open ONE
-        // shared window (#fabricate-app); "Craft Item" lands on the Crafting
-        // tab and "Gathering" focuses the same window on the Gathering tab.
-        // Verify the shell, its four nav tabs, and the cross-tab focus
-        // behaviour, then close it. (Crafting itself runs via the API below,
-        // which does not require the window to be open.)
+        // The "Craft Item" and "Gathering" sidebar actions both open one shared window
+        // (#fabricate-app); "Craft Item" lands on the Crafting tab and "Gathering" focuses the same
+        // window on the Gathering tab.
         process.stdout.write('  Opening shared Fabricate app via "Craft Item"...\n');
         await closeOpenApplications(page);
         const sidebarItemsTab = page.locator('#sidebar [data-tab="items"]').first();
         await sidebarItemsTab.click({ force: true });
-        // The craft button IS the readiness signal — it lives in the Items directory header,
-        // so it can only be visible once that panel is active. Wait on it directly rather
-        // than on a separate "is the tab selected" probe: the tab markup varies across
-        // Foundry versions and sheet layouts, and asserting it produced a FALSE failure on a
-        // run where the sidebar was open, populated, and the button plainly visible
-        // (issue #996).
-        //
-        // On timeout, diagnose before throwing. `force: true` skips actionability CHECKS but
-        // still dispatches at the element's coordinates, so a modal overlay silently swallows
-        // the click and the panel never opens — the bare Playwright error then reads
-        // "resolved to hidden", which looks like a Fabricate UI defect rather than a blocked
-        // click (issue #993). Naming the overlay is the whole value; it must not also be able
-        // to fail when nothing is wrong.
+        // The craft button is the readiness signal — it lives in the Items directory header, so it
+        // can only be visible once that panel is active.
         const craftButton = page.locator('button[data-fabricate-action="craft"]').first();
         try {
           await craftButton.waitFor({ state: 'visible', timeout: 10_000 });
@@ -12171,11 +10274,9 @@ async function main() {
         const navItems = appShell.locator('.fabricate-app-nav-item');
         await navItems.first().waitFor({ state: 'visible', timeout: 10_000 });
 
-        // The shared actor-selection top bar mounts with the shell and flips
-        // [data-actor-bar-state] from "loading" to "ready" once its selectable
-        // actor list and gathering conditions have loaded. Wait on the ready
-        // state so captured player-app frames show the mounted, conditions-loaded
-        // bar rather than its loading placeholder.
+        // The shared actor-selection top bar mounts with the shell and flips [data-actor-bar-state]
+        // from "loading" to "ready" once its selectable actor list and gathering conditions have
+        // loaded.
         await appShell.locator('[data-actor-bar-state="ready"]')
           .first().waitFor({ state: 'visible', timeout: 10_000 });
         // Crafting/Gathering/Journal/Inventory are always present; the Alchemy
@@ -12206,40 +10307,29 @@ async function main() {
           throw new Error('Shared Fabricate app did not switch off the Crafting tab after "Gathering".');
         }
 
-        // The nav switch above only proves the Gathering tab is active; GatheringView
-        // then fires an async services.listGatheringForActor() fetch and renders a
-        // [data-gathering-state] container ("loading" -> "populated"/"empty"/"error").
-        // Wait for that container to settle off "loading" so the captured frame shows
-        // the resolved environment cards (or empty state) instead of the spinner.
+        // The nav switch above only proves the Gathering tab is active; GatheringView then fires an
+        // async services.listGatheringForActor() fetch and renders a [data-gathering-state]
+        // container ("loading" -> "populated"/"empty"/"error").
         await appShell.locator('[data-gathering-state]:not([data-gathering-state="loading"])')
           .first().waitFor({ state: 'visible', timeout: 10_000 });
 
-        // The populated layout now fills the center column with the environment
-        // detail (GatheringDetail). A selectable environment auto-selects, so
-        // wait for the detail to render its selected view ([data-gathering-detail]
-        // → [data-gathering-detail-state="selected"]) before capturing, so the
-        // frame shows the populated detail panel (header, pips, attempt area)
-        // rather than the select-an-environment hint. The seeded fixtures
-        // guarantee at least one non-locked environment to select.
+        // The populated layout now fills the center column with the environment detail
+        // (GatheringDetail).
         if (await appShell.locator('[data-gathering-state="populated"]').count() > 0) {
           await appShell.locator('[data-gathering-detail] [data-gathering-detail-state="selected"]')
             .first().waitFor({ state: 'visible', timeout: 10_000 });
         }
 
         await assertNoScreenshotOverlays(page);
-        // Dedicated player Gathering tab evidence: the same populated/selected
-        // state, captured under its own label so changes under
-        // src/ui/svelte/apps/gathering/ map to a real screenshot (see the
-        // 'player-gathering' VIEW_RECIPE in ui-pr-screenshot-evidence.mjs).
+        // Dedicated player Gathering tab evidence: the same populated/selected state, captured
+        // under its own label so changes under src/ui/svelte/apps/gathering/ map to a real
+        // screenshot (see the 'player-gathering' VIEW_RECIPE in ui-pr-screenshot-evidence.mjs).
         await screenshot(page, 'player-gathering-environments');
         await screenshot(page, 'fabricate-app-shell');
 
-        // Dedicated player Inventory tab evidence: switch the shared window to the
-        // Inventory tab and wait for its listing to settle off "loading" so the
-        // captured frame shows the resolved owned-materials grid (or the empty /
-        // no-actor state) rather than the spinner. Maps changes under
-        // src/ui/svelte/apps/inventory/ to a real screenshot (see the
-        // 'player-inventory' VIEW_RECIPE in ui-pr-screenshot-evidence.mjs).
+        // Dedicated player Inventory tab evidence: switch the shared window to the Inventory tab
+        // and wait for its listing to settle off "loading" so the captured frame shows the resolved
+        // owned-materials grid (or the empty / no-actor state) rather than the spinner.
         await appShell.locator('.fabricate-app-nav-item:has-text("Inventory")')
           .first().click();
         await appShell.locator('.fabricate-app-nav-item.active:has-text("Inventory")')
@@ -12256,20 +10346,7 @@ async function main() {
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'player-inventory');
 
-        // Dedicated player SALVAGE evidence (issue 675) — the first player-facing
-        // salvage surface. Select the progressive-salvage fixture (Smoke Cracked
-        // Amphora) and open its Salvage tab, so the frame shows the reorderable stage
-        // list: the headline feature, and the only visual proof of it.
-        //
-        // THIS STEP FAILS LOUDLY, BY DESIGN. It has no `if (… .count() > 0)` guard and
-        // no try/catch, unlike the inventory capture above. The evidence gate only
-        // regex-scrapes `screenshot(page, '<label>')` LITERALS out of this file and
-        // never checks that the capture ran — so a guarded step would silently no-op,
-        // publish no PNG, and still pass every gate. A hard `waitFor` is what makes the
-        // absence of the panel a red run instead of a missing frame. That is the
-        // behaviour in BOTH CI and local dev: there is no environment in which this
-        // step is skipped or downgraded to a warning. If it times out, the fixture or
-        // the surface is broken and the run should say so.
+        // Dedicated player salvage evidence (issue 675) — the first player-facing salvage surface.
         const salvageSearch = appShell.locator('[data-inventory-filters] input').first();
         await salvageSearch.waitFor({ state: 'visible', timeout: 10_000 });
         await salvageSearch.fill('Smoke Cracked Amphora');
@@ -12287,16 +10364,9 @@ async function main() {
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'player-salvage');
 
-        // The SECOND salvage frame: the no-check body — Smoke Relic's real shape, and
-        // the shape most real worlds have (a simple-mode salvage with no authored check
-        // formula recovers its materials outright, with every result tagged
-        // "Guaranteed"). The progressive frame above cannot show it, and this is the
-        // body a wrong (mode, checkUsable) dispatch would silently replace with a
-        // pass/fail contract under a footer that never prompts.
-        //
-        // This capture does NOT commit a salvage, so the two seeded Smoke Relic copies
-        // remain sufficient (the exec-salvage-run step consumes exactly one). Fails
-        // loudly, for the same reason as the frame above.
+        // The second salvage frame: the no-check body — Smoke Relic's real shape, and the shape
+        // most real worlds have (a simple-mode salvage with no authored check formula recovers its
+        // materials outright, with every result tagged "Guaranteed").
         await salvageSearch.fill('Smoke Relic');
         await page.waitForTimeout(200);
         await appShell.locator('[data-inventory-card]').first()
@@ -12310,14 +10380,7 @@ async function main() {
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'player-salvage-no-check');
 
-        // Issue 777: the pre-roll required-tools disclosure. Smoke Toolchest's salvage
-        // names two library tools — the Mallet the crafter holds (available, green) and the
-        // Anvil it does not (unavailable, red) — so this single frame proves the section is
-        // visible before any roll, the available/unavailable chip treatment reads by
-        // icon+label (not colour alone), the human tool name shows (not a raw componentId),
-        // and the pre-roll action is disabled while a required tool is missing. Fails
-        // loudly on the `[data-inventory-salvage-tools]` waitFor, for the same reason as the
-        // frames above; does NOT commit a salvage.
+        // Issue 777: the pre-roll required-tools disclosure.
         await salvageSearch.fill('Smoke Toolchest');
         await page.waitForTimeout(200);
         await appShell.locator('[data-inventory-card]').first()
@@ -12331,19 +10394,10 @@ async function main() {
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'player-salvage-tools');
 
-        // Issue 766: ONE physical stack registered as a salvageable component in TWO
-        // crafting systems (Smoke Air Shard, in the simple AND progressive forges) must
-        // render as a SINGLE inventory card, its quantity counted ONCE, carrying a
-        // System selector DROP-DOWN that re-scopes the whole detail body. This one frame
-        // proves both halves: (a) the collapsed single card with its union badges and a ×1
-        // pip (never ×2), and (b) the selector with per-system affordance annotations, opened
-        // to a participation's detail. That control was a native `<select>` until issue 1511
-        // and renders the app's OWN option list now, so what the frame shows is Fabricate's
-        // trigger rather than the operating system's; the wait below is unaffected, because
-        // the hook rides `triggerData` onto the trigger button. Fails loudly, by design (no
-        // guard, no try/catch), for the same reason as the salvage frames above — the
-        // evidence gate only scrapes the `screenshot(page, '<label>')` literal, so a
-        // silent no-op would publish no PNG yet still pass. Does NOT commit a salvage.
+        // Issue 766: one physical stack registered as a salvageable component in two crafting
+        // systems (Smoke Air Shard, in the simple AND progressive forges) must render as a single
+        // inventory card, its quantity counted once, carrying a System selector drop-down that
+        // re-scopes the whole detail body.
         const collapseSearch = appShell.locator('[data-inventory-filters] input').first();
         await collapseSearch.waitFor({ state: 'visible', timeout: 10_000 });
         await collapseSearch.fill('Smoke Air Shard');
@@ -12359,15 +10413,8 @@ async function main() {
         await assertNoScreenshotOverlays(page);
         await screenshot(page, 'player-inventory-multi-system');
 
-        // Issue 764: the GM-facing Simple-mode MISCONFIGURED salvage cue. A stored Simple
-        // config with more than one success result group is invalid (the engine awards only
-        // the first). The normalizer now CLAMPS it on every save, and initialize()
-        // re-normalizes on load — so it is unreachable through updateSystem or a planted
-        // setting (both self-heal). Reproduce it the only faithful way: an IN-MEMORY
-        // post-init push of a second role-less group onto the live normalized system,
-        // bypassing the normalizer. Then remount InventoryView (a tab switch re-fetches the
-        // listing, which reads the live system) and capture the GM cue: SalvageMisconfigured
-        // Body with Simple-specific copy and the mode banner suppressed. Fails loudly.
+        // Issue 764: the GM-facing Simple-mode misconfigured salvage cue. A stored Simple config
+        // with more than one success result group is invalid (the engine awards only the first).
         await page.evaluate(({ systemId, componentId }) => {
           const csm = game.fabricate.getCraftingSystemManager();
           const system = csm.getSystem(systemId);
@@ -12422,10 +10469,9 @@ async function main() {
         await salvageSearch.fill('');
         await page.waitForTimeout(150);
 
-        // Restore the Gathering tab (the tab active before this inventory capture):
-        // the downstream steps operate on the Gathering view (selecting the
-        // 'Azure Grove' environment, etc.), so re-activate it and wait for its
-        // listing to settle off "loading" before continuing.
+        // Restore the Gathering tab (the tab active before this inventory capture): the downstream
+        // steps operate on the Gathering view (selecting the 'Azure Grove' environment, etc.), so
+        // re-activate it and wait for its listing to settle off "loading" before continuing.
         await appShell.locator('.fabricate-app-nav-item:has-text("Gathering")').first().click();
         await appShell.locator('.fabricate-app-nav-item.active:has-text("Gathering")')
           .first().waitFor({ state: 'visible', timeout: 10_000 });
@@ -12485,23 +10531,15 @@ async function main() {
 
         async function clickReadyGatheringAttempt() {
           await appShell.locator('[data-gathering-attempt][data-gathering-attempt-blocked="false"]').first().click();
-          // An immediate (d100) attempt opens the interactive roll prompt: capture
-          // it and click Roll. A timed task resolves without a roll, so the helper's
-          // short presence check simply returns false there — safe for both callers.
+          // An immediate (d100) attempt opens the interactive roll prompt: capture it and click
+          // Roll.
           await handleRollPromptIfPresent(page, 'player-gathering-roll-prompt');
           await appShell.locator('[data-gathering-state="populated"]').first()
             .waitFor({ state: 'visible', timeout: 10_000 });
         }
 
-        // Documentation journey captures: exercise the user-visible gathering
-        // states the quickstart and gathering docs discuss. These steps select
-        // the player environments by name (Verdant Meadow, Crystal Thicket,
-        // Timed Orchard, Moonlit Blind Grove), which are only listable once the
-        // full-profile gathering library and Travel/realm fixtures are seeded in
-        // Phase D0 (RUN_SCREENSHOT_PHASES). Under rc/ci that seeding is skipped,
-        // so those environments have no visible tasks and never appear — gate the
-        // whole navigation (not just the screenshot calls) behind the full
-        // profile so rc/ci does not block on a card that cannot exist.
+        // Documentation journey captures: exercise the user-visible gathering states the quickstart
+        // and gathering docs discuss.
         if (RUN_FULL_ONLY_GATHERING_STATES) {
           await selectGatheringEnvironment('Azure Grove');
           await appShell.locator('[data-gathering-detail-tab="events"]').first().click();
@@ -12552,9 +10590,8 @@ async function main() {
           await clearGatheringEnvironmentSearch();
         }
 
-        // Region-lock evidence (#294): the locked "Hidden Hollow" env sorts last,
-        // so page forward until it appears, then capture it. The detail panel keeps
-        // showing the already-selected environment, so the frame stays populated.
+        // Region-lock evidence (#294): the locked "Hidden Hollow" env sorts last, so page forward
+        // until it appears, then capture it.
         const lockedEnvCard = appShell.locator('.gathering-env-card[data-locked="true"]');
         const envNextPage = appShell.locator('.gathering-env-list [data-pagination-next]');
         for (let i = 0; i < 6 && (await lockedEnvCard.count()) === 0 && (await envNextPage.count()) > 0; i++) {
@@ -12568,28 +10605,18 @@ async function main() {
           await screenshot(page, 'player-gathering-realm-locked');
         }
 
-        // Narrow-window stacked evidence (#330): shrink the Fabricate window below
-        // the gathering grid's stacking breakpoint so the three columns reflow into
-        // a single vertical stack instead of clipping the side columns. Page back to
-        // the first environments page so a non-locked environment is selected and the
-        // centre detail renders, then size the app narrow and capture the stacked
-        // layout under its own distinct recipe label (player-gathering-stacked) so it
-        // never collides with the normal-width frame.
+        // Narrow-window stacked evidence (#330): shrink the Fabricate window below the gathering
+        // grid's stacking breakpoint so the three columns reflow into a single vertical stack
+        // instead of clipping the side columns.
         const envPrevPage = appShell.locator('.gathering-env-list [data-pagination-prev]');
         for (let i = 0; i < 6 && (await envPrevPage.count()) > 0; i++) {
           if (await envPrevPage.isDisabled()) break;
           await envPrevPage.click();
           await page.waitForTimeout(150);
         }
-        // Drive the window below the gathering grid's stacking breakpoint. This
-        // simulates the small-screen case from #330 where Foundry constrains the
-        // window to a viewport narrower than the CSS floor. That floor is on
-        // `.fabricate.fabricate-app-window`, which only the player window emits
-        // (issue 1520 split it off the shared `.fabricate-app` area class so the
-        // three canvas windows could adopt that class without being inflated to
-        // 1024px). The inline `min-width: 0` set below beats the floor whichever
-        // class carries it, so this capture can shrink past the 900px breakpoint,
-        // at which point the grid's @container query collapses it to one column.
+        // Drive the window below the gathering grid's stacking breakpoint. This simulates the
+        // small-screen case from #330 where Foundry constrains the window to a viewport narrower
+        // than the CSS floor.
         const stackedSize = await page.evaluate(() => {
           const app = document.querySelector('#fabricate-app');
           if (!app) return null;
@@ -12612,14 +10639,9 @@ async function main() {
         await screenshot(page, 'player-gathering-stacked');
         results.steps.push({ step: 'player-gathering-stacked', passed: true, size: stackedSize });
 
-        // ── Player Crafting tab evidence ──────────────────────────────────────
-        // Switch the shared window to the Crafting tab and capture its states so
-        // changes under src/ui/svelte/apps/crafting/ map to real screenshots (the
-        // 'player-crafting' VIEW_RECIPES entry). The seeded smoke system resolves
-        // by check, so the mode-specific selections fall back to the current frame
-        // when a distinct mode is not present; each capture is defensive so a
-        // missing recipe/control never fails the phase. Gated to the full screenshot
-        // profile (like the other dedicated frame captures) so rc/ci never runs it.
+        // Switch the shared window to the Crafting tab and capture its states so changes under
+        // src/ui/svelte/apps/crafting/ map to real screenshots (the 'player-crafting' VIEW_RECIPES
+        // entry).
         if (RUN_SCREENSHOT_PHASES) {
         try {
           // Restore the window to a normal width before re-capturing the tab.
@@ -12634,10 +10656,8 @@ async function main() {
           await appShell.locator('[data-crafting-state]:not([data-crafting-state="loading"])')
             .first().waitFor({ state: 'visible', timeout: 10_000 });
 
-          // Best-effort: select the recipe whose detail renders the given mode, so
-          // the captured frame matches the label when that mode is seeded. Returns
-          // without throwing if no such recipe exists (the seeded smoke system
-          // resolves by check), leaving the current selection on screen.
+          // Best-effort: select the recipe whose detail renders the given mode, so the captured
+          // frame matches the label when that mode is seeded.
           async function selectCraftingRecipeByMode(mode) {
             const rows = appShell.locator('[data-recipe-id]');
             const count = await rows.count().catch(() => 0);
@@ -12683,12 +10703,9 @@ async function main() {
           await assertNoScreenshotOverlays(page);
           await screenshot(page, 'player-crafting-run-summary');
 
-          // Roll-result box evidence (issue #752 — evidence for #727's pill fix):
-          // the run summary only renders when a craft recorded a roll result, and
-          // it embeds the RollResultBox (awarded pills + outcome). Capture that box
-          // directly so a change under crafting/detail maps to a real frame that
-          // proves the pills + roll total. Guarded so a non-craftable selection
-          // (no run summary) records a failed step rather than aborting the phase.
+          // Roll-result box evidence (issue #752 — evidence for #727's pill fix): the run summary
+          // only renders when a craft recorded a roll result, and it embeds the RollResultBox
+          // (awarded pills + outcome).
           try {
             const rollResultBox = appShell
               .locator('[data-crafting-run-summary] [data-recipe-section="roll-result"]')
@@ -12707,12 +10724,10 @@ async function main() {
             process.stdout.write(`  Player Crafting roll-result capture skipped: ${rollResultError?.message ?? rollResultError}\n`);
           }
 
-          // Multi-option ingredient selector evidence (issue #552): select the
-          // seeded 'Smoke Weave Filigree' recipe, whose single ingredient group
-          // offers a held component or authored essence, so the detail
-          // renders the IngredientOptionSelector "Alternatives" radiogroup with
-          // two selectable rows. Defensive: a missing recipe/control records a
-          // failed step rather than aborting the surrounding phase.
+          // Multi-option ingredient selector evidence (issue #552): select the seeded 'Smoke Weave
+          // Filigree' recipe, whose single ingredient group offers a held component or authored
+          // essence, so the detail renders the IngredientOptionSelector "Alternatives" radiogroup
+          // with two selectable rows.
           try {
             // The recipe list is paginated (12/page); filter to the multi-option
             // recipe via the browser search so its row is in the DOM regardless of
@@ -12725,20 +10740,8 @@ async function main() {
               .first();
             await altRecipeRow.scrollIntoViewIfNeeded({ timeout: 5_000 }).catch(() => {});
             await altRecipeRow.locator('.crafting-recipe-row-main').click({ timeout: 5_000 });
-            // Issue 917 re-point: `[data-recipe-section="alternatives"]` is no longer
-            // always present. The alternatives picker is now the chooser ONE rail slot
-            // opens, so it renders only while that slot is the open one. The rail
-            // auto-advances to the first unsatisfied openable slot and this recipe's only
-            // openable slot IS the coil choice, so it opens by itself — the slot tile is a
-            // real disclosure now (a later accessibility fix), and clicking one that is
-            // ALREADY open collapses it rather than being a no-op, so a blind click here
-            // would race the auto-advance and could close the very chooser this step
-            // asserts on. `ensureSlotOpen` reads the tile's own `aria-expanded` state and
-            // clicks only when it is still closed, making the precondition explicit
-            // without fighting the auto-advance. Wait on the rail container first: a
-            // container-level marker fails fast and locally, whereas waiting straight on
-            // deep chooser content turns any upstream slip into an unrelated-looking later
-            // failure.
+            // Issue 917 re-point: `[data-recipe-section="alternatives"]` is no longer always
+            // present.
             await appShell.locator('[data-recipe-section="requirement-rail"]').first()
               .waitFor({ state: 'visible', timeout: 10_000 });
             const altSlotTile = appShell
@@ -12795,18 +10798,9 @@ async function main() {
             const firstClass = await selectCraftingRecipeByName(
               'Smoke First-Class Essence Draught'
             );
-            // Issue 917 re-point: a first-class essence requirement is no longer a separate
-            // essence thumb inside the ingredient image grid — it is a rail slot whose glyph
-            // carries the authored icon and colour token. The predecessor selector paired the
-            // ingredients group with that thumb class; it matches nothing here, so waiting on
-            // it would time out and fail the whole step. The `data-io-group="ingredients"`
-            // wrapper itself survives as the rail's container, which is why this wait anchors
-            // on the rail section rather than on that wrapper.
-            //
-            // Issue 1506 re-point: the slot's glyph is the ONE shared art tile now, which has
-            // no `class` prop, so the caller-owned `requirement-slot-glyph` hook is gone. The
-            // tile's own `data-medallion` attribute says the same thing inside a slot this
-            // selector already narrows by kind.
+            // Issue 917 re-point: a first-class essence requirement is no longer a separate essence
+            // thumb inside the ingredient image grid — it is a rail slot whose glyph carries the
+            // authored icon and colour token.
             await appShell
               .locator('[data-recipe-section="requirement-rail"] [data-slot-kind="essence"] [data-medallion]')
               .first()
@@ -12815,9 +10809,8 @@ async function main() {
             await screenshot(page, 'player-crafting-essence-ingredient');
 
             await firstClass.row.locator('.crafting-recipe-row-add').click({ timeout: 5_000 });
-            // Issue 1506: the acquire card's essence row draws the shared art tile in its
-            // GLYPH face. `[data-medallion="glyph"]` keeps that row distinct from the item
-            // rows above it, which draw the same tile carrying artwork.
+            // Issue 1506: the acquire card's essence row draws the shared art tile in its glyph
+            // face.
             await appShell.locator('[data-shopping-acquire-components] [data-medallion="glyph"]').first()
               .waitFor({ state: 'visible', timeout: 10_000 });
             await assertNoScreenshotOverlays(page);
@@ -12832,21 +10825,10 @@ async function main() {
             });
           }
 
-          // ── Requirement rail, shared essence pool + consumption plan (issue 917) ──
-          // The redesign's own surfaces. Six frames, each a NAMED rendered state that no
-          // pre-existing fixture could reach — the world seeded no essence-carrying
-          // component at all before this change, so every essence frame photographed
-          // `have: 0` and a shared pool was unphotographable.
-          //
-          // Each frame is its own `VIEW_RECIPES` entry (`collect` publishes only
-          // `candidates[0]` per view id), so all six reach the PR rather than one
-          // arbitrary member of a shared list. Guarded like its neighbours: a missing
-          // recipe or control records a failed step instead of aborting the phase.
+          // The redesign's own surfaces.
           try {
-            // Set one carrier's allocation through its real stepper input rather than the
-            // store, so what the frame shows is what a player's keystroke produces. The
-            // input is the Stepper's PRIMARY control (the −/+ buttons are adjuncts), and
-            // `fill` + blur drives both its `oninput` commit and its clamp-on-blur.
+            // Set one carrier's allocation through its real stepper input rather than the store, so
+            // what the frame shows is what a player's keystroke produces.
             const setCarrierUnits = async (carrierName, units) => {
               const input = appShell
                 .locator(`[data-essence-carrier]:has-text("${carrierName}") [data-stepper-input]`)
@@ -12856,13 +10838,10 @@ async function main() {
               await input.blur().catch(() => {});
               await page.waitForTimeout(300);
             };
-            // `ensureSlotOpen` (issue 917): the essence slot's tile is a real disclosure,
-            // and focus auto-advance already opens the rail's first unsatisfied openable
-            // slot — which is this very essence slot in both recipes this helper is used
-            // against — the moment the recipe is selected. A blind click here would
-            // therefore collapse the pool that auto-advance already opened instead of
-            // opening it, which is exactly the defect that turned this step's fresh
-            // `[data-recipe-section="essence-pool"]` wait into a 10s timeout.
+            // `ensureSlotOpen` (issue 917): the essence slot's tile is a real disclosure, and focus
+            // auto-advance already opens the rail's first unsatisfied openable slot — which is this
+            // very essence slot in both recipes this helper is used against — the moment the recipe
+            // is selected.
             const openEssencePool = async () => {
               await ensureSlotOpen(
                 appShell.locator('[data-requirement-slot][data-slot-kind="essence"]').first()
@@ -12877,9 +10856,8 @@ async function main() {
                 ratio: String(node.querySelector('.essence-pool-meter-ratio')?.textContent ?? '').trim()
               }))
             );
-            // Container-level wait: the rail's slot row, not a particular tile. An
-            // over-specific wait that times out fails the whole phase and reads as an
-            // unrelated later breakage.
+            // Container-level wait: the rail's slot row, not a particular tile. An over-specific
+            // wait that times out fails the whole phase and reads as an unrelated later breakage.
             const railSlots = appShell
               .locator('[data-recipe-section="requirement-rail"] [data-requirement-rail-slots]')
               .first();
@@ -12911,10 +10889,9 @@ async function main() {
             await screenshot(page, 'player-crafting-slot-rail');
             await railRecipe.recipeSearch.fill('');
 
-            // (2) Acceptance criterion 5. Nothing in inventory carries the authored tag, so
-            // the tile has no item image to borrow and MUST render its glyph — never
-            // Foundry's `icons/svg/item-bag.svg`. Both of this set's groups are fixed, so
-            // it is also the world's only rail with every chooser closed.
+            // (2) Acceptance criterion 5. Nothing in inventory carries the authored tag, so the
+            // tile has no item image to borrow and must render its glyph — never Foundry's
+            // `icons/svg/item-bag.svg`.
             const tagRecipe = await selectCraftingRecipeByName('Smoke Sigil Etching');
             await railSlots.waitFor({ state: 'visible', timeout: 10_000 });
             const tagReport = await page.evaluate(() => {
@@ -12945,15 +10922,8 @@ async function main() {
             await screenshot(page, 'player-crafting-tag-unmatched');
             await tagRecipe.recipeSearch.fill('');
 
-            // (3) The pool at its simplest: ONE requirement, a partial allocation, exactly
-            // one stepper left non-zero, and the "your selection" recap beneath it.
-            //
-            // THE WAND CLICK IS A PRECONDITION, not decoration. The store holds NO
-            // allocation until the player makes one, and an allocation map that becomes
-            // empty again re-reads the baked craftability — so with every carrier already
-            // at its maximum, zeroing the first one would simply snap back to the
-            // resolver's suggestion. "Pick for me" writes that suggestion into the store,
-            // which is what makes the subsequent per-carrier trims stick.
+            // (3) The pool at its simplest: one requirement, a partial allocation, exactly one
+            // stepper left non-zero, and the "your selection" recap beneath it.
             const poolRecipe = await selectCraftingRecipeByName('Smoke First-Class Essence Draught');
             await railSlots.waitFor({ state: 'visible', timeout: 10_000 });
             await openEssencePool();
@@ -12965,11 +10935,9 @@ async function main() {
             await page.waitForTimeout(400);
             await setCarrierUnits('Smoke Tidebloom', 0);
             await setCarrierUnits('Smoke Starmote', 0);
-            // Pointer hit-test (issue 917): the `+` adjunct is a 24px icon-only control
-            // nested in a list row inside a panel that only exists while its slot is open —
-            // a new stacking arrangement no mounted test can evaluate. Run it on a carrier
-            // that has just been zeroed, so the button under the point is ENABLED and the
-            // check cannot pass merely because a disabled control still hit-tests.
+            // Pointer hit-test (issue 917): the `+` adjunct is a 24px icon-only control nested in a
+            // list row inside a panel that only exists while its slot is open — a new stacking
+            // arrangement no mounted test can evaluate.
             await assertPointerTarget(
               page,
               appShell
@@ -12989,11 +10957,9 @@ async function main() {
             await assertNoScreenshotOverlays(page);
             await screenshot(page, 'player-crafting-essence-pool');
 
-            // (4) "Pick for me", captured on the SAME recipe immediately after (3) so the
-            // pair reads as a genuine before/after: one carrier funding 2 of 6, then the
-            // wand restoring the resolver's full suggestion. The wand stays on screen in
-            // both frames because this requirement can never be fully funded, which is the
-            // only arrangement in which the control itself is photographable at all.
+            // (4) "Pick for me", captured on the same recipe immediately after (3) so the pair
+            // reads as a genuine before/after: one carrier funding 2 of 6, then the wand restoring
+            // the resolver's full suggestion.
             await poolWand.click({ timeout: 5_000 });
             await page.waitForTimeout(400);
             const pickedRows = await appShell.locator('[data-essence-picked]').count();
@@ -13006,16 +10972,7 @@ async function main() {
             await screenshot(page, 'player-crafting-pick-for-me');
             await poolRecipe.recipeSearch.fill('');
 
-            // (5) The D-ESS proof. TWO requirements in one set funded from ONE dual
-            // carrier: allocating only the Duskcrystal leaves Star fully delivered and
-            // Tide short from the SAME units — which a per-group disjoint draw could not
-            // produce at all (Tide alone would claim both duals and starve Star).
-            //
-            // Every slot is met at rest here, so there is no wand to seed the store with.
-            // The allocation is therefore built the way a player builds one: raise a
-            // carrier that the suggestion left at zero (which both seeds the map and, since
-            // a short allocation is never topped up, drops the rest), add the dual, then
-            // clear the seed.
+            // (5) The D-ESS proof.
             const sharedRecipe = await selectCraftingRecipeByName('Smoke Tidecore Tempering');
             await railSlots.waitFor({ state: 'visible', timeout: 10_000 });
             await openEssencePool();
@@ -13033,11 +10990,8 @@ async function main() {
               );
             }
             // Issue 917 re-point: the chip's class is `.essence-contribution`
-            // (`EssenceContribution.svelte`) — `.essence-pool-contribution` never
-            // existed and always counted zero. Masked until now because the walk
-            // never actually reached this state: the essence pool auto-opened by
-            // focus advance and the (now-fixed) blind click above immediately closed
-            // it again, so the panel this selector reads was never rendered live.
+            // (`EssenceContribution.svelte`) — `.essence-pool-contribution` never existed and
+            // always counted zero.
             const duskContributions = await appShell
               .locator('[data-essence-carrier]:has-text("Smoke Duskcrystal") .essence-contribution')
               .count();
@@ -13049,16 +11003,10 @@ async function main() {
             await assertNoScreenshotOverlays(page);
             await screenshot(page, 'player-crafting-essence-pool-shared');
 
-            // (6) The same recipe and the same essence allocation, framed on the
-            // consumption plan: a FIXED row (the runeplate the craft spends) and an
-            // ESSENCE-CARRIER row (one entry per item key however many requirements that
-            // item funds), plus the "still to choose" line. `smoke-shared-fitting` (an
-            // unaffordable pair, permanently unchosen — see the recipe fixture above) is
-            // what keeps this frame from being a duplicate of (5): the essence-pool panel
-            // never shows a non-essence choice at all, so the plan naming its unresolved
-            // option ('Smoke Anvil' — the tile reports the CHOSEN OPTION's name, not the
-            // authored group label) here is evidence unique to this capture, not the same
-            // store state re-photographed.
+            // (6) The same recipe and the same essence allocation, framed on the consumption plan:
+            // a fixed row (the runeplate the craft spends) and an essence-carrier row (one entry
+            // per item key however many requirements that item funds), plus the "still to choose"
+            // line.
             const planPanel = appShell.locator('[data-recipe-section="consumption-plan"]').first();
             await planPanel.waitFor({ state: 'visible', timeout: 10_000 });
             await planPanel.scrollIntoViewIfNeeded({ timeout: 5_000 }).catch(() => {});
@@ -13079,12 +11027,10 @@ async function main() {
             if (planReport.pending.length === 0) {
               throw new Error('Consumption plan showed no "still to choose" line for the unsettled requirement');
             }
-            // The tile's own name is the CHOSEN option's name, not the authored group
-            // name — `_resolveGroupDescription`/`_resolveIngredientVisual` in
-            // `RecipeManager.js` report the option (here 'Smoke Anvil', the default pick
-            // among the unaffordable pair), never the group label ('Fitting'). Live-run
-            // verified (issue 917): asserting the group name here fails against the real
-            // render.
+            // The tile's own name is the chosen option's name, not the authored group name —
+            // `_resolveGroupDescription`/`_resolveIngredientVisual` in `RecipeManager.js` report
+            // the option (here 'Smoke Anvil', the default pick among the unaffordable pair), never
+            // the group label ('Fitting').
             if (!planReport.pending.includes('Smoke Anvil')) {
               throw new Error(`Consumption plan pending line did not name the unchosen Fitting requirement's option: ${JSON.stringify(planReport)}`);
             }
@@ -13113,13 +11059,8 @@ async function main() {
             process.stdout.write(`  Player Crafting requirement-rail capture failed: ${railError?.message ?? railError}\n`);
           }
 
-          // ── Explicit multi-step simple recipe (issue 765) ─────────────────
-          // Select the seeded 'Smoke Raise Tent' recipe (a simple-mode recipe whose
-          // sets live on steps[]). The step-aware projection must render an ordered
-          // per-step requirement list (data-recipe-section="steps") with the hint
-          // strip, one terminal PRODUCES row (the crate, not step 1's dowel), and no
-          // check card. Defensive: a missing recipe records a failed step rather than
-          // aborting the phase.
+          // Select the seeded 'Smoke Raise Tent' recipe (a simple-mode recipe whose sets live on
+          // steps[]).
           try {
             const recipeSearch = appShell.locator('.crafting-browser-search input').first();
             await recipeSearch.fill('Smoke Raise Tent');
@@ -13180,11 +11121,7 @@ async function main() {
             process.stdout.write(`  Player Crafting multi-step capture skipped: ${multiStepError?.message ?? multiStepError}\n`);
           }
 
-          // ── Progressive player stage list (issue 651) ─────────────────────
-          // The change's main new player surface. Four frames plus programmatic
-          // assertions that cannot be made anywhere else: happy-dom computes no
-          // cascade, so the Foundry `.app button` reset and the `.fabricate
-          // .visually-hidden` block are only observable against real CSS.
+          // The change's main new player surface.
           try {
             const recipeSearch = appShell.locator('.crafting-browser-search input').first();
             const selectRecipeByName = async (name) => {
@@ -13204,11 +11141,7 @@ async function main() {
             await assertNoScreenshotOverlays(page);
             await screenshot(page, 'player-crafting-progressive');
 
-            // (2) Reordered. The live region and the monotonic-threshold invariant are
-            // BOTH vacuous at rest — the region is empty until a move announces, and the
-            // builder's authored thresholds ascend by construction — so those checks only
-            // bite once a move has happened. This frame is what would catch a regression
-            // of the carried-threshold defect or a missing .fabricate .visually-hidden block.
+            // (2) Reordered.
             const moveDown = appShell.locator('[data-progressive-stage-move-down]').first();
             await moveDown.click({ timeout: 5_000 });
             await page.waitForTimeout(250);
@@ -13326,16 +11259,8 @@ async function main() {
         }
         }
 
-        // ── Player Alchemy tab evidence (issue #543) ──────────────────────────
-        // The Alchemy tab is conditional — shown only when an enabled alchemy
-        // system has recipes (seeded above under RUN_SCREENSHOT_PHASES). With TWO
-        // alchemy systems the discipline chooser renders first; enter one to reach
-        // the three-column workbench. Capture the chooser, the populated workbench,
-        // the narrow stacked layout, and each theme. Maps changes under
-        // src/ui/svelte/apps/alchemy/ to real screenshots (the 'player-alchemy*'
-        // VIEW_RECIPES entries). Gated to the full screenshot profile and guarded
-        // so a missing tab/control records a failed step rather than aborting the
-        // phase.
+        // The Alchemy tab is conditional — shown only when an enabled alchemy system has recipes
+        // (seeded above under RUN_SCREENSHOT_PHASES).
         if (RUN_SCREENSHOT_PHASES) {
         try {
           if (await appShell.locator('.fabricate-app-nav-item:has-text("Alchemy")').count() === 0) {
@@ -13350,10 +11275,8 @@ async function main() {
           });
           await page.waitForTimeout(300);
 
-          // The alchemy listing resolves its actor from the shared top-bar
-          // selection, and the no-actor state precedes the chooser in AlchemyView.
-          // Wait for the bar to finish selecting an actor so we land on the
-          // discipline chooser rather than the no-actor placeholder.
+          // The alchemy listing resolves its actor from the shared top-bar selection, and the
+          // no-actor state precedes the chooser in AlchemyView.
           await appShell.locator('[data-actor-bar-state="ready"]')
             .first().waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {});
 
@@ -13361,10 +11284,7 @@ async function main() {
           await appShell.locator('.fabricate-app-nav-item.active:has-text("Alchemy")')
             .first().waitFor({ state: 'visible', timeout: 10_000 });
 
-          // Let the view settle out of its loading state. With two seeded
-          // disciplines the chooser renders; if a discipline is already active
-          // (persisted selection), use the "Switch discipline" control to return
-          // to the chooser.
+          // Let the view settle out of its loading state.
           await appShell
             .locator('#fabricate-app [data-alchemy-state]:not([data-alchemy-state="loading"]), #fabricate-app .alchemy-chooser')
             .first().waitFor({ state: 'visible', timeout: 15_000 }).catch(() => {});
@@ -13493,12 +11413,8 @@ async function main() {
         await screenshot(page, 'post-craft');
         process.stdout.write('  Screenshotted post-craft state.\n');
 
-        // Chat card evidence (issue #752 — evidence for #727's roll-total fix):
-        // the API craft above posts a crafting result card to chat. Activate the
-        // sidebar chat tab, scroll the newest fabricate craft card into view, and
-        // clip the screenshot to the sidebar bounding box (a viewport region shot,
-        // not the full page). Full-profile only, and guarded so a hiccup records a
-        // failed step rather than aborting the phase.
+        // Chat card evidence (issue #752 — evidence for #727's roll-total fix): the API craft above
+        // posts a crafting result card to chat.
         if (RUN_SCREENSHOT_PHASES) {
           try {
             await page.locator('#sidebar [data-tab="chat"]').first().click({ force: true }).catch(() => {});
@@ -13550,11 +11466,8 @@ async function main() {
           if (crafter) crafter.sheet.close();
         }, cleanup.crafterId);
 
-        // ── Issue #489: execute-and-assert coverage (always-run, rc/ci) ────────
-        // Cheap API crafts, tool breakages, salvage, negative gating, and one
-        // guaranteed-success gather — no screenshots, so they run in every
-        // profile. A failed scenario is recorded as a failed step and fails the
-        // run via the final step-failure gate.
+        // Cheap API crafts, tool breakages, salvage, negative gating, and one guaranteed-success
+        // gather — no screenshots, so they run in every profile.
         if (executionFixtures) {
           process.stdout.write('  Running craft-execution coverage asserts (#489)...\n');
           const execSteps = await runCraftExecutionAsserts(page, executionFixtures, cleanup.crafterId);
@@ -13581,30 +11494,13 @@ async function main() {
           results.steps.push({ step: 'exec-coverage', passed: false, error: 'Execution fixtures not seeded' });
         }
 
-        // ── Player Journal capture ────────────────────────────────────────────
-        // The Phase E craft above produced at least one terminal crafting run for
-        // the crafter, so the player Journal screen has a populated, selectable run
-        // to render. Captured under its own label so changes under
-        // src/ui/svelte/apps/journal/ map to a real screenshot (see the
-        // 'fabricate-journal' VIEW_RECIPE in ui-pr-screenshot-evidence.mjs).
-        //
-        // This is the last heavy action of the run — a full app re-open + Journal
-        // navigation ~15min in. A transient renderer/page teardown here ("Target
-        // page/context/browser has been closed") is an INFRA hiccup, not a product
-        // failure (the Journal render itself is covered by the mounted journal-view
-        // tests). So retry the capture to ride out a live-page navigation hiccup;
-        // if the page is torn down even after retries, record the step as SKIPPED
-        // (with the reason, so a persistent pattern still shows in summary.json)
-        // rather than red-failing the whole smoke on a known-flaky last step. A
-        // genuine UI failure (locator not visible / wrong journal state) with a
-        // LIVE page still fails hard and still captures a journal-failure frame.
+        // The Phase E craft above produced at least one terminal crafting run for the crafter, so
+        // the player Journal screen has a populated, selectable run to render.
         const JOURNAL_CAPTURE_ATTEMPTS = 3;
         const captureJournalScreen = async () => {
           await closeOpenApplications(page);
-          // Ensure the crafter (the actor that owns the terminal run) is the
-          // persisted bar selection so the Journal lists ITS runs even though the
-          // harness runs as GM. JournalView.load() reads this remembered-actor seam
-          // directly via services.getSelectedActorId().
+          // Ensure the crafter (the actor that owns the terminal run) is the persisted bar
+          // selection so the Journal lists its runs even though the harness runs as GM.
           await page.evaluate(async (crafterId) => {
             await game.fabricate.setSelectedGatheringActorId(crafterId);
           }, cleanup.crafterId);
@@ -13628,19 +11524,15 @@ async function main() {
           await appShell.locator('.fabricate-app-nav-item.active:has-text("Journal")')
             .first().waitFor({ state: 'visible', timeout: 10_000 });
 
-          // JournalView mounts and fires an async listJournalForActor() fetch,
-          // rendering a [data-journal-state] container ("loading" -> "populated"/
-          // "empty"/"error"). Wait for it to settle off loading, then for the
-          // populated 3-column layout (guaranteed by the crafter's terminal run).
+          // JournalView mounts and fires an async listJournalForActor() fetch, rendering a
+          // [data-journal-state] container ("loading" -> "populated"/ "empty"/"error").
           await appShell.locator('[data-journal-state]:not([data-journal-state="loading"])')
             .first().waitFor({ state: 'visible', timeout: 15_000 });
           await appShell.locator('[data-journal-state="populated"]')
             .first().waitFor({ state: 'visible', timeout: 15_000 });
 
-          // Render the centre detail for a concrete run: prefer an active run card,
-          // else the first terminal history row. The centre detail article carries
-          // both [data-journal-detail] and [data-run-key] only when a run is
-          // selected (the unselected placeholder is [data-journal-empty="detail"]).
+          // Render the centre detail for a concrete run: prefer an active run card, else the first
+          // terminal history row.
           const journalActiveCard = appShell.locator('.journal-run-card[data-run-id]').first();
           if (await journalActiveCard.count() > 0) {
             await journalActiveCard.click();
@@ -13723,13 +11615,9 @@ async function main() {
             requiredCapturesComplete: true,
           })
         ) {
-          // Infra teardown (renderer/page closed) — do not fail the whole smoke on
-          // a known-flaky last step; mark it skipped with the reason so a
-          // persistent pattern is still visible in summary.json. The Journal step
-          // is the last step, so its required captures are complete by definition.
-          // Routes through the same shouldTolerateSmokeTeardown helper and stamps
-          // the same exported TRANSIENT_TEARDOWN_SKIP_PREFIX as the D0 skip site,
-          // so both writers and the degraded matcher can never drift.
+          // Infra teardown (renderer/page closed) — do not fail the whole smoke on a known-flaky
+          // last step; mark it skipped with the reason so a persistent pattern is still visible in
+          // summary.json.
           results.steps.push({
             step: 'player-journal',
             passed: true,
@@ -13754,9 +11642,7 @@ async function main() {
       } catch (err) {
         results.steps.push({ step: 'craft-item-phase', passed: false, error: err.message });
         process.stderr.write(`Phase E failed: ${err.message}\n`);
-        // Issue #807: wrap the failure screenshot (mirroring journal-failure). A
-        // gone-page screenshot would otherwise throw out of this catch into the
-        // Phase C catch and REVIVE the deleted create-crafting-system record.
+        // Issue #807: wrap the failure screenshot (mirroring journal-failure).
         try {
           await screenshot(page, 'craft-failure');
         } catch {
@@ -13771,11 +11657,8 @@ async function main() {
     }
     } // end if (phaseBPassed)
 
-    // ── Final: Check for step failures and runtime errors ──────────────────
-    // Step failures are evaluated FIRST and are NEVER waivable by any input; a
-    // non-waived console error throws only after steps are clean. Waived errors
-    // were filtered out at capture time, so an all-waived run reaches here with
-    // an empty consoleErrors and passes.
+    // Step failures are evaluated first and are never waivable by any input; a non-waived console
+    // error throws only after steps are clean.
     const outcome = evaluateSmokeOutcome({ steps: results.steps, consoleErrors });
     if (outcome.reason === 'console-errors') {
       results.errors = consoleErrors;
@@ -13794,11 +11677,8 @@ async function main() {
     // Capture failure screenshot
     await page.screenshot({ path: join(RESULTS_DIR, 'screenshot-failure.png') }).catch(() => {});
   } finally {
-    // ── Phase F: Cleanup created documents ────────────────────────────────
-    // Cleanup matters for local dev (the container is preserved across runs
-    // and stale state can shadow fresh fixtures). CI containers are torn
-    // down by `foundry-test-down.mjs` immediately after this script exits,
-    // so cleanup is wasted wall-time. Gate behind RUN_FULL_ONLY_BEHAVIORS.
+    // Cleanup matters for local dev (the container is preserved across runs and stale state can
+    // shadow fresh fixtures).
     if (RUN_FULL_ONLY_BEHAVIORS) {
     startPhase('phase-F');
     process.stdout.write('Phase F: Cleaning up test data...\n');
@@ -13825,9 +11705,8 @@ async function main() {
           }
         }
 
-        // Delete the issue #489 craft-execution coverage systems (and any gather
-        // environments/items they own). Their recipes are already in recipeIds
-        // above; the Arcane Forge rc gather env/task are cleaned with systemId.
+        // Delete the issue #489 craft-execution coverage systems (and any gather environments/items
+        // they own).
         if (Array.isArray(cleanupData.executionSystemIds) && cleanupData.executionSystemIds.length > 0) {
           const environmentStore = game.fabricate?.getGatheringEnvironmentStore?.();
           const csm = game.fabricate?.getCraftingSystemManager?.();
@@ -13841,10 +11720,8 @@ async function main() {
         }
 
         // Delete the dedicated single-purpose systems: the broken one seeded for the
-        // overview/banner captures, and the restricted-visibility one seeded for the
-        // recipe rail's access branch (issue 643). Both go through the same delete
-        // (with their gathering environments via the environment store), so they
-        // share one loop rather than two near-identical blocks.
+        // overview/banner captures, and the restricted-visibility one seeded for the recipe rail's
+        // access branch (issue 643).
         const singlePurposeSystemIds = [
           cleanupData.blockedSystemId,
           cleanupData.restrictedSystemId
@@ -13891,18 +11768,14 @@ async function main() {
     endPhase();
 
     results.consoleErrors = consoleErrors;
-    // Split the smoke signal (issue #628): a gate can then ask "did a step fail,
-    // or did we merely capture noise?". Computed HERE in the finally block —
-    // beside results.consoleErrors — not in the try, so an early phase abort
-    // still populates them and a gate never reads undefined.
+    // Split the smoke signal (issue #628): a gate can then ask "did a step fail, or did we merely
+    // capture noise?".
     const { stepFailures, consoleErrorCount, degraded } = computeSmokeSignal(results);
     results.stepFailures = stepFailures;
     results.consoleErrorCount = consoleErrorCount;
-    // Issue #807: a tolerated transient D0/Journal teardown marks the run DEGRADED
-    // (still exit 0, but distinguishable in summary.json); rendererCrashed carries
-    // the causation-bearing page 'crash' signal (coerced to a boolean here even
-    // when the listener never fired). Both ride in summary.json beside the other
-    // signals — see AGENTS.md for how to read them.
+    // Issue #807: a tolerated transient D0/Journal teardown marks the run degraded (still exit 0,
+    // but distinguishable in summary.json); rendererCrashed carries the causation-bearing page
+    // 'crash' signal (coerced to a boolean here even when the listener never fired).
     results.degraded = degraded;
     results.rendererCrashed = Boolean(results.rendererCrashed);
     results.screenshotRun = screenshotRunIdentity;
@@ -13911,10 +11784,7 @@ async function main() {
     results.bootTimings = bootTimings;
     results.phaseTimings = phaseTimings;
     results.viewTimings = viewTimings;
-    // A browser that already CRASHED (the teardown case) can make close() reject. This is
-    // the finally block and the run's verdict is already recorded in `results`, so a close
-    // failure is post-run cleanup noise — never re-throw here (it would mask the try's
-    // outcome and skip the summary.json write below). Log and continue.
+    // A browser that already crashed (the teardown case) can make close() reject.
     try {
       await browser.close();
     } catch (closeErr) {

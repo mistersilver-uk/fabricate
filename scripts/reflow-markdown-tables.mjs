@@ -1,13 +1,6 @@
 /**
- * `npm run format:tables -- <file>…` — re-emit a Markdown file's pipe tables without column padding.
- *
- * The gate in `tests/domain-table-reflow.test.js` reports which rows drifted; this is what fixes
- * them. Without it the failure message would name a property and no way to satisfy it, which is
- * how a gate becomes something people work around rather than run — the sibling ledger gates in
- * this repository all name their regenerator, and this one now does too.
- *
- * Prints what it changed and rewrites in place. With no argument it does `DOMAIN.md`, the file the
- * gate actually guards.
+ * `npm run format:tables -- <file>…` — re-emit a Markdown file's pipe tables without column
+ * padding.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 

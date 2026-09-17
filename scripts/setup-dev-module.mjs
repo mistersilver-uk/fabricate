@@ -1,38 +1,6 @@
 /**
- * setup-dev-module.mjs
- *
- * Creates (or repairs) the link from Foundry's modules directory to this
- * repository, so a running Foundry install sees the project as the `fabricate`
- * module. Intended for local development only — CI uses a different flow
- * (scripts/foundry-setup-data.mjs).
- *
- * Two link targets are supported:
- *   - the repo ROOT (default), for a Foundry data dir that loads the source
- *     manifest directly; and
- *   - the built `dist/` output (`--dist`/`--dev`), matching the desktop "dev"
- *     workflow where every module junction points at a repo's `dist` folder.
- *     Run `npm run build` first so `dist/module.json` exists.
- *
- * Usage:
- *   node scripts/setup-dev-module.mjs                 # default dir → repo root
- *   node scripts/setup-dev-module.mjs --force         # repoint a wrong-target link
- *   node scripts/setup-dev-module.mjs --dist          # link → dist/ instead of root
- *   node scripts/setup-dev-module.mjs --dev --force   # FoundryVTT-dev data dir + dist
- *
- * Env vars:
- *   FOUNDRY_DATA_PATH  Foundry's user-data path. Accepts either the user-data
- *                      ROOT (what Foundry's `--dataPath` takes, e.g.
- *                      %LOCALAPPDATA%\FoundryVTT-dev) or its `Data`
- *                      subdirectory — both resolve to the same modules dir.
- *                      Overrides the platform default and `--dev`.
- *
- * Platform defaults for Foundry's user-data ROOT (a `Data` subdir is appended):
- *   Windows: %LOCALAPPDATA%\FoundryVTT      (--dev → %LOCALAPPDATA%\FoundryVTT-dev)
- *   macOS:   ~/Library/Application Support/FoundryVTT
- *   Linux:   ~/.local/share/FoundryVTT
- *
- * Link type: directory junction on Windows (no admin / Developer Mode
- * needed), symlink on Linux and macOS.
+ * Creates (or repairs) the link from Foundry's modules directory to this repository, so a running
+ * Foundry install sees the project as the `fabricate` module.
  */
 
 import {
@@ -52,12 +20,7 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
 
-/**
- * Normalize any Foundry user-data path to its `Data/` directory. Accepts the
- * user-data ROOT (the value Foundry's `--dataPath` takes, which contains
- * `Data/`, `Config/`, `Logs/`) or the `Data` dir itself, so callers can pass
- * whichever they have on hand.
- */
+/** Normalize any Foundry user-data path to its `Data/` directory. */
 function toDataDir(userPath) {
   const resolved = resolve(userPath);
   if (basename(resolved).toLowerCase() === 'data') return resolved;

@@ -1,15 +1,6 @@
 /**
- * foundry-setup-data.mjs
- *
- * Assembles the .foundry-e2e/data/ directory that is bind-mounted as Foundry's
- * /data volume. Copies the world fixture and creates symlinks for the module
- * and game systems. Symlinks use relative paths so they resolve correctly
- * both on the host and inside the container.
- *
- * Usage: node scripts/foundry-setup-data.mjs
- *
- * This script is called automatically by foundry-test-up.mjs before starting
- * the Docker container.
+ * Assembles the .foundry-e2e/data/ directory that is bind-mounted as Foundry's /data volume. Copies
+ * the world fixture and creates symlinks for the module and game systems.
  */
 
 import { mkdirSync, cpSync, existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
@@ -27,13 +18,7 @@ const DIST_DIR = join(ROOT, 'dist');
 const WORLDS_SRC = join(ROOT, '.foundry-e2e', 'worlds');
 const SYSTEMS_SRC = join(ROOT, '.foundry-e2e', 'systems');
 
-/**
- * Read a package version out of a Foundry `system.json` / `module.json`.
- *
- * @param {string} manifestPath Absolute path to the manifest.
- * @returns {string|null} The declared version, or null when it cannot be read — an unreadable
- *   manifest is treated as "not what we want" so the copy is redone rather than trusted.
- */
+/** Read a package version out of a Foundry `system.json` / `module.json`. */
 function manifestVersion(manifestPath) {
   try {
     return JSON.parse(readFileSync(manifestPath, 'utf8')).version ?? null;
@@ -42,20 +27,7 @@ function manifestVersion(manifestPath) {
   }
 }
 
-/**
- * Stamp the copied world manifest for the arm being booted.
- *
- * The committed fixture at `.foundry-e2e/worlds/fabricate-smoke-ci/world.json` targets the DEFAULT
- * arm, and `tests/view-lab-chrome-version-lock.test.js` holds it to the compose pin. A second
- * committed fixture for the second arm would be a second source of truth that drifts silently — and
- * the drift presents as a two-minute launch timeout, not as anything mentioning versions. So the
- * runtime copy is stamped here instead: `coreVersion`, `systemVersion` and `compatibility` follow the
- * arm. For the default arm the derivation is the identity function, which
- * `tests/foundry-smoke-arms.test.js` asserts against the committed file.
- *
- * @param {string} worldDest The world directory inside the runtime data directory.
- * @param {ReturnType<typeof resolveSmokeArmFromEnv>} arm
- */
+/** Stamp the copied world manifest for the arm being booted. */
 function stampWorldManifestForArm(worldDest, arm) {
   const manifestPath = join(worldDest, 'world.json');
   if (!existsSync(manifestPath)) return;
@@ -78,8 +50,6 @@ function main() {
   }
 
   // Create the container cache directory so Docker doesn't create it as root.
-  // The felddy/foundryvtt image runs as the host user (via `user:` in
-  // docker-compose) and needs write access to both /data and /data/container_cache.
   const cacheDir = join(ROOT, '.foundry-e2e', 'cache');
   mkdirSync(cacheDir, { recursive: true });
 
@@ -91,19 +61,13 @@ function main() {
     cpSync(DIST_DIR, moduleDest, { recursive: true });
     process.stdout.write('Copied module: dist/ → data/Data/modules/fabricate/\n');
   } else {
-    // Fail fast: without dist/ the module is never copied into the data dir, so
-    // Foundry has no `fabricate` module to enable. Continuing here surfaces much
-    // later in the run as a misleading "module could not be activated" error.
-    // Make the real cause obvious and actionable at setup time instead.
+    // Fail fast: without dist/ the module is never copied into the data dir, so Foundry has no
+    // `fabricate` module to enable.
     process.stderr.write('Error: dist/ not found — run `npm run build` before the Foundry smoke test.\n');
     process.exit(1);
   }
 
-  // Copy CI smoke world fixture. The runtime dir is wiped and recopied on
-  // every up so that smoke runs start pristine — no leftover settings db,
-  // actors, items, or crafting systems from a prior run can contaminate
-  // assertions. The user's other worlds at .foundry-e2e/data/Data/worlds/
-  // are not touched; only `fabricate-smoke-ci/` is automation-owned.
+  // Copy CI smoke world fixture.
   const worldDest = join(DATA_DIR, 'worlds', 'fabricate-smoke-ci');
   const worldSrc = join(WORLDS_SRC, 'fabricate-smoke-ci');
   if (existsSync(worldSrc)) {
@@ -117,13 +81,6 @@ function main() {
   }
 
   // Copy each downloaded game system.
-  //
-  // Compared by VERSION, not by mere presence. Presence alone meant a system bump in
-  // `foundry-fetch-systems.mjs` never reached the assembled data directory, so the container went
-  // on running the old release while the world manifest declared the new one. That is not a
-  // cosmetic mismatch: a dnd5e built for the previous core generation loads under the new one and
-  // then fails data preparation on every actor ("Cannot read properties of undefined"), which
-  // surfaces two phases later as an empty compendium rather than as a version problem.
   if (existsSync(SYSTEMS_SRC)) {
     for (const entry of readdirSync(SYSTEMS_SRC, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue;

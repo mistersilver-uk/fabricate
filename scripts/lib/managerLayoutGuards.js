@@ -1,35 +1,8 @@
 /**
- * Pure helpers for the Foundry smoke harness's manager layout-overflow guard
- * (issue #645, Guard 2).
- *
- * `assertManagerLayoutStable` in `scripts/foundry-test-run.mjs` measures a fixed
- * list of ~38 manager selectors and throws on horizontal overflow of whatever it
- * FINDS. That is fail-open: if a critical row/edit-form class is renamed or
- * removed, its selector matches nothing, is simply not measured, and the surface
- * loses overflow coverage silently. The only global backstop is a
- * `rowCount === 0 && editFormCount === 0` throw that spans EVERY surface, so a
- * single renamed per-surface class stays invisible.
- *
- * These helpers close that gap by naming, per manager surface, the selector(s)
- * that MUST match at least one element, and failing loud when one does not. They
- * are deliberately side-effect-free and import nothing from Playwright or
- * `foundry-test-run.mjs` (that harness launches Chromium on import), so
- * `tests/foundry-manager-layout-guard.test.js` exercises the same decision logic
- * the harness runs at smoke time.
+ * Pure helpers for the Foundry smoke harness's manager layout-overflow guard (issue #645, Guard 2).
  */
 
-/**
- * Count how many measured elements matched each selector.
- *
- * Accepts the harness's per-element measurement array (each record carries a
- * `.selector`; one record per matched element) OR a pre-summarised
- * `{ selector, count }[]` array. A record's `count` is used when it is a finite
- * number, otherwise the record counts as a single matched element. A selector
- * that matched nothing has no records, so it is absent from the map (count 0).
- *
- * @param {Array<{ selector?: string, count?: number }>} metrics
- * @returns {Map<string, number>}
- */
+/** Count how many measured elements matched each selector. */
 function countMatchesBySelector(metrics) {
   const counts = new Map();
   if (!Array.isArray(metrics)) return counts;
@@ -42,23 +15,8 @@ function countMatchesBySelector(metrics) {
 }
 
 /**
- * Assert every `expected` selector matched at least one measured element, and
- * throw naming EACH expected selector that matched none.
- *
- * This is the fail-loud converse of the harness's measure-what-you-find pass: a
- * renamed or removed critical class drops its match count to 0, so listing it in
- * `expected` for the surfaces that render it turns silent coverage loss into a
- * thrown error. Extra/unexpected selectors in `metrics` are ignored — a surface
- * legitimately renders many selectors the caller does not pin.
- *
- * An empty (or non-array) `expected` asserts nothing, so a surface with no
- * pinned critical selector is a no-op rather than a false failure.
- *
- * @param {Array<{ selector?: string, count?: number }>} metrics - the per-element
- *   (or pre-summarised) selector measurements the harness computed
- * @param {string[]} expected - selectors that MUST match at least one element
- * @param {string} [label] - the surface label, included in the thrown message
- * @throws {Error} when any `expected` selector matched zero elements
+ * Assert every `expected` selector matched at least one measured element, and throw naming each
+ * expected selector that matched none.
  */
 export function assertExpectedSelectorsPresent(metrics, expected, label) {
   if (!Array.isArray(expected) || expected.length === 0) return;
@@ -75,26 +33,11 @@ export function assertExpectedSelectorsPresent(metrics, expected, label) {
 }
 
 /**
- * Per manager-surface critical selectors that MUST render, keyed by the exact
- * `label` (or `captureStableManagerView` `layout`) passed to
- * `assertManagerLayoutStable`.
- *
- * Each surface pins ONLY selector(s) the harness already proves are present
- * right before its layout assertion (via a `waitFor`/`.count()` check), so this
- * map never false-fails on a legitimately-rendered surface. Surfaces that render
- * no stable row/edit-form selector (e.g. the checks editor/validation LIST
- * views, the tags browser, the selected-system overview facts page, the
- * gathering settings form) are intentionally OMITTED — an unmapped label asserts
- * nothing and keeps relying on the harness's global row/edit-form backstop.
- *
- * @type {Record<string, string[]>}
+ * Per manager-surface critical selectors that must render, keyed by the exact `label` (or
+ * `captureStableManagerView` `layout`) passed to `assertManagerLayoutStable`.
  */
 export const MANAGER_SURFACE_EXPECTED_SELECTORS = {
-  // System library browser — the systems list (harness clicks a system row). Issue 1515 turned
-  // the `role="table"` grid into a `role="list"` of `role="listitem"` rows and moved the row's
-  // click onto an identity `<button>`, exactly as the component and essence studios already had.
-  // `.manager-system-identity` is pinned alongside the row for that reason: it is the control the
-  // capture steps click, so losing it is a silent break the unit suite cannot see.
+  // System library browser — the systems list (harness clicks a system row).
   'normal default selection': ['.manager-system-row', '.manager-system-identity'],
 
   // Recipes browser (harness waits on `.manager-recipe-row`).
@@ -114,31 +57,17 @@ export const MANAGER_SURFACE_EXPECTED_SELECTORS = {
   'manager-recipe-edit-results-progressive': ['.manager-recipe-edit-main'],
   'manager-recipe-edit-results-alchemy': ['.manager-recipe-edit-main'],
 
-  // Components browser (harness clicks a `.manager-component-row`). The Component
-  // Studio rebuild (issue 676) made this a LIST of rows rather than a `role="table"`
-  // grid; `.manager-component-row` and `.manager-component-identity` survive that on
-  // purpose, and `.manager-components-list` pins the list container that replaced the
-  // table. The row moved into `components/ComponentRow.svelte`, so these selectors are
-  // what catch it being renamed out from under the harness.
+  // Components browser (harness clicks a `.manager-component-row`).
   'components normal': [
     '.manager-components-list',
     '.manager-component-row',
     '.manager-component-identity',
   ],
   'components stacked': ['.manager-components-list', '.manager-component-row'],
-  // The component editor is a single scrolling column with NO right rail (decision 4).
-  // `.manager-component-edit-view` is the form the header's Save submits BY ID, and
-  // the identity strip is where the rehomed source actions live — losing either is a
-  // silent break the unit suite cannot see.
+  // The component editor is a single scrolling column with no right rail (decision 4).
   'component edit normal': ['.manager-component-edit-view', '.manager-component-identity-strip'],
 
-  // Essences browser + editor (issue 1036). `.manager-essence-row` survives the redesign
-  // deliberately: it stays in the four shared selector lists in `styles/fabricate.css` (the
-  // row skin, the 76px geometry group, hover and the `.is-selected` accent ring), so only
-  // the row's INTERIOR moved into `EssenceRow.svelte`. `.manager-essences-table` pins the
-  // list container that replaced the `role="table"` grid, and `.manager-essence-identity`
-  // pins the selecting button — losing either is a silent break the unit suite cannot see,
-  // because both are what the capture steps click through.
+  // Essences browser + editor (issue 1036).
   'essences normal': ['.manager-essences-table', '.manager-essence-row'],
   'essences stacked': ['.manager-essence-row'],
   'essences disabled in use': ['.manager-essence-row', '.manager-essence-identity'],
@@ -150,10 +79,7 @@ export const MANAGER_SURFACE_EXPECTED_SELECTORS = {
   'essence edit on craft': ['.manager-essence-edit-view'],
   'essence edit validation': ['.manager-essence-edit-view'],
 
-  // Environments browser (harness asserts `.manager-environment-row` count >= 1). Issue 1515
-  // converted this surface to a list too; `.manager-environments-table` pins the container that
-  // now carries `role="list"` and `.manager-environment-identity` the selecting button, both of
-  // which the harness already measures.
+  // Environments browser (harness asserts `.manager-environment-row` count >= 1).
   'environments normal': [
     '.manager-environments-table',
     '.manager-environment-row',
@@ -180,23 +106,15 @@ export const MANAGER_SURFACE_EXPECTED_SELECTORS = {
   // Tools browser (harness waits on `.manager-tools-row`).
   'tools normal': ['.manager-tools-row'],
 
-  // GM Knowledge surface (issue 785). Both widths pin the owned-copy row, which the
-  // harness proves is rendered right before each of these assertions. The NARROW
-  // label is measured at ~880px — deliberately ABOVE the 831px single-column
-  // collapse, because that band is where three columns still hold, the detail pane is
-  // at its narrowest, and the row's action cluster is therefore at real risk of
-  // clipping. The class is lowercase-and-hyphen only so the drift guard's
-  // `/'(\.[a-z-]+)'/g` recovery can see it in the harness source.
+  // GM Knowledge surface (issue 785). Both widths pin the owned-copy row, which the harness proves
+  // is rendered right before each of these assertions.
   'knowledge normal': ['.manager-knowledge-copy-row'],
   'knowledge narrow': ['.manager-knowledge-copy-row'],
 };
 
 /**
- * Look up the pinned critical selectors for a manager surface label. Returns an
- * empty array for an unmapped surface so the caller asserts nothing there.
- *
- * @param {string} label
- * @returns {string[]}
+ * Look up the pinned critical selectors for a manager surface label. Returns an empty array for an
+ * unmapped surface so the caller asserts nothing there.
  */
 export function expectedSelectorsForManagerSurface(label) {
   return MANAGER_SURFACE_EXPECTED_SELECTORS[label] || [];

@@ -5,27 +5,12 @@ import { join, normalize, extname, sep } from 'node:path';
 const FOUNDRY_ORIGIN = 'http://localhost:30000';
 const MODULE_PATH_PREFIX = '/modules/fabricate/';
 
-// The premium companion, served from its own checkout so a change to its source
-// reloads without a build. Only its ENTRY is rewritten: once that is served from
-// `/@fs/`, Vite resolves the rest of its import graph against the file's own path,
-// and `/@`-prefixed requests already fall through to Vite below.
-//
-// Dev only, and asymmetric with production: a built premium bundles its OWN Svelte
-// runtime and shares nothing with Fabricate, whereas here its source resolves
-// `svelte` from this repo's node_modules. Both are 5.56.3 today and premium mounts
-// its own root, so nothing crosses the seam either way -- but a version skew between
-// the two repos would surface here and not in a built module.
+// The premium companion, served from its own checkout so a change to its source reloads without a
+// build.
 const PREMIUM_PATH_PREFIX = '/modules/fabricate-premium/';
 const PREMIUM_ENTRY = 'scripts/main.js';
 
-/**
- * Absolute path to premium's source directory, or null when it is not checked out.
- *
- * `FABRICATE_PREMIUM_PATH` points at the premium repo root; the default assumes it
- * sits beside this one, so the common layout needs no configuration.
- *
- * @returns {string | null}
- */
+/** Absolute path to premium's source directory, or null when it is not checked out. */
 export function premiumSourceRoot() {
   const configured = process.env.FABRICATE_PREMIUM_PATH;
   const repoRoot = configured || join(process.cwd(), '..', 'fabricate-premium');
@@ -37,13 +22,7 @@ export function premiumSourceRoot() {
   }
 }
 
-/**
- * Map premium's manifest-declared esmodule onto its source entry under `/@fs/`.
- *
- * @param {string | undefined} requestUrl
- * @param {string | null} sourceRoot
- * @returns {string | null}
- */
+/** Map premium's manifest-declared esmodule onto its source entry under `/@fs/`. */
 export function rewritePremiumModuleUrl(requestUrl, sourceRoot) {
   if (!requestUrl || !sourceRoot) return null;
 
@@ -58,10 +37,6 @@ export function rewritePremiumModuleUrl(requestUrl, sourceRoot) {
 }
 
 // Static content types for repo assets served in dev (fonts + preview images).
-// The fonts matter most: `styles/fabricate.css`'s `@font-face` rules resolve to
-// `/assets/fonts/*.woff2`, and without this the dev proxy forwards them to Foundry
-// (which has no such file), so every weight fails to download. Production copies
-// `assets/` into `dist/assets/`, so this is a dev-server gap only.
 const ASSET_CONTENT_TYPES = {
   '.woff2': 'font/woff2',
   '.woff': 'font/woff',
@@ -86,26 +61,15 @@ export function fabricateDevProxy() {
       const root = server.config.root;
       const premiumRoot = premiumSourceRoot();
       if (premiumRoot) {
-        // Vite's watcher covers the project ROOT. Premium's source is outside it and reaches
-        // the browser through `/@fs/`, so without this its files are read once, cached, and
-        // never invalidated -- edits keep serving the transform from first request, which
-        // looks exactly like a change that did not land. Adding the directory to the watcher
-        // puts those files back on the ordinary invalidate-and-HMR path.
+        // Vite's watcher covers the project root.
         server.watcher.add(premiumRoot);
         server.config.logger.info(`  ➜  premium:  serving ${premiumRoot} with HMR`);
       }
-      // Pre-middleware: runs BEFORE Vite's internal middleware.
-      // This is essential because Vite's SPA fallback would otherwise intercept
-      // HTML requests looking for index.html (which doesn't exist) and 404.
-      // Vite-owned paths (/@vite/, /src/, etc.) are passed through via next().
+      // Pre-middleware: runs before Vite's internal middleware. This is essential because Vite's
+      // spa fallback would otherwise intercept HTML requests looking for index.html (which doesn't
+      // exist) and 404.
       server.middlewares.use((req, res, next) => {
-        // Rewrite Fabricate module paths to project-root-relative paths. This also
-        // maps `/modules/fabricate/assets/...` onto `/assets/...`, so the asset
-        // branch below catches both the rewritten and the direct (`@font-face`
-        // relative-url) forms.
-        // Premium's entry, checked first only for readability -- the two prefixes are
-        // disjoint, because "/modules/fabricate-premium/" does not start with
-        // "/modules/fabricate/" (the character after "fabricate" is "-", not "/").
+        // Rewrite Fabricate module paths to project-root-relative paths.
         const premiumUrl = rewritePremiumModuleUrl(req.url, premiumRoot);
         if (premiumUrl) {
           req.url = premiumUrl;
@@ -117,12 +81,9 @@ export function fabricateDevProxy() {
           req.url = rewrittenModuleUrl;
         }
 
-        // Serve repo static assets (fonts, preview images) straight from disk.
-        // Without this the `@font-face` `/assets/fonts/*.woff2` requests fall to
-        // the catch-all and get proxied to Foundry, which 404s them. A path that is
-        // NOT a repo asset (Foundry serves plenty under `/assets/` too) must fall
-        // through to Foundry — the original catch-all — NOT to Vite's `next()`,
-        // which would dead-end it in a 404.
+        // Serve repo static assets (fonts, preview images) straight from disk. Without this the
+        // `@font-face` `/assets/fonts/*.woff2` requests fall to the catch-all and get proxied to
+        // Foundry, which 404s them.
         if (req.url?.startsWith('/assets/')) {
           if (serveRepoAsset(req, res, root)) return;
           return proxyToFoundry(req, res);
@@ -149,17 +110,7 @@ export function fabricateDevProxy() {
   };
 }
 
-/**
- * Map a Fabricate module request from Foundry's module namespace to a Vite
- * project-root path. In dev we serve the source entry (`/src/main.js`) directly
- * rather than the root `main.js` shim: the shim's `await import('./src/main.js')`
- * adds an extra async hop before the real module evaluates, widening the window in
- * which Foundry's `init` event can fire first (the cause of the manager's "still
- * loading" stall). Going straight to the source removes that hop.
- *
- * @param {string | undefined} requestUrl
- * @returns {string | null}
- */
+/** Map a Fabricate module request from Foundry's module namespace to a Vite project-root path. */
 export function rewriteFabricateModuleUrl(requestUrl) {
   if (!requestUrl) return null;
 
@@ -176,23 +127,7 @@ export function rewriteFabricateModuleUrl(requestUrl) {
   return `/${relativePath}${suffix}`;
 }
 
-/**
- * Serve a file under the repo's `assets/` directory in dev.
- *
- * Returns `true` when it wrote a response, `false` when the request is not a repo
- * asset (missing file, or a path that escapes `assets/`) — the caller then proxies
- * the request to Foundry, which owns every other `/assets/` path.
- *
- * Synchronous on purpose: the middleware must decide serve-or-proxy in a single
- * tick and hand a miss straight to `proxyToFoundry` (deferring that decision to a
- * promise let connect fall through to Vite's 404 before the proxy ran). A `statSync`
- * in a dev-only proxy is negligible.
- *
- * @param {http.IncomingMessage} req
- * @param {http.ServerResponse} res
- * @param {string} root Vite project root (the repo root).
- * @returns {boolean} whether a response was written.
- */
+/** Serve a file under the repo's `assets/` directory in dev. */
 export function serveRepoAsset(req, res, root) {
   const pathname = new URL(req.url || '/', FOUNDRY_ORIGIN).pathname;
   const relative = normalize(decodeURIComponent(pathname)).replace(/^([/\\])+/, '');

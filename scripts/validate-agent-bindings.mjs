@@ -1,39 +1,6 @@
 #!/usr/bin/env node
-// Validates that every agent role stays consistent across its canonical skill,
-// both provider bindings, and the AGENTS.md "Agent Roles & Bindings" table.
-//
-// The role list is DERIVED from the AGENTS.md table (the single source of truth),
-// not hard-coded — a new routed role or a stale binding on either side is caught.
-//
-// Beyond role bindings, this script also gates harness-document reference
-// integrity (see the "Harness reference integrity" requirement in
-// openspec/specs/agentic-workflow/spec.md):
-//   - every conservatively path-shaped backtick reference in a harness document
-//     must resolve to an existing file or directory (ALLOW_MISSING lists the
-//     intentional exceptions, each with a reason);
-//   - line-number code citations (file.js:NNN / "~line NNN") are rejected —
-//     cite the symbol and file instead, locatable with `grep -n`;
-//   - every skill-backed role pins its declared model tier's model in both
-//     provider bindings, and a model-tiered binding's description names its own
-//     model tier and neither of the other two;
-//   - every binding file is byte-identical to its render from
-//     scripts/lib/agentBindingRoles.js, so a hand edit to a generated file fails
-//     here (`--write` regenerates them);
-//   - a model-tiered family declares all three model tiers, resolves to its BASE
-//     family skill, and the AGENTS.md `Family` table names exactly those tokens;
-//   - the AGENTS.md "Shared skills with no persona binding" list must equal the
-//     set of .agents/skills/ subdirectories containing a SKILL.md minus the role
-//     directories derived from the bindings table.
-//   - every repository skill has valid matching frontmatter and directly cites
-//     each Markdown reference bundled under its references/ directory.
-//
-// This file is a THIN CALLER over scripts/lib/agentModelTiers.js, which holds the
-// model-tier tables and the pure, error-returning gates over them. `main(root)`
-// returns `errors[]` and never exits, so a test can import and drive it; only the
-// entry-point guard at the bottom exits non-zero.
-//
-// Pure Node, no dependencies, no Docker/network — behaves identically in CI and
-// local dev. Run with `npm run validate:agents`. Exits non-zero on any mismatch.
+// Validates that every agent role stays consistent across its canonical skill, both provider
+// bindings, and the AGENTS.md "Agent Roles & Bindings" table.
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -50,11 +17,9 @@ import {
 
 const SKILLS_ROOT = '.agents/skills';
 
-// A backtick token is treated as a checkable repo path only when it is
-// conservative: a known root file, or slash-joined under a known top-level
-// segment, with no glob/template/expression characters. Everything else
-// (commands, code identifiers, templated paths like a SKILL.md under a
-// placeholder role directory) is skipped, never guessed at.
+// A backtick token is treated as a checkable repo path only when it is conservative: a known root
+// file, or slash-joined under a known top-level segment, with no glob/template/expression
+// characters.
 const KNOWN_SEGMENTS = [
   'src/',
   'tests/',
@@ -105,9 +70,6 @@ const ALLOW_MISSING = new Set([
 const TEMPLATE_CHARS = /[*<>{}$|()\\"'\s,;!?=]|…/;
 
 // Line-number citations rot silently as code moves; cite symbol + file instead.
-// A bare backticked `:NNN` is NOT banned — it cannot be told apart from a port
-// reference like `:30000`, and shorthand citations only occur next to a primary
-// file-colon-number citation, which the first pattern already rejects.
 const LINE_CITATION_PATTERNS = [
   /`[^`\n]*\.[a-z]{2,6}\s*:\s*~?\d+[^`\n]*`/, // backticked file-colon-number citations
   /~line\s*\d+/i, // approximate line references
@@ -332,19 +294,16 @@ function scanOrphans(ctx, dir, ext, expected, label) {
   }
 }
 
-// --- Harness reference integrity --------------------------------------------
-// The harness documents: the exact, closed set of files whose repo-path
-// references and code citations this script gates. Mirrors the set named in
-// openspec/specs/agentic-workflow/spec.md (Harness reference integrity).
+// --- Harness reference integrity -------------------------------------------- The harness
+// documents: the exact, closed set of files whose repo-path references and code citations this
+// script gates.
 function harnessDocList(io) {
   return [
     'AGENTS.md',
     'CLAUDE.md',
     'CONTRIBUTING.md',
-    // The two narratives CONTRIBUTING.md used to carry, moved beside the code they describe
-    // (issue #1661). They are listed here for the same reason CONTRIBUTING.md is: between them
-    // they cite 33 repository paths, and moving prose out of a checked document into an unchecked
-    // one is how those citations start rotting silently.
+    // The two narratives CONTRIBUTING.md used to carry, moved beside the code they describe (issue
+    // #1661).
     'scripts/README.md',
     '.github/workflows/README.md',
     '.agents/docs/foundry-and-architecture.md',
@@ -386,11 +345,8 @@ function validateHarnessDocs(ctx, harnessDocs) {
   }
 }
 
-// --- Repository skill discovery and progressive disclosure ------------------
-// Codex scans .agents/skills from the working directory to the repository root.
-// Validate the metadata it initially sees and ensure every bundled Markdown
-// reference is named by its owning SKILL.md so the full material is reachable
-// after that skill activates.
+// --- Repository skill discovery and progressive disclosure ------------------ Codex scans
+// .agents/skills from the working directory to the repository root.
 function parseYamlString(raw) {
   const value = raw.trim();
   if (!value) return null;
@@ -490,11 +446,9 @@ function validateSkills(ctx) {
   }
 }
 
-// --- Shared-skills list parity ----------------------------------------------
-// AGENTS.md "Shared skills with no persona binding" must equal the .agents/skills/
-// subdirectories that contain a SKILL.md minus the role directories from the
-// bindings table. Deleting or adding a shared skill without updating the list
-// (or vice versa) fails here.
+// --- Shared-skills list parity ---------------------------------------------- AGENTS.md "Shared
+// skills with no persona binding" must equal the .agents/skills/ subdirectories that contain a
+// SKILL.md minus the role directories from the bindings table.
 function validateSharedSkills(ctx, roleDirs) {
   const { req, io } = ctx;
   const lines = (ctx.agentsMd ?? '').split('\n');

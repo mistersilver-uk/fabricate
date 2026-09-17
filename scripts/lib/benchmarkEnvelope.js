@@ -1,21 +1,6 @@
 /**
- * The run-record envelope, and the refusal rule that keeps two run records from being
- * compared when they cannot meaningfully be compared (issue 1071).
- *
- * ## Why a compare tool must REFUSE rather than warn
- *
- * A wall-clock ratio between two machines is not a weak signal, it is a wrong one, and a
- * printed ratio gets pasted into an issue where nobody can see which machines produced it.
- * This repository has already paid for that mistake once: `scripts/lib/foundryRunBudget.js`
- * documents the Foundry `rc` walk budget being re-estimated three times because hosted-runner
- * timing did not match local. So `assertComparable` returns a refusal with the specific fields
- * that differ, and `benchmark:compare` exits non-zero on it rather than printing a delta and a
- * caveat nobody reads.
- *
- * Three fields decide comparability: `nodeVersion`, `cpuModel` and `arch`. They are the ones
- * that change instruction selection, JIT behaviour and cache geometry. Everything else in the
- * envelope is recorded for forensics — `commit`, `branch` and `dirty` say WHAT was measured;
- * `containerized` and `cpuCount` explain a noisy sample after the fact.
+ * The run-record envelope, and the refusal rule that keeps two run records from being compared when
+ * they cannot meaningfully be compared (issue 1071).
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
@@ -26,18 +11,7 @@ import { resolveExecutable } from './resolveExecutable.js';
 /** The envelope fields a comparison must agree on, or refuse. */
 export const COMPARABILITY_FIELDS = Object.freeze(['nodeVersion', 'cpuModel', 'arch']);
 
-/**
- * The git executable, resolved ONCE to an absolute path in an absolute `PATH` directory.
- *
- * Spawning a bare `'git'` leaves resolution to the OS at spawn time, which is SonarCloud's
- * `javascript:S4036`: a writable or relative `PATH` entry earlier in the list would win and run
- * with this process's privileges. `resolveExecutable` skips relative entries outright and pins
- * the result, and is shared with `compare-svelte-render.mjs` rather than copied.
- *
- * `null` when git is not installed, which is not an error here: a run record without commit
- * metadata is still a perfectly valid set of timings, and refusing to benchmark because a VCS is
- * missing would be a strange thing for a benchmark harness to do.
- */
+/** The git executable, resolved once to an absolute path in an absolute `PATH` directory. */
 const GIT_EXECUTABLE = resolveExecutable('git');
 
 function git(args, cwd) {
@@ -55,29 +29,13 @@ function git(args, cwd) {
   }
 }
 
-/**
- * Whether this process is running inside a container.
- *
- * Recorded rather than acted on: a containerised run is usually CPU-throttled and its samples
- * are wider, which is worth knowing when a comparison looks noisy.
- *
- * @returns {boolean}
- */
+/** Whether this process is running inside a container. */
 function detectContainerized() {
   if (existsSync('/.dockerenv')) return true;
   return Boolean(process.env.KUBERNETES_SERVICE_HOST || process.env.container);
 }
 
-/**
- * Capture the full run envelope.
- *
- * @param {object} options
- * @param {string} options.repoRoot
- * @param {string} options.fixtureProfile
- * @param {number} options.fixtureSeed
- * @param {number} options.harnessVersion
- * @returns {object}
- */
+/** Capture the full run envelope. */
 export function captureEnvelope({ repoRoot, fixtureProfile, fixtureSeed, harnessVersion }) {
   const cpuList = cpus();
   const status = git(['status', '--porcelain'], repoRoot);
@@ -85,9 +43,7 @@ export function captureEnvelope({ repoRoot, fixtureProfile, fixtureSeed, harness
     commit: git(['rev-parse', 'HEAD'], repoRoot),
     branch: git(['rev-parse', '--abbrev-ref', 'HEAD'], repoRoot),
     // A dirty tree is the single most common reason two runs of "the same commit" disagree, so it
-    // is captured rather than inferred. `null` — not `false` — when git could not be consulted:
-    // reporting a tree as clean because nothing looked is the misleading answer, and it is the one
-    // that would let someone compare two runs of the same SHA and never suspect the diff.
+    // is captured rather than inferred.
     dirty: status === null ? null : status !== '',
     nodeVersion: process.versions.node,
     v8Version: process.versions.v8,
@@ -104,13 +60,7 @@ export function captureEnvelope({ repoRoot, fixtureProfile, fixtureSeed, harness
   };
 }
 
-/**
- * Decide whether two run records may be diffed.
- *
- * @param {object} left
- * @param {object} right
- * @returns {{comparable: boolean, reasons: string[]}}
- */
+/** Decide whether two run records may be diffed. */
 export function assertComparable(left, right) {
   const reasons = [];
   for (const field of COMPARABILITY_FIELDS) {
@@ -123,12 +73,7 @@ export function assertComparable(left, right) {
   return { comparable: reasons.length === 0, reasons };
 }
 
-/**
- * The file name a run record is written under: sortable, and self-identifying.
- *
- * @param {object} envelope
- * @returns {string}
- */
+/** The file name a run record is written under: sortable, and self-identifying. */
 export function runRecordFilename(envelope) {
   const stamp = String(envelope.capturedAt)
     .replaceAll(':', '-')

@@ -1,32 +1,6 @@
 /**
- * The Foundry perf run record: what a run writes down, and when two runs may be compared
- * (issue 1073).
- *
- * ## Comparability is STRICTER here than for the headless harness, and that is the point
- *
- * Issue 1071 refuses to diff two run records whose `nodeVersion`, `cpuModel` or `arch` differ,
- * because those change instruction selection and cache geometry. A live-Foundry run inherits all
- * three and adds five more that move the numbers just as hard: the Foundry build, the smoke arm, the
- * game-system release, the browser build, and the fixture the world was seeded with. A run of
- * `simple-corpus` on 14.365 and a run of `held-inventory` on 13.351 are not a before and an after;
- * they are two different experiments, and printing a ratio between them would be a wrong number
- * wearing the costume of a measurement.
- *
- * So {@link assertFoundryComparable} refuses, naming every differing field, and the comparison
- * command exits non-zero on a refusal rather than printing a delta with a caveat nobody reads.
- *
- * ## Nothing this module produces is ever committed
- *
- * The record is class 2 by construction — every duration and heap reading in it is
- * machine-dependent, and the class-1 half is recorded alongside for forensics rather than as a
- * baseline. Issue 1073 is explicit that nothing here becomes a CI assertion, and the profile writes
- * NO committed baseline: the committed, machine-invariant baseline is issue 1071's headless one,
- * which is the layer that can honestly hold one. Run records land under the gitignored
- * `.foundry-perf/runs/`.
- *
- * The host half of the envelope is INJECTED rather than re-derived. Issue 1071 already captures
- * commit, branch, dirty flag, Node/V8, OS, arch, CPU and memory; a second implementation of that
- * here would be a second thing to keep true.
+ * The Foundry perf run record: what a run writes down, and when two runs may be compared (issue
+ * 1073).
  */
 
 /** Where class-2 Foundry perf run records are written, relative to the repository root. */
@@ -52,17 +26,7 @@ export const FOUNDRY_COMPARABILITY_FIELDS = Object.freeze([
 /** The host-envelope fields inherited from issue 1071's comparability rule. */
 export const HOST_COMPARABILITY_FIELDS = Object.freeze(['nodeVersion', 'cpuModel', 'arch']);
 
-/**
- * Compose a complete run record.
- *
- * @param {object} options
- * @param {object} options.host Host envelope, from issue 1071's `captureEnvelope`.
- * @param {object} options.foundry Foundry-side envelope fields.
- * @param {object} options.seed The seed's class-1 invariants.
- * @param {object} options.reconciled Output of `reconcileResults`.
- * @param {object} [options.trace] Chrome trace metadata, when one was captured.
- * @returns {object}
- */
+/** Compose a complete run record. */
 export function buildPerfRunRecord({ host, foundry, seed, reconciled, trace = null }) {
   return {
     schema: 'fabricate-foundry-perf/1',
@@ -84,13 +48,7 @@ export function buildPerfRunRecord({ host, foundry, seed, reconciled, trace = nu
   };
 }
 
-/**
- * Decide whether two run records may be diffed.
- *
- * @param {object} left
- * @param {object} right
- * @returns {{comparable: boolean, reasons: string[]}}
- */
+/** Decide whether two run records may be diffed. */
 export function assertFoundryComparable(left, right) {
   const reasons = [];
   const compare = (scope, fields) => {
@@ -107,12 +65,7 @@ export function assertFoundryComparable(left, right) {
   return { comparable: reasons.length === 0, reasons };
 }
 
-/**
- * The file name a run record is written under: sortable, and self-identifying.
- *
- * @param {object} record
- * @returns {string}
- */
+/** The file name a run record is written under: sortable, and self-identifying. */
 export function perfRunFilename(record) {
   const host = record?.envelope?.host ?? {};
   const foundry = record?.envelope?.foundry ?? {};
@@ -126,11 +79,8 @@ export function perfRunFilename(record) {
 }
 
 /**
- * Median of a sample. Returns `null` for an empty sample rather than `NaN`, so a missing measurement
- * stays visibly missing instead of becoming a number-shaped hole downstream.
- *
- * @param {number[]} samples
- * @returns {number|null}
+ * Median of a sample. Returns `null` for an empty sample rather than `NaN`, so a missing
+ * measurement stays visibly missing instead of becoming a number-shaped hole downstream.
  */
 export function median(samples) {
   const sorted = [...(samples ?? [])].filter(Number.isFinite).sort((a, b) => a - b);
@@ -139,17 +89,7 @@ export function median(samples) {
   return sorted.length % 2 === 0 ? (sorted[middle - 1] + sorted[middle]) / 2 : sorted[middle];
 }
 
-/**
- * Compare two comparable records, reporting RATIOS.
- *
- * Absolute milliseconds are deliberately not reported: a ratio is the only form that survives being
- * pasted into an issue by someone who did not run it.
- *
- * @param {object} baseline
- * @param {object} candidate
- * @returns {{measurement: string, baselineMs: number|null, candidateMs: number|null,
- *   ratio: number|null}[]}
- */
+/** Compare two comparable records, reporting ratios. */
 export function compareTimings(baseline, candidate) {
   const ids = new Set([
     ...Object.keys(baseline?.timing ?? {}),
@@ -168,18 +108,7 @@ export function compareTimings(baseline, candidate) {
   return rows;
 }
 
-/**
- * Compare the class-1 halves of two records.
- *
- * These CAN legitimately differ between comparable runs — a candidate commit that changes how much
- * is serialized should move `payloadBytes` — so a difference is reported as a finding rather than as
- * a refusal. That is the inverse of the timing rule, and deliberately so: an invariant that moved is
- * a fact about the code, whereas a duration that moved may be a fact about the machine.
- *
- * @param {object} baseline
- * @param {object} candidate
- * @returns {string[]}
- */
+/** Compare the class-1 halves of two records. */
 export function compareInvariants(baseline, candidate) {
   const differences = [];
   const ids = new Set([

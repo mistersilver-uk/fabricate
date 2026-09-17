@@ -1,10 +1,4 @@
-/*
- * Mythwright DnD5e bootstrap for Fabricate.
- *
- * Run this as a GM world script in Foundry VTT with DnD5e and Fabricate active.
- * The script is idempotent: it updates existing Mythwright folders, items, macro,
- * crafting system, recipes, and gathering environments by deterministic identity.
- */
+/** Mythwright DnD5e bootstrap for Fabricate. */
 
 const MythwrightDnd5eBootstrap = (() => {
   const SYSTEM_ID = 'mythwright-dnd5e';
@@ -946,10 +940,8 @@ const MythwrightDnd5eBootstrap = (() => {
     'tool-dragon-tongs': ['broken-tool-dragon-tongs', 'iron-ingot', 'dragon-scale']
   });
 
-  // The standard D&D 5e gathering character-modifier library, copied verbatim
-  // from DND5E_CHARACTER_MODIFIER_PRESETS (src/config/gatheringCharacterModifierPresets.js).
-  // Seeded into the system's `characterModifiers` so task `staminaCostModifiers`
-  // resolve their `@abilities.<key>.mod` / `@skills.<key>.total` expressions in-game.
+  // The standard D&D 5e gathering character-modifier library, copied verbatim from
+  // DND5E_CHARACTER_MODIFIER_PRESETS (src/config/gatheringCharacterModifierPresets.js).
   const MYTHWRIGHT_CHARACTER_MODIFIERS = Object.freeze([
     { id: 'strength', label: 'Strength', icon: 'fa-solid fa-dumbbell', provider: 'dnd5e', expression: '@abilities.str.mod', macroUuid: '' },
     { id: 'dexterity', label: 'Dexterity', icon: 'fa-solid fa-feather', provider: 'dnd5e', expression: '@abilities.dex.mod', macroUuid: '' },
@@ -1065,10 +1057,7 @@ const MythwrightDnd5eBootstrap = (() => {
       .filter(Boolean));
   }
 
-  // A per-task resource-node pool (config + initial state). Seeded on every task
-  // so that flipping the system economy to `nodes` mode yields sensible finite
-  // counts with no further authoring; dormant while the system is in `stamina`
-  // mode. `current` starts full; the pool tops up by 1 every `intervalDays`.
+  // A per-task resource-node pool (config + initial state).
   function gatheringNode(max, intervalDays = 1) {
     return {
       enabled: true,
@@ -1079,9 +1068,8 @@ const MythwrightDnd5eBootstrap = (() => {
     };
   }
 
-  // A stamina-cost modifier reference that *reduces* a task's cost by a character
-  // modifier (operator `-`): positive modifiers make the task cheaper, negative
-  // ones make it dearer. `modifierId` must exist in MYTHWRIGHT_CHARACTER_MODIFIERS.
+  // A stamina-cost modifier reference that *reduces* a task's cost by a character modifier
+  // (operator `-`): positive modifiers make the task cheaper, negative ones make it dearer.
   function staminaReducedBy(taskId, modifierId) {
     return [{ id: `${taskId}-stamina-${modifierId}`, modifierId, operator: '-', min: null, max: null, expressionOverride: '' }];
   }
@@ -1623,9 +1611,8 @@ const MythwrightDnd5eBootstrap = (() => {
     // Ship the system in stamina mode. Overwritten each run — this is the seed's
     // intended economy; a GM can switch to `nodes`/`none` in the manager afterwards.
     systemConfig.economy = clonePlain(MYTHWRIGHT_STAMINA_ECONOMY);
-    // Seed the standard 5e character-modifier library, preserving any existing
-    // entry whose id already matches (mirrors seedCharacterModifierPresets) so GM
-    // edits survive a re-run. The task staminaCostModifiers reference these by id.
+    // Seed the standard 5e character-modifier library, preserving any existing entry whose id
+    // already matches (mirrors seedCharacterModifierPresets) so GM edits survive a re-run.
     const existingModifierIds = new Set(
       collectionValues(systemConfig.characterModifiers).filter(entry => entry?.id).map(entry => String(entry.id))
     );
