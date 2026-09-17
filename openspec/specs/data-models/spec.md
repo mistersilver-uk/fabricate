@@ -1898,7 +1898,11 @@ Represent one consumable ingredient requirement.
 
 ```js
 Ingredient = {
+  // HOW MANY. `quantity` is the fixed amount. A non-empty `quantityFormula` means the
+  // amount is ROLLED and is that expression; `quantity` is then the authored fallback
+  // rather than the number consumed.
   quantity: number,
+  quantityFormula?: string,
   extractEffects: boolean,
 
   match: {
@@ -1927,26 +1931,31 @@ Ingredient = {
 ### Requirements
 
 1. `quantity` must be positive.
-2. `match.type` is required.
-3. If `match.type === "component"`, `match.componentId` is required.
-4. If `match.type === "tags"`, `match.tags` must contain one or more tag IDs.
-5. Tag IDs in `match.tags` must exist in `CraftingSystem.itemTags`.
-6. Tag placeholder ingredients are valid in all resolution modes, including `simple`.
-7. A `match.type === "currency"` option is a currency ALTERNATIVE for its ingredient group: `unit` is a configured world `CurrencyConfig.units[].id` and `amount` is a positive cost.
+2. A non-empty `quantityFormula` means the amount is ROLLED, and `quantity` is not the number consumed.
+   The fixed-or-rolled amount is a property of the ROW and not of the side it sits on, so an ingredient carries it on the same terms a result does — a craft that consumes a variable quantity is as authorable as one that produces one.
+   It is the shared roll expression, validated the way a crafting check formula is: usable only where it evaluates to a finite total, because `Roll.validate` is parse-only.
+   Where an ingredient amount resolves differs from where a result amount does: an INGREDIENT amount resolves BEFORE the craft, because what it resolves to is what the crafter must hold, and both resolve once per craft rather than being re-rolled while they are read.
+   An empty or absent `quantityFormula` leaves the amount fixed at `quantity`, which is the state every ingredient persisted before this change is in.
+3. `match.type` is required.
+4. If `match.type === "component"`, `match.componentId` is required.
+5. If `match.type === "tags"`, `match.tags` must contain one or more tag IDs.
+6. Tag IDs in `match.tags` must exist in `CraftingSystem.itemTags`.
+7. Tag placeholder ingredients are valid in all resolution modes, including `simple`.
+8. A `match.type === "currency"` option is a currency ALTERNATIVE for its ingredient group: `unit` is a configured world `CurrencyConfig.units[].id` and `amount` is a positive cost.
    A currency option matches no inventory item and contributes no alchemy signature.
-8. A `match.type === "essence"` option is an essence ALTERNATIVE for its ingredient group: `essenceId` is a configured `CraftingSystem.essences` key and `amount` is a positive essence quantity.
+9. A `match.type === "essence"` option is an essence ALTERNATIVE for its ingredient group: `essenceId` is a configured `CraftingSystem.essences` key and `amount` is a positive essence quantity.
    It is satisfied by consuming items whose accumulated `essenceId` essence meets `amount`, and it expands to every component carrying that essence.
    An essence option matches no single inventory item (satisfaction is amount-accumulative across items and routes through the consumption planner).
    An essence option is resolved inside its ingredient set's single essence block rather than in its own author position (see §Essence-Alternative Consumption), so its funding is pooled with every other essence option in the set.
    The player selects the held **items** that fund the block through the `essenceAllocation` channel, rather than picking one option per essence requirement as they would for a component/tag group.
-9. `Ingredient.toJSON()` OMITS a field whose value is the one the constructor rebuilds from absence, and omits the `systemItemId` duplicate unconditionally (issue 1135).
-   Option-level keys are the dominant term in a serialized recipe corpus because they are paid once per option, per group, per set, per recipe: an authored component option of 68 bytes was written as 213 — a 3.1x expansion made entirely of these defaults and one exact duplicate — and ablating them is 19.66% of a simple corpus and 47.55% of a rich one.
-   The omitted set is `componentId`, `itemUuid`, `tag`, `alternatives`, `extractEffects` and `effectFilter`; `match` and `quantity` are never omitted.
-   `quantity` is omittable by the model (`data.quantity || 1`) and is deliberately excluded, because serialized options are read arithmetically by the shopping-list and consumption projections and that is a separate reader audit.
-   Absence is not a new on-disk state for any omitted key: the 1.17.0 essence migration and `IngredientSet._legacyIngredientsToGroups` have both been writing options as a bare `{quantity, match}` with all seven fields missing, so every reader has always had to cope.
-   `extractEffects` and `effectFilter` have NO readers at all — the ingredient-level effect-extraction path was removed — and are worth 7.00% of a simple corpus between them.
-   `componentId` is a canonical field omitted when `null`, which does not weaken the canonical-write policy: the top-level field is DERIVED by the constructor from `match` (`match.type === 'component' ? match.componentId : null`), the canonical component reference is `match.componentId` and is always emitted, and `null` means "this option is not a component match" — which absence says identically to every reader, each of which coerces through `componentId || systemItemId`.
-   The omission set is a hand-maintained mirror of the constructor, guarded mechanically by `tests/ingredient-serialization-payload.test.js`.
+10. `Ingredient.toJSON()` OMITS a field whose value is the one the constructor rebuilds from absence, and omits the `systemItemId` duplicate unconditionally (issue 1135).
+    Option-level keys are the dominant term in a serialized recipe corpus because they are paid once per option, per group, per set, per recipe: an authored component option of 68 bytes was written as 213 — a 3.1x expansion made entirely of these defaults and one exact duplicate — and ablating them is 19.66% of a simple corpus and 47.55% of a rich one.
+    The omitted set is `componentId`, `itemUuid`, `tag`, `alternatives`, `extractEffects` and `effectFilter`; `match` and `quantity` are never omitted.
+    `quantity` is omittable by the model (`data.quantity || 1`) and is deliberately excluded, because serialized options are read arithmetically by the shopping-list and consumption projections and that is a separate reader audit.
+    Absence is not a new on-disk state for any omitted key: the 1.17.0 essence migration and `IngredientSet._legacyIngredientsToGroups` have both been writing options as a bare `{quantity, match}` with all seven fields missing, so every reader has always had to cope.
+    `extractEffects` and `effectFilter` have NO readers at all — the ingredient-level effect-extraction path was removed — and are worth 7.00% of a simple corpus between them.
+    `componentId` is a canonical field omitted when `null`, which does not weaken the canonical-write policy: the top-level field is DERIVED by the constructor from `match` (`match.type === 'component' ? match.componentId : null`), the canonical component reference is `match.componentId` and is always emitted, and `null` means "this option is not a component match" — which absence says identically to every reader, each of which coerces through `componentId || systemItemId`.
+    The omission set is a hand-maintained mirror of the constructor, guarded mechanically by `tests/ingredient-serialization-payload.test.js`.
 
 ### Currency-Alternative Spend (Craft-Time)
 
@@ -2983,17 +2992,89 @@ Represent one produced item.
 ```js
 Result = {
   id: string,
-  componentId: string,
+
+  // WHAT IS AWARDED. Absent reads as "component", which is what every result
+  // persisted before this change is, so the discriminator costs no migration.
+  kind?: "component" | "currency" | "knowledge",
+
+  componentId: string,        // kind = "component"
+  unit?: string,              // kind = "currency" — a configured world CurrencyConfig.units[].id
+  recipeId?: string,          // kind = "knowledge" — the recipe the craft teaches
+
+  // A CURRENCY reward's own name, and the reason the player is given it. Both
+  // optional; a reward is complete without either.
+  label?: string,
+  reason?: string,
+
+  // HOW MANY. `quantity` is the fixed amount. A non-empty `quantityFormula`
+  // means the amount is ROLLED and is that expression; `quantity` is then the
+  // authored fallback rather than the number awarded.
   quantity: number,
+  quantityFormula?: string,
+
   propertyMacroUuid: string | null,
+
+  // PRESENT = this result IS a choice group and these are its alternatives.
+  // The carrier's own `kind` and value fields are not read while it is set.
+  alternatives?: Result[],
+
+  // GROUP SETTINGS, read only where `alternatives` is present.
+  chooser?: "playerChooses" | "rolled",
+  awardStrategy?: "anyOne" | "upTo" | "draw",
+  awardCount?: number,
+  awardCountFormula?: string,
+  withReplacement?: boolean,
+  selectionFormula?: string,
+
+  // AN ALTERNATIVE'S OWN selecting range, read only on a member of a rolled group.
+  selectionRange?: { from: number, to: number },
 };
 ```
 
 ### Requirements
 
-1. `componentId` is required.
+1. `componentId` is required where `kind` is `"component"` or absent.
 2. `quantity` must be positive.
 3. `propertyMacroUuid` is only valid when `features.propertyMacros` is true.
+4. `kind` is a closed set, and an absent `kind` IS `"component"`.
+   Every result persisted before this change carries no `kind` and reads unchanged, so the discriminator is additive and needs no migration.
+   An unrecognized `kind` is a misconfiguration rather than a new state, and is reported where an unknown resolution mode is.
+5. Where `kind` is `"currency"`, `unit` is required and is a configured world `CurrencyConfig.units[].id`; where it is `"knowledge"`, `recipeId` is required.
+   A `"knowledge"` result grants through `game.fabricate.grantRecipeKnowledge` rather than by writing an item.
+6. `label` and `reason` are valid only where `kind` is `"currency"`, and each is optional.
+   An amount of a currency states a quantity and no meaning, which is what they exist to supply; a component, an essence and a piece of recipe knowledge each name a record whose own name is the label.
+7. A non-empty `quantityFormula` means the amount is ROLLED, and `quantity` is not the number awarded.
+   The expression is the shared roll expression: dice plus optional actor data paths, resolved against the crafting character.
+   It is validated the way a crafting check's formula is: `Roll.validate` is parse-only and passes an expression that cannot evaluate, so a formula is usable only where it evaluates to a finite total.
+   An empty or absent `quantityFormula` leaves the amount fixed at `quantity`, which is the state every result persisted before this change is in.
+The authoring surface for all of it — the chooser as a segmented control in the group header, the award strategy, the range cell per alternative and the currency reward's naming body — is specified by the `design-system` capability, under the requirements "A result-side choice group states who chooses and how many it awards" and "One requirement row serves both sides of a recipe".
+This section states only what is persisted.
+
+8. `alternatives` PRESENT makes this result a choice group, and every member including the one the group was converted from is an entry in that array.
+   The carrier's own `kind`, `componentId`, `unit`, `recipeId`, `quantity` and `quantityFormula` are not read while `alternatives` is set, so a group is never also a result in its own right.
+   `alternatives` holds two or more entries; a group reduced to one is a plain result again.
+   Alternatives do not nest: a member MUST NOT carry `alternatives` of its own.
+9. `chooser` defaults to `"playerChooses"` and is read only on a group.
+   `"rolled"` requires a non-empty `selectionFormula`, and `"playerChooses"` ignores `selectionFormula` and every member's `selectionRange`.
+10. `awardStrategy` defaults to `"anyOne"` and is read only on a group.
+    `"upTo"` and `"draw"` require exactly one of `awardCount` or a non-empty `awardCountFormula`; `"anyOne"` reads neither.
+    `awardCount` must be positive.
+    `awardCountFormula` is the same roll expression a `quantityFormula` is, validated the same way.
+11. `withReplacement` is read only where `awardStrategy` is `"draw"`, and defaults to `false`.
+    It is meaningless under `"anyOne"` and `"upTo"`, where it MUST NOT be written.
+12. `"draw"` pins `chooser` to `"rolled"`: a draw is rolled by definition, and a persisted `"playerChooses"` beside a `"draw"` is read as `"rolled"` rather than honoured.
+13. `selectionRange` is read only on a member of a group whose `chooser` is `"rolled"`, and `from` and `to` are inclusive.
+    The ranges of a group's members are read as an ORDERED LADDER rather than as independent windows: a roll below the lowest selects the lowest member and a roll above the highest selects the highest, so no authored group can produce nothing.
+    Under `"draw"` the `selectionFormula` is rolled once per draw rather than once for the group.
+14. A choice group is NOT valid inside a `progressive` result group.
+    Progressive awards every ordered entry whose difficulty the roll affords and normalizes a result's quantity to 1, so neither a chooser nor an award strategy has anything to mean there.
+    A payload carrying one is a misconfiguration; the authoring surface does not offer it.
+15. A `ResultGroup` whose `role` is `"failure"` MAY hold choice groups on the same terms as any other result group.
+    The reserved role is a statement about ROUTING rather than about the shape of what the group holds.
+16. `Result.toJSON()` omits every key above whose value is the one the constructor rebuilds from absence, under the issue-1135 omission policy the `Ingredient` section states.
+    `id`, `componentId` where the kind is a component, and `quantity` are never omitted.
+    Absence is the pre-change on-disk state for all of them, so no reader gains a case it did not already have.
+17. The addition is LOSSLESS FORWARD and LOSSY BACKWARD: a payload written by an older build carries none of these keys and reads identically, while a downgrade drops a group's alternatives and settings rather than degrading them, and MUST say so at the point of downgrade.
 
 ## Versioned Run Lifecycle
 

@@ -1126,7 +1126,7 @@ The rolled form is the shared expression control: dice plus optional actor data 
 The toggle selects which control occupies the quantity slot and MUST NOT be modelled as a third kind of quantity, so the amount keeps one meaning and one position in the row.
 Where a rolled amount resolves is a property of the SIDE: an ingredient amount resolves before the craft, because what it resolves to is what the crafter must hold, and a result amount resolves when the craft is awarded.
 Both resolve once per craft and neither is re-rolled while it is being read.
-The persisted shape of an amount is out of scope for this capability and is specified by the data model.
+The persisted shape of an amount is out of scope for this capability: it is `quantity` beside a `quantityFormula` on both `Ingredient` and `Result`, specified in the `data-models` capability.
 
 A row with a kind but no value MUST render the catalogue search IN PLACE OF the subject cell, and that search is the only element in the row permitted to stretch, because it is the one thing the row is waiting for.
 The lead chip stays untinted until a value resolves, and the quantity and convert controls remain live so a GM can set an amount before choosing the thing.
@@ -1368,7 +1368,7 @@ A container-level group adder MUST NOT exist.
 A set's adders create ROWS, and a group is always something an existing row BECAME, reached through the convert control that row already carries.
 An "add group" button beside "add result" would ask a GM to state what the alternatives are before stating what the first one replaces, and would leave two paths to one construct.
 
-The persisted shape of the chooser, the award strategy, N and replacement is out of scope for this capability and is specified by the data model.
+The persisted shape of the chooser, the award strategy, N and replacement is out of scope for this capability: it is `Result.chooser`, `Result.awardStrategy`, `Result.awardCount`/`awardCountFormula` and `Result.withReplacement`, specified under §Result in the `data-models` capability.
 
 #### Scenario: A GM lets the dice decide which reward is awarded
 
