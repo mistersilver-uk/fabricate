@@ -1,22 +1,15 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  Validation tab for the recipe editor (issue 643 §E rebuild). The prototype's
-  grouped, bordered, tagged row stack: checks are grouped (Ingredients / Results /
-  Resolution / Requirements), each group an uppercase icon-led label over a shared
-  1px-bordered container of rows. Each row carries a three-state status — pass /
-  warn / block — derived from the OWNING issue's `severity` + `blocks === 'enable'`,
-  the merged issue text as a `detail` sub-line, and the View deep-link on the right
-  (the separate "Issues" card is retired, §E3).
+  Validation tab for the recipe editor: checks grouped (Ingredients / Results / Resolution /
+  Requirements), each group an uppercase icon-led label over a bordered container of rows. Each
+  row carries a three-state status — pass / warn / block — derived from the OWNING issue's
+  `severity` plus `blocks === 'enable'`, the merged issue text as a `detail` sub-line and a View
+  deep link.
 
-  Deviation 1 (issue 643): this reuses the ONE `evaluateRecipeReadiness` evaluator
-  the rail's mini-list also reads — it does NOT introduce a second `recipeValidationGroups`
-  evaluator that could disagree. The category map below is display metadata only.
-
-  The MARKUP is `EditorValidationSurface`'s since issue 1444: this file computes the readiness
-  and hands over title, intro, summary, counts, groups and labels. Every `data-*` hook the tab
-  shipped is preserved through `hookAttrs`, `countAttrs`, `viewDataAttr` and each row's own
-  `dataAttrs`, so nothing reading this surface — the smoke harness, `recipe-edit-mounted`,
-  `recipe-validation-tab` — has to learn a new name.
+  It reuses the ONE `evaluateRecipeReadiness` evaluator the rail's mini-list also reads rather
+  than introducing a second one that could disagree; the category map below is display metadata
+  only. The MARKUP is `EditorValidationSurface`'s, and every `data-*` hook this tab shipped is
+  preserved through `hookAttrs`, `countAttrs`, `viewDataAttr` and each row's own `dataAttrs`.
 -->
 <script>
   import EditorValidationSurface from '../../../components/EditorValidationSurface.svelte';
@@ -108,8 +101,7 @@
     ],
   };
 
-  // Display grouping (metadata only — the evaluator is untouched). A check id not
-  // listed falls into "requirements".
+  // Display grouping only. A check id not listed falls into "requirements".
   const CHECK_CATEGORY = {
     hasIngredientSet: 'ingredients',
     noDuplicateMatches: 'ingredients',
@@ -148,12 +140,9 @@
   }
 
   /**
-   * The two per-row hooks this tab has always emitted, as the bag the surface spreads.
-   *
-   * Built conditionally rather than with `undefined` values, because the surface spreads this
-   * onto the row element and "the attribute is absent" and "the attribute is present and empty"
-   * are different DOM states to a `[data-issue]` presence selector — which is what every
-   * consumer of these two uses.
+   * The two per-row hooks this tab has always emitted, as the bag the surface spreads. Built
+   * conditionally rather than with `undefined` values, because absent and present-but-empty are
+   * different DOM states to the `[data-issue]` presence selector every consumer uses.
    *
    * @param {string} checkId the check row's id, empty for an issue-only row
    * @param {boolean} satisfied whether the check holds
@@ -167,9 +156,8 @@
     return attrs;
   }
 
-  // WHICH GROUP AN ISSUE-ONLY ROW JOINS, by the route it deep-links to. A check row is placed by
-  // `CHECK_CATEGORY`; a row that is only an issue (`disabledIncomplete` is the usual one) has no
-  // check to place it, so its destination does.
+  // WHICH GROUP AN ISSUE-ONLY ROW JOINS, by the route it deep-links to: it has no check for
+  // `CHECK_CATEGORY` to place it, so its destination does.
   const ISSUE_TARGET_GROUP = {
     ingredients: 'ingredients',
     results: 'results',
@@ -177,10 +165,9 @@
   };
 
   // ONE ROW PER CHECK, borrowing the owning issue when the check fails, then one row per issue no
-  // check claimed. The pairing and the STATUS come from `recipeReadiness.js` — see
-  // {@link recipeValidationRowStates} for why they moved out of this file — and this maps them
-  // onto copy. The status is taken verbatim, so the tab strip's badge, which counts the same
-  // states, cannot report a number this list contradicts.
+  // check claimed. The pairing and the STATUS come from {@link recipeValidationRowStates} and
+  // this maps them onto copy, taking the status verbatim so the tab strip's badge cannot report
+  // a number this list contradicts.
   const rows = $derived(
     recipeValidationRowStates(readiness).map(({ checkId, issue, status }) => ({
       id: checkId,
@@ -192,10 +179,8 @@
       detail: checkId && issue ? issueTitle(issue) : '',
       dataAttrs: rowAttrs(checkId, checkId ? status === 'pass' : false, issue ? issue.id : ''),
       target: issue ? issue.target || '' : '',
-      // The CONTROL half, forwarded verbatim from the owning issue (issue 1517). It is
-      // threaded here and not derived: `recipeReadiness.js` is the only thing that knows
-      // WHICH requirement or result set a failing check is about, and a row that dropped
-      // it would render a View button that changes route and focuses nothing.
+      // The CONTROL half, forwarded verbatim rather than derived: `recipeReadiness.js` alone
+      // knows WHICH requirement or result set a failing check is about.
       focusTarget: issue ? issue.focusTarget || '' : '',
     }))
   );
@@ -209,29 +194,16 @@
     })).filter((group) => group.rows.length > 0)
   );
 
-  // --- The aggregate summary (issue 676) -----------------------------------------
-  // Rehomed from the deleted RecipeContextRail, which showed it only while this very tab
-  // was open. The grouped rows below say what each check does; nothing said the
-  // at-a-glance STATE, so this is a header over them, not a duplicate of them.
+  // THE AGGREGATE SUMMARY. The grouped rows below say what each check does; nothing said the
+  // at-a-glance STATE, so this is a header over them rather than a duplicate of them.
   //
-  // THE COUNTS ARE A TALLY OF THE ROWS ABOVE, not a second reading beside them (issue 1517,
-  // docs round). They used to read the `readiness` object directly — passing = satisfied
-  // checks, warnings = `severity === 'warning'` issues, blocking = `critical` ones — on the
-  // claim that reading the same object made the rail structurally unable to disagree with the
-  // list. It did not, because the rows are not the issues:
-  //
-  //  - `stepsNamed` has no `CHECK_TO_ISSUES` entry, so an unnamed step in a multi-step recipe
-  //    paints an amber row that raised no issue, and the old warnings count could not see it:
-  //    the rail read "Warnings: 0" and the verdict read "All clear" over an amber row.
-  //  - a `blocks: 'enable'` issue graded `warning` draws a BLOCK row and WOULD be counted as a
-  //    warning — the divergence the environment editor's rail actually had. This producer cannot
-  //    reach it today, because all seven of `recipeReadiness.js`'s `blocks: 'enable'` issues are
-  //    also `severity: 'critical'`; reading the row's own status forecloses it here rather than
-  //    repairing it, so the pair cannot part the day one of those is graded `warning`.
-  //
-  // `countRecipeReadiness` tallies the SAME row states the list above is built from, so the two
-  // cannot disagree by construction rather than by convention — and the editor shell's tab badge
-  // reads that one function too.
+  // THE COUNTS ARE A TALLY OF THE ROWS ABOVE, not a second reading of `readiness` beside them.
+  // Reading the same object is NOT enough, because the rows are not the issues: `stepsNamed` has
+  // no `CHECK_TO_ISSUES` entry, so an unnamed step paints an amber row that raised no issue and
+  // the verdict read "All clear" over it; and a `blocks: 'enable'` issue graded `warning` draws a
+  // BLOCK row while counting as a warning, which this producer cannot reach today only because
+  // all seven such issues are also `critical`. `countRecipeReadiness` tallies the SAME row states
+  // the list is built from, and the editor shell's tab badge reads that one function too.
   const counts = $derived(countRecipeReadiness(readiness));
   const summaryStatus = $derived(
     counts.blocking > 0 ? 'blocked' : counts.warnings > 0 ? 'warning' : 'clear'
@@ -268,13 +240,9 @@
           }
   );
 
-  // THE PILL WORDS AND THE COUNT WORDS ARE NOT PASSED AT ALL (issue 1517, docs round). This tab
-  // wrote `Pass / Warning / Blocks enable` and `Passing / Warnings / Blocking` into its own
-  // namespace, byte for byte identical to the shared vocabulary `EditorValidationSurface`
-  // already defaults to — which is the second home the requirement's "lives once" sentence
-  // forbids. Both props are gone and the six keys with them, so the words this tab renders and
-  // the words every other validation surface renders are one string each. The three status
-  // ICONS went the same way at issue 1444.
+  // THE PILL WORDS AND THE COUNT WORDS ARE NOT PASSED AT ALL: they are `EditorValidationSurface`'s
+  // shared vocabulary, so the words this tab renders and the words every other validation surface
+  // renders are one string each. The three status ICONS are shared the same way.
   const tabTitle = $derived(text('FABRICATE.Admin.Manager.Recipe.Validation.Title', 'Validation'));
 </script>
 

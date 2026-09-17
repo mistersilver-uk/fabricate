@@ -1,34 +1,21 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  The system Component Rules list's inspector (issue 676; rebuilt to the design reference for
-  issue 1371, maintainer parity round 4 — `rebuild-spec.md` C7, `proto:1247-1275`).
+  The system Component Rules list's inspector. It lives under the BROWSER's directory, NOT
+  `component/`, which the screenshot evidence map globs for the EDITOR's frames, and it renders into
+  the shell's existing `.manager-inspector` column owning no grid, so it cannot nest a second one.
 
-  It lives under `apps/manager/components/` (the BROWSER's dir), NOT `component/`, which the
-  screenshot evidence map globs for the EDITOR's frames, and it is named ComponentBrowserInspector
-  so it cannot be confused with the editor's own surfaces. It renders into the shell's existing
-  `.manager-inspector` column and owns no grid, so it cannot introduce a nested second inspector.
+  In the reference's order: the `SELECTED COMPONENT` kicker; the medallion, the name and the
+  `{n} tags · {m} essences` subline — no stat tiles, since the subline states both numbers and a
+  panel about to list them would say each three times; `Shared identity`, the info card that used to
+  head the LIST pane; `Tags in effect` with its `{w} world · {s} system` split counter; `Category`
+  with its source line; `Salvage in {system}`; and a PINNED foot carrying ONE primary action.
 
-  ── WHAT IT SAYS, IN THE REFERENCE'S ORDER ────────────────────────────────────────────────
-   1. the `SELECTED COMPONENT` kicker (gap-list row 117 — there was none);
-   2. the medallion, the name at 16px serif and the `{n} tags · {m} essences` subline (row 118).
-      The two stat tiles are gone: the subline states both numbers, and a tile per number over a
-      panel that is about to list them is the same fact three times;
-   3. `Shared identity` — the info card that used to sit at the head of the LIST pane, which is
-      the screen the reference does NOT draw it on (row 119, and row 101 for where it came from);
-   4. `Tags in effect`, with the `{w} world · {s} system` split counter (row 120);
-   5. `Category`, with its source line and boxed value (row 121);
-   6. `Salvage in {system}`, with its boxed note (row 122);
-   7. a PINNED foot carrying ONE primary action (row 123).
+  ONE PINNED PRIMARY, AND A KEBAB FOR THE REST. A four-button stack scrolled inline and gave four
+  commands equal weight where the design pins one, so `Edit system rules` is the pinned primary and
+  the other three move onto the shared `ActionMenu` — the primitive `openspec/specs/design-system/
+  spec.md` gives "two or more commands behind one trigger". Nothing is lost and nothing is a link.
 
-  ── ONE PINNED PRIMARY, AND A KEBAB FOR THE REST ─────────────────────────────────────────
-  The four-button stack (`Edit component`, `Copy source UUID`, `Unlink component`,
-  `Delete component`) scrolled inline with the body and gave four commands equal weight where
-  the design pins one. `Edit system rules` is the pinned primary; the other three move onto the
-  shared `ActionMenu`, which is the primitive that owns "two or more commands behind one
-  trigger" (`design-system/spec.md:485-514`). Nothing is lost and nothing is a text link.
-
-  Strings are localized here; the CALLER resolves nothing but the actions and the world facts
-  this screen's own row set cannot answer.
+  Strings are localized here; the CALLER resolves only the actions and the world facts this
+  screen's own row set cannot answer.
 -->
 <script>
   import Chip from '../../../components/Chip.svelte';
@@ -278,29 +265,17 @@
           {:else}
             <div class="manager-chip-row" data-component-tag-list>
               {#each tagsInEffect as entry (entry.tag)}
-                <!-- Each chip NAMES ITS ORIGIN in a `title`, because the split counter above
-                     says how many came from where and the chips themselves must say which — and
-                     it names it in COLOUR too, which is the half that was inverted. `proto:5663`
-                     inks a WORLD tag blue and `proto:5665` inks the system's OWN tag purple, the
-                     same pairing the rules editor's two runs use (`proto:5692`/`proto:5711`);
-                     this run had world purple and own neutral, so the two screens disagreed
-                     about what purple means. Measured by the `sys-inspector-tag-chip` region.
+                <!-- Each chip NAMES ITS ORIGIN in a `title` and in COLOUR: the split counter above
+                     says how many came from where, and the chips say which. World is blue and the
+                     system's own is purple, the same pairing the rules editor's two runs use; this
+                     run had them inverted, so the two screens disagreed about what purple means.
 
-                     THE SCALE IS THE DEFAULT CHIP SPOKEN MORE QUIETLY, and that is a
-                     measurement rather than a preference. `proto:5663` draws this pill at
-                     `padding: 3px 9px; border-radius: 999px; font: 600 10px` with no
-                     line-height, which lays out ~20px tall — exactly the default chip's height.
-                     Neither micro variant is nearer: `list` would draw it 13px tall and
-                     `tag-run` 25px. What a `compare` run actually measured open was never a
-                     size: it was the base scale's `font-weight: 700` against the reference's
-                     600, its `0.62rem` against 10px, and its `--fab-space-chip` inset against a
-                     wider one — which is `density="inspector"`, the primitive's name for this
-                     exact pill, added rather than a fourth micro scale invented.
-
-                     IT GOES ON BOTH HALVES, and the density is deliberately geometry-only: the
-                     run's two halves are DIFFERENTLY toned on purpose, and a scale applied to
-                     one of them would draw the run at two sizes and read as the origin split
-                     the colours already state. -->
+                     `density="inspector"` is a MEASUREMENT, not a preference: the reference's pill
+                     lays out at the default chip's height, and neither micro variant is nearer
+                     (`list` 13px, `tag-run` 25px). What a `compare` run measured was never a size
+                     but the base scale's weight, size and inset. It goes on BOTH halves, and is
+                     deliberately geometry-only: the halves are differently TONED on purpose, and a
+                     scale on one would draw the run at two sizes. -->
                 <Chip
                   tone={entry.source === 'world' ? 'info' : 'tag'}
                   density="inspector"
@@ -338,15 +313,10 @@
       </div>
 
       <!--
-        THE ONE STATE THIS PANEL KEEPS THAT THE REFERENCE'S AT-REST FRAME DOES NOT DRAW.
-
-        `rebuild-spec.md` C7 enumerates five blocks and this is not one of them, and the source
-        Item is world data under epic 1357 — so the panel's `Linked` / `Compendium` pill and its
-        whole description paragraph are gone with the rest of the source register. A DANGLING
-        LINK IS NOT THAT: it is the component claiming a document that no longer exists, and it
-        is the only thing on this screen a GM has to act on. It renders ONLY in that state, so
-        the reference's at-rest anatomy is exact and this is a warning the frame never had to
-        show. Reported to the driver as a retained subject-only element.
+        THE ONE STATE THIS PANEL KEEPS THAT THE REFERENCE'S AT-REST FRAME DOES NOT DRAW. The source
+        register is gone with the rest of the world data, but a DANGLING LINK is not that: it is the
+        component claiming a document that no longer exists, and the only thing on this screen a GM
+        has to act on. It renders ONLY in that state, so the at-rest anatomy stays exact.
       -->
       {#if sourceMissing}
         <p class="manager-component-inspector-warning" data-component-source-missing>

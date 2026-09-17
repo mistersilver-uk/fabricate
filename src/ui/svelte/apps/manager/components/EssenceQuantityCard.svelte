@@ -1,56 +1,23 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  The manager's ONE essence quantity card: an icon tile + a truncating essence name above a
-  clamped numeric stepper, tinted by whether this essence is contributed at all (issue 772).
+  The manager's ONE essence quantity card: an icon tile and a truncating essence name above a
+  clamped numeric stepper, tinted by whether this essence is contributed at all. The editor's 4-up
+  grid and the bulk panel's 2-up grid render this one card, so no third essence-quantity control
+  exists with its own keyboard, clamp and commit behaviour. The number control is the shared
+  `Stepper` (min 0); the hand-rolled pair it replaced is ratcheted in `manager-layout.test.js`.
 
-  It was extracted out of `ComponentEditView`, which hand-rolled the card against the global
-  `.manager-component-essence-card` rules and drove it with a bare `manager-icon-button` −,
-  a raw `<input type="number">` and a +. The component browser's bulk-edit panel needs the
-  same card, and building it from `Stepper` against that same global class would have left a
-  THIRD essence-quantity control adjacent to the other two with different keyboard, clamp and
-  commit behaviour. So the card was extracted and the editor was converted onto it in the
-  same change: the editor's 4-up grid and the panel's 2-up grid now render one card.
+  IDENTITY FIRST, then the stepper: the card was once one five-column run putting the control
+  before the thing it counted. THE TILE IS THE SHARED `Medallion` at `variant="glyph-chip"` —
+  a 22px slate chip with the glyph in the essence's colour — rather than a second tile of its own,
+  and the colour arrives as the BARE `--fab-tag-*` key the Essence Catalogue stores.
 
-  The number control is the shared `Stepper` (min 0), so typing, clamping and the −/+
-  adjuncts behave here exactly as they do on the progressive DC beside it. The hand-rolled
-  `.manager-component-essence-stepper` / `-quantity` pair it replaced is retired and
-  ratcheted in `tests/components/manager-layout.test.js`.
+  The class names are the SHIPPED ones, moved out of the global sheet into this scoped block
+  unchanged; what stayed global is the PARENT grid, which is host layout rather than card identity.
+  `data-component-edit-essence` and `data-component-essence-active` are likewise PRESERVED verbatim.
 
-  IDENTITY FIRST, then the stepper: the card was once a single five-column run rendering
-  −, qty, +, icon, name, which put the control before the thing it counted.
-
-  THE TILE IS THE SHARED `Medallion` (issue 1371 r18-colour, maintainer ruling M29). The card
-  used to draw its own 22px span and take a `color` prop for the glyph's ink — a prop the editor
-  passed and nothing ever fed, because the editor's option builder is a whitelist rebuild that
-  never named the colour, so every tile painted the accent. The reference draws the tile as a
-  22px slate chip with the glyph in the essence's colour (`proto:5717`: `width: 22px; height:
-  22px; border-radius: 6px; background: var(--bg3); color: e.color`), which is exactly the
-  `variant="glyph-chip"` face the bulk panels' essence rows already draw at the same size, so
-  the card now renders that medallion rather than a second tile of its own. The colour arrives
-  as the BARE `--fab-tag-*` key the Essence Catalogue stores (`colorToken`), the same shape
-  `Medallion`'s `tint` and `Chip`'s `tint` validate; the retired `color` prop took an authored
-  CSS colour, which no projection ever produced.
-
-  The class names are the SHIPPED ones. `.manager-component-essence-card`, `-identity` and
-  `-name` moved out of the global sheet into this scoped block unchanged, so the editor
-  renders what it rendered before the extraction. What stayed global is the PARENT grid
-  (`.manager-component-essence-grid`), because the editor's 4-up and the bulk panel's 2-up are
-  host layout, not card identity.
-
-  Props:
-   - id / name / icon: the essence's identity. `icon` falls back to a mortar-and-pestle.
-   - colorToken: the essence's own colour as a bare `--fab-tag-*` key, or '' for the untinted
-     tile (the accent glyph the tile has always painted).
-   - quantity: the current amount. Zero renders the receding `is-inactive` treatment — an
-     essence the GM has not used is still the control they would use to add one.
-   - disabled: disables the stepper (a saving editor, an inert panel section).
-   - ariaLabel / decrementLabel / incrementLabel: already-localized accessible names. This
-     component takes no localization import of its own, so the strings arrive from the host.
-   - onChange(quantity): the clamped integer the stepper committed.
-
-  `data-component-edit-essence` and `data-component-essence-active` are PRESERVED verbatim
-  from the editor's markup: they are the editor's authoring hooks, and renaming them during
-  an extraction would move the surface and its seams in one commit.
+  Props: id / name / icon (falling back to a mortar-and-pestle); colorToken ('' for the untinted
+  tile); quantity (zero renders the receding `is-inactive` treatment, since an unused essence is
+  still the control a GM would add one with); disabled; ariaLabel / decrementLabel / incrementLabel,
+  already localized because this component imports no localization; onChange(quantity).
 -->
 <script>
   import Medallion from '../../../components/Medallion.svelte';
@@ -107,15 +74,12 @@
 </article>
 
 <style>
-  /* THEME-ROOT tokens only. The reason once recorded here — that living under
-     `apps/manager/` puts an area-scoped `--fab-manager-*` property in scope — has LAPSED:
-     a scoped `<style>` may not reach one from ANY directory (design-system spec, *The token
-     namespace is one generation and names its purpose*). `SelectionCheckbox` records the
-     same rule for the same reason; it is no longer the opposite case.
+  /* THEME-ROOT tokens only: a scoped `<style>` may not reach an area-scoped `--fab-manager-*`
+     property from any directory (`openspec/specs/design-system/spec.md`, "The token namespace is
+     one generation and names its purpose").
 
-     TWO rows — identity (tile + label) above, the stepper below — not a single run. The
-     card is TINTED by whether the component contributes this essence at all, so a GM
-     scanning the grid sees which essences are set without reading every number. */
+     TWO rows — identity above, stepper below — not a single run, and TINTED by whether the
+     component contributes this essence, so a grid reads without every number being read. */
 
   .manager-component-essence-card {
     box-sizing: border-box;
@@ -125,15 +89,14 @@
     align-content: start;
     min-width: 0;
     padding: var(--fab-space-2) var(--fab-space-2);
-    /* `proto:5716`: a contributing tile is `--fab-bg-1` behind a `border-strong` hairline, not an
-       accent wash. Radius 10 snaps to the 9 rung (`design-system/spec.md:220`). */
+    /* A contributing tile is `--fab-bg-1` behind a `border-strong` hairline, not an accent wash. */
     border: 1px solid var(--fab-border-strong);
     border-radius: 9px;
     background: var(--fab-bg-1);
   }
 
-  /* No essence contributed: this card is a control the GM has not used. It recedes rather
-     than disappearing — the stepper is still how they would add one. */
+  /* No essence contributed: the card recedes rather than disappearing, since the stepper is
+     still how a GM would add one. */
   .manager-component-essence-card.is-inactive {
     border-color: var(--fab-border);
     background: var(--fab-surface-soft);
@@ -147,8 +110,7 @@
     min-width: 0;
   }
 
-  /* `proto:5717`: 11.5px/600 in the SECONDARY ink, ellipsised. The tile's subject is the
-     numeral below it, so the name recedes a rung rather than competing with it. */
+  /* Ellipsised in the SECONDARY ink: the tile's subject is the numeral below it. */
   .manager-component-essence-name {
     min-width: 0;
     overflow: hidden;
@@ -159,9 +121,8 @@
     white-space: nowrap;
   }
 
-  /* `Stepper` is an `inline-flex` island rather than the full-bleed row the retired
-     `-stepper` / `-quantity` pair drew, so the row centres it: a grid of cards stays
-     optically aligned whatever width the host hands out. */
+  /* `Stepper` is an `inline-flex` island, not a full-bleed row, so centring it keeps a grid of
+     cards optically aligned whatever width the host hands out. */
   .manager-component-essence-control {
     display: flex;
     justify-content: center;

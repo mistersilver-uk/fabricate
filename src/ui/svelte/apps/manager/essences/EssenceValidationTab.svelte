@@ -1,24 +1,13 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  The essence editor's VALIDATION tab (issue 1036).
+  The essence editor's VALIDATION tab, rendering the shared `ScopedValidationTab`. The check SET,
+  its order and its severities come from the pure `essenceValidation.js` and the mapping onto copy
+  from `essenceStudio.js`, so nothing about which checks exist is decided here. It keeps its
+  `manager-essence-tab-stack` class and its `data-essence-tab-panel="validation"` hook.
 
-  It renders the shared `ScopedValidationTab` (issue 1362), which is the generalisation of
-  the shell this file and `tools/ToolValidationTab` were both already written as; the check
-  SET, its order and its severities come from the pure `essenceValidation.js`, and the mapping
-  onto copy from `essenceStudio.js`. Nothing about which checks exist is decided here.
-
-  It keeps its `manager-essence-tab-stack` class and its `data-essence-tab-panel="validation"`
-  hook, so no shipped rule and no test selector stops matching.
-
-  ── AN ESSENCE ALWAYS SAVES ───────────────────────────────────────────────────────
-  Unlike a Tool, a blocking issue here does not stop the save and does NOT disable the
-  essence's own Enabled toggle: the prototype's subtitle asserts a gate this change does not
-  implement, and that copy is dropped. The tab is a readout of what is unfinished, which is
-  why `Blocking` is worded as an issue count rather than as a refusal.
-
-  ── UNSET COLOUR IS A PASS ────────────────────────────────────────────────────────
-  An essence with no colour renders in the theme accent BY DESIGN, so the colour row is
-  informational and always passes; its detail line says which of the two states it is.
+  AN ESSENCE ALWAYS SAVES: unlike a Tool, a blocking issue neither stops the save nor disables the
+  Enabled toggle, so `Blocking` is worded as an issue count rather than a refusal. UNSET COLOUR IS A
+  PASS, because an essence with no colour renders in the theme accent by design, so that row is
+  informational and its detail line says which of the two states it is.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
@@ -28,13 +17,9 @@
   let {
     essence = null,
     context = {},
-    // ── THE ROW ACTION (issue 1517) ─────────────────────────────────────────────────────
-    // `tabIds` is the tab set the EDITOR is rendering, and it is a prop rather than a constant
-    // because this editor has two: a create draft renders `identity | oncraft | validation`
-    // and every catalogued essence renders the rules screen's `rules | validation`. An address
-    // is attached only for a zone the live set can reach, so a row whose subject is edited on
-    // another screen draws no View button instead of one that routes to a tab that is not
-    // there. Defaulted to none, which is the shipped no-action behaviour.
+    // The tab set the EDITOR is rendering, a prop rather than a constant because this editor has
+    // two. An address is attached only for a zone the live set can reach, so a row whose subject
+    // is edited on another screen draws no View button rather than one routing to a missing tab.
     tabIds = [],
     onSelectIssue = () => {},
   } = $props();
@@ -47,12 +32,9 @@
   const presentation = $derived(essenceValidationPresentation(essence, context, text));
   const counts = $derived(presentation.counts);
 
-  // The row's two addresses, attached HERE rather than inside `essenceValidationPresentation`
-  // (issue 1517). That function is also the world essence entry page's, and that page is a
-  // different host with different tabs and no row action — attaching there would give it a View
-  // button that changes nothing. Threading rather than deriving is the same rule the recipe
-  // editor's tab follows: `essenceStudio.js` owns which control a check is about, and a row that
-  // dropped the address would render an action that changes tab and focuses nothing.
+  // Attached HERE rather than inside `essenceValidationPresentation`, which is also the world
+  // entry page's — a different host with different tabs and no row action, which would gain a View
+  // button that changes nothing. `essenceStudio.js` still owns which control a check is about.
   const addresses = $derived(essenceIssueAddresses(tabIds));
   const groups = $derived(
     presentation.groups.map((group) => ({

@@ -1,42 +1,14 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  The selected-essence inspector (issue 1036), extracted from ~200 inlined lines in
-  `CraftingSystemManagerRoot.svelte`. It is the last of the four library inspectors to
-  become a component; `ComponentBrowserInspector`, `RecipeBrowserInspector` and
-  `ToolBrowserInspector` were already extracted.
+  The selected-essence inspector, under the BROWSER's directory, which the screenshot evidence map
+  globs for the essence views. THREE THINGS ARE RETAINED THAT THE PROTOTYPE DOES NOT DEPICT, each a
+  shipped affordance with no replacement: the component-usage THUMB GRID and its click-through, the
+  only route from "34 components carry this" to any one of them; copy-source-UUID, unlink-source and
+  the `EssenceSourceSelector` drop target, deliberately NOT `ItemDropZone` because an essence source
+  is an in-system managed COMPONENT; and the delete-impact note, because the delete is warned.
 
-  It lives under `essences/` — the BROWSER's directory, which the screenshot evidence map
-  globs for the essence views.
-
-  ── WHAT IS RETAINED, AND WHY THE PROTOTYPE IS NOT AUTHORITY FOR ITS REMOVAL ──────
-  The prototype depicts none of these, and each is a shipped affordance with no replacement:
-
-   - the component-usage THUMB GRID, and its click-through to the component editor. It is
-     the only route from "34 components carry this" to any one of them.
-   - copy-source-UUID, unlink-source and the `EssenceSourceSelector` drop target, still
-     gated on `features.effectTransfer` and moved here verbatim. `EssenceSourceSelector` is
-     deliberately NOT `ItemDropZone`: an essence source is an in-system managed COMPONENT,
-     not a document uuid.
-   - the delete-impact note, which tells the GM in advance how far a delete's cascade
-     reaches — how many components it strips the essence from and how many recipes it
-     rewrites — because the delete is warned, not blocked.
-
-  ── ON CRAFT ANSWERS A DIFFERENT QUESTION FROM THE PREVIEW, AND NOW SAYS SO ───────
-  This section rendered `EssenceBehaviorPreview` with its kicker suppressed, on the reading that
-  the editor's preview and this panel are one list. They are not, and treating them as one is
-  what left this rail with NO PROVENANCE on a screen whose whole subject is inherit-versus-
-  override. The preview answers "what does this essence DO to a crafted result"; the reference's
-  cards answer "what does THIS SYSTEM resolve each section to, and did it author that or inherit
-  it" — titled after the value and ending in `· overridden here` or `· world default`
-  (`tmp/proto/essence-rules.png`, data at `proto:5093`-`5098`). Two meanings had been collapsed
-  rather than shared, so the second one is projected in `essenceStudio.projectEssenceOnCraftCards`
-  and drawn with the SAME `IconFactRow` primitive the preview uses.
-
-  ── THE SYSTEM ROSTER IS `SystemRulesRoster`, THE CATALOGUE'S OWN PANEL ───────────
-  The reference draws `SYSTEM RULES n / m` — a count, a system search, five named rows each with
-  a `Rules ↗` link out, and a pager — on this rail as well as on the world catalogue's. The
-  catalogue's was inlined in `EntityCatalogueShell`; it is now a component, and this composes it
-  rather than growing a second one.
+  ON CRAFT ANSWERS A DIFFERENT QUESTION FROM THE PREVIEW, AND NOW SAYS SO: rendering
+  `EssenceBehaviorPreview` here left the rail with NO PROVENANCE on a screen whose whole subject is
+  inherit-versus-override. THE SYSTEM ROSTER IS `SystemRulesRoster`, the world catalogue's own panel.
 -->
 <script>
   import EssenceSourceSelector from '../../../components/EssenceSourceSelector.svelte';
@@ -58,12 +30,9 @@
     showPropertyMacroUi = false,
     managedItemOptions = [],
     sourceUuid = '',
-    // ── WHAT THE SYSTEM LAYER NEEDS TO NAME ITSELF (issue 1372, maintainer parity round 8) ──
-    // `systemName` heads the on-craft section, as the reference's `ON CRAFT IN MYTHWRIGHT FORGE`
-    // does; `inherited` is this system's per-section inherit map from the world-scope join, and
-    // it is what turns a resolved value into a resolved value AND the layer it came from. It is
-    // `null` for a system with no membership record, which suppresses the layer clause rather
-    // than guessing one.
+    // `systemName` heads the on-craft section, and `inherited` is the per-section inherit map that
+    // turns a resolved value into a resolved value AND its layer. `null` with no membership
+    // record, which suppresses the layer clause rather than guessing one.
     systemName = '',
     inherited = null,
     // The `SYSTEM RULES n / m` panel's own three facts, threaded from the world-scope join the
@@ -75,10 +44,8 @@
     membershipActions = null,
     onOpenSystemRules = null,
     onEdit = () => {},
-    // THE DEEP LINK OUT TO THE WORLD DEFINITION (issue 1372, `proto:1678`). One callback, and
-    // the only reason `CraftingSystemManagerRoot.svelte` is reopened at all: the shell already
-    // owns `openWorldScopedEntry`, and this site is the one place the seam can be attached
-    // because the inspector is rendered there with explicit props and no bundle spread.
+    // THE DEEP LINK OUT TO THE WORLD DEFINITION: one callback, attachable only where the
+    // inspector is rendered with explicit props and no bundle spread.
     onOpenWorldDefinition = () => {},
     onDelete = () => {},
     onEditComponent = () => {},
@@ -105,10 +72,8 @@
 
   const disabled = $derived(essence?.enabled === false);
   const description = $derived(truncate(essence?.description));
-  // THE META LINE the reference puts under the name: the colour's own display name and how many
-  // components in THIS system carry the essence (`proto:5086`). The colour name is the shared
-  // `essenceColourName`, so this line and the world catalogue's caption cannot disagree about
-  // what a token is called; the hex is the world screen's, because that screen owns the colour.
+  // THE META LINE under the name: the colour's display name and this system's carrier count. The
+  // name is the shared `essenceColourName`, so this and the catalogue's caption cannot disagree.
   const colourName = $derived(essenceColourName(essence?.colorToken));
   const carrierLine = $derived(
     format('FABRICATE.Admin.Manager.Essence.CarriersHere', '{count} components here', {
@@ -116,9 +81,8 @@
     })
   );
   const identityMeta = $derived(colourName ? `${colourName} · ${carrierLine}` : carrierLine);
-  // AGREEING WITH ITS NUMBER (issue 1372). One key served every count, so the Usage row read
-  // `1 components`. The corpus's convention is a `…One` sibling carrying the singular written
-  // out; `EssenceRow` selects the same pair for the same two keys.
+  // AGREEING WITH ITS NUMBER: a `…One` sibling carrying the singular written out, the same pair
+  // `EssenceRow` selects for the same two keys.
   const componentUsageSentence = $derived(
     (essence?.componentUsageCount || 0) === 1
       ? format('FABRICATE.Admin.Manager.Essence.ComponentUsageCountOne', '1 component', {
@@ -132,10 +96,8 @@
     Array.isArray(essence?.componentUsageItems) ? essence.componentUsageItems : []
   );
 
-  // The macro's display NAME, resolved cancellably through the SAME leaf the editor uses.
-  // Selecting another essence while a lookup is in flight is the ordinary case here, so the
-  // `cancelled` latch is what stops a slow resolution of the previous essence's macro
-  // landing on the newly selected one.
+  // Resolved cancellably through the SAME leaf the editor uses: selecting another essence mid
+  // lookup is ordinary here, so the `cancelled` latch stops the previous macro landing on it.
   let macroName = $state('');
   $effect(() => {
     const uuid = essence?.propertyMacroUuid || '';
@@ -144,10 +106,8 @@
     });
   });
 
-  // THE MACRO NAME FALLS BACK TO ITS ID, exactly as the row's summary line does. `resolveMacroName`
-  // needs `fromUuid`, and until it answers — or where it cannot — an empty name made a CONFIGURED
-  // macro's card read `No macro` while the row two columns left printed `Macro: lab-aether-binding`.
-  // The terminal segment is the closest true thing either surface can say.
+  // THE MACRO NAME FALLS BACK TO ITS ID, as the row's summary line does: until `fromUuid` answers,
+  // an empty name made a CONFIGURED macro's card read `No macro` beside a row that named it.
   const macroLabel = $derived(macroName || essenceShortValueName(essence?.propertyMacroUuid));
   const onCraftCards = $derived(
     projectEssenceOnCraftCards(
@@ -190,11 +150,9 @@
         {text('FABRICATE.Admin.Manager.Essence.Selected', 'Selected essence')}
       </p>
       <h2 class="manager-inspector-name" title={essence.name}>{essence.name}</h2>
-      <!-- THE META LINE (issue 1372, maintainer parity round 8, `proto:5086`): the colour's
-           display name and how many components in THIS system carry the essence. It is not the
-           colour-name CHIP that issue 1036 removed — that was a tinted pill restating the
-           medallion beside it. This is a one-line caption whose second half is a fact no other
-           control on the rail states, and the reference draws it in exactly this slot. -->
+      <!-- THE META LINE: not the colour-name CHIP that was removed, which was a tinted pill
+           restating the medallion beside it, but a caption whose second half is a fact no other
+           control on the rail states. -->
       <p class="manager-essence-inspector-meta" data-essence-inspector-meta>{identityMeta}</p>
       <div class="manager-chip-row">
         <Chip
@@ -214,24 +172,13 @@
 </section>
 
 <!--
-  WHICH LAYER THE GM IS LOOKING AT, AND THE WAY OUT TO THE OTHER ONE (`proto:1676`-`1678`).
+  WHICH LAYER THE GM IS LOOKING AT, AND THE WAY OUT TO THE OTHER ONE. This describes ONE system's
+  rules for an essence whose name, icon and colour are a world record every system shares, and
+  nothing on the panel said so, so `Edit essence` beside a shared name read as "edit the essence".
 
-  This inspector describes ONE system's rules for an essence whose name, icon and colour are a
-  world record every system shares. Nothing on the panel said so, and nothing offered a route
-  to the record — so `Edit essence` beside a shared name read as "edit the essence" when what
-  it opens is this system's rules. The prototype answers both with an info-toned block: the
-  kicker names the layer, a sentence says what is shared, and an accent link opens the world
-  definition.
-
-  THE SENTENCE IS SYSTEM-AGNOSTIC, AND THAT IS A STATED LIMIT rather than an oversight, and it
-  is the ONE place this block is not already shipped copy. `EssenceEditView` renders the SAME
-  sentence, counted and named, from `FABRICATE.Admin.Manager.Scoped.Essence.IdentityBanner`
-  ("shared with {count} other system(s). Everything below belongs to {system} alone."), which
-  is what the prototype draws at `proto:5091`. Rendering that key here needs the roster size
-  and the selected system's name, and both would have to arrive as further props from
-  `CraftingSystemManagerRoot.svelte` — a gateway file this change reopens for ONE callback and
-  nothing else. So this is the uncounted variant of one sentence, deliberately, and the two
-  keys collapse into that one the moment the inspector legitimately holds those two values.
+  THE SENTENCE IS SYSTEM-AGNOSTIC, A STATED LIMIT: `EssenceEditView` renders the same sentence
+  counted and named, and that key needs the roster size and the system's name here — both further
+  props. The two keys collapse into one the moment the inspector holds those values.
 -->
 <InspectorCard class="manager-essence-shared" data-essence-section="shared">
   <p class="manager-kicker">
@@ -243,8 +190,7 @@
       'Name, icon and colour come from the Essence Catalogue and are shared by every system. Everything below belongs to this system alone.'
     )}
   </p>
-  <!-- `.manager-link-button` is the manager's shipped inline text-link button; only its
-       colour is restated below, because the prototype paints this one in the accent. -->
+  <!-- `.manager-link-button` is the shipped inline text-link button; only its colour is restated. -->
   <button
     type="button"
     class="manager-link-button manager-essence-shared-link"
@@ -258,15 +204,12 @@
   </button>
 </InspectorCard>
 
-<!-- Two stats, two different questions. Components CARRY the essence, which is what blocks
-     a delete; recipes REQUIRE it, which is what a delete rewrites. Neither number is
-     derivable from the other. -->
+<!-- Two stats, two questions: components CARRY the essence and recipes REQUIRE it, and neither
+     number is derivable from the other. -->
 <section class="manager-essence-inspector-section" data-essence-section="stats">
-  <!-- The SHIPPED two-stat grid, joined rather than re-authored: `.manager-essence-stat-*`
-       is added to the `.manager-recipe-stat-*` / `.manager-component-stat-*` selector lists
-       in `styles/fabricate.css`. This inspector is one click from those two, and a
-       hand-rolled copy had already drifted on radius, background, value size and both
-       halves of the typographic contract (serif + `tabular-nums`). -->
+  <!-- The SHIPPED two-stat grid, joined into the sibling selector lists in
+       `styles/fabricate.css` rather than re-authored: a hand-rolled copy had already drifted on
+       radius, background, value size and both halves of the typographic contract. -->
   <div class="manager-essence-stat-grid">
     <div class="manager-essence-stat" data-essence-stat="components">
       <strong class="manager-essence-stat-value">{essence.componentUsageCount || 0}</strong>
@@ -305,17 +248,9 @@
 {/if}
 
 <!--
-  `SYSTEM RULES n / m` (issue 1372, maintainer parity round 8, `proto:1694`-`1716`).
-
-  It answers the one question this rail could not: which OTHER crafting systems have rules for
-  this essence, and how to get to each one's. The reference gives it a count over the whole
-  roster, a `Search systems` field, five named rows each ending in `Rules ↗`, and a pager — the
-  same panel the world Essence Catalogue's inspector already draws, which is why this composes
-  `SystemRulesRoster` rather than authoring a second one.
-
-  It renders only when the world corpus answered: `systemRows` is the world-scope join, and an
-  empty one over an unreadable corpus would report this essence as held by no system at all,
-  which is a false statement rather than an unavailable one.
+  `SYSTEM RULES n / m` answers the one question this rail could not: which OTHER crafting systems
+  have rules for this essence. It renders only when the world corpus answered, because an empty
+  `systemRows` over an unreadable corpus reports the essence as held by no system at all.
 -->
 {#if systemRows.length > 0}
   <section class="manager-essence-inspector-section" data-essence-section="systems">
@@ -334,33 +269,18 @@
   </section>
 {/if}
 
-<!--
-  THE ACTIONS SIT ABOVE `Source` AND `Usage`, not below them (issue 1036 fidelity pass).
-  The prototype's rail is hero, stats, `On craft`, then the actions — the primary `Edit
-  essence` is the loudest control on the panel and it is on screen. Ordered after two
-  supplementary detail cards it fell past the fold at the 1280×820 capture size, so the
-  rail's one loud thing was invisible in every frame of it. `Source` and `Usage` are
-  reference, so they follow the verb rather than delaying it.
--->
+<!-- THE ACTIONS SIT ABOVE `Source` AND `Usage`: ordered after two detail cards the primary fell
+     past the fold, so the rail's one loud control was invisible in every captured frame. -->
 <section class="manager-essence-inspector-section" data-essence-section="actions">
   <!-- The three verbs render through `InspectorActionButton`, the extracted point-of-arrival
-       button for every right inspector (issue 1036, maintainer round 2). What changes here
-       is not only the size: the primary was `.manager-button.is-primary`, which is the
-       SUCCESS family, so `Edit essence` painted green where the design's primary — and the
-       recipe and component inspectors a click away — is the accent. -->
+       button for every right inspector. The primary was `.manager-button.is-primary`, the SUCCESS
+       family, so `Edit essence` painted green where the design's primary is the accent. -->
   <!--
-    NO DUPLICATE (issue 1372, maintainer parity round 8).
-
-    `store.duplicateEssence` wrote a second `system.essenceDefinitions` entry with a fresh id and
-    a `(copy)` name — a SYSTEM-owned essence carrying its own name, icon and colour, minted from a
-    rail whose own banner two cards above says that name, icon and colour come from the Essence
-    Catalogue and are shared by every system. Both claims were on screen at once.
-
-    The reference offers no essence duplicate on any of its four essence screens. What it offers
-    instead is `Reuse these rules` on the system rules editor (`proto:3600`+), which copies THIS
-    system's effect source and macro into another system's own rules for the SAME essence — the
-    verb a GM actually wants, without minting an identity. That card is already shipped in
-    `EssenceEditView.svelte` and is one click away through `Edit essence` below.
+    NO DUPLICATE. `store.duplicateEssence` minted a SYSTEM-owned essence with its own name, icon and
+    colour from a rail whose banner two cards above says those come from the Essence Catalogue and
+    are shared by every system — both claims on screen at once. What the reference offers instead is
+    `Reuse these rules` on the system rules editor, copying THIS system's effect source and macro
+    into another system's rules for the SAME essence, already shipped one click away.
   -->
   <div class="manager-essence-inspector-actions">
     <InspectorActionButton
@@ -370,13 +290,9 @@
       data-essence-action="edit"
       onClick={() => onEdit(essence.id)}
     />
-    <!-- The SINGLE delete keeps the `confirmDialog` the store already owns. The two-step
-         ARM is the BULK panel's, per the maintainer's decision for that action alone;
-         wearing both idioms on one screen for one verb would teach the GM neither. The
-         delete is WARNED, not BLOCKED (maintainer round): the control is never disabled by
-         component usage, and `store.deleteEssence` states the cascade's impact counts in
-         its confirm dialog rather than refusing. The impact note below previews the same
-         counts on the panel. -->
+    <!-- The SINGLE delete keeps the `confirmDialog` the store owns; the two-step ARM is the BULK
+         panel's alone. It is WARNED, not BLOCKED: never disabled by component usage, with the
+         cascade's counts stated in the dialog and previewed below. -->
     <InspectorActionButton
       tone="danger"
       icon="fas fa-trash"
@@ -426,11 +342,9 @@
           <strong>{essence.associatedItem.name || essence.sourceName}</strong>
         </div>
       </div>
-      <!-- The SAME primitive as the three verbs above. These two are a pair in a two-column
-           grid rather than a stack, but they are the same meaning in the same rail, and a
-           rail that sized its source actions differently from its entity actions is the
-           drift the extraction exists to remove. `warning` carries the amber the shipped
-           `Unlink Source` wore: unlinking breaks a reference, it destroys nothing. -->
+      <!-- The SAME primitive as the three verbs above, paired in a two-column grid: a rail sizing
+           its source actions differently from its entity actions is the drift the extraction
+           removes. `warning` carries the amber `Unlink Source` wore — it breaks a reference. -->
       <div class="manager-essence-inspector-source-actions">
         <InspectorActionButton
           icon="fas fa-copy"
@@ -500,40 +414,25 @@
 </section>
 
 <style>
-  /* No stat-grid block here. The four rules this file used to declare are the shipped
-     `.manager-recipe-stat-*` / `.manager-component-stat-*` rules with four visible
-     divergences, so the classes joined those selector lists in `styles/fabricate.css`
-     instead — one shape, one definition, and the essence inspector's numbers now match the
-     recipe and component inspectors a click away. */
+  /* No stat-grid block here: the classes joined the sibling selector lists in
+     `styles/fabricate.css` instead, so there is one shape and one definition. */
 
-  /* The prototype's shared-definition block is INFO-toned — the one panel on the rail that is
-     an explanation rather than a control (`proto:1676`). It reuses the inspector card's own
-     geometry and restates only the tint, so no second card shape enters the rail.
+  /* The shared-definition block is INFO-toned, the one panel on the rail that is an explanation
+     rather than a control. It reuses the inspector card's geometry and restates only the tint.
 
-     `:global()` AND CHAINED (issue 1427), for the reason `ItemPageInspector` states at length.
-     That block is an `<InspectorCard>` now, so `manager-essence-shared` rides the `class` prop
-     onto an element THIS component does not write, and Svelte stamps its `svelte-<hash>` only
-     onto the ones it does. `.manager-inspector-card` is chained rather than left off so the
-     selector stays at (0,2,0), exactly where the scoped form put it, and it still beats nothing
-     it did not beat before. */
+     `:global()` AND CHAINED, for the reason `ItemPageInspector` states: the class rides a `class`
+     prop onto an element THIS component does not write, so it carries no `svelte-<hash>`, and
+     `.manager-inspector-card` is chained so the selector stays at (0,2,0). */
   :global(.manager-inspector-card.manager-essence-shared) {
     border-color: var(--fab-info-border);
     background: var(--fab-info-soft);
   }
 
-  /* Colour only. `.manager-link-button` in `styles/fabricate.css` owns the shape, and it
-     paints muted; the prototype paints this link in the accent because it LEAVES the screen.
-     Compounded through `.manager-inspector-card` so the rule is (0,3,0) and beats the global
-     `.fabricate-manager .manager-link-button` outright instead of tying it at (0,2,0) and
-     being decided by stylesheet injection order.
-
-     WHOLLY `:global()` for the same issue-1427 reason, rather than a `:global()` ancestor with a
-     scoped descendant — which is the form that looks right and quietly changes the cascade. The
-     ANCESTOR compound is the one that stopped matching: `.manager-inspector-card` is now written
-     by the primitive and carries no hash, and the button, which this component does still write,
-     cannot rescue a selector whose left half matches nothing. `.manager-essence-shared` replaces
-     the hash as the compound that narrows the match set to this card, so the count of classes —
-     and therefore the specificity — is unchanged at (0,3,0). */
+  /* Colour only: `.manager-link-button` owns the shape and paints muted, and this link takes the
+     accent because it LEAVES the screen. Compounded through `.manager-inspector-card` so the rule
+     is (0,3,0) and beats the global outright rather than tying and being decided by injection order.
+     WHOLLY `:global()`, not a global ancestor with a scoped descendant — the form that looks right
+     and quietly changes the cascade — because the ANCESTOR is what stopped matching. */
   :global(.manager-inspector-card.manager-essence-shared .manager-essence-shared-link) {
     color: var(--fab-accent);
     font-weight: 600;
@@ -547,10 +446,8 @@
     font-size: 0.6rem;
   }
 
-  /* THE META LINE under the inspected name: the colour and this system's carrier count. It is
-     the same size and colour as the world catalogue's own caption
-     (`.manager-scoped-list-inspector-caption`), so a GM reading one rail and then the other sees
-     one treatment rather than two. */
+  /* THE META LINE under the inspected name, at the world catalogue caption's own size and colour,
+     so a GM reading one rail and then the other sees one treatment. */
   .manager-essence-inspector-meta {
     margin: 0;
     color: var(--fab-text-subtle);
@@ -574,25 +471,11 @@
     opacity: 0.72;
   }
 
-  /* A BARE COLUMN, NOT A STACK OF BOXES (issue 1372, maintainer parity round 8).
-
-     `.manager-inspector-card` draws a 1px border, an 8px radius and `--fab-space-3` of padding.
-     Every section on this rail wore it, and four of those sections CONTAIN cards — two on-craft
-     cards, two stat tiles, five system rows — so the reference's one border became three nested
-     ones and the whole right third read as a panel inside a panel inside a window.
-
-     The reference draws the rail as a column on the pane's own surface with a micro-label per
-     section, and only the things that ARE objects keep a box (`tmp/proto/essence-rules.png`).
-     That is also exactly what `RecipeBrowserInspector` already does one click away, and its own
-     header records the same correction — so this brings the fourth library inspector onto the
-     shape the other one already has rather than inventing a treatment.
-
-     THE SHARED-DEFINITION CALLOUT KEEPS ITS BOX, because it IS an object: an info-toned
-     explanation the reference draws as a filled, bordered block. It is therefore the ONE site
-     in this file that calls `<InspectorCard>` (issue 1427). The other six are not unconverted
-     callers of that primitive — they stopped being cards at all, so there is no shell for them
-     to ask for, and calling the primitive to then unpaint its border, radius and padding would
-     be a worse hand-roll than writing the column. */
+  /* A BARE COLUMN, NOT A STACK OF BOXES. Every section wore `.manager-inspector-card` and four of
+     them CONTAIN cards, so one border became three nested ones. The rail is a column on the pane's
+     own surface with a micro-label per section, and only the things that ARE objects keep a box, as
+     `RecipeBrowserInspector` already does. THE SHARED-DEFINITION CALLOUT KEEPS ITS BOX, because it
+     IS an object, and is therefore the ONE site here calling `<InspectorCard>`. */
   .manager-essence-inspector-section {
     display: flex;
     flex-direction: column;
