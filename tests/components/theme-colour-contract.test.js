@@ -33,6 +33,10 @@ const dynamicTagReadSites = Object.freeze([
   }
 ]);
 const dynamicallyReadTokenPattern = /^--fab-tag-/;
+// A theme foundation read only by the premium companion, which this repository's CI never checks
+// out, so the unread gate below cannot see the read. An exact name and never a prefix: the product
+// reads --fab-on-accent, --fab-on-danger, --fab-on-success and --fab-on-badge-gold (issue 1765).
+const companionReadTokens = Object.freeze(['--fab-on-info']);
 const colourLiteralPattern = /(#[0-9a-fA-F]{3,8}\b|rgba?\([^)]*\)|hsla?\([^)]*\)|(?<![-\w])(?:white|black)(?![-\w]))/g;
 const themeSelectors = Object.freeze({
   fabricate: ':root,\n:root[data-fabricate-theme="fabricate"],\n.fabricate[data-fabricate-theme="fabricate"]',
@@ -215,6 +219,42 @@ describe('Theme colour contract', () => {
     );
   });
 
+  // The only absolute presence check here; the others are all relative (issue 1765, and
+  // `Downtime Preview and Premium Extension` in ui-integration/spec.md). Stripped per block: the
+  // sheet names the token in prose beside it, and `--fab-on-info:` in a comment matches this scan.
+  it('declares every companion-read token in every theme block', () => {
+    const css = readFileSync(cssPath, 'utf8');
+    const themeIdsInSheet = [
+      ...new Set([...css.matchAll(/\[data-fabricate-theme="([^"]+)"\]/g)].map(match => match[1]))
+    ].sort();
+
+    assert.deepEqual(
+      Object.keys(themeSelectors).sort(),
+      themeIdsInSheet,
+      `themeSelectors must name every theme block the sheet declares, or this assertion is `
+        + `absolute only over a hand-written list: an unlisted theme is skipped here AND by the `
+        + `parity assertion above, and the bare \`:root\` compound would resolve its companion `
+        + `tokens to fabricate's values rather than leaving them unresolved`
+    );
+
+    const missing = Object.entries(themeSelectors).flatMap(([themeId, selector]) => {
+      const declaredInBlock = tokenNames(stripCommentedSource(blockFor(css, selector)));
+
+      return companionReadTokens
+        .filter(token => !declaredInBlock.includes(token))
+        .map(token => `${themeId} is missing ${token}`);
+    });
+
+    assert.deepEqual(
+      missing,
+      [],
+      `every theme block must declare every companion-read token — the premium companion reads `
+        + `them, and an unresolvable var() in an inherited property computes the inherited value, `
+        + `so a missing declaration paints the theme's body ink instead of failing:\n`
+        + `${missing.join('\n')}`
+    );
+  });
+
   it('declares no root-layer token the product never reads', () => {
     const css = readFileSync(cssPath, 'utf8');
     const declared = new Set([
@@ -234,7 +274,12 @@ describe('Theme colour contract', () => {
 
     const read = tokensReadByProduct();
     const unread = [...declared]
-      .filter(token => !read.has(token) && !dynamicallyReadTokenPattern.test(token))
+      .filter(
+        token =>
+          !read.has(token)
+          && !dynamicallyReadTokenPattern.test(token)
+          && !companionReadTokens.includes(token)
+      )
       .sort();
 
     assert.deepEqual(
