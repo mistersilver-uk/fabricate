@@ -1,9 +1,6 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  Inline realm-name editor for the Travel > Realms inspector. Keeps a local
-  draft seeded from the upstream name (reseeded when a different realm is
-  selected or the name changes externally) and commits on blur / Enter; Escape
-  reverts.
+  Inline realm-name editor for the Travel > Realms inspector: a local draft seeded from the upstream
+  name, committed on blur or Enter, reverted on Escape.
 -->
 <script>
   import Field from '../../components/Field.svelte';
@@ -19,8 +16,7 @@
   // eslint-disable-next-line svelte/prefer-writable-derived
   let draft = $state(untrack(() => name));
 
-  // Reseed the draft whenever the upstream name changes (selection change or
-  // external rename). Does not fire while the user is typing (name is stable).
+  // Reseed on an upstream change; it does not fire while typing, because `name` is stable then.
   $effect(() => {
     draft = name;
   });

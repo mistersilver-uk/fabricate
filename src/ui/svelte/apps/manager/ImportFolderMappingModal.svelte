@@ -1,24 +1,13 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  Folder-aware bulk-import mapping step (issue 771). Opened before a folder / whole-pack
-  drop commits: it lists the folders detected in the drop, each with its item count, and
-  lets the GM assign (or inline-create) a category and/or tags per folder — or skip a
-  folder — before importing.
+  Folder-aware bulk-import mapping step (issue 771), opened before a folder or whole-pack drop
+  commits: it lists the detected folders with their item counts and lets the GM assign — or inline
+  create — a category and tags per folder, or skip one. Match-by-name is ON by default and pre-fills
+  each row; the primary `Import N items` commits, and its count updates live as folders are skipped.
 
-  The dialog chrome — portal into `.fabricate-manager`, centring, the compact title +
-  subtitle, the round close control, and the footer rail — comes from the shared
-  `ManagerModal` primitive (issue 877), so this modal and the post-import reference
-  report are ONE implementation of "manager modal dialog" rather than two. This file
-  owns only the mapping body. Each per-folder row mirrors the compact
-  RecipeRoutingAssignment + SearchablePopover "assign X per Y" pattern: a folder name, a
-  `tabular-nums` item-count badge, a category `<Select>` (the app's own option list, issue
-  1510) with an inline "＋ New" (the
-  shared InlineVocabularyAdd), a tags multi-assign (RecipeRoutingAssignment chips +
-  popover), and a per-row Skip.
-
-  Match-by-name (ON by default) pre-fills each row from the folder name; the primary
-  "Import N items" button commits the pre-filled assignments, and the count updates live
-  as folders are skipped (a skipped folder's items are excluded from the import).
+  The dialog chrome comes from the shared `ManagerModal` primitive (issue 877), so this modal and
+  the post-import reference report are ONE implementation of "manager modal dialog"; this file owns
+  only the mapping body, and each row mirrors the compact `RecipeRoutingAssignment` +
+  `SearchablePopover` "assign X per Y" pattern.
 -->
 <script>
   import Field from '../../components/Field.svelte';
@@ -121,20 +110,16 @@
     ...(componentCategories || []).map((category) => ({ value: category, label: category })),
   ]);
 
-  // THE GENERAL BUCKET IS THE SENTINEL ROW (issue 1510). Its value is the empty string, and
-  // `Select` stamps `data-popover-option="__unchanged__"` on any row whose value is `''` — a
-  // declared token, because `SearchablePopover` omits the attribute entirely for a falsy `dataId`
-  // and the one row a driver most needs to click would have been the one row with no handle.
+  // THE GENERAL BUCKET IS THE SENTINEL ROW (issue 1510): its value is `''`, and `Select` stamps
+  // `data-popover-option="__unchanged__"` on any such row, because `SearchablePopover` omits the
+  // attribute for a falsy `dataId` and the row a driver most needs to click would have no handle.
   // Every mounted assertion and capture step that clicks General must use that literal.
 
   // The caption id, per ROW: the modal renders one category control per detected folder, so a
   // single component-level id would name every trigger in the list the same way.
   const instanceId = $props.id();
 
-  /**
-   * @param {number} rowIndex The folder row's index.
-   * @returns {string} The document-unique id of that row's category caption.
-   */
+  /** The document-unique id of one folder row's category caption. */
   function categoryCaptionId(rowIndex) {
     return `${instanceId}-category-${rowIndex}`;
   }
@@ -153,13 +138,9 @@
   );
   const importDisabled = $derived(importCount === 0);
 
-  // Every existing tag, in the RecipeRoutingAssignment shape. Handing over the UNFILTERED
-  // list IS that component's contract: it takes `options` (the full candidate list) beside
-  // `selectedIds` and derives its own picker from the pair, dropping what is already selected
-  // here or disabled elsewhere. Do not filter here — it would be a second, divergent copy of
-  // that rule, and it would break the selected chips, whose labels resolve each selected id
-  // back through `options`. The `_state` parameter is vestigial: the row contributes nothing
-  // to the mapping.
+  // Every existing tag, UNFILTERED, which IS `RecipeRoutingAssignment`'s contract: it derives its
+  // own picker from `options` beside `selectedIds`. Filtering here would be a divergent copy of
+  // that rule and would break the selected chips, whose labels resolve back through `options`.
   function tagOptionsFor(_state) {
     return (itemTags || []).map((tag) => ({ id: tag, name: `#${tag}` }));
   }
@@ -261,10 +242,8 @@
   {onClose}
 >
   {#snippet body()}
-    <!-- The manager's ONE selection control (issue 772). This was a raw checkbox wearing
-         Foundry's default control chrome, which is exactly the inconsistency the shared
-         primitive exists to remove — and it sat one dialog away from the component
-         browser's rows, which now render through the same component. -->
+    <!-- The manager's ONE selection control (issue 772), in place of a raw checkbox wearing
+         Foundry's default control chrome. -->
     <label class="manager-import-mapping-match" data-import-mapping-match>
       <SelectionCheckbox
         size="sm"
@@ -323,11 +302,10 @@
 
           {#if !row.state.skipped}
             <div class="manager-import-mapping-controls">
-              <!-- A `Field as="div"` RATHER THAN THE `as="label"` THIS WAS (issue 1510). The
-                   wrapper keeps its class — the row's own `min-width` and control font hang off
-                   it — and stops naming the trigger by containment, which it must, because a
-                   `<label>` forwards a caption click into a control whose panel is dismissed on
-                   `mousedown` while open. The caption is pointed at instead. -->
+              <!-- A `Field as="div"` RATHER THAN `as="label"` (issue 1510): the wrapper keeps its
+                   class but must stop naming the trigger by containment, because a `<label>`
+                   forwards a caption click into a control whose panel is dismissed on `mousedown`
+                   while open. The caption is pointed at instead. -->
               <Field as="div" class="manager-import-mapping-category">
                 <span id={categoryCaptionId(row.index)}
                   >{text('FABRICATE.Admin.Items.ImportMapping.Category', 'Category')}</span
@@ -425,15 +403,9 @@
 </ManagerModal>
 
 <style>
-  /*
-    One control scale for the whole dialog (issue 772).
-
-    Every control in here rendered at the manager's default body size while the surfaces
-    it sits between — the components toolbar it is launched from, and the bulk edit rail
-    beside it — read at `--fab-recipe-control-font`. The dialog is dense (a row per
-    detected folder, each with a select, a chip, and three buttons), so it was both the
-    largest type on screen and the one with the least room for it.
-  */
+  /* One control scale for the whole dialog (issue 772): it is dense, and it sits between surfaces
+     that read at `--fab-recipe-control-font`, so the manager's default body size made it both the
+     largest type on screen and the one with the least room for it. */
   .manager-import-mapping-match {
     display: flex;
     align-items: center;
@@ -442,25 +414,15 @@
     color: var(--fab-text-secondary);
   }
 
-  /* The row's inline actions — Skip / New / Add tag — are secondary to the dialog's own
-     Cancel and Import, which keep the default 34px so the commit action stays the
-     heaviest thing in the footer.
+  /* The row's inline actions are secondary to the dialog's Cancel and Import, which keep the
+     default 34px so the commit action stays the heaviest thing in the footer.
 
-     RE-CHAINED, and split in two, at the conversion (issue 1118, task 9). The `:global()`
-     was always here and is still load-bearing: the row is written by THIS component so it
-     carries the scoping hash, while the buttons inside it are not — two are
-     `<ManagerButton>`s now and the third never was. What changed is the arbitration. At
-     (0,3,0) this rule TIED `.fabricate-button.manager-button.fab-manager-button` and kept
-     its 28px only because a component's injected sheet lands after the linked one; naming
-     the primitive's own class takes it to (0,4,0), which wins on specificity instead.
-
-     The SECOND selector is the half a plain re-chain would have broken, and it is the same
-     hazard as `.manager-knowledge-row-actions .manager-button`: the "Add tag" control in
-     this row is a `SearchablePopover` trigger rendered from `RecipeRoutingAssignment`'s
-     `triggerClass` STRING. It is population B, it is not converted, and it will never carry
-     `fab-manager-button` — so a chained rule cannot reach it and it would have snapped back
-     to the default 34px beside the two 28px controls it sits with. It is named by its own
-     trigger class instead, which puts it at (0,4,0) too. */
+     RE-CHAINED, and split in two, at the conversion (issue 1118). `:global()` is load-bearing: the
+     row carries this component's hash and the buttons inside it do not. At (0,3,0) this rule TIED
+     the primitive's own compound and kept its 28px only on injection order, so naming that class
+     takes it to (0,4,0). The SECOND selector is the half a plain re-chain would have broken: the
+     "Add tag" control is a `SearchablePopover` trigger from a `triggerClass` STRING and will never
+     carry `fab-manager-button`, so it is named by its own trigger class instead. */
   .manager-import-mapping-row :global(.manager-button.fab-manager-button),
   .manager-import-mapping-row :global(.manager-button.manager-recipe-routing-add-trigger) {
     min-height: 28px;
@@ -468,11 +430,9 @@
     font-size: var(--fab-recipe-control-font);
   }
 
-  /* `InlineVocabularyAdd`'s Add is `role="primary"`, and the primitive's `is-primary`
-     companion states `padding: 0 var(--fab-space-4)` at (0,4,0) — a tie with the rule
-     above, settled by injection order. This restates the row's compact padding one class
-     higher so the dense row wins on specificity. Only `padding` is repeated: `min-height`
-     and `font-size` are already uncontested at (0,4,0). */
+  /* `InlineVocabularyAdd`'s Add is `role="primary"`, whose companion rule ties the one above at
+     (0,4,0) and is settled by injection order, so the row's compact padding is restated one class
+     higher. Only `padding`: the other two are uncontested. */
   .manager-import-mapping-row :global(.manager-button.fab-manager-button.is-primary) {
     padding: 0 var(--fab-space-2);
   }
@@ -516,10 +476,8 @@
     font-size: var(--fab-recipe-control-font);
   }
 
-  /* The field labels read as the bulk rail's micro-labels rather than as body text: the
-     two surfaces sit side by side and were captioning the same vocabulary — a category
-     and a tag set — at two different scales. This also settles an inconsistency inside
-     the dialog itself, where "Category" was sentence case beside an uppercase "TAGS". */
+  /* The field labels read as the bulk rail's micro-labels rather than as body text: the two
+     surfaces caption the same vocabulary and sat at two different scales. */
   .manager-import-mapping-controls :global(.manager-field > span) {
     font-size: 0.58rem;
     font-weight: 700;
@@ -541,52 +499,30 @@
     gap: var(--fab-space-2);
   }
 
-  /* ONE RULE, ON THE TRIGGER (issue 1510). This was TWO blocks with the identical selector —
-     `no-duplicate-selectors` exists to catch exactly that — one carrying the control font and one
-     the width floor, and both were element-typed against a `<select>` this row no longer renders.
-     An element-typed leg in a scoped block dies SILENTLY on conversion and no gate sees it, so
-     both are re-pointed at `.fabricate-select-trigger` together.
+  /* ONE RULE, ON THE TRIGGER (issue 1510), where this was two blocks with the identical selector,
+     both element-typed against a `<select>` this row no longer renders — an element-typed leg in a
+     scoped block dies SILENTLY on conversion and no gate sees it. `:global(...)` chained with
+     `.manager-field`, because a scoped rule cannot reach a class handed to a child, and the
+     compound restores the (0,2,0) the scoped form had.
 
-     `:global(...)`, chained with `.manager-field`: this class sits on a `<Field>`, and a scoped
-     rule cannot reach a class the component hands to a child (see `Field.svelte`). The
-     `.manager-field` compound is not decoration — it restores the (0,2,0) the scoped
-     `.manager-import-mapping-category.svelte-hash` form had, which the bare
-     `:global(.manager-import-mapping-category)` would drop to (0,1,0).
-
-     THE FLOOR IS WHAT KEEPS THE ROW STILL. The controls row is `flex-wrap` with
-     `align-items: flex-end`, so the trigger hugs its value rather than filling a column — which
-     is the row's intended shape — and without a floor choosing General after a long category
-     name would visibly shrink the control and re-flow the New button beside it. 140px is the
-     figure the `<select>` carried, kept rather than re-derived.
-
-     AND THE FLOOR DECIDES THE PANEL'S CEILING, which is the accepted cost of keeping the hug.
-     `anchoredPopover` resolves the band as `clamp(max(triggerWidth, minWidth), minWidth,
-     maxWidth)`, and this caller states neither bound, so it takes the `form` rung's 240/340: a
-     140px trigger resolves to `clamp(max(140, 240), 240, 340)` = 240px, and the panel never
-     widens with the list because the trigger never widens with the value. So a long enough
-     category name ellipsises: measured in Chromium on
-     `tests/fixtures/manager-select/?subject=import`, the row draws 38 characters of
-     "Alchemical reagents and rare herbs from the deep wood" at 500 12px Arial before its
-     `text-overflow` takes over. The exact count is text-dependent — it is a width, not a
-     character budget. Accepted rather than fixed here:
-     raising `maxWidth` would not help while the trigger is the floor, widening the trigger would
-     undo the row's intended shape, and the categories are world-authored so no figure is the
-     right one for every world. It is also the one converted list in this phase that no View Lab
-     case can photograph — this modal opens only on a folder or compendium drop, and the runner
-     has no `drop` verb — so it is recorded here where the rule is, and measured by
-     `tests/components/manager-select-conversion-rendered.test.js`. */
+     THE FLOOR IS WHAT KEEPS THE ROW STILL: the controls row is `flex-wrap` with
+     `align-items: flex-end`, so the trigger hugs its value, and without a floor choosing General
+     after a long category name would shrink the control and re-flow the New button beside it.
+     AND THE FLOOR DECIDES THE PANEL'S CEILING, which is the accepted cost of the hug: with neither
+     bound stated the `form` rung's 240/340 applies, so the panel never widens with the list and a
+     long enough category name ellipsises. Accepted rather than fixed, since raising `maxWidth`
+     cannot help while the trigger is the floor and the categories are world-authored. No View Lab
+     case can photograph it — the modal opens only on a drop — so
+     `tests/components/manager-select-conversion-rendered.test.js` measures it. */
   :global(.manager-field.manager-import-mapping-category .fabricate-select-trigger) {
     min-width: 140px;
     font-size: var(--fab-recipe-control-font);
   }
 
-  /* The real control is 1px and transparent, so the ring has to be drawn on the visible
-     box. `SelectionCheckbox` scopes its own ring to the `<label>` IT renders, which this
-     host opts out of with `wrapper="contents"` — so the host draws it. This rule reaches
-     into the component's markup using `:global()`, following the pattern in
-     `BulkSelectionToolbar.svelte` (issue 924). The adjacent-sibling form is what makes
-     `:global()` sufficient: `<input>` and `<span class="fab-selection-check">` are
-     siblings in the component's `wrapper="contents"` mode. */
+  /* The real control is 1px and transparent, so the ring is drawn on the visible box.
+     `SelectionCheckbox` scopes its own ring to the `<label>` IT renders, which this host opts out
+     of with `wrapper="contents"`, so the host draws it — reaching in with `:global()`, which the
+     adjacent-sibling form makes sufficient. */
   .manager-import-mapping-match :global(.fab-selection-input:focus-visible + .fab-selection-check) {
     outline: 2px solid var(--fab-accent);
     outline-offset: 2px;

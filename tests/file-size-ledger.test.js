@@ -266,6 +266,6 @@ test('the ledger reports the two figures epic 1656 tracks', (t) => {
   // `.svelte` files under the threshold on comment lines alone. Regenerated from the merged tree
   // rather than reconciled by hand -- these counts are derived, so picking a side of the conflict
   // would have pinned a figure no tree actually has.
-  assert.equal(files, 117, 'oversized files');
+  assert.equal(files, 115, 'oversized files');
   assert.equal(keys.length - files, 120, 'oversized functions');
 });
