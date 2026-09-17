@@ -63,10 +63,10 @@ jobs:
           S3_RELEASE_BUCKET: ${{ vars.S3_RELEASE_BUCKET }}
           RELEASE_BASE_URL: ${{ vars.RELEASE_BASE_URL }}
           # The tester-path secret for whichever channel was chosen; the script reads the one its
-          # channel config names (S3_TESTER_PATH_SECRET for beta, S3_EARLY_ACCESS_PATH_SECRET for
+          # channel config names (S3_TESTER_PATH_SECRET for beta, S3_GUILD_ARTISAN_PATH_SECRET for
           # early-access) and ignores the rest. GitHub masks their values in logs.
           S3_TESTER_PATH_SECRET: ${{ secrets.S3_TESTER_PATH_SECRET }}
-          S3_EARLY_ACCESS_PATH_SECRET: ${{ secrets.S3_EARLY_ACCESS_PATH_SECRET }}
+          S3_GUILD_ARTISAN_PATH_SECRET: ${{ secrets.S3_GUILD_ARTISAN_PATH_SECRET }}
           CHANNEL: ${{ inputs.channel }}
         run: |
           node scripts/release-s3.js \
