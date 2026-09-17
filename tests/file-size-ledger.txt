@@ -145,8 +145,8 @@ src/ui/svelte/apps/manager/BooksScrollsView.svelte	753
 src/ui/svelte/apps/manager/BulkStagingInset.svelte	547
 src/ui/svelte/apps/manager/ComponentEditView.svelte	2498
 src/ui/svelte/apps/manager/ComponentsBrowserView.svelte	862
-src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte	16645
-src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte::viewSubtitle	243
+src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte	13919
+src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte::viewSubtitle	230
 src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte	1432
 src/ui/svelte/apps/manager/EssenceBrowserView.svelte	670
 src/ui/svelte/apps/manager/EssenceEditView.svelte	802
@@ -215,11 +215,11 @@ src/ui/svelte/components/SearchablePopover.svelte	882
 src/ui/svelte/stores/actorBarStore.svelte.js::createActorBarStore	205
 src/ui/svelte/stores/adminComponentRowProjection.js::_createItemCard	131
 src/ui/svelte/stores/adminRecipeRowProjection.js	889
-src/ui/svelte/stores/adminStore.js	12147
-src/ui/svelte/stores/adminStore.js::createAdminStore	10316
-src/ui/svelte/stores/adminStore.js::createAdminStore>_createTravelSection	582
-src/ui/svelte/stores/adminStore.js::createAdminStore>_createTravelSection>buildState	213
-src/ui/svelte/stores/adminStore.js::createAdminStore>refresh	349
+src/ui/svelte/stores/adminStore.js	9786
+src/ui/svelte/stores/adminStore.js::createAdminStore	8207
+src/ui/svelte/stores/adminStore.js::createAdminStore>_createTravelSection	551
+src/ui/svelte/stores/adminStore.js::createAdminStore>_createTravelSection>buildState	204
+src/ui/svelte/stores/adminStore.js::createAdminStore>refresh	278
 src/ui/svelte/stores/adminStore.js::createAdminStore>updateEnvironmentDraft	131
 src/ui/svelte/stores/adminSystemInspectorProjection.js::buildSelectedSystemViewData	313
 src/ui/svelte/stores/alchemyStore.svelte.js::createAlchemyStore	644

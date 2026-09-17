@@ -17,10 +17,7 @@
   import { announceAfterFocusMove } from '../../util/announceAfterFocus.js';
   import { resolveDropUuid } from '../../util/dropUtils.js';
   import { permitsFailureResults } from '../../../../utils/failureResultPolicy.js';
-  // THE SHARED SOURCE-REFERENCE WALK (issue 1373). One Item is one world Tool, and the union
-  // over `registeredItemUuid` / `originItemUuid` / `aliasItemUuids` is how every other reader
-  // in this repository answers "is this record that Item". A fourth comparison written here
-  // would drift from the index the migration grouped by.
+  // THE SHARED SOURCE-REFERENCE WALK (issue 1373).
   import { getItemMatchUuids } from '../../../../utils/sourceReferenceUnion.js';
   import {
     routedOutcomeTierOptions,
@@ -41,11 +38,8 @@
     normalizeComponentCategory,
   } from '../../../../utils/componentCategories.js';
   import { categoryIconFor } from '../../../../utils/categoryIcons.js';
-  // ── COMPLICATIONS: the trigger picker's option labels (issue 1286) ───────────────────
-  // A check trigger carries no authored name — `_normalizeUnifiedTrigger` drops `label`
-  // deliberately — so what NAMES one is its condition sentence, and the Checks Studio's own
-  // trigger cards already build that sentence from these three modules. The complications
-  // picker reuses them rather than composing a second sentence for the same trigger.
+  // ── COMPLICATIONS: the trigger picker's option labels (issue 1286) ─────────────────── A check
+  // trigger carries no authored name — `_normalizeUnifiedTrigger` drops `label` deliberately.
   import { parseDiceGroups } from '../../../../utils/craftingCheckExpression.js';
   import { interpolate } from './checks/checksCopy.js';
   import { summariseCondition } from './checks/checkTriggerSummary.js';
@@ -89,9 +83,8 @@
   import GatheringMapLinksTab from './GatheringMapLinksTab.svelte';
   import EssenceBrowserView from './EssenceBrowserView.svelte';
   import EssenceEditView from './EssenceEditView.svelte';
-  // The essence library's rail halves and the editor's live preview (issue 1036), extracted
-  // out of this file. `essences/` is the BROWSER's directory, which the screenshot evidence
-  // map globs for the essence views.
+  // The essence library's rail halves and the editor's live preview (issue 1036), extracted out of
+  // this file.
   import EssenceBrowserInspector from './essences/EssenceBrowserInspector.svelte';
   import EssenceBulkEditPanel from './essences/EssenceBulkEditPanel.svelte';
   import EssenceBehaviorPreview from './essences/EssenceBehaviorPreview.svelte';
@@ -103,13 +96,10 @@
   import ToolBrowserInspector from './tools/ToolBrowserInspector.svelte';
   import RecipesBrowserView from './RecipesBrowserView.svelte';
   import RecipeBrowserInspector from './recipes/RecipeBrowserInspector.svelte';
-  // The recipe library's bulk edit panel (issue 1010) — the sibling of the above, and
-  // under `recipes/` for the same reason: `recipe/` is the EDITOR's directory, which the
-  // screenshot map globs for the five recipe-editor frames.
+  // The recipe library's bulk edit panel (issue 1010) — the sibling of the above, and under
+  // `recipes/` for the same reason: `recipe/` is the EDITOR's directory.
   import RecipeBulkEditPanel from './recipes/RecipeBulkEditPanel.svelte';
-  // The component library's inspector (issue 676) — the sibling of the above. It lives
-  // under `components/` (the BROWSER's dir), NOT `component/`, which the screenshot map
-  // globs for the component EDITOR's frames.
+  // The component library's inspector (issue 676) — the sibling of the above.
   import ComponentBrowserInspector from './components/ComponentBrowserInspector.svelte';
   // The three component-scope sentences this shell owns (issue 1371, parity round 4): the two
   // header subtitles it renders, and the salvage-mode label all three of them name.
@@ -163,9 +153,8 @@
   import { scopedEntryName, scopedEntryRoute } from './scoped/scopedEntryRoutes.js';
   import { essenceShortValueName, mintEssenceId } from './scoped/essenceScoped.js';
   import ScopedEntryHeaderActions from './scoped/ScopedEntryHeaderActions.svelte';
-  // The shipped two-step destructive control, for the world Tool entry's header `Delete`
-  // (issue 1373). It is the manager's one destructive idiom, so the header's Delete is guarded
-  // exactly as the row and card ones already are.
+  // The shipped two-step destructive control, for the world Tool entry's header `Delete` (issue
+  // 1373).
   import ArmedDangerButton from '../../components/ArmedDangerButton.svelte';
   import { confirmScopedEntryExit } from './scoped/scopedEntryDraft.js';
   import WorldDowntimeExtensionHost from './downtime/WorldDowntimeExtensionHost.svelte';
@@ -187,26 +176,16 @@
   let { store, services = null, managerExtensions = null, playerExtensions = null } = $props();
   let downtimeExtensionHost = $state(null);
   const PATREON_URL = 'https://www.patreon.com/c/mistersilver';
-  // Which provider currently holds the Downtime surface, and which one has already failed
-  // to mount. The shell owns both because the rail renders the active tab set while the
-  // host is unmounted, and a fault has to move the rail as well as the panel.
+  // Which provider currently holds the Downtime surface, and which one has already failed to mount.
   let downtimeProviderSnapshot = $state(null);
   let downtimeFaultedProvider = $state(null);
   // Bumped by `context.requestRemount()`. The host's mount effect keys on the context
   // object, so a new identity is the whole re-render mechanism.
   let downtimeContextRevision = $state(0);
-  // The chrome the live companion mount has asked Core to render, or null for "use what the
-  // active tab declared at registration". Assigned ONLY by the channel below.
-  //
-  // This is the whole no-remount mechanism, and it is a mechanism of OMISSION: nothing in
-  // `worldDowntimeContext` reads this state, so writing it re-renders the header and moves
-  // neither the context identity nor the host's mount effect. A reader added to the context
-  // derivation would silently turn every chrome update into a remount, which is precisely the
-  // failure the runtime channel exists to avoid — so keep chrome out of the context.
+  // The chrome the live companion mount has asked Core to render, or null for "use what the active
+  // tab declared at registration".
   let downtimeRouteChrome = $state(null);
-  // Whether the live mount can be asked to pop one level, which the breadcrumb's tab crumb
-  // reads. Its own signal rather than a field on the chrome above, because it is a separate
-  // fact: chrome is what the header SAYS and this is what one of its controls can DO.
+  // Whether the live mount can be asked to pop one level, which the breadcrumb's tab crumb reads.
   let downtimeCanReselect = $state(false);
   const downtimeChromeChannel = createRouteChromeChannel({
     onChange: (chrome) => {
@@ -219,20 +198,11 @@
     // where the registered provider's tab set and the rail's own navigation already live.
     onNavigate: (tabId) => navigateWorldDowntimeTab(tabId),
   });
-  // Every surface a companion currently claims, not just Core's Downtime one. The title bar
-  // reports the MODULE, so it must not be keyed on one route: a premium module whose only
-  // surface is one Core has never heard of is still installed and still working.
-  //
-  // …and for the same reason it must not be keyed on one REGISTRY either (issue 1198). A
-  // companion whose only surface is a player-window one is just as installed, so each
-  // registry publishes into its own private array and the pair are unioned below. Widening
-  // the SOURCE rather than the predicate is deliberate: `premiumInstalled` already means
-  // "read the whole registered surface set", so there is nothing about the flag to change.
+  // Every surface a companion currently claims, not just Core's Downtime one.
   let managerRegisteredSurfaceIds = $state([]);
   let playerRegisteredSurfaceIds = $state([]);
-  // The runtime side of a Downtime tab's badge (issue 1302): a frozen, null-prototype record
-  // keyed by tab id, one snapshot per publication. Registration-scoped, not mount-scoped — see
-  // `navTabBadgeStore.js` — so it is read here rather than by the (mount-scoped) extension host.
+  // The runtime side of a Downtime tab's badge (issue 1302): a frozen, null-prototype record keyed
+  // by tab id, one snapshot per publication.
   let downtimeNavTabBadges = $state(null);
 
   $effect(() => {
@@ -252,9 +222,7 @@
     });
   });
 
-  // The runtime badge channel. This is THE CAPABILITY (issue 1302): an implementation that
-  // renders only a tab's REGISTERED `badge` and never subscribes would satisfy every
-  // registry-level criterion while shipping `setWorldNavTabBadge` as a write-only sink.
+  // The runtime badge channel.
   $effect(() => {
     if (!managerExtensions?.subscribeNavTabBadges) return;
     return managerExtensions.subscribeNavTabBadges(WORLD_DOWNTIME_SURFACE_ID, (badges) => {
@@ -273,9 +241,8 @@
     downtimeContextRevision += 1;
   }
 
-  // A provider whose mount threw is set aside rather than unregistered: it keeps its
-  // registration (and its unregister handle stays the companion's), Core simply renders its
-  // own surface until the next snapshot arrives.
+  // A provider whose mount threw is set aside rather than unregistered: it keeps its registration
+  // (and its unregister handle stays the companion's).
   function noteDowntimeProviderFault(faultedProvider) {
     downtimeFaultedProvider = faultedProvider;
   }
@@ -289,19 +256,7 @@
   }
 
   // Core's own tab fields are lang KEYS and a companion's are already-localized text, so
-  // `downtimeCoreFallback` is the one discriminator between the two readings — the rule the
-  // rail's Downtime sub-items already apply to `label` / `tooltip`, applied to route chrome too.
-  // The two defaults are genuinely different values, not one repeated. `coreDefault` is what
-  // Core shows when its OWN lang key is missing. `providerDefault` is what Core shows over a
-  // companion's screens when that companion declared no chrome, and it must never be Core's
-  // preview copy: a raw English marketing sentence under someone else's UI is exactly the
-  // defect this seam exists to remove.
-  //
-  // THREE LAYERS, in one order, everywhere: the live mount's runtime chrome, then the active
-  // tab's registered chrome, then Core's own string. Unsetting is therefore not a separate
-  // path — a runtime update that omits a field simply does not shadow the layer below it, so a
-  // companion that never calls `setRouteChrome` reads exactly as it did before the channel
-  // existed and one that clears it lands back on its registered chrome with no further work.
+  // `downtimeCoreFallback` is the one discriminator between the two readings.
   function downtimeChrome(field, coreDefault, providerDefault = coreDefault) {
     const runtime = downtimeRuntimeChrome?.[field];
     if (runtime) return runtime;
@@ -318,15 +273,6 @@
   }
 
   // THE DOWNTIME TRAIL'S LAST TWO CRUMBS (issue 1322), and they are two rather than one.
-  //
-  // `downtimeChrome` reads the runtime layer FIRST, which is right for the page title and the
-  // subtitle — a companion's detail screen should own those outright. It is wrong for the
-  // breadcrumb, because a trail is a PATH: the detail belongs BELOW the tab it was reached
-  // through rather than in place of it. Shadowing it there left a GM inside a faction reading
-  // `World > Downtime > Emberwatch`, with the Factions tab absent from its own trail.
-  //
-  // So the tab crumb deliberately does NOT go through `downtimeChrome`: it reads the two lower
-  // layers only, in the same order, and the runtime value becomes a crumb of its own beneath.
   const downtimeTabCrumb = $derived.by(() => {
     const value = activeDowntimeTab?.breadcrumb;
     if (downtimeCoreFallback) return value ? text(value, worldDowntimeTabId) : worldDowntimeTabId;
@@ -334,25 +280,17 @@
   });
 
   // The companion's own leaf, or the empty string when there is nothing further to say.
-  //
-  // EMPTY WHEN IT MATCHES THE TAB CRUMB, which is not a tidy-up: the Tracking tab's board
-  // screen restates its registered chrome at runtime, so a leaf drawn unconditionally would
-  // read `... > Tracking > Tracking` on the screen a GM lands on.
   const downtimeLeafCrumb = $derived.by(() => {
     const runtime = downtimeRuntimeChrome?.breadcrumb;
     if (!runtime || runtime === downtimeTabCrumb) return '';
     return runtime;
   });
 
-  // Whether the tab crumb is worth pressing. `reselect` is offered to the live mount and Core
-  // has nothing of its own to do, so a companion that registered no handler would get a button
-  // that visibly does nothing — and there is nothing to go back UP to when the leaf is absent,
-  // because the tab crumb is then the screen the GM is already on.
+  // Whether the tab crumb is worth pressing.
   const downtimeTabCrumbNavigable = $derived(downtimeLeafCrumb !== '' && downtimeCanReselect);
 
-  // The ApplicationV2 shell calls this before it unmounts the Svelte root, while a
-  // companion target is still connected. `onDestroy` remains the safety net for
-  // direct Svelte teardown paths that do not go through the application shell.
+  // The ApplicationV2 shell calls this before it unmounts the Svelte root, while a companion target
+  // is still connected.
   export function disposeDowntimeProviderBeforeRemoval() {
     downtimeExtensionHost?.disposeBeforeRemoval?.();
   }
@@ -363,15 +301,10 @@
   const viewState = store.viewState;
 
   let activeView = $state('systems');
-  // The tab the System Overview page (`system-edit`) should open on. The standalone
-  // overview route was folded into this page as its Validation tab; bumping
-  // `requestedSystemTabNonce` alongside `requestedSystemTab` lets a deep link (or the
-  // blocker banner) force the Validation tab open even when the page is already shown.
+  // The tab the System Overview page (`system-edit`) should open on.
   let requestedSystemTab = $state('settings');
   let requestedSystemTabNonce = $state(0);
-  // Deep link into the System Overview page's Modifiers section (issue 1117). The Checks
-  // screen renders the modifier library read-only for every activity and links here, which
-  // is the one navigation that replaces the authoring the Checks card used to do.
+  // Deep link into the System Overview page's Modifiers section (issue 1117).
   let requestedSystemModifierSectionNonce = $state(0);
   let selectedRecipeId = $state('');
   let selectedComponentId = $state('');
@@ -385,10 +318,8 @@
   let componentEditDirty = $state(false);
   let componentEditSaving = $state(false);
   let componentEditDraft = $state(null);
-  // The System Overview → Settings identity form (Name + Description) stages its
-  // typed values in `SystemEditView` locally; they are lifted here so the
-  // route-exit guard can Save on navigate. `systemDetailsReseedNonce` is bumped on
-  // Discard to force the view to re-seed its inputs from the persisted system.
+  // The System Overview → Settings identity form (Name + Description) stages its typed values in
+  // `SystemEditView` locally; they are lifted here so the route-exit guard can Save on navigate.
   let systemDetailsDraft = $state({ name: '', description: '' });
   let systemDetailsDirty = $state(false);
   let systemDetailsReseedNonce = $state(0);
@@ -398,115 +329,51 @@
   let recipeEditSaving = $state(false);
   let recipeSaveFailed = $state(false);
   // The recipe editor stages edits in a root-held draft and commits only on Save.
-  // `recipeDraft` is the live, edited copy passed down to the editor; `recipeDraftBaseline`
-  // is the last-persisted snapshot. Both are deep PLAIN clones so JSON.stringify
-  // comparison drives the dirty flag (mirrors the gathering-task/event editors).
   let recipeDraft = $state(null);
   let recipeDraftBaseline = $state(null);
   // The recipe browser's filter / sort / group / paginate view-state, lifted OUT of
-  // RecipesBrowserView so it survives the editor round-trip (issue 643). Opening the
-  // editor switches `currentView` to `recipe-edit`, which unmounts the browser; without
-  // this the browser remounted with every control reset to defaults, throwing away the
-  // page, filters, sort and grouping the GM left. `editRecipe()` never touches it, and
-  // `saveRecipeDraft()` / `backToRecipesBrowse()` only flip `activeView`, so on return
-  // the browser remounts against this intact object. Fresh open still starts at defaults
-  // (this is seeded once, on first mount).
+  // RecipesBrowserView so it survives the editor round-trip (issue 643).
   let recipeBrowserState = $state(createRecipeBrowserState());
-  // Same lift, same reason, for the component library (issue 676): its filter/sort/
-  // group/page state used to live inside ComponentsBrowserView, so every editor
-  // round-trip reset it.
+  // Same lift, same reason, for the component library (issue 676): its filter/sort/ group/page
+  // state used to live inside ComponentsBrowserView, so every editor round-trip reset it.
   let componentBrowserState = $state(createComponentBrowserState());
-  // The staged-but-unwritten bulk edit (issue 772). The ROOT owns it, not the panel: the
-  // panel is unmounted the moment the selection empties, so a panel-owned draft would be
-  // destroyed by the very transition that is supposed to DISCARD it — indistinguishable
-  // from working, until the panel is kept alive for any other reason. The selection itself
-  // lives on the lifted `componentBrowserState`, beside the browser's other view-state.
+  // The staged-but-unwritten bulk edit (issue 772).
   let componentBulkDraft = $state(createComponentBulkDraft());
   let componentBulkApplying = $state(false);
-  // The armed bulk delete (issue 1129). `…Armed` is the single armed token for the whole
-  // selection — the target is the set, not a row — and it is cleared by the selection effect
-  // below on ANY change to the set.
+  // The armed bulk delete (issue 1129).
   let componentBulkDeleting = $state(false);
   let componentBulkDeleteArmed = $state(false);
-  // The recipe library's twin (issue 1010), owned here for the identical reason: the
-  // recipe bulk panel is unmounted the moment the selection empties, so a panel-owned
-  // draft would be destroyed by the very transition that is supposed to DISCARD it. The
-  // selection itself lives on the lifted `recipeBrowserState`.
+  // The recipe library's twin (issue 1010), owned here for the identical reason: the recipe bulk
+  // panel is unmounted the moment the selection empties.
   let recipeBulkDraft = $state(createRecipeBulkDraft());
   let recipeBulkApplying = $state(false);
-  // The recipe library's armed bulk delete (issue 1132), the third and last studio to get
-  // one. `…Deleting` is the caller's OWN in-flight flag and is what the card's busy face
-  // derives from — never `…Armed`. Disabling a focused button fires blur in Chromium and
-  // Firefox and `ArmedDangerButton` disarms on blur, so a busy face keyed off the arm flips
-  // back to idle for the whole duration of the write; happy-dom does not fire that blur, so
-  // a mounted assertion would pass on behaviour that does not hold in Foundry.
+  // The recipe library's armed bulk delete (issue 1132), the third and last studio to get one.
   let recipeBulkDeleting = $state(false);
   let recipeBulkDeleteArmed = $state(false);
-  // What a FINISHED delete that left the card mounted has to say for itself. Confirming
-  // disables the control, which moves focus to `document.body` and empties the card's live
-  // region, so on the refused or no-op path an assistive-technology user is left on `<body>`
-  // beside a re-enabled button with nothing announced — the Foundry error toast is not a
-  // live region this module controls. The card announces this and takes focus back; it is
-  // cleared on the next arm so a second refusal speaks again.
+  // What a FINISHED delete that left the card mounted has to say for itself.
   let recipeBulkDeleteOutcome = $state('');
-  // Its two twins (issue 1157, review round). The Component and Essence panels rendered the
-  // same card and never passed it a sentence, so their refused deletes landed on `<body>`
-  // and said nothing at all — the half of the paragraph above that had only ever been
-  // implemented once.
+  // Its two twins (issue 1157, review round).
   let componentBulkDeleteOutcome = $state('');
   let essenceBulkDeleteOutcome = $state('');
-  // The essence library's lifted view-state (issue 1036) — the third and last studio to get
-  // one, and the fix for criterion 12. Search, status, source, sort, view mode, page and
-  // the bulk selection all lived inside `EssenceBrowserView`, so opening an essence
-  // unmounted the browser and coming back reset every one of them.
+  // The essence library's lifted view-state (issue 1036) — the third and last studio to get one,
+  // and the fix for criterion 12.
   let essenceBrowserState = $state(createEssenceBrowserState());
-  // ── EVERY OTHER BROWSE SURFACE'S LIFTED VIEW-STATE (issue 1438) ────────────────────────
-  // The three studios above each got their own declaration as they shipped; the remaining
-  // eleven surfaces arrive together, so they arrive as ONE record rather than as eleven more
-  // `let`s in this file. It is a state record and not a service bag: each surface is handed
-  // its OWN slot below and never the record, so none can read or write another's.
-  //
-  // Why the ROOT and not each surface's immediate parent: every one of them is a branch of
-  // the `{#if currentView === …}` chain below, or lives inside one, so the parent is unmounted
-  // by the very editor round-trip the state has to survive. The two rosters the issue asked
-  // about — Knowledge and Grant access — are exactly this case: their parents survive every
-  // in-surface interaction and die on the route change.
+  // ── EVERY OTHER BROWSE SURFACE'S LIFTED VIEW-STATE (issue 1438) ──────────────────────── The
+  // three studios above each got their own declaration as they shipped.
   let managerBrowserState = $state(createManagerBrowserViewStates());
-  // The staged-but-unwritten essence bulk edit, owned HERE for the reason its two siblings
-  // are: the panel is unmounted the moment the selection empties, so a panel-owned draft
-  // would be destroyed by the very transition that is supposed to DISCARD it.
+  // The staged-but-unwritten essence bulk edit, owned HERE for the reason its two siblings are: the
+  // panel is unmounted the moment the selection empties.
   let essenceBulkDraft = $state(createEssenceBulkDraft());
   let essenceBulkApplying = $state(false);
   let essenceBulkDeleting = $state(false);
-  // The bulk delete's ARMED latch (the maintainer's binding decision for this action). It
-  // is a single boolean rather than a token map because exactly one bulk delete exists on
-  // the screen at a time; `ArmedDangerButton` still reports its own Escape and blur
-  // disarms, and the selection changing disarms it too — an arm is a statement about a
-  // specific set, so it must not survive that set changing.
+  // The bulk delete's ARMED latch (the maintainer's binding decision for this action).
   let essenceBulkDeleteArmed = $state(false);
   let activeGatheringTab = $state('environments');
-  // `activeTravelTab` serves World > Parties ALONE now (issue 1282). It used to be one
-  // variable behind two routes — the World route and the selected-system Travel route — which
-  // is why entering Parties also had to set `activeGatheringTab = 'travel'`. World > Travel
-  // owns `worldTravelTab` below, so neither route can move the other's selection any more.
+  // `activeTravelTab` serves World > Parties ALONE now (issue 1282).
   let activeTravelTab = $state('parties');
   // World > Travel's destination: `realms` or `map`. Realms is the landing tab.
   let worldTravelTab = $state('realms');
   // ── Rail group expansion: USER INTENT only (issue 1185) ──────────────────────────────
-  //
-  // The five collapsible rail groups used to hold user intent and route-derived state in
-  // ONE variable each, and the two overwrote one another in both directions. Four groups
-  // ran an effect that read its own flag to guard itself (`if (!onRoute || expanded)
-  // return; expanded = true`), so collapsing the group changed the effect's own dependency,
-  // re-ran it, passed the now-false guard and forced the group back open — a chevron that
-  // visibly did nothing. Crafting had the mirror defect: `craftingMenuExpanded =
-  // isCraftingRoute` never read its own flag, so a collapse stuck, but leaving the category
-  // force-CLOSED a group the GM had deliberately opened.
-  //
-  // The fix is to stop conflating the two. This map is intent and nothing else: only the
-  // disclosure toggle, a navigation that opens a group, and the auto-open effect below ever
-  // write it. Whether a group is DISPLAYED expanded is `railGroupExpanded`, which ORs this
-  // with `railGroupLockedOpen` — see the block beside the route predicates.
   const RAIL_GROUP_IDS = Object.freeze([
     'crafting',
     'checks',
@@ -531,40 +398,25 @@
   // The recipe selected on the Access surface (visibility=restricted); drives the
   // GrantAccessInspector aside.
   let selectedRecipeIdForAccess = $state('');
-  // Recipe-item editor draft (recipe-item-edit route). Mirrors the recipe-edit
-  // draft pattern: a root-held live draft + last-persisted baseline (deep plain
-  // clones) so JSON comparison drives the dirty flag and Discard reverts.
+  // Recipe-item editor draft (recipe-item-edit route).
   let recipeItemDraft = $state(null);
   let recipeItemDraftBaseline = $state(null);
   let recipeItemLinkedSourceSnapshot = $state(null);
   let recipeItemEditSaving = $state(false);
-  // Set on every failed recipe-item save. Read by the header toolbar, which renders the
-  // localized failure alert beside Save (issue 919 — before that this had no reader at all
-  // and a GM whose save failed was shown nothing).
+  // Set on every failed recipe-item save.
   let recipeItemSaveFailed = $state(false);
   let recipeItemActiveTab = $state('overview');
-  // World-item options fed to the recipe-item editor's Overview link picker. (The
-  // Books & Scrolls creation flow is a drop-zone now — issue 844 — so this no longer
-  // backs a create-recipe-item modal.)
+  // World-item options fed to the recipe-item editor's Overview link picker.
   let worldItemOptions = $state([]);
   // Folder-aware import mapping modal (issue 771): opened before a folder / whole-pack
   // component drop commits, seeded with the per-folder groups the drop resolved to.
   let importMappingOpen = $state(false);
   let importMappingFolders = $state([]);
   // Post-import reference report (issue 877): the store resolves the assembled
-  // `buildImportReportContent` output once a system import completes, and this renders
-  // it in the same ManagerModal chrome the mapping step above uses.
+  // `buildImportReportContent` output once a system import completes.
   let importReportContent = $state(null);
   // `Add from catalogue to {system}` (issue 1371, M9): the system Component Rules list's header
-  // action opens an IN-PLACE picker over the world catalogue rather than navigating anywhere, so
-  // its open state is one boolean here beside the manager's two other dialogs.
-  //
-  // AN OUTSIDE CLICK IS NOT ENOUGH TO KEEP IT ON ITS ROUTE (issue 1371, r11). This comment used
-  // to claim the picker "cannot outlive its route: `ManagerModal` dismisses on an outside click,
-  // and every nav control is outside it". `dismissOnOutsideClick` listens on `mousedown` and on
-  // Escape — never on `click` — so a KEYBOARD activation of a rail or breadcrumb control fires no
-  // `mousedown` at all: it navigates, and the dialog was left standing over the new route. The
-  // route binding is now stated as code rather than asserted in prose, in the effect below.
+  // action opens an IN-PLACE picker over the world catalogue rather than navigating anywhere.
   let componentAddFromCatalogueOpen = $state(false);
   // svelte-ignore state_referenced_locally
   let railCollapsed = $state(services?.getSetting?.('managerRailCollapsed') === true);
@@ -597,14 +449,8 @@
   let toolEditorActiveTab = $state('breakage');
   let toolValidationFocusNonce = $state(0);
 
-  // Per-check unified trigger block (issue 419), carried on every check draft so
-  // authoring it persists. Deep-clone the persisted block or seed the empty default.
-  //
-  // This is an ALLOWLIST, and that makes it the highest-consequence line in the
-  // editor's draft plumbing: a trigger key missing here is dropped on every editor
-  // load, so a GM authors the effect, sees it, saves — and it vanishes with no error.
-  // `checkRoutedDirty` compares the JSON of two values that BOTH pass through here,
-  // so the editor also looks clean. Every trigger key must be listed.
+  // Per-check unified trigger block (issue 419), carried on every check draft so authoring it
+  // persists.
   function cloneCheckBreakage(checkBreakage) {
     const source = checkBreakage && typeof checkBreakage === 'object' ? checkBreakage : {};
     return {
@@ -630,10 +476,9 @@
     };
   }
 
-  // Routed crafting check editor: a staged draft is seeded from the selected
-  // system's craftingCheck.routed and committed only via the top-right Save
-  // button (the same staged pattern the other editors use), so persistence is
-  // explicit and never raced by navigation.
+  // Routed crafting check editor: a staged draft is seeded from the selected system's
+  // craftingCheck.routed and committed only via the top-right Save button (the same staged pattern
+  // the other editors use), so persistence is explicit and never raced by navigation.
   function cloneRoutedCheck(routed) {
     const source = routed && typeof routed === 'object' ? routed : {};
     const dc = Number(source.dc);
@@ -694,45 +539,12 @@
   );
 
   // THE ALCHEMY CHECK MODE IS A STAGED DRAFT, not a live write.
-  //
-  // It is a Checks Studio control like every other one on The roll, so it belongs to the
-  // same stage → Unsaved → `Save checks` → applied lifecycle. It used to call
-  // `store.setAlchemyCheckMode` straight from the radio's `onChange`, which persisted on
-  // click: the studio showed no Unsaved chip, the route-exit guard had nothing to guard,
-  // and `Save checks` stayed disabled over a change that had already landed. Worse, it
-  // could not be undone — the Discard branch of the exit prompt reset every OTHER draft
-  // and left this one applied.
-  //
-  // `none` IS THE OFF STATE, and that is the whole reason this is one value rather than a
-  // mode plus a flag. The persisted enum stays `none | simple | tiered` (the engine's own
-  // vocabulary, unchanged), but the studio presents it as a two-option mode — Simple or
-  // Tiered — plus the rail's Active toggle, which writes `simple` on and `none` off. A
-  // separate `enabled` flag beside the mode would be a second spelling of a state the enum
-  // already has, and the two would drift the first time one was written without the other.
-  //
-  // NOT `craftingCheck.enabled`. That flag is the generic `checksEnabled` master toggle,
-  // and the engine deliberately does NOT read it for alchemy — alchemy dispatches on
-  // `alchemy.checkMode` alone (`CraftingEngine.js`, the `mode === 'alchemy'` branch of
-  // `_runCraftingCheck`). Wiring the Active toggle to `enabled` here would have moved a
-  // switch the engine never consults.
   let alchemyCheckModeDraft = $state($viewState.selectedSystem?.alchemy?.checkMode || 'none');
   let alchemyCheckModeBaseline = $state($viewState.selectedSystem?.alchemy?.checkMode || 'none');
   let alchemyCheckModeSaving = $state(false);
   const alchemyCheckModeDirty = $derived(alchemyCheckModeDraft !== alchemyCheckModeBaseline);
 
   // THE OTHER THREE ACTIVE SWITCHES STAGE TOO — the `enabled` flag of each activity's check.
-  //
-  // The alchemy switch above was staged first because its off state IS a check mode. That
-  // left the studio with ONE CONTROL ON TWO LIFECYCLES: the same switch, on the same screen,
-  // staged on an alchemy crafting route and wrote through on click everywhere else. A GM who
-  // flipped Active on Salvage got no Unsaved chip, a disabled `Save checks`, nothing for the
-  // route-exit guard to guard, and a Discard that could not put it back — while the identical
-  // control one route over behaved correctly. Two contracts behind one affordance is worse
-  // than either contract, so all four now stage.
-  //
-  // CRAFTING'S IS THE NON-ALCHEMY ONE. An alchemy system's switch never touches this draft
-  // (`onToggleCheckActive` returns before it), so the flag stays at its baseline and is never
-  // written for a system whose engine ignores it.
   function readCheckActive(config) {
     return config?.enabled === true;
   }
@@ -763,17 +575,10 @@
     gatheringCheckActiveDraft !== gatheringCheckActiveBaseline
   );
 
-  // Progressive crafting check draft — same staged pattern, used for progressive
-  // resolution mode. Only the roll formula and crit table are edited here; the
-  // award setting (awardMode) is carried through untouched so a save never drops it.
+  // Progressive crafting check draft — same staged pattern, used for progressive resolution mode.
   function cloneProgressiveCheck(progressive) {
     const source = progressive && typeof progressive === 'object' ? progressive : {};
-    // The Checks Studio's PREVIEW SANDBOX (issue 1097). This clone is the SECOND allowlist
-    // rebuild the block passes through — the manager's `_normalizeProgressiveCraftingCheck`
-    // is the first — and a draft that dropped the key would carry the GM's experiment for
-    // exactly as long as the panel stayed open, then write a block without it. It is
-    // normalized through the SAME derivation the persistence path uses, so a value the
-    // draft holds is a value that survives the save.
+    // The Checks Studio's PREVIEW SANDBOX (issue 1097).
     const preview = normalizePreviewSandbox(source.preview);
     const draft = {
       awardMode: ['partial', 'equal', 'exceed'].includes(source.awardMode)
@@ -782,9 +587,8 @@
       rollFormula: typeof source.rollFormula === 'string' ? source.rollFormula : '',
       checkBreakage: cloneCheckBreakage(source.checkBreakage),
     };
-    // Attached rather than spread, so an absent experiment stays absent — and so the
-    // baseline and the draft, both built here, produce the same key order for the
-    // `JSON.stringify` dirty comparison.
+    // Attached rather than spread, so an absent experiment stays absent — and so the baseline and
+    // the draft, both built here.
     if (preview) draft.preview = preview;
     return draft;
   }
@@ -800,8 +604,7 @@
   );
 
   // Salvage check drafts — the salvage check now mirrors the crafting check shapes
-  // (simple/routed/progressive), so the crafting clone helpers are reused. Same
-  // staged pattern: one draft per mode, committed via the tab-aware header Save.
+  // (simple/routed/progressive), so the crafting clone helpers are reused.
   const sysSalvage = $viewState.selectedSystem?.salvageCraftingCheck;
   let salvageSimpleDraft = $state(cloneSimpleCheck(sysSalvage?.simple));
   let salvageSimpleBaseline = $state(cloneSimpleCheck(sysSalvage?.simple));
@@ -822,9 +625,8 @@
     JSON.stringify(salvageProgressiveDraft) !== JSON.stringify(salvageProgressiveBaseline)
   );
 
-  // Gathering check drafts — the system-level gathering check mirrors the
-  // crafting/salvage progressive + routed shapes (d100 has no editable config),
-  // so the crafting clone helpers are reused. Same staged pattern as salvage.
+  // Gathering check drafts — the system-level gathering check mirrors the crafting/salvage
+  // progressive + routed shapes (d100 has no editable config).
   const sysGathering = $viewState.selectedSystem?.gatheringCraftingCheck;
   let gatheringProgressiveDraft = $state(cloneProgressiveCheck(sysGathering?.progressive));
   let gatheringProgressiveBaseline = $state(cloneProgressiveCheck(sysGathering?.progressive));
@@ -839,17 +641,8 @@
     JSON.stringify(gatheringRoutedDraft) !== JSON.stringify(gatheringRoutedBaseline)
   );
   // Which Checks child route is open (crafting | salvage | gathering | validation).
-  // It is DERIVED from the route now (issue 1096), not held: the four activities became
-  // rail routes, so a second copy of "which one is open" would be a source of truth the
-  // rail highlight and the breadcrumb could disagree with.
-  // Which section of that route is open, for a Validation deep link.
-  // Empty until the router asks for one, so the very first deep link TO the roll section is
-  // still a new request rather than one the view has already honoured at mount.
   let checksActiveSection = $state('');
-  // The REQUEST's identity, bumped on every deep link. `ChecksView` latches on this rather
-  // than on the section name, so asking twice for the same section is two requests: leave
-  // `roll` for Triggers, deep-link to `roll` again, and the second one still lands. Without
-  // it the repeat equalled the latch and was swallowed, stranding the GM on Triggers.
+  // The REQUEST's identity, bumped on every deep link.
   let checksSectionRequestNonce = $state(0);
   // The Graph surface (issue 442) is unimplemented; it stays a disabled placeholder
   // and, as of issue 745, renders only when experimental features are enabled.
@@ -857,9 +650,6 @@
     {
       id: 'graph',
       // The rail id, as a COMPLETE LITERAL rather than a `manager-nav-${view.id}` template.
-      // Both harnesses target every rail entry by id since issue 1362, and an interpolated one
-      // is invisible to the source gate that checks the id is rendered at all — the same
-      // weakening the View Lab's own hook scan records for a stem-built selector.
       navId: 'manager-nav-graph',
       icon: 'fas fa-project-diagram',
       labelKey: 'FABRICATE.Admin.Manager.Nav.Graph',
@@ -882,37 +672,20 @@
   // gate only decides whether the unimplemented Graph placeholder is advertised.
   const experimentalFeaturesEnabled = $derived($viewState.experimentalFeaturesEnabled === true);
   const showEssenceSourceUi = $derived(selectedSystem?.features?.effectTransfer === true);
-  // The essence property-macro gate (issue 1036). `features.propertyMacros` defaults to
-  // FALSE, and it gates the editor's Macro section, the row's Macro capability pill and the
-  // preview's macro row — the same way `effectTransfer` gates the source half. With both
-  // off the On-craft tab renders an explanatory empty state rather than an empty tab.
+  // The essence property-macro gate (issue 1036).
   const showEssencePropertyMacroUi = $derived(selectedSystem?.features?.propertyMacros === true);
   const currentView = $derived(
     normalizedActiveView(activeView, selectedSystem, canShowEnvironments, canShowEssences)
   );
   const isToolStudioRoute = $derived(currentView === 'tools' || currentView === 'tool-edit');
 
-  // THE `Add from catalogue` PICKER CANNOT OUTLIVE ITS ROUTE (issue 1371, r11). It is an IN-PLACE
-  // picker over the list behind it — the whole point of M9's ruling is that the GM stays on the
-  // list and watches the rows arrive — so a picker still standing over the crafting-systems
-  // library is offering to write rules into a system the GM has navigated away from. The dialog's
-  // own dismissal cannot cover this: `dismissOnOutsideClick` fires on `mousedown` and Escape, and
-  // a keyboard activation of a nav control fires neither.
+  // THE `Add from catalogue` PICKER CANNOT OUTLIVE ITS ROUTE (issue 1371, r11).
   $effect(() => {
     if (currentView !== 'components') componentAddFromCatalogueOpen = false;
   });
 
   // WHICH ROUTES NEED THE ITEM ROSTER, which is a WIDER set than the Tool Studio's own (issue
-  // 1373). It was `isToolStudioRoute`, and that left both WORLD tool screens with an empty
-  // roster: the catalogue could not resolve a linked Tool's description off its Item — so every
-  // record read `No description` while wearing a `Linked` chip — and the entry's linked-item card
-  // could show neither the live name nor the live art. Those two screens are exactly where the
-  // link is authored, so they are the ones that most need to resolve it.
-  // THE TWO WORLD COMPONENT SCREENS JOIN THE SET (issue 1371), for exactly the reason the two
-  // world Tool screens did: both AUTHOR the link between a world record and a world-scoped Item —
-  // the catalogue's create-from-drop zone resolves one, the entry's card re-points one — and a
-  // `worldItems` prop handed over without extending this derived is an EMPTY ARRAY, which is the
-  // defect the note above records rather than a hypothetical.
+  // 1373).
   const needsWorldItemOptions = $derived(
     isToolStudioRoute ||
       currentView === 'world-tools' ||
@@ -941,9 +714,8 @@
     };
   });
 
-  // The pure `evaluateSystemValidation` report, computed in the admin store from
-  // the selected system's recipes/environments/components. Drives the GM system
-  // overview view, its rail count badge, and the system-blocker banner.
+  // The pure `evaluateSystemValidation` report, computed in the admin store from the selected
+  // system's recipes/environments/components.
   const systemValidationReport = $derived(
     $viewState.systemValidation || {
       issues: [],
@@ -956,28 +728,12 @@
     (systemValidationReport.counts?.critical || 0) + (systemValidationReport.counts?.warning || 0)
   );
 
-  // Per-check activation state for the right-menu "Active" card. A check is only
-  // toggleable when its resolution mode makes it optional (Simple); otherwise the
-  // mode requires it and the card explains that.
+  // Per-check activation state for the right-menu "Active" card.
   const checkActivation = $derived({
     crafting: {
       mode: selectedSystem?.resolutionMode || 'simple',
-      // The crafting check is optional in simple and routedByIngredients (it runs
-      // only when a roll formula is authored and checks are enabled); routedByCheck
-      // and progressive REQUIRE it.
-      //
-      // ALCHEMY IS OPTIONAL AT `simple` AND REQUIRED AT `tiered`, read from the DRAFT
-      // check mode so the rail's switch reflects what the GM has staged rather than what
-      // was last saved. Alchemy used to report `optional: false` for all three modes,
-      // which is what put the "cannot be turned off here" hint on a Simple check that has
-      // a perfectly good off state — `checkMode: 'none'` — and left the GM no way to reach
-      // it once "No check" stopped being a mode you pick. Tiered keeps the locked
-      // always-on indicator: it routes result groups by outcome tier, so it cannot resolve
-      // without a roll (see `_isCheckOutcomeSatisfied`).
-      //
-      // `enabled` IS THE MODE, not `craftingCheck.enabled`. The engine ignores that flag
-      // for alchemy and dispatches on `alchemy.checkMode` alone, so reading it here would
-      // have shown a switch position the engine never honours.
+      // The crafting check is optional in simple and routedByIngredients (it runs only when a roll
+      // formula is authored and checks are enabled); routedByCheck and progressive REQUIRE it.
       optional:
         (selectedSystem?.resolutionMode || 'simple') === 'alchemy'
           ? alchemyCheckModeDraft !== 'tiered'
@@ -992,9 +748,7 @@
       optional: (selectedSystem?.salvageResolutionMode || 'simple') === 'simple',
       enabled: salvageCheckActiveDraft,
     },
-    // The system-level gathering check's shape is the gathering economy's
-    // resolution mode. d100 is the fixed roll (optional/no enable toggle);
-    // progressive/routed are editable checks with an Active toggle.
+    // The system-level gathering check's shape is the gathering economy's resolution mode.
     gathering: {
       mode: gatheringResolutionMode,
       optional: gatheringResolutionMode === 'd100',
@@ -1002,39 +756,8 @@
     },
   });
 
-  // WHICH `craftingCheck` sub-config this system actually rolls — the SLOT — and therefore
-  // which draft is edited, tracked dirty, saved by the top-right Save button, and read for
-  // the recipe editor's "Check tier" options.
-  //
-  // IT IS THE ENGINE'S OWN ANSWER (issue 1096), not a second mapping beside it.
-  // `checkModifierResolver` owns `CRAFTING_CHECK_SLOTS` / `ALCHEMY_CHECK_SLOTS`, and the copy
-  // that stood here disagreed with it for exactly one configuration: alchemy at
-  // `checkMode: 'tiered'`, which rolls the ROUTED slot. The Checks route renders the routed
-  // editor there (its own derivation reads `alchemy.checkMode`), so a GM could edit that
-  // draft — while this said `simple`, so the edit was never marked dirty and Save never
-  // wrote it. The rail's readiness badge meanwhile evaluated the untouched simple draft
-  // under routed rules. One derivation is the only way those cannot disagree.
-  //
-  // `null` means the mode rolls NO check: alchemy `checkMode: 'none'`, and any resolution
-  // mode outside the canonical set. Nothing is dirty, nothing is saved and no tier options
-  // are offered, which is the honest answer for a check that never runs.
-  //
-  // Only `routedByCheck` authors the tier-routing routed check; `routedByIngredients` shares
-  // the simple pass/fail slot with `simple`. Collapsing those two here costs nothing
-  // elsewhere, because the multi-set and routing behaviours are derived separately from the
-  // RAW `resolutionMode` rather than from this value: `recipeMultiSetAllowed` gates more than
-  // one ingredient/result set, and `recipeRoutingProvider` picks the routing basis ('check'
-  // for routedByCheck, 'ingredientSet' for routedByIngredients). Both routed modes stay
-  // covered there.
-  // RESOLVED AGAINST THE DRAFT ALCHEMY MODE, not the persisted one, and only alchemy's
-  // input is substituted (every other mode reads the same system it always did).
-  //
-  // The slot decides which draft is dirty-tracked and which one `Save checks` writes, so
-  // resolving it from persisted state stranded the draft it was staged beside. Turn the
-  // alchemy check ON and author a formula in one visit: the persisted mode is still `none`,
-  // which resolves to slot `null`, so `craftingCheckDirty` read false for the simple draft
-  // and Save wrote the mode but dropped the formula the GM had just typed. The two have to
-  // be resolved from the same value to be saved together.
+  // WHICH `craftingCheck` sub-config this system actually rolls — the SLOT — and therefore which
+  // draft is edited, tracked dirty, saved by the top-right Save button.
   const craftingCheckMode = $derived(
     resolveActiveCraftingCheckFormula(
       selectedSystem?.resolutionMode === 'alchemy'
@@ -1087,16 +810,6 @@
   );
 
   // THE DRAFT MODEL LIVES ABOVE THE ROUTE (issue 1096).
-  //
-  // It used to be tab-aware: `checksDirty` reported only the ACTIVE sub-tab, and the header
-  // Save persisted only that one. That was safe while the four activities were tabs inside
-  // one view, because a switch between them never left the surface. They are ROUTES now, and
-  // one click on `Components` leaves it — so a per-route dirty flag would have let an unsaved
-  // crafting edit walk out of the building while the GM stood on Gathering, with the Unsaved
-  // chip already gone.
-  //
-  // So: ONE dirty set across the four activities, and one plural `Save checks` that persists
-  // every dirty one. The per-activity flags survive as the rail's own markers.
   const checksDirtyActivities = $derived(
     [
       craftingCheckDirty ? 'crafting' : '',
@@ -1107,20 +820,13 @@
   const checksDirty = $derived(checksDirtyActivities.length > 0);
   const checksSaving = $derived(craftingCheckSaving || salvageCheckSaving || gatheringCheckSaving);
 
-  // Recipe tiers offered to the recipe editor's "Check tier" dropdown, resolved
-  // from the active crafting-check mode. Recipe tiers are authored on a RELATIVE
-  // check, so a simple-static check surfaces its `simple.tiers` and a routed
-  // relative check (`routed.type !== 'fixed'`) surfaces its `routed.tiers`; fixed,
-  // dynamic-dc, progressive and unknown modes offer nothing. See the pure helper.
+  // Recipe tiers offered to the recipe editor's "Check tier" dropdown, resolved from the active
+  // crafting-check mode.
   const recipeCheckTierOptions = $derived(
     resolveRecipeCheckTierOptions(selectedSystem?.craftingCheck, craftingCheckMode)
   );
-  // Fixed-type routed success tiers offered to the recipe's "Minimum success tier"
-  // override; empty (control hidden) unless the system's real resolution mode is
-  // `routedByCheck` + fixed. Gated on `resolutionMode`, not the collapsed
-  // `craftingCheckMode`, so a `routedByIngredients` system (which authors its check
-  // on the shared `simple` pass/fail slot and has no outcome tiers) does not surface
-  // a dead control.
+  // Fixed-type routed success tiers offered to the recipe's "Minimum success tier" override; empty
+  // (control hidden) unless the system's real resolution mode is `routedByCheck` + fixed.
   const recipeMinSuccessTierOptions = $derived(
     resolveRecipeFixedOutcomeTierOptions(
       selectedSystem?.craftingCheck,
@@ -1128,27 +834,13 @@
     )
   );
 
-  // Why the system's active crafting check applies no check modifiers, or '' when it
-  // does. Consumes the inert-cause derivation from the store's `craftingCheck`
-  // projection (issue 1055), which resolves it from the PERSISTED system through the
-  // shared five-mode selector. The recipe editor is not the surface authoring those formulas,
-  // so the Checks-tab drafts are not in play here and the saved state is the truthful
-  // one. Either cause makes a per-recipe override inert, so the Overview tab replaces
-  // its control with a banner naming which; a bare boolean cannot say which. See
-  // ChecksView.svelte's separate derivation for the draft-based consumer.
+  // Why the system's active crafting check applies no check modifiers, or '' when it does.
   const recipeCraftingModifierInertCause = $derived(
     selectedSystem?.craftingCheck?.modifierFormulaInertCause || ''
   );
 
-  // Routed-check outcome tiers (active type) offered to the recipe editor's
-  // check-mode result-set assignment control as {id, name}. Failure tiers are
-  // excluded — a failed check produces no result set to route to.
-  // POLICY-CONDITIONAL since issue 1098 (decision 7): success-filtered when the crafting
-  // failure-result policy forbids failure results, unfiltered when it permits them, so a
-  // GM can bind a result group to a failure-marked tier exactly where the engine will
-  // route one. It is a SWAP between two functions the codebase already had, and
-  // `systemValidation` feeds `recipeReadiness` from the same swap — the picker and the
-  // readiness warnings can never disagree about which tiers are assignable.
+  // Routed-check outcome tiers (active type) offered to the recipe editor's check-mode result-set
+  // assignment control as {id, name}.
   const recipeRoutedOutcomeTierOptions = $derived.by(() =>
     routedTierOptionsForPolicy(
       selectedSystem?.craftingCheck?.routed,
@@ -1160,16 +852,12 @@
   const recipeAllOutcomeTierOptions = $derived.by(() =>
     routedOutcomeTierOptions(selectedSystem?.craftingCheck?.routed)
   );
-  // Whether ANY outcome tier is defined (even failure-only). Lets the recipe
-  // editor tell "no tiers authored" apart from "tiers exist but none is Success"
-  // — both empty the option list above, but each needs a different hint.
+  // Whether ANY outcome tier is defined (even failure-only).
   const recipeRoutedHasOutcomeTiers = $derived.by(() =>
     routedHasOutcomeTiers(selectedSystem?.craftingCheck?.routed)
   );
-  // Whether this system's crafting failure-result policy permits results on a failed check
-  // (issue 1098). Read through the shared predicate rather than compared to a literal, so
-  // the editor's third empty hint and the engine's routing decision cannot disagree about
-  // what an absent or unrecognized value means.
+  // Whether this system's crafting failure-result policy permits results on a failed check (issue
+  // 1098).
   const recipeFailureResultsAllowed = $derived(
     permitsFailureResults(selectedSystem?.craftingCheck?.failureResultPolicy)
   );
@@ -1177,11 +865,8 @@
   // Salvage feature gate + the inputs the per-component salvage editor needs.
   const componentSalvageEnabled = $derived(selectedSystem?.features?.salvage === true);
 
-  // ── THE SYSTEM'S SALVAGE MODE, AS A LABEL, FOR THE THREE COMPONENT SURFACES THAT STATE IT ──
-  // The list's header subtitle, the rules editor's header subtitle and the list inspector's
-  // `Salvage in {system}` note all name it, and the persisted token is never displayed.
-  // `salvageResolutionModeOptions` is the list whose own comment records that `routed` reads as
-  // "Routed by check"; deriving the label three times would be three chances to disagree.
+  // ── THE SYSTEM'S SALVAGE MODE, AS A LABEL, FOR THE THREE COMPONENT SURFACES THAT STATE IT ── The
+  // list's header subtitle.
   const componentSalvageModeLabel = $derived(
     (() => {
       const option = salvageResolutionModeOptions.find(
@@ -1192,8 +877,6 @@
   );
 
   // The world projection's entry for the SELECTED row, and that entry's row for THIS system.
-  // Resolved here rather than inside the inspector so the panel takes two plain objects instead
-  // of the whole world-scope bundle.
   const componentInspectorWorldEntry = $derived(
     (Array.isArray(worldScopeState.component?.entries)
       ? worldScopeState.component.entries
@@ -1206,11 +889,8 @@
       : []
     ).find((row) => row?.systemId === selectedSystemId) ?? null
   );
-  // Routed-salvage outcome tier NAMES (active type), used by the per-component
-  // outcome-routing selects. Names map to result-group ids in component.salvage.
-  // Policy-conditional on the same terms (issue 1098). Unfiltered until that issue, so it
-  // offered failure tier names as DEAD OPTIONS: `salvage()` returned before
-  // `_resolveSalvageResultGroups` on a failed check, and nothing ever routed through them.
+  // Routed-salvage outcome tier NAMES (active type), used by the per-component outcome-routing
+  // selects.
   const salvageOutcomeNames = $derived(
     routedOutcomeTierNamesForPolicy(
       selectedSystem?.salvageCraftingCheck?.routed,
@@ -1228,38 +908,9 @@
   );
   const salvageCheckDc = $derived(selectedSystem?.salvageCraftingCheck?.simple?.dc ?? 0);
   // System components offered to the salvage yield picker.
-  //
-  // READ FROM `managedItemOptions`, NEVER FROM `itemCards` (issue 676). `itemCards` is
-  // the component BROWSER's list and is SEARCH-FILTERED:
-  //   itemCards ← _buildItemCards(…, itemSearchTerm, …) ← getItems(systemId, search)
-  // where `itemSearchTerm` is `get(itemSearch)`, the browser's search store. Projecting
-  // the picker from it leaked that search into the editor: typing "iron" in the browser
-  // and then opening any component silently narrowed the yield picker to components
-  // matching "iron" — a filter applied by a control that is not on screen, with no
-  // feedback. `selectedSystem.managedItemOptions` is `_buildManagedItemOptions` over the
-  // UNFILTERED managed items, and is already what the recipe editor's component pickers
-  // read; salvage was the one surface that diverged.
-  //
-  // It is REUSED rather than re-projected here on purpose. The old hand-rolled map was an
-  // ALLOWLIST whose every field had to be remembered — an omitted `difficulty` reaches the
-  // editor as `undefined` and the progressive row's badge silently reads "No difficulty"
-  // for every row, which looks like unauthored data rather than a dropped projection.
-  // `_buildManagedItemOptions` already carries `id`/`name`/`img`/`description`/`category`/
-  // `difficulty`, so there is one projection to keep correct instead of two.
   const salvageComponentOptions = $derived(selectedSystem?.managedItemOptions || []);
 
   // ── COMPLICATIONS: the SYSTEM-scoped bag the component editor cannot derive (issue 1286) ─
-  //
-  // Which activities THIS system resolves progressively. The editor already holds
-  // `salvageResolutionMode`, so left to itself it derives the salvage axis and nothing else —
-  // which lit the complications section up for progressive-SALVAGE systems only and offered a
-  // progressive-CRAFTING system no complications at all. Crafting's and gathering's modes live
-  // on the system record and the gathering economy, neither of which reaches a component.
-  //
-  // `gatheringProgressive` is the SAME economy read `componentDifficultyAxisProgressive`
-  // makes, so the three progressive axes agree across every surface that asks. Progressive
-  // gathering is dormant pending issue 683; the section's own "· not progressive" annotation
-  // is what tells the GM a complication authored for it is stored and will not fire.
   const complicationActivities = $derived({
     crafting: selectedSystem?.resolutionMode === 'progressive',
     salvage: salvageResolutionMode === 'progressive',
@@ -1267,28 +918,13 @@
   });
 
   // The named triggers on the three PROGRESSIVE check blocks, as `{ id, label, activity }`.
-  //
-  // Each activity's check block owns its OWN trigger id space, so an option that did not name
-  // its activity would make two triggers reading "Roll total is at least 15" — one on
-  // crafting, one on salvage — indistinguishable in the picker, and a GM could not tell which
-  // one a complication was bound to.
-  //
-  // Only the PROGRESSIVE block of each activity is offered: a complication fires from a
-  // progressive stage outcome, so a trigger on the simple or routed block has no moment to
-  // reach it.
   const complicationTriggerOptions = $derived([
     ...complicationTriggersFor('crafting', selectedSystem?.craftingCheck?.progressive),
     ...complicationTriggersFor('salvage', selectedSystem?.salvageCraftingCheck?.progressive),
     ...complicationTriggersFor('gathering', selectedSystem?.gatheringCraftingCheck?.progressive),
   ]);
 
-  /**
-   * Resolve one summary FRAGMENT to a sentence. `summariseCondition` returns
-   * `{ key, fallback, data }` and a datum may itself be a fragment (the comparator and
-   * aggregate words are), so the nested ones are localized first — the same two-step
-   * `CheckTriggers.phrase()` performs, because a one-step fill would render "[object Object]"
-   * inside the sentence.
-   */
+  /** Resolve one summary FRAGMENT to a sentence. */
   function complicationTriggerPhrase(fragment) {
     const data = Object.fromEntries(
       Object.entries(fragment.data ?? {}).map(([key, entry]) => [
@@ -1299,15 +935,7 @@
     return interpolate(text(fragment.key, fragment.fallback), data);
   }
 
-  /**
-   * The `{ id, label, activity }` options for ONE activity's progressive check block.
-   *
-   * The label is the trigger's CONDITION SENTENCE, built by the very builder the Checks
-   * Studio's trigger cards use. A trigger has no authored name, so an id would name nothing
-   * to a GM, and a second sentence composed here would drift from the Studio's the first time
-   * either is retuned. `parseDiceGroups` over the block's own roll formula is what lets a
-   * per-die condition read "Lowest of 1d20 is 1" rather than naming a group number.
-   */
+  /** The `{ id, label, activity }` options for ONE activity's progressive check block. */
   function complicationTriggersFor(activity, block) {
     const triggers = Array.isArray(block?.checkBreakage?.triggers)
       ? block.checkBreakage.triggers
@@ -1325,21 +953,12 @@
       }));
   }
 
-  // The macro picker's options. The store already publishes `availableScriptMacros`
-  // `type === 'script'`-filtered and name-sorted, so this is a pass-through and deliberately
-  // NOT a second projection: a macro a GM can link here is exactly a macro the essence
-  // property-macro picker can link, and two lists would disagree the first time either
-  // filter moved.
+  // The macro picker's options.
   const complicationMacroOptions = $derived(selectedSystem?.availableScriptMacros || []);
 
-  // Reseed the routed + simple check drafts and baselines when the selected system
-  // changes (not on every refresh of the same system, so a save never clobbers an
-  // open draft) OR when the SAME system's resolution mode changes. The latter is a
-  // data-loss guard: `CraftingSystemManager.updateSystem` moves the persisted
-  // crafting-check config across slots when a mode crosses the `routedByIngredients`
-  // boundary (routed↔simple), so the editor must re-read both crafting-check slots
-  // from the persisted system — otherwise a stale/empty draft would be Saved back and
-  // clobber the migrated config.
+  // Reseed the routed + simple check drafts and baselines when the selected system changes (not on
+  // every refresh of the same system, so a save never clobbers an open draft) OR when the SAME
+  // system's resolution mode changes.
   $effect(() => {
     const resolutionMode = selectedSystem?.resolutionMode || 'simple';
     const systemChanged = selectedSystemId !== lastChecksSystemId;
@@ -1353,17 +972,12 @@
     checkSimpleBaseline = cloneSimpleCheck(selectedSystem?.craftingCheck?.simple);
     checkProgressiveDraft = cloneProgressiveCheck(selectedSystem?.craftingCheck?.progressive);
     checkProgressiveBaseline = cloneProgressiveCheck(selectedSystem?.craftingCheck?.progressive);
-    // Reseeded on a system switch alongside the three slot drafts. NOT on every refresh:
-    // the guard above is what keeps a `Save checks` — which refreshes the store — from
-    // clobbering a draft the GM is still editing, and this value needs that protection
-    // exactly as much as the formulas do.
+    // Reseeded on a system switch alongside the three slot drafts.
     alchemyCheckModeDraft = selectedSystem?.alchemy?.checkMode || 'none';
     alchemyCheckModeBaseline = selectedSystem?.alchemy?.checkMode || 'none';
     craftingCheckActiveDraft = readCheckActive(selectedSystem?.craftingCheck);
     craftingCheckActiveBaseline = readCheckActive(selectedSystem?.craftingCheck);
-    // A same-system resolution-mode change never touches the salvage/gathering
-    // checks; only reseed those on a genuine system switch so an open salvage/
-    // gathering draft is not clobbered by a crafting-mode change.
+    // A same-system resolution-mode change never touches the salvage/gathering checks.
     if (!systemChanged) return;
     const nextSalvage = selectedSystem?.salvageCraftingCheck;
     salvageCheckActiveDraft = readCheckActive(nextSalvage);
@@ -1415,10 +1029,7 @@
     gatheringRoutedDraft = next;
   }
 
-  // Live-persist an alchemy behaviour-flag patch (issue 713). saveAlchemyConfig
-  // rewrites all three flags from its argument, so send the current projected values
-  // with the single toggled field overridden — passing a bare `{ learnOnCraft }` would
-  // silently re-default consumeOnFail/showAttemptHistoryToPlayers to their defaults.
+  // Live-persist an alchemy behaviour-flag patch (issue 713).
   function onUpdateAlchemyFlags(patch) {
     const current = selectedSystem?.alchemy || {};
     store?.saveAlchemyConfig?.({
@@ -1430,24 +1041,7 @@
     });
   }
 
-  /**
-   * Run ONE check save and ANSWER WHETHER IT LANDED (issue 1096).
-   *
-   * Every check save used to be `await store?.save…()` and nothing else, which made "did that
-   * work?" an unanswerable question: a store no-op and a rejected `updateSystem` were both
-   * indistinguishable from success, so the route-exit guard's Save branch navigated away from
-   * unsaved work and a rejection escaped as an unhandled promise. The shipped essence and
-   * system-details guards answer it with `result !== false` and are the pattern followed
-   * here, with the rejection caught as well because the three check savers are the only ones
-   * whose store call can reject rather than return.
-   *
-   * The draft is RE-BASELINED only on success, so a failed save leaves the activity dirty —
-   * which is what keeps the rail marker, the Save button and the exit prompt all still
-   * saying there is something to save.
-   *
-   * @param {{ save: () => unknown, rebaseline: () => void, setSaving: (on: boolean) => void }} steps
-   * @returns {Promise<boolean>}
-   */
+  /** Run ONE check save and ANSWER WHETHER IT LANDED (issue 1096). */
   async function persistCheckDraft({ save, rebaseline, setSaving }) {
     setSaving(true);
     try {
@@ -1462,13 +1056,7 @@
     }
   }
 
-  /**
-   * Persist the staged alchemy check mode, if it moved.
-   *
-   * Runs BEFORE the slot draft below, and the order matters: the slot write reseeds the
-   * store, and a mode that had not landed yet would be re-read as its old value. Both are
-   * awaited inside one `saveCraftingCheck` so the pair lands under a single `Save checks`.
-   */
+  /** Persist the staged alchemy check mode, if it moved. */
   async function saveAlchemyCheckMode() {
     if (!alchemyCheckModeDirty) return true;
     return persistCheckDraft({
@@ -1482,18 +1070,7 @@
     });
   }
 
-  /**
-   * Persist one activity's staged Active flag.
-   *
-   * The three share a shape, so they share a function: `enabled` is one boolean per activity
-   * and the only thing that differs is which store action writes it.
-   *
-   * THE CALLER GUARDS ON DIRTY, and that is a timing contract rather than a style choice. Each
-   * activity's save runs its flag before its slot draft, so an UNCONDITIONAL `await` here
-   * would push every ordinary formula save one microtask later — enough to break the shipped
-   * mounted tests that click Save and assert the store call on the next tick. Guarding at the
-   * call site means a save with a clean switch awaits nothing extra at all.
-   */
+  /** Persist one activity's staged Active flag. */
   async function persistCheckActive({ save, rebaseline, setSaving }) {
     return persistCheckDraft({ save, rebaseline, setSaving });
   }
@@ -1512,17 +1089,11 @@
 
   async function saveCraftingCheck() {
     if (!selectedSystemId || craftingCheckSaving || !craftingCheckDirty) return true;
-    // The mode and its slot draft are one save. `&&` is deliberate over an early return:
-    // a failed mode write must not skip the formula the GM staged beside it, exactly as
-    // `saveChecks` attempts every dirty activity rather than stopping at the first failure.
+    // The mode and its slot draft are one save.
     let modeSaved = true;
     if (alchemyCheckModeDirty) modeSaved = await saveAlchemyCheckMode();
     if (craftingCheckActiveDirty) modeSaved = (await saveCraftingCheckActive()) && modeSaved;
-    // EACH SLOT IS GUARDED ON ITS OWN DIRTY FLAG. The outer guard used to be enough, because
-    // `craftingCheckDirty` meant "the active slot draft moved" and nothing else. It now also
-    // reports a moved MODE, so an unguarded branch would write an untouched formula block —
-    // one redundant `updateSystem` plus its store refresh — every time the GM only flipped
-    // the Active switch.
+    // EACH SLOT IS GUARDED ON ITS OWN DIRTY FLAG.
     if (craftingCheckMode === 'routed' && checkRoutedDirty) {
       return (
         (await persistCheckDraft({
@@ -1569,10 +1140,8 @@
 
   async function saveSalvageCheck() {
     if (!selectedSystemId || salvageCheckSaving || !salvageCheckDirty) return true;
-    // The Active flag first, then the slot draft — and each slot guarded on its OWN dirty
-    // flag, because `salvageCheckDirty` now also reports a moved switch. Without the guard a
-    // GM who only flipped Active would rewrite an untouched formula block and pay a second
-    // store refresh for it.
+    // The Active flag first, then the slot draft — and each slot guarded on its OWN dirty flag,
+    // because `salvageCheckDirty` now also reports a moved switch.
     let activeSaved = true;
     if (salvageCheckActiveDirty) {
       activeSaved = await persistCheckActive({
@@ -1671,16 +1240,8 @@
     return activeSaved;
   }
 
-  // The shared Checks header Save persists EVERY dirty activity (issue 1096), not just the
-  // route in view. Sequential rather than concurrent: each of the three saves through the
-  // store and re-baselines its own draft, and the store's publish is a two-phase projection
-  // rebuild that three overlapping writers would race.
-  //
-  // It ANSWERS, and the answer is the conjunction rather than the last one: a Save that
-  // persisted crafting and failed salvage has not saved the checks, and the route-exit guard
-  // must not navigate away from the half that is still dirty. Every dirty activity is still
-  // ATTEMPTED — a crafting failure does not cancel the salvage write — because the GM asked
-  // to save all of them and stopping early would leave a second, unexplained casualty.
+  // The shared Checks header Save persists EVERY dirty activity (issue 1096), not just the route in
+  // view.
   async function saveChecks() {
     let saved = true;
     if (craftingCheckDirty) saved = (await saveCraftingCheck()) && saved;
@@ -1689,15 +1250,7 @@
     return saved;
   }
 
-  /**
-   * The rail's Active switch, for all four activities. EVERY ONE STAGES — flip it and the
-   * studio reports Unsaved, `Save checks` lights up, and Discard puts it back.
-   *
-   * ALCHEMY WRITES A CHECK MODE, not the `enabled` flag. Its on/off IS `alchemy.checkMode`,
-   * which is what the engine dispatches on; the generic `craftingCheck.enabled` flag is
-   * ignored for alchemy, so routing this switch there would have moved a control the engine
-   * never consults while the brew rolled anyway.
-   */
+  /** The rail's Active switch, for all four activities. */
   function onToggleCheckActive(kind, enabled) {
     const on = enabled === true;
     if (kind === 'crafting' && selectedSystem?.resolutionMode === 'alchemy') {
@@ -1721,24 +1274,7 @@
   });
   const itemCards = $derived($viewState.itemCards || []);
   // Reference counting for the Tags & Categories screen delegates to the pure
-  // `buildVocabularyUsage` helper (issue 689), which — unlike the pre-689 inline count —
-  // also credits a tag for every recipe tag-placeholder ingredient (`match.type === 'tags'`)
-  // that names it, so a tag only ever used as an ingredient filter no longer reads as
-  // "Unused".
-  //
-  // The recipe half of that tag count arrives PRE-COUNTED from the store (issue 1081). This
-  // derivation feeds the left nav rail's Tags & Categories badge, which is a sibling of the
-  // view switch rather than a child of one, so it is evaluated on every render of the
-  // manager in every view. Counting the placeholders here read `ingredientSets` and `steps`
-  // off each projected row, and those are detail-tier fields sharing one memoized producer
-  // — so an always-mounted badge deep-cloned the whole library before first paint. The
-  // recipe CATEGORY count below stays here because `category` is a summary-tier field.
-  // Passed RAW, with no `|| {}` default: an empty record is a legitimate pre-count (a system
-  // with no tag placeholders at all), so `buildVocabularyUsage` has to treat `{}` as
-  // authoritative — which means a defensive `|| {}` here would make its documented
-  // "omit it and the walk runs here" fallback unreachable and turn "not published" into
-  // "there are none". A tag referenced only by a recipe ingredient placeholder would then
-  // read as unused and be offered for one-click deletion with no confirm strip.
+  // `buildVocabularyUsage` helper (issue 689), which — unlike the pre-689 inline count.
   const tagCategoryUsage = $derived(
     buildVocabularyUsage($viewState.recipes || [], itemCards, {
       recipeTagPlaceholderCounts: $viewState.recipeTagPlaceholderCounts,
@@ -1759,15 +1295,8 @@
     )
   );
   const tagRows = $derived(buildTagRows(selectedSystem?.itemTags || [], tagCategoryUsage.tagUsage));
-  // Every category counter on the Tags & Categories screen reports the WHOLE vocabulary
-  // — the GM's own entries plus the reserved General bucket — because General is a real,
-  // referenceable category that recipes and components genuinely fall under (issue 878).
-  // `buildCategoryRows` / `buildComponentCategoryRows` both emit General first, so a row
-  // array's length already IS that total. The previous `custom*` fields subtracted
-  // General here and fed the tab badge and the at-a-glance tile, while `VocabularyPanel`
-  // counted it independently for its own entry chip — one screen, three numbers, two
-  // meanings. The `baseCategories: 1` companion field was read by nothing and is gone
-  // rather than left to invite a double count against these now-inclusive totals.
+  // Every category counter on the Tags & Categories screen reports the WHOLE vocabulary — the GM's
+  // own entries plus the reserved General bucket — because General is a real.
   const tagCategoryCounts = $derived({
     recipeCategories: categoryRows.length,
     componentCategories: componentCategoryRows.length,
@@ -1776,12 +1305,7 @@
     componentCategoryReferences: tagCategoryUsage.componentCategoryReferenceCount,
     tagReferences: tagCategoryUsage.tagReferenceCount,
   });
-  // The Tags & Categories screen shows one vocabulary tab at a time; the active tab
-  // is owned here so the inspector's contextual help can follow it (the view is a
-  // controlled component over this state). Each help block is a title plus three
-  // glyph-led rows, rendered by the shared `ExplainerCard` (issue 881) — the same
-  // primitive the Tool Studio's "How Tools work in Fabricate" card renders, so the two
-  // right-hand panels no longer state one meaning at two heading and body scales.
+  // The Tags & Categories screen shows one vocabulary tab at a time.
   let tagsActiveTab = $state('recipe');
   const tagsHelp = $derived.by(() => {
     if (tagsActiveTab === 'component') {
@@ -1876,9 +1400,8 @@
       ],
     };
   });
-  // The reference-safety reassurance was a bare `.manager-muted` paragraph under its own
-  // card title — the third re-derivation of the explainer (issue 881). One glyph-led row
-  // in the shared card says the same thing at the shared scale.
+  // The reference-safety reassurance was a bare `.manager-muted` paragraph under its own card title
+  // — the third re-derivation of the explainer (issue 881).
   const tagsReferenceSafeItems = $derived([
     {
       icon: 'fas fa-shield-halved',
@@ -1893,10 +1416,7 @@
   const selectedGatheringConditionShortcuts = $derived(
     buildSelectedGatheringConditionShortcuts(selectedSystem, $viewState.gatheringConfig)
   );
-  // The ONE authored modifier library (issue 1117). It is projected off the SYSTEM, not
-  // the gathering config: crafting, salvage and gathering checks select over it, and the
-  // gathering d100 drop rows, events and stamina costs reference it. Every surface that
-  // reads a modifier reads this one derivation.
+  // The ONE authored modifier library (issue 1117).
   const selectedSystemModifiers = $derived(
     Array.isArray($viewState.worldModifiers) ? $viewState.worldModifiers : []
   );
@@ -1913,9 +1433,7 @@
   const selectedCurrencyUnits = $derived(
     Array.isArray(worldCurrency.units) ? worldCurrency.units : []
   );
-  // The derived `validateCurrencyProfile` report (issue 1493). Its OWN derivation, deliberately
-  // NOT a fifth key inside the `worldCurrency` fallback above: that literal is a `CurrencyConfig`,
-  // which is exactly four keys, so a report hung inside it would stop being one.
+  // The derived `validateCurrencyProfile` report (issue 1493).
   const worldCurrencyValidation = $derived(
     $viewState.worldCurrencyValidation || { valid: true, errors: [] }
   );
@@ -1923,28 +1441,22 @@
     Array.isArray(worldCurrencyValidation.errors) ? worldCurrencyValidation.errors : []
   );
   // Units exist world-wide regardless of any one system, so the recipe editor must gate cost
-  // affordances on the SYSTEM's explicit enable flag, not on unit presence. Threaded alongside
-  // the units so existing requirements can render read-only (rather than vanish) when the
-  // selected system has currency off.
+  // affordances on the SYSTEM's explicit enable flag, not on unit presence.
   const selectedCurrencyEnabled = $derived(
     selectedSystem?.requirements?.currency?.enabled === true
   );
-  // Time requirements default ON (issue 714): an absent flag keeps existing recipe/step
-  // durations authorable and applied, so gate the recipe Duration surfaces only on an
-  // explicit GM opt-out (`enabled === false`), mirroring the normalizer default.
+  // Time requirements default ON (issue 714): an absent flag keeps existing recipe/step durations
+  // authorable and applied.
   const selectedTimeRequirementsEnabled = $derived(
     selectedSystem?.requirements?.time?.enabled !== false
   );
   const foundrySystemId = $derived(String($viewState.foundrySystemId || ''));
   const characterModifierPresetsSupported = $derived(['dnd5e', 'pf2e'].includes(foundrySystemId));
   const currencyPresetsSupported = $derived(['dnd5e', 'pf2e'].includes(foundrySystemId));
-  // How many crafting systems actually opt into the world's currency. The World > Currency
-  // subtitle reports it so a GM who has configured a ladder that NO system uses can see that
-  // immediately — the commonest way this feature looks broken when it is merely unadopted.
+  // How many crafting systems actually opt into the world's currency.
   const allSystems = $derived($viewState.systems || []);
   // Reads the projected `currencyEnabled` flag, NOT `requirements.currency.enabled`: the system
-  // list is a deliberate allowlist projection that does not carry `requirements`, so the deep
-  // read counted zero for every world and the subtitle reported every ladder as unadopted.
+  // list is a deliberate allowlist projection that does not carry `requirements`.
   const currencyEnabledSystemCount = $derived(
     allSystems.filter((system) => system?.currencyEnabled === true).length
   );
@@ -1965,11 +1477,7 @@
     }))
   );
   // WORLD scope since issue 1308: none of these takes a system id, and none of them requires a
-  // crafting system to be SELECTED. That second half is the part that is easy to get wrong — the
-  // old `if (!selectedSystemId) return;` guards were correct while the library belonged to a
-  // system and become a silent no-op once it does not, so a GM editing the library with no system
-  // selected would click Add and watch nothing happen. Currency's handlers below dropped the same
-  // guard for the same reason.
+  // crafting system to be SELECTED.
   async function onAddCharacterModifier(partial) {
     return await store.addModifier(partial);
   }
@@ -2014,9 +1522,8 @@
     await store.seedPrerequisitePresets();
   }
 
-  // Currency is WORLD scope (issue 1278): none of these take a system id, and none of them
-  // require a selected crafting system — a GM configures the world's coins from the World tab
-  // before any system opts in.
+  // Currency is WORLD scope (issue 1278): none of these take a system id, and none of them require
+  // a selected crafting system.
   async function onAddCurrencyUnit() {
     return await store.addCurrencyUnit();
   }
@@ -2347,39 +1854,29 @@
       ($viewState.recipes || [])[0] ||
       null
   );
-  // Recipe-edit deriveds read the live draft (not the persisted record) so the
-  // editor, inspector, and header chip all track unsaved staged edits.
-  // Alchemy check mode drives the alchemy recipe editor shape (decoupled from the
-  // single `complex` flag): none/simple → single ingredient set + single/labeled
-  // result sets; tiered → multi-group tier assignment (like routedByCheck).
+  // Recipe-edit deriveds read the live draft (not the persisted record) so the editor, inspector,
+  // and header chip all track unsaved staged edits.
   const alchemyCheckMode = $derived(
     selectedSystem?.resolutionMode === 'alchemy'
       ? selectedSystem?.alchemy?.checkMode || 'none'
       : null
   );
-  // Recipe complexity is EMERGENT from structure now (issue 643): the editor renders
-  // multi-set chrome purely off the ingredient-set / result-group COUNT, so there is
-  // no `complex` prop threaded down any more. What the Ingredients tab still needs is
-  // whether the mode PERMITS more than one set — that gates the "Add ingredient set"
-  // promotion affordance. Multiple sets are allowed everywhere except the structurally
-  // 1×1 modes (simple/progressive) and alchemy (which forces a single set).
+  // Recipe complexity is EMERGENT from structure now (issue 643): the editor renders multi-set
+  // chrome purely off the ingredient-set / result-group COUNT.
   const recipeCanAddSet = $derived(
     recipeMultiSetAllowed && selectedSystem?.resolutionMode !== 'alchemy'
   );
   // Alchemy Simple mode drives the Results tab's fixed two-slot editor (success +
   // reserved failure result set).
   const recipeAlchemySimple = $derived(alchemyCheckMode === 'simple');
-  // A SIMPLE-resolution system with the crafting check enabled has a pass/fail outcome,
-  // so it too gets the reserved-failure two-slot result editor (issue 643): a failed
-  // check produces the reserved `role: 'failure'` group (or nothing).
+  // A SIMPLE-resolution system with the crafting check enabled has a pass/fail outcome, so it too
+  // gets the reserved-failure two-slot result editor (issue 643).
   const recipeSimpleWithCheck = $derived(
     (selectedSystem?.resolutionMode || 'simple') === 'simple' &&
       selectedSystem?.craftingCheck?.enabled === true
   );
-  // The routing basis is a property of the system MODE for the routed crafting
-  // modes (routedByCheck → 'check', routedByIngredients → 'ingredientSet'). Alchemy
-  // routes by the system-level check mode: tiered → 'check' (routed tier assignment),
-  // none/simple → null. The retired per-recipe provider is no longer read.
+  // The routing basis is a property of the system MODE for the routed crafting modes (routedByCheck
+  // → 'check', routedByIngredients → 'ingredientSet').
   const recipeRoutingProvider = $derived(
     (() => {
       const mode = selectedSystem?.resolutionMode || 'simple';
@@ -2392,12 +1889,7 @@
   // Progressive systems award a recipe's results in order, so the Results tab
   // enables drag-reorder of the result rows (resolution mode is a system setting).
   const recipeProgressive = $derived(selectedSystem?.resolutionMode === 'progressive');
-  // Alchemy enable-blocker context for the recipe editor's Validation tab (issue
-  // 549): the alchemy check mode (drives the result-selection blocker) and the
-  // cross-recipe signature conflicts touching this recipe. Both are null/[] for every
-  // non-alchemy system, so those systems gain no new checks. The conflicts recompute
-  // against the LIVE draft's ingredient sets (and the current recipe list) so the tab
-  // predicts the collision before the GM saves and clicks enable.
+  // Alchemy enable-blocker context for the recipe editor's Validation tab (issue 549).
   const recipeAlchemy = $derived(
     selectedSystem?.resolutionMode === 'alchemy' ? { checkMode: alchemyCheckMode || 'none' } : null
   );
@@ -2415,10 +1907,8 @@
   const recipeVisibilityEffect = $derived(
     craftingEffect(selectedSystem?.visibilityMode || 'knowledge')
   );
-  // Resolution happens in the STORE (the tab never touches ids): granted characters
-  // resolve over EVERY world actor, not the player-character roster, because the
-  // runtime predicate applies no type filter. The rosters are passed explicitly so the
-  // reactive dependency on them is visible here rather than hidden inside the store.
+  // Resolution happens in the STORE (the tab never touches ids): granted characters resolve over
+  // EVERY world actor, not the player-character roster.
   const recipeAccessRoster = $derived(
     store.resolveRecipeAccess?.(recipeDraft?.access, {
       players: $viewState.worldUsers || [],
@@ -2432,11 +1922,7 @@
     itemCards.some((item) => item.showTags || (Array.isArray(item.tags) && item.tags.length > 0))
   );
   // THE `itemCards[0]` FALLBACK IS THE FIRST RENDER'S ANSWER, NOT THE SELECTION'S (issue 1371
-  // r13-list, M14). The rules list selects its first DRAWN row — the category-major, name-sorted,
-  // paged order — whenever `selectedComponentId` names nothing this system holds, and it does so
-  // through `selectComponent` below, so from the next flush the two agree. The fallback survives
-  // for the render before that flush and for a page drawing only world ghosts, where the list
-  // selects nothing; it is what the hydration effect below asks for on first open.
+  // r13-list, M14).
   const selectedComponent = $derived(
     itemCards.find((item) => item.id === selectedComponentId) || itemCards[0] || null
   );
@@ -2446,17 +1932,7 @@
   const selectedEssenceStrict = $derived(
     essenceCards.find((essence) => essence.id === selectedEssenceId) || null
   );
-  // NO `isCreatingEssenceDraft` (issue 1372, maintainer parity round 8). `essence-edit` with no
-  // selected essence was the system-scope CREATE draft, and its only entry point was the Essence
-  // Rules header's `+ Create essence`, which is gone: an essence's identity is a world record and
-  // the create that authors one is the Essence Catalogue's `+ New essence`. Every branch that
-  // asked this question — the route title, two subtitles, the save label and the breadcrumb leaf
-  // — answered for a state nothing can reach, so each is now the single answer it always gave.
-  //
-  // The THREE-TAB editor survives, and it is not this state. `EssenceEditView` forks on whether
-  // the world corpus holds a record for the essence being edited, so an unreadable corpus still
-  // renders the Identity tab over an EXISTING essence. That is a fallback with a live trigger;
-  // a create draft is not.
+  // NO `isCreatingEssenceDraft` (issue 1372, maintainer parity round 8).
   const selectedEssence = $derived(selectedEssenceStrict || essenceCards[0] || null);
   const selectedEssenceForInspector = $derived(
     currentView === 'essence-edit' ? essenceEditDraft : selectedEssence
@@ -2464,28 +1940,17 @@
   const canSaveEssenceEdit = $derived(
     essenceEditDirty === true && essenceEditDraft?.validName === true && essenceEditSaving !== true
   );
-  // ── The essence bulk selection (issue 1036) ──────────────────────────────────────
-  // Read straight off the LIFTED browser state, which `EssenceBrowserView` binds: the
-  // browser assigns a NEW `Set` on every mutation, so this re-derives without a callback
-  // prop or a second copy of the truth. The Component and Recipe Studio blocks are twins.
+  // ── The essence bulk selection (issue 1036) ────────────────────────────────────── Read straight
+  // off the LIFTED browser state, which `EssenceBrowserView` binds.
   const essenceBulkSelectedIds = $derived(essenceBrowserState.bulkSelectedEssenceIds ?? new Set());
   const essenceBulkSelectionCount = $derived(essenceBulkSelectedIds.size);
   // The PROJECTED rows, not the ids: the delete-impact statement unions carrier IDENTITIES
-  // (`componentUsageItems` and `recipeUsageIds`), which live on the projection, and a sum of
-  // per-essence counts would over-report every shared carrier.
+  // (`componentUsageItems` and `recipeUsageIds`), which live on the projection.
   const essenceBulkSelectedRows = $derived(
     essenceCards.filter((essence) => essenceBulkSelectedIds.has(essence.id))
   );
-  // Discard the staged draft when the selection empties — a clear, a system switch, a prune
-  // that removed the last id, or a successful apply — and DISARM the delete whenever the
-  // selection changes at all. An arm is a statement about a SPECIFIC set: once the set
-  // moves, the impact sentence the GM read before arming is no longer the impact of
-  // confirming, so the second click must not still be a confirmation.
-  //
-  // It reads the SET, not its size. The browser assigns a NEW `Set` on every mutation, so
-  // the set identity is what "changes at all" actually means; a size dependency cannot see
-  // a same-size swap, and every control happening to change the size today is a property of
-  // the current controls rather than of this rule.
+  // Discard the staged draft when the selection empties — a clear, a system switch, a prune that
+  // removed the last id, or a successful apply.
   $effect(() => {
     const selectedIds = essenceBulkSelectedIds;
     if (selectedIds.size === 0) essenceBulkDraft = createEssenceBulkDraft();
@@ -2503,34 +1968,8 @@
       ? itemCards.find((item) => item.id === selectedComponentId) || null
       : null
   );
-  // The expensive half of a component card — its linked source document, the "Missing"
-  // verdict and the live description fallback — resolves on demand (issue 1081), and
-  // `ComponentsBrowserView` only ever asks for the page it renders. Both cards above are
-  // resolved from the WHOLE cohort rather than from that page, so unless this asks, nothing
-  // does. Three independent routes reach an un-asked-for card:
-  //   - first open, where `selectedComponentId` is still empty for the first render so the
-  //     inspector falls back to `itemCards[0]` — the manager's STORED order, while the browser
-  //     renders the name-sorted page 1, so on any library past one page that card is off-page
-  //     (the rules list then selects its first drawn row, M14, but the fallback card has
-  //     already been asked);
-  //   - a selection made on one page and still held after paging elsewhere, because every
-  //     refresh rebuilds every card un-hydrated and only the rendered page is re-asked;
-  //   - the component editor, which UNMOUNTS the browser entirely — and Replace source /
-  //     Unlink source refresh without navigating away from it.
-  // Left un-asked, all three render the pre-hydration reading permanently: "No description
-  // has been added." for a compendium-linked component whose prose lives on the source
-  // document, which is the regression issue 676 filed and issue 800 preserved, and an accent
-  // `Compendium` / `Items Directory` pill telling the GM a dangling link is healthy.
-  //
-  // Called off the card rather than through the projection's `hydrateItemCards` helper for
-  // the reason `ComponentsBrowserView` states at its own effect: importing that store module
-  // here would pull it into the dependency closure of every mounted suite rendering this
-  // tree, where a module missing from the harness allowlist HANGS the suite rather than
-  // failing it. A card with no `hydrate` — a fixture's plain object — is left as it is.
-  //
-  // The rejection is swallowed deliberately: a card that could not resolve keeps its
-  // un-hydrated reading, which renders correctly rather than blankly, and the projection
-  // drops its memo on rejection so the next render retries rather than re-throwing forever.
+  // The expensive half of a component card — its linked source document, the "Missing" verdict and
+  // the live description fallback — resolves on demand (issue 1081).
   $effect(() => {
     for (const card of [selectedComponent, componentForEdit]) {
       card?.hydrate?.()?.catch?.(() => {});
@@ -2540,43 +1979,21 @@
   const componentEditEssenceOptions = $derived(componentEssenceOptionsFor(componentForEdit));
   const componentEditShowTags = $derived(componentShowTagsFor(componentForEdit));
   const componentEditShowEssences = $derived(componentShowEssencesFor(componentForEdit));
-  // Progressive difficulty is authored from the right inspector but STAGED into
-  // the component editor's save flow (it persists on Save, not on change). The
-  // draft is seeded on edit-entry (editComponent); these derive its visibility,
-  // dirtiness, and the combined dirty state the Save button + route guard use.
-  // `component.difficulty` is ONE component-level scalar read by SEVERAL
-  // progressive surfaces, each with its OWN resolution mode:
-  //   - progressive recipes   → ResolutionModeService  (system.resolutionMode)
-  //   - progressive salvage   → CraftingEngine         (system.salvageResolutionMode)
-  //   - progressive gathering → GatheringEngine        (the system's gathering
-  //     economy `resolutionMode`; `difficultyForResult` costs each result by the
-  //     component's difficulty)
-  // Gating on the RECIPE mode alone was the bug (issue 676): a system that is
-  // `routedByCheck` for recipes but progressive for salvage reads difficulty and
-  // could never author it. Read the gathering economy straight off viewState
-  // rather than via `gatheringResolutionMode` (declared further down) so this
-  // derivation carries no declaration-order coupling. The economy is ONE block
-  // per system (`gatheringConfig.systems[systemId].economy`), so this is a direct
-  // read of the edited system's mode, not a scan.
+  // Progressive difficulty is authored from the right inspector but STAGED into the component
+  // editor's save flow (it persists on Save, not on change).
   const gatheringProgressive = $derived(
     $viewState.gatheringConfig?.systems?.[selectedSystemId]?.economy?.resolutionMode ===
       'progressive'
   );
-  // The SYSTEM-scoped half of that question, extracted so three surfaces can share it
-  // (issue 772): the single-component editor control, the browser row's read-only DC
-  // badge, and the browser's bulk-edit progressive-DC section. It carries NO view and NO
-  // selection term — `componentDifficultyShown` below adds those back for the editor —
-  // because the two browser surfaces are, by definition, not in the editor: reusing the
-  // view-scoped predicate there would render both of them NEVER, and pass vacuously.
+  // The SYSTEM-scoped half of that question, extracted so three surfaces can share it (issue 772):
+  // the single-component editor control, the browser row's read-only DC badge.
   const componentDifficultyAxisProgressive = $derived(
     selectedSystem?.resolutionMode === 'progressive' ||
       salvageResolutionMode === 'progressive' ||
       gatheringProgressive
   );
-  // Behaviour-preserving by construction: the same three axes ANDed with the same two view
-  // terms this derivation always had. It gates the editor control's VISIBILITY and the
-  // difficulty fold-in on the SAVE path (`saveComponentEdit`), so the rewrite has to hold
-  // for both — nothing under `tests/` names it.
+  // Behaviour-preserving by construction: the same three axes ANDed with the same two view terms
+  // this derivation always had.
   const componentDifficultyShown = $derived(
     currentView === 'component-edit' && componentDifficultyAxisProgressive && !!componentForEdit
   );
@@ -2588,10 +2005,8 @@
   const componentEditCombinedDirty = $derived(
     componentEditDirty === true || componentDifficultyDirty === true
   );
-  // ── The bulk selection (issue 772) ───────────────────────────────────────────────
-  // Read straight off the LIFTED browser state, which `ComponentsBrowserView` binds: the
-  // browser assigns a NEW `Set` on every mutation, so this re-derives without a callback
-  // prop or a second copy of the truth.
+  // ── The bulk selection (issue 772) ─────────────────────────────────────────────── Read straight
+  // off the LIFTED browser state, which `ComponentsBrowserView` binds.
   const componentBulkSelectedIds = $derived(
     componentBrowserState.bulkSelectedComponentIds ?? new Set()
   );
@@ -2602,9 +2017,7 @@
   const componentBulkCategoryOptions = $derived(
     componentCategoryOptions(itemCards, selectedSystem?.componentCategories || [])
   );
-  // What deleting the current selection would do (issue 1129). Derived from the STORE rather
-  // than from the selected cards, because the "recipes disabled" number depends on the whole
-  // selection against real recipe bodies — see `adminStore.describeComponentDelete`.
+  // What deleting the current selection would do (issue 1129).
   const componentBulkDeleteImpact = $derived(
     store.describeComponentDelete?.(componentBulkSelectedIds) ?? {
       deletable: 0,
@@ -2613,25 +2026,15 @@
       recipesDisabled: 0,
     }
   );
-  // Discard the staged draft when the selection empties — a clear, a system switch, a prune
-  // that removed the last id, or a successful apply — and DISARM the delete whenever the
-  // selection changes at all. An arm is a statement about a SPECIFIC set: once the set moves,
-  // the impact sentence the GM read before arming is no longer the impact of confirming, so
-  // the second click must not still be a confirmation. The Essence Studio's twin above is
-  // where this rule is stated at length.
-  //
-  // It reads the SET, not its size, for the reason recorded there: the browser assigns a NEW
-  // `Set` on every mutation, so set identity is what "changes at all" means, and a size
-  // dependency cannot see a same-size swap.
+  // Discard the staged draft when the selection empties — a clear, a system switch, a prune that
+  // removed the last id, or a successful apply.
   $effect(() => {
     const selectedIds = componentBulkSelectedIds;
     if (selectedIds.size === 0) componentBulkDraft = createComponentBulkDraft();
     componentBulkDeleteArmed = false;
   });
-  // ── The recipe bulk selection (issue 1010) ───────────────────────────────────────
-  // Read straight off the LIFTED browser state, which `RecipesBrowserView` binds: the
-  // browser assigns a NEW `Set` on every mutation, so this re-derives without a callback
-  // prop or a second copy of the truth. The Component Studio's block above is the twin.
+  // ── The recipe bulk selection (issue 1010) ─────────────────────────────────────── Read straight
+  // off the LIFTED browser state, which `RecipesBrowserView` binds.
   const recipeBulkSelectedIds = $derived(recipeBrowserState.bulkSelectedRecipeIds ?? new Set());
   const recipeBulkSelectionCount = $derived(recipeBulkSelectedIds.size);
   // The PROJECTED rows, not the ids: the blocked-enable forecast reads `enableBlocked` and
@@ -2639,27 +2042,16 @@
   const recipeBulkSelectedRows = $derived(
     ($viewState.recipes || []).filter((recipe) => recipeBulkSelectedIds.has(recipe.id))
   );
-  // The SAME predicate the row's `Can't enable` pill reads, so the panel's count and the
-  // pilled rows are one set by construction rather than by convention. It is 0 unless
-  // `Enable` is actually staged — nothing can be refused by a disable or a leave-alone.
+  // The SAME predicate the row's `Can't enable` pill reads, so the panel's count and the pilled
+  // rows are one set by construction rather than by convention.
   const recipeBulkBlockedCount = $derived(
     countBlockedRecipeEnables(recipeBulkSelectedRows, recipeBulkDraft?.status)
   );
-  // How many of the SELECTED recipes each recipe book holds — the `holds n of {total}`
-  // figure the bulk panel's book picker states, and what its Add / Remove counts and
-  // disabled states are derived from.
-  //
-  // Derived from the same PROJECTED ROWS, and that is the load-bearing part. Each row's
-  // `recipeItemIds` comes from `recipeItemDefinitionsContaining`, which takes the system's
-  // `membershipResolvesByRecipeIds` marker as a parameter and is therefore basis-aware.
-  // Counting from `recipeItemDefinitions[].recipeIds` instead would report "holds none
-  // selected" on every legacy-basis system — where membership still resolves through the
-  // `recipe.recipeItemId` scalar and a book's own array is empty — and would disable Remove
-  // on exactly the worlds this axis exists to fix.
+  // How many of the SELECTED recipes each recipe book holds — the `holds n of {total}` figure the
+  // bulk panel's book picker states.
   const recipeBulkBookMembership = $derived(countRecipeBookMembership(recipeBulkSelectedRows));
-  // The axis gate reuses the EXISTING `recipeCheckTierOptions` derived rather than
-  // re-resolving the tier list: `resolveRecipeCheckTierOptions` is the single source of
-  // truth for which tiers a system offers, and this helper only explains an empty list.
+  // The axis gate reuses the EXISTING `recipeCheckTierOptions` derived rather than re-resolving the
+  // tier list.
   const recipeBulkCheckTierAxis = $derived(
     describeRecipeCheckTierAxis({
       craftingCheck: selectedSystem?.craftingCheck,
@@ -2667,32 +2059,12 @@
       tierOptions: recipeCheckTierOptions,
     })
   );
-  // The system's AUTHORED vocabulary, which is what the single-recipe editor's own select
-  // offers — not the browser filter's in-use tally, which would make an authored but
-  // currently unused category unreachable as an assignment target.
+  // The system's AUTHORED vocabulary, which is what the single-recipe editor's own select offers —
+  // not the browser filter's in-use tally.
   const recipeBulkCategoryOptions = $derived(
     getEffectiveRecipeCategories(selectedSystem?.categories || [])
   );
-  // What deleting the current selection would do (issue 1132). Derived from the STORE, not
-  // from the projected rows: the learner count needs actor flags and the recipe-item count
-  // needs the system's definitions with its membership basis, neither of which is in the
-  // row projection — and the store counts through the SAME leaf the write executes
-  // through, so the stated numbers cannot drift from the performed ones.
-  //
-  // THE `$viewState` READ IS A DEPENDENCY, NOT A LEFTOVER (review round). Everything
-  // `describeRecipeDelete` consults is invisible to the rune graph — `get(selectedSystemId)`
-  // is a `svelte/store` read, `getSystem()` walks a plain Map, and the learner index is a
-  // plain `let` — so the selection was the derivation's ONLY trigger. Concretely: select
-  // three recipes, stage "add to Book X" in this same panel, Apply (the selection survives;
-  // only a count reaching zero discards state) and the card still read "Will be removed
-  // from 1 book or scroll" while the confirm pruned two. Taking the projection the store
-  // republishes on every `refresh()` makes the card recompute whenever the world it counts
-  // over has been re-read. It does NOT make the card recompute on an external actor-flag
-  // write with no refresh behind it — the store's stale-index marker is the other half of
-  // that, see `adminStore.markLearnedRecipeIndexStale`.
-  //
-  // Deliberately NOT applied to `componentBulkDeleteImpact` above: that path ships as it is,
-  // and widening its dependency is a change to a shipped studio this change does not owe.
+  // What deleting the current selection would do (issue 1132).
   const recipeBulkDeleteImpact = $derived.by(() => {
     void $viewState;
     return (
@@ -2706,40 +2078,12 @@
       }
     );
   });
-  // Discard the staged draft whenever the selection empties — a clear, a system switch, a
-  // prune that removed the last id, or a successful apply. The panel is unmounted at that
-  // point, so this is the only place the discard can honestly happen.
-  //
-  // It reads the COUNT, and that is deliberate rather than an oversight: retargeting it to
-  // the Set identity — as the Component Studio's single combined effect is keyed — would
-  // discard a staged draft on every selection change, which is a regression of issue 1010's
-  // whole staging model. The arm needs the other dependency, so it gets its own effect
-  // below rather than folding into this one.
+  // Discard the staged draft whenever the selection empties — a clear, a system switch, a prune
+  // that removed the last id, or a successful apply.
   $effect(() => {
     if (recipeBulkSelectionCount === 0) recipeBulkDraft = createRecipeBulkDraft();
   });
-  // DISARM the delete whenever the selection changes at all. An arm is a statement about a
-  // SPECIFIC set: once the set moves, the impact sentence the GM read before arming is no
-  // longer the impact of confirming, so the second click must not still be a confirmation.
-  //
-  // It reads the SET, not its size, and the honest reason is narrower than the one issue
-  // 1132's delta gives. The delta motivates it as "a size dependency cannot see a same-size
-  // swap"; MEASURED AGAINST THE SHIPPED BROWSER, no such swap is reachable. Every mutation
-  // `RecipesBrowserView` performs changes the count — untick then tick is two flushes, the
-  // phantom-id prune assigns only `if (pruned.size !== current.size)`, and
-  // `Select all N results` is hidden once every filtered row is selected. So a
-  // count-keyed disarm would behave identically today, and the mutation proof for that
-  // claim comes back GREEN. What the Set dependency actually buys is that this effect is
-  // keyed on the reactive unit the state IS — `bulkSelectedRecipeIds` is reassigned, never
-  // mutated — so it stays correct if a future republish does produce an equal-sized set,
-  // and it matches the Component Studio's shipped effect rather than inventing a second
-  // convention. It is robustness and consistency, not a live defect fix; the test below
-  // says the same rather than dressing an unreachable case up as coverage.
-  //
-  // It is a SECOND effect rather than a clause added to the one above, and that part is
-  // load-bearing: folding the disarm in would either leave the draft discard keyed on the
-  // count (fine) or retarget the draft discard to the Set (a regression of issue 1010,
-  // discarding a staged draft on every selection change).
+  // DISARM the delete whenever the selection changes at all.
   $effect(() => {
     void recipeBulkSelectedIds;
     recipeBulkDeleteArmed = false;
@@ -2811,15 +2155,10 @@
       hintFallback: 'Set system-level rules for gathering.',
     },
   ];
-  // The SELECTED SYSTEM's participation in Travel & Realms (issue 1282). It no longer gates a
-  // route: the realm library is world scope and World > Travel is always reachable. What it
-  // still gates is this system's environment realm controls and its party overrides.
+  // The SELECTED SYSTEM's participation in Travel & Realms (issue 1282).
   const gatheringRealmsEnabled = $derived($viewState.gatheringRealmSettings?.enabled === true);
-  // A party's current-realm override is per-selected-system, so it needs that system to take
-  // part: the gathering feature AND its Travel & Realms toggle. `adminStore`'s
-  // `canUsePartyRealmOverrides` states the same rule on the write side; re-stating it here
-  // against the LIVE projection is what stops a stale flag outliving the capability when
-  // gathering is switched off or the selection is cleared under the GM.
+  // A party's current-realm override is per-selected-system, so it needs that system to take part:
+  // the gathering feature AND its Travel & Realms toggle.
   const partyRealmOverridesAvailable = $derived(
     canShowEnvironments &&
       gatheringRealmsEnabled &&
@@ -2845,37 +2184,15 @@
   );
   const isWorldRoute = $derived(currentView === 'world');
   const isWorldDowntimeRoute = $derived(currentView === 'world-downtime');
-  // World > Currency (issue 1278). UNGATED, like Parties and unlike experimental-gated Downtime:
-  // a GM has to be able to configure the world's coins BEFORE any crafting system opts in, so
-  // gating this on a system having currency enabled would be a chicken-and-egg lock-out.
+  // World > Currency (issue 1278).
   const isWorldCurrencyRoute = $derived(currentView === 'world-currency');
-  // World > Rules & Resources (issue 1311). THREE SIBLING ROUTES under one rail group, rather
-  // than one route with a sub-tab variable as Travel and Downtime use. The reason is concrete:
-  // Travel's model would force a rename of `world-currency`, churning three View Lab cases and
-  // their `expectView` assertions, the route-scoped CSS, the spec section and the docs page, for
-  // nothing a GM could see. The Checks group is the precedent for a group whose children are
-  // real routes.
+  // World > Rules & Resources (issue 1311).
   const isWorldPrerequisitesRoute = $derived(currentView === 'world-prerequisites');
   const isWorldModifiersRoute = $derived(currentView === 'world-modifiers');
   const isWorldRulesRoute = $derived(
     isWorldCurrencyRoute || isWorldPrerequisitesRoute || isWorldModifiersRoute
   );
   // -- World scoped-entity routes (issue 1362, epic 1357) --------------------------------
-  //
-  // SEVEN NEW TOKENS, and the system tokens (`components`, `essences`, `tools`, `tags`) are
-  // PRESERVED unrenamed: those screens get new TITLES in this change, not new routes, so
-  // every deep link, every `expectView` and every stored `activeView` keeps resolving.
-  //
-  // Six of the seven are the component / essence / tool pairs -- a catalogue and an entry
-  // editor each. The seventh, `world-vocabulary`, is the World Vocabulary and is deliberately
-  // NOT a scoped-entity layer: it holds the category and tag vocabularies those entities draw
-  // FROM, which is why it carries its own spec requirement rather than sharing theirs.
-  //
-  // EVERY ONE IS REACHABLE WITH NO CRAFTING SYSTEM SELECTED, which is the normal state for a
-  // world screen. That is why they join the world pass-through in `normalizedActiveView`
-  // AHEAD of its `if (!system) return 'systems'` fallthrough, are absent from `setView`'s
-  // `!selectedSystem` refusal, and are absent from `SCOPE_BROWSER_BY_VIEW` -- a world route
-  // has no per-system record to be stranded on when the scope select changes.
   const WORLD_SCOPED_VIEWS = Object.freeze([
     'world-components',
     'world-component-entry',
@@ -2886,69 +2203,18 @@
     'world-vocabulary',
   ]);
   const isWorldScopedRoute = $derived(WORLD_SCOPED_VIEWS.includes(currentView));
-  // The world corpus behind the rail leaves' count badges. Read from the store's TOP-LEVEL
-  // `worldScope` key rather than from `selectedSystem`, because on these routes there may be
-  // no selected system at all.
+  // The world corpus behind the rail leaves' count badges.
   const worldScopeState = $derived($viewState.worldScope || {});
   const worldScopedCounts = $derived({
     components: worldScopeState.component?.entities?.length ?? 0,
     essences: worldScopeState.essence?.entities?.length ?? 0,
     tools: worldScopeState.tool?.entities?.length ?? 0,
     // The World Vocabulary count, WIRED NOW even though its corpus arrives with PR 7, and the
-    // reason is a one-way door: `### GM World Scoped Entity Routes` requirement 7 bars every
-    // later PR in this epic from touching this file, so a badge omitted here could never be
-    // added.
-    //
-    // BOTH HALVES ARE WIRED, not just this one. `worldScopeProjection.js` publishes
-    // `worldScope.vocabulary.total` today — 0 until a vocabulary store exists — and
-    // `adminStore`'s `_worldScopeStores` already reads an optional fourth `vocabulary` leg, so
-    // PR 7 registers its store and its projection without reopening either gateway file. The
-    // field name `total` is the contract between the two; `### GM World Vocabulary Route`
-    // names it and `tests/world-scope-projection.test.js` pins it.
+    // reason is a one-way door.
     vocabulary: worldScopeState.vocabulary?.total ?? 0,
   });
 
   // ── THE WORLD-SCOPE DATA SEAM (issue 1374) ─────────────────────────────────────────────
-  //
-  // Everything a scoped-entity screen needs to draw itself against the world corpus, bundled
-  // once per entity type and spread at each of the TWELVE call sites that take one: the six
-  // world entity pages and the six system-scope entity views.
-  //
-  // IT IS HERE BECAUSE THERE IS NOWHERE ELSE. This corpus registers no component context and
-  // exports no store singleton, and no manager component imports a store module, so a DECLARED
-  // PROP is the only route a value has into a child. Requirement 7 of
-  // `### GM World Scoped Entity Routes` closes this file to the lanes that draw those screens,
-  // which is exactly why the seam they read is wired once, here, ahead of them.
-  //
-  // THREE BUNDLES, NOT THIRTEEN LITERAL BLOCKS. Thirteen near-identical four-line prop blocks
-  // in one file is the shape SonarCloud's new-code duplication gate counts, and `.svelte` IS
-  // duplication-analysed.
-  //
-  // PER ENTITY TYPE, NEVER THE WHOLE FAMILY. Handing a page `store.worldScope` would let a
-  // component screen address `worldScope.tool.setEnabled`. A family's KEY SET is part of its
-  // contract — only the component family has `setWorldTags`, and none of them has a
-  // `setEnabled` the component path must not offer — so each screen gets its own family and
-  // `'setEnabled' in actions` stays false where a screen tests it.
-  //
-  // `systemId` ON A WORLD PAGE IS NOT A LEAK. The bundle is ONE concept, and a world ENTRY
-  // editor legitimately marks the row for the system the GM is working in. A page that does
-  // not need it ignores it, exactly as today's placeholders ignore `onOpenEntry`.
-  //
-  // EVERY FIELD TOLERATES ABSENCE. `adminStore` seeds the full `worldScope` shape on its very
-  // first publish, so in production none of these fallbacks fires; the case they exist for is
-  // a mounted test driving a hand-written `viewState`.
-  //
-  // THESE BUNDLES ARE NOT EVALUATED TODAY, AND THAT IS A PROPERTY OF THE CALL SITES RATHER
-  // THAN OF THIS DECLARATION. Svelte resolves a spread by walking its prop sources in reverse
-  // and stopping at the first that owns the key, so while a child declares NONE of these four
-  // names the bundle behind it is never read at all — measured at eleven of the twelve sites.
-  //
-  // THE HAZARD IS THE REVERSE. A later lane that declares a prop on one of these children which
-  // its call site does NOT pass makes the lookup fall THROUGH to the spread, and every reader
-  // of that prop becomes a live subscriber to the whole bundle — including `scope`, which is a
-  // new object on every publish. That is fine for a value read imperatively from a handler, and
-  // it is a re-render on every world-corpus change for a value read in a reactive scope. Declare
-  // what the site passes, or pass what you declare.
   const componentScopeProps = $derived({
     scope: worldScopeState.component ?? null,
     actions: store?.worldScope?.component ?? null,
@@ -2969,28 +2235,12 @@
   });
 
   // ── THE WORLD INGREDIENT ROSTERS (issue 1373, maintainer round 2) ────────────────────────
-  //
-  // The world Tool entry's Breakage tab authors two answers that NAME OTHER RECORDS: the
-  // Component a broken Tool is replaced by, and the ingredient groups that mend a marked-broken
-  // one. Both were unauthorable at world scope, on the standing reading that a repair group
-  // "names ingredient quantities over the OWNING SYSTEM's components, which world scope cannot
-  // address" — which epic 1357 retired by giving the world its own component and essence
-  // catalogues. A world entity id IS the id a membership record carries, so a world default
-  // naming one resolves in every system that has adopted it.
-  //
-  // THEY ARE NOT IN `toolScopeProps`, and that is deliberate rather than an oversight: that
-  // bundle is ONE family's scope, actions and roster, spread at twelve call sites, and three of
-  // these four values come from a DIFFERENT family's corpus. Folding a component roster into the
-  // tool bundle would hand every tool screen a key its contract does not have.
   const worldComponentOptions = $derived(
     (worldScopeState.component?.entries ?? []).map((entry) => ({
       id: entry.id,
       name: entry.entity?.name || entry.id,
       img: entry.entity?.img || '',
-      // CARRIED FOR THE DROP TARGET. `resolveDroppedComponentId` matches a dragged Foundry
-      // document against these two, which is the only way a leaf holding no Foundry global can
-      // answer a drop at all. (The word for that global is deliberately not written here:
-      // `manager-contract.test.js` greps this file's SOURCE for it, comments included.)
+      // CARRIED FOR THE DROP TARGET.
       ...(entry.entity?.registeredItemUuid && {
         registeredItemUuid: entry.entity.registeredItemUuid,
       }),
@@ -2999,9 +2249,7 @@
   );
 
   // WORLD-DISABLED ESSENCES ARE WITHHELD FROM THE OFFER, which is exactly what
-  // `selectableEssenceOptions` does with a system-disabled one: the projection answers `enabled`
-  // from the world master switch, and an ingredient picker must not offer a record the world has
-  // turned off everywhere.
+  // `selectableEssenceOptions` does with a system-disabled one.
   const worldEssenceOptions = $derived(
     (worldScopeState.essence?.entries ?? []).map((entry) => ({
       ...(entry.entity ?? {}),
@@ -3010,11 +2258,7 @@
     }))
   );
 
-  // THE WORLD TAG VOCABULARY, DERIVED FROM THE RECORDS THAT CARRY IT. `setWorldTags` writes each
-  // world component's own `tags`, and there is no separate world tag roster to read: the
-  // `world-vocabulary` store that will publish one is not registered yet (its projection answers
-  // `total: 0`), so the union of what is actually authored is the honest list. Sorted, so the
-  // picker's order does not follow catalogue order.
+  // THE WORLD TAG VOCABULARY, DERIVED FROM THE RECORDS THAT CARRY IT.
   const worldComponentTags = $derived(
     [
       ...new Set(
@@ -3026,15 +2270,6 @@
   );
 
   // ── WHAT THE ESSENCE RULES INSPECTOR NEEDS FROM THE WORLD JOIN (issue 1372, round 8) ──────
-  //
-  // The rail states two facts it could not reach before: which LAYER each on-craft section
-  // resolved from, and which other crafting systems have rules for the inspected essence. Both
-  // live on the world-scope join — `worldScope.essence.entries[].systems` — which is published
-  // here and nowhere a page or a browser view can see it.
-  //
-  // DERIVED FROM `selectedEssenceForInspector`, not from `selectedEssenceId`: while the editor is
-  // open the inspector shows the DRAFT, and pinning the roster to the persisted selection would
-  // put one essence's systems under another essence's name.
   const inspectedEssenceWorldEntry = $derived(
     (worldScopeState.essence?.entries ?? []).find(
       (candidate) => candidate?.id === selectedEssenceForInspector?.id
@@ -3046,29 +2281,12 @@
       ? inspectedEssenceWorldEntry.systems
       : []
   );
-  // The inherit map for THIS system, or `null` when there is no membership record. `null` is not
-  // "everything inherited": a system with no record resolves nothing at all, and the on-craft
-  // cards omit their layer clause rather than attributing a value to a layer.
+  // The inherit map for THIS system, or `null` when there is no membership record.
   const inspectedEssenceInherited = $derived(
     inspectedEssenceSystemRows.find((row) => row?.systemId === selectedSystemId)?.inherited ?? null
   );
 
   // ── THE SYSTEM ESSENCE RULES HEADER (issue 1372, maintainer parity round 7) ───────────────
-  //
-  // The route heads with the essence's own tile, its NAME, and `<system> rules · enabled`
-  // (`proto:5091`). What shipped was the generic page header every route falls through to — the
-  // static title `Edit essence` over the sentence "Update identity, icon, and source linkage for
-  // this essence", which ADVERTISED the capability this change removes and named nothing the GM
-  // had opened.
-  //
-  // IT IS DERIVED HERE FOR THE REASON THE WORLD ENTRY HEADING ABOVE IS: `.manager-header` is a
-  // SIBLING of `.manager-main`, so the page structurally cannot render into it, exactly as it
-  // cannot render its own breadcrumb.
-  //
-  // THE FALLBACK IS THE SHIPPED HEADER, and the condition is the same one the editor forks on: a
-  // world record exists for this essence, so its identity is not this screen's to edit and the
-  // screen is the rules screen. A create draft and a world corpus that cannot answer both keep
-  // the generic heading, because in those states the in-system record IS the record.
   const essenceRulesWorldEntry = $derived(
     currentView === 'essence-edit' && selectedEssenceId
       ? ((worldScopeState.essence?.entries ?? []).find(
@@ -3081,11 +2299,7 @@
   );
 
   // Name and glyph follow the world record wherever there is one (issue 1654): `1.34.0` merges
-  // equivalent world essences and `icon` is not in the equivalence key, so one world entity can
-  // back N in-system records whose icons differ, and this route edits neither. Requirement 13
-  // forbids two medallions on one screen drawing different glyphs for one essence.
-  // `essenceRulesWorldEntry` is null for a create draft and for an unreadable corpus, which is
-  // where the draft must still lead: there the in-system record is the record.
+  // equivalent world essences and `icon` is not in the equivalence key.
   const essenceEditName = $derived(
     essenceRulesWorldEntry?.entity?.name ||
       essenceEditDraft?.name ||
@@ -3099,16 +2313,13 @@
       'fas fa-mortar-pestle'
   );
   // The tint needs no world read of its own (maintainer ruling M29): `adminStore`'s projection
-  // already overlays the world colour onto the in-system row's `colorToken`, so the copy the
-  // draft buffers is the world colour, and reading the draft first keeps the create state right.
+  // already overlays the world colour onto the in-system row's `colorToken`.
   const essenceEditTint = $derived(
     essenceEditDraft?.colorToken ?? selectedEssenceStrict?.colorToken ?? ''
   );
 
   // The subline states the two facts the reference states: WHICH system's rules these are, and
-  // whether the essence is on in it. The enabled half follows the DRAFT, because the switch that
-  // changes it is buffered and a subline pinned to disk would contradict the card two inches
-  // below it until Save.
+  // whether the essence is on in it.
   const essenceEditSubline = $derived(
     interpolate(text('FABRICATE.Admin.Manager.Essence.RulesSubtitle', '{system} rules · {state}'), {
       system: selectedSystem?.name || '',
@@ -3120,72 +2331,21 @@
   );
 
   // WHICH WORLD ENTITY AN ENTRY ROUTE IS OPEN ON (issue 1362).
-  //
-  // The three entry routes are the only World screens whose trail is THREE crumbs — the
-  // prototype's `crumbFor` maps an entry to `[World, <catalogue>, <entity name>]`, with the
-  // middle crumb clickable back to the catalogue. That middle crumb is the only way back out
-  // of an entry editor, which is released to full width and so has no inspector to carry one.
-  //
-  // IT IS ROOT STATE BECAUSE THE BREADCRUMB IS SHELL CHROME. A page cannot render a crumb, and
-  // requirement 7 of `### GM World Scoped Entity Routes` closes this file to PRs 6a, 6b and 6c
-  // — so the subject a later lane will choose has to be expressible through a prop it already
-  // has. `onOpenEntry` is that prop: a catalogue row calls it with the entity id, this shell
-  // performs the navigation, and the third crumb follows from the published corpus with no
-  // further edit here.
   let worldScopedEntryId = $state('');
   const worldScopedEntryRoute = $derived(scopedEntryRoute(currentView));
 
   /**
-   * THE BUFFERED IDENTITY OF WHICHEVER SCOPED ENTRY EDITOR IS OPEN (issue 1372, maintainer
-   * parity round 6).
-   *
-   * GENERIC ON PURPOSE, and that is the whole point of it. An entry editor buffers its edit and
-   * is saved explicitly, so every piece of chrome that names the entity has to follow the DRAFT
-   * or the screen contradicts itself — which it did: mid-rename the heading read `Aetherlight`,
-   * the player preview read `Aetherlight`, and the breadcrumb's last crumb read `Aether`.
-   * The crumb is derived once, here, for ALL THREE entry routes out of one route table, so a
-   * per-screen fix would have had to be written into a shared derivation three times. The world
-   * tool entry inherits this by reporting its own buffered identity through the same prop; it
-   * needs no crumb code of its own, exactly as it needs no `scopedEntryRoute` entry of its own.
-   *
-   * A PAGE HANDS ITS WHOLE BUFFERED IDENTITY MAP and this shell reads the chrome fields it
-   * happens to render — the name for the crumb and the heading, the icon and the colour for the
-   * medallion beside them. The two screens buffer different field sets (`scopedEntryDraft.js`
-   * makes that the caller's argument), so a fixed three-key payload would be a second, narrower
-   * statement of a shape the scope descriptor already owns.
-   *
-   * `null` while no entry editor is reporting one, which is what makes every reader below fall
-   * back to the published projection rather than to an empty string. The page withdraws it on
-   * unmount, so leaving an entry route cannot leave a stale name in the trail.
-   *
-   * @type {Record<string, unknown>|null}
+   * THE BUFFERED IDENTITY OF WHICHEVER SCOPED ENTRY EDITOR IS OPEN (issue 1372, maintainer parity
+   * round 6).
    */
   let scopedEntryDraftIdentity = $state(null);
 
-  /**
-   * One scoped entry editor's buffered identity, or `null` to withdraw it.
-   *
-   * Stored as a NEW plain object rather than the page's own: Svelte 5 does not proxy a value
-   * that arrives from another component's `$state` through a prop callback, so holding the
-   * caller's object would make a later in-place write invisible here. Every reader below is a
-   * `$derived` over this one assignment.
-   *
-   * @param {unknown} identity
-   */
+  /** One scoped entry editor's buffered identity, or `null` to withdraw it. */
   function handleScopedEntryDraftIdentity(identity) {
     scopedEntryDraftIdentity = identity && typeof identity === 'object' ? { ...identity } : null;
   }
 
-  /**
-   * One buffered identity field as a string, or `null` when no editor is reporting one.
-   *
-   * `null` and not `''` is the difference the callers depend on: an author who CLEARS a name or
-   * a colour is stating a real value and must see it, so the fallback to the projection has to
-   * be `??` on "no editor" rather than `||` on "nothing authored".
-   *
-   * @param {string} field
-   * @returns {string|null}
-   */
+  /** One buffered identity field as a string, or `null` when no editor is reporting one. */
   function scopedEntryDraftField(field) {
     if (!scopedEntryDraftIdentity) return null;
     const value = scopedEntryDraftIdentity[field];
@@ -3203,29 +2363,6 @@
   );
 
   // THE ESSENCE ENTRY ROUTE'S HEADER NAMES THE ESSENCE (issue 1372, maintainer parity round 4).
-  //
-  // The prototype heads that screen with the essence's own tile, its NAME, and
-  // `World definition · used by 8 of 24 systems` (`essEntry.png`). What shipped was the generic
-  // page header every route falls through to — the static title `Essence entry` over a sentence
-  // describing what the screen is FOR — so the one thing a GM opened the screen to work on was
-  // the one thing the top of it did not say. The breadcrumb named it and the header did not.
-  //
-  // IT REUSES THE RECIPE EDITOR'S HEADING BLOCK WHOLESALE, which is the same move
-  // `data-component-edit-heading` and `data-downtime-chrome-heading` above already make: same
-  // classes, same `Medallion`, same 44px. An entity-named page header is one meaning, and a
-  // fourth parallel block would be a fourth implementation of it that agreed with the other
-  // three only until one of them changed.
-  //
-  // WHY IT IS DERIVED HERE RATHER THAN PASSED UP FROM THE PAGE. `.manager-header` is a SIBLING
-  // of `.manager-main` — that is the whole reason the route's surface fix had to be written
-  // twice — so the page cannot render into it, exactly as it cannot render its own breadcrumb.
-  // The corpus the page reads is the corpus this shell already publishes to it, so the heading
-  // follows from `worldScopeState` with no new prop and no new import.
-  //
-  // A MISSING RECORD FALLS BACK, it does not print an empty header: an entry route with no
-  // subject chosen, or one whose subject the corpus no longer holds, renders the generic title
-  // and subtitle below — which is the state the page itself answers with its entity-not-found
-  // empty state, and the same guard `currentView === 'recipe-edit' && recipeDraft` uses.
   const worldEssenceEntryRecord = $derived(
     currentView === 'world-essence-entry'
       ? ((worldScopeState.essence?.entries ?? []).find(
@@ -3234,9 +2371,8 @@
       : null
   );
 
-  // `count` is the projection's own member total and `total` is the crafting-system roster the
-  // same entry was built against, so this line cannot disagree with the `n of m systems have
-  // rules` count the page prints below it.
+  // `count` is the projection's own member total and `total` is the crafting-system roster the same
+  // entry was built against.
   const worldEssenceEntrySubtitle = $derived(
     worldEssenceEntryRecord
       ? interpolate(
@@ -3254,23 +2390,7 @@
       : ''
   );
 
-  /**
-   * THE WORLD ESSENCE ENTRY EDITOR'S BUFFERED EDIT, HELD WHERE ITS TWO CONSUMERS ARE
-   * (issue 1372, maintainer parity round 4).
-   *
-   * That editor persisted every keystroke on change and so carried no Save at all. It buffers now
-   * — the mechanism is `scoped/scopedEntryDraft.js`, shared with the tool entry editor — and the
-   * two things that act on a buffered edit are both HERE and cannot be anywhere else: the header
-   * action pair, because `.manager-header` is a sibling of `.manager-main`, and the route-exit
-   * cascade, because leaving via the rail or the breadcrumb never touches the page at all.
-   *
-   * `handle` is a LIVE accessor the page reports once on mount, not a snapshot: the guard reads
-   * it at the moment of a click, and a snapshot published by an effect can be one turn behind the
-   * click that reads it. `worldEssenceEntryDirty` is the reactive mirror the button is disabled
-   * from, reported separately for the opposite reason — a disabled attribute has to re-render.
-   *
-   * @type {{isDirty: () => boolean, save: () => Promise<boolean>, discard: () => void}|null}
-   */
+  /** THE WORLD ESSENCE ENTRY EDITOR'S BUFFERED EDIT. */
   let worldEssenceEntryHandle = null;
   let worldEssenceEntryDirty = $state(false);
   let worldEssenceEntrySaving = $state(false);
@@ -3285,14 +2405,6 @@
   }
 
   // THE HEADING NAMES THE DRAFT, NOT THE RECORD ON DISK (issue 1372, maintainer parity round 5).
-  //
-  // With the edit buffered, the name field and the player preview rail both showed the buffered
-  // name while this heading showed the persisted one — one screen naming one essence two ways.
-  // A heading names the thing being edited, and the enabled `Save essence` beside it is what says
-  // the edit is unsaved; the heading is not a second, quieter version of that signal.
-  //
-  // `??` and not `||`: an editor reporting an EMPTY name is reporting a real authored state, and
-  // it falls through to `viewTitle()` below exactly as an empty persisted name already does.
   const worldEssenceEntryName = $derived(
     worldEssenceEntryRecord
       ? (scopedEntryDraftField('name') ?? worldEssenceEntryRecord.entity?.name ?? '')
@@ -3300,16 +2412,6 @@
   );
 
   // AND SO DOES THE MEDALLION BESIDE IT (issue 1372, maintainer parity round 6).
-  //
-  // The icon and the colour token are buffered identity fields exactly as the name is — the same
-  // `IDENTITY_FIELDS` list, staged by the same `patchIdentity` — so a GM who re-picks the glyph
-  // or the swatch watched the picker, the preview rail and the tile in the form all move while
-  // the 44px tile at the top of the screen kept the value on disk. That is the same
-  // self-contradiction the heading had, one control to the left of it.
-  //
-  // The SUBTITLE is deliberately NOT in this set. It counts the crafting systems using the
-  // essence, and no buffered edit on this screen changes that count — it moves only when a
-  // membership write lands. See its own note above.
   const worldEssenceEntryIcon = $derived(
     worldEssenceEntryRecord
       ? (scopedEntryDraftField('icon') ?? worldEssenceEntryRecord.entity?.icon ?? '')
@@ -3321,15 +2423,7 @@
       : ''
   );
 
-  // THE TOOL ENTRY ROUTE'S HEADER NAMES THE TOOL. Same decision as the essence route above,
-  // reached the same way and for the same reason: the reference heads that screen with the
-  // Tool's own tile, its NAME and one line saying what the record IS (`PROTO-tool-entry.png`),
-  // where what shipped was the generic page header every route falls through to. The page
-  // cannot draw it — `.manager-header` is a SIBLING of `.manager-main` — so the RECORD is
-  // resolved here, out of the corpus this shell already publishes to the page.
-  //
-  // A MISSING RECORD FALLS BACK to the generic title and subtitle below rather than printing an
-  // empty header, which is the same guard the essence branch makes.
+  // THE TOOL ENTRY ROUTE'S HEADER NAMES THE TOOL.
   const worldToolEntryRecord = $derived(
     currentView === 'world-tool-entry'
       ? ((worldScopeState.tool?.entries ?? []).find(
@@ -3338,33 +2432,14 @@
       : null
   );
 
-  /**
-   * WHAT THE RECORD IS, under its name, REPORTED BY THE PAGE rather than derived here.
-   *
-   * The page already renders this sentence on its linked-item card, so resolving it a second
-   * time up here would put one pair of copy keys in two files and let the band and the card
-   * disagree about one record. The essence entry states its subtitle here instead because its
-   * subtitle is a COUNT this shell already holds and its page does not draw.
-   *
-   * @type {string}
-   */
+  /** WHAT THE RECORD IS, under its name, REPORTED BY THE PAGE rather than derived here. */
   let worldToolEntrySubtitle = $state('');
 
   function handleWorldToolEntrySubline(subline) {
     worldToolEntrySubtitle = typeof subline === 'string' ? subline : '';
   }
 
-  /**
-   * THE WORLD TOOL ENTRY EDITOR'S BUFFERED EDIT, held where its two consumers are.
-   *
-   * The tool entry takes the seam the essence entry shipped — `scoped/scopedEntryDraft.js` and
-   * `ScopedEntryHeaderActions` — so this is the twin of the block below rather than a second
-   * design, and every note there applies verbatim. The handle is a LIVE accessor because the
-   * route-exit guard reads it at the moment of a click; the dirty flag is reported separately
-   * because a disabled attribute has to re-render and the handle deliberately never does.
-   *
-   * @type {{isDirty: () => boolean, save: () => Promise<boolean>, discard: () => void}|null}
-   */
+  /** THE WORLD TOOL ENTRY EDITOR'S BUFFERED EDIT, held where its two consumers are. */
   let worldToolEntryHandle = null;
   let worldToolEntryDirty = $state(false);
   let worldToolEntrySaving = $state(false);
@@ -3384,15 +2459,6 @@
   /**
    * THE WORLD TOOL ENTRY'S HEADER `Delete`, which the design draws between Back and Save
    * (`tmp/proto/tool-entry.png`) and which this screen did not have (issue 1373).
-   *
-   * The page reports an ACTION DESCRIPTOR rather than the shell resolving one: the two labels,
-   * the two consequence sentences and the ordering the write needs all name THIS record and are
-   * derived from values only the editor holds. This half is the arm token, which is the shell's
-   * because `ArmedDangerButton` requires exactly one armed control at a time across the window
-   * and this is where that invariant already lives for every other header action.
-   *
-   * @type {{token: string, label: string, armedLabel: string, idleAriaLabel: string,
-   *   armedAriaLabel: string, run: () => Promise<void>}|null}
    */
   let worldToolEntryDelete = $state(null);
   let worldToolEntryDeleteArmed = $state('');
@@ -3403,28 +2469,14 @@
   }
 
   // THE HEADING NAMES THE DRAFT, NOT THE RECORD ON DISK — consistent with the essence entry and
-  // with the linked-item tile this page draws from the same buffered value. `??` and not `||`:
-  // an editor reporting an EMPTY name is reporting a real authored state, and it falls through
-  // to `viewTitle()` below exactly as an empty persisted name already does.
-  //
-  // READ OFF THE SHARED `scopedEntryDraftIdentity` CHANNEL, which is also what the breadcrumb's
-  // last crumb reads: this route holds no buffered-name rune of its own. That channel is
-  // route-agnostic on purpose (see its own note above), so the crumb, the heading and any later
-  // piece of chrome that names an entry all follow one report rather than three. It is not
-  // ambiguous across routes because only one entry editor is mounted at a time and the page
-  // withdraws its report on unmount.
+  // with the linked-item tile this page draws from the same buffered value.
   const worldToolEntryName = $derived(
     worldToolEntryRecord
       ? (scopedEntryDraftField('name') ?? worldToolEntryRecord.entity?.name ?? '')
       : ''
   );
 
-  /**
-   * Flush the world tool entry editor's buffered edit. Same contract as its essence twin: it
-   * answers whether the write landed, because the route-exit guard gates navigation on it.
-   *
-   * @returns {Promise<boolean>}
-   */
+  /** Flush the world tool entry editor's buffered edit. */
   async function saveWorldToolEntry() {
     if (!worldToolEntryHandle) return false;
     worldToolEntrySaving = true;
@@ -3435,21 +2487,7 @@
     }
   }
 
-  /**
-   * The world tool entry editor's route-exit prompt.
-   *
-   * Re-entering the SAME Tool is not leaving it, so it never prompts — `world-tool-entry` is one
-   * of the routes whose view token does not change when its subject does, which is exactly what
-   * `nextRouteId` exists for.
-   *
-   * The prompt is the store's three-way one for this record type. It is not the boolean
-   * `confirmDiscardDirtyToolsDraft` beside it: that one asks about the SYSTEM tool editor's row
-   * draft, answers true/false, and offers no Save — three differences over one word.
-   *
-   * @param {string} nextView
-   * @param {string} nextRouteId
-   * @returns {boolean|Promise<boolean>}
-   */
+  /** The world tool entry editor's route-exit prompt. */
   function confirmWorldToolEntryRouteExit(nextView, nextRouteId = '') {
     if (activeView !== 'world-tool-entry') return true;
     if (nextView === 'world-tool-entry' && nextRouteId && nextRouteId === worldScopedEntryId) {
@@ -3463,14 +2501,7 @@
     });
   }
 
-  /**
-   * THE WORLD COMPONENT ENTRY EDITOR'S DRAFT (issue 1371), in the shape both siblings already
-   * report: a LIVE handle the route-exit guard reads at the moment of a click, and a separate
-   * reactive dirty flag because a disabled attribute has to re-render and the handle deliberately
-   * never does.
-   *
-   * @type {{isDirty: () => boolean, save: () => Promise<boolean>, discard: () => void}|null}
-   */
+  /** THE WORLD COMPONENT ENTRY EDITOR'S DRAFT (issue 1371). */
   let worldComponentEntryHandle = null;
   let worldComponentEntryDirty = $state(false);
   let worldComponentEntrySaving = $state(false);
@@ -3487,19 +2518,7 @@
     worldComponentEntryDirty = dirty === true;
   }
 
-  /**
-   * THE WORLD COMPONENT ENTRY ROUTE'S HEADER NAMES THE COMPONENT (issue 1371, parity round 4).
-   *
-   * The same decision as the essence and tool entry branches above, reached the same way: the
-   * reference heads this screen with the record's own chip, its NAME at 20px serif and one line
-   * saying what it IS (`proto:813-815`), where what shipped was the generic page header every
-   * route falls through to. The page cannot draw it — `.manager-header` is a SIBLING of
-   * `.manager-main` — so the RECORD is resolved here, out of the corpus this shell already
-   * publishes to the page.
-   *
-   * A MISSING RECORD FALLS BACK to the generic title and subtitle below rather than printing an
-   * empty header, which is the same guard both sibling branches make.
-   */
+  /** THE WORLD COMPONENT ENTRY ROUTE'S HEADER NAMES THE COMPONENT (issue 1371, parity round 4). */
   const worldComponentEntryRecord = $derived(
     currentView === 'world-component-entry'
       ? ((worldScopeState.component?.entries ?? []).find(
@@ -3508,14 +2527,7 @@
       : null
   );
 
-  /**
-   * WHAT THE RECORD IS, under its name, REPORTED BY THE PAGE rather than derived here — the same
-   * arrangement the tool entry uses. The page already resolves the source TYPE for its own lock
-   * pill, so resolving it a second time up here would put one pair of copy keys in two files and
-   * let the band and the card disagree about one record.
-   *
-   * @type {string}
-   */
+  /** WHAT THE RECORD IS, under its name, REPORTED BY THE PAGE rather than derived here. */
   let worldComponentEntrySubtitle = $state('');
 
   function handleWorldComponentEntrySubline(subline) {
@@ -3523,8 +2535,7 @@
   }
 
   // THE HEADING NAMES THE DRAFT, NOT THE RECORD ON DISK, off the shared `scopedEntryDraftIdentity`
-  // channel the breadcrumb's last crumb also reads. `??` and not `||`: an editor reporting an
-  // EMPTY name is reporting a real authored state, and it falls through to `viewTitle()`.
+  // channel the breadcrumb's last crumb also reads.
   const worldComponentEntryName = $derived(
     worldComponentEntryRecord
       ? (scopedEntryDraftField('name') ?? worldComponentEntryRecord.entity?.name ?? '')
@@ -3536,15 +2547,7 @@
       : ''
   );
 
-  /**
-   * Flush the world component entry editor's buffered edit.
-   *
-   * Same contract as its two siblings: it answers whether the write landed, because the
-   * route-exit guard gates navigation on it — a Save a write refused must leave the GM on the
-   * editor with the edit still in front of them.
-   *
-   * @returns {Promise<boolean>}
-   */
+  /** Flush the world component entry editor's buffered edit. */
   async function saveWorldComponentEntry() {
     if (!worldComponentEntryHandle) return false;
     worldComponentEntrySaving = true;
@@ -3555,17 +2558,7 @@
     }
   }
 
-  /**
-   * The world component entry editor's route-exit prompt.
-   *
-   * Re-entering the SAME component is not leaving it, so it never prompts — `world-component-entry`
-   * is one of the routes whose view token does not change when its subject does, which is exactly
-   * what `nextRouteId` exists for.
-   *
-   * @param {string} nextView
-   * @param {string} nextRouteId
-   * @returns {boolean|Promise<boolean>}
-   */
+  /** The world component entry editor's route-exit prompt. */
   function confirmWorldComponentEntryRouteExit(nextView, nextRouteId = '') {
     if (activeView !== 'world-component-entry') return true;
     if (nextView === 'world-component-entry' && nextRouteId && nextRouteId === worldScopedEntryId) {
@@ -3579,16 +2572,7 @@
     });
   }
 
-  /**
-   * Flush the world essence entry editor's buffered edit.
-   *
-   * Answers whether it landed, because the route-exit guard gates navigation on it: a Save that a
-   * write refused must leave the GM on the editor with the edit still in front of them rather
-   * than navigating away from work nothing persisted. Same contract as `saveEssenceEdit` and
-   * `saveSystemDetails` in the guards above.
-   *
-   * @returns {Promise<boolean>}
-   */
+  /** Flush the world essence entry editor's buffered edit. */
   async function saveWorldEssenceEntry() {
     if (!worldEssenceEntryHandle) return false;
     worldEssenceEntrySaving = true;
@@ -3599,22 +2583,7 @@
     }
   }
 
-  /**
-   * The world essence entry editor's route-exit prompt.
-   *
-   * Re-entering the SAME essence is not leaving it, so it never prompts — the same subject
-   * comparison `confirmEssenceRouteExit` and `confirmToolsRouteExit` make, and for the same
-   * reason: `world-essence-entry` is one of the routes whose view token does not change when its
-   * subject does, which is exactly what `nextRouteId` exists for.
-   *
-   * The prompt itself is the shipped three-way essence one. It is not a new dialog: the sentence
-   * is about an essence with unsaved changes, which is what this is, and a second prompt saying
-   * the same thing in different words is how two screens end up disagreeing about one verb.
-   *
-   * @param {string} nextView
-   * @param {string} nextRouteId
-   * @returns {boolean|Promise<boolean>}
-   */
+  /** The world essence entry editor's route-exit prompt. */
   function confirmWorldEssenceEntryRouteExit(nextView, nextRouteId = '') {
     if (activeView !== 'world-essence-entry') return true;
     if (nextView === 'world-essence-entry' && nextRouteId && nextRouteId === worldScopedEntryId) {
@@ -3628,9 +2597,7 @@
     });
   }
 
-  // Open an entry route ON a world entity. Routed through the same confirm-discard gate every
-  // other navigation passes, and the subject is recorded only once that gate has allowed the
-  // move — a refused exit must not leave the shell naming a record it did not navigate to.
+  // Open an entry route ON a world entity.
   function openWorldScopedEntry(view, entityId) {
     const nextEntryId = typeof entityId === 'string' ? entityId : String(entityId ?? '');
     return afterTruthyResult(confirmRouteExit(view), () => {
@@ -3639,41 +2606,9 @@
     });
   }
 
-  /**
-   * Create a world essence from the page header and open its entry editor.
-   *
-   * ── THE SEAM, AND ITS WHOLE EXTENT ──────────────────────────────────────────────────────────
-   * `### GM World Scoped Entity Routes` requirement 7 closes this file to the catalogue lanes, and
-   * this is the one place it is opened: the header band the prototype puts `+ New essence` in is
-   * rendered here and cannot be reached from a page. Everything else the button needs already
-   * exists here — `store.worldScope.essence.createEntity` is the same family the page is handed,
-   * and `openWorldScopedEntry` is the same navigation the row's pen already takes.
-   *
-   * THE NAME IS A PLACEHOLDER AND THE EDITOR IS THE POINT. `createEntity` refuses a duplicate id,
-   * so a fixed id would make the second press a button that does nothing and says nothing;
-   * `mintEssenceId` resolves the collision by suffix instead. Navigating straight into the entry
-   * puts the GM on the screen that names it, so the placeholder is never a row they have to find
-   * again.
-   *
-   * @returns {Promise<void>}
-   */
+  /** Create a world essence from the page header and open its entry editor. */
   /**
    * Open ONE crafting system's essence rules for a world essence, from the catalogue inspector.
-   *
-   * ── THE SECOND SEAM, AND THE SAME BOUND AS THE FIRST ────────────────────────────────────────
-   * The prototype's catalogue inspector lists the systems that hold an essence and gives each one
-   * a `Rules ↗` deep link (`essences.png`). Both halves of that navigation are the shell's:
-   * selecting a crafting system runs through `selectSystem`, which owns the route-exit gate and
-   * the store write, and changing route sets `activeView`. A page can do neither.
-   *
-   * IT COMPOSES, AND ADDS NOTHING. `selectSystem` is the same function the rail's scope select and
-   * five other navigations call, and `essences` is the shipped system-scope essence rules route.
-   * The one thing this adds is the pairing.
-   *
-   * THE ENTITY ID IS ACCEPTED AND DELIBERATELY UNUSED. The rules list is not addressable by
-   * entity — it opens on the system's whole essence list — and a caller that passed a different
-   * shaped argument would be a defect this signature makes visible rather than one that silently
-   * routes somewhere close enough.
    *
    * @param {string} _entityId the essence the row belongs to; see above.
    * @param {string} systemId the crafting system whose rules to open.
@@ -3689,13 +2624,6 @@
   /**
    * Open one crafting system's TOOL RULES from the world tool catalogue's inspector row.
    *
-   * The twin of `openSystemEssenceRules` above, and every note it carries applies: the pair
-   * of moves — select the system, then commit the route — already exists separately, and the
-   * entity id is accepted and deliberately unused because the rules list opens on the
-   * system's whole tool list rather than on one Tool.
-   *
-   * @param {string} _entityId the Tool the row belongs to; see above.
-   * @param {string} systemId the crafting system whose rules to open.
    * @returns {unknown} whatever `selectSystem` answered, so a refused exit stays refused.
    */
   function openSystemToolRules(_entityId, systemId) {
@@ -3708,16 +2636,7 @@
   /**
    * Open one crafting system's COMPONENT RULES list, from a world catalogue row (issue 1371).
    *
-   * The twin of `openSystemEssenceRules` and `openSystemToolRules`, and it takes the same
-   * two-argument shape the shell's `onOpenSystemRules` seam declares. Unlike its twins it USES
-   * the entity id (r13-list, maintainer ruling M14): the rules list now selects its first drawn
-   * row whenever nothing this system holds is selected, so a link that left the id unused would
-   * land the GM on a DIFFERENT component from the one whose entry they came from. The seed goes
-   * through `resetComponentSelectionFor`, inside the guarded callback, so a refused selection
-   * seeds nothing and the system-switch effect cannot wipe it.
-   *
    * @param {string} entityId the component the row belongs to, selected into the list.
-   * @param {string} systemId the crafting system whose rules to open.
    * @returns {unknown} whatever `selectSystem` answered, so a refused exit stays refused.
    */
   function openSystemComponentRules(entityId, systemId) {
@@ -3730,9 +2649,7 @@
 
   async function createWorldEssence() {
     const name = text('FABRICATE.Admin.Manager.Scoped.Essence.NewName', 'New essence');
-    // The retired leg is required here (issue 1654): this mints from a fixed placeholder name, so
-    // the id sequence is dense and every id `1.34.0` retired is otherwise reclaimable on the next
-    // press. See `mintEssenceId`.
+    // The retired leg is required here (issue 1654): this mints from a fixed placeholder name.
     const id = mintEssenceId(
       name,
       worldScopeState.essence?.entities ?? [],
@@ -3882,10 +2799,7 @@
       selector: '.fabricate-manager[data-manager-view="knowledge"] .manager-body',
       predicate: (view) => view === 'knowledge',
     },
-    // The seven world scoped-entity routes. Written OUT rather than mapped from
-    // `WORLD_SCOPED_VIEWS`: the gate parses this file's SOURCE for literal selector strings,
-    // and an interpolated one would yield nothing to compare against the stylesheet -- the
-    // same weakening an interpolated id inflicts on the View Lab source-hook check.
+    // The seven world scoped-entity routes.
     {
       id: 'world-components',
       layoutClass: 'full-width-2-track',
@@ -3943,65 +2857,29 @@
         ? text('FABRICATE.Admin.Manager.Modifiers.Title', 'Modifiers')
         : text('FABRICATE.Admin.Manager.World.CurrencyTitle', 'World Currency')
   );
-  // World > Travel (issue 1282). UNGATED for the same reason World > Currency is: the realm
-  // library is world geography, and a GM has to be able to author a valley before deciding
-  // which crafting systems care about it. The per-system Travel & Realms toggle governs
-  // consumption — environment gating and party overrides — never reachability of this page.
+  // World > Travel (issue 1282).
   const isWorldTravelRoute = $derived(currentView === 'world-travel');
-  // ONE attribute answering "which World travel destination is on screen", written once so
-  // the markup carries no nested ternary. Parties still reports through `activeTravelTab`
-  // because World > Parties has not moved off it yet.
+  // ONE attribute answering "which World travel destination is on screen", written once so the
+  // markup carries no nested ternary.
   const worldTravelTabAttribute = $derived.by(() => {
     if (isWorldTravelRoute) return worldTravelTab;
     return isWorldRoute ? activeTravelTab : undefined;
   });
   // THE WORLD > DOWNTIME EXPERIMENTAL GATE (issue 1257), and it is TEMPORARY.
-  //
-  // The route exists to host the premium Downtime Studio, and the Studio is unreleased: both
-  // seams it needs are on `main` and in no published version. Until it ships, the route and
-  // everything that advertises it — including the premium call to action Core renders when no
-  // companion is installed — are shown only to a GM who has opted into experimental features,
-  // exactly as the unimplemented Graph placeholder is (issue 745, `isViewAvailableForSystem`).
-  // Delete this pair and its readers when the Studio releases; nothing here is a design rule.
-  //
-  // ONE PREDICATE, read in three places and DELIBERATELY NOT IN A FOURTH. The rail group's
-  // `{#if}` and the two route entries are what make the route unreachable: nothing can produce a
-  // `world-downtime` token without passing an entry, and every entry consults this. Adding the
-  // read to `normalizedActiveView` as well looks like defence in depth and is not — that function
-  // has one caller and is always handed `activeView`, so the branch is unreachable on arrival,
-  // and the only state it CAN act on is the one below, where acting is the wrong thing to do.
-  //
-  // TURNING THE SETTING OFF UNDER A GM WHO IS ON THE ROUTE HIDES THE RAIL ENTRY AND LEAVES THE
-  // PANEL. `currentView` is a `$derived`, so a gate read in the normalizer would resolve the
-  // route away in the same flush the setting moved in — unmounting the extension host, which runs
-  // a mounted companion's cleanup and destroys its unsaved work without ever consulting the
-  // `onBeforeNavigate` guard every other exit from this route honours. A GM's in-progress edit is
-  // not ours to discard because a setting changed. So the open panel stays until the GM navigates
-  // away, and that navigation is the ordinary guarded exit it has always been. They cannot come
-  // back: the rail entry is gone and both entries refuse.
   const worldDowntimeAvailable = $derived(experimentalFeaturesEnabled);
-  // A registered provider holds the surface until it faults; otherwise Core's own preview
-  // does. `WORLD_DOWNTIME_PREVIEW_PROVIDER` is one implementation of the same interface, so
-  // the rail, the route chrome and — in core-fallback only — the preview's tab strip all read
-  // ONE tab list either way.
+  // A registered provider holds the surface until it faults; otherwise Core's own preview does.
   const downtimeProvider = $derived(
     downtimeProviderSnapshot && downtimeProviderSnapshot !== downtimeFaultedProvider
       ? downtimeProviderSnapshot
       : null
   );
   const downtimeCoreFallback = $derived(downtimeProvider === null);
-  // The union of both registries' claimed surfaces. The two id namespaces are separate by
-  // design (one companion may claim `downtime` in both windows), so this is a concatenation
-  // and never a set: it is only ever read for its length.
+  // The union of both registries' claimed surfaces.
   const registeredSurfaceIds = $derived([
     ...managerRegisteredSurfaceIds,
     ...playerRegisteredSurfaceIds,
   ]);
-  // The title bar's premium signal (issue 1185). It is deliberately BROADER than
-  // `downtimeCoreFallback`: that flag answers "who owns the Downtime route", while this one
-  // answers "is a companion module registered at all", which is the claim the strip makes.
-  // Reading it off the surface SET rather than off Core's one surface id is what lets a
-  // premium module that ships some future surface light the same badge with no change here.
+  // The title bar's premium signal (issue 1185).
   const premiumInstalled = $derived(registeredSurfaceIds.length > 0);
   const downtimeTabs = $derived(downtimeProvider?.tabs ?? WORLD_DOWNTIME_PREVIEW_PROVIDER.tabs);
   const activeDowntimeTab = $derived(
@@ -4014,45 +2892,26 @@
     if (tabs.some((tab) => tab.id === worldDowntimeTabId)) return;
     worldDowntimeTabId = tabs[0].id;
   });
-  // The rail's Downtime children render the active tab set. In core-fallback they are one of
-  // TWO renderings of it — the preview's own tab strip is the other — and in provider mode
-  // they are the only one, because a companion's screens carry no strip (issue 1213). Either
-  // way they read the same list, so a rail label and a tab label can never drift apart.
+  // The rail's Downtime children render the active tab set.
   const downtimeNavItems = $derived(downtimeTabs);
   // The rail sub-item BUTTON's element id. It is the click target the mounted suite drives and
   // the anchor the group's markup is keyed on.
   const downtimeNavItemId = (tabId) => `manager-downtime-nav-${tabId}`;
-  // The id of the element carrying the sub-item's VISIBLE LABEL, stated once and used twice:
-  // the rail stamps it, and the extension host reads it for the companion panel's
-  // `aria-labelledby` (issue 1213). A second literal here and there would be a mirror across a
-  // component boundary with nothing to catch its drift.
-  //
-  // It names the LABEL SPAN rather than the button deliberately. The button carries the fuller
-  // `aria-label` — the tab's `accessibleName`, which reads as an instruction ("Open the
-  // downtime ledger") because it names an action — and a landmark inherits the whole accessible
-  // name of whatever it points at, so pointing at the button would announce the region as
-  // "Open the downtime ledger, region". A landmark takes the name of the SCREEN, so it points
-  // at the span that holds exactly that: "Ledger".
+  // The id of the element carrying the sub-item's VISIBLE LABEL, stated once and used twice: the
+  // rail stamps it.
   const downtimeNavLabelId = (tabId) => `manager-downtime-nav-label-${tabId}`;
   // The id of the sub-item's badge element (issue 1302) — the `aria-describedby` target, and
   // never a descendant of `downtimeNavLabelId`'s span, which names the companion panel region.
   const downtimeNavBadgeId = (tabId) => `manager-downtime-nav-badge-${tabId}`;
-  // The badge Core renders for one sub-item, in provider mode only: Core's own preview tabs
-  // never carry a `badge`, but a runtime badge CAN be stored against one of their ids (the
-  // faulted-provider case), so the mode guard is load-bearing here and not merely defensive.
+  // The badge Core renders for one sub-item, in provider mode only: Core's own preview tabs never
+  // carry a `badge`.
   function downtimeSubitemBadge(item) {
     return downtimeCoreFallback ? null : resolveNavTabBadge(item, downtimeNavTabBadges);
   }
-  // Gated on provider mode rather than merely on the channel being empty. The channel already
-  // releases itself on every path that ends a mount, so this is belt and braces — but Core's
-  // preview is CORE's screen, and no reachable ordering may ever let a companion's copy,
-  // artwork or Save button land on it.
+  // Gated on provider mode rather than merely on the channel being empty.
   const downtimeRuntimeChrome = $derived(downtimeCoreFallback ? null : downtimeRouteChrome);
-  // Header actions belong to the live mount, then to the active TAB, then to the provider's
-  // own list; Core keeps its bespoke premium anchor rather than routing it through a public
-  // descriptor. `??` and not `||`: an EMPTY runtime array means "this screen has no actions",
-  // which a truthiness test would read as "say nothing" and answer with the tab's own list —
-  // leaving a companion's editor wearing its list screen's buttons.
+  // Header actions belong to the live mount, then to the active TAB, then to the provider's own
+  // list; Core keeps its bespoke premium anchor rather than routing it through a public descriptor.
   const downtimeHeaderActions = $derived(
     downtimeCoreFallback
       ? []
@@ -4064,10 +2923,7 @@
   // The staged-changes indicator, and a runtime-only channel by design: it reports what the
   // mount is DOING right now, which nothing stated at registration can know.
   const downtimeHeaderStatus = $derived(downtimeRuntimeChrome?.status ?? null);
-  // Header artwork, opt-in per update. Absent it, this route's header keeps the plain heading
-  // it has carried since issue 1185 removed the prototype's glyph tile from it; present, it
-  // renders the identity block Fabricate's own recipe and component editors use, which is what
-  // makes a companion's drill-down look like a drill-down.
+  // Header artwork, opt-in per update.
   const downtimeHeaderArtwork = $derived(
     downtimeRuntimeChrome?.icon || downtimeRuntimeChrome?.image ? downtimeRuntimeChrome : null
   );
@@ -4075,12 +2931,8 @@
     // Read the revision so `requestRemount()` yields a NEW frozen identity, which is what
     // the host's mount effect keys on. Nothing here is a Core store, document or component.
     const revision = downtimeContextRevision;
-    // The context object is its own mount's identity token, which is why the two channel
-    // functions close over a holder rather than being stated once outside this derivation.
-    // A stable function has no way to say WHICH mount called it, so a companion holding a
-    // retired context could repaint the screen the GM moved on to; bound this way, a call
-    // from a dead mount is simply refused. The holder is written once, immediately below,
-    // and never again — this derivation stays pure.
+    // The context object is its own mount's identity token, which is why the two channel functions
+    // close over a holder rather than being stated once outside this derivation.
     const self = { context: null };
     const context = Object.freeze({
       schemaVersion: 1,
@@ -4120,34 +2972,15 @@
     }
   });
 
-  // Crafting nav group (issue 511, PR-B redesign). The visible sub-tabs are a
-  // conditional set derived from the system's `visibilityMode` by the shared nav
-  // model (`buildCraftingNavItems`): Recipes and Settings are always present,
-  // Access appears under `restricted`, Books & Scrolls under `item`/`knowledge`.
-  // Each sub-item maps to a distinct route, so highlighting is derived from the
-  // active route via `resolveActiveCraftingTab`. The group is unconditional as of
-  // issue 745 (v1.3 headline).
+  // Crafting nav group (issue 511, PR-B redesign).
   const craftingVisibilityMode = $derived(selectedSystem?.visibilityMode || 'knowledge');
-  // The Knowledge surface's gate is wider than Books & Scrolls': it is also shown
-  // for an alchemy system under ANY visibility mode, because `learnRecipeOnCraft`
-  // writes learned recipes regardless and under `global` alchemy they are the sole
-  // reveal source (issue 785).
+  // The Knowledge surface's gate is wider than Books & Scrolls': it is also shown for an alchemy
+  // system under ANY visibility mode.
   const craftingResolutionMode = $derived(selectedSystem?.resolutionMode || '');
   const recipeCount = $derived($viewState.recipes?.length || 0);
   const recipeItemCount = $derived(recipeItemDefinitions.length);
-  // ONE argument bag, read by the rail AND by route reconciliation in
-  // `normalizedActiveView` (issue 1151), mirroring `checksNavArgs`/`checksNavItems`
-  // below. Two bags could disagree about what the selected system offers, which is
-  // the defect: the rail would drop the entry while the router kept rendering it.
-  //
-  // `visibilityMode` is the DEFAULTED `craftingVisibilityMode`, not a bare
-  // `selectedSystem?.visibilityMode`. The difference is invisible to
-  // `buildCraftingNavItems` (`craftingEffect` resolves undefined to `knowledge`
-  // anyway), but this same derived is the prop source for BooksScrollsView,
-  // RecipeItemEditor and ItemPageInspector, and RecipeItemEditor's own prop default
-  // is `'item'` — so feeding an undefined-bearing field through would silently flip
-  // its Limits card from learning caps to use caps for a system with no persisted
-  // mode. None of the four inputs reads `currentView`, so the graph stays acyclic.
+  // ONE argument bag, read by the rail AND by route reconciliation in `normalizedActiveView` (issue
+  // 1151), mirroring `checksNavArgs`/`checksNavItems` below.
   const craftingNavArgs = $derived({
     visibilityMode: craftingVisibilityMode,
     resolutionMode: craftingResolutionMode,
@@ -4155,9 +2988,8 @@
     recipeItemCount,
   });
   const craftingNavItems = $derived(buildCraftingNavItems(craftingNavArgs));
-  // The Crafting parent-group badge totals its visible sub-tabs (Recipes + Books &
-  // Scrolls where that surface applies), mirroring the gathering group's total, so
-  // the collapsed group count reflects everything inside it — not recipes alone.
+  // The Crafting parent-group badge totals its visible sub-tabs (Recipes + Books & Scrolls where
+  // that surface applies), mirroring the gathering group's total.
   const craftingNavCount = $derived(
     craftingNavItems.reduce((sum, item) => sum + (item.count || 0), 0)
   );
@@ -4165,26 +2997,14 @@
   const activeCraftingTab = $derived(resolveActiveCraftingTab(currentView));
 
   // ── The Checks rail GROUP (issue 1096) ───────────────────────────────────────────────
-  //
-  // `Checks` was one flat rail button holding four tabs; it is an expandable group whose
-  // children are routes, exactly like the Gathering group above.
-  //
-  // The badges are a DRAFT PREVIEW: readiness is evaluated against the live drafts the GM
-  // is editing, so a badge clears the moment the edit that clears it is made rather than
-  // when it is saved. The ENABLE gate is a different question and reads committed state —
-  // see the Validation hero, which says so rather than claiming "Ready to enable" for
-  // unsaved work.
   const checksDraftSystem = $derived({
     modifiers: selectedSystemModifiers,
     craftingCheck: selectedSystem?.craftingCheck || {},
     salvageCraftingCheck: selectedSystem?.salvageCraftingCheck || {},
     gatheringCraftingCheck: selectedSystem?.gatheringCraftingCheck || {},
   });
-  // ONE slot per activity decides BOTH halves of every badge: which draft is evaluated, and
-  // which rules it is evaluated under. Two derivations answered those two questions before
-  // (issue 1096) and disagreed for alchemy at `checkMode: 'tiered'` — the badge evaluated the
-  // untouched SIMPLE draft under ROUTED rules, so it hid criticals the Validation route
-  // reported, breaking the invariant that the dot, the badge and Validation cannot disagree.
+  // ONE slot per activity decides BOTH halves of every badge: which draft is evaluated, and which
+  // rules it is evaluated under.
   const salvageCheckSlot = $derived(
     resolveActiveSalvageCheckFormula({
       salvageResolutionMode,
@@ -4210,19 +3030,8 @@
     return slot ? (drafts[slot] ?? null) : null;
   }
   /**
-   * A SWITCHED-OFF check reports NO issues, and this is the same predicate the route renders
-   * by (`ChecksView`'s `routeIsOff`), restated here because the badge is drawn by the rail
-   * rather than by the route.
-   *
-   * Without it the two disagree, and the disagreement is unresolvable from the screen: an off
-   * check's route collapses to the single "Turn this check on" panel with no sections, no
-   * dots and no Modifiers card — while the rail child still badged the issues that panel no
-   * longer renders anywhere. The reachable case is an alchemy system with an authored
-   * check-modifier selection: switching the check off raised `modifiersInertNoCheck`, badged
-   * "1", and left the GM no control anywhere on the route that could clear it.
-   *
-   * It is right on the merits too, not just for agreement: readiness answers "will this check
-   * work when it runs", and a check that has been turned off does not run.
+   * A SWITCHED-OFF check reports NO issues, and this is the same predicate the route renders by
+   * (`ChecksView`'s `routeIsOff`).
    */
   function checksActivityIsOff(activity) {
     const state = checkActivation?.[activity];
@@ -4274,28 +3083,6 @@
   const checksActiveTab = $derived(resolveActiveChecksTab(currentView) || 'crafting');
 
   // ── Rail group expansion: the LOCK, and what the rail actually renders (issue 1185) ───
-  //
-  // One rule, stated once for all five groups: a group is expanded when the GM expanded it
-  // (`railGroupUserExpanded`) OR when collapsing it would hide the screen they are standing
-  // on (`railGroupLockedOpen`). The lock is the ONLY exception to "every group collapses in
-  // any state", and it is why the disclosure control renders genuinely `disabled` there
-  // rather than swallowing the click — a chevron that visibly does nothing is what the
-  // whole defect read as.
-  //
-  // "Locked" means "the current view BELONGS to this group", and an editor detail route
-  // belongs to the group whose sub-item opened it: `recipe-edit` is reached from Recipes and
-  // is read as part of Recipes, so the group that owns it stays open while the GM is in it.
-  // That is why the lock keys on the group's route CATEGORY (`isCraftingView` covers
-  // `CRAFTING_VIEWS`, which carries `recipe-edit` and `recipe-item-edit`) rather than on the
-  // narrower "is a rendered rail entry" test.
-  //
-  // The rule is deliberately uniform across all five groups. Gathering already behaved this
-  // way — `isActiveGatheringChildRoute` is true throughout `environment-edit`,
-  // `gathering-task-edit` and `gathering-event-edit` — and Crafting and Checks were the
-  // outliers, releasing their group the moment an editor opened.
-  // Downtime's every sub-tab IS the one `world-downtime` route (the tab is panel state, not
-  // a route), and that holds for a companion's tab set exactly as it does for Core's four —
-  // nothing here reads a tab id.
   const railGroupLockedOpen = $derived({
     crafting: isCraftingRoute,
     checks: isChecksRoute,
@@ -4312,25 +3099,16 @@
     worldRules: railGroupUserExpanded.worldRules || railGroupLockedOpen.worldRules,
     worldDowntime: railGroupUserExpanded.worldDowntime || railGroupLockedOpen.worldDowntime,
   });
-  // Entering a sub-tab also records the INTENT, so the group stays open when the GM later
-  // navigates away instead of snapping shut behind them.
-  //
-  // This effect reads `railGroupLockedOpen` and NEVER `railGroupUserExpanded`. That is the
-  // whole fix for the re-assert loop: a write to a state this effect does not read cannot
-  // re-trigger it, so a collapse the GM makes is final until the lock itself changes.
+  // Entering a sub-tab also records the INTENT, so the group stays open when the GM later navigates
+  // away instead of snapping shut behind them.
   $effect(() => {
     const locked = railGroupLockedOpen;
     for (const group of RAIL_GROUP_IDS) {
       if (locked[group]) railGroupUserExpanded[group] = true;
     }
   });
-  // The Tool Studio is a TOP-LEVEL rail entry that presents as Crafting context — its
-  // breadcrumb reads "<system> › Crafting › Tools" — so entering it opens the Crafting group,
-  // as it has since issue 784. What changed is the mechanism: it records INTENT here instead
-  // of ORing `isToolStudioRoute` into the rendered expansion. Tools is not one of Crafting's
-  // rail sub-items, so it must not LOCK the group; the old form pinned the group open and
-  // left its chevron inert, which is one of the five faces of the issue 1185 report.
-  // Reads only the route, never the flag, so a collapse from here is final.
+  // The Tool Studio is a TOP-LEVEL rail entry that presents as Crafting context — its breadcrumb
+  // reads "<system> › Crafting › Tools" — so entering it opens the Crafting group.
   $effect(() => {
     if (isToolStudioRoute) railGroupUserExpanded.crafting = true;
   });
@@ -4350,51 +3128,21 @@
     )
   );
   // THE WHOLE RAIL LOCKS OPEN OVER A COMPANION'S DOWNTIME SURFACE (issue 1213).
-  //
-  // MODE-scoped, not route-scoped. Provider mode renders no tab strip, and the 56px rail hides
-  // `.manager-nav-submenu` outright — measured with the strip suppressed, the number of
-  // reachable tab switchers was ZERO. `display: none` also removes them from the accessibility
-  // tree, so a collapsed rail there is a keyboard and screen-reader dead end and not merely a
-  // pointer one. Core's fallback keeps its strip, is never stranded, and therefore keeps its
-  // collapsible rail — which is also what protects the `manager-world-downtime-collapsed`
-  // View Lab frame.
-  //
-  // The lock flips live when a provider registers or deregisters mid-session, so a GM sitting
-  // on this route with a collapsed rail sees it snap open in the same frame as the swap. That
-  // is strand-avoidance working, not a glitch.
   const railLockedOpen = $derived(isWorldDowntimeRoute && !downtimeCoreFallback);
-  // DISPLAY-ONLY. `railCollapsed` is seeded from and written back to a `client`-scoped setting
-  // — localStorage, per device, surviving reload — so the group lock's template is the WRONG
-  // one here: `toggleRailGroup` resolves its lock by writing intent into `railGroupUserExpanded`,
-  // which is safe only because that map is in-memory. Copying it would mean merely VISITING
-  // World Downtime permanently un-collapses the GM's rail on every other route and in every
-  // future session. Derive what is DISPLAYED instead and leave the stored preference alone, so
-  // leaving the route restores it.
+  // DISPLAY-ONLY.
   const railCollapsedDisplay = $derived(railCollapsed && !railLockedOpen);
-  // The Downtime parent rollup total (issue 1302) — Core's own summary of what is hidden
-  // behind a closed disclosure, never registered-plus-runtime added together (`navTabBadgeTotal`
-  // sums the RESOLVED value once per tab). Zero in core-fallback: Core's preview tabs never
-  // carry a badge, so there is nothing of the companion's to summarise there.
+  // The Downtime parent rollup total (issue 1302) — Core's own summary of what is hidden behind a
+  // closed disclosure.
   const downtimeNavRollupTotal = $derived(
     downtimeCoreFallback ? 0 : navTabBadgeTotal(downtimeTabs, downtimeNavTabBadges)
   );
-  // Renders only while the children are hidden — BOTH disjuncts are load-bearing. The first
-  // covers the default state (the group closed on a fresh Manager); the second covers the GM
-  // who expanded the group this session and then collapsed the rail, where the submenu is
-  // `display: none` and the rollup is the only surviving signal left.
+  // Renders only while the children are hidden — BOTH disjuncts are load-bearing.
   const downtimeNavRollupVisible = $derived(
     !downtimeCoreFallback &&
       downtimeNavRollupTotal > 0 &&
       (!railGroupExpanded.worldDowntime || railCollapsedDisplay)
   );
-  // "{count} update" / "{count} updates" — Core's own generic word, because Core cannot know
-  // whether a companion is counting records or demands and the summed value is heterogeneous
-  // across tabs by construction. Deliberately not "issue": that borrows Checks' severity claim
-  // about data Core cannot inspect.
-  //
-  // Two full literal keys, not a composed base — the repo's lang-key-literal guard pins the
-  // exact count of dynamic `` `${base}.${suffix}` `` namespace bases project-wide, and this key
-  // pair has exactly two shapes, so naming both in full costs nothing and adds no new base.
+  // "{count} update" / "{count} updates" — Core's own generic word.
   function downtimeRollupName(count) {
     const key =
       count === 1
@@ -4403,11 +3151,7 @@
     const fallback = count === 1 ? '{count} update' : '{count} updates';
     return text(key, fallback).replace('{count}', String(count));
   }
-  // The parent row's composed accessible name while the rollup shows. The row's `aria-label`
-  // replaces its subtree, so a `role="img"` rollup inside it would otherwise be silent — the
-  // same reason the shipped `PREMIUM` chip already is. One Core-owned key carries both tokens
-  // in the translator's word order; `{label}` is SUBSTITUTED from the same value the visible
-  // label renders (never hard-coded), so the row's noun has exactly one source.
+  // The parent row's composed accessible name while the rollup shows.
   function downtimeParentName(count) {
     const key =
       count === 1
@@ -4417,11 +3161,7 @@
     const label = text('FABRICATE.Admin.Manager.World.Downtime.Nav', 'Downtime');
     return text(key, fallback).replace('{label}', label).replace('{count}', String(count));
   }
-  // Every rail-toggle attribute reads the DISPLAY value, never the stored one. Forcing the rail
-  // open without them gives a GM who arrived collapsed an expanded rail whose control reports
-  // `aria-pressed="true"`, is labelled "Expand navigation rail", points its chevron the wrong
-  // way and does nothing when clicked — the same defect class as issue 1185, in the same widget,
-  // one route over. Stated once here because two scope-card branches render the control.
+  // Every rail-toggle attribute reads the DISPLAY value, never the stored one.
   const railToggleLabel = $derived(
     railCollapsedDisplay
       ? text('FABRICATE.Admin.Manager.Nav.ExpandRail', 'Expand navigation rail')
@@ -4437,24 +3177,7 @@
   const railToggleIcon = $derived(
     railCollapsedDisplay ? 'fas fa-angles-right' : 'fas fa-angles-left'
   );
-  // REVEAL THE SWITCHER ON ROUTE ENTRY (issue 1213). Measured at a 1330x900 Manager, the nav
-  // scrollport ends at y=977 while the three Downtime sub-items render at 983-1083: with the
-  // strip gone, the route's FIRST VISIBLE STATE offered no visible way to change screen. They
-  // are reachable by scrolling, so this is not the stranding the rail lock exists to prevent —
-  // it is the one real cost of deleting the strip, and one scroll removes it.
-  //
-  // `nearest` so a switcher already in view does not move the rail at all. Provider mode only:
-  // core-fallback keeps its strip at the top of the panel and needs no help.
-  //
-  // `revealedDowntimeNavId` is DEFENSIVE, not load-bearing, and the distinction was measured
-  // rather than assumed. An earlier version of this comment said the rail "re-renders on far
-  // more than a route change and a repeat would yank the pane back", which misstates Svelte 5:
-  // the effect re-runs on DEPENDENCY change, not on re-render, and every path that changes a
-  // dependency either changes `worldDowntimeTabId` (re-scroll wanted) or resets this to null
-  // (re-scroll wanted). The keyed each-block keeps `bind:this` node identity stable, so
-  // `downtimeNavNodes[tabId]` does not churn either. No re-entry it prevents could be
-  // constructed, and deleting it broke no test — so it stays as cheap insurance against a
-  // future dependency being added, and nothing claims to gate it.
+  // REVEAL THE SWITCHER ON ROUTE ENTRY (issue 1213).
   const downtimeNavNodes = $state({});
   let revealedDowntimeNavId = null;
   $effect(() => {
@@ -4470,15 +3193,11 @@
     // happy-dom does not implement it, hence the optional call.
     node.scrollIntoView?.({ block: 'nearest' });
   });
-  // The Knowledge surface's projection is published TOP-LEVEL, never hung off
-  // `selectedSystem` (issue 785): hanging it there would force a `selectedSystem`
-  // reference rebuild on every knowledge publish and let a late phase-2 publish
-  // clobber freshly projected rows.
+  // The Knowledge surface's projection is published TOP-LEVEL, never hung off `selectedSystem`
+  // (issue 785).
   const knowledgeState = $derived($viewState.knowledge || null);
-  // Entering the surface arms the store's whole-world scan; leaving it makes
-  // `refreshKnowledge` a total no-op again and drops the cached snapshot. Without
-  // this gate the scan would have to join `refresh()`, which ~40 mutation paths
-  // call and which has no cheap invalidation signature for actors × items.
+  // Entering the surface arms the store's whole-world scan; leaving it makes `refreshKnowledge` a
+  // total no-op again and drops the cached snapshot.
   $effect(() => {
     store.setKnowledgeActive?.(currentView === 'knowledge');
   });
@@ -4498,9 +3217,7 @@
   const canSaveRecipeItemEdit = $derived(
     recipeItemEditDirty === true && recipeItemEditSaving !== true
   );
-  // The linked linked world item for the editor's Overview preview: resolve from the
-  // DRAFT's originItemUuid (so a staged link change updates the preview) against the
-  // projected recipe item's resolved fields, then the world-item options.
+  // The linked linked world item for the editor's Overview preview.
   const recipeItemEditorLinkedItem = $derived.by(() => {
     const uuid = String(recipeItemDraft?.originItemUuid || '');
     if (!uuid) return null;
@@ -4520,9 +3237,7 @@
     const option = (worldItemOptions || []).find((item) => item.uuid === uuid);
     return option ? { ...option } : { uuid, name: '', img: '', type: '' };
   });
-  // Recipes contained by the edited recipe item, and the pool that can still be
-  // added. Derived from the DRAFT's `recipeIds` (staged membership), so linking and
-  // unlinking reflect live and only persist on Save.
+  // Recipes contained by the edited recipe item, and the pool that can still be added.
   const recipeItemDraftRecipeIds = $derived(
     new Set((recipeItemDraft?.recipeIds || []).map((id) => String(id)))
   );
@@ -4555,9 +3270,7 @@
   const selectedGatheringSystemConfig = $derived(
     $viewState.gatheringConfig?.systems?.[selectedSystemId] || {}
   );
-  // Two independent limitation flags. Honor key-presence precedence: a present
-  // `enabled` flag wins over a stale legacy `mode` (mirrors the service / GM
-  // economy-view read-compat mapping) so a disabled limit can't be resurrected.
+  // Two independent limitation flags.
   const selectedGatheringEconomy = $derived(selectedGatheringSystemConfig.economy || {});
   // The gathering check editor shown is selected by the gathering economy's
   // resolution mode (d100 → fixed, not editable; progressive/routed → editable).
@@ -4576,17 +3289,6 @@
   );
   // ─────────────────────────────────────────────────────────────────────────────────────────
   // BREADCRUMB LEAVES: the SUBJECT of an editor, not the act of editing it (issue 1328).
-  //
-  // The recipe, component and tool editors have always named their subject — "Ravenglass Ink",
-  // not "Edit recipe" — and four editors did not: the environment, the gathering task, the
-  // gathering event and the recipe item each read `Edit <type>`. That is a trail that says what
-  // KIND of screen you are on when you can already see the screen, and withholds the one fact
-  // only the trail can carry, which is WHICH of them you opened. Four rungs of a ladder all
-  // reading `Edit gathering task` are four identical trails over four different subjects.
-  //
-  // Each falls back to the type name for the case the subject has none yet: a draft a GM has
-  // created and not named. `.trim()` matters there — a field cleared to spaces is not a name,
-  // and `||` alone would put a run of blanks in the trail.
   const crumbSubject = (name, key, fallback) => {
     const trimmed = String(name ?? '').trim();
     return trimmed || text(key, fallback);
@@ -4612,10 +3314,8 @@
       'Edit gathering event'
     )
   );
-  // THE LINKED ITEM'S name rather than a field on the draft, because a recipe item HAS no name
-  // of its own: it is a world item plus the recipes it contains, and `recipeItemEditorLinkedItem`
-  // is the one resolution of that already used by the editor's own Overview preview. A second
-  // resolution here would be a second answer to "what is this thing called".
+  // THE LINKED ITEM'S name rather than a field on the draft, because a recipe item HAS no name of
+  // its own: it is a world item plus the recipes it contains.
   const recipeItemCrumb = $derived(
     crumbSubject(
       recipeItemEditorLinkedItem?.name,
@@ -4625,26 +3325,12 @@
   );
 
   // WHICH GATHERING SUB-TAB IS ON SCREEN, in the label the rail gives it.
-  //
-  // Gathering is a group of four screens — Environments, Tasks, Events, Settings — and its trail
-  // named only the group, so all four read `<system> > Gathering` and the trail could not tell
-  // you which one you were looking at. Checks already names its own sub-tab; this is the same
-  // rule applied to the other group that has one.
-  //
-  // Read off `gatheringNavItems` rather than written out, so the crumb is the same string as the
-  // rail item it corresponds to and a fifth tab needs nothing here.
   const gatheringTabLabel = $derived.by(() => {
     const item = gatheringNavItems.find((entry) => entry.id === activeGatheringTab);
     return item ? text(item.labelKey, item.labelFallback) : '';
   });
 
   // THE GATHERING FAMILY'S PER-TAB PAGE COPY, RESOLVED HERE RATHER THAN IN THE VIEW (issue 1515).
-  // Each of the four Gathering tabs used to title itself inside `EnvironmentsBrowserView`'s own
-  // section header, which stacked a second page title and hint under this shell's. The shell owns
-  // the page header for every route, so the branch that chose that copy moves here — and reads the
-  // rail's OWN record, the same way `gatheringTabLabel` above reads its label, so the four tabs
-  // cannot drift into two tables. The `environments` tab declares no title/hint pair in that
-  // record and falls through to the library's own name and sentence in the resolvers below.
   const activeGatheringNavItem = $derived(
     gatheringNavItems.find((entry) => entry.id === displayedGatheringTab) || null
   );
@@ -4665,18 +3351,16 @@
   const gatheringEventDefinitions = $derived(
     Array.isArray(selectedGatheringSystemConfig.events) ? selectedGatheringSystemConfig.events : []
   );
-  // Tools are system-owned: read the canonical library from the selected
-  // crafting system (surfaced on $viewState.selectedSystem.tools by the store)
-  // rather than the gathering-config copy.
+  // Tools are system-owned: read the canonical library from the selected crafting system (surfaced
+  // on $viewState.selectedSystem.tools by the store) rather than the gathering-config copy.
   const selectedGatheringSystemTools = $derived(
     Array.isArray($viewState.selectedSystem?.tools) ? $viewState.selectedSystem.tools : []
   );
   const toolsNavCount = $derived(selectedGatheringSystemTools.length);
-  // Recipe-editor tools library: enrich each tool with its backing component's
-  // name (so an unlabelled tool can fall back to the component name rather than
-  // exposing a raw id, mirroring the tool inspector's `label || component.name`
-  // resolution) and image (so the recipe Tools section and picker show the
-  // component thumbnail instead of a generic tool glyph).
+  // Recipe-editor tools library: enrich each tool with its backing component's name (so an
+  // unlabelled tool can fall back to the component name rather than exposing a raw id, mirroring
+  // the tool inspector's `label || component.name` resolution) and image (so the recipe Tools
+  // section and picker show the component thumbnail instead of a generic tool glyph).
   const recipeToolsLibrary = $derived(
     selectedGatheringSystemTools.map((tool) => {
       const component = (selectedSystem?.managedItemOptions || []).find(
@@ -4685,9 +3369,8 @@
       return { ...tool, componentName: component?.name || '', componentImg: component?.img || '' };
     })
   );
-  // Environments of the selected system, as { id, name } rows for the task
-  // editor's optional default-environment select (the on-drop precedence middle
-  // tier).
+  // Environments of the selected system, as { id, name } rows for the task editor's optional
+  // default-environment select (the on-drop precedence middle tier).
   const selectedSystemEnvironmentOptions = $derived(
     environmentList
       .filter(
@@ -4701,18 +3384,7 @@
   );
   const travelParties = $derived($viewState.travelParties || []);
 
-  // World > Parties page-header subtitle (issue 1182). `enabled` counts `enabled === true`
-  // and NOT the prototype's `enabled && members.length`: an enabled party resolves its
-  // travel actor's current realm with or without members (gathering-and-harvesting req 6),
-  // and an enabled party with neither members nor a travel actor is still the record a
-  // downtime group is grouped by, so a member-less enabled party is in use.
-  //
-  // `assigned` / `total` are PLAYER CHARACTERS only, each counted once across all parties.
-  // Travel actors are deliberately outside the numerator — a currently linked one is
-  // offered by its picker whether or not its type is configured, so a vehicle standing in
-  // as one would otherwise be counted against a player-character denominator and render
-  // "5 of 4 characters assigned". Stale member
-  // uuids resolve to no projected actor and drop out for the same reason.
+  // World > Parties page-header subtitle (issue 1182).
   const playerCharacterUuids = $derived(
     new Set(
       ($viewState.actorOptions || [])
@@ -4737,9 +3409,7 @@
   // reads the selected realm from the system-realm projection.
   let selectedTravelRealmId = $state('');
   const worldRealms = $derived($viewState.worldRealms || []);
-  // Rows for the Realms tab's per-realm environment editor. Projected here rather than inside
-  // `EnvironmentsBrowserView`, which no longer hosts the Realms surface at all: World > Travel
-  // renders `GatheringRealmsTab` straight from this root.
+  // Rows for the Realms tab's per-realm environment editor.
   const worldTravelEnvironmentOptions = $derived(
     environmentList.map((environment) => ({
       id: environment.id,
@@ -4880,10 +3550,6 @@
   );
 
   // WHICH WORLD TOOL THE RULES LIST HAS SELECTED THAT THIS SYSTEM HAS NO RECORD FOR.
-  //
-  // Root state because the inspector is rendered by the SHELL's shared aside rather than by
-  // `ToolsBrowserView`, so a selection held inside that view could never reach the panel it is
-  // meant to fill. Cleared by `selectLibraryTool` the moment an adopted Tool is chosen.
   let unadoptedToolId = $state('');
   const unadoptedWorldTool = $derived(
     unadoptedToolId
@@ -4892,36 +3558,10 @@
       : null
   );
 
-  /**
-   * The Tool the browser inspector describes, or `null` while a NON-MEMBER world Tool is
-   * selected (issue 1373).
-   *
-   * `selectedLibraryTool` is derived from the open tool DRAFT, and a world Tool this system
-   * holds no rules for cannot open one - `openToolDraft` returns false and the draft stays on
-   * whatever was selected before. So clicking a `No rules in this system` row set
-   * `unadoptedToolId` correctly and the panel went on describing the PREVIOUS Tool, because
-   * `ToolBrowserInspector` prefers its `tool` prop over its `unadopted` one and both were
-   * populated at once. The two states are mutually exclusive by design; this is where that is
-   * made true.
-   *
-   * It was invisible because no capture case selected a non-member row - which is what
-   * `manager-tool-non-member-selected-1280x720` exists to end.
-   */
+  /** The Tool the browser inspector describes. */
   const inspectedLibraryTool = $derived(unadoptedWorldTool ? null : selectedLibraryTool);
 
-  /**
-   * The selected Tool's per-section INHERIT map, for the browser inspector's `Inheritance`
-   * region (issue 1373).
-   *
-   * Read off the world projection's per-system JOIN, which is the only place that answer
-   * exists: the system's own Tool record carries the RESOLVED values, so it cannot tell an
-   * inherited section from one overridden to an identical value. `ToolsBrowserView` reads the
-   * same join for its per-row `Overrides ...` sentence, and reading it here is what makes the
-   * row and the panel incapable of disagreeing.
-   *
-   * `{}` for a Tool with no membership record: an absent key reads as inheriting everywhere,
-   * and the panel renders the region for members only anyway.
-   */
+  /** The selected Tool's per-section INHERIT map. */
   const selectedLibraryToolInherited = $derived.by(() => {
     const toolId = String(inspectedLibraryTool?.id ?? '');
     if (!toolId) return {};
@@ -4937,15 +3577,8 @@
   /**
    * Seed the component selection for a system, and stamp the system sentinel with it.
    *
-   * ONE HELPER FOR TWO CALLERS (issue 1371 r13-list, M14). The system-switch effect below calls it
-   * with no component, which is the reset it always performed; `openSystemComponentRules` calls
-   * it with the deep-linked id. The sentinel is stamped HERE rather than left to the effect,
-   * because the effect compares `selectedSystemId` against it and would otherwise wipe the
-   * deep-linked seed the moment the selected system catches up with the switch.
-   *
-   * @param {string} systemId the system the selection belongs to.
    * @param {string} [componentId] the component to select, or `''` for none — the rules list then
-   *   selects its first drawn row.
+   * selects its first drawn row.
    */
   function resetComponentSelectionFor(systemId, componentId = '') {
     selectedComponentId = componentId;
@@ -5041,10 +3674,7 @@
     return () => services?.registerToolDirtyGuard?.(null);
   });
 
-  // The companion's own window-close guard. Registered unconditionally and SELF-SCOPING: the
-  // channel answers `undefined` unless a live mount holds a guard, and a live mount only
-  // exists while the GM is on the Downtime route with a companion panel on screen. Nothing
-  // here needs to know the active route, and nothing fires on any other one.
+  // The companion's own window-close guard.
   $effect(() => {
     services?.registerDowntimeCompanionGuard?.(() =>
       downtimeChromeChannel.confirmNavigation('close')
@@ -5057,14 +3687,7 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  /**
-   * The interpolating localizer, for the notices this shell composes itself.
-   *
-   * @param {string} key
-   * @param {string} fallback
-   * @param {object} [data]
-   * @returns {string}
-   */
+  /** The interpolating localizer, for the notices this shell composes itself. */
   function format(key, fallback, data) {
     let result = text(key, fallback);
     for (const [token, value] of Object.entries(data ?? {})) {
@@ -5089,19 +3712,15 @@
     return `${count} ${text(key, fallback)}`;
   }
 
-  // The recipe editor's header subline: "<category> · <resolution mode>". The mode is
-  // the SYSTEM's, restated here because it dictates the editor's whole shape; the
-  // banner on each tab is where the GM goes to change it.
+  // The recipe editor's header subline: "<category> · <resolution mode>".
   function recipeEditSubtitle() {
     const category = getRecipeCategoryLabel(
       normalizeRecipeCategory(recipeDraft?.category),
       localize
     );
     const mode = resolutionModeLabel(selectedSystem?.resolutionMode);
-    // "⟨category⟩ · ⟨mode⟩ · DC ⟨n⟩" (§F4): resolve the check DC from the same
-    // projected `checkSummary` the browser row's check pill reads. A DC-kind check
-    // shows its number; a check-bearing system with no usable check shows "—";
-    // dynamic / progressive / by-ingredients modes carry no DC and omit the segment.
+    // "⟨category⟩ · ⟨mode⟩ · DC ⟨n⟩" (§F4): resolve the check DC from the same projected
+    // `checkSummary` the browser row's check pill reads.
     const summary = selectedRecipe?.checkSummary || null;
     let dcSuffix = '';
     if (summary?.kind === 'dc' && Number.isFinite(Number(summary.dc))) {
@@ -5112,14 +3731,7 @@
     return `${category} · ${mode}${dcSuffix}`;
   }
 
-  // The component editor's header subline: "<category> · Linked <source>" (issue 676,
-  // decision 4). The SOURCE segment names where the linked item lives — the same origin
-  // the browser row's status pill reports — because the editor's whole premise is that
-  // name, image and description follow that item. An unlinked component says so.
-  // ISSUE 1371, PARITY ROUND 4 (gap-list row 125). The reference reads
-  // `{system} rules · {effective category} · {mode}` (`proto:5719`). What shipped was
-  // `{category} · Linked Items Directory` — a source segment that names where the linked Item
-  // lives, which under epic 1357 is world data and is stated on the world entry, not here.
+  // The component editor's header subline: "<category> · Linked <source>" (issue 676, decision 4).
   function componentEditSubtitle() {
     const category = getComponentCategoryLabel(
       normalizeComponentCategory(componentForEdit?.category),
@@ -5151,11 +3763,7 @@
     );
   }
 
-  // The titlebar's right-hand status line. Resolution mode is a SYSTEM property, so
-  // this reports the selected system's mode — and, only when that mode actually
-  // routes by outcome tier, how many tiers the GM has authored on its routed check.
-  // A `simple`/`progressive`/`alchemy` system has no tiers to count, and a routed
-  // system with none yet says so by omission rather than by printing "0".
+  // The titlebar's right-hand status line.
   const titlebarOutcomeTierCount = $derived(
     selectedSystem?.resolutionMode === 'routedByCheck'
       ? routedOutcomeTierCount(selectedSystem?.craftingCheck?.routed)
@@ -5289,38 +3897,18 @@
   }
 
   function normalizedActiveView(view, system, environmentsAvailable, essencesAvailable) {
-    // `checks` is RETAINED as a redirect to the first available child (issue 1096), so
-    // existing deep links, the salvage editor's "Manage presets" link and every View Lab
-    // `expectView: 'checks'` still have a defined answer after the split. The target is
-    // resolved from the same nav model the rail renders, so "first available" cannot mean
-    // two different things.
+    // `checks` is RETAINED as a redirect to the first available child (issue 1096), so existing
+    // deep links.
     if (system && view === 'checks') return resolveChecksRedirect(checksNavArgs);
     // A child whose feature was switched off while it was open falls back to the same
     // redirect rather than rendering a route the rail no longer offers.
     if (system && CHECKS_VIEWS.includes(view) && !checksNavItems.some((item) => item.view === view))
       return resolveChecksRedirect(checksNavArgs);
-    // The same reconciliation for the Crafting group (issue 1151): a crafting-system
-    // scope change or a `visibilityMode` edit must not leave the GM rendering a
-    // mode-conditional entry the selected system no longer offers, with no rail entry
-    // to return to it.
-    //
-    // The membership test is taken over the entry that OWNS the view, not over the
-    // view — `isCraftingViewAvailable` maps through `activeCraftingTab` — so
-    // `recipes`, `recipe-edit` and `crafting-settings` are never caught, and
-    // `recipe-item-edit` follows its Books & Scrolls parent. The Checks clause above
-    // can compare views directly because every Checks child IS a view; the crafting
-    // model's ids and views deliberately differ.
-    //
-    // This is a read-time normalization, so it invokes no route-exit guard and does
-    // not weaken one: every path reaching it has already passed the guard. A scope
-    // change maps an editor route to its browser through `SCOPE_BROWSER_BY_VIEW` and
-    // prompts BEFORE `selectSystem`, and `setVisibilityMode` is reachable only from
-    // the unconditional Settings entry.
+    // The same reconciliation for the Crafting group (issue 1151).
     if (system && isCraftingView(view) && !isCraftingViewAvailable(view, craftingNavArgs))
       return resolveCraftingRedirect(craftingNavArgs);
-    // The standalone `system-overview` route was folded into the `system-edit`
-    // page's Validation tab; a stale value (no system selected) falls through to
-    // the `systems` library here.
+    // The standalone `system-overview` route was folded into the `system-edit` page's Validation
+    // tab; a stale value (no system selected) falls through to the `systems` library here.
     if (
       view === 'world' ||
       view === 'world-downtime' ||
@@ -5328,10 +3916,8 @@
       view === 'world-prerequisites' ||
       view === 'world-modifiers' ||
       view === 'world-travel' ||
-      // The seven scoped-entity routes join the world pass-through (issue 1362) and MUST be
-      // above the fallthrough below: a world screen's normal state is that no crafting
-      // system is selected, so `if (!system) return 'systems'` would bounce every one of
-      // them the moment the GM had not picked a system first.
+      // The seven scoped-entity routes join the world pass-through (issue 1362) and MUST be above
+      // the fallthrough below.
       WORLD_SCOPED_VIEWS.includes(view)
     )
       return view;
@@ -5371,22 +3957,6 @@
   }
 
   // THE PAGE HEADER'S EYEBROW, ONE PER ROUTE (issue 1515).
-  //
-  // Six manager routes used to draw their own `manager-section-header` — kicker, title and hint —
-  // directly under this shell's header, so each of the six rendered TWO page headings. The section
-  // headers are deleted and the shell states the whole heading; the eyebrow is the part of it that
-  // had nowhere else to go, because it names the CONTEXT the `<h1>` beneath it is read in rather
-  // than restating the route. Usually that context is the scope the route acts inside — the
-  // selected system on `access`, `crafting-settings` and `environments`, and `WORLD / every
-  // system` on `world`. On `systems` there is no narrower scope than the manager itself, so it
-  // names the ACTIVITY instead ("Browse"), which is the same job done with the only word left.
-  //
-  // A ROUTE THAT RETURNS THE EMPTY STRING RENDERS NO EYEBROW, and `system-edit` is deliberately
-  // one of them: its `<h1>` now carries the selected system's name and its breadcrumb already
-  // names both the system and the route, so an eyebrow there would be a third statement of a fact
-  // the screen makes twice.
-  //
-  // Written as whole literal keys, never an interpolated base — see `worldScopedSubtitle` below.
   function viewKicker() {
     if (currentView === 'systems') return text('FABRICATE.Admin.Manager.Browse', 'Browse');
     if (currentView === 'world')
@@ -5430,12 +4000,7 @@
     if (currentView === 'essence-edit')
       return text('FABRICATE.Admin.Manager.Essence.EditTitle', 'Edit essence');
     // The Gathering family titles itself after the TAB on screen (issue 1515), the same way the
-    // Downtime route below does: the four tabs are four screens and one page header must change
-    // with them. Only Tasks did this here before; the other three named themselves in the browse
-    // view's own section header, which is what made every Gathering screen carry two titles. The
-    // `environments` tab declares no per-tab pair in the rail record, so it keeps the library's
-    // own name — the wording its section header used, and the one that reads as a member of the
-    // same family as the other three rather than as the route token.
+    // Downtime route below does.
     if (currentView === 'environments')
       return (
         gatheringTabPageTitle ||
@@ -5465,9 +4030,8 @@
         return text('FABRICATE.Admin.Manager.Travel.MapLinksTitle', 'Map Region Links');
       return text('FABRICATE.Admin.Manager.Travel.RealmsTitle', 'Realms');
     }
-    // The Downtime route titles itself after the tab on screen, not after the route: a GM
-    // switching sub-tabs must see the page name change with them, and a companion's screens
-    // must not wear Core's preview copy.
+    // The Downtime route titles itself after the tab on screen, not after the route: a GM switching
+    // sub-tabs must see the page name change with them.
     if (currentView === 'world-downtime')
       return downtimeChrome(
         'title',
@@ -5477,12 +4041,8 @@
     if (currentView === 'tools') return text('FABRICATE.Admin.Manager.Tools.Title', 'Tools');
     if (currentView === 'tool-edit')
       return text('FABRICATE.Admin.Manager.Tools.EditTitle', 'Edit Tool');
-    // Written as a LOOKUP over four whole keys rather than one interpolated template ending
-    // at the `Checks` segment: `tests/lang-keys-no-orphans.test.js` credits an interpolation
-    // base as a covering PREFIX over its whole subtree, so that single template would have
-    // silently un-orphaned every dead key under the Checks namespace — including the
-    // nineteen this repo tracks deliberately in `tests/lang-known-orphans.js`. The scan reads
-    // COMMENTS too, so this note must not spell that prefix out either.
+    // Written as a LOOKUP over four whole keys rather than one interpolated template ending at the
+    // `Checks` segment.
     if (isChecksRoute) return text(CHECKS_ROUTE_TITLE_KEYS[checksActiveTab], 'Checks');
     if (currentView === 'environment-edit')
       return text('FABRICATE.Admin.Manager.Environment.EditTitle', 'Edit environment');
@@ -5490,12 +4050,7 @@
       return text('FABRICATE.Admin.Manager.Environment.Tasks.EditTitle', 'Edit gathering task');
     if (currentView === 'gathering-event-edit')
       return text('FABRICATE.Admin.Manager.Environment.Events.EditTitle', 'Edit gathering event');
-    // THE RECORD, NOT THE ROUTE (issue 1515). Every other editor route in the Manager puts the
-    // name of the thing being edited in the page title — recipe, component, essence, tool — and
-    // this one alone repeated its route name, which the breadcrumb tail and the rail item already
-    // say. The tail and the nav item keep saying it: the trail names where you are, the title
-    // names what you are looking at. The fallback is the route's own name for the state where no
-    // system is selected, so the heading is never empty.
+    // THE RECORD, NOT THE ROUTE (issue 1515).
     if (currentView === 'system-edit')
       return (
         selectedSystem?.name || text('FABRICATE.Admin.Manager.SystemEdit.Nav', 'System Overview')
@@ -5503,12 +4058,8 @@
     return text('FABRICATE.Admin.Manager.Title', 'Crafting systems');
   }
 
-  // ONE derivation for each world scoped-entity route's subtitle, keyed by route, so a page
-  // and the placeholder body inside it cannot drift into saying two different things.
-  //
-  // COMPLETE LITERAL KEYS, never a `${...}` suffix on a shared base. An interpolated key is
-  // invisible to the lang-key resolution gate and to the orphan scan, so a missing string ships
-  // silently and every one of these seven would read as an unreferenced key.
+  // ONE derivation for each world scoped-entity route's subtitle, keyed by route, so a page and the
+  // placeholder body inside it cannot drift into saying two different things.
   function worldScopedSubtitle() {
     if (currentView === 'world-components')
       return text('FABRICATE.Admin.Manager.Scoped.ComponentCatalogueSubtitle', '');
@@ -5528,9 +4079,7 @@
   }
 
   function viewSubtitle() {
-    // The seven world scoped-entity routes (issue 1362). Without a branch of its own a route
-    // falls through to the generic system-library subtitle, which describes crafting systems
-    // — the one thing these screens deliberately do not have.
+    // The seven world scoped-entity routes (issue 1362).
     if (isWorldScopedRoute) return worldScopedSubtitle();
     if (currentView === 'recipes')
       return text(
@@ -5538,25 +4087,20 @@
         'Manage recipes for the selected crafting system.'
       );
     if (currentView === 'recipe-edit') return recipeEditSubtitle();
-    // The lede states the OUTCOME rather than the mechanism (issue 1515). The route's deleted
-    // section header carried this sentence and the shell carried a restatement of the rail item;
-    // one page header keeps one of them, and it is the one a GM can act on.
+    // The lede states the OUTCOME rather than the mechanism (issue 1515).
     if (currentView === 'crafting-settings')
       return text(
         'FABRICATE.Admin.Manager.Crafting.Settings.Subtitle',
         'Control how players get access to the recipes in this system.'
       );
-    // The SUPERSET of the two sentences the route used to carry (issue 1515). The shell's own was
-    // the first half of the section header's; the second half — what a grant actually does to what
-    // a player can see — is GM-facing rules content with no other home on the screen.
+    // The SUPERSET of the two sentences the route used to carry (issue 1515).
     if (currentView === 'access')
       return text(
         'FABRICATE.Admin.Manager.Access.Hint',
         'Grant individual recipes to specific characters or players. Only granted recipes are visible to them.'
       );
-    // The system library's lede is the one sentence on that screen telling a GM what to DO with
-    // it (issue 1515); the generic `Manager.Subtitle` below describes what a crafting system IS and
-    // stays the fall-through for the routes with nothing more specific to say.
+    // The system library's lede is the one sentence on that screen telling a GM what to DO with it
+    // (issue 1515).
     if (currentView === 'systems')
       return text(
         'FABRICATE.Admin.Manager.SystemLibraryHint',
@@ -5577,9 +4121,7 @@
         'FABRICATE.Admin.Manager.RecipeItem.EditSubtitle',
         'Link a world item and recipes, then set its use and learn caps.'
       );
-    // ISSUE 1371, PARITY ROUND 4 (gap-list row 98). The generic sentence said nothing a GM
-    // could act on; the reference writes THIS system's own posture — its salvage mode, and which
-    // half of a component's rules is world data and which is the system's.
+    // ISSUE 1371, PARITY ROUND 4 (gap-list row 98).
     if (currentView === 'components')
       return componentListSubtitle(
         {
@@ -5600,11 +4142,7 @@
         'Manage recipe category and item tag vocabulary for the selected crafting system.'
       );
     // THE SUBTITLE STATES THE SCREEN'S THREE FACTS (issue 1372, maintainer parity round 8,
-    // reference `proto:4970`): what the list holds, what DISABLING actually stops, and where
-    // identity comes from. What shipped — "Manage essence definitions for the selected crafting
-    // system" — used the WORLD-scope word "definitions" for a screen that authors none, and said
-    // nothing about either of the other two, so the panel's own shared-definition banner was the
-    // only thing on the route that named the layer.
+    // reference `proto:4970`): what the list holds, what DISABLING actually stops.
     if (currentView === 'essences')
       return interpolate(
         text(
@@ -5894,24 +4432,15 @@
       const result = await saveEssenceEdit(essenceEditDraft.id || null, essenceEditDraft.updates);
       return result !== false;
     }
-    // DISCARD. `store.cancelEssenceDraft` (issue 1036, criterion 23) is the store's half:
-    // it writes NOTHING and republishes the persisted projections, so the browser and the
-    // inspector show what is actually stored rather than whatever the abandoned draft last
-    // rendered. It exists for the same reason `cancelEnvironmentDraft` and
-    // `cancelToolsDraft` do — the guard's discard branch and the editor's Back button must
-    // reach ONE function rather than each re-deriving what cancelling means.
+    // DISCARD.
     essenceEditDirty = false;
     essenceEditDraft = null;
     store.cancelEssenceDraft?.();
     return true;
   }
 
-  // Apply the three-way discard choice for the identity sub-form and answer whether
-  // navigation may proceed (`true`) or must stay put (`false`). Save persists from the
-  // ROOT-LIFTED draft, not from `SystemEditView`'s local inputs: on a Save-and-navigate
-  // the view is still mounted but the root is the only holder the guard can read.
-  // Navigation is gated on `result !== false`, so only an explicit `false` from
-  // `saveSystemDetails` (its no-selected-system no-op) blocks the exit.
+  // Apply the three-way discard choice for the identity sub-form and answer whether navigation may
+  // proceed (`true`) or must stay put (`false`).
   async function finishSystemDetailsRouteExit(action) {
     if (action === 'cancel' || action === false) return false;
     if (action === 'save') {
@@ -5921,15 +4450,8 @@
       );
       return result !== false;
     }
-    // Discard: clear the dirty flag and bump the reseed nonce so `SystemEditView`
-    // reverts its local inputs to the persisted values, then let navigation proceed.
-    //
-    // The nonce bump is intentional defence-in-depth and is currently REDUNDANT: every
-    // path that reaches this discard branch either navigates away (unmounting the view,
-    // which re-seeds on remount) or changes the system id (which the identity gate
-    // re-seeds on). It exists so a future in-place discard affordance — one that keeps
-    // the form mounted on the same system — reverts the inputs correctly. Do not delete
-    // it as dead code just because removing it leaves the tests green.
+    // Discard: clear the dirty flag and bump the reseed nonce so `SystemEditView` reverts its local
+    // inputs to the persisted values, then let navigation proceed.
     systemDetailsDirty = false;
     systemDetailsReseedNonce += 1;
     return true;
@@ -6019,21 +4541,8 @@
     return finishEnvironmentRouteExit(confirmed);
   }
 
-  // The SAME-VIEW SKIP (issue 1036, criterion 23), comparing the ESSENCE and not only the
-  // view token. This guard ignored its argument, unlike the recipe, component, recipe-item
-  // and system guards, so re-entering the essence editor from the essence editor raised a
-  // discard prompt for a navigation that never leaves the route. `SCOPE_BROWSER_BY_VIEW`
-  // already maps `essence-edit` to `essences`, so skipping is safe: this is not the
-  // `environment-edit` hazard, whose scope key differs.
-  //
-  // But `essence-edit` is a "same token, different subject" route, exactly like `tool-edit`
-  // and `system-edit`, and both of those learned it the hard way. `editEssence` already
-  // early-returns on an unchanged id, so EVERY call that reaches this guard from inside the
-  // editor is a switch to a different essence, and a bare `nextView === 'essence-edit'` skip
-  // returned `true` for all of them, after which `editEssence` clears `essenceEditDraft` with
-  // the draft unsaved, no prompt, and `store.cancelEssenceDraft()` never called.
-  // `confirmToolsRouteExit` compares ids for this reason; so does
-  // `confirmSystemDetailsScopeChange`.
+  // The SAME-VIEW SKIP (issue 1036, criterion 23), comparing the ESSENCE and not only the view
+  // token.
   function confirmEssenceRouteExit(nextView, nextEssenceId = '') {
     if (activeView !== 'essence-edit') return true;
     if (nextView === 'essence-edit' && nextEssenceId && nextEssenceId === selectedEssenceId)
@@ -6050,23 +4559,16 @@
     return finishSystemDetailsRouteExit(confirmed);
   }
 
-  // Same-view navigation keeps the identity form mounted on the SAME system, so the
-  // lifted draft survives and must NOT prompt: `showSystemOverview` (the validation
-  // blocker link) and `editSystem` on the already-selected system both re-enter
-  // `system-edit`. Mirrors the `nextView` skip in `confirmRecipeRouteExit`.
-  //
-  // A scope-select SYSTEM swap also keeps the `system-edit` token (system-edit has no
-  // SCOPE_BROWSER_BY_VIEW entry), and there the draft genuinely is at risk — that case
-  // is guarded explicitly by `confirmSystemDetailsScopeChange`, not here.
+  // Same-view navigation keeps the identity form mounted on the SAME system, so the lifted draft
+  // survives and must NOT prompt.
   function confirmSystemDetailsRouteExit(nextView) {
     if (activeView !== 'system-edit' || nextView === 'system-edit') return true;
     if (systemDetailsDirty !== true) return true;
     return runSystemDetailsDiscardPrompt();
   }
 
-  // Scope-select swaps the SYSTEM while keeping the view token, so the same-view skip
-  // above would let a dirty identity draft through. The draft belongs to the outgoing
-  // system, so a real switch must still prompt.
+  // Scope-select swaps the SYSTEM while keeping the view token, so the same-view skip above would
+  // let a dirty identity draft through.
   function confirmSystemDetailsScopeChange(systemId) {
     if (activeView !== 'system-edit') return true;
     if (systemId === selectedSystemId || systemDetailsDirty !== true) return true;
@@ -6098,22 +4600,11 @@
     return finishGatheringTaskRouteExit(confirmed, nextView);
   }
 
-  // `nextRouteId` is the identity of the SUBJECT the caller is navigating to, for the
-  // routes whose view token does not change when the subject does. Inside this cascade only
-  // the essence guard reads it; `confirmRouteExit` also reads it for the Downtime tab a
-  // companion's navigation guard is being asked about. Every other caller keeps its
-  // one-argument shape.
+  // `nextRouteId` is the identity of the SUBJECT the caller is navigating to, for the routes whose
+  // view token does not change when the subject does.
   function confirmRouteExitGuards(nextView, nextRouteId = '') {
     // THE WORLD SCOPED-ENTRY EDITORS ARE ASKED FIRST, and the order is immaterial rather than
-    // arbitrary: every guard below is gated on an `activeView` that a world route cannot also
-    // be, so on `world-essence-entry` or `world-tool-entry` the whole rest of this cascade is
-    // already a synchronous `true`. Asking first therefore reorders nothing.
-    //
-    // THE TWO ARE ASKED IN SEQUENCE RATHER THAN COMBINED because each is gated on its own
-    // `activeView` and the two routes are mutually exclusive: exactly one of them can answer
-    // anything but a synchronous `true`, so the pair costs one extra comparison and never two
-    // prompts. Combining them into one guard with a route lookup would put the third entry
-    // editor's wiring somewhere other than beside its own state.
+    // arbitrary: every guard below is gated on an `activeView` that a world route cannot also be.
     const worldEntryConfirmed = confirmWorldEssenceEntryRouteExit(nextView, nextRouteId);
     if (isPromise(worldEntryConfirmed)) {
       return worldEntryConfirmed.then((value) =>
@@ -6135,13 +4626,7 @@
     return confirmWorldComponentEntryExitThenRest(nextView, nextRouteId);
   }
 
-  // THE THIRD ENTRY EDITOR IN THE SAME CHAIN (issue 1371). Added as its own link rather than
-  // folded into either sibling, on the reason the chain's own note gives: each is gated on its
-  // own `activeView` and the three routes are mutually exclusive, so exactly one of them can
-  // answer anything but a synchronous `true` and the chain costs one comparison per link.
-  //
-  // WITHOUT IT AN UNSAVED COMPONENT EDIT IS LOST IN SILENCE by the rail, the breadcrumb and the
-  // header Back alike — all three navigate through this one gate.
+  // THE THIRD ENTRY EDITOR IN THE SAME CHAIN (issue 1371).
   function confirmWorldComponentEntryExitThenRest(nextView, nextRouteId = '') {
     const componentEntryConfirmed = confirmWorldComponentEntryRouteExit(nextView, nextRouteId);
     if (isPromise(componentEntryConfirmed)) {
@@ -6181,19 +4666,6 @@
   /**
    * Ask a mounted companion whether the GM may leave the screen it is showing.
    *
-   * `undefined` — never `true` — means there is nothing to ask, and every caller reads it
-   * as "run the path you ran before this seam existed". That is what makes a companion which
-   * never registers a guard cost exactly nothing: no prompt, no `await`, no extra microtask,
-   * and no change to the promise identity `confirmRouteExit` is careful to preserve.
-   *
-   * The DESTINATION decides whether this is a navigation at all. `nextRouteId` already carries
-   * "the identity of the subject the caller is navigating to, for the routes whose view token
-   * does not change when the subject does" — which is exactly what a Downtime tab is — so the
-   * Downtime tab id travels on the parameter that exists for it rather than on a second one.
-   * Re-entering the route the GM is already on (the parent rail item, which states no tab)
-   * leaves nothing, so it must not prompt.
-   *
-   * @param {string} nextView Route token the caller is navigating to.
    * @param {string} nextRouteId Destination Downtime tab id, when the caller states one.
    * @returns {undefined|boolean|Promise<boolean>} `undefined` when there is nothing to ask.
    */
@@ -6204,25 +4676,12 @@
     return downtimeChromeChannel.confirmNavigation(nextView === 'world-downtime' ? 'tab' : 'route');
   }
 
-  /**
-   * Core's own route-exit cascade, plus the Downtime host disposal that follows it.
-   *
-   * Split out of `confirmRouteExit` so the companion guard can gate the WHOLE of it: a
-   * companion that vetoes must leave Core's drafts untouched and its host mounted, and a
-   * guard placed inside the cascade would have Core prompting — or saving — first.
-   *
-   * @param {string} nextView Route token the caller is navigating to.
-   * @param {string} nextRouteId Destination subject id, for same-token routes.
-   * @returns {boolean|Promise<boolean>} Whether the navigation may proceed.
-   */
+  /** Core's own route-exit cascade, plus the Downtime host disposal that follows it. */
   function finishRouteExit(nextView, nextRouteId) {
     const result = confirmRouteExitGuards(nextView, nextRouteId);
     if (activeView !== 'world-downtime' || nextView === 'world-downtime') return result;
 
-    // Keep the original route-guard promise identity. `afterTruthyResult` already subscribes to
-    // it immediately; wrapping it would put route activation one microtask later and regress
-    // every existing async discard path. Reactions run in registration order, so this cleanup
-    // still happens before the caller's route activation removes the host target.
+    // Keep the original route-guard promise identity.
     const disposeDowntime = (confirmed) => {
       if (confirmed !== false) downtimeExtensionHost?.disposeBeforeRemoval?.();
     };
@@ -6231,16 +4690,11 @@
     return result;
   }
 
-  // The companion is asked FIRST, and only about navigations that end its mount. Every Core
-  // guard below is route-gated, so on `world-downtime` the whole Core cascade is already a
-  // synchronous `true` — asking the companion first therefore reorders nothing, and it means
-  // a veto costs no Core write at all, where asking Core first could persist an environment
-  // or a tool for a navigation the companion then refuses.
+  // The companion is asked FIRST, and only about navigations that end its mount.
   function confirmRouteExit(nextView, nextRouteId = '') {
     const companion = confirmDowntimeCompanionNavigation(nextView, nextRouteId);
-    // Returned UNTOUCHED, not wrapped: `afterTruthyResult` subscribes to this value
-    // immediately, and wrapping it would put every existing route activation one microtask
-    // later. Only the new path, where a companion actually holds a guard, composes.
+    // Returned UNTOUCHED, not wrapped: `afterTruthyResult` subscribes to this value immediately,
+    // and wrapping it would put every existing route activation one microtask later.
     if (companion === undefined) return finishRouteExit(nextView, nextRouteId);
     if (isPromise(companion))
       return companion.then((allowed) =>
@@ -6304,10 +4758,7 @@
     return continueRouteExitAfterTools(nextView);
   }
 
-  // Tail of the route-exit cascade: tools, then system-details. `system-details` is
-  // evaluated LAST because it is the only kind whose "editor" is a sub-form of a page the
-  // GM may also be leaving for another reason, so a real editor draft gets first refusal
-  // on the exit. Same promise / `false`-short-circuit shape as the other links.
+  // Tail of the route-exit cascade: tools, then system-details.
   function continueRouteExitAfterTools(nextView) {
     const toolsResult = confirmToolsRouteExit(nextView);
     if (isPromise(toolsResult)) {
@@ -6348,9 +4799,8 @@
 
   async function finishChecksRouteExit(action) {
     if (action === 'save') {
-      // Navigation is gated on the SAVE, exactly as the essence and system-details guards
-      // gate theirs: a Save that did not land leaves the GM on the studio with the edit
-      // still in front of them, rather than navigating away from work nothing persisted.
+      // Navigation is gated on the SAVE, exactly as the essence and system-details guards gate
+      // theirs.
       return await saveChecks();
     }
     if (action === 'discard' || action === true) {
@@ -6360,15 +4810,7 @@
     return false;
   }
 
-  /**
-   * The Checks Studio's route-exit prompt (issue 1096).
-   *
-   * Navigating BETWEEN Checks children never prompts: the drafts live above the route, so
-   * moving from Crafting to Salvage and back preserves them. Leaving the studio for a
-   * non-Checks route with any activity dirty raises the three-way prompt, which names the
-   * dirty activities — the GM may be standing on Gathering while the unsaved edit is on
-   * Crafting.
-   */
+  /** The Checks Studio's route-exit prompt (issue 1096). */
   function confirmChecksRouteExit(nextView) {
     if (!isChecksRoute || isChecksView(nextView)) return true;
     if (!checksDirty) return true;
@@ -6467,17 +4909,7 @@
     return runSelection();
   }
 
-  // A per-record editor/detail view is bound to ONE system's record, so switching the
-  // crafting system from the rail scope-select must return the GM to the corresponding
-  // studio BROWSER for the new system rather than stranding them in an editor for a
-  // record that does not exist under the new system (e.g. recipe-edit → recipes).
-  //
-  // Browser, list, and settings views are not listed here, but "they simply reload for
-  // the new system" is only true once the ROUTER has reconciled them (issue 1151): a
-  // mode-conditional Crafting browser such as `access` or `books-scrolls` may not exist
-  // under the new system at all. `normalizedActiveView` owns that answer, so this map
-  // stays a per-record editor concern and every entry path — a scope change, a
-  // `visibilityMode` edit, a restored stale `activeView` — is reconciled in one place.
+  // A per-record editor/detail view is bound to ONE system's record.
   const SCOPE_BROWSER_BY_VIEW = {
     'recipe-edit': 'recipes',
     'recipe-item-edit': 'books-scrolls',
@@ -6491,50 +4923,6 @@
   }
 
   // ---- Route-scoped library search clear (issue 1462) -----------------------------
-  //
-  // A library search survived every navigation, so a term typed into the recipe library kept
-  // filtering `$viewState.recipes` on screens that render no search box for it: the Tags &
-  // Categories reference counts, the recipe-item editor's available-recipes pool, the rail
-  // badge. A filter the GM cannot see is a filter they cannot clear, which is the failure
-  // issue 676 recorded on the salvage yield picker, repaired there, and left open as a class.
-  // The search is now scoped to the browser that owns it plus that browser's own detail
-  // editor, which is the one round trip the maintainer's rule preserves.
-  //
-  // The scope is `browserViewForScopeChange` UNCHANGED and nothing else. That map already
-  // pairs every browser with its detail editor, so `recipes` and `recipe-edit` collapse to one
-  // scope and the round trip falls out of it; adding a third store-backed search later needs no
-  // edit here at all. There is deliberately NO set of "browsers worth clearing for" beside it:
-  // that would be a second source of truth about which routes own a search, and the transition
-  // it silently collapses is Access -> Tags & Categories — the Access surface writes the recipe
-  // search from its own box, and Tags renders reference counts over the filtered rows where an
-  // `Unused` row deletes in one click with no confirm strip. Every scope change therefore calls
-  // the action unconditionally and the store's short-circuit decides whether anything happens,
-  // so the cost of a no-op navigation is one `get` per store rather than a `refresh()`.
-  //
-  // The seam is an effect on `currentView` — the RESULTING route — rather than
-  // `confirmRouteExit`. `activeView` is assigned directly from ~40 places, several of which
-  // bypass that guard; `normalizedActiveView` reconciles the route at READ time and invokes no
-  // guard at all, so a feature toggle or a cross-client edit can move the GM off the library
-  // with nothing running; and the guard is an async veto whose answer may be "no", which would
-  // clear a search for a navigation the GM then cancels. Observing the outcome is total by
-  // construction: a future direct assignment is covered without the author doing anything.
-  // `store.setKnowledgeActive?.(currentView === 'knowledge')` above is the same shape.
-  //
-  // `lastSearchScope` is a plain `let`, NOT `$state`: writing a rune inside its own effect
-  // re-triggers it. It is SEEDED at declaration, so no clear fires at mount. Left at a sentinel
-  // it would fire once on every route before any navigation happened, which is both a spurious
-  // refresh and — because it makes a "was it called?" assertion true for the wrong reason — the
-  // thing that would let this feature's tests pass while the navigation clear did nothing.
-  // `RecipesBrowserView` records that failure for issue 806, on its own systemId sentinel.
-  //
-  // The seed reads `currentView` through `untrack` because that read is a one-off snapshot at
-  // component init, not a subscription. Read bare it is `state_referenced_locally`, and the
-  // compiler-warning gate's bar is zero — so unwrapping it fails `lint:svelte:warnings`
-  // rather than merely reading untidily.
-  //
-  // The effect's only reactive dependency is `currentView`. `clearLibrarySearches` triggers a
-  // `refresh()` that republishes `$viewState`, which this effect does not read, so it does not
-  // re-enter.
   function searchScopeForView(view) {
     return browserViewForScopeChange(view);
   }
@@ -6547,9 +4935,8 @@
     store.clearLibrarySearches?.();
   });
 
-  // Scope-select change: route to the corresponding browser for the new system, running
-  // the dirty-exit guard first (the different-system path in selectSystem skips it), so
-  // an unsaved editor still prompts before the switch.
+  // Scope-select change: route to the corresponding browser for the new system, running the
+  // dirty-exit guard first (the different-system path in selectSystem skips it).
   function changeScopeSystem(systemId) {
     if (!systemId) return;
     const target = browserViewForScopeChange(currentView);
@@ -6575,10 +4962,7 @@
     });
   }
 
-  // Open the System Overview page (`system-edit`) on a specific tab. Bumping the
-  // nonce re-applies the requested tab in the child even when the page is already
-  // shown or the same system is re-selected, so deep links and the blocker banner
-  // can force the Validation tab open.
+  // Open the System Overview page (`system-edit`) on a specific tab.
   function requestSystemTab(tab) {
     requestedSystemTab = tab === 'validation' ? 'validation' : 'settings';
     requestedSystemTabNonce += 1;
@@ -6592,9 +4976,8 @@
     });
   }
 
-  // Open the System Overview page on its Settings tab with the Modifiers section expanded
-  // and scrolled to (issue 1117). It goes through the SAME route-exit guard every other
-  // navigation here does, so leaving a dirty Checks draft still prompts.
+  // Open the System Overview page on its Settings tab with the Modifiers section expanded and
+  // scrolled to (issue 1117).
   function showSystemModifiers() {
     if (!selectedSystem) return;
     afterTruthyResult(confirmRouteExit('system-edit'), () => {
@@ -6604,9 +4987,7 @@
     });
   }
 
-  // The standalone overview route was folded into the System Overview page's
-  // Validation tab. Anything that asked for the old overview now opens this page
-  // with the Validation tab active.
+  // The standalone overview route was folded into the System Overview page's Validation tab.
   function showSystemOverview() {
     if (!selectedSystem) return;
     afterTruthyResult(confirmRouteExit('system-edit'), () => {
@@ -6615,17 +4996,8 @@
     });
   }
 
-  // Maps a system-validation issue `kind` to the manager's deep-link selection
-  // helper + the view it routes to. This is the single source of truth the
-  // overview deep-links and the deep-link drift test both read, so an issue
-  // `nav.view`/`kind` the aggregator can emit always resolves to a real view
-  // token (the `system` kind is the overview itself and carries no deep link).
-  //
-  // `targetId(issue)` picks the id the selection helper can actually resolve:
-  // recipe/salvage use the entity's own id, but the environment editor selects
-  // by ENVIRONMENT id, so environment/task/event deep-links use the issue's
-  // `environmentId` (the task/event record id never resolves through
-  // `selectEnvironment`).
+  // Maps a system-validation issue `kind` to the manager's deep-link selection helper + the view it
+  // routes to.
   const OVERVIEW_DEEP_LINKS = {
     recipe: {
       view: 'recipe-edit',
@@ -6714,8 +5086,7 @@
   function essenceEditSaveLabel() {
     if (essenceEditSaving) return text('FABRICATE.Admin.Manager.Essence.Saving', 'Saving...');
     // `Save rules` on the rules screen, because that is what the screen holds: the identity the
-    // word "essence" names is a world record this route cannot write. The generic label survives
-    // for the state where the in-system record IS the essence.
+    // word "essence" names is a world record this route cannot write.
     return essenceRulesMode
       ? text('FABRICATE.Admin.Manager.Essence.SaveRules', 'Save rules')
       : text('FABRICATE.Admin.Manager.Essence.Save', 'Save essence');
@@ -6725,9 +5096,7 @@
     selectedRecipeId = recipeId;
   }
 
-  // Deep PLAIN clone for the recipe draft + baseline. Mirrors the gathering-task /
-  // event draft helpers: JSON round-trip strips reactivity and shared references so
-  // the dirty comparison and discard-revert are stable.
+  // Deep PLAIN clone for the recipe draft + baseline.
   function cloneRecipeDraft(source) {
     return source ? JSON.parse(JSON.stringify(source)) : null;
   }
@@ -6764,10 +5133,8 @@
     });
   }
 
-  // Commit the staged draft in a single updateRecipe call. allowIncomplete keeps a
-  // shell's empty ingredients/results from blocking the save. On success the
-  // baseline advances (clearing dirty) and we return to the browser; on failure the
-  // store toasts and we surface an in-view warning.
+  // Commit the staged draft in a single updateRecipe call. allowIncomplete keeps a shell's empty
+  // ingredients/results from blocking the save.
   async function saveRecipeDraft() {
     if (recipeEditSaving) return false;
     if (!recipeDraft?.id) return false;
@@ -6809,10 +5176,8 @@
     activeView = 'recipes';
   }
 
-  // The on/off toggle is the one immediate exception: enabling validates against the
-  // PERSISTED recipe, so it commits straight away (no staging, no dirty). On success
-  // both draft and baseline sync to the new state so it never registers as dirty; on
-  // failure the store toasts and we leave the toggle as-is.
+  // The on/off toggle is the one immediate exception: enabling validates against the PERSISTED
+  // recipe, so it commits straight away (no staging, no dirty).
   async function handleToggleRecipeEnabled() {
     if (!recipeDraft?.id) return;
     const next = recipeDraft.enabled === false;
@@ -6824,17 +5189,15 @@
       : recipeDraftBaseline;
   }
 
-  // Deep-link from the recipe editor's context rail to the Access screen, with THIS
-  // recipe selected. The rail is read-only: authoring a grant lives on the Access tab,
-  // which owns the canonical `recipe.access` editor.
+  // Deep-link from the recipe editor's context rail to the Access screen, with THIS recipe
+  // selected.
   function openRecipeAccess() {
     if (recipeDraft?.id) selectedRecipeIdForAccess = recipeDraft.id;
     openCraftingSection('access');
   }
 
-  // Remove ONE book from this recipe's membership (issue 511 many-to-many) — used
-  // by the Books & Scrolls tab's per-book unlink. Other linked books are kept. ADDING a
-  // recipe to a book is authored on Books & Scrolls, not here.
+  // Remove ONE book from this recipe's membership (issue 511 many-to-many) — used by the Books &
+  // Scrolls tab's per-book unlink.
   async function handleRemoveRecipeItem(recipeItemId) {
     const rid = recipeDraft?.id;
     if (!rid || !recipeItemId) return false;
@@ -6862,13 +5225,9 @@
     return true;
   }
 
-  // Enter multi-step: seed Step 1 from the draft's current top-level ingredients /
-  // results / tools so an already-craftable recipe stays craftable (the engine only
-  // falls back to top-level fields when the steps array is empty). New/empty recipes
-  // simply start with one named, empty step.
-  // Draft-staged steps need a stable id up front: step-scoped edits (ingredient
-  // sets, results, tools, duration) route by step id, and the store only assigns
-  // ids on save. Without one, an id-less step's edits misroute to the recipe scope.
+  // Enter multi-step: seed Step 1 from the draft's current top-level ingredients / results / tools
+  // so an already-craftable recipe stays craftable (the engine only falls back to top-level fields
+  // when the steps array is empty).
   function newStepId() {
     return (
       globalThis.foundry?.utils?.randomID?.() || `step-${Math.random().toString(36).slice(2, 10)}`
@@ -6910,10 +5269,8 @@
     return Array.isArray(recipeDraft?.steps) ? [...recipeDraft.steps] : [];
   }
 
-  // Locking persists immediately (like enable) and is NEVER gated in either
-  // direction — a GM locks a recipe precisely while it is unfinished, which is the
-  // explicit contrast with toggleRecipeEnabled. Draft AND baseline both advance so a
-  // lock never registers as an unsaved recipe edit.
+  // Locking persists immediately (like enable) and is NEVER gated in either direction — a GM locks
+  // a recipe precisely while it is unfinished.
   async function handleToggleRecipeLocked(next) {
     if (!recipeDraft?.id) return;
     const ok = await store.toggleRecipeLocked?.(recipeDraft.id, next === true);
@@ -6954,10 +5311,7 @@
     return true;
   }
 
-  // Deleting a step removes the whole step (its ingredients, results, and tools), so
-  // warn with wording contextual to the tab the delete came from
-  // ('overview' | 'ingredients' | 'results' | 'tools'). Removing the last step
-  // reverts to single-step (empty steps array → top-level fallback). Then stage it.
+  // Deleting a step removes the whole step (its ingredients, results, and tools).
   async function handleDeleteStep(stepId, context = 'overview') {
     if (!recipeDraft) return false;
     const steps = currentSteps();
@@ -6999,9 +5353,8 @@
   function editEssence(essenceId = selectedEssence?.id) {
     if (!essenceId || !canShowEssences) return;
     if (currentView === 'essence-edit' && essenceId === selectedEssenceId) return;
-    // The target id is what lets the essence guard tell "re-entering this editor" from
-    // "switching to a different essence"; without it the guard would skip the discard
-    // prompt for the switch.
+    // The target id is what lets the essence guard tell "re-entering this editor" from "switching
+    // to a different essence"; without it the guard would skip the discard prompt for the switch.
     afterTruthyResult(confirmRouteExit('essence-edit', essenceId), () => {
       selectedEssenceId = essenceId;
       essenceEditDirty = false;
@@ -7015,17 +5368,8 @@
     selectSystem(systemId);
   }
 
-  // A newly created system is already SELECTED by the store, but the GM was left on the
-  // systems library looking at a list — one more click from the thing they just asked for,
-  // and with no signal about which row is the new one. Open its System Overview instead,
-  // on the Settings tab, exactly as `editSystem` does: a new system's first job is to be
-  // configured, and that is the page that configures it.
-  //
-  // This depends on the store's refresh staleness guard. The manager fires
-  // `fabricate.craftingSystemsChanged` from inside its own write, which schedules a refresh
-  // holding the PREVIOUS selection; before that guard existed the older run could publish
-  // last, so the new system appeared and then flicked back and this navigation landed on
-  // the system the GM started from.
+  // A newly created system is already SELECTED by the store, but the GM was left on the systems
+  // library looking at a list — one more click from the thing they just asked for.
   function createSystem() {
     afterTruthyResult(store.createSystem?.(), () => {
       requestSystemTab('settings');
@@ -7033,9 +5377,8 @@
     });
   }
 
-  // The store resolves the post-import report content (or null when the import was
-  // cancelled, failed, or skipped an existing system). Opening the report is driven by
-  // that content being present, so there is no separate open flag to fall out of sync.
+  // The store resolves the post-import report content (or null when the import was cancelled,
+  // failed, or skipped an existing system).
   async function importSystem() {
     importReportContent = (await store.importSystem?.()) ?? null;
   }
@@ -7060,17 +5403,13 @@
     store.deleteRecipe?.(recipeId);
   }
 
-  // Enabling is GATED: an incomplete recipe (or one with a conflicting signature) is
-  // refused. `options.onBlocked` is the library row's in-window flash claiming that
-  // refusal message; supplying it makes the store SUPPRESS its Foundry notification,
-  // so the GM is never told the same thing twice.
+  // Enabling is GATED: an incomplete recipe (or one with a conflicting signature) is refused.
   function toggleRecipeEnabled(recipeId, enabled, options) {
     store.toggleRecipeEnabled?.(recipeId, enabled, options);
   }
 
-  // A folder / whole-pack drop opens the mapping modal BEFORE importing so the GM can
-  // categorize + tag per folder; every other drop (single item, an empty or folderless
-  // drop) falls through to the unchanged one-shot import path in services.onDropItem.
+  // A folder / whole-pack drop opens the mapping modal BEFORE importing so the GM can categorize +
+  // tag per folder.
   async function dropComponent(data) {
     const plan = (await services?.collectImportFolderGroups?.(data)) || null;
     if (plan?.groups?.length) {
@@ -7078,9 +5417,8 @@
       importMappingOpen = true;
       return;
     }
-    // `handled` means the collector already notified (e.g. a compendium-directory folder
-    // groups packs, not items) and there is nothing to import — do NOT fall through to
-    // onDropItem, or it would fire a second toast for the same drop.
+    // `handled` means the collector already notified (e.g. a compendium-directory folder groups
+    // packs, not items) and there is nothing to import — do NOT fall through to onDropItem.
     if (plan?.handled) return;
     services?.onDropItem?.(data);
   }
@@ -7113,8 +5451,6 @@
   }
 
   // The salvage DC control's "Manage presets" deep link (issue 676, decision 7).
-  // Routed through setView so it passes confirmRouteExit like every other navigation
-  // — never by assigning `activeView`, which would silently discard a dirty draft.
   function openSalvageCheckPresets() {
     setView('checks');
   }
@@ -7135,13 +5471,7 @@
         ? { ...(updates || {}), difficulty: normalizeComponentDifficulty(componentDifficultyDraft) }
         : updates;
       // AND THE BASELINE THE EDITOR DREW TRAVELS WITH IT (issue 1371 r22-store4, the Foundry
-      // integrator's round-8 finding 1). A system-scope essence write is an OVERRIDE, and the
-      // rule tells a restatement of the editor's own seed from a real authored override by
-      // comparing against the baseline the caller states. This verb used to state none, so the
-      // rule fell back to "the caller was seeded from the read union" — true of this editor only
-      // while the item card's essence run WAS that union, which stopped being so when the card
-      // grew a narrowed display run beside it. `ComponentEditView` computes it from the rows it
-      // rendered, which is the only place that fact exists.
+      // integrator's round-8 finding 1).
       const result = await store.updateComponent?.(itemId, merged, { baseline });
       if (result === false) return false;
       componentEditDirty = false;
@@ -7160,19 +5490,15 @@
     services?.onReplaceSource?.(itemId, data);
   }
 
-  // Coerce a raw difficulty value to the persisted shape: an integer >= 1, or
-  // null (cleared) for blank / sub-1 / non-integer / invalid input. Used to both
-  // stage and compare the draft against the persisted component value.
+  // Coerce a raw difficulty value to the persisted shape: an integer >= 1, or null (cleared) for
+  // blank / sub-1 / non-integer / invalid input.
   function normalizeComponentDifficulty(value) {
     if (value === null || value === undefined || String(value).trim() === '') return null;
     const numeric = Math.trunc(Number(value));
     return Number.isFinite(numeric) && numeric >= 1 ? numeric : null;
   }
 
-  // Stage a progressive-difficulty edit from the right inspector. This does NOT
-  // persist — the value rides along with the component editor's draft and is
-  // written on Save (see saveComponentEdit), so its dirty state and the Save
-  // button stay in sync with the rest of the editor.
+  // Stage a progressive-difficulty edit from the right inspector.
   function stageComponentDifficulty(value) {
     componentDifficultyDraft = value;
   }
@@ -7200,65 +5526,13 @@
   }
 
   // ── EMPTYING A BULK SELECTION (issue 1157) ───────────────────────────────────────
-  //
-  // Every action that empties a bulk selection unmounts the panel it was performed FROM.
-  // The three that do it are Clear (the toolbar's and the panel header's, which are one
-  // action reached two ways), a successful set delete, and a successful Apply — and all
-  // three left the GM with focus on `document.body` and nothing announced.
-  //
-  // Both halves are owned HERE rather than by a panel or a browser, and for the same
-  // reason the bulk drafts are: the panel is destroyed by the very transition that has to
-  // be reported. `BulkDeleteCard`'s own region closed the FAILURE half only, because on
-  // that path the card survives; on the success path there was nowhere left to speak
-  // from. This root outlives every one of them.
-  //
-  // ── THE REGION ───────────────────────────────────────────────────────────────────
-  // ONE polite region for the whole manager, rendered at the end of `.fabricate-manager`
-  // (see the markup) and mounted for the manager's whole life. Two live-region facts
-  // shape it, and both are already recorded on `BulkDeleteCard`:
-  //
-  //  - a region inserted into the DOM together with its text is not announced by most
-  //    screen readers, so this one exists from mount and is EMPTY until something is
-  //    said;
-  //  - re-inserting identical text announces nothing the second time, and "Selection
-  //    cleared." twice running is an ordinary GM gesture. The card solves this by having
-  //    its owner clear the outcome on the next arm; there is no equivalent moment here,
-  //    so the announcement is a NEW OBJECT every time and the markup keys its child node
-  //    on it. The node is destroyed and recreated rather than having its text rewritten,
-  //    which is a genuine insertion into the region on every announcement — the same
-  //    device a per-message node gives a live announcer.
-  //
-  // It is deliberately NOT a component. A new `.svelte` under `apps/manager/` is claimed
-  // by four hand-maintained mirrors (the view-lab case registry, the screenshot evidence
-  // map and its pinning test, and this suite's compile list), and one region rendered at
-  // one site is not the repeated control the shared-primitive rule exists for.
   let bulkSelectionAnnouncement = $state(null);
   // Orders the deferred announcements below against each other; see
   // `announceBulkSelectionEmptied`. Plain, not `$state`: nothing renders it.
   let bulkAnnouncementTicket = 0;
 
-  // The focus target: the studio's TOOLBAR — the `<section>` holding the filter rows and,
-  // as its last row, the selection register. It is a landmark with a per-studio accessible
-  // name ("Essence filters"), it is rendered whether or not anything is selected, and it
-  // survives every transition below, where the panel, the delete card and the toolbar's own
-  // Clear are all gone by the time focus needs somewhere to land.
-  //
-  // IT IS AN INERT TARGET, AND THAT IS THE POINT (review round, issue 1157). The hop first
-  // went to the toolbar's page-selection box, which is a real `<input type="checkbox">`
-  // whose `onchange` selects every rendered row: a GM who clicked Clear with the mouse and
-  // then pressed Space to scroll would have silently re-selected the whole page, with no
-  // visible focus indicator, because the box's only ring is `:focus-visible` and Chrome does
-  // not match that for programmatic focus after a pointer interaction. Landing on a
-  // `tabindex="-1"` section instead announces where the GM now is, leaves Space as scroll,
-  // and leaves every control of the register one Tab away.
-  //
-  // `tabindex="-1"` is also why the browser's results count was wrongly ruled out earlier as
-  // "a `<span>` nothing can focus": that attribute is the standard device for making a
-  // non-actionable element a focus target. The toolbar wins on the accessible name, not on
-  // focusability.
-  //
-  // These three are a hand-maintained mirror of the hooks the browser views put on their own
-  // toolbars; `manager-mounted.test.js` fails if one drifts.
+  // The focus target: the studio's TOOLBAR — the `<section>` holding the filter rows and, as its
+  // last row, the selection register.
   const BULK_SELECTION_TOOLBAR = {
     components: 'data-component-toolbar',
     essences: 'data-essence-toolbar',
@@ -7272,14 +5546,8 @@
   /**
    * Put the keyboard back on `studio`'s toolbar, and report whether it actually moved.
    *
-   * ONLY RESCUE FOCUS THE RE-RENDER ACTUALLY DROPPED. A GM who tabbed into the search field
-   * while an awaited write was in flight keeps their place; a control the re-render has
-   * detached is not somewhere they can still be, whatever the engine left `activeElement`
-   * pointing at (Chromium moves it to `<body>`, happy-dom can strand it on the removed node
-   * — `recipe-bulk-edit-panel-mounted.test.js` reports both shapes for exactly this reason).
-   *
    * @returns {boolean} true only when focus was moved, which is what decides whether the
-   *   announcement has a focus utterance to queue behind.
+   * announcement has a focus utterance to queue behind.
    */
   function focusBulkSelectionToolbar(studio) {
     if (typeof document === 'undefined') return false;
@@ -7294,20 +5562,13 @@
   }
 
   /**
-   * Report an emptied bulk selection: put the keyboard back on `studio`'s toolbar and
-   * announce `message` through the manager's region, IN THAT ORDER.
-   *
-   * The order is the whole point and it is not the obvious one — see
-   * `util/announceAfterFocus.js`, which owns it for this and for `BulkDeleteCard`. Assigning
-   * the announcement here, synchronously, is what the first cut did, and it puts a queued
-   * `polite` utterance in front of a focus change that cancels it.
+   * Report an emptied bulk selection: put the keyboard back on `studio`'s toolbar and announce
+   * `message` through the manager's region, IN THAT ORDER.
    */
   function announceBulkSelectionEmptied(studio, message) {
     const spoken = String(message || '');
-    // The ticket is what the delay costs: a sentence still waiting must never land on top of
-    // one asked for after it, or two actions inside the delay would leave the region holding
-    // the OLDER of the two — with a new node under it, so the GM would hear the wrong
-    // sentence rather than nothing. `BulkDeleteCard` carries the same guard.
+    // The ticket is what the delay costs: a sentence still waiting must never land on top of one
+    // asked for after it.
     bulkAnnouncementTicket += 1;
     const ticket = bulkAnnouncementTicket;
     announceAfterFocusMove(
@@ -7319,22 +5580,14 @@
     );
   }
 
-  // ── Bulk edit (issue 772) ────────────────────────────────────────────────────────
-  // The panel stages into a draft this root owns; NOTHING is written until Apply. The
-  // model's helpers are immutable, so the panel hands back a NEW draft rather than
-  // mutating this one — an in-place assumption would compile and silently do nothing.
+  // ── Bulk edit (issue 772) ──────────────────────────────────────────────────────── The panel
+  // stages into a draft this root owns; NOTHING is written until Apply.
   function stageComponentBulkDraft(next) {
     componentBulkDraft = next || createComponentBulkDraft();
   }
 
-  // Clearing the selection is the documented escape from a mode that hides unlink, delete
-  // and copy-source-UUID; the count reaching zero also discards the draft (see the effect
-  // above) and returns the rail to the single-component inspector.
-  //
-  // Every caller that empties the selection routes through here, so the announcement and
-  // the focus hop cannot be had by one exit and missed by another. `message` defaults to
-  // the noun-free clear sentence and is overridden by the delete and apply paths with the
-  // sentence they are already toasting, so the two audiences are told the same thing.
+  // Clearing the selection is the documented escape from a mode that hides unlink, delete and
+  // copy-source-UUID.
   function clearComponentBulkSelection(message = selectionClearedAnnouncement()) {
     componentBrowserState.bulkSelectedComponentIds = new Set();
     announceBulkSelectionEmptied('components', message);
@@ -7344,29 +5597,21 @@
     if (componentBulkApplying) return false;
     const ids = componentBulkSelectedIds;
     if (ids.size === 0) return false;
-    // An unstaged axis is never sent. `essences` is present IFF the essence axis is
-    // staged and `difficulty` IFF the DC axis is — a staged all-zero map and a staged 0
-    // are REAL edits meaning "clear", so the write primitive tests key presence rather
-    // than truthiness and this projection must give it something to test.
+    // An unstaged axis is never sent.
     const edit = toBulkComponentEdit(componentBulkDraft);
     if (Object.keys(edit).length === 0) return false;
     componentBulkApplying = true;
     try {
-      // The store returns the write RESULT, never a bare boolean, so a `null` covers every
-      // no-write case in one test — including the optional call resolving to `undefined`
-      // because the action is absent, which a `=== false` check would have read as success.
+      // The store returns the write RESULT, never a bare boolean, so a `null` covers every no-write
+      // case in one test.
       const result = await store.applyComponentBulkEdit?.(ids, edit);
       if (!result) return false;
-      // The count the GM is told is the count that actually CHANGED, not the count they
-      // ticked: the write primitive compares each component before and after, so adding a
-      // tag three of five already carry updates two. Naming the selection size instead
-      // would report work that did not happen.
+      // The count the GM is told is the count that actually CHANGED, not the count they ticked: the
+      // write primitive compares each component before and after.
       const count = result.updated;
       const message = componentBulkAppliedMessage(count);
-      // One `save()` and one `refresh()` happened inside the store action, so the rows are
-      // already re-rendering; clearing the selection returns the rail to the inspector and
-      // the count-to-zero effect discards the draft. It also announces and re-homes focus,
-      // because the apply is one of the three actions that empties the selection.
+      // One `save()` and one `refresh()` happened inside the store action, so the rows are already
+      // re-rendering.
       clearComponentBulkSelection(message);
       notifyInfo(message);
       return true;
@@ -7375,15 +5620,8 @@
     }
   }
 
-  // Singular, on the same terms as the panel's own heading and Apply label: the threshold is
-  // `> 0`, so ONE ticked row is the advertised case, and this sentence is the only feedback
-  // that survives the panel unmounting on a successful apply — as a toast for the GM reading
-  // the screen and through the manager's live region for the one who is not.
-  //
-  // Zero is its own message rather than "applied to 0 components", which reads as a failure
-  // for what is a legitimate outcome — every selected component already matched the staged
-  // values. A guard chain rather than a nested ternary, which the SonarCloud gate reports as
-  // a new code smell.
+  // Singular, on the same terms as the panel's own heading and Apply label: the threshold is `> 0`,
+  // so ONE ticked row is the advertised case.
   function componentBulkAppliedMessage(count) {
     if (count === 0) {
       return text(
@@ -7403,10 +5641,7 @@
     ).replace('{count}', count);
   }
 
-  // The ARMED bulk delete's confirm step (issue 1129). The impact statement is rendered by
-  // the panel from `componentBulkDeleteImpact`; this only performs the write and reports what
-  // happened. The delete is warned, not blocked, so every selected component is deleted and
-  // nothing is skipped.
+  // The ARMED bulk delete's confirm step (issue 1129).
   async function deleteSelectedComponents(ids) {
     if (componentBulkDeleting) return false;
     const targets = Array.isArray(ids) ? ids : [];
@@ -7414,20 +5649,11 @@
     componentBulkDeleting = true;
     try {
       const result = await store.deleteComponents?.(targets);
-      // A FAILED write returns the store's zero result, which is an OBJECT and therefore
-      // truthy — `if (!result)` alone caught only the absent-action case and let a failed
-      // delete clear the selection and report "Deleted 0 component(s)" on top of the error
-      // toast the store already raised. Nothing was deleted, so nothing is announced and the
-      // selection stays put; the arm is dropped either way, because the GM's confirmation has
-      // been spent and a still-armed button would delete on the next single click.
+      // A FAILED write returns the store's zero result, which is an OBJECT and therefore truthy.
       const deleted = Number(result?.deleted) || 0;
       if (deleted === 0) {
-        // The card SURVIVES this path, so it is the one place the outcome can be spoken and
-        // the one control focus can be returned to. The sentence is the neutral one the
-        // recipe twin uses, because the two outcomes folded into this branch — a refused
-        // write, already toasted, and a concurrent client having deleted the same components
-        // — are indistinguishable from here, and "Failed" is false on the more reachable of
-        // the two.
+        // The card SURVIVES this path, so it is the one place the outcome can be spoken and the one
+        // control focus can be returned to.
         componentBulkDeleteOutcome = text(
           'FABRICATE.Admin.Manager.BulkEdit.DeleteNoneDeleted',
           'Nothing was deleted. The selection is unchanged.'
@@ -7439,27 +5665,18 @@
       notifyInfo(message);
       return true;
     } catch (err) {
-      // The store catches its own write failures, so reaching here means the failure was
-      // elsewhere. Swallowing it at the boundary keeps an unhandled rejection out of a click
-      // handler that has no caller to receive it.
+      // The store catches its own write failures, so reaching here means the failure was elsewhere.
       console.error('Fabricate | Failed to delete the selected components:', err);
       return false;
     } finally {
-      // Both live here so the comment above stays true on EVERY exit. `store.deleteComponents`
-      // catches its own write failures, but it resolves the system and its managed items
-      // OUTSIDE that try, so a rejection can reach this function — and a disarm sitting in the
-      // `try` after the await would be skipped, leaving an armed button that deletes on the
-      // next single click.
+      // Both live here so the comment above stays true on EVERY exit.
       componentBulkDeleteArmed = false;
       componentBulkDeleting = false;
     }
   }
 
-  // `recipesDisabled` is the most consequential outcome of the three — recipes the GM's
-  // players could craft this morning and cannot craft now — and the toast is the ONLY
-  // feedback that survives the panel unmounting on a successful delete. It is reported when
-  // non-zero, and the zero case takes the shorter sentence rather than trailing ", disabling
-  // 0 of them", which reads as a warning about nothing.
+  // `recipesDisabled` is the most consequential outcome of the three — recipes the GM's players
+  // could craft this morning and cannot craft now.
   function componentBulkDeletedMessage(result) {
     const disabled = Number(result?.recipesDisabled) || 0;
     const template =
@@ -7478,21 +5695,14 @@
       .replace('{disabled}', disabled);
   }
 
-  // ── Recipe bulk edit (issue 1010) ────────────────────────────────────────────────
-  // The twin of the block above. The panel stages into a draft this root owns; NOTHING is
-  // written until Apply, and the model's helpers are immutable, so the panel hands back a
-  // NEW draft rather than mutating this one.
+  // ── Recipe bulk edit (issue 1010) ──────────────────────────────────────────────── The twin of
+  // the block above.
   function stageRecipeBulkDraft(next) {
     recipeBulkDraft = next || createRecipeBulkDraft();
   }
 
-  // Clearing the selection is the documented escape from a mode that hides Edit, Duplicate
-  // and Delete; the count reaching zero also discards the draft (see the effect above) and
-  // returns the rail to the single-recipe inspector.
-  //
-  // The twin of `clearComponentBulkSelection` above, including its announcement and focus
-  // hop: see that function for why every exit that empties the selection routes through one
-  // place per studio.
+  // Clearing the selection is the documented escape from a mode that hides Edit, Duplicate and
+  // Delete.
   function clearRecipeBulkSelection(message = selectionClearedAnnouncement()) {
     recipeBrowserState.bulkSelectedRecipeIds = new Set();
     announceBulkSelectionEmptied('recipes', message);
@@ -7505,12 +5715,8 @@
     return text(manyKey, manyFallback).replace('{count}', count);
   }
 
-  // The book half of the post-apply report, reporting membership EDGES rather than the
-  // DEFINITIONS `booksUpdated` counts: the GM asked to put these recipes in that book, so
-  // "4 additions and 2 removals" answers them where "1 book updated" does not.
-  //
-  // Returns `''` when the batch created no edges, including for an unstaged book axis, so
-  // the caller composes it in exactly as it does the blocked and rejected sentences.
+  // The book half of the post-apply report, reporting membership EDGES rather than the DEFINITIONS
+  // `booksUpdated` counts: the GM asked to put these recipes in that book.
   function recipeBulkBooksMessage(result) {
     const added = Number(result?.bookAdditions) || 0;
     const removed = Number(result?.bookRemovals) || 0;
@@ -7530,9 +5736,8 @@
       'FABRICATE.Admin.Manager.Recipe.BulkEdit.AppliedBookRemovals',
       '{count} removals'
     );
-    // Three WHOLE sentences rather than one assembled around a localized " and ": a join
-    // word is the part of this string a translator is least able to place, and two of the
-    // three shapes never need one.
+    // Three WHOLE sentences rather than one assembled around a localized " and ": a join word is
+    // the part of this string a translator is least able to place.
     if (added > 0 && removed > 0) {
       return text(
         'FABRICATE.Admin.Manager.Recipe.BulkEdit.AppliedBooksBoth',
@@ -7553,27 +5758,15 @@
     ).replace('{removed}', removedText);
   }
 
-  // The post-apply report, and the AUTHORITY on the blocked count — the panel's pre-flight
-  // figure is only a lower bound, because it cannot see collisions the batch itself
-  // creates. `rejected` is named separately and is not an expected outcome: it counts
-  // recipes a persistence failure excluded from the batch entirely, each of which the write
-  // primitive logs, which is what makes "see the console" point at something real.
-  //
-  // Every sentence COMPOSES; none replaces another. The prototype swaps its books message
-  // in for its blocked message with a ternary, which would let a batch that touched books
-  // silently swallow the report that some recipes stayed off — the one outcome the GM
-  // cannot see by looking at the rows they just deselected.
+  // The post-apply report, and the AUTHORITY on the blocked count — the panel's pre-flight figure
+  // is only a lower bound, because it cannot see collisions the batch itself creates.
   function recipeBulkAppliedMessage(result) {
     const updated = Number(result?.updated) || 0;
     const blocked = Number(result?.blockedEnables) || 0;
     const rejected = Number(result?.rejected) || 0;
     const books = recipeBulkBooksMessage(result);
-    // Zero is its own message rather than "applied to 0 recipes", which reads as a failure
-    // for what is a legitimate outcome — every selected recipe already matched. It is
-    // SUPPRESSED when the batch moved book membership: `updated` counts recipes whose own
-    // fields changed, so a book-only edit legitimately changes none, and leading with "No
-    // recipes needed changing" ahead of "4 additions" reads as a contradiction rather than
-    // as the two distinct facts it is.
+    // Zero is its own message rather than "applied to 0 recipes", which reads as a failure for what
+    // is a legitimate outcome — every selected recipe already matched.
     const sentences = [];
     if (updated === 0 && !books) {
       sentences.push(
@@ -7616,20 +5809,7 @@
     return sentences.join(' ');
   }
 
-  // The ARMED bulk delete's confirm step (issue 1132). The impact statement is rendered by
-  // the panel from `recipeBulkDeleteImpact`; this only performs the write and reports what
-  // happened. The delete is warned, not blocked, so every resolvable selected recipe is
-  // deleted and nothing is skipped.
-  //
-  // FAILURE IS NOT SILENT, and this path is genuinely reachable: a GM whose
-  // `SETTINGS_MODIFY` has been explicitly revoked passes the client-side `_assertGM` gate
-  // and is then refused by the server. The store raises the error toast; this returns the
-  // card to IDLE — disarmed, not busy — with the selection intact, so the GM can see what
-  // they were about to delete and try again. A stuck spinner over a live selection would be
-  // worse than the failure.
-  // Arming CLEARS the previous outcome, so the card's live region is free to announce the
-  // next one. Without it a second refusal would re-insert identical text, which a live
-  // region does not speak.
+  // The ARMED bulk delete's confirm step (issue 1132).
   function armRecipeBulkDelete() {
     recipeBulkDeleteOutcome = '';
     recipeBulkDeleteArmed = true;
@@ -7654,23 +5834,11 @@
     recipeBulkDeleting = true;
     try {
       const result = await store.deleteRecipes?.(targets);
-      // A FAILED write returns the store's zero result, which is an OBJECT and therefore
-      // truthy — `if (!result)` would catch only the absent-action case and let a failed
-      // delete clear the selection and report "Deleted 0 recipe(s)" on top of the error
-      // toast the store already raised.
+      // A FAILED write returns the store's zero result, which is an OBJECT and therefore truthy.
       const deleted = Number(result?.deleted) || 0;
       if (deleted === 0) {
-        // The card survives this path, so the outcome is announced through the card's own
-        // live region and focus goes back to the control. The store has already raised the
-        // Foundry toast; a toast is not a live region, so without this the GM's keyboard is
-        // on `<body>` and nothing at all has been said.
-        //
-        // This branch covers TWO outcomes the store's own `deleteRecipes` cannot let this
-        // caller tell apart: a concurrent client already deleted the same recipes (a
-        // WARNING — nothing failed), and a refused write (an ERROR, already toasted). Both
-        // return the identical zero result, so a single neutral sentence is used rather than
-        // the "Failed" wording that was false on the more reachable of the two (issue 1132,
-        // review round 2).
+        // The card survives this path, so the outcome is announced through the card's own live
+        // region and focus goes back to the control.
         recipeBulkDeleteOutcome = text(
           'FABRICATE.Admin.Manager.BulkEdit.DeleteNoneDeleted',
           'Nothing was deleted. The selection is unchanged.'
@@ -7682,9 +5850,7 @@
       notifyInfo(message);
       return true;
     } catch (err) {
-      // The store catches its own write failures, so reaching here means the failure was
-      // elsewhere. Swallowing it at the boundary keeps an unhandled rejection out of a
-      // click handler that has no caller to receive it.
+      // The store catches its own write failures, so reaching here means the failure was elsewhere.
       console.error('Fabricate | Failed to delete the selected recipes:', err);
       recipeBulkDeleteOutcome = text(
         'FABRICATE.Admin.Manager.Recipe.BulkEdit.DeleteFailed',
@@ -7692,27 +5858,14 @@
       );
       return false;
     } finally {
-      // Both live here so the paragraph above stays true on EVERY exit. A disarm sitting in
-      // the `try` after the await would be skipped by a rejection, leaving an armed button
-      // that deletes on the next single click.
+      // Both live here so the paragraph above stays true on EVERY exit.
       recipeBulkDeleteArmed = false;
       recipeBulkDeleting = false;
     }
   }
 
   // The post-delete report, and the only feedback that survives the panel unmounting on a
-  // successful delete. Every NON-ZERO outcome is named, and each is omitted when zero rather
-  // than stated as ", removing them from 0 books & scrolls", which reads as a warning about
-  // nothing. The four-way table is explicit rather than assembled from a localized join
-  // word, which is the part of a sentence a translator is least able to place.
-  //
-  // IT REPORTS `recipeItemsAffected`, THE NUMBER THE CARD PROMISED — not
-  // `recipeItemsRewritten`, the definitions the write actually rewrote (review round). The
-  // two-number design is right and both names are right; surfacing the IMPLEMENTATION figure
-  // to the GM was the defect. On a legacy-basis system membership lives on the recipe and
-  // dies with it, so nothing is rewritten while the books really do stop containing the
-  // recipes: the card read "Will be removed from 1 book or scroll" and the toast then
-  // dropped the clause, making the operation look as though it had done less than it said.
+  // successful delete.
   function recipeBulkDeletedMessage(result) {
     const count = Number(result?.deleted) || 0;
     const items = Number(result?.recipeItemsAffected) || 0;
@@ -7749,24 +5902,17 @@
     if (recipeBulkApplying) return false;
     const ids = recipeBulkSelectedIds;
     if (ids.size === 0) return false;
-    // An unstaged axis is never sent. Three of the projected keys are FALSY BUT REAL —
-    // `enabled: false`, `locked: false` and `checkTierId: null` — so the write primitive
-    // tests key PRESENCE rather than truthiness, and this projection is what gives it
-    // something to test.
+    // An unstaged axis is never sent.
     const edit = toBulkRecipeEdit(recipeBulkDraft);
     if (Object.keys(edit).length === 0) return false;
     recipeBulkApplying = true;
     try {
-      // The store returns the write RESULT, never a bare boolean, so a `null` covers every
-      // no-write case in one test — including the optional call resolving to `undefined`
-      // because the action is absent, which a `=== false` check would have read as success.
+      // The store returns the write RESULT, never a bare boolean, so a `null` covers every no-write
+      // case in one test.
       const result = await store.applyRecipeBulkEdit?.(ids, edit);
       if (!result) return false;
       // One save and one refresh happened inside the store action, so the rows are already
-      // re-rendering; clearing the selection returns the rail to the single-recipe
-      // inspector and the count-to-zero effect discards the draft. The sentence below is the
-      // only feedback that survives the panel unmounting on a successful apply, so it is both
-      // toasted and announced through the manager's live region.
+      // re-rendering.
       const message = recipeBulkAppliedMessage(result);
       clearRecipeBulkSelection(message);
       notifyInfo(message);
@@ -7830,11 +5976,8 @@
             // The authored colour (issue 917) has to travel with the create call too, or a
             // new essence loses the colour the GM picked before its first save.
             updates.colorToken || null,
-            // …and so do the two fields issue 1036 added, for exactly the same reason: the
-            // editor can author both BEFORE the first save, so a create call that dropped
-            // them would silently discard an Enabled switch the GM turned off and a macro
-            // they had already dropped. Presence-gated on `Object.hasOwn` downstream, so
-            // `enabled: false` and a null macro are real instructions rather than absences.
+            // …and so do the two fields issue 1036 added, for exactly the same reason: the editor
+            // can author both BEFORE the first save.
             {
               enabled: updates.enabled !== false,
               ...(showEssencePropertyMacroUi
@@ -7856,9 +5999,8 @@
 
   function cancelEssenceEdit() {
     afterTruthyResult(confirmRouteExit('essences'), () => {
-      // A CLEAN draft never reaches `finishEssenceRouteExit`, so its `cancelEssenceDraft`
-      // call does not run for it. Calling it here too means Back always republishes the
-      // persisted projections, whichever branch the guard took.
+      // A CLEAN draft never reaches `finishEssenceRouteExit`, so its `cancelEssenceDraft` call does
+      // not run for it.
       store.cancelEssenceDraft?.();
       activeView = canShowEssences ? 'essences' : 'systems';
     });
@@ -7871,10 +6013,8 @@
 
   function removeEssence(essenceId = selectedEssence?.id) {
     if (!essenceId) return;
-    // `deleteEssence` (issue 1036) — the store's singular delete, renamed from
-    // `removeEssence` so it pairs with the new `deleteEssences` set delete. It returns a
-    // boolean and owns the impact-aware confirm dialog: the delete is warned, not blocked,
-    // so there is no component-usage guard to gate this call on.
+    // `deleteEssence` (issue 1036) — the store's singular delete, renamed from `removeEssence` so
+    // it pairs with the new `deleteEssences` set delete.
     store.deleteEssence?.(essenceId);
   }
 
@@ -7903,19 +6043,14 @@
 
   // ── Essence library actions (issue 1036) ─────────────────────────────────────────
 
-  // The row's enable switch. It routes through the store's `setEssenceEnabled`, which is
-  // ONE manager write and which REPORTS how many already-enabled recipes the disable just
-  // invalidated — disabling does not retro-disable a recipe, so without that count the
-  // consequence would be invisible until someone tried to re-enable one.
+  // The row's enable switch.
   function toggleEssenceEnabled(essenceId, enabled) {
     if (!essenceId) return;
     store.setEssenceEnabled?.(essenceId, enabled === true);
   }
 
-  // ── Essence bulk edit (issue 1036) ───────────────────────────────────────────────
-  // The panel stages into a draft this root owns; NOTHING is written until Apply, and the
-  // model's helpers are immutable, so the panel hands back a NEW draft rather than mutating
-  // this one. An in-place call would compile, run, and silently do nothing.
+  // ── Essence bulk edit (issue 1036) ─────────────────────────────────────────────── The panel
+  // stages into a draft this root owns; NOTHING is written until Apply.
   function stageEssenceBulkDraft(next) {
     essenceBulkDraft = next || createEssenceBulkDraft();
   }
@@ -7930,10 +6065,7 @@
     if (essenceBulkApplying) return false;
     const ids = essenceBulkSelectedIds;
     if (ids.size === 0) return false;
-    // An unstaged axis is never sent. Two of the projected keys are FALSY BUT REAL —
-    // `colorToken: null` (Clear colour) and `enabled: false` (Disable) — so the write
-    // primitive tests key PRESENCE rather than truthiness, and this projection is what
-    // gives it something to test.
+    // An unstaged axis is never sent.
     const edit = toBulkEssenceEdit(essenceBulkDraft);
     if (Object.keys(edit).length === 0) return false;
     essenceBulkApplying = true;
@@ -7950,13 +6082,6 @@
   }
 
   // The third of the three apply reports, on the same terms as its two siblings.
-  //
-  // ZERO IS ITS OWN SENTENCE (review round, issue 1157). `updated: 0` is reachable — every
-  // selected essence already matched the staged values — and it used to fall through to the
-  // plural branch and say "Updated 0 essences.", which reads as a failure for a legitimate
-  // outcome. That was survivable while the sentence was only a toast; this change makes it
-  // the SOLE SPOKEN OUTCOME of a successful action, so the branch both siblings already had
-  // is no longer optional here.
   function essenceBulkAppliedMessage(count) {
     if (count === 0) {
       return text(
@@ -7973,9 +6098,7 @@
     ).replace('{count}', count);
   }
 
-  // The ARMED bulk delete's confirm step. The impact statement is rendered by the panel
-  // from the same rows; this only performs the write and reports what happened. The delete
-  // is warned, not blocked, so every selected essence is deleted and nothing is skipped.
+  // The ARMED bulk delete's confirm step.
   async function deleteSelectedEssences(ids) {
     if (essenceBulkDeleting) return false;
     const targets = Array.isArray(ids) ? ids : [];
@@ -7983,12 +6106,7 @@
     essenceBulkDeleting = true;
     try {
       const result = await store.deleteEssences?.(targets);
-      // A FAILED write returns the store's zero result, which is an OBJECT and therefore
-      // truthy — `if (!result)` caught only the absent-action case and let a failed delete
-      // clear the selection and report "Deleted 0 essence(s)" on top of the error toast the
-      // store already raised. The component and recipe twins in this file carry the
-      // identical guard; nothing was deleted, so nothing is announced and the selection
-      // stays put.
+      // A FAILED write returns the store's zero result, which is an OBJECT and therefore truthy.
       const deleted = Number(result?.deleted) || 0;
       if (deleted === 0) {
         // The twin of the component branch above, and for the same reason: the card survives
@@ -8004,9 +6122,7 @@
       notifyInfo(message);
       return true;
     } catch (err) {
-      // The store catches its own write failures, so reaching here means the failure was
-      // elsewhere. Swallowing it at the boundary keeps an unhandled rejection out of a
-      // click handler that has no caller to receive it.
+      // The store catches its own write failures, so reaching here means the failure was elsewhere.
       console.error('Fabricate | Failed to delete the selected essences:', err);
       return false;
     } finally {
@@ -8017,11 +6133,8 @@
     }
   }
 
-  // `recipesDisabled` is the most consequential outcome of the three — recipes the GM's
-  // players could craft this morning and cannot craft now — and the toast is the ONLY
-  // feedback that survives the panel unmounting on a successful delete. It is reported when
-  // non-zero, and the zero case takes the shorter sentence rather than trailing ", disabling
-  // 0 of them", which reads as a warning about nothing. Mirrors `componentBulkDeletedMessage`.
+  // `recipesDisabled` is the most consequential outcome of the three — recipes the GM's players
+  // could craft this morning and cannot craft now.
   function essenceBulkDeletedMessage(result) {
     const disabled = Number(result?.recipesDisabled) || 0;
     const template =
@@ -8137,12 +6250,7 @@
       )) ?? true;
     if (!proceed) return false; // GM cancelled the match-loss warning — keep editing, no save error
     // Cleared here — once an attempt is actually committed to, and before the awaited store call
-    // (mirrors saveRecipeItemDraft). A retry that fails the same way writes a byte-identical
-    // string, which $state treats as clean, so the role="alert" region is never re-inserted and a
-    // screen reader announces nothing. Dropping it before the await lets the alert leave the DOM
-    // while the save is in flight and be re-inserted when the same failure recurs. It is
-    // deliberately NOT at the top of the function: the early returns above make no new attempt,
-    // and quietly removing a standing failure notice announces nothing at all in its place.
+    // (mirrors saveRecipeItemDraft).
     gatheringTaskSaveError = '';
     gatheringTaskSaving = true;
     try {
@@ -8279,9 +6387,7 @@
       )) ?? true;
     if (!proceed) return false; // GM cancelled the match-loss warning — keep editing, no save error
     // Cleared at the same point, and for the same reason, as in saveGatheringTaskDraft: an
-    // unchanged error string is not a DOM mutation, so a repeated identical failure would never
-    // re-announce — and the early returns above are left alone so a cancelled confirmation does
-    // not wipe a failure notice the GM has not yet acted on.
+    // unchanged error string is not a DOM mutation.
     gatheringEventSaveError = '';
     gatheringEventSaving = true;
     try {
@@ -8487,20 +6593,6 @@
   /**
    * The world Tool that ALREADY names `uuid` as its source Item, or `null`.
    *
-   * ── WHY THE UNION AND NOT A FIELD COMPARISON ────────────────────────────────────────────
-   * A world Tool can name its Item through three fields, and `getItemMatchUuids` is the shared
-   * walk over all three — the same one `definitionIndex` builds its source-reference facet with
-   * and the same one the read union matches on. A comparison written here against
-   * `registeredItemUuid` alone would be a fourth answer to a question the repository already
-   * answers once, and it would miss exactly the records that make this check matter: a Tool
-   * whose link was re-pointed keeps the previous uuid as an ALIAS, so the Item a GM is dragging
-   * may be reachable only through `aliasItemUuids`.
-   *
-   * READ OFF `entries` RATHER THAN `entities` because the caller needs `worldEnabled` too, and
-   * that is resolved by the projection through `isWorldEnabled` — an ABSENT flag means enabled,
-   * so a raw entity cannot answer it without restating that rule.
-   *
-   * @param {string} uuid The resolved source Item uuid.
    * @returns {object|null} The world scope entry, or `null` when no record names that Item.
    */
   function worldToolForSourceItem(uuid) {
@@ -8513,49 +6605,7 @@
     );
   }
 
-  /**
-   * Create a WORLD Tool from an Item dropped on the world Tools Catalogue, and open its entry.
-   *
-   * ── ONE GAME-WORLD ITEM IS ONE WORLD TOOL (issue 1373) ──────────────────────────────────
-   * The drop RESOLVES before it creates. Minting `store.randomID()` unconditionally made the
-   * same Item dropped twice into two world Tools with identical identity, and
-   * `worldScopeActions.createEntity` cannot catch that: it dedupes on the entity id, and the id
-   * is fresh every time. Both records then show up in every system's catalogue with nothing on
-   * any screen to say which one a recipe means.
-   *
-   * This is the rule the rest of the epic already keeps. `worldScopeEntityGrouping` groups the
-   * migration BY RESOLVED SOURCE ITEM so that one real Item becomes one world record, the
-   * system-scope path this zone replaced upserted rather than inserted, and copy-mode import
-   * reuses the world entity when the source item matches.
-   *
-   * A MATCH NAVIGATES AND SAYS SO, rather than silently doing nothing: a drop that appears to
-   * have no effect is precisely the defect this screen spent a round removing. A world-DISABLED
-   * record is reused on the same terms and told apart in the sentence — `enabled` is the world
-   * master switch, so landing on a Tool that does nothing without being told why is worse than
-   * being told, and a second record would strand the GM's own switch decision on the row they
-   * can no longer find.
-   *
-   * ── WHY THE RESOLUTION HAPPENS HERE ─────────────────────────────────────────────────────
-   * `worldScopeActions` reads no Foundry global by design, and a page cannot reach the
-   * services bag, so nothing below this file can turn a drag payload into a name, an image and
-   * a description. `services.resolveToolSource` is the seam that can; this is the one call
-   * site that has it AND can navigate afterwards.
-   *
-   * ── A DROPPED ITEM MAY BE A COMPENDIUM DOCUMENT ─────────────────────────────────────────
-   * `resolveDropUuid` covers both shipped drag shapes - `{uuid}` from the world sidebar and
-   * `{pack, id}` from a compendium, which carries NO `uuid` at all - and the snapshot resolver
-   * accepts either, because `documentName === 'Item'` is true of a pack document too. A guard
-   * that read `data.uuid` would refuse exactly the module-shipped content this is most often
-   * used on.
-   *
-   * ── NO INVENTED FALLBACK IMAGE ──────────────────────────────────────────────────────────
-   * `img` is written through from the resolved Item or left EMPTY. It is unvalidated by
-   * Foundry, so a guessed path 404s silently and leaves a broken tile with nothing to say why;
-   * an empty `img` makes `Medallion` draw the Tool glyph, which is a real answer.
-   *
-   * @param {object} data The raw drag payload.
-   * @returns {Promise<boolean>}
-   */
+  /** Create a WORLD Tool from an Item dropped on the world Tools Catalogue, and open its entry. */
   async function createWorldToolFromItemDrop(data) {
     if (!data) return false;
     const uuid = resolveDropUuid(data);
@@ -8586,24 +6636,10 @@
     return true;
   }
 
-  /**
-   * What a GM is told when their drop landed on a world Tool that already existed.
-   *
-   * TWO SENTENCES, not one with a clause, because the two states have different consequences:
-   * an enabled record is simply the one they were about to duplicate, while a world-DISABLED one
-   * is a Tool that no system can use until the switch on the screen they just arrived at moves.
-   *
-   * @param {object} entry The matched world scope entry.
-   * @returns {string}
-   */
+  /** What a GM is told when their drop landed on a world Tool that already existed. */
   function existingWorldToolMessage(entry) {
     const name = String(entry?.entity?.name || entry?.id || '');
-    // BOTH KEYS ARE WRITTEN OUT WHOLE rather than composed from a suffix. A composed key is a
-    // namespace BASE to the lang-key resolution gate, which can then only check that the base
-    // exists; a complete literal is checked against `en.json` for real. The branch costs two
-    // lines and buys the stronger assertion, which is the trade that gate's own note asks for.
-    // (Its filename is deliberately not written here: the manager source contract greps this
-    // file for bare Foundry global words, and one of them appears inside that path.)
+    // BOTH KEYS ARE WRITTEN OUT WHOLE rather than composed from a suffix.
     const message =
       entry?.worldEnabled === false
         ? text(
@@ -8617,49 +6653,8 @@
     return message.replace('{name}', name);
   }
 
-  /**
-   * RE-POINT a world Tool at another world Item, from the world Tool entry's linked-item
-   * card (issue 1373).
-   *
-   * ── WHY THE RESOLUTION IS HERE ──────────────────────────────────────────────────────────
-   * The same reason `createWorldToolFromItemDrop` above gives, and this is its sibling rather
-   * than a second design: `worldScopeActions` reads no Foundry global by design and a page
-   * cannot reach the services bag, so nothing below this file can turn a drag payload into a
-   * name, an image and a description. `resolveDropUuid` covers both shipped drag shapes,
-   * including the compendium `{pack, id}` payload that carries no `uuid` at all.
-   *
-   * ── THE SNAPSHOT IS REWRITTEN, WHICH IS WHAT "REPLACE THE LINKED SOURCE" MEANS ──────────
-   * `name`, `img` and `description` are the world record's snapshot OF the linked Item, so
-   * re-pointing the link and keeping the old Item's name would leave the catalogue naming a
-   * document the record no longer references. `img` is written through or left EMPTY — never
-   * guessed, because Foundry does not validate the path and a wrong one 404s silently.
-   *
-   * IT IS IMMEDIATE rather than staged into the entry's buffered draft, on the rule that
-   * screen already states: the draft buffers what the editor AUTHORS, and the source-link
-   * fields are not among them.
-   *
-   * @param {object} data The raw drag payload.
-   * @returns {Promise<boolean>}
-   */
-  /**
-   * The actors the world Tool entry's `Preview as` region offers.
-   *
-   * ── READ FROM THE STORE'S PUBLISHED `actorOptions`, THE ROSTER THE SYSTEM TOOL RULES EDITOR
-   * ALREADY READS. This used to call `services.getWorldActors`, and the services bag this root
-   * receives is the app's NARROWED one, which does not carry it: the optional chain answered
-   * `[]` and the picker offered `No actor` alone in every world.
-   *
-   * ── THE SAME PREDICATE THE CHECKS STUDIO'S PICKER USES, and for the same reason it states:
-   * a real world's actor directory is mostly bestiary, and a crafting Tool is wielded by a
-   * CHARACTER. Each published row carries `isPlayerCharacter`, stamped by the app service from
-   * the shared GM-configurable predicate, so the two pickers cannot disagree about who a player
-   * character is.
-   *
-   * KEYED BY UUID, carried in `id`: the page maps `id` onto the rail's `uuid`, and
-   * `worldToolPreviewRollData` below resolves the same UUID through the store.
-   *
-   * @type {Array<{id: string, name: string, img: string}>}
-   */
+  /** RE-POINT a world Tool at another world Item. */
+  /** The actors the world Tool entry's `Preview as` region offers. */
   const worldToolPreviewActors = $derived(
     currentView === 'world-tool-entry'
       ? ($viewState.actorOptions || [])
@@ -8672,17 +6667,7 @@
       : []
   );
 
-  /**
-   * ONE actor's prepared roll data, for resolving a Tool's world-default prerequisites.
-   *
-   * `null` for the `No actor` selection AND for an actor that no longer resolves, which are the
-   * same answer from the readout's point of view: nothing was evaluated. It must NOT degrade to
-   * `{}` — every `@` path would then resolve to zero and a numeric gate would read as FAILED
-   * rather than as unevaluated, which is a plausible wrong answer rather than a missing one.
-   *
-   * @param {string} actorUuid
-   * @returns {Promise<object|null>|null}
-   */
+  /** ONE actor's prepared roll data, for resolving a Tool's world-default prerequisites. */
   function worldToolPreviewRollData(actorUuid) {
     if (!actorUuid) return null;
     return store?.getActorRollData?.(actorUuid) ?? null;
@@ -8706,16 +6691,7 @@
     return patched === true;
   }
 
-  /**
-   * UNLINK a world Tool from its world Item.
-   *
-   * The three source-link fields are cleared and the SNAPSHOT is kept: `name`, `img` and
-   * `description` are what the catalogue and every system row render, so blanking them would
-   * turn an unlinked record into an unfindable one. The world entry says so on the card.
-   *
-   * @param {string} entityId
-   * @returns {Promise<boolean>}
-   */
+  /** UNLINK a world Tool from its world Item. */
   async function unlinkWorldToolSource(entityId) {
     if (!entityId) return false;
     const patched = await store?.worldScope?.tool?.updateEntity?.(entityId, {
@@ -8726,51 +6702,7 @@
     return patched === true;
   }
 
-  /**
-   * Whether a uuid names an Item EMBEDDED in another document (issue 1371).
-   *
-   * ── WHY THIS IS NOT A PREFIX TEST ───────────────────────────────────────────────────────
-   * Foundry composes an embedded uuid as `<parentUuid>.Item.<id>`, so the shapes are
-   * `Actor.a.Item.b`, `Scene.s.Token.t.Actor.a.Item.b` for an unlinked token's sheet, and
-   * `Compendium.p.Actor.a.Item.b`. A `startsWith('Actor.')` test catches only the first, and the
-   * token shape is exactly the one a GM reaches by dragging off a token sheet.
-   *
-   * ── AND WHY THE REASON IS NOT ROSTER MEMBERSHIP ─────────────────────────────────────────
-   * A compendium uuid is equally absent from the world Item roster and this zone ACCEPTS it. The
-   * reason is that an embedded Item is a per-actor — and for an unlinked token, per-scene-instance
-   * — COPY rather than a world-addressable definition source: its uuid dies with its parent, while
-   * a compendium Item resolves on every client.
-   *
-   * ── IT FAILS CLOSED, AND THE FAILURE IT GUARDS DIFFERS BY BUILD ────────────────────────
-   * THE NULL RETURN IS THE 14.365 STORY. On the VERIFIED build the parser does not throw: it
-   * RETURNS `null` — for a non-string input, for a relative uuid with no `relative` option, and
-   * for an odd embedded-part count — so a gate written as
-   * `Number(parse(uuid)?.embedded?.length) > 0` inside a try/catch reads every one of those as
-   * "not embedded" and ACCEPTS it, while the catch it relies on is unreachable there: every
-   * global the parser dereferences is present, and its prefix-tree lookup always answers a node.
-   * That is fail-OPEN wearing a fail-closed comment, which is why the null result is branched on
-   * explicitly rather than left to the catch.
-   *
-   * THE THROW IS THE 13.351 STORY, AND 13 IS THE DECLARED MINIMUM (`module.json`
-   * `compatibility.minimum`). The two builds guard the head of the function differently:
-   * 14.365 opens `if ( typeof uuid !== "string" ) return null;` and then returns `null` for a
-   * relative uuid with no `relative` option, while 13.351 opens `if ( !uuid ) return null;` and
-   * falls a relative uuid THROUGH to the split path. So on the minimum build a TRUTHY NON-STRING
-   * reaches `uuid.split(".")` and raises a `TypeError`. The try/catch is therefore a LIVE FLOOR
-   * on the minimum build rather than a hypothetical one, and deleting it as dead code would be
-   * true only of the verified build.
-   *
-   * (The refusal ANSWER is the same on both: the shapes this rejects are rejected by part count,
-   * which both builds compute identically, and `ItemDropZone.handleDrop` rejects a non-string
-   * uuid before it ever reaches here. The version split is about which guard is load-bearing,
-   * not about which uuids are accepted.)
-   *
-   * The parser reads three globals unguarded, which is why this lives here rather than in a pure
-   * module.
-   *
-   * @param {string} uuid
-   * @returns {boolean}
-   */
+  /** Whether a uuid names an Item EMBEDDED in another document (issue 1371). */
   function isEmbeddedItemUuid(uuid) {
     const parseUuid = globalThis.foundry?.utils?.parseUuid;
     if (typeof parseUuid !== 'function') return true;
@@ -8783,24 +6715,7 @@
     }
   }
 
-  /**
-   * The world component whose source-link fields already name one Item, or `null`.
-   *
-   * Matched through `getItemMatchUuids` over the record's THREE source fields, never by comparing
-   * `registeredItemUuid` alone. A record can name its Item through any of the three: the alias
-   * list is authored on the entry's own alias editor, and the `1.30.0` migration UNIONS all three
-   * across a merge group — so a component grouped with another under one elected id carries the
-   * other's uuid as an alias. An equality test on one field mints a duplicate for exactly those
-   * records.
-   *
-   * RE-POINTING IS NOT ONE OF THOSE ROUTES, and an earlier version of this note said it was:
-   * `relinkWorldComponentSource` writes `aliasItemUuids: []`, discarding the previous uuid, which
-   * is byte-identical to the merged tool handler. The behaviour here is right either way; the
-   * reason had to be corrected so a later lane does not rely on an invariant nothing maintains.
-   *
-   * @param {string} uuid The resolved source Item uuid.
-   * @returns {object|null}
-   */
+  /** The world component whose source-link fields already name one Item, or `null`. */
   function worldComponentForSourceItem(uuid) {
     const needle = String(uuid ?? '').trim();
     if (!needle) return null;
@@ -8811,41 +6726,10 @@
     );
   }
 
-  /**
-   * Create a WORLD component from an Item dropped on the world Component Catalogue, and open its
-   * entry (issue 1371).
-   *
-   * ── IT RESOLVES BEFORE IT MINTS ─────────────────────────────────────────────────────────
-   * `worldScopeActions.createEntity` dedupes on the entity id and the id is fresh every time, so
-   * an unresolved drop turns one world-scoped Item into two world components with identical
-   * identity, and nothing on any screen says which one a recipe means. A MATCH navigates and says
-   * so, rather than silently doing nothing.
-   *
-   * ── THE SNAPSHOT COMES FROM THE SHIPPED GENERIC RESOLVER ────────────────────────────────
-   * `services.resolveToolSource` IS `resolveItemSourceSnapshot`: it answers `{uuid, name, img,
-   * description}` for any Item document, world or compendium. No new service is minted for this,
-   * and specifically not a `resolveComponentSource`, which is already bound to the tool-breakage
-   * replacement source elsewhere in the engine and would collide by name.
-   *
-   * ── AN EMBEDDED ITEM IS REFUSED ─────────────────────────────────────────────────────────
-   * See `isEmbeddedItemUuid`. This is new behaviour on ONE zone: no shipped drop path refuses an
-   * embedded payload today.
-   *
-   * ── NO INVENTED FALLBACK IMAGE ──────────────────────────────────────────────────────────
-   * `img` is written through from the resolved Item or left EMPTY. It is unvalidated, so a guessed
-   * path 404s silently and leaves a broken tile with nothing to say why.
-   *
-   * @param {object} data The raw drag payload.
-   * @returns {Promise<boolean>}
-   */
+  /** Create a WORLD component from an Item dropped on the world Component Catalogue. */
   async function createWorldComponentFromItemDrop(data) {
     if (!data) return false;
     // The payload arrives UNRESOLVED, so the drop shape is normalised before anything reads it.
-    // A 14.365 compendium drag carries a FULL uuid — `Compendium.<scope>.<pack>.Item.<id>`, from
-    // `Compendium#_getEntryDragData` through `CompendiumCollection#getUuid` to `buildUuid` — and
-    // `{pack, id}` is the pre-v10 legacy shape `resolveDropUuid` still tolerates. Both reach here,
-    // and neither is embedded: the parser splices the pack triple AND the primary pair off before
-    // it reads `embedded`.
     const uuid = resolveDropUuid(data);
     if (!uuid) return false;
     if (isEmbeddedItemUuid(uuid)) {
@@ -8889,12 +6773,7 @@
     return true;
   }
 
-  /**
-   * RE-POINT a world component at a different world-scoped Item, from the entry's own card.
-   *
-   * @param {object} data The raw drag payload.
-   * @returns {Promise<boolean>}
-   */
+  /** RE-POINT a world component at a different world-scoped Item, from the entry's own card. */
   async function relinkWorldComponentSource(data) {
     const entityId = worldScopedEntryId;
     if (!entityId || !data) return false;
@@ -8922,16 +6801,7 @@
     return patched === true;
   }
 
-  /**
-   * UNLINK a world component from its world-scoped Item.
-   *
-   * The three source-link fields are cleared and the SNAPSHOT is kept: `name`, `img` and
-   * `description` are what the catalogue and every system row render, so blanking them would turn
-   * an unlinked record into an unfindable one.
-   *
-   * @param {string} entityId
-   * @returns {Promise<boolean>}
-   */
+  /** UNLINK a world component from its world-scoped Item. */
   async function unlinkWorldComponentSource(entityId) {
     if (!entityId) return false;
     const patched = await store?.worldScope?.component?.updateEntity?.(entityId, {
@@ -9098,14 +6968,7 @@
     });
   }
 
-  // World > Rules & Resources (issue 1311). UNGATED, exactly like Currency was on its own and
-  // like Travel, and for the same reason: the libraries have to be authorable before any
-  // crafting system references them.
-  //
-  // The destination travels as the route-exit subject id, because a Rules & Resources page is
-  // the "same group, different subject" case that parameter exists for — without it a
-  // navigation guard could not tell a real move apart from re-entering the page the GM is
-  // already on.
+  // World > Rules & Resources (issue 1311).
   const WORLD_RULES_ROUTES = Object.freeze({
     currency: 'world-currency',
     prerequisites: 'world-prerequisites',
@@ -9127,21 +6990,11 @@
   }
 
   // The cross-copy between the two libraries (issue 1308's `characterModifierPrerequisiteCopy`)
-  // used to be an in-page affair: both lists rendered on System Settings, so copying expanded
-  // the other section and scrolled to the new row. Across two sibling routes it is a
-  // NAVIGATION, which a page component cannot perform — so each page hands the source entry up
-  // and this pair owns the mapping, the write, the route change and the open request.
-  //
-  // The nonce is what makes the request re-assertable: copying the same entry twice must open it
-  // both times, and an id alone cannot say that it was asked for again.
+  // used to be an in-page affair: both lists rendered on System Settings.
   let worldRulesRequestOpenId = $state('');
   let worldRulesRequestOpenNonce = $state(0);
 
-  // The copy announcement moved up here with the handler. It used to live on the System Settings
-  // page beside both lists; once the copy became a NAVIGATION the source page unmounts, so an
-  // announcement rendered there would be torn down before a screen reader read it. The
-  // destination page scrolls to and focuses the new row, which is the sighted half of the same
-  // confirmation — this is the other half.
+  // The copy announcement moved up here with the handler.
   let worldRulesCopyAnnouncement = $state('');
   function announceWorldRulesCopy(name) {
     const label = String(name || '').trim();
@@ -9171,10 +7024,7 @@
   }
 
   function openWorldDowntime() {
-    // Issue 1257. The rail row does not render while the gate is shut, so this refusal is for
-    // every OTHER caller — a restored token, a future deep link, a test — and it is stated on
-    // the navigation rather than only on the markup for the same reason
-    // `openWorldTravelDestination` states its own destination allowlist.
+    // Issue 1257.
     if (!worldDowntimeAvailable) return;
     return afterTruthyResult(confirmRouteExit('world-downtime'), () => {
       railGroupUserExpanded.worldDowntime = true;
@@ -9189,30 +7039,13 @@
     if (!worldDowntimeAvailable) return;
     // The ACTIVE tab set, never a fixed list: whoever holds the surface decides what exists.
     if (!downtimeTabs.some((tab) => tab.id === tabId)) return;
-    // RE-ACTIVATION, not navigation. Clicking the sub-item for the tab already on screen used
-    // to do nothing at all, because Core had nothing to navigate to — but a companion whose
-    // tab is a list that drills into an editor does: the GM asking for a screen they are
-    // notionally already on means "take me back up to it".
-    //
-    // Core cannot act on that itself. The drill-down is inside the companion's own target and
-    // Core neither knows the level nor could restore it, so the click is OFFERED to the mount
-    // through a handler it registered, and Core's own behaviour is unchanged when no companion
-    // took it. That handler is what makes this DISTINGUISHABLE from a first mount, which is
-    // the property the seam needs: a re-activation pops one level, a mount initialises, and a
-    // signal a companion had to disambiguate by remembering whether it had mounted before
-    // would be wrong the first time a remount followed a drill-down.
-    //
-    // Deliberately NOT routed through `confirmRouteExit`: no route is being exited and no
-    // Core draft is at risk. Whether the companion's own unsaved work should stop it is the
-    // companion's question to ask, inside its handler.
+    // RE-ACTIVATION, not navigation.
     if (isWorldDowntimeRoute && worldDowntimeTabId === tabId) {
       downtimeChromeChannel.reselect();
       return;
     }
-    // The destination TAB travels as the route-exit subject id, because a Downtime tab is
-    // precisely the "same view token, different subject" case that parameter exists for. Without
-    // it a companion's navigation guard could not tell this apart from the parent rail item
-    // re-entering the route the GM is already on, which navigates nowhere and must not prompt.
+    // The destination TAB travels as the route-exit subject id, because a Downtime tab is precisely
+    // the "same view token, different subject" case that parameter exists for.
     return afterTruthyResult(confirmRouteExit('world-downtime', tabId), () => {
       worldDowntimeTabId = tabId;
       railGroupUserExpanded.worldDowntime = true;
@@ -9223,42 +7056,18 @@
   /**
    * A mounted companion asking Core to take the GM to another of its OWN tabs (issue 1332).
    *
-   * ROUTED THROUGH THE RAIL'S OWN HANDLER, never around it. A companion's programmatic request
-   * and a GM's click are the same navigation and must not come to mean different things: the
-   * tab already on screen re-activates rather than remounting, any other tab is offered to the
-   * companion's own `onBeforeNavigate` guard with reason `'tab'`, and an allowed move expands
-   * the group and commits the route. A second implementation would be a second set of those
-   * rules, correct on the day it was written.
-   *
-   * MEMBERSHIP COMES FROM THE REGISTERED PROVIDER, never from `downtimeTabs`. That chain
-   * answers "what is Core RENDERING", and it falls back to Core's own preview tab ids — which
-   * no companion registered. The window where the two differ is real rather than theoretical:
-   * between a companion's `unregister()` and Core's next render its mount is still the live
-   * one, and reading the rendered list there would hand a provider that no longer exists a
-   * working route onto Core's own screens.
-   *
-   * The two REFUSALS below are stated here rather than read back out of the handler, because
-   * the handler reports both by returning `undefined`, which is also what it returns when it
-   * re-activates and when there is no guard to ask. Reading its return for them would make a
-   * refusal indistinguishable from the two things that did exactly what was asked.
-   *
    * @param {string} tabId A tab id the live mount's own provider registered.
-   * @returns {boolean|Promise<boolean>} Whether the GM moved; a promise when the companion's
-   *   own guard answers asynchronously, so the answer is never a claim about an open dialog.
    */
   function navigateWorldDowntimeTab(tabId) {
     // A well-formed id this provider does not declare is `false`, not a throw: the tab set is a
-    // runtime fact that moves under a companion — a provider may re-register with a different
-    // one, and a conditional tab may not exist yet — so this is a question, not a defect. The
-    // channel has already thrown on a malformed id, which never is one.
+    // runtime fact that moves under a companion — a provider may re-register with a different one.
     if (!downtimeProvider?.tabs?.some((tab) => tab.id === tabId)) return false;
     // Issue 1257's gate, restated for the same reason `openWorldDowntime` restates it: the
     // route is unreachable while the gate is shut, so a companion cannot be routed onto it.
     if (!worldDowntimeAvailable) return false;
     const moved = openWorldDowntimePreview(tabId);
-    // `undefined` reaches here only from the re-activation branch or from a route exit with
-    // nothing to ask — both did what the companion asked, so both are `true`. Only an explicit
-    // `false` is a veto, which is the `=== false` reading every guard on this route uses.
+    // `undefined` reaches here only from the re-activation branch or from a route exit with nothing
+    // to ask — both did what the companion asked, so both are `true`.
     if (isPromise(moved)) return moved.then((value) => value !== false);
     return moved !== false;
   }
@@ -9313,26 +7122,12 @@
     const id = String(toolId);
     const opened = store?.openToolDraft?.(id, selectedSystemId) ?? false;
     // A WORLD TOOL THIS SYSTEM HAS NO RULES RECORD FOR CANNOT OPEN A DRAFT, and that is not a
-    // failure to swallow: it is precisely the state the inspector's `Add {tool} to {system}`
-    // action exists to answer. The subject is therefore RECORDED rather than discarded, so the
-    // panel can describe the Tool a GM just clicked instead of going empty on the one row that
-    // needs an affordance. Selecting an adopted Tool clears it, so only one is ever inspected.
+    // failure to swallow.
     unadoptedToolId = opened === false ? id : '';
     return opened;
   }
 
-  /**
-   * Adopt a world Tool into this system, and MOVE THE SELECTION ONTO THE RECORD IT CREATED.
-   *
-   * The second half is not polish. `unadoptedToolId` is what routes this panel to the
-   * `No rules here` / `Add {tool} to {system}` branch, and nothing clears it on its own - so
-   * without this the GM presses the button, the Tool becomes a member row in the list behind
-   * the panel, and the panel goes on offering to add a Tool that is already there.
-   * `selectLibraryTool` is the one clearer: the draft now opens because the record exists.
-   *
-   * @param {string} entityId The world tool entity id.
-   * @returns {Promise<boolean>}
-   */
+  /** Adopt a world Tool into this system, and MOVE THE SELECTION ONTO THE RECORD IT CREATED. */
   async function adoptWorldToolIntoSystem(entityId) {
     const adopted = await store?.worldScope?.tool?.addToSystem?.(entityId, selectedSystemId);
     if (adopted !== true) return false;
@@ -9352,43 +7147,18 @@
     return saved;
   }
 
-  /**
-   * STOP USING THE FOCUSED TOOL IN THE SELECTED SYSTEM (issue 1373).
-   *
-   * THE REPLACEMENT FOR THE EDITOR'S `Delete`, and a different action rather than a renamed one.
-   * `Delete` destroyed the crafting system's Tool record and nothing else, under a label that
-   * read as though it destroyed the Tool; the design puts `Delete` on the world entry, which is
-   * the record that word describes, and gives system scope this — the rules in ONE system, with
-   * the world Tool and every other system untouched. The store owns both halves of that.
-   *
-   * @returns {Promise<boolean>}
-   */
+  /** STOP USING THE FOCUSED TOOL IN THE SELECTED SYSTEM (issue 1373). */
   async function removeFocusedToolFromSystem() {
     const toolId = String(focusedToolDraft?.id || '');
     if (!toolId || !selectedSystemId) return false;
-    // NO `confirmDeleteTool` DIALOG, and that is not an omission. The control is an
-    // `ArmedDangerButton`: it already takes two deliberate presses, and the callout it sits in
-    // states the whole consequence in a sentence. `confirmDeleteTool` also asks `Delete <name>?`
-    // over a `Delete` button, which is the WORLD action's wording and the exact confusion this
-    // callout replaced. The service stays for the world Tool entry, which is where a real
-    // deletion is authored.
+    // NO `confirmDeleteTool` DIALOG, and that is not an omission.
     const removed = await store?.removeToolFromSystem?.(toolId, selectedSystemId);
     if (removed !== true) return false;
     activeView = 'tools';
     return true;
   }
 
-  /**
-   * Move ONE of the focused Tool's world-default sections between inheriting and overriding.
-   *
-   * Refused for an unpersisted draft on the same rule the enable switch already applies: both
-   * write the LIVE record, and there is no live record to write until the draft has been saved
-   * once.
-   *
-   * @param {string} section
-   * @param {boolean} inherit
-   * @returns {Promise<boolean>}
-   */
+  /** Move ONE of the focused Tool's world-default sections between inheriting and overriding. */
   async function setFocusedToolSectionInherited(section, inherit) {
     if (!focusedToolDraft?.id || $viewState.toolDraftBaseline === null) return false;
     return store?.setToolSectionInherited?.(
@@ -9407,9 +7177,7 @@
     openGatheringSection('environments');
   }
 
-  // Crafting nav group handlers (issue 511), mirroring the gathering group. Route
-  // exit runs through `confirmRouteExit` (the Manager confirm-discard guard) via
-  // `setView`/`afterTruthyResult`.
+  // Crafting nav group handlers (issue 511), mirroring the gathering group.
   function openCraftingSection(tabId = 'recipes') {
     const item = craftingNavItems.find((tab) => tab.id === tabId) || craftingNavItems[0];
     const nextView = item?.view || 'recipes';
@@ -9433,9 +7201,8 @@
     selectedRecipeItemId = recipeItemId;
   }
 
-  // The ItemPageInspector quick-limit toggle emits a boolean; turn it into the
-  // right caps patch for the active visibility mode (live-apply, no draft). Item
-  // mode caps uses; every other mode caps learning.
+  // The ItemPageInspector quick-limit toggle emits a boolean; turn it into the right caps patch for
+  // the active visibility mode (live-apply, no draft).
   function toggleRecipeItemQuickLimit(recipeItemId, limited) {
     const patch =
       craftingVisibilityMode === 'item'
@@ -9446,9 +7213,7 @@
     store.updateRecipeItemCaps?.(recipeItemId, patch);
   }
 
-  // Deep PLAIN clone for the recipe-item draft + baseline. Mirrors the recipe
-  // draft helpers: JSON round-trip strips reactivity and shared references so the
-  // dirty comparison and discard-revert are stable.
+  // Deep PLAIN clone for the recipe-item draft + baseline.
   function cloneRecipeItemDraft(source) {
     return source ? JSON.parse(JSON.stringify(source)) : null;
   }
@@ -9465,9 +7230,7 @@
     };
   }
 
-  // Recursively deep-merge a partial patch into the recipe-item draft. The editor
-  // emits nested caps patches (`{ caps: { item|learn: {...} } }`), so a shallow
-  // spread would clobber sibling cap fields; merge object values, replace scalars.
+  // Recursively deep-merge a partial patch into the recipe-item draft.
   function deepMergeDraft(base, patch) {
     const result = { ...(base || {}) };
     for (const [key, value] of Object.entries(patch || {})) {
@@ -9485,9 +7248,7 @@
     recipeItemDraft = deepMergeDraft(recipeItemDraft, patch);
   }
 
-  // Open the full-window recipe-item editor for a definition (recipe-item-edit
-  // route). Seeds both draft and baseline from the persisted projection and loads
-  // the world-item options so the Overview tab's item picker has candidates.
+  // Open the full-window recipe-item editor for a definition (recipe-item-edit route).
   function editRecipeItem(recipeItemId) {
     afterTruthyResult(confirmRouteExit('recipe-item-edit'), () => {
       selectedRecipeItemId = recipeItemId;
@@ -9513,9 +7274,8 @@
     recipeItemSaveFailed = false;
   }
 
-  // Commit the staged recipe-item draft in a single updateRecipeItemDefinition
-  // call (via the store's saveRecipeItem wrapper). On success the baseline advances
-  // (clearing dirty) and we return to Books & Scrolls; on failure we surface a flag.
+  // Commit the staged recipe-item draft in a single updateRecipeItemDefinition call (via the
+  // store's saveRecipeItem wrapper).
   async function saveRecipeItemDraft() {
     if (recipeItemEditSaving) return false;
     if (!recipeItemDraft?.id) return false;
@@ -9572,9 +7332,7 @@
     patchRecipeItemDraft({ originItemUuid: null });
   }
 
-  // Add / remove a recipe on the edited book. Membership lives on the book, so these
-  // STAGE into the recipe-item draft's `recipeIds` (persisted on Save, reverted on
-  // Discard) rather than editing the recipe directly — no "Recipe updated" toast.
+  // Add / remove a recipe on the edited book.
   function linkRecipeToItem(recipeId) {
     if (!recipeItemDraft?.id || !recipeId) return;
     // Function-local scratch: the draft is patched with the spread array below, so the Set
@@ -9593,11 +7351,7 @@
     patchRecipeItemDraft({ recipeIds: next });
   }
 
-  // Create a recipe item from a dropped world/compendium Item (issue 844). The
-  // Books & Scrolls surface resolves the drop to a UUID via `resolveDropData` and
-  // hands it here; we add + link the definition, then open its editor. This replaced
-  // the former picker modal, which was seeded only from the world-item list and so
-  // rendered an empty/unusable window in a fresh world with no world items.
+  // Create a recipe item from a dropped world/compendium Item (issue 844).
   async function dropRecipeItem(uuid) {
     if (!uuid) return;
     const created = await store.addRecipeItemFromUuid?.(selectedSystemId, uuid);
@@ -9699,27 +7453,7 @@
     };
   }
 
-  /**
-   * One of the three environment inspector counts, as the store computed it.
-   *
-   * All three now read a stored number with a zero fallback — the pattern
-   * `EnvironmentsBrowserView.svelte:394-398` already uses for the same fact. The
-   * `environmentComposedIds` fallback these three used to share is deleted, not moved:
-   *
-   * - It was **unreachable in practice.** `adminStore.js`'s `_buildEnvironmentState` writes a
-   *   finite entry into `environmentTaskCounts` for every environment in the same `listBySystem`
-   *   result this component iterates as `environmentList`, so the fallback arm could only be
-   *   taken for an environment absent from that map — never true for one the UI is rendering a
-   *   row for. No test exercises `data-environment-fact` at all.
-   * - Where it did run it was **wrong.** It worked only from the three id lists on the
-   *   environment object: structurally match-blind (no biome, danger, or condition evaluation)
-   *   and mode-blind (it unioned `enabled*Ids` with `forced*Ids` in both composition modes). It
-   *   was one of the disagreeing copies of the composition rule that issue 1321 collapses, and
-   *   this component cannot host the correct rule — it imports no gathering library data.
-   *
-   * Fixing it here would have meant new data wiring for an arm nothing reaches; the honest
-   * outcome is that the store is the single answer and this is a read of it.
-   */
+  /** One of the three environment inspector counts, as the store computed it. */
   function environmentStoredCount(environment, key) {
     const stored = $viewState.environmentTaskCounts?.[String(environment?.id || '')]?.[key];
     return Number.isFinite(stored) ? stored : 0;
@@ -9886,11 +7620,8 @@
     return 'var(--fab-drop-rate-legendary)';
   }
 
-  // The drop-rate input/blur/keydown trio that used to live here is gone with the
-  // hand-rolled slider it drove (issue 883). `ChanceSlider` owns those three handlers now,
-  // including the commit-on-blur behaviour: an empty field reverts to the model value on
-  // blur rather than being committed. The COUNT field below still hand-rolls them, because
-  // it is a bare numeric field with no slider and no shared control to render through.
+  // The drop-rate input/blur/keydown trio that used to live here is gone with the hand-rolled
+  // slider it drove (issue 883).
   function onGatheringDropCountInput(rowId, event) {
     const input = event.currentTarget;
     const normalized = String(input.value || '')
@@ -9993,43 +7724,15 @@
     });
   }
 
-  /**
-   * The environments a library gathering record is active in right now — the shared
-   * `activeEnvironmentsForRecord` seam, which owns composition (mode, match, forces,
-   * exclusions) AND the runtime weather/time-of-day gate.
-   *
-   * This is the single answer behind BOTH "Active environments" facts. They previously
-   * disagreed twice over: the task fact hand-rolled biome, weather and time inline over a
-   * `gatheringTaskAllowedInEnvironment` helper that applied `enabledTaskIds` as an allow-list in
-   * every mode and never read `forcedTaskIds`, and the event fact was `enabledEventIds.includes`
-   * and nothing else. Both are deleted; see issue 1321.
-   *
-   * Only the two SCOPING filters stay here, because they answer "which environments is this GM
-   * looking at" rather than "does this record compose": the disabled-environment filter and the
-   * system filter. The seam deliberately applies neither.
-   *
-   * `conditionSettings` is handed the raw SETTINGS object (`{weather: {enabled, current}, …}`),
-   * not a current-conditions shape — the module owns that conversion and needs the `enabled`
-   * flags the current shape does not carry.
-   *
-   * @param {object} record Library task or event.
-   * @param {'task' | 'event'} kind
-   * @param {object[]} scopedEnvironments Caller-scoped; see above.
-   */
+  /** The environments a library gathering record is active in right now. */
   function activeEnvironmentsForGatheringRecord(record, kind, scopedEnvironments) {
     return activeEnvironmentsForRecord(record, scopedEnvironments, kind, {
       conditionSettings: selectedGatheringSystemConfig.conditions,
     });
   }
 
-  // The `task.enabled === false` early return this used to open with is gone rather than kept as
-  // a second gate: `activeEnvironmentsForRecord` returns `[]` for a library-disabled record
-  // without inspecting an environment.
-  //
-  // The `|| selectedSystemId` in the system filter is PRESERVED from the shipped code, and is a
-  // deliberate asymmetry with the event fact below, which has no such fallback: a legacy
-  // environment with no `craftingSystemId` counts for tasks and not for events. Unifying the two
-  // would be a third behaviour change on top of this fact's two, and it is not this change's.
+  // The `task.enabled === false` early return this used to open with is gone rather than kept as a
+  // second gate.
   function activeGatheringTaskEnvironmentCount(task) {
     return activeEnvironmentsForGatheringRecord(
       task,
@@ -10099,10 +7802,7 @@
     );
   }
 
-  // `componentSourceState` lived here to tone the inline components inspector's source
-  // chip. That inspector is now `ComponentBrowserInspector` (issue 676), which derives
-  // its own linked badge, and the browser row derives its origin pill in
-  // `ComponentsBrowserView` — so the helper had no callers left.
+  // `componentSourceState` lived here to tone the inline components inspector's source chip.
 
   // No caller left. Deleting this and its two helpers (usageEvidenceItems,
   // salvageSummaryLabel) would strip the only readers of the twelve component Salvage* and
@@ -10227,10 +7927,7 @@
     ];
   }
 
-  // Component-category rows (issue 676). Shaped exactly like buildCategoryRows so the
-  // Tags & Categories screen can render both sections through one row component, but
-  // fed from its own vocabulary and its own usage map. `kind` distinguishes them for
-  // the removal-confirmation copy.
+  // Component-category rows (issue 676).
   function buildComponentCategoryRows(categories, usage, icons) {
     const generalName = text('FABRICATE.Common.General', 'General');
     const customRows = uniqueSorted(categories || []).map((category) => {
@@ -10296,25 +7993,9 @@
 >
   <!--
     The manager titlebar: a thin, always-present identity strip above the header.
-    Its right-hand end answers "how does the selected system resolve?" from every screen.
-    Its gold badge is the PREMIUM signal, and it appears only when a companion module has
-    registered with `managerExtensions` — in the free module the slot is simply empty.
   -->
   <!--
     THE TITLE BAND RENDERS ON THE TOOL ROUTES TOO (issue 1373).
-
-    It was gated `{#if !isToolStudioRoute}`, so the two screens the design draws this band on
-    most explicitly were the two that did not draw it: `Tool Rules` and its editor rendered
-    ~18px of empty ground where the reference states the selected system's resolution mode,
-    and the premium slot with it. Nothing about the band is route-specific - the gate below,
-    which suppresses the shared `.manager-header`, is, because both Tool routes render headers
-    of their own.
-
-    THE LEFT-HAND SYSTEM BADGE STAYS RETIRED. The reference puts the system's name here; issue
-    1185 moved it to the rail's crafting-system card because the strip was repeating it on
-    every one of the manager's ~20 routes, and re-adding it on two of them would restore the
-    duplication AND make those two disagree with the other eighteen. Recorded rather than
-    silently skipped.
   -->
   <div
     class="manager-titlebar"
@@ -10322,16 +8003,7 @@
     aria-label={text('FABRICATE.Admin.Manager.Titlebar.Label', 'Crafting manager')}
   >
     <!--
-    The layer-group icon and "Crafting Systems" product label used to lead this
-    strip, but the Foundry window's own title bar already names the app — a second
-    copy inside the window was duplicated chrome (issue 643).
-
-    The gold badge used to carry the SELECTED SYSTEM's name and no longer does (issue
-    1185): the rail's crafting-system card already names the selected system on every
-    screen, so the strip was repeating it. The slot now carries the one thing nothing
-    else in the chrome says — that a premium companion module is installed and connected
-    — and the rail's own PREMIUM chip steps down to a quiet marker in that state, so the
-    loud signal is stated exactly once.
+    The layer-group icon and "Crafting Systems" product label used to lead this strip.
   -->
     {#if premiumInstalled}
       <span
@@ -10365,11 +8037,7 @@
 
   {#if !isToolStudioRoute}
     <!--
-      Two children, always: the heading block and the trailing actions. The Downtime route
-      briefly led this header with a 42px glyph tile from the prototype, and it was removed
-      (issue 1185) because no other Manager route has one — consistency across the app beats
-      parity with one screen's mockup. It is also why `.manager-header`'s `space-between` can
-      be trusted again: a third child parked the heading in the middle of the row.
+      Two children, always: the heading block and the trailing actions.
     -->
     <header class="manager-header">
       <div class="manager-heading">
@@ -10378,27 +8046,12 @@
           aria-label={text('FABRICATE.Admin.Manager.Breadcrumbs', 'Breadcrumbs')}
         >
           <!--
-            TWO ROOTS, NOT ONE (issue 1322). `Crafting Systems` used to lead every trail in the
-            Manager, including the World ones, so a GM configuring their world's parties or
-            downtime read `Crafting Systems > World > ...` — which says World is a page inside a
-            crafting system. It is not: World routes are `every system`, as the rail's own
-            micro-label says, and several of them (Parties, Currency, Travel) are reachable
-            before any crafting system has opted into anything.
-
-            So the trail has two possible roots and this is the fork between them. A World route
-            is rooted at `World`; everything else is rooted at `Crafting Systems`. Neither is
-            nested under the other.
+            TWO ROOTS, NOT ONE (issue 1322).
           -->
           {#if isWorldRoute || isWorldDowntimeRoute || isWorldRulesRoute || isWorldTravelRoute || isWorldScopedRoute}
             <!--
               `World.Heading` is the RAIL's micro-label and is authored in caps for the
-              letter-spaced treatment there. A breadcrumb carries no `text-transform`, so
-              reusing it printed a literal "WORLD" mid-trail; this crumb has its own
-              Title Case key and the rail keeps its shout.
-
-              A BUTTON WHEREVER IT IS NOT THE LEAF, which is the same rule every other crumb in
-              this trail follows: an intermediate crumb navigates and the last one does not. On
-              World > Parties it IS the leaf and stays a span.
+               letter-spaced treatment there.
             -->
             {#if isWorldRoute}
               <span data-breadcrumb-world
@@ -10411,15 +8064,7 @@
             {/if}
             {#if isWorldScopedRoute}
               <!--
-                A CATALOGUE IS TWO CRUMBS AND AN ENTRY IS THREE, which is the prototype's own
-                `crumbFor` shape: a catalogue is `World > <screen>` because it IS a world screen
-                rather than a destination inside a group, and an entry is
-                `World > <catalogue> > <entity>` with the catalogue crumb CLICKABLE.
-
-                The middle crumb is not decoration. An entry editor is released to full width
-                and therefore renders no inspector, so this crumb is the only affordance that
-                takes the GM back to the list they came from — the same "a button wherever it is
-                not the leaf" rule the World crumb above follows.
+                A CATALOGUE IS TWO CRUMBS AND AN ENTRY IS THREE.
               -->
               <i class="fas fa-chevron-right" aria-hidden="true"></i>
               {#if worldScopedEntryRoute}
@@ -10465,25 +8110,7 @@
               <span>{text('FABRICATE.Admin.Manager.World.Downtime.Title', 'Downtime')}</span>
               <i class="fas fa-chevron-right" aria-hidden="true"></i>
               <!--
-                THE TAB CRUMB NAMES THE TAB, so it belongs to whoever owns the tab. The crumb
-                above it names the Downtime ROUTE, which Core owns in the rail too.
-
-                IT IS THE TAB'S REGISTERED BREADCRUMB AND NEVER THE RUNTIME ONE (issue 1322).
-                A companion whose tab is a list drilling into a detail publishes the detail's
-                name at runtime, and that used to REPLACE this crumb rather than extend it: a
-                GM inside a faction read `World > Downtime > Emberwatch`, with the tab they
-                were in missing from its own trail and nothing between Downtime and the leaf.
-                So this crumb reads past the runtime layer to the registration underneath,
-                which is what makes the trail grow by one instead of changing its last word.
-
-                AND IT IS A BUTTON, because a crumb that names a screen the GM can go back to
-                should take them there. Core cannot do that itself — the drill-down is inside
-                the companion's own target, and Core neither knows the level nor could restore
-                it — so this is the same re-activation the rail already offers when the GM
-                clicks the sub-item for the tab they are on, through the same channel. A
-                companion that registered no handler gets Core's own behaviour, which is
-                nothing, and the crumb is a span for that case rather than a button that does
-                nothing when pressed.
+                THE TAB CRUMB NAMES THE TAB, so it belongs to whoever owns the tab.
               -->
               {#if downtimeTabCrumbNavigable}
                 <button
@@ -10495,9 +8122,8 @@
                 <span data-breadcrumb-downtime-tab={worldDowntimeTabId}>{downtimeTabCrumb}</span>
               {/if}
               <!--
-                AND THE COMPANION'S OWN LEAF UNDER IT, when there is one and it says something
-                the tab crumb does not. A screen that restates the tab's own breadcrumb — which
-                is what the Tracking board does — must not draw the same word twice.
+                AND THE COMPANION'S OWN LEAF UNDER IT, when there is one and it says something the
+                 tab crumb does not.
               -->
               {#if downtimeLeafCrumb}
                 <i class="fas fa-chevron-right" aria-hidden="true"></i>
@@ -10707,10 +8333,7 @@
           {/if}
         </nav>
         <!--
-          The eyebrow sits between the trail and the title, which is the order the six deleted
-          section headers drew it in and the order `Kicker`'s own specimen draws. `Kicker` takes no
-          `class`, so the one-off bottom margin the eyebrow needs is the WRAPPER's, exactly as that
-          component's contract requires of a caller that needs layout.
+          The eyebrow sits between the trail and the title.
         -->
         {#if viewKicker()}
           <div class="manager-page-kicker">
@@ -10908,69 +8531,19 @@
         {/if}
       </div>
       <!--
-        World > Currency renders NO page-header actions (issue 1278). Its own two actions, Add
-        currency unit and Seed presets, live on the card header where they always did and where
-        the read-only provider gating that hides them is computed. Without this exclusion the
-        route falls through to the final `{:else}` below and offers Import / Export / Create —
-        which act on CRAFTING SYSTEMS, so "Create" on the currency page would create a crafting
-        system and "Export" would sit disabled against a selected-system id the route does not
-        even have.
+        World > Currency renders NO page-header actions (issue 1278).
       -->
       <!--
-        The world scoped-entity routes join that exclusion (issue 1362), for the identical
-        reason and with the identical consequence: they have no selected crafting system by
-        design, so the fallthrough's Create would create a crafting system and its Export would
-        sit permanently disabled against an id the route does not have. Each screen's own
-        actions belong on the surface that owns them, which PRs 6a-c and 7 build.
+        The world scoped-entity routes join that exclusion (issue 1362).
       -->
       <!--
         ONE WORLD SCOPED ROUTE IS BACK IN, AND IT IS A SEAM RATHER THAN A RELAXATION (issue 1372).
-
-        The exclusion above is about the FALLTHROUGH: a world scoped route has no selected crafting
-        system, so the final `{:else}` branch's Create would create a crafting system and its Export
-        would sit disabled against an id the route does not have. That reasoning is about the
-        DEFAULT branch, not about the band, and the Essence Catalogue needs the band: the prototype
-        puts its one `+ New essence` button in the header, right-aligned on the title line
-        (`essences.png`), and there is nowhere else on a released full-width route to put it that
-        does not cost the list a 60px form band.
-
-        The world essence ENTRY route joins it for the same reason and a sharper one. The prototype
-        heads that screen with `← Back` and a save action beside the essence's own name
-        (`essEntry.png`), and the shipped screen had NO way out of it but the breadcrumb: the page
-        renders a Back only in its entity-not-found empty state, so the one state a GM actually
-        reaches it in offered none.
-
-        `Save` JOINS IT (issue 1372, maintainer parity round 4), and the earlier note here — that
-        a Save could commit nothing because `patchIdentity` wrote on every change — has been
-        answered by changing the screen rather than the header: the editor buffers its edit now,
-        so there IS a dirty state, and `design-system/spec.md`'s EDITOR recipe orders "the action
-        pair with back before save" for every screen of that archetype. Both halves render through
-        `ScopedEntryHeaderActions`, which the world tool entry takes next.
-
-        So each route is admitted BY NAME and lands on its OWN branch below — neither reaches the
-        fallthrough — and the other five world scoped routes stay excluded exactly as before.
       -->
       {#if (currentView !== 'tools' && currentView !== 'tool-edit' && !isWorldRulesRoute && !isWorldScopedRoute) || currentView === 'world-essences' || currentView === 'world-essence-entry' || currentView === 'world-tool-entry' || currentView === 'world-component-entry'}
         <div class="manager-header-actions" aria-label={headerActionsLabel()}>
           {#if currentView === 'world-essence-entry'}
             <!--
               THE EDITOR ACTION PAIR, THROUGH THE SHARED COMPONENT (issue 1372, parity round 4).
-
-              `design-system/spec.md`'s EDITOR recipe orders "the action pair with back before
-              save", and the prototype draws exactly that on this screen (`essEntry.png`). The
-              world tool entry takes the same pair next, so it is one component rather than two
-              copies — two screens of one archetype rendering their action pair from two places
-              is the recipe drift that sentence exists to prevent.
-
-              THE BACK LABEL IS A SEPARATE KEY from the page's own `BackToCatalogue`, which reads
-              "Back to the catalogue". That phrase belongs to the entity-not-found empty state,
-              where it is the only thing on screen and has to say where it goes; in the header
-              band it sits beside a breadcrumb that already names the destination, and the
-              prototype writes it as one word.
-
-              BACK ROUTES THROUGH `setView`, which is what puts it through the same route-exit
-              gate as the rail and the breadcrumb — so an unsaved edit prompts whichever of the
-              three ways out a GM takes.
             -->
             <ScopedEntryHeaderActions
               backAttribute="data-world-essence-back"
@@ -10987,26 +8560,7 @@
             />
           {:else if currentView === 'world-tool-entry'}
             <!--
-              THE SAME PAIR, THROUGH THE SAME COMPONENT (issue 1373). The reference draws
-              `← Back to tools` and `Save tool` on this screen's title line
-              (`PROTO-tool-entry.png`), which is the EDITOR recipe's
-              "action pair with back before save" — so this is the second caller
-              `ScopedEntryHeaderActions` was extracted for rather than a copy of it.
-
-              THE HOOKS ARE PER SITE. The tests and the capture registry address this screen's
-              actions by their own names, which is why the component takes them as props.
-
-              BACK ROUTES THROUGH `setView`, which is what puts it through the same route-exit
-              gate as the rail and the breadcrumb — so an unsaved edit prompts whichever of the
-              three ways out a GM takes.
-
-              DELETE IS HERE, between them (issue 1373). It used to be a danger CARD on the
-              Overview tab, on the argument that a header button has nowhere to state the reach.
-              That argument was answered rather than overruled: the reach is the armed button's
-              accessible name and hover title, which is where a consequence belongs on a control
-              that has one — and the card idiom it borrowed is the SYSTEM rules editor's `Stop
-              using this Tool here`, so the two scopes had swapped their destructive treatments
-              and a GM met the same verb in two different places one route apart.
+              THE SAME PAIR, THROUGH THE SAME COMPONENT (issue 1373).
             -->
             <ScopedEntryHeaderActions
               backAttribute="data-world-tool-back"
@@ -11021,37 +8575,10 @@
             />
           {:else if currentView === 'world-component-entry'}
             <!--
-              THE THIRD CALLER OF THE SAME PAIR (issue 1371). `### Scoped entity editor patterns`
-              requirement 14 makes an explicit Save MANDATORY for a world entry editor and states
-              that the pair is ONE shared component rendered by this shell, because
-              `.manager-header` is a SIBLING of `.manager-main` and no page can render into it.
-              Until this branch existed the component entry was the only entry route with no way
-              to save at all.
-
-              DELETE IS NOT HERE (issue 1371, parity round 4). It was moved into this slot on the
-              world Tool entry's precedent, and the reference draws it as a `Delete from the world`
-              danger card at the FOOT of the Catalogue entry tab (`proto:928-936`) — which is also
-              the only placement that can state the reach, and the REFUSAL epic decision 7
-              requires, as visible body copy rather than only in an armed control's accessible
-              name. The card is the page's; this band carries Back and Save alone.
-
-              BACK ROUTES THROUGH `setView`, which is what puts it through the same route-exit gate
-              as the rail and the breadcrumb, so an unsaved edit prompts whichever of the three
-              ways out a GM takes.
+              THE THIRD CALLER OF THE SAME PAIR (issue 1371).
             -->
             <!--
-              THE UNSAVED MARKER, WHICH THE BAND HAD NOWHERE (`proto:817`, gap-list row 53). This
-              is an explicit-save screen, and the only thing that said so was `Save entry` going
-              from disabled to enabled — a state a GM reads as "the button woke up", not as "your
-              edit is not written yet". The reference draws a 7px warning dot and the words beside
-              the pair, and it is the only thing in the band that appears and disappears.
-
-              A SIBLING OF THE PAIR RATHER THAN A SLOT ON IT. `ScopedEntryHeaderActions` owns the
-              ORDER of back-and-save and nothing else, which is the reason its `danger` slot sits
-              BETWEEN them; a marker that is not one of the verbs would make that component the
-              union of its callers, which its own docblock declines. It reads the same
-              `worldComponentEntryDirty` the Save's disabled state does, so the two cannot
-              disagree.
+              THE UNSAVED MARKER, WHICH THE BAND HAD NOWHERE (`proto:817`, gap-list row 53).
             -->
             {#if worldComponentEntryDirty}
               <span class="manager-header-unsaved" data-world-component-entry-unsaved>
@@ -11074,13 +8601,7 @@
             />
           {:else if currentView === 'world-essences'}
             <!--
-              CREATE TAKES NO NAME FIELD. `mintEssenceId` slugs an id from the name and RESOLVES a
-              collision by suffix (`ash`, `ash-2`), so pressing this twice mints two records rather
-              than silently doing nothing the second time — which is the failure the page's old
-              name field existed to prevent and no longer can happen. The new essence opens
-              straight into its own world entry editor, which is where its name, icon, colour and
-              description are authored; a row called "New essence" left on the list would be a
-              record a GM has to go and find.
+              CREATE TAKES NO NAME FIELD.
             -->
             <ManagerButton role="primary" data-world-essence-create onclick={createWorldEssence}>
               <i class="fas fa-plus" aria-hidden="true"></i>
@@ -11089,12 +8610,7 @@
           {:else if currentView === 'world-downtime'}
             {#if downtimeCoreFallback}
               <!--
-                The design puts this promotional pill at the top of every Downtime screen, in
-                ADDITION to the hero's Patreon CTA. It is inert in the mockup — a fixed canvas
-                has nowhere to go — but a shipped control labelled "Unlock with Premium" that
-                does nothing is dead UI, so it carries the same subscription link as the hero.
-                It stays Core's own markup rather than a public action descriptor: its premium
-                treatment is Core copy about Core's product, not a shape to ask a companion for.
+                The design puts this promotional pill at the top of every Downtime screen.
               -->
               <ManagerButton
                 tag="a"
@@ -11115,10 +8631,7 @@
             {:else}
               <!--
                 The status chip leads the group, exactly where every Core editor puts its own
-                "Unsaved" chip, and renders through the SAME `Chip` primitive with the same
-                `truncate` — a companion's staged-changes indicator has to be the manager's
-                one chip, not a lookalike. Its text is already localized: Core renders the
-                strings a companion gives it, as it does for `title` and `subtitle`.
+                 "Unsaved" chip.
               -->
               {#if downtimeHeaderStatus}
                 <Chip
@@ -11241,9 +8754,8 @@
               <span>{text('FABRICATE.Admin.Manager.RecipeItem.Save', 'Save recipe item')}</span>
             </ManagerButton>
             <!--
-          An attempted-and-failed save is announced beside the control the GM just clicked
-          (issue 919). It trails the Save button so the wrapping toolbar drops it onto its
-          own line instead of shoving the "Unsaved" chip out of the row.
+          An attempted-and-failed save is announced beside the control the GM just clicked (issue
+           919).
         -->
             {#if recipeItemSaveFailed}
               <p class="manager-header-save-error" role="alert" data-recipe-item-save-error>
@@ -11571,15 +9083,7 @@
             {/if}
           {:else if currentView === 'system-edit'}
             <!--
-              `ghost` here rests on the VERB, not on a neighbour. Every other Back in this
-              container is a peer of a Save that outranks it, and is painted `ghost` for that
-              reason: the `recipe-edit` branch above, `ComponentEditorHeader` (which renders
-              its own Back into THIS div, for `component-edit` and `essence-edit`), and
-              `ToolEditView`, the maintainer's authority for what a manager button looks
-              like. The system editor has no Save to sit beside — it saves per field — so
-              Back is the lone action on this route. It is still the same verb, and a Back
-              that is neutral here and ghost on every other route is the drift this sweep
-              exists to end.
+              `ghost` here rests on the VERB, not on a neighbour.
             -->
             <ManagerButton role="ghost" data-system-edit-back onclick={backToSystemsBrowser}>
               <i class="fas fa-arrow-left" aria-hidden="true"></i>
@@ -11655,20 +9159,14 @@
       aria-label={text('FABRICATE.Admin.Manager.Navigation', 'Crafting manager navigation')}
     >
       <!--
-        Name the workspace before its scope controls. Every manager route, including
-        the Tool library/editor, shares this one rail branch.
+        Name the workspace before its scope controls. Every manager route.
       -->
       <p class="manager-rail-title" data-manager-rail-section>
         {text('FABRICATE.Admin.Manager.Nav.SectionLabel', 'GM management')}
       </p>
 
       <!--
-        The rail's crafting-system card. The kicker names what the card CONTAINS
-        ("Crafting system"), not the product — the product name is already on the
-        titlebar. The card is a real `<select>`, so the rail can switch system without
-        a round trip through the system library, and a back link out to that library.
-        The "GM management workspace" caption that used to hang below it is gone: the
-        rail's section label already names the workspace above this card.
+        The rail's crafting-system card.
       -->
       <section
         class="manager-rail-block"
@@ -11706,10 +9204,7 @@
               {/each}
             </select>
             <!--
-              The systems browser IS the destination this link returns to, so on that
-              view there is nowhere to go back to (issue 643): it renders faded and
-              inert (`disabled` + `aria-disabled` + `pointer-events: none`), and stays a
-              live control on every other view.
+              The systems browser IS the destination this link returns to.
             -->
             <button
               type="button"
@@ -11786,12 +9281,6 @@
           </button>
           <!--
             Crafting group is unconditional as of issue 745 (v1.3 headline).
-
-            The Tool Studio used to force this group open (`|| isToolStudioRoute`, issue
-            784) even though Tools is a top-level rail entry and has never been a Crafting
-            child. That pinned the group open on a screen that is not in it and left its
-            chevron inert — one of the five faces of the "refuses to minimize" report
-            (issue 1185). The rule is uniform now: only a Crafting SUB-ITEM locks it.
           -->
           <div class={`manager-nav-group ${railGroupExpanded.crafting ? 'is-expanded' : ''}`}>
             <button
@@ -11809,10 +9298,7 @@
               <span class="manager-nav-count">{craftingNavCount}</span>
             </button>
             <!--
-              Locked ⇒ genuinely `disabled`, with the reason on the control. A collapse that
-              would hide the screen the GM is standing on is the ONE case the rule forbids,
-              and a chevron that silently swallowed the click is what made the old behaviour
-              read as a bug rather than a constraint.
+              Locked ⇒ genuinely `disabled`, with the reason on the control.
             -->
             <button
               type="button"
@@ -11864,13 +9350,7 @@
             {/if}
           </div>
           <!--
-            SCREEN TITLE, NOT A DOMAIN NOUN (issue 1362). The three system entries are relabelled
-            `Component Rules` / `Essence Rules` / `Tool Rules` after the prototype, because the
-            world scope now owns a `Component catalogue` and a `Tools Catalogue` and an
-            unqualified `Components` no longer says which scope it means. The relation these
-            screens edit is a System Membership Record: no route token, setting key, code
-            identifier or persisted field takes the spelling `rules` for it, and the ROUTE
-            TOKENS are preserved unrenamed.
+            SCREEN TITLE, NOT A DOMAIN NOUN (issue 1362).
           -->
           <button
             type="button"
@@ -11899,11 +9379,7 @@
               >{text('FABRICATE.Admin.Manager.Nav.TagsCategories', 'Tags & Categories')}</span
             >
             <!--
-              The rail badge is the whole screen's vocabulary, so it sums the SAME
-              inclusive projection the tab badges and at-a-glance tiles read (issue 878).
-              It previously summed `selectedCounts`, which counts raw persisted arrays:
-              General was absent and component categories were omitted entirely, so the
-              rail read 5 beside tab badges of 3 / 1 / 3.
+              The rail badge is the whole screen's vocabulary.
             -->
             <span class="manager-nav-count"
               >{tagCategoryCounts.recipeCategories +
@@ -12150,35 +9626,7 @@
             </span>
           </div>
           <!--
-            The four world scoped-entity leaves (issue 1362, epic 1357), ABOVE Parties and in
-            the PROTOTYPE'S AUTHORED ORDER — Component catalogue, Tags & Categories, Essence
-            Catalogue, Tools Catalogue.
-
-            THREE ODDITIES IN THESE LABELS READ AS TYPOS AND NONE IS. `Component catalogue`
-            carries a lowercase `c` (authored three times in the prototype, including in its
-            breadcrumb map); `Tools Catalogue` is PLURAL where its siblings are singular; and
-            `Tags & Categories` is CHARACTER-FOR-CHARACTER IDENTICAL to the system-scope entry
-            further up this rail. The prototype is the authority for rail labels and order, and
-            `scripts/visual-parity/inventory.mjs` asserts landmark ORDER, so "correcting" any
-            of the three reds the parity gate this epic exists to establish.
-
-            The exact duplicate is also why NEITHER HARNESS may match a rail entry by visible
-            text any more: `:has-text("Tags")` now matches two buttons, `:has-text("Tools")`
-            matches `Tools Catalogue` as a substring, and `Components` has become
-            `Component Rules` while a `Component`-prefixed entry exists in both scopes. Every
-            rail button therefore carries a stable `id`, and both harnesses target those.
-
-            UNGATED and reachable with NO crafting system selected, like Parties, Travel and
-            Rules & Resources: the world catalogue has to be authorable before any system opts
-            into anything.
-
-            EVERY LEAF CARRIES AN EXPLICIT `aria-label`, which is not belt-and-braces here. The
-            collapsed rail hides `.manager-nav-label` and every trailing marker that reports on
-            the row's own contents — `.manager-nav-count`, `.manager-nav-planned` and
-            `.manager-nav-premium` (`styles/fabricate.css`) — so a collapsed leaf is left with
-            only an `aria-hidden` glyph, and without an explicit label the
-            button's accessible name is EMPTY at 56px, which is a state this PR ships a frame
-            of. Parties, Travel, Rules & Resources and Downtime all do the same.
+            The four world scoped-entity leaves (issue 1362, epic 1357).
           -->
           <button
             type="button"
@@ -12275,14 +9723,7 @@
             <span class="manager-nav-count">{travelParties.length}</span>
           </button>
           <!--
-            World > Travel (issue 1282). A GROUP, not a leaf, for the reason Downtime is one:
-            the route has two destinations — Realms and Map Region Links — and the rail is
-            where this Manager has always put a route's destinations. The group moved here
-            wholesale from the selected-system rail, because realms are world geography and a
-            crafting system now only decides whether it PARTICIPATES.
-
-            UNGATED, like Parties and Currency: the library has to be authorable before any
-            system opts into it.
+            World > Travel (issue 1282).
           -->
           <div
             class={`manager-nav-group manager-world-travel-group ${railGroupExpanded.worldTravel ? 'is-expanded' : ''}`}
@@ -12367,17 +9808,7 @@
             {/if}
           </div>
           <!--
-            World > Rules & Resources (issue 1311). A GROUP, for the reason Travel and Downtime
-            are: the route has several destinations, and the rail is where this Manager has
-            always put a route's destinations. Currency was a leaf only because it was the first
-            of the three to move to world scope; the character prerequisite library and the
-            modifier library joined it in issue 1308 and the three are one kind of thing.
-
-            UNGATED, like Parties and Travel: every one of these libraries has to be authorable
-            before any crafting system references it.
-
-            The count is the total across all three, because the parent stands for the group
-            rather than for any one destination.
+            World > Rules & Resources (issue 1311).
           -->
           <div
             class={`manager-nav-group manager-world-rules-group ${railGroupExpanded.worldRules ? 'is-expanded' : ''}`}
@@ -12480,25 +9911,8 @@
             {/if}
           </div>
           <!--
-            Downtime is a GROUP, not a leaf: the design nests the same four previews under it
-            that Core's own tab strip offers, each carrying a premium padlock. The structure
-            follows the shipped Travel group exactly — parent, disclosure toggle, submenu —
-            so the collapsed 56px rail hides the labels, the toggle and the whole submenu
-            without a rule of its own.
-
-            THE PREMIUM CHIP HAS ITS OWN CLASS (issue 1515). It used to ride
-            `.manager-nav-count` — a tier gate drawn through the record-count vehicle, which is
-            the one substitution the Rail Marker Family forbids, and it rode it only to inherit
-            the collapsed-rail hide. The hide now names `.manager-nav-premium` directly, so the
-            chip keeps the behaviour without borrowing the vehicle.
-
-            THE WHOLE GROUP IS EXPERIMENTAL-GATED (issue 1257), parent row, disclosure toggle
-            and submenu alike, and everything premium that rides them goes with it: the
-            `.manager-nav-premium` badge is a child of the parent button, the padlocks
-            are children of the sub-items, and the PREMIUM PREVIEW callout is a child of the
-            submenu. Nothing outside this group names Downtime — the title-bar badge answers
-            "is a companion module registered at all" across BOTH registries and is not this
-            route's signal, so it stays.
+            Downtime is a GROUP, not a leaf: the design nests the same four previews under it that
+             Core's own tab strip offers, each carrying a premium padlock.
           -->
           {#if worldDowntimeAvailable}
             <div
@@ -12532,14 +9946,7 @@
                   {text('FABRICATE.Admin.Manager.World.Downtime.Nav', 'Downtime')}
                 </span>
                 <!--
-                The chip is MUTED, never removed, once a companion holds the surface (issue
-                1185) — EXCEPT while a nonzero rollup shows (issue 1302), which REPLACES it
-                outright: the parent row's single trailing track carries either the chip or
-                the rollup, never both, so a second grid item never auto-places into an
-                implicit row under the icon. With premium installed the title bar carries the
-                loud gold signal, and two shouts of the same word is one too many — but the
-                rail still has to say which route premium provides. `is-installed` re-tones
-                the chip to a quiet accent marker and leaves its geometry alone.
+                The chip is MUTED, never removed, once a companion holds the surface (issue 1185).
               -->
                 {#if !downtimeNavRollupVisible}
                   <span
@@ -12550,9 +9957,7 @@
                   >
                 {/if}
                 <!--
-                The rollup — Core's own summary of what the closed disclosure is hiding,
-                identical in shape to the Checks parent badge. Renders in provider mode only,
-                and only while the children are hidden, in the parent's one trailing track.
+                The rollup — Core's own summary of what the closed disclosure is hiding.
               -->
                 {#if !downtimeCoreFallback}
                   {#if downtimeNavRollupVisible}
@@ -12601,15 +10006,6 @@
                   {#each downtimeNavItems as item (item.id)}
                     <!--
                     `accessibleName` and `tooltip` LAND HERE in provider mode (issue 1213).
-                    With no tab strip over a companion's screens this button is the only
-                    control naming the active screen, so the two fields the seam requires have
-                    to be consumed by it or Core would validate them and throw them away.
-                    `aria-label` REPLACES the visible label as the button's accessible name —
-                    the same contract the player seam's rail button already ships — so a
-                    provider's `accessibleName` must contain the label's text. In core-fallback
-                    it stays `undefined`: Core's preview keeps its strip, which is where Core's
-                    own accessible names and keyboard-visible tooltips already live, and this
-                    change touches nothing in that mode.
                   -->
                     <button
                       type="button"
@@ -12634,19 +10030,7 @@
                         >{downtimeTabText(item, 'label')}</span
                       >
                       <!--
-                      IT IS THE ISSUE-SUMMARY VEHICLE, not the record count (issue 1515). The
-                      discriminator the family states is that this mark carries a count AND
-                      names its unit in an `aria-label`, which is what the rollup on the parent
-                      row above does; the rollup is literally the sum of these badges, so the
-                      sum and its addends have to be the same mark. A record count is a bare
-                      numeral standing for Fabricate records, and a companion's badge is not
-                      that.
-
-                      A badge is a DESCRIPTION, never a name: it is a sibling of the label
-                      span above, and it is never nested inside it, because that span names
-                      the whole companion panel region (issue 1213) and a nested badge would
-                      silently rename the region. No `aria-describedby` is present above when
-                      no badge renders here — no dangling IDREF on a 3 → 0 transition.
+                      IT IS THE ISSUE-SUMMARY VEHICLE, not the record count (issue 1515).
                     -->
                       {#if !downtimeCoreFallback}
                         {@const badge = downtimeSubitemBadge(item)}
@@ -12693,30 +10077,7 @@
 
     {#if currentView === 'world-components'}
       <!--
-        The seven world scoped-entity routes (issue 1362). Each renders its own
-        `<main class="manager-main">` through the shared `ScopedPlaceholderPage`, carrying a
-        per-page `data-scoped-page` hook. These SEVEN FILES are what PRs 6a, 6b, 6c and 7
-        replace, which is the whole reason they are separate components rather than seven
-        branches of markup here.
-
-        AND THE ROUTE SEAM THOSE LANES CONSUME. A catalogue takes `onOpenEntry(entityId)` and an
-        entry takes the `entityId` it was opened on plus the way back to its catalogue. The
-        placeholder bodies use none of the four — they render an empty state — but the wiring is
-        here rather than in 6a/6b/6c because it is the SHELL that owns routing, the breadcrumb
-        and the confirm-discard gate.
-
-        AND THE DATA SEAM, ADDED HERE (issue 1374) FOR THE SAME REASON THE ROUTE SEAM WAS.
-        Issue 1362 wired the routes and handed the pages nothing to read: this corpus registers
-        no component context and exports no store singleton, so a declared prop is the only way
-        a page reaches the published world corpus or the world-scope write path. Six of the
-        seven take one of the three bundles declared above; the seventh, World Vocabulary, is
-        NOT a scoped entity — `### GM World Vocabulary Route` says so — so it takes its own
-        published state under its own name rather than a `scope`.
-
-        THE PLACEHOLDER BODIES DECLARE NO PROPS AT ALL, so every one of these values is inert
-        until the lane that replaces a body declares the ones it wants. That is the point: the
-        seam is open before the screens arrive, and no later lane has to reopen this file to
-        open it.
+        The seven world scoped-entity routes (issue 1362).
       -->
       <WorldComponentCataloguePage
         {...componentScopeProps}
@@ -12816,11 +10177,7 @@
       </main>
     {:else if isWorldCurrencyRoute}
       <!--
-        World > Currency renders its own `manager-main` straight from the root, following the
-        Downtime route rather than Parties: Parties reuses `EnvironmentsBrowserView` as its
-        container, which is a leftover from when it was a Travel tab and not a shape to copy.
-        There is no right-hand inspector — the unit editors expand in place, as they did on the
-        Settings tab they came from.
+        World > Currency renders its own `manager-main` straight from the root.
       -->
       <main
         class="manager-main"
@@ -12851,8 +10208,6 @@
     {:else if isWorldPrerequisitesRoute}
       <!--
         World > Character prerequisites (issue 1311), the second Rules & Resources destination.
-        Same shape as Currency above and for the same reasons: its own `manager-main` from the
-        root, no right-hand inspector, and the entry editors expand in place.
       -->
       <main class="manager-main" aria-label={worldRulesPageTitle}>
         <p class="visually-hidden" aria-live="polite" data-list-copy-announcement>
@@ -12893,14 +10248,7 @@
       </main>
     {:else if isWorldTravelRoute}
       <!--
-        World > Travel renders its own `manager-main` straight from the root, following
-        Currency and Downtime rather than Parties: Parties reuses `EnvironmentsBrowserView`
-        as its container, which is a leftover from when it was a Travel tab and not a shape
-        to copy.
-
-        Unlike Currency it KEEPS the right-hand inspector, because the realm detail pane IS
-        the authoring surface here — currency's unit editors expand in place, whereas a realm
-        is renamed, described and deleted from the inspector.
+        World > Travel renders its own `manager-main` straight from the root.
       -->
       <main
         class="manager-main"
@@ -13915,11 +11263,7 @@
                               )}</span
                             >
                             <!--
-                    The shared control (issue 883). This inspector used to hand-roll the same
-                    track/fill/range structure the drop ROWS render through `ChanceSlider`, and
-                    re-derive the same `--fab-drop-rate-value` / `--fab-drop-rate-color` inline.
-                    `min` stays 0 here: a task drop has a real "none" tier at 0, unlike a
-                    gathering event.
+                    The shared control (issue 883).
                   -->
                             <ChanceSlider
                               value={gatheringDropRateValue(selectedGatheringDrop)}
@@ -15900,16 +13244,6 @@
         {:else if currentView === 'essences' || currentView === 'essence-edit'}
           <!--
           Three mutually exclusive rail states, in priority order (issue 1036):
-
-           1. the EDITOR's live preview, which is where the prototype's 330px panel sits —
-              the shell already owns this column, so the editor does not grow a second one;
-           2. the BULK EDIT panel, which REPLACES the single-essence inspector for as long
-              as the selection is non-empty, at the same `> 0` threshold the Component and
-              Recipe Studios use;
-           3. `EssenceBrowserInspector`, extracted out of ~200 lines that used to be inlined
-              here.
-
-          The setup card and the no-selection empty state are unchanged and still last.
         -->
           {#if currentView === 'essence-edit' && essenceEditDraft}
             <EssenceBehaviorPreview
@@ -16067,11 +13401,8 @@
           {/if}
         {:else if currentView === 'components'}
           <!--
-          The bulk panel REPLACES the single-component inspector while the selection is
-          non-empty (issue 772) — the prototype's `bulkOn` / `bulkOff` swap, at its
-          `> 0` threshold. It sits FIRST so it wins over `selectedComponent`, which is
-          always truthy once the library has rows. The setup card below cannot be masked by
-          it: an empty `itemCards` forces an empty pruned selection.
+          The bulk panel REPLACES the single-component inspector while the selection is non-empty
+           (issue 772) — the prototype's `bulkOn` / `bulkOff` swap, at its `> 0` threshold.
         -->
           {#if componentBulkSelectionCount > 0}
             <ComponentBulkEditPanel
@@ -16098,14 +13429,7 @@
             />
           {:else if selectedComponent}
             <!--
-              THE WORLD FACTS THE IN-SYSTEM CARD CANNOT ANSWER (issue 1371, parity round 4). Three
-              of this inspector's blocks are about the relationship between the two scopes — how
-              many other systems share the identity, which tags came from the world and are not
-              muted here, and whether the category was inherited or set — and the read union
-              re-derives identity from the in-system record on every row, so none of them is
-              answerable from `selectedComponent`. They are resolved HERE, off the world
-              projection this route already holds, rather than handed the whole `scope` bundle:
-              a spread would subscribe the panel to an object that is new on every world edit.
+              THE WORLD FACTS THE IN-SYSTEM CARD CANNOT ANSWER (issue 1371, parity round 4).
             -->
             <ComponentBrowserInspector
               {selectedComponent}
@@ -16222,10 +13546,8 @@
           {/if}
         {:else if currentView === 'recipes'}
           <!--
-          The bulk panel REPLACES the single-recipe inspector while the selection is
-          non-empty (issue 1010), at the same `> 0` threshold the Component Studio uses. It
-          sits FIRST so it wins over `selectedRecipe`, which is always truthy once the
-          library has rows.
+          The bulk panel REPLACES the single-recipe inspector while the selection is non-empty
+           (issue 1010), at the same `> 0` threshold the Component Studio uses.
         -->
           {#if recipeBulkSelectionCount > 0}
             <RecipeBulkEditPanel
@@ -16549,29 +13871,6 @@
 
   <!--
     THE SYSTEM COMPONENT RULES LIST'S `Add from catalogue` PICKER (issue 1371, M9).
-
-    HOSTED HERE, beside the two import dialogs, for the reason those two are: `ManagerModal`
-    portals its panel to the nearest Fabricate application root, and a dialog rendered from
-    inside a view is destroyed the moment that view is swapped. This is the manager's third
-    dialog and its third mount at this level; it is not a new pattern.
-
-    IT PASSES THE COMPOSED WRITE, NOT THE RAW ONE. `store.worldScope.component.addToSystem` is
-    `joinComponentToSystem` — the verb that writes the membership record AND seeds the in-system
-    row. The generic membership-only write would leave every adopted component invisible to the
-    very list the GM adopted it into.
-
-    AND THE WIRE ANSWERS A STRICT BOOLEAN (issue 1371, r11). The optional chain is what makes an
-    unwired leg safe, and it is also what made this seam lie: `store?.…?.addToSystem?.(…)` answers
-    `undefined` — not `false` — when any link is absent, so the picker's refusal branch was
-    unreachable in exactly the case it exists for. `=== true` on the awaited answer collapses the
-    two into the one fact the dialog needs, which is whether the record was written.
-
-    AND THE WIRE WRITES TO THE SYSTEM THE RUN NAMES, NEVER THE LIVE SELECTION (issue 1371, r17).
-    The shared modal has no backdrop, so the rail's system select is clickable under an open
-    picker; `dismissOnOutsideClick` is refused while a run is in flight, and the selection then
-    moves under it. A wire reading `selectedSystemId` per call sent the rest of that run to the
-    system the GM had just moved to. The dialog pins its subject at run start and hands it down
-    as the second argument; this closure reads nothing of its own.
   -->
   <ComponentAddFromCatalogueDialog
     open={componentAddFromCatalogueOpen}
@@ -16584,23 +13883,7 @@
   />
 
   <!--
-    THE MANAGER'S ONE PERSISTENT LIVE REGION (issue 1157). It is the LAST child of
-    `.fabricate-manager` and is never conditionally rendered, so it outlives every view, every
-    browser and every bulk panel — which is the whole point: the actions it reports are the
-    ones that destroy the surface they were performed from.
-
-    It is EMPTY on mount. A region inserted into the DOM together with its text is not
-    announced by most screen readers, so the region has to be there first and the text has to
-    arrive later.
-
-    The child is KEYED ON THE ANNOUNCEMENT OBJECT, which `announceBulkSelectionEmptied`
-    replaces on every call. That is what makes "Selection cleared." speak the SECOND time:
-    re-inserting identical text announces nothing, so the node is destroyed and recreated
-    rather than having its text rewritten, and each announcement is a genuine insertion.
-    `aria-atomic` then has the region read as one sentence rather than as a diff.
-
-    `.visually-hidden` is declared under `.fabricate` in `styles/fabricate.css`, which
-    this element is inside; do not lift this region out of that root.
+    THE MANAGER'S ONE PERSISTENT LIVE REGION (issue 1157).
   -->
   <p
     class="visually-hidden"
@@ -16616,15 +13899,6 @@
 
 <!--
   THE WORLD TOOL ENTRY'S HEADER `Delete` (issue 1373).
-
-  Rendered into `ScopedEntryHeaderActions`' `danger` slot, which places it between `Back to
-  tools` and `Save tool` — the design's own order. The copy and the write are the PAGE's, and
-  arrive as a descriptor over `onDeleteChange`; what lives here is the arm token, because the
-  manager's invariant is one armed control at a time across the whole window.
-
-  THE COMPONENT ENTRY HAD A TWIN OF THIS SNIPPET AND NO LONGER DOES (issue 1371, parity round 4):
-  the reference deletes a catalogue entry from a danger CARD at the foot of its Catalogue entry
-  tab, which is where the reach and the refusal can be read rather than only heard.
 -->
 {#snippet worldToolDeleteAction()}
   <ArmedDangerButton
