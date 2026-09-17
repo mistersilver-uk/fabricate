@@ -18,7 +18,7 @@ Out of scope: what the module does, except that one narrow recovery; the CI chec
 - **target** — one publishable manifest-and-archive pair, each baking its own URLs.
 - **sources target** — a channel's own manifest and archive, at a stable, derivable path.
 It is what the tooling reads; on a private channel nothing installs from it and it is not anonymously readable.
-- **tester group** — a named cohort within a channel, served the same build through an unguessable URL.
+- **tester group** — a named cohort within a channel, served the same build through an unguessable URL derived from one segment shared by every repository publishing into it, under one secret name.
 - **cohort** — the clients installed from one target.
 - **channel head** — the version a channel's `latest` manifest currently advertises.
 - **prerelease line** — the branch that produces prerelease versions, and those versions.
@@ -117,12 +117,12 @@ The scheme does not by itself guarantee that a channel keeps offering updates wi
 
 Each channel is an independent distribution line, and ordering between channels is not meaningful and MUST NOT be relied on.
 A client installed from one channel MUST NOT be able to move to another channel in place; changing channel is an uninstall and a reinstall from the other channel's manifest URL.
-A private channel's targets MUST be reachable only with credentials, in the case of its sources target, or through an unguessable URL derived from a per-channel secret, in the case of a tester target.
+A private channel's targets MUST be reachable only with credentials, in the case of its sources target, or through an unguessable URL derived from a per-group secret, in the case of a tester target.
 A derivable path is not a private one: a private channel's sources target MUST NOT be anonymously readable, because that path is computable from published configuration.
-Each private channel MUST derive its tester URLs from its own secret.
+Each tester group MUST derive its tester URLs from its own secret.
 A publish MUST NOT write any target belonging to a channel it was not asked to publish.
-A channel that declares tester targets but has no secret configured MUST fail the publish rather than write a guessable path.
-A cohort's URL is immutable once distributed: rotating a channel's secret is a cohort migration, never hygiene.
+A channel that declares a tester group whose secret is not configured MUST fail the publish rather than write a guessable path.
+A cohort's URL is immutable once distributed: rotating a group's secret is a cohort migration, never hygiene.
 Publishing MUST NOT remove a target it has already published for a tester group.
 A target superseded by rotation keeps serving its last pre-rotation manifest, so no update is ever offered to its cohort and no error is surfaced — the cohort silently stops receiving updates rather than failing.
 Secret rotation MUST NOT be relied on as a lockout, because every artefact published to a superseded target stays reachable to anyone holding its URL.
@@ -143,6 +143,19 @@ A manifest a cohort holds MUST remain readable to that cohort: privacy is enforc
 
 - **WHEN** a user installed from one channel wants to be on another
 - **THEN** the only supported route is to uninstall and reinstall from the other channel's manifest URL
+
+### Requirement: Tester group identity
+
+A tester group MUST resolve to one path segment for every repository that publishes into it, so a cohort holds one URL prefix regardless of how many repositories serve modules to it.
+A given tester group's secret MUST be declared under the same environment-variable name in every repository publishing into it.
+A secret MAY serve more than one tester group; rotating it then rotates every group it serves together.
+Rotating a group's segment MUST rotate it for every repository publishing into that group, because a partial rotation splits one cohort across two prefixes.
+
+#### Scenario: rotating a tester group shared by two repositories
+
+- **WHEN** a tester group's segment is rotated
+- **THEN** every repository publishing into that group receives the same new segment
+- **AND** no repository is left serving the group's old segment while another serves the new one
 
 ### Requirement: Monotonic channel heads
 
