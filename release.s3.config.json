@@ -10,8 +10,8 @@
       "testerSecretEnv": "S3_TESTER_PATH_SECRET"
     },
     "early-access": {
-      "testerGroups": ["patrons-2026"],
-      "testerSecretEnv": "S3_EARLY_ACCESS_PATH_SECRET"
+      "testerGroups": ["guild-artisan-2026"],
+      "testerSecretEnv": "S3_GUILD_ARTISAN_PATH_SECRET"
     },
     "public": {
       "testerGroups": []
