@@ -1,13 +1,7 @@
 /**
- * Thin Foundry edge for GM-routed Interactable behaviour-state writes
- * (region-first model).
- *
- * The PURE routing decision (who applies, payload validation, GM-on-GM local
- * apply) lives in `interactableSocket.js`. This module is the Foundry glue: it
- * reads `game.users.activeGM` / `game.socket`, resolves the behaviour's
- * scene + region + behaviour id (and the linked-visual document), and performs
- * the actual `behavior.update(...)` / visual write. It is intentionally small so
- * the decision logic stays unit-testable without `game.*`.
+ * The Foundry glue for GM-routed interactable writes: it reads `game.users.activeGM` and
+ * `game.socket`, resolves the target from a ref, and performs the write. The routing decision and
+ * payload validation live in `interactableSocket.js`, testable without `game.*`.
  */
 
 import {
@@ -37,28 +31,14 @@ function isActiveGM() {
   return globalThis.game?.user === globalThis.game?.users?.activeGM;
 }
 
-/**
- * Resolve a region behaviour by scene + region + behaviour id. The active-GM
- * edge: walks `scene.regions.get(regionId).behaviors.get(behaviorId)`. Returns
- * null when any link is missing.
- *
- * @param {{ sceneId: string, regionId: string, behaviorId: string }} ref
- * @returns {object|null}
- */
+/** The active-GM edge: `scene.regions.get(...).behaviors.get(...)`, or null. */
 function resolveRegionBehavior({ sceneId, regionId, behaviorId } = {}) {
   const scene = globalThis.game?.scenes?.get?.(String(sceneId ?? ''));
   const region = scene?.regions?.get?.(String(regionId ?? ''));
   return region?.behaviors?.get?.(String(behaviorId ?? '')) ?? null;
 }
 
-/**
- * Public ref→behaviour resolver for the gathering rich-state service's
- * `resolveRegionBehavior` seam (issue 302). Resolves a live `fabricate.interactable`
- * Region Behaviour from a `{sceneId, regionId, behaviorId}` ref, or null. No-throw.
- *
- * @param {{sceneId:string, regionId:string, behaviorId:string}} ref
- * @returns {object|null}
- */
+/** Public resolver for the gathering service's `resolveRegionBehavior` seam (issue 302). */
 export function resolveInteractableBehaviorByRef(ref) {
   try {
     return resolveRegionBehavior(ref);
@@ -67,15 +47,7 @@ export function resolveInteractableBehaviorByRef(ref) {
   }
 }
 
-/**
- * GM-routed writer for an interactable's scoped node (issue 302). Routes a
- * `{ system: { node } }` behaviour write through the active GM (local apply on the
- * active GM, socket emit otherwise), addressing the behaviour by ref.
- *
- * @param {{sceneId:string, regionId:string, behaviorId:string}} ref
- * @param {{ node: object }} patch
- * @returns {void|Promise<void>}
- */
+/** GM-routed writer for an interactable's scoped `{ system: { node } }` by ref (issue 302). */
 export function writeInteractableBehaviorNode(ref, { node } = {}) {
   if (!ref) return;
   const writer = createInteractableBehaviorWriter({
@@ -91,14 +63,7 @@ export function writeInteractableBehaviorNode(ref, { node } = {}) {
   });
 }
 
-/**
- * Apply a behaviour-document update to a `fabricate.interactable` Region Behaviour
- * (the active-GM edge for `{ system: { state } }` and other behaviour writes).
- * No-throw.
- *
- * @param {{ sceneId: string, regionId: string, behaviorId: string, update: object }} args
- * @returns {Promise<void>}
- */
+/** The active-GM edge applying a behaviour-document update. No-throw. */
 export async function applyInteractableBehaviorUpdate({
   sceneId,
   regionId,
@@ -107,9 +72,8 @@ export async function applyInteractableBehaviorUpdate({
 } = {}) {
   const behavior = resolveRegionBehavior({ sceneId, regionId, behaviorId });
   if (!behavior?.update) return;
-  // Ownership guard: the resolved Region Behaviour must be a `fabricate.interactable`.
-  // Ref drift / uuid reuse / a crafted socket payload could otherwise mutate a
-  // foreign behaviour. Bail LOUDLY (not silently) so a rejected write is observable.
+  // Ownership guard: the resolved behaviour must be a `fabricate.interactable`, since ref drift,
+  // uuid reuse or a crafted payload could otherwise mutate a foreign one. Bail LOUDLY.
   if (!isInteractableRegionBehavior(behavior)) {
     console.warn(
       'Fabricate | Refused an interactable behaviour update: the resolved Region Behaviour is not a fabricate.interactable',
@@ -124,13 +88,7 @@ export async function applyInteractableBehaviorUpdate({
   }
 }
 
-/**
- * Resolve a linked-visual document (Tile/Drawing/Token) by uuid or by
- * scene+docId+documentName. Prefers `fromUuidSync` then a scene-embedded lookup.
- *
- * @param {{ sceneId?: string, visualUuid?: string|null, docId?: string|null, documentName?: string|null }} args
- * @returns {object|null}
- */
+/** Resolve a linked visual by uuid, else by scene plus docId and documentName. */
 function resolveLinkedVisualDoc({ sceneId, visualUuid, docId, documentName } = {}) {
   if (visualUuid) {
     try {
@@ -149,16 +107,7 @@ function resolveLinkedVisualDoc({ sceneId, visualUuid, docId, documentName } = {
   return null;
 }
 
-/**
- * Resolve the `fabricate.interactable` behaviour a visual claims to be linked to,
- * from the visual's reverse flag ref (`linkedRegionUuid` + `linkedBehaviorId`). The
- * Foundry edge for {@link visualLinkRoundTrips}: `fromUuidSync(regionUuid)` → the
- * Region → `behaviors.get(behaviorId)`. Returns null when the visual carries no
- * reverse flag or the behaviour cannot be resolved. No-throw.
- *
- * @param {object} doc  The resolved visual document.
- * @returns {object|null}
- */
+/** The Foundry edge for {@link visualLinkRoundTrips}: region uuid to behaviour. No-throw. */
 function resolveLinkedBehaviorForVisual(doc) {
   const ref = readLinkedVisualRef(doc);
   if (!ref) return null;
@@ -170,14 +119,7 @@ function resolveLinkedBehaviorForVisual(doc) {
   }
 }
 
-/**
- * Apply a linked-visual update (the active-GM edge for writing a linked
- * Tile/Drawing/Token, e.g. the relink reverse-flag write). No-throw, no-op when
- * the visual is missing.
- *
- * @param {object} args
- * @returns {Promise<void>}
- */
+/** The active-GM edge writing a linked visual. No-throw, and a no-op when it is missing. */
 export async function applyInteractableVisualUpdate({
   sceneId,
   visualUuid,
@@ -187,13 +129,8 @@ export async function applyInteractableVisualUpdate({
 } = {}) {
   const doc = resolveLinkedVisualDoc({ sceneId, visualUuid, docId, documentName });
   if (!doc?.update) return;
-  // Ownership guard: permit the relink provenance STAMP (writes no core data), or a
-  // core-data write only when the visual is GENUINELY bidirectionally linked to its
-  // behaviour — a reverse flag alone does not authorize a core write. This is
-  // defense-in-depth (see visualLinkRoundTrips): it raises the escalation from one
-  // message to a multi-message forge but does not fully close it, because the
-  // forward link is itself socket-writable; full closure needs socket sender
-  // authentication (issue 593). Any other write to a foreign/minted document is refused.
+  // Ownership guard (requirement 4): permit the provenance STAMP, which writes no core data, or a
+  // core-data write only on a genuine round trip.
   const behavior = resolveLinkedBehaviorForVisual(doc);
   if (!mayApplyInteractableVisualUpdate(doc, update, behavior)) {
     console.warn(
@@ -209,12 +146,7 @@ export async function applyInteractableVisualUpdate({
   }
 }
 
-/**
- * Delete a linked visual (terminal). No-throw, no-op when the visual is missing.
- *
- * @param {object} args
- * @returns {Promise<void>}
- */
+/** Terminal delete of a linked visual. No-throw, and a no-op when it is missing. */
 export async function applyInteractableVisualDelete({
   sceneId,
   visualUuid,
@@ -223,11 +155,8 @@ export async function applyInteractableVisualDelete({
 } = {}) {
   const doc = resolveLinkedVisualDoc({ sceneId, visualUuid, docId, documentName });
   if (!doc?.delete) return;
-  // Ownership guard: NEVER delete a document unless it is GENUINELY bidirectionally
-  // linked to its behaviour. A drifted/crafted uuid — or a minted reverse flag —
-  // could otherwise resolve to a foreign Tile/Drawing/Token and delete it outright.
-  // Defense-in-depth (see visualLinkRoundTrips): the forward link is itself
-  // socket-writable, so full closure of the escalation needs sender auth (issue 593).
+  // Ownership guard (same requirement): NEVER delete without a genuine round trip. A drifted or
+  // crafted uuid, or a minted reverse flag, could otherwise resolve to a foreign document.
   const behavior = resolveLinkedBehaviorForVisual(doc);
   if (!mayDeleteInteractableVisual(doc, behavior)) {
     console.warn(
@@ -243,15 +172,7 @@ export async function applyInteractableVisualDelete({
   }
 }
 
-/**
- * GM-routed linked-visual UPDATE seam: local apply on the active GM, socket emit
- * otherwise. Used for reverse linked-visual flag writes (relink). Standalone
- * export so the config panel's relink edge can route the reverse-flag write/clear
- * through the same active-GM seam.
- *
- * @param {{ sceneId: string, visualUuid: string, documentName: string, update: object }} args
- * @returns {void|Promise<void>}
- */
+/** GM-routed UPDATE seam, exported so the relink edge routes its flag write through it too. */
 export function emitInteractableVisualUpdate({ sceneId, visualUuid, documentName, update } = {}) {
   if (isActiveGM()) {
     return applyInteractableVisualUpdate({ sceneId, visualUuid, documentName, update });
@@ -265,14 +186,7 @@ export function emitInteractableVisualUpdate({ sceneId, visualUuid, documentName
   });
 }
 
-/**
- * GM-routed linked-visual DELETE seam: local apply on the active GM, socket emit
- * otherwise. Standalone export so the config panel's remove/delete edges can route
- * the visual delete through the same active-GM seam.
- *
- * @param {{ sceneId: string, visualUuid: string, documentName: string }} args
- * @returns {void|Promise<void>}
- */
+/** GM-routed linked-visual DELETE seam, exported for the config panel's remove edges. */
 export function emitInteractableVisualDelete({ sceneId, visualUuid, documentName } = {}) {
   if (isActiveGM()) {
     return applyInteractableVisualDelete({ sceneId, visualUuid, documentName });
@@ -285,15 +199,7 @@ export function emitInteractableVisualDelete({ sceneId, visualUuid, documentName
   });
 }
 
-/**
- * Build the `emitWrite(update)` seam for one region behaviour: it identifies the
- * behaviour ref and routes a behaviour `system` update through the GM (local apply
- * on the active GM, socket emit otherwise). Used by the GM config panel for state /
- * visual-link writes.
- *
- * @param {object} behavior The live `fabricate.interactable` Region Behaviour.
- * @returns {(update: object) => (void|Promise<void>)}
- */
+/** The `emitWrite(update)` seam for one behaviour, routing a `system` update through the GM. */
 export function emitInteractableBehaviorWrite(behavior) {
   const writer = createInteractableBehaviorWriter({
     isActiveGM,
@@ -313,27 +219,12 @@ export function emitInteractableBehaviorWrite(behavior) {
 }
 
 /**
- * Route an inbound `module.fabricate` socket payload for the region-first
- * Interactable actions: only the active GM applies the behaviour/visual write;
- * activation requests route to validate+grant; grants route to the targeted local
- * user. Called from main.js's shared `module.fabricate` socket handler (the same
- * channel the event coordinator uses), so this module owns these branches without
- * registering a second listener. No-ops for other actions.
- *
- * SENDER AUTHENTICATION (issue 593): Foundry's server attaches a TRUSTED,
- * non-forgeable sender user id as the SECOND callback argument of every custom
- * module socket broadcast (`dist/server/sockets.mjs handleCustomSocket` emits
- * `this.user.id` from the authenticated session), NOT from the client payload.
- * main.js threads it in as `deps.senderId` + `deps.isSenderGM(id)`. The privileged
- * edges are gated on the sender being a GM: VISUAL_UPDATE / VISUAL_DELETE are
- * fully GM-only; a non-GM BEHAVIOR_UPDATE is restricted to `system.node` writes;
- * ACTIVATE asserts the requesting user IS the sender; GRANTED/DENIED accept only a
- * GM sender.
- *
- * @param {object} payload
- * @param {object} [deps]
- * @param {string} [deps.senderId]  The server-attested socket sender's user id.
- * @param {(userId: string) => boolean} [deps.isSenderGM]  Resolve whether an id is a GM.
+ * Route an inbound `module.fabricate` payload, called from main.js's shared handler so this module
+ * owns its branches without a second listener.
+ * SENDER AUTHENTICATION (issue 593): the server attaches a trusted, non-forgeable sender id as the
+ * SECOND callback argument of a custom module broadcast, from the authenticated session rather
+ * than the payload. VISUAL_UPDATE and VISUAL_DELETE are GM-only, a non-GM BEHAVIOR_UPDATE is held
+ * to `system.node`, ACTIVATE asserts the requester IS the sender, GRANTED and DENIED need a GM.
  */
 export function handleInteractableSocketMessage(payload, deps = {}) {
   const action = payload?.action;
@@ -343,9 +234,7 @@ export function handleInteractableSocketMessage(payload, deps = {}) {
       ? deps.isSenderGM(senderId) === true
       : false;
 
-  // Region-first behaviour write (e.g. GM config panel → active GM `{ system: { state } }`).
-  // A GM sender may write any field; a non-GM sender is restricted to the scoped
-  // node pool by the router's `system.node`-only allowlist.
+  // Behaviour write. A GM sender may write any field; a non-GM is held to the scoped node pool.
   if (action === INTERACTABLE_BEHAVIOR_UPDATE) {
     void routeInteractableBehaviorMessage(payload, {
       isActiveGM,
@@ -355,9 +244,7 @@ export function handleInteractableSocketMessage(payload, deps = {}) {
     return;
   }
 
-  // Linked-visual write, e.g. the relink reverse-flag write. GM-only: the active GM
-  // applies, but ONLY when the server-attested sender is also a GM. A non-GM sender
-  // can mint no reverse flag and repoint no linked visual.
+  // Linked-visual write. GM-only, so a non-GM sender can mint no reverse flag and repoint nothing.
   if (action === INTERACTABLE_VISUAL_UPDATE) {
     if (isActiveGM()) {
       if (!senderIsGM) {
@@ -383,9 +270,7 @@ export function handleInteractableSocketMessage(payload, deps = {}) {
     return;
   }
 
-  // Activation request → active GM validates + grants. The validate/grant body is
-  // injected; the dispatch + active-GM gate live here. The router asserts the
-  // requesting `userId` matches the authenticated sender (anti-impersonation).
+  // Activation request to the active GM. The router asserts `userId` matches the sender.
   if (action === INTERACTABLE_ACTIVATE) {
     if (typeof deps.validateAndGrant === 'function') {
       void routeInteractableActivateMessage(payload, {
@@ -397,8 +282,7 @@ export function handleInteractableSocketMessage(payload, deps = {}) {
     return;
   }
 
-  // Activation granted → the targeted local user opens the session. GM→player, so
-  // accept only a GM sender (low severity, for completeness).
+  // Grant to the targeted local user. GM to player, so accept only a GM sender.
   if (action === INTERACTABLE_ACTIVATION_GRANTED) {
     if (senderIsGM && typeof deps.openGrant === 'function') {
       void routeInteractableActivationGranted(payload, {
@@ -409,8 +293,7 @@ export function handleInteractableSocketMessage(payload, deps = {}) {
     return;
   }
 
-  // Activation denied → the targeted local user is told WHY (localized). GM→player,
-  // so accept only a GM sender.
+  // Denial to the targeted local user. GM to player, so accept only a GM sender.
   if (
     action === INTERACTABLE_ACTIVATION_DENIED &&
     senderIsGM &&

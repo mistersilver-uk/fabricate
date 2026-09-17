@@ -1,43 +1,18 @@
 /**
- * Pure drag-payload builder for the GM Interactable browser app (Phase 7).
- *
- * The browser app's draggable rows are the only NET-NEW drag SOURCE in the
- * module: `src/ui/svelte/actions/dragDrop.js` is drop-only. A dragged row must
- * emit a `dropCanvasData`-compatible payload that round-trips through
- * `classifyInteractableDrop` (in `interactableResolution.js`) to the correct
- * `interactableType` + ids. This module shapes that payload purely so the
- * contract is unit-testable without a DOM/DataTransfer.
- *
- * Foundry's canvas drop pipeline reads the dragged JSON from the
- * `text/plain` DataTransfer entry, augments it with the scene-space `x`/`y`
- * (and modifier flags), and passes it to the `dropCanvasData` hook. So the
- * payload only needs to carry the discriminating `fabricate` block; the canvas
- * supplies the coordinates. `classifyInteractableDrop` reads `data.fabricate`
- * and expects `{ interactableType: 'tool'|'gatheringTask', systemId, toolId|taskId }`.
- *
- * A top-level `type` is included so the drag reads as a recognizable Foundry
- * drag payload, but classification keys ONLY off `data.fabricate` — the `type`
- * is cosmetic for the drop side.
+ * PURE drag-payload builder for the GM Interactable browser, the module's only net-new drag
+ * SOURCE (`src/ui/svelte/actions/dragDrop.js` is drop-only), shaped here so the round trip
+ * through `classifyInteractableDrop` is testable without a DOM or DataTransfer.
+ * Foundry reads the dragged JSON from `text/plain` and augments it with scene-space coordinates,
+ * so the payload carries only the discriminating `fabricate` block. The top-level `type` is
+ * cosmetic: classification keys ONLY off `data.fabricate`.
  */
 
 export const INTERACTABLE_DRAG_TYPE = 'fabricate-interactable';
 
 /**
- * Build the `dropCanvasData`-compatible drag payload for a browser row.
- *
- * A `visualMode:'none'` is carried in the `fabricate` block ONLY for the
- * region-only ("no marker") placement variant; a normal drag omits it (the drop
- * side defaults to 'marker'). Classification keys off type + ids only, so the
- * extra field is ignored by `classifyInteractableDrop` and read directly by the
- * manager's spawn path.
- *
- * @param {object} params
- * @param {'tool'|'gatheringTask'} params.interactableType
- * @param {string} params.systemId   Owning crafting system id.
- * @param {string} params.referenceId  Library Tool id (tool) or Task id (gatheringTask).
- * @param {'marker'|'none'} [params.visualMode]  'none' ⇒ region-only (no marker).
- * @returns {{ type: string, fabricate: { interactableType: string, systemId: string,
- *   toolId?: string, taskId?: string, visualMode?: 'none' } } | null}  Null when the inputs are invalid.
+ * The `dropCanvasData`-compatible payload for a browser row, or null for invalid inputs.
+ * `visualMode: 'none'` is carried only for the region-only variant; a normal drag omits it and
+ * the drop side defaults to 'marker'.
  */
 export function buildInteractableDragPayload({
   interactableType,
@@ -49,8 +24,7 @@ export function buildInteractableDragPayload({
   const refId = typeof referenceId === 'string' ? referenceId.trim() : '';
   if (!sysId || !refId) return null;
 
-  // Only stamp the no-marker variant; 'marker' (default) stays omitted so an
-  // ordinary drag payload is unchanged.
+  // Only stamp the no-marker variant, so an ordinary drag payload is unchanged.
   const visual = visualMode === 'none' ? { visualMode: 'none' } : {};
 
   if (interactableType === 'tool') {
@@ -68,15 +42,7 @@ export function buildInteractableDragPayload({
   return null;
 }
 
-/**
- * Serialize a drag payload for `DataTransfer.setData('text/plain', …)`.
- *
- * Returns `''` for an unbuildable payload so the dragstart handler can decline
- * to start a drag.
- *
- * @param {object} params  See {@link buildInteractableDragPayload}.
- * @returns {string}
- */
+/** Serialize for `DataTransfer.setData`; `''` when unbuildable, so dragstart can decline. */
 export function serializeInteractableDragPayload(params) {
   const payload = buildInteractableDragPayload(params);
   return payload ? JSON.stringify(payload) : '';

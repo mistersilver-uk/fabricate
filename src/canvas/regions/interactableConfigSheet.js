@@ -1,23 +1,10 @@
 /**
- * Config-sheet registration + tile discoverability seams for the rich GM
- * Interactable config panel (`InteractableConfigApp`).
- *
- * Two pure decisions live here so the live-Foundry edges stay thin + testable:
- *  - {@link assignInteractableConfigSheet}: register the document sheet for the
- *    `fabricate.interactable` RegionBehavior subtype, mutating/calling a fake
- *    registrar. The registered `SheetClass` is the CORE
- *    `foundry.applications.sheets.RegionBehaviorConfig` (a real DocumentSheet) so
- *    `behavior.sheet` resolves and the edit pencil opens — our rich
- *    `InteractableConfigApp` is NOT a DocumentSheet and stays reachable via the
- *    Tile/Token HUD entry + scene-control opener instead. Defensive (no-throw when
- *    the API shape differs) + idempotent.
- *  - {@link resolveInteractableConfigTarget}: from a linked Tile (or Drawing /
- *    Token) document, resolve the owning behaviour's `{ sceneId, regionId,
- *    behaviorId }` so a Tile HUD / context-menu entry can open the panel against
- *    it. Pure — the document-graph walk is via injected resolvers.
- *
- * The actual `DocumentSheetConfig.registerSheet(...)` call + the HUD/context-menu
- * hook are the thin Foundry edges (wired in main.js); they delegate to these.
+ * Sheet registration and tile-discoverability decisions for the GM Interactable config panel,
+ * kept pure so the live `DocumentSheetConfig.registerSheet` call and the HUD hook in `main.js`
+ * stay thin.
+ * The registered sheet is the CORE `RegionBehaviorConfig`, because the rich `InteractableConfigApp`
+ * is not a DocumentSheet: registering it would leave `behavior.sheet` unresolvable and the edit
+ * pencil dead, so the panel is reached from the Tile/Token HUD entry instead.
  */
 
 import {
@@ -27,26 +14,11 @@ import {
 } from './interactableRegionFlags.js';
 
 /**
- * Register the Interactable config panel as the sheet for the
- * `fabricate.interactable` RegionBehavior subtype. PURE-ish: the Foundry
- * registrar (`DocumentSheetConfig`) + the `RegionBehavior` document class are
- * INJECTED, so a fake records the call. Defensive + idempotent + no-throw.
- *
- * Tracks registration on the registrar via a private marker so a repeat call is a
- * clean no-op. Foundry's `registerSheet` simply overwrites the prior registration,
- * but we avoid redundant `makeDefault` re-shuffling of every sibling sheet's default
- * flag by guarding locally. V14 adds a validation throw for non-sheet classes; we
- * defensively catch any throw to remain robust across versions.
- *
- * @param {object} deps
- * @param {object} deps.registrar  A `DocumentSheetConfig`-shaped object exposing
- *   `registerSheet(documentClass, scope, sheetClass, options)`.
- * @param {Function} deps.RegionBehavior  The `RegionBehavior` document class.
- * @param {Function} deps.SheetClass  The document-sheet class to register (the
- *   CORE `RegionBehaviorConfig`).
- * @param {string} [deps.scope]  Registration scope (defaults to 'fabricate').
- * @param {boolean} [deps.makeDefault]  Whether the sheet is the default (defaults to true).
- * @returns {boolean} Whether a registration was performed (false when skipped/no-op).
+ * Register the core sheet for the subtype, with the registrar and document class injected so a
+ * fake records the call. Defensive, idempotent and no-throw: registration is tracked by a private
+ * marker on the registrar, because Foundry's `registerSheet` overwrites happily but re-running
+ * `makeDefault` re-shuffles every sibling sheet's default flag. V14 also throws on a non-sheet
+ * class, so any throw is caught to stay robust across versions.
  */
 export function assignInteractableConfigSheet({
   registrar,
@@ -70,8 +42,7 @@ export function assignInteractableConfigSheet({
       label: 'FABRICATE.Canvas.Interactable.Config.SheetLabel',
     });
   } catch {
-    // Defensive: a differing API shape (or a double-register race) must not throw
-    // into init.
+    // Defensive: a differing API shape, or a double-register race, must not throw into init.
     return false;
   }
 
@@ -84,20 +55,9 @@ export function assignInteractableConfigSheet({
 }
 
 /**
- * Resolve the owning interactable behaviour target `{ sceneId, regionId,
- * behaviorId }` from a linked visual document (Tile / Drawing / Token). PURE: the
- * reverse linked-visual ref is read off the document's flags
- * ({@link readLinkedVisualRef}); the Region uuid → scene + region id resolution is
- * via the injected `resolveRegion` seam (so it is testable without Foundry).
- *
- * Returns null when the document is not a Fabricate interactable visual, or when
- * the linked region/behaviour can no longer be resolved.
- *
- * @param {object} doc  The linked Tile/Drawing/Token document (carries `flags.fabricate`).
- * @param {object} deps
- * @param {(regionUuid: string) => ({ sceneId: string, regionId: string }|null)} deps.resolveRegion
- *   Resolve a Region uuid to its scene + region id (the Foundry edge).
- * @returns {{ sceneId: string, regionId: string, behaviorId: string } | null}
+ * PURE. The owning `{ sceneId, regionId, behaviorId }` behind a linked visual, read from its
+ * reverse flag with the Region-uuid lookup injected. Null when the document is not a Fabricate
+ * visual or its region or behaviour no longer resolves.
  */
 export function resolveInteractableConfigTarget(doc, { resolveRegion } = {}) {
   const ref = readLinkedVisualRef(doc);
@@ -113,15 +73,8 @@ export function resolveInteractableConfigTarget(doc, { resolveRegion } = {}) {
 }
 
 /**
- * Decide whether to add the "Configure Fabricate Interactable" discoverability
- * entry for a Tile. PURE: GM-only AND the tile must be a Fabricate interactable
- * visual ({@link readLinkedVisualRef}). The HUD/context-menu edge calls this to
- * gate the entry.
- *
- * @param {object} doc  The Tile document.
- * @param {object} [ctx]
- * @param {boolean} [ctx.isGM]
- * @returns {boolean}
+ * PURE. Show the "Configure Fabricate Interactable" entry for a Tile: GM-only, and only when the
+ * tile carries a well-formed reverse flag.
  */
 export function shouldOfferInteractableConfigEntry(doc, { isGM } = {}) {
   if (isGM !== true) return false;

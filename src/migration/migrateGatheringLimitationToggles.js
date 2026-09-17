@@ -1,29 +1,10 @@
 /**
- * 0.8.0 migration — independent stamina + resource-node limitation toggles.
- *
- * The single mutually-exclusive gathering limitation `mode`
- * (`none|stamina|nodes`) stored under
- * `gatheringConfig.systems[systemId].economy.mode` is replaced by two
- * independent boolean flags: `stamina.enabled` and `nodes.enabled`. This
- * migration rewrites any economy block that still carries a legacy `mode` into
- * the flag shape and drops `mode`.
- *
- * | legacy `mode` | `stamina.enabled` | `nodes.enabled` |
- * | ------------- | ----------------- | --------------- |
- * | `'stamina'`   | `true`            | `false`         |
- * | `'nodes'`     | `false`           | `true`          |
- * | `'none'`/else | `false`           | `false`         |
- *
- * Pure, idempotent, and by-reference (no clone). An already-migrated economy
- * (no `mode`, flags present) is left untouched. The matching read-time mapping
- * in `normalizeGatheringEconomy()` keeps un-migrated worlds working before this
- * migration ever runs; this step simply makes the persisted shape canonical.
+ * `0.8.0` — replace the mutually-exclusive gathering limitation `mode` with independent
+ * `stamina.enabled` and `nodes.enabled` flags, dropping `mode`. Pure, idempotent and by-reference.
+ * The matching read-time mapping in `normalizeGatheringEconomy` keeps un-migrated worlds working, so
+ * this step only makes the persisted shape canonical.
  */
 
-/**
- * @param {object} gatheringConfig Raw gathering config setting.
- * @returns {{gatheringConfig: object}}
- */
 export function migrateGatheringLimitationToggles(gatheringConfig = {}) {
   const rawSystems = gatheringConfig?.systems;
   if (!rawSystems || typeof rawSystems !== 'object') {
@@ -35,8 +16,7 @@ export function migrateGatheringLimitationToggles(gatheringConfig = {}) {
 
   for (const [systemId, system] of Object.entries(rawSystems)) {
     const economy = system?.economy;
-    // Only rewrite economies that still carry a legacy `mode`. Already-migrated
-    // economies (no `mode`) are left exactly as-is.
+    // Only rewrite economies that still carry a legacy `mode`.
     if (!economy || typeof economy !== 'object' || !('mode' in economy)) continue;
 
     const { mode, ...restEconomy } = economy;

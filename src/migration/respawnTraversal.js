@@ -1,28 +1,13 @@
 /**
- * Shared traversal for resource-node respawn migrations.
- *
- * Respawn config lives in three places, and every node-respawn migration has to
- * walk all three identically, differing only in how a single respawn block is
- * rewritten:
- *   - library tasks:         `gatheringConfig.systems[sid].tasks[].nodes.respawn`
- *   - inline env tasks:      `environments[].tasks[].nodes.respawn`
- *   - per-env runtime state: `environments[].nodeRuntime[taskId].respawn`
- *
- * This factors that walk out so each migration supplies only its per-respawn
- * transform. The traversal is shape-preserving and idempotent: any subtree the
- * transform leaves unchanged (returns by reference) is itself returned by
- * reference, so worlds with no matching respawn config see zero churn.
+ * The shared walk over the three places node respawn config lives — library tasks, inline
+ * environment tasks and per-env runtime state — so each respawn migration supplies only its
+ * per-block transform. Shape-preserving and idempotent: a subtree the transform returns by reference
+ * is itself returned by reference, so a world with no matching config sees zero churn.
  */
 
 /**
- * Apply a per-respawn transform across every place node respawn config lives.
- *
- * @param {object} gatheringConfig Raw gathering config setting.
- * @param {Array<object>} environments Raw gathering environments setting.
- * @param {(respawn: object) => object} migrateRespawn Rewrites one respawn
- *   block. MUST return the same reference when nothing changes, so the
- *   traversal can preserve references upstream.
- * @returns {{gatheringConfig: object, environments: Array<object>}}
+ * Apply a per-respawn transform across all three locations. `migrateRespawn` MUST return the same
+ * reference when nothing changes, so the traversal can preserve references upstream.
  */
 export function migrateNodeRespawnConfig(gatheringConfig = {}, environments = [], migrateRespawn) {
   const migrateNode = (node) => {

@@ -256,6 +256,11 @@ test('the ledger reports the two figures epic 1656 tracks', (t) => {
   // file threshold and its constructor under the 100-line function threshold. Regenerated from
   // the merged tree rather than reconciled by hand: these counts are derived, so picking a side
   // of the conflict would have pinned a figure no tree actually has.
-  assert.equal(files, 123, 'oversized files');
-  assert.equal(keys.length - files, 123, 'oversized functions');
+  //
+  // 122/120 on this branch. Four rows leave the ledger with its comment mass --
+  // `interactableRegionFlags.js::buildInteractableBehaviorSchema`, `main.js::Hooks.once>on`,
+  // `migrateRecipeForModeChange` and `remapWorldScopeIdentityFlags.js` -- on top of the figure
+  // main carries.
+  assert.equal(files, 122, 'oversized files');
+  assert.equal(keys.length - files, 120, 'oversized functions');
 });
