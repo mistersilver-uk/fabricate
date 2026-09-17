@@ -12,7 +12,7 @@ src/integrations	20
 src/migration	1797
 src/models	467
 src/models/match	66
-src/systems	33367
+src/systems	28748
 src/ui	1109
 src/ui/svelte	52
 src/ui/svelte/actions	73
