@@ -1,14 +1,6 @@
 /**
- * foundry-test-up.mjs
- *
- * Starts the Foundry VTT Docker Compose test harness and waits for the
- * container to become healthy before exiting.
- *
- * Usage: node scripts/foundry-test-up.mjs
- *
- * Environment variables (loaded from .env.foundry if present):
- *   FOUNDRY_USERNAME  — Foundry account username (required)
- *   FOUNDRY_PASSWORD  — Foundry account password (required)
+ * Starts the Foundry VTT Docker Compose test harness and waits for the container to become healthy
+ * before exiting.
  */
 
 import { execSync, spawnSync } from 'node:child_process';
@@ -28,20 +20,11 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
 const COMPOSE_FILE = join(ROOT, 'docker-compose.foundry.yml');
 const ENV_FILE = join(ROOT, '.env.foundry');
-// Which Foundry generation this run boots (issue #1088). The DEFAULT arm reads its image out of the
-// compose file rather than restating it: that value is what actually boots (it is written into
-// process.env below, before compose reads its own default), while the compose file is what CI
-// hashes into the `foundry-binary-*` cache key — so a second copy is wrong in opposite directions
-// depending on which one you edit. A non-default arm (FOUNDRY_SMOKE_ARM=v13) reaches compose purely
-// through FOUNDRY_IMAGE, so the compose pin — and the version-lock test that reads it — never moves.
+// Which Foundry generation this run boots (issue #1088).
 const SMOKE_ARM = resolveSmokeArmFromEnv();
 const DEFAULT_FOUNDRY_IMAGE = SMOKE_ARM.image;
 
-// Per-worktree-stable container identity (issue #827). Derived deterministically from
-// the worktree root so it is unique across worktrees (no fixed-name collision) yet
-// stable within one (preserving the reuse cache + felddy's hostname-bound license).
-// Respect explicit overrides so the parent foundry-test.mjs (which also finds a free
-// port) can pin the values for the whole up/run/down pipeline.
+// Per-worktree-stable container identity (issue #827).
 const identity = deriveRunIdentity(ROOT);
 process.env.FOUNDRY_CONTAINER_NAME ||= identity.containerName;
 process.env.FOUNDRY_CONTAINER_HOSTNAME ||= identity.hostname;
@@ -131,13 +114,8 @@ function compose(args) {
 }
 
 /**
- * Inspect the exact per-worktree container without treating Docker failures as
- * proof that the container is absent.
- *
- * @param {object} [options]
- * @param {string} [options.containerName]
- * @param {typeof spawnSync} [options.runInspect]
- * @returns {string | null}
+ * Inspect the exact per-worktree container without treating Docker failures as proof that the
+ * container is absent.
  */
 export function inspectCachedContainerStatus({
   containerName = CONTAINER_NAME,
@@ -192,18 +170,7 @@ const cachedContainer = {
   }
 };
 
-/**
- * The host port a cached container is bound to, from the two places Docker records one.
- *
- * NetworkSettings.Ports is the live binding (only populated when the container has run at least
- * once). HostConfig.PortBindings is the *desired* binding from create-time — populated even for
- * `created` and `exited` containers that have never bound the port. Reading both lets the reuse
- * check detect a cached container created with an old port default.
- *
- * @param {string|undefined} networkRaw JSON for `.NetworkSettings.Ports`.
- * @param {string|undefined} hostConfigRaw JSON for `.HostConfig.PortBindings`.
- * @returns {string|null}
- */
+/** The host port a cached container is bound to, from the two places Docker records one. */
 function readBoundHostPort(networkRaw, hostConfigRaw) {
   try {
     const network = JSON.parse(networkRaw || '{}');
@@ -216,18 +183,7 @@ function readBoundHostPort(networkRaw, hostConfigRaw) {
   }
 }
 
-/**
- * Everything the container-reuse decision needs, from ONE `docker inspect`.
- *
- * The image and the bound port used to be two separate inspects. They are one because the reuse
- * decision needs both at the same moment and a second `spawnSync('docker', …)` is a new
- * PATH-resolved spawn site — which SonarCloud rates as a security finding on new code (S4036), and
- * rightly: `$PATH` is attacker-influenced on a shared or CI machine. Folding removes the new call
- * site rather than arguing about it, and costs one round trip less.
- *
- * @returns {{ image: string|null, hostPort: string|null }} Nulls when the container is absent or
- *   the inspect fails; the caller treats "unknown" as "no mismatch proven" and reuses.
- */
+/** Everything the container-reuse decision needs, from one `docker inspect`. */
 function inspectCachedContainerReuse() {
   const result = spawnSync('docker', [
     'inspect',
@@ -250,21 +206,7 @@ function inspectCachedContainerReuse() {
   };
 }
 
-/**
- * Why a cached container cannot be reused, phrased for the log, or null when it can be.
- *
- * The IMAGE check is what makes smoke arms work (issue #1088). The container-reuse cache is keyed on
- * nothing but the container's existence, and the reuse path is a plain `compose start` that never
- * consults FOUNDRY_IMAGE — so a reused 14.365 container would boot Foundry 14 while every log line,
- * the stamped world manifest and the arm's own assertions said 13. The container identity (name,
- * hostname, port, data dir) is deliberately unchanged across arms: the felddy licence binds to the
- * HOSTNAME, so a per-arm hostname would burn a second Foundry activation per worktree. The corollary
- * is that the two arms cannot run concurrently in one worktree.
- *
- * @param {{ image: string|null, hostPort: string|null }} cached
- * @param {{ desiredImage: string, desiredHostPort: string, armId: string }} wanted
- * @returns {string|null}
- */
+/** Why a cached container cannot be reused, phrased for the log, or null when it can be. */
 function describeCachedContainerMismatch(cached, { desiredImage, desiredHostPort, armId }) {
   if (cached.image && cached.image !== desiredImage) {
     return `was created from ${cached.image}; recreating for ${desiredImage} (smoke arm ${armId})`;
@@ -318,16 +260,7 @@ function configureCachedReleaseUrl() {
   process.stdout.write(`Using cached Foundry archive ${archiveName}.\n`);
 }
 
-/**
- * Pin the uid/gid the container runs as, so bind-mounted volumes are writable.
- *
- * The felddy/foundryvtt image runs as 1000:1000 by default and no longer supports
- * FOUNDRY_UID/FOUNDRY_GID, so Docker's native `user:` directive is fed from these instead (see
- * docker-compose.foundry.yml). On Windows, Docker Desktop bind mounts go through a translation layer
- * that ignores the host uid; the image's pre-created `foundry` user is uid 1000, which is what the
- * daemon expects. Hardcoding there skips the noisy "id not found" stderr the previous try/catch
- * produced.
- */
+/** Pin the uid/gid the container runs as, so bind-mounted volumes are writable. */
 function resolveContainerUser() {
   if (!process.env.FOUNDRY_HOST_UID) {
     process.env.FOUNDRY_HOST_UID = process.platform === 'win32'
@@ -355,18 +288,7 @@ function ensureImageAvailable() {
   compose('pull --quiet');
 }
 
-/**
- * Poll until the container reports healthy, or fail at the deadline.
- *
- * `unhealthy` is NOT terminal, and treating it as terminal is what an arm switch exposed (issue
- * #1088). Docker flips to `unhealthy` after `retries` consecutive failures and flips straight back
- * on the next passing probe, so it reports "not answering yet", not "broken". A switch between arms
- * installs a different dnd5e release, and Foundry then migrates package data on the world's first
- * launch — a one-off that runs past the compose healthcheck's grace and made
- * `npm run test:foundry:v13` abort on a container that was serving 200s seconds later. So only the
- * DEADLINE fails the run; a seen-unhealthy is reported for diagnosis. The deadline is generous for
- * the same reason: the slow case is a legitimate first-launch migration, not a hang.
- */
+/** Poll until the container reports healthy, or fail at the deadline. */
 async function waitForHealthyContainer() {
   process.stdout.write('Waiting for Foundry to become healthy...\n');
   const deadline = Date.now() + 300_000;
@@ -431,9 +353,7 @@ export async function runFoundryLauncher({
     `${SMOKE_ARM.isDefault ? ' (default arm — the compose pin)' : ' (env-selected arm)'}\n`
   );
 
-  // Both local and CI runs use this same per-worktree identity and recovery
-  // boundary. A live container must release its bind mount before setup replaces
-  // smoke data; a failed synchronous stop aborts before either preparation step.
+  // Both local and CI runs use this same per-worktree identity and recovery boundary.
   let existingStatus = await prepareData({
     cachedContainer,
     async replaceBoundData() {
@@ -467,9 +387,7 @@ export async function runFoundryLauncher({
 
   configureCachedReleaseUrl();
 
-  // Reuse the stopped container by default. The felddy image stores the
-  // extracted Foundry application in the container filesystem, so preserving
-  // the container avoids repeated release-service requests that can hit 429s.
+  // Reuse the stopped container by default.
   const recreate = process.env.FOUNDRY_RECREATE === '1';
   if (recreate && existingStatus) {
     process.stdout.write('FOUNDRY_RECREATE=1 set; removing cached Foundry container...\n');

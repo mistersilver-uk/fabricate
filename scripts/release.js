@@ -1,26 +1,6 @@
 /**
- * Local release build script for Fabricate.
- * Assembles a fully runnable FoundryVTT module inside dist/.
- *
- * Usage:
- *   node scripts/release.js              # build + zip
- *   node scripts/release.js --no-zip    # build without zip
- *   node scripts/release.js --validate-only  # validate existing dist/
- *   node scripts/release.js --version 1.2.3  # inject version into module.json, then build
- *   node scripts/release.js --dist-version 1.2.3  # inject version into dist/module.json only
- *
- * Future GitHub Actions note:
- *   This script is designed to be usable directly in a GitHub Actions workflow:
- *     - uses: actions/setup-node@v4
- *     - run: node scripts/release.js --no-zip
- *   The --no-zip flag avoids the zip dependency issue in CI; Actions can use
- *   upload-artifact or a dedicated zip step instead.
- *
- *   Semantic-release passes --version <tag> via release.config.js prepareCmd.
- *   The script updates module.json on disk before building so the dist/module.json
- *   contains the correct version string.
- *   S3 publishing passes --dist-version <tag> so the generated dist/ manifest
- *   gets the release version without touching source module.json.
+ * Local release build script for Fabricate. Assembles a fully runnable FoundryVTT module inside
+ * dist/.
  */
 
 import { readFile, writeFile, mkdir, rm, cp, access, stat, readdir } from 'node:fs/promises';
@@ -40,21 +20,9 @@ import {
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
 
-// ───────────────────────────────────────────────────────────────────────────
 // Exported utility functions (also used by tests)
-// ───────────────────────────────────────────────────────────────────────────
 
-/**
- * Rewrite a parsed module.json for placement in dist/.
- * - esmodules[]: strip leading 'dist/' prefix
- * - styles[]: keep unchanged
- * - languages[].path: keep unchanged
- * - packs[].path: normalize legacy '.db' suffixes to LevelDB directory paths
- * - All other fields: preserved
- *
- * @param {object} manifest - Parsed module.json object
- * @returns {object} New manifest object safe to write into dist/
- */
+/** Rewrite a parsed module.json for placement in dist/. */
 export function rewriteModuleJson(manifest) {
   const esmodules = (manifest.esmodules ?? []).map(p =>
     p.startsWith('dist/') ? p.slice('dist/'.length) : p
@@ -74,27 +42,7 @@ export function rewriteModuleJson(manifest) {
   };
 }
 
-/**
- * Apply the release artefact's self-contained URLs to a dist/-ready manifest.
- *
- * The in-zip `manifest` MUST be the repository's LATEST-release manifest URL — never version-pinned,
- * and never a channel (S3) URL — so a public client updating from this artefact is not put through a
- * manifest-rewrite prompt on every update: a version-pinned manifest URL changes each release, which
- * Foundry treats as a manifest move and confirms with the user. A latest-release URL is stable across
- * every public release, so the update is silent. `download` STAYS version-pinned so the artefact
- * always fetches its OWN archive (the latest zip would be wrong the moment a newer one is published).
- *
- * Drafts are excluded from GitHub's "latest", so a private early-access draft is never served from
- * /releases/latest/ — the un-draft (the release promotion) is what first makes a version the latest.
- * The version-pinned URL SENT TO THE REGISTRY is a different artefact, constructed by the promotion
- * workflow from the version; it is deliberately NOT read from this field. See issue #627 task 3.6 and
- * the "Self-contained distribution targets" requirement in
- * openspec/specs/release-and-distribution/spec.md.
- *
- * @param {object} manifest - dist/-ready manifest (post rewriteModuleJson). Mutated in place.
- * @param {string} releaseVersion - the bare version, no leading `v` (e.g. `1.5.0`).
- * @returns {object} The same manifest, for chaining.
- */
+/** Apply the release artefact's self-contained URLs to a dist/-ready manifest. */
 export function applyReleaseUrls(manifest, releaseVersion) {
   const tag = `v${releaseVersion}`;
   const releasesBase = 'https://github.com/mistersilver-uk/fabricate/releases';
@@ -104,11 +52,8 @@ export function applyReleaseUrls(manifest, releaseVersion) {
 }
 
 /**
- * Return the list of relative file paths that must exist inside dist/
- * based on the (already-rewritten) manifest.
- *
- * @param {object} manifest - dist/-ready manifest (post rewriteModuleJson)
- * @returns {string[]}
+ * Return the list of relative file paths that must exist inside dist/ based on the
+ * (already-rewritten) manifest.
  */
 export function getRequiredFiles(manifest) {
   const files = ['module.json'];
@@ -129,13 +74,7 @@ export function getRequiredFiles(manifest) {
   return files;
 }
 
-/**
- * Validate that dist/ contains all required files and a parseable module.json.
- *
- * @param {string} distDir - Absolute path to dist/
- * @param {object} srcManifest - Original (non-rewritten) manifest to derive requirements
- * @returns {Promise<{ valid: boolean, missing: string[], errors: string[] }>}
- */
+/** Validate that dist/ contains all required files and a parseable module.json. */
 export async function validateDist(distDir, srcManifest) {
   const missing = [];
   const errors = [];
@@ -170,9 +109,7 @@ export async function validateDist(distDir, srcManifest) {
   };
 }
 
-// ───────────────────────────────────────────────────────────────────────────
 // Main script logic (runs only when invoked directly)
-// ───────────────────────────────────────────────────────────────────────────
 
 async function fileExists(p) {
   try {
@@ -195,27 +132,6 @@ async function copyIfExists(src, dest) {
 /**
  * Prove the produced archive carries every module file its own entry script references, or say
  * plainly that the proof did not run (issue 1565).
- *
- * SHARED BY BOTH BRANCHES of main(). The build path is the one that matters in CI — semantic
- * release's `prepareCmd` goes through it and this is what fails the release job — but main() takes
- * no `deps` and does `rm -rf dist` -> build -> zip in one pass, so no test can present it with a
- * short archive. `--validate-only`, which returns before the build, is therefore the seam the
- * negative proof uses, and it is a maintainer-facing check of an existing dist/ in its own right.
- *
- * A BUILD THAT PRODUCED NO ARCHIVE IS NOT A PASS. `npm run build` is `--no-zip`, so it has nothing
- * to check; it says so and still exits 0. Reporting "OK" there would be the vacuous pass the gate
- * exists to prevent.
- *
- * NOR IS A NAME MISMATCH A SKIP, which is the failure the `--validate-only` branch can actually
- * reach: the archive's name carries a version, and `--dist-version <next>` leaves the tracked
- * `module.json` alone, so a bare `npm run release:validate` afterwards derives a DIFFERENT name,
- * finds nothing at it, and would otherwise report a build that produced no archive while the real
- * one sits in the same directory unproved. See archiveNameMismatchMessage.
- *
- * @param {string} distDir - Absolute path to dist/
- * @param {object} builtManifest - The manifest inside the archive, whose esmodules name the entry
- * @param {string} version - The version whose archive name to look for
- * @returns {Promise<void>}
  */
 async function runArchiveChunkGate(distDir, builtManifest, version) {
   const zipPath = join(distDir, releaseZipName(version));
@@ -245,13 +161,7 @@ async function runArchiveChunkGate(distDir, builtManifest, version) {
   }
 }
 
-/**
- * Parse `--flag <value>` from an argv slice. Returns the value or null.
- *
- * @param {string[]} args
- * @param {string} flag
- * @returns {string|null}
- */
+/** Parse `--flag <value>` from an argv slice. Returns the value or null. */
 export function getFlag(args, flag) {
   const idx = args.indexOf(flag);
   if (idx !== -1 && args[idx + 1] && !args[idx + 1].startsWith('--')) {
@@ -261,11 +171,8 @@ export function getFlag(args, flag) {
 }
 
 /**
- * Resolve release-version flags. `--version` intentionally mutates source
- * module.json; `--dist-version` only changes generated release output.
- *
- * @param {string[]} args
- * @returns {{ sourceVersion: string|null, distVersion: string|null, releaseVersion: string|null }}
+ * Resolve release-version flags. `--version` intentionally mutates source module.json;
+ * `--dist-version` only changes generated release output.
  */
 export function parseReleaseVersionOptions(args) {
   const sourceVersion = getFlag(args, '--version');
@@ -287,10 +194,7 @@ async function main() {
   const flags = new Set(args);
   const noZip = flags.has('--no-zip');
   const validateOnly = flags.has('--validate-only');
-  // --analyze: opt-in bundle visualizer. Forwarded to the vite build subprocess
-  // as ANALYZE=1 (cross-platform, no shell-specific env syntax); vite.config.js
-  // only wires the visualizer plugin when ANALYZE=1 is set, so the default build
-  // is byte-for-byte unaffected.
+  // --analyze: opt-in bundle visualizer.
   const analyze = flags.has('--analyze');
   let versionOptions;
   try {
@@ -349,19 +253,13 @@ async function main() {
 
   // 2. Run vite build
   console.log(`Running vite build${analyze ? ' (bundle analyzer enabled)' : ''}...`);
-  // Opt the child vite build into the bundle analyzer via an inherited env var,
-  // set on process.env (which execSync inherits) so the build command below is
-  // left exactly as-is.
+  // Opt the child vite build into the bundle analyzer via an inherited env var, set on process.env
+  // (which execSync inherits) so the build command below is left exactly as-is.
   if (analyze) {
     process.env.ANALYZE = '1';
   }
-  // Bake THE VERSION THIS SCRIPT IS SHIPPING into the bundle (issue 1565), from the same `version`
-  // binding written into dist/module.json below, so the baked and shipped versions cannot
-  // disagree. Load-bearing on a release: semantic-release builds with `--dist-version <next>` and
-  // never writes the tracked module.json (still 0.1.0), so without this every release would bake a
-  // stale version and warn every user that their perfectly current client is out of date.
-  // vite.config.js reads it from the env this execSync inherits and falls back to the tracked
-  // manifest when it is unset, which is the `npm run dev` case.
+  // Bake the version this script is shipping into the bundle (issue 1565), from the same `version`
+  // binding written into dist/module.json below, so the baked and shipped versions cannot disagree.
   process.env.FABRICATE_BUILD_VERSION = version;
   execSync('npx vite build', { cwd: ROOT, stdio: 'inherit' });
 
@@ -432,9 +330,8 @@ async function main() {
     exit(1);
   }
 
-  // Issue 1565: prove the ARCHIVE — not dist/, which the two checks above cover — carries every
-  // file its own entry script references. Runs last on purpose: a dist/ that is itself short or
-  // mis-split should be reported as that, not as an incomplete archive.
+  // Issue 1565: prove the archive — not dist/, which the two checks above cover — carries every
+  // file its own entry script references.
   await runArchiveChunkGate(distDir, distManifest, version);
 }
 

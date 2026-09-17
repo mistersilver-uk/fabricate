@@ -1,15 +1,4 @@
-/**
- * foundry-test-down.mjs
- *
- * Stops the Foundry VTT Docker Compose test harness.
- * The container is preserved between normal runs so the extracted Foundry
- * application remains cached and the next run does not have to request a
- * release URL again. Pass --clean for a full reset.
- *
- * Usage:
- *   node scripts/foundry-test-down.mjs          # stop container, keep cache
- *   node scripts/foundry-test-down.mjs --clean  # remove container + volumes
- */
+/** Stops the Foundry VTT Docker Compose test harness. */
 
 import { execSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
@@ -20,10 +9,7 @@ import { deriveRunIdentity } from './lib/foundryRunIdentity.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
 
-// Target the same per-worktree compose project the up phase created (issue #827). `down`
-// is compose-project-scoped, so pinning COMPOSE_PROJECT_NAME + the container-name env
-// (already set when invoked by the parent pipeline; derived here for a standalone
-// `test:foundry:down`) tears down THIS worktree's container, never a sibling's.
+// Target the same per-worktree compose project the up phase created (issue #827).
 const identity = deriveRunIdentity(ROOT);
 process.env.FOUNDRY_CONTAINER_NAME ||= identity.containerName;
 process.env.FOUNDRY_CONTAINER_HOSTNAME ||= identity.hostname;

@@ -1,50 +1,5 @@
 #!/usr/bin/env node
-/**
- * Fail on ANY Svelte compiler warning, across EVERY component — not just the reachable ones.
- *
- * WHY THIS EXISTS ALONGSIDE `onwarn`
- * ----------------------------------
- * `svelte.config.js` carries an `onwarn` hook, so `npm run build` fails on a warning too, and
- * that is the fast local signal. It is not sufficient on its own: a Vite build compiles the
- * ENTRY GRAPH, and this repository has components that nothing under `src/` imports
- * (`RowDisclosure.svelte` is one today; issue 927). A warning in one of those would never reach
- * `onwarn`, and a gate that silently skips files is the failure mode this whole static-analysis
- * programme exists to remove — the same graph-blindness that made an earlier baseline in it
- * unsound.
- *
- * So this walks the component tree directly, with `scripts/lib/svelteComponentFiles.js` — the
- * same walker `compare-svelte-render.mjs` and `tests/prettier-svelte-scope.test.js` use, so
- * "every component" means one thing across every gate — and compiles each one with the build's
- * own options, read out of `svelte.config.js` by `scripts/lib/svelteCompilerWarnings.js`. That
- * shared read is what makes a disagreement between this and `onwarn` diagnostic: it can only be
- * graph reachability, never drift in `compilerOptions`.
- *
- * One seam sits outside that read and is closed by assertion instead: `emitCss` is a
- * `vite-plugin-svelte` option, and `emitCss: false` makes the plugin drop every
- * `css_unused_selector` before `onwarn` ever sees it — the build half would go quiet on a class
- * this sweep still reports. `tests/svelte-warning-scope.test.js` pins it at its default.
- *
- * A DISAGREEMENT WITH `onwarn` IS A BUG HERE, NOT A REASON TO OVERRIDE IT. If this sweep is
- * clean while the build fails, the sweep has stopped seeing something; repair it rather than
- * treating "exhaustive" as automatically "authoritative".
- *
- * USAGE
- *   node scripts/check-svelte-warnings.mjs [--root <dir>] [--json]
- *
- *   --root <dir>   source root to walk (default: `src`, resolved against the repository root).
- *                  Exists so `tests/svelte-warning-scope.test.js` can drive the REAL command
- *                  against a fixture tree and prove it both catches a warning and passes a
- *                  clean one — a gate whose detection is never exercised is one assertion away
- *                  from vacuous.
- *   --json         emit the findings as JSON instead of the human report.
- *
- * EXIT CODES
- *   0   every component compiled with no warning
- *   1   at least one warning (or a component that failed to compile)
- *   2   the run could not check — bad arguments, an unreadable root, or NO COMPONENTS FOUND.
- *       Finding nothing is a failure, not a clean sweep: a walker that stopped recursing, or a
- *       root that moved, would otherwise report success while inspecting zero files.
- */
+/** Fail on any Svelte compiler warning, across every component — not just the reachable ones. */
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -80,12 +35,7 @@ function parseArgs(argv) {
   return options;
 }
 
-/**
- * Every component under `root`, as paths relative to `root`'s own parent chain.
- *
- * Reported relative to the repository root so a finding names the file the way the rest of the
- * tooling does, and reads identically on Windows and on the CI runner.
- */
+/** Every component under `root`, as paths relative to `root`'s own parent chain. */
 function collectComponents(root) {
   const absoluteRoot = path.resolve(repoRoot, root);
   return {

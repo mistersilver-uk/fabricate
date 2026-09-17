@@ -1,42 +1,4 @@
-/**
- * foundry-perf-run.mjs — the Foundry performance profile (issue 1073).
- *
- * Seeds a live Foundry world with one of issue 1071's scale fixtures, walks the paths the
- * performance programme is about, and writes a class-2 run record. It is the `--check=perf` arm of
- * the EXISTING harness: `scripts/foundry-test.mjs` still owns build, up, run and down, and this file
- * is only what runs against the booted container — exactly as `foundry-version-assert.mjs` is.
- *
- * WHAT IT MEASURES AND WHAT MAY BE BELIEVED. Every number is declared in
- * `scripts/lib/foundryPerfMeasurements.js` with its class. Counts are class 1 and may be asserted;
- * every millisecond and every heap byte is class 2, is written to a GITIGNORED record, is never
- * asserted, and is only ever compared as a ratio between two runs on one machine. Wall clock inside
- * a live Foundry is the least deterministic number in this programme and the report says so in its
- * own text.
- *
- * ORDER MATTERS, AND ONE ORDERING IS LOAD-BEARING. The world is seeded and THEN reloaded, so the
- * startup measurement is taken against the seeded corpus. Measuring startup before seeding would
- * report the cost of loading an empty world under a name that claims otherwise.
- *
- * SEEDING IS NOT MEASURED, AND IS NOT DONE THROUGH THE API. `createRecipe()` saves the whole corpus
- * per call; 10,000 of those is hours. The corpus goes in as two `game.settings.set` writes and one
- * batched `Actor.createDocuments`, and the payload is transferred to the page in chunks first
- * because a single 20 MB `page.evaluate` argument is its own kind of hazard. Chunk transfer happens
- * outside every timed region.
- *
- * Usage:
- *   npm run test:foundry:perf                      # up + this + down
- *   npm run test:foundry:perf -- --arm=v13         # the same profile on Foundry 13
- *   node scripts/foundry-perf-run.mjs --preflight  # preconditions only; starts nothing
- *   node scripts/foundry-perf-run.mjs              # against an already-running container
- *
- * Environment:
- *   FOUNDRY_PERF_FIXTURE       issue 1071 scale profile to seed (default `simple-corpus`)
- *   FOUNDRY_PERF_SEED          fixture seed (default: issue 1071's own default)
- *   FOUNDRY_PERF_INVENTORY     which point of a held-inventory series to seed (default 0)
- *   FOUNDRY_PERF_IMPORT_LIMIT  recipes the import scenario imports (default 200)
- *   FOUNDRY_PERF_TRACE=1       also export a Chrome DevTools trace
- *   FOUNDRY_PERF_SECOND_CLIENT=0  skip the cross-client propagation scenario
- */
+/** The Foundry performance profile (issue 1073). */
 
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
@@ -108,21 +70,13 @@ function log(message) {
   process.stdout.write(message);
 }
 
-/**
- * Gather the preflight facts, none of which starts or downloads anything.
- *
- * `docker image inspect` is a LOCAL store lookup and never reaches a registry, which is what makes
- * it usable in a check whose whole contract is "attempt no download".
- *
- * @returns {{ok: boolean, problems: Array<{id: string, what: string, fix: string}>}}
- */
+/** Gather the preflight facts, none of which starts or downloads anything. */
 function runPreflight() {
   const probe = (command, args) =>
     spawnSync(command, args, { stdio: 'ignore', windowsHide: true }).status === 0;
 
-  // Read `.env.foundry` as a FALLBACK for the credentials, exactly as `foundry-test-up.mjs` does
-  // when it forwards them to compose. Read, not applied: the preflight has no business mutating the
-  // environment of the run it is checking.
+  // Read `.env.foundry` as a fallback for the credentials, exactly as `foundry-test-up.mjs` does
+  // when it forwards them to compose.
   const envFile = join(ROOT, '.env.foundry');
   const envFilePresent = existsSync(envFile);
   const envFileContents = envFilePresent ? readFileSync(envFile, 'utf8') : null;
@@ -138,12 +92,7 @@ function runPreflight() {
   });
 }
 
-/**
- * Bring a page to a joined, Fabricate-ready session for one user.
- *
- * @param {object} page
- * @param {string} userLabel
- */
+/** Bring a page to a joined, Fabricate-ready session for one user. */
 async function bootToReadyWorld(page, userLabel) {
   const reporter = createBootReporter({ log });
 
@@ -179,24 +128,7 @@ async function bootToReadyWorld(page, userLabel) {
   });
 }
 
-/**
- * Enable the Fabricate module when the world has it installed but not active.
- *
- * WITHOUT THIS THE PERF PROFILE CANNOT BOOT A FRESH WORLD, and the failure is silent about its
- * cause: `scripts/foundry-setup-data.mjs` copies the built module into `Data/modules/fabricate/`
- * and the fixture world's `world.json` declares no `modules` array, so a freshly copied world has
- * the module INSTALLED and INACTIVE. `game.fabricate` is then never defined, and the wait above
- * times out after three minutes reporting only `page.waitForFunction: Timeout 180000ms exceeded` —
- * which reads as "Fabricate is slow to initialise", the opposite of what happened.
- *
- * `scripts/foundry-test-run.mjs` has carried this step since the smoke harness was written; the
- * perf profile (issue 1073) did not inherit it, so it only ever succeeded against a world some
- * earlier smoke run had already activated. Found and fixed by issue 1079, which needed the profile
- * to run.
- *
- * @param {object} page
- * @returns {Promise<boolean>} Whether activation was performed and a reload is required.
- */
+/** Enable the Fabricate module when the world has it installed but not active. */
 async function activateFabricateIfNeeded(page) {
   const active = await page.evaluate(
     () => globalThis.game?.modules?.get('fabricate')?.active === true
@@ -212,16 +144,7 @@ async function activateFabricateIfNeeded(page) {
   return true;
 }
 
-/**
- * Move a large array into the page in bounded chunks.
- *
- * Playwright serializes an `evaluate` argument through CDP in one message; a 20 MB corpus in one
- * argument is a hazard with no upside, and chunking costs nothing because none of this is timed.
- *
- * @param {object} page
- * @param {string} slot
- * @param {unknown[]} values
- */
+/** Move a large array into the page in bounded chunks. */
 async function transferInChunks(page, slot, values) {
   await page.evaluate(
     ({ staging, key }) => {
@@ -246,15 +169,7 @@ async function transferInChunks(page, slot, values) {
   }
 }
 
-/**
- * Write the seeded corpus into the world: two setting writes, one batched actor create.
- *
- * Returns the write counts it actually performed, so "bounded" is observed rather than asserted from
- * the outside.
- *
- * @param {object} page
- * @param {object} seed
- */
+/** Write the seeded corpus into the world: two setting writes, one batched actor create. */
 async function applySeed(page, seed) {
   await transferInChunks(page, 'craftingSystems', seed.settings[0].value);
   await transferInChunks(page, 'recipes', seed.settings[1].value);
@@ -277,12 +192,7 @@ async function applySeed(page, seed) {
         writes.actorCreateCalls += 1;
       }
 
-      // The fidelity census, taken against the CREATED documents. `_stats.compendiumSource` is
-      // core-managed and a create call may ignore a supplied value; if it does, every `sourceRef`
-      // stack silently became an `unmatched` one and the run would report a mix it does not have.
-      // Selected by the EXACT names the seed asked for, not by a name prefix: a prefix is a
-      // second, unstated contract with the fixture generator, and a generator that renamed its
-      // actors would silently census zero and report a total fidelity failure that was not one.
+      // The fidelity census, taken against the created documents.
       const wanted = new Set(actorNames);
       const seededActors = game.actors.filter((actor) => wanted.has(actor.name));
       let stacks = 0;
@@ -310,11 +220,7 @@ async function applySeed(page, seed) {
   );
 }
 
-/**
- * Read the startup attribution and readiness timings the reloaded page recorded.
- *
- * @param {object} page
- */
+/** Read the startup attribution and readiness timings the reloaded page recorded. */
 async function readStartupObservations(page) {
   const observed = await page.evaluate(() => {
     const measures = performance
@@ -347,12 +253,7 @@ async function readStartupObservations(page) {
   };
 }
 
-/**
- * Re-join the world after a reload and wait for Fabricate to report ready.
- *
- * @param {object} page
- * @param {string} userLabel
- */
+/** Re-join the world after a reload and wait for Fabricate to report ready. */
 async function rejoinAfterReload(page, userLabel) {
   await page.reload({ waitUntil: 'load', timeout: 120_000 });
   await joinWorldSession(page, { userLabel, reporter: createBootReporter({ log }) });
@@ -361,12 +262,7 @@ async function rejoinAfterReload(page, userLabel) {
   });
 }
 
-/**
- * Read the page-side bridge's long-task and heap samples into two measurement results.
- *
- * @param {object} page
- * @returns {Promise<Record<string, object>>}
- */
+/** Read the page-side bridge's long-task and heap samples into two measurement results. */
 async function readBridgeSummaries(page) {
   const bridge = await page.evaluate(
     (key) => ({
@@ -390,12 +286,6 @@ async function readBridgeSummaries(page) {
 
 /**
  * Start a Chrome DevTools trace. Returns a stop function, or `null` when tracing is unavailable.
- *
- * Failure here NEVER fails the run: a trace is a diagnostic aid, and losing one is not a reason to
- * lose an entire measurement walk that costs a container boot to reproduce.
- *
- * @param {object} context
- * @param {object} page
  */
 async function startChromeTrace(context, page) {
   try {
@@ -424,12 +314,7 @@ async function startChromeTrace(context, page) {
   }
 }
 
-/**
- * Walk every scenario, isolating failures so one broken step cannot cost the rest of the run.
- *
- * @param {object} context
- * @returns {Promise<Record<string, object>>}
- */
+/** Walk every scenario, isolating failures so one broken step cannot cost the rest of the run. */
 async function walkScenarios(context) {
   const results = {};
   for (const scenario of PERF_SCENARIOS) {
@@ -446,27 +331,10 @@ async function walkScenarios(context) {
   return results;
 }
 
-/**
- * The player user the second client joins as.
- *
- * A FRESH WORLD HAS NO PLAYER. `scripts/foundry-setup-data.mjs` copies a world whose `world.json`
- * declares nothing but an id, a core version and a system, and Foundry creates exactly one
- * Gamemaster on first launch. The GM context holds that user, so a second context finds an empty
- * user select and reports `User select has no joinable options yet` — which reads as a boot flake
- * and is in fact a world that never had a second user.
- *
- * `scripts/foundry-test-run.mjs` creates its own player users for the same reason (`Fabricate
- * Gatherer`, `Fabricate Observer`); the perf profile (issue 1073) did not, so every cross-client
- * measurement it declares reported `unavailable` on a fresh world. Found and fixed by issue 1079,
- * whose `persistence-experiments` scenario needs a real receiver to read a delivered payload from.
- */
+/** The player user the second client joins as. */
 const PERF_PLAYER_NAME = 'Player1';
 
-/**
- * Create the player user the propagation and persistence scenarios join as, if it is missing.
- *
- * @param {object} page A page already joined as Gamemaster.
- */
+/** Create the player user the propagation and persistence scenarios join as, if it is missing. */
 async function ensurePlayerUser(page) {
   const created = await page.evaluate(async (name) => {
     if (game.users.some((user) => user.name === name)) return false;
@@ -476,11 +344,7 @@ async function ensurePlayerUser(page) {
   if (created) log(`Created player user "${PERF_PLAYER_NAME}" for the cross-client scenarios.\n`);
 }
 
-/**
- * Join a second browser context as a player, for the propagation scenario.
- *
- * @param {object} browser
- */
+/** Join a second browser context as a player, for the propagation scenario. */
 async function joinSecondClient(browser) {
   if (process.env.FOUNDRY_PERF_SECOND_CLIENT === '0') return { context: null, page: null };
   try {
@@ -495,11 +359,7 @@ async function joinSecondClient(browser) {
   }
 }
 
-/**
- * Stop Foundry's New User Experience tours ever starting.
- *
- * @param {object} context
- */
+/** Stop Foundry's New User Experience tours ever starting. */
 async function suppressTours(context) {
   await context.addInitScript(
     ({ key, value }) => {
@@ -513,13 +373,7 @@ async function suppressTours(context) {
   );
 }
 
-/**
- * Everything the run record's Foundry-side envelope needs.
- *
- * @param {object} page
- * @param {object} browser
- * @param {object} fixture
- */
+/** Everything the run record's Foundry-side envelope needs. */
 async function captureFoundryEnvelope(page, browser, fixture) {
   const core = await page.evaluate(() => ({
     version: globalThis.game?.version ?? null,
@@ -590,13 +444,6 @@ async function main() {
     await rejoinAfterReload(page, 'Gamemaster');
 
     // Read after the reload above, before the second client joins, and before the trace starts.
-    // All three matter, and the last one is easy to miss: `fabricateReadyMs` is a
-    // `performance.now()` evaluated on this page when the read RUNS, so it goes on ticking through
-    // anything done first. Reading after the reload is what makes it the SEEDED world's boot;
-    // reading before the join keeps the second context's boot out of it; reading before
-    // `startChromeTrace` keeps the CDP `Tracing.start` round trip out of it, which would otherwise
-    // make a traced run and an untraced run disagree for a reason that has nothing to do with the
-    // corpus. The trace is wanted around the WALK, and the walk is all still below.
     const startup = await readStartupObservations(page);
 
     const stopTrace =

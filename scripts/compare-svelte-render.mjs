@@ -1,91 +1,5 @@
 #!/usr/bin/env node
-/**
- * Compare what every `src/**\/*.svelte` component RENDERS against a base ref.
- *
- * Written for the Prettier-formats-components change (issue 923) and kept for the reformat
- * follow-ups after it. A mechanical reformat is only safe if it is render-neutral, and neither
- * the test suite nor a source diff can tell you that: whitespace between elements is significant
- * in Svelte markup, whitespace inside an element's attribute list is not, and the source diff for
- * the two looks the same. So this compiles both sides and compares the compiler's own output.
- *
- * WHAT IS COMPARED, and why the static HTML alone is not enough
- * ------------------------------------------------------------
- * The obvious signal is the `$.from_html(...)` / `$.from_svg(...)` template each component builds
- * its static skeleton from. That signal alone is too narrow, and quietly so: a run of DYNAMIC
- * text is not part of it. Svelte compiles `{a}{b}` to a template literal assigned at runtime —
- *
- *     $.set_text(text_4, `${a ?? ''}${b ?? ''}`);
- *
- * — so a newline introduced between those two interpolations lands INSIDE that literal and never
- * touches `from_html`. Comparing only the static skeletons reports such a file as identical.
- * Sites in this repository drift exactly that way under Prettier, and the narrow comparison
- * cannot see any of them.
- *
- * This therefore collects, per component:
- *
- *   - `templates` — EVERY template literal in the generated module: static skeletons and runtime
- *     text/attribute/class/style literals alike.
- *   - `emissions` — every generated statement that writes to the DOM (`$.set_attribute`,
- *     `$.set_class`, `$.set_style`, `$.set_text`, `$.toggle_class`, `$.clsx`, direct
- *     `textContent`/`nodeValue` assignment, …). This is where a dynamic class, style or attribute
- *     expression drifts.
- *   - `css` — the compiled stylesheet, whitespace-normalised. Rewrapped CSS text is not a render
- *     change; a changed declaration is.
- *   - `code` — the whole generated module, normalised. A file that differs here while matching
- *     the three signals above is reported as `other`: a real difference, but not a render one.
- *
- * NORMALISATION — this is what separates signal from noise, and it is deliberate:
- *
- *   - Whitespace in CODE is removed where it is not lexically required (kept as one space only
- *     between two word characters). The code printer preserves some of the source's own line
- *     breaks, so without this every rewrapped call reads as a difference.
- *   - Whitespace in the TEXT of a template literal is preserved byte for byte. That is the whole
- *     signal: it is what reaches the DOM.
- *   - The CODE INSIDE a `${…}` interpolation is normalised recursively, because it is evaluated,
- *     not rendered.
- *   - Quoted strings are canonicalised to their VALUE. Prettier's `singleQuote` setting flips
- *     `'it\'s'` to `"it's"`, which changes the generated module without changing one byte of what
- *     the user sees.
- *   - Svelte's `svelte-<hash>` scoping class is masked. The hash derives from the component's
- *     style text, so reformatting a `<style>` block renames it consistently on both sides.
- *
- * ON READING THE RESULT. A reported `templates`/`emissions` drift means a whitespace text node
- * appears or disappears in the DOM. That is not automatically a bug: the repository already
- * ships that shape on `main` — `src/ui/svelte/apps/journal/ActionsPanel.svelte` compiles to a
- * newline between adjacent interpolations and renders correctly in real Foundry — which is
- * evidence that the `white-space` inherited at Fabricate's actual mount points collapses such a
- * run. Note the ground: it is that observation, NOT any claim that Svelte collapses the newline.
- * Svelte does not; the newline reaches the DOM, and CSS is what collapses it. Nor is the mount
- * point ours to control, so a `white-space` audit of this repository's own stylesheets cannot
- * settle it. What it IS, always, is a change no other gate in this repository can see, so it
- * wants an explicit look and, where it matters, a committed assertion.
- *
- * USAGE
- *   node scripts/compare-svelte-render.mjs [--base <ref>] [--json] [--fail-on-drift]
- *                                          [--filter <substring>]
- *
- *   --base <ref>      ref to compare against (default: origin/main)
- *   --filter <text>   only compare components whose path contains <text>
- *   --json            emit the full record as JSON instead of a summary
- *   --fail-on-drift   exit 1 when any render drift is found (default: report and exit 0)
- *
- * EXIT CODES. 2 is kept distinct from 1 so a caller can tell "could not compare" apart from
- * "compared, and found drift":
- *
- *   0   compared at least one component and found nothing blocking (or found drift, without
- *       `--fail-on-drift`)
- *   1   render drift, with `--fail-on-drift`
- *   2   the run could not compare — the base ref does not resolve, no component was compared, or
- *       a component failed to compile on either side
- *
- * A run that compares NOTHING is a failure here, not a pass. It used to be a pass, and silently:
- * `--base` naming an unresolvable ref made `readAtRef` report every component as absent from the
- * base, so the run printed `compared=0`, listed all ~240 components as `new`, and exited 0 EVEN
- * under `--fail-on-drift`. That is this script's own instance of the vacuous gate issue 923
- * exists to remove — a check reporting success while checking nothing. The CI shape is the
- * dangerous one: `actions/checkout` fetches a single commit by default, so `origin/main` — this
- * script's default base — is frequently absent there.
- */
+/** Compare what every `src/**\/*.svelte` component renders against a base ref. */
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -155,12 +69,7 @@ function parseArgs(argv) {
   return options;
 }
 
-/**
- * The two git reads this script needs, bound to one absolute git executable resolved up front.
- *
- * Both spawn through `execFile`, never a shell: `^` and `{}` are shell metacharacters and nothing
- * here is quoted, and an MSYS shell additionally rewrites the `<ref>:<path>` argument on Windows.
- */
+/** The two git reads this script needs, bound to one absolute git executable resolved up front. */
 function createGitCommands() {
   // Fatal here, unlike in the benchmark envelope: a run that cannot find git cannot compare
   // anything, and the top-level handler turns this into exit 2 with git's absence named, instead
@@ -183,12 +92,7 @@ function createGitCommands() {
   };
 
   return {
-    /**
-     * Resolve a ref to a commit SHA, or null when it does not resolve in this repository.
-     *
-     * `^{commit}` makes this reject a ref that exists but does not name a commit, and `--quiet`
-     * turns the failure into a plain exit code so the caller can word its own message.
-     */
+    /** Resolve a ref to a commit SHA, or null when it does not resolve in this repository. */
     resolveCommit: (ref) =>
       // `^{commit}` is git's own peel-to-a-commit revision syntax, written literally into the
       // argument. It is not a `${…}` placeholder that lost its dollar sign, which is what
@@ -197,27 +101,12 @@ function createGitCommands() {
       // eslint-disable-next-line unicorn/no-incorrect-template-string-interpolation
       read(['rev-parse', '--verify', '--quiet', `${ref}^{commit}`])?.trim() ?? null,
 
-    /**
-     * `git show <ref>:<path>`, or null when the path does not exist there.
-     *
-     * Every failure reads as "absent from the base", which is only sound because `main` has
-     * already proved the ref resolves. Without that preflight an unresolvable ref makes EVERY
-     * component look new and the whole run vacuous.
-     */
+    /** `git show <ref>:<path>`, or null when the path does not exist there. */
     readAtRef: (ref, relativePath) => read(['show', `${ref}:${relativePath}`], 64 * 1024 * 1024),
   };
 }
 
-/**
- * Decode the one escape sequence introduced by the `\` immediately before `index`.
- *
- * `index` addresses the character AFTER the backslash, and `next` is the index one past the whole
- * sequence — variable-length, which is why this reports it rather than letting the caller guess.
- *
- * `String.fromCodePoint`, not `fromCharCode`: identical for every value these two forms can carry
- * (`\uXXXX` caps at U+FFFF, `\xNN` at U+00FF, and a lone surrogate is a valid argument to both),
- * and it is the one that stays correct if an astral escape ever reaches here.
- */
+/** Decode the one escape sequence introduced by the `\` immediately before `index`. */
 function decodeEscape(body, index) {
   const escape = body[index];
   if (escape === 'u' && body[index + 1] === '{') {
@@ -244,13 +133,7 @@ function decodeEscape(body, index) {
   return { text: SIMPLE_ESCAPES[escape] ?? escape, next: index + 1 };
 }
 
-/**
- * Decode a JS string literal (quotes included) to its value, so quote style stops mattering.
- *
- * A `while` over an explicit cursor rather than a `for` counter: the cursor advances by whatever
- * the escape at hand consumed, and a `for` header that claims `index++` while the body overrides
- * it lies about the step (SonarCloud's `javascript:S2310`).
- */
+/** Decode a JS string literal (quotes included) to its value, so quote style stops mattering. */
 function decodeString(literal) {
   const body = literal.slice(1, -1);
   let value = '';
@@ -273,12 +156,7 @@ function opensComment(char, next) {
   return char === '/' && (next === '/' || next === '*');
 }
 
-/**
- * Index one past the comment opening at `index`.
- *
- * A line comment stops ON its newline rather than after it, so the whitespace rule below still
- * gets to decide whether that newline joins two words.
- */
+/** Index one past the comment opening at `index`. */
 function endOfComment(code, index) {
   if (code[index + 1] === '/') {
     const end = code.indexOf('\n', index);
@@ -295,12 +173,7 @@ function endOfWhitespace(code, index) {
   return end;
 }
 
-/**
- * Index one past the closing delimiter of the `'`, `"` or `` ` `` run starting at `index`.
- *
- * A backslash consumes the character after it, and an unterminated run reports one past the input
- * so the caller's cursor still advances past the end.
- */
+/** Index one past the closing delimiter of the `'`, `"` or `` ` `` run starting at `index`. */
 function endOfDelimited(code, index) {
   const delimiter = code[index];
   let end = index + 1;
@@ -308,25 +181,13 @@ function endOfDelimited(code, index) {
   return end + 1;
 }
 
-/**
- * What a run of whitespace between these two characters contributes to the normalised output.
- *
- * A space only between two word characters, where it is lexically required (`return x`).
- * Everywhere else the printer's line breaks are cosmetic, so they are dropped rather than
- * collapsed to a space — collapsing would keep `( (` distinct from `((`.
- */
+/** What a run of whitespace between these two characters contributes to the normalised output. */
 function joiningWhitespace(previous, following) {
   const joinsWords = Boolean(previous) && /[\w$]/.test(previous) && /[\w$]/.test(following ?? '');
   return joinsWords ? ' ' : '';
 }
 
-/**
- * Index one past the `}` closing the `${…}` interpolation whose body starts at `start`.
- *
- * Brace depth is counted, and any nested quoted or template run is skipped wholesale so a brace
- * inside a string cannot unbalance the scan. Skipped, not parsed: the caller normalises the whole
- * interpolation body recursively, which is what handles the nested literal properly.
- */
+/** Index one past the `}` closing the `${…}` interpolation whose body starts at `start`. */
 function endOfInterpolation(code, start) {
   let end = start;
   let depth = 1;
@@ -346,13 +207,6 @@ function endOfInterpolation(code, start) {
 /**
  * Read the template literal starting at `index`, normalising only the code inside its `${…}`
  * interpolations.
- *
- * Collecting into `templates` happens here, and after the loop, so a literal nested inside an
- * interpolation — pushed by the recursive `normalise` below — is collected before the literal
- * containing it.
- *
- * @returns {{ literal: string, next: number }} the literal as it should be emitted, and the index
- *   one past it
  */
 function readTemplateLiteral(code, index, templates) {
   let literal = '`';
@@ -385,17 +239,7 @@ function readTemplateLiteral(code, index, templates) {
   return { literal, next: at };
 }
 
-/**
- * Normalise generated JS and collect its template literals.
- *
- * Hand-rolled rather than parsed. The input is machine-generated, so the lexical states are the
- * simple ones, and this keeps the script free of a JS-parser dependency. It walks characters and
- * recurses into `${…}` interpolations, which is what lets template TEXT stay byte-exact while the
- * expressions inside it are normalised like any other code.
- *
- * The body is a dispatch over which lexical run starts here; each run's scanning rules live in
- * its own helper above, so this stays a table of cases rather than one nested scanner.
- */
+/** Normalise generated JS and collect its template literals. */
 function normalise(code, templates = null) {
   let out = '';
   let index = 0;
@@ -441,16 +285,7 @@ function nextParenDepth(depth, char) {
   return depth;
 }
 
-/**
- * Split normalised code into statements, so each DOM write is one comparable unit.
- *
- * Breaks on `;`, `{` and `}`, but only at parenthesis/bracket depth 0. Brace depth is
- * deliberately NOT tracked: breaking on braces is what gives statement granularity inside a
- * function body, and without it a whole component function is a single chunk — which makes the
- * emission signal indistinguishable from the whole module. Paren depth IS tracked, so a
- * `$.template_effect(() => { … })` stays atomic: the effect body is one DOM write and its
- * internals travel with it.
- */
+/** Split normalised code into statements, so each DOM write is one comparable unit. */
 function statements(normalised) {
   const chunks = [];
   let current = '';
@@ -478,20 +313,7 @@ function statements(normalised) {
   return chunks.filter(Boolean);
 }
 
-/**
- * Order two Svelte compiler warning codes by codepoint, independently of the host locale.
- *
- * This inventory is not a cross-commit signal — `renderCategories` compares only `templates`,
- * `emissions` and `css`, and `compareComponent` reads the head side's `warnings` alone. It is the
- * head-side warning inventory `printReport` prints and `--json` serializes, so the order must be
- * locale-INDEPENDENT for two runs on different machines to stay diffable. `localeCompare` would
- * make it depend on the host's collation, so it is deliberately not used here.
- *
- * `String(…)` first, because the bare `.sort()` this replaces coerces with `ToString` before
- * comparing: a relational comparator over the raw values diverges from it on non-strings
- * (`[10, 9].sort()` is `[10, 9]`, while comparing the numbers gives `[9, 10]`). `warning.code` is
- * a string today and nothing pins that, so the coercion is made explicit rather than assumed.
- */
+/** Order two Svelte compiler warning codes by codepoint, independently of the host locale. */
 function compareWarningCodes(a, b) {
   const left = String(a);
   const right = String(b);
@@ -499,30 +321,7 @@ function compareWarningCodes(a, b) {
   return left > right ? 1 : 0;
 }
 
-/**
- * The compiled-render fingerprint of one component.
- *
- * The compile itself goes through `scripts/lib/svelteCompilerWarnings.js`, which reads the
- * build's options out of `svelte.config.js`. That matters for the `warnings` field below: it is
- * the same signal `scripts/check-svelte-warnings.mjs` and `svelte.config.js`'s `onwarn` produce,
- * and three independent `compile()` calls with three private option sets is how a baseline goes
- * quietly wrong.
- *
- * `css: 'external'` is the one deliberate departure from the build's own `css: 'injected'`.
- * Under `injected` the compiler returns `result.css === null` and folds the stylesheet into a
- * string literal inside the JS, which would collapse the separate `css` signal below into the
- * whole-module `code` fallback and turn every rewrapped CSS declaration into a reported
- * difference — the exact noise this script normalises away everywhere else.
- *
- * It is not a new risk taken on. Svelte's `css` option DEFAULTS to `'external'`, and this
- * function's pre-change call passed no `css` key — so `{ css: 'external' }` reproduces the
- * behaviour this script has always had, byte for byte, and merely says so out loud now that
- * the rest of the options come from `svelte.config.js`.
- *
- * The override is confined to where the stylesheet is EMITTED, not whether it is ANALYSED, so
- * the `warnings` field above is unaffected — which `tests/svelte-warning-scope.test.js` asserts
- * over sources that actually warn (one CSS, one a11y) rather than leaving to this comment.
- */
+/** The compiled-render fingerprint of one component. */
 function fingerprint(source, filename) {
   const result = compileComponent(source, filename, { css: 'external' });
   const maskHash = (text) => text.replaceAll(/svelte-[\da-z]+/g, 'svelte-HASH');
@@ -541,14 +340,7 @@ function fingerprint(source, filename) {
   };
 }
 
-/**
- * Every positional difference between two ordered signal lists.
- *
- * Positional, not a longest-common-subsequence diff: a component that gains or loses an element
- * shifts everything after it and reports as a wide drift, which is the right alarm for the
- * question this script asks. Reformat-only changes preserve length and order, so the alignment
- * holds for the case it is built for.
- */
+/** Every positional difference between two ordered signal lists. */
 function differences(left, right) {
   const found = [];
   const length = Math.max(left.length, right.length);
@@ -558,12 +350,7 @@ function differences(left, right) {
   return found;
 }
 
-/**
- * Show the window around the first differing character, not the first 200 identical ones.
- *
- * The empty-string defaults cover the one-sided case: `differences` reports an index present on
- * only one side, so the other arrives as `undefined`.
- */
+/** Show the window around the first differing character, not the first 200 identical ones. */
 function window_(base = '', head = '') {
   let at = 0;
   while (at < base.length && at < head.length && base[at] === head[at]) at++;
@@ -610,12 +397,7 @@ function createReport(base, baseCommit, componentCount) {
   };
 }
 
-/**
- * Every render-signal difference between the two sides of one component, in report order.
- *
- * `code` is deliberately absent: it is the fallback signal the caller consults only when this
- * comes back empty.
- */
+/** Every render-signal difference between the two sides of one component, in report order. */
 function renderCategories(base, head) {
   const categories = Array.from(differences(base.templates, head.templates), (delta) => ({
     kind: 'templates',
@@ -699,8 +481,7 @@ function printReport(report) {
 function exitCodeFor(report, options) {
   if (report.failed.length > 0) return 2;
   // Same rule as the base-ref preflight, applied to the outcome rather than the input: a run that
-  // compared nothing proves nothing, so it must not read as a pass. The usual cause is a
-  // `--filter` that matches no component.
+  // compared nothing proves nothing, so it must not read as a pass.
   if (report.compared === 0) {
     const scope = options.filter ? ` matching --filter "${options.filter}"` : '';
     console.error(
