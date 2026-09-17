@@ -25,6 +25,43 @@ Useful options:
 | `--no-premium` | Skip the sibling premium config. |
 | `--json` | Print machine-readable JSON instead of a table. |
 
+## Tester secret rotation
+
+`rotate-tester-secrets.mjs` rotates every tester path segment in one pass, across this repository and the premium sibling.
+It reads the root `release.s3.config.json` plus `../fabricate-premium/release.config.json` to derive which repository secret each tester group's segment is written to, then writes those secrets through `gh secret set` over stdin.
+A tester group is one cohort holding one URL prefix, so its segment is one value shared by every repository publishing into it, and rotating one repository alone splits that cohort across two prefixes.
+
+```bash
+node scripts/rotate-tester-secrets.mjs
+node scripts/rotate-tester-secrets.mjs --apply
+node scripts/rotate-tester-secrets.mjs --group closed-beta-2026 --apply
+```
+
+Useful options:
+
+| Option | Description |
+|---|---|
+| `--apply` | Write the secrets; without it the run is a dry run that writes nothing. |
+| `--group <name>` | Rotate one group's secret alone; refused when that secret also serves groups the flag did not name. |
+| `--config <path>` | Fabricate release config path. |
+| `--premium-config <path>` | Premium release config path, for when the sibling is not checked out beside this repository. |
+| `--no-premium` | Inspect this repository alone; dry run only. |
+| `-h`, `--help` | Print the usage summary. |
+
+`--no-premium` is refused together with `--apply`.
+Without the premium config every secret looks single-repository, which suppresses both the collapse warning and the ambiguous-narrowing refusal exactly when they matter.
+
+`gh` is resolved to one absolute executable path before it is run, rather than left for `execFile` to search `PATH` at spawn time.
+Set `GH_BIN` to an absolute path when the GitHub CLI is not on `PATH` or a non-standard install must be used; a relative `GH_BIN` is refused.
+
+Rotation is a cohort migration, not hygiene.
+It deletes nothing and republishes nothing, so a superseded prefix keeps serving its last manifest and the cohort on it stops receiving updates silently rather than failing.
+Under `--apply` the script prints one feed URL per rotated group and module.
+`gh` cannot read a secret back, so that report is the only record of where each cohort now lives, and every run must be paired with the announcement carrying those URLs.
+
+The script is deliberately absent from `package.json` and from every workflow, and a test asserts that.
+It mutates repository secrets in two repositories, so it stays a deliberate local act.
+
 ## Icon catalogue
 
 `generate-icon-catalogue.mjs` regenerates `src/ui/svelte/util/foundryIconCatalogue.js` from the Font Awesome bundle a Foundry install ships.
