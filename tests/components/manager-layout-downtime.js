@@ -13,7 +13,6 @@ import { openLayoutContext } from '../helpers/layout-harness.js';
 import { blockIn, css } from './manager-layout-shared.js';
 import {
   MANAGER_WIDTH_LADDER,
-  READ_ROW,
   assertBadgeFixtureMirrorsComponent,
   companionRoot,
   companionRows,
@@ -390,15 +389,47 @@ test('a four-digit companion badge takes width from the LABEL, which never split
           `</div></div>`
       )
     );
-    const read = await page.evaluate((body) => {
-      const of = eval(`(${body})`);
+    // Counting LINE BOXES by distinct top edge, not by rect count: a range yields several rects
+    // for one visual line, so `rects.length` reads a single line as two and passes a split as fine.
+    const read = await page.evaluate(() => {
+      const of = (id) => {
+        const row = document.getElementById(id);
+        const label = row.querySelector('.manager-nav-label');
+        const badge = row.querySelector('.manager-nav-issue-badge');
+        const range = document.createRange();
+        range.selectNodeContents(label);
+        const lines = new Set([...range.getClientRects()].map((rect) => Math.round(rect.top)));
+        const rowBox = row.getBoundingClientRect();
+        const labelBox = label.getBoundingClientRect();
+        const badgeBox = badge.getBoundingClientRect();
+        return {
+          lines: lines.size,
+          clipped: label.scrollWidth > label.clientWidth,
+          wrap: getComputedStyle(label).overflowWrap,
+          labelWidth: +labelBox.width.toFixed(1),
+          labelFirstLineBottom: Math.min(...[...range.getClientRects()].map((rect) => rect.bottom)),
+          badgeWidth: +badgeBox.width.toFixed(1),
+          badgeHeight: +badgeBox.height.toFixed(1),
+          badgeClipped: badge.scrollWidth > badge.clientWidth,
+          badgeCentreY: +(badgeBox.top + badgeBox.height / 2).toFixed(1),
+          badgeInsideRow:
+            badgeBox.left >= rowBox.left - 0.5 &&
+            badgeBox.right <= rowBox.right + 0.5 &&
+            badgeBox.top >= rowBox.top - 0.5 &&
+            badgeBox.bottom <= rowBox.bottom + 0.5,
+          badgeClearsLabel: badgeBox.left >= labelBox.right - 0.5,
+          rowHeight: +rowBox.height.toFixed(1),
+          rowCentreY: +(rowBox.top + rowBox.height / 2).toFixed(1),
+          rowVerticallyClipped: row.scrollHeight > row.clientHeight + 1,
+        };
+      };
       return {
         wide: of('wide'),
         control: of('control'),
         oneWord: of('oneword'),
         short: of('short'),
       };
-    }, READ_ROW);
+    });
 
     // THE NUMERAL IS NEVER TRUNCATED. A truncated numeral actively lies — "12" for "128" —
     // while a truncated label is fully recoverable from the row's `title` and its
@@ -493,45 +524,44 @@ test('the Downtime parent rollup keeps the row’s label on one line, and surviv
       parentRow('chip', chip) +
       `</section>`;
 
-    const readParent = `(id, markSelector) => {
-      const row = document.getElementById(id);
-      const label = row.querySelector('.manager-nav-label');
-      const mark = row.querySelector(markSelector);
-      const toggle = document.getElementById(id + '-toggle');
-      const range = document.createRange();
-      range.selectNodeContents(label);
-      const lines = new Set([...range.getClientRects()].map((rect) => Math.round(rect.top)));
-      const rowBox = row.getBoundingClientRect();
-      const markBox = mark.getBoundingClientRect();
-      const toggleBox = toggle.getBoundingClientRect();
-      return {
-        lines: lines.size,
-        clipped: label.scrollWidth > label.clientWidth,
-        labelWidth: +label.getBoundingClientRect().width.toFixed(1),
-        markDisplay: getComputedStyle(mark).display,
-        markWidth: +markBox.width.toFixed(1),
-        markHeight: +markBox.height.toFixed(1),
-        markInsideRow:
-          markBox.left >= rowBox.left - 0.5 &&
-          markBox.right <= rowBox.right + 0.5 &&
-          markBox.top >= rowBox.top - 0.5 &&
-          markBox.bottom <= rowBox.bottom + 0.5,
-        overlapsToggle:
-          markBox.right > toggleBox.left + 0.5 &&
-          markBox.left < toggleBox.right - 0.5 &&
-          markBox.bottom > toggleBox.top + 0.5 &&
-          markBox.top < toggleBox.bottom - 0.5,
-      };
-    }`;
 
     await page.setContent(railPage(nav));
-    const expanded = await page.evaluate((body) => {
-      const of = eval(`(${body})`);
+    const expanded = await page.evaluate(() => {
+      const of = (id, markSelector) => {
+        const row = document.getElementById(id);
+        const label = row.querySelector('.manager-nav-label');
+        const mark = row.querySelector(markSelector);
+        const toggle = document.getElementById(id + '-toggle');
+        const range = document.createRange();
+        range.selectNodeContents(label);
+        const lines = new Set([...range.getClientRects()].map((rect) => Math.round(rect.top)));
+        const rowBox = row.getBoundingClientRect();
+        const markBox = mark.getBoundingClientRect();
+        const toggleBox = toggle.getBoundingClientRect();
+        return {
+          lines: lines.size,
+          clipped: label.scrollWidth > label.clientWidth,
+          labelWidth: +label.getBoundingClientRect().width.toFixed(1),
+          markDisplay: getComputedStyle(mark).display,
+          markWidth: +markBox.width.toFixed(1),
+          markHeight: +markBox.height.toFixed(1),
+          markInsideRow:
+            markBox.left >= rowBox.left - 0.5 &&
+            markBox.right <= rowBox.right + 0.5 &&
+            markBox.top >= rowBox.top - 0.5 &&
+            markBox.bottom <= rowBox.bottom + 0.5,
+          overlapsToggle:
+            markBox.right > toggleBox.left + 0.5 &&
+            markBox.left < toggleBox.right - 0.5 &&
+            markBox.bottom > toggleBox.top + 0.5 &&
+            markBox.top < toggleBox.bottom - 0.5,
+        };
+      };
       return {
         rollup: of('rollup', '[data-world-downtime-badge-total]'),
         chip: of('chip', '.manager-nav-premium'),
       };
-    }, readParent);
+    });
 
     assert.equal(
       expanded.rollup.lines,
@@ -556,13 +586,42 @@ test('the Downtime parent rollup keeps the row’s label on one line, and surviv
     // left once the labels and the children are gone. This is the guard chosen for accepted
     // limitation 8 in place of a further View Lab case: a measurement rather than a picture.
     await page.setContent(railPage(nav, ' is-rail-collapsed'));
-    const collapsed = await page.evaluate((body) => {
-      const of = eval(`(${body})`);
+    const collapsed = await page.evaluate(() => {
+      const of = (id, markSelector) => {
+        const row = document.getElementById(id);
+        const label = row.querySelector('.manager-nav-label');
+        const mark = row.querySelector(markSelector);
+        const toggle = document.getElementById(id + '-toggle');
+        const range = document.createRange();
+        range.selectNodeContents(label);
+        const lines = new Set([...range.getClientRects()].map((rect) => Math.round(rect.top)));
+        const rowBox = row.getBoundingClientRect();
+        const markBox = mark.getBoundingClientRect();
+        const toggleBox = toggle.getBoundingClientRect();
+        return {
+          lines: lines.size,
+          clipped: label.scrollWidth > label.clientWidth,
+          labelWidth: +label.getBoundingClientRect().width.toFixed(1),
+          markDisplay: getComputedStyle(mark).display,
+          markWidth: +markBox.width.toFixed(1),
+          markHeight: +markBox.height.toFixed(1),
+          markInsideRow:
+            markBox.left >= rowBox.left - 0.5 &&
+            markBox.right <= rowBox.right + 0.5 &&
+            markBox.top >= rowBox.top - 0.5 &&
+            markBox.bottom <= rowBox.bottom + 0.5,
+          overlapsToggle:
+            markBox.right > toggleBox.left + 0.5 &&
+            markBox.left < toggleBox.right - 0.5 &&
+            markBox.bottom > toggleBox.top + 0.5 &&
+            markBox.top < toggleBox.bottom - 0.5,
+        };
+      };
       return {
         rollup: of('rollup', '[data-world-downtime-badge-total]'),
         chip: of('chip', '.manager-nav-premium'),
       };
-    }, readParent);
+    });
 
     assert.equal(
       collapsed.chip.markDisplay,

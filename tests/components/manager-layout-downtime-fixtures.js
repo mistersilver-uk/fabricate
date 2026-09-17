@@ -146,39 +146,6 @@ export function railPage(navMarkup, bodyClass = '') {
   );
 }
 
-// Counting LINE BOXES by distinct top edge, not by rect count: a range yields several rects
-// for one visual line, so `rects.length` reads a single line as two and passes a split as fine.
-export const READ_ROW = `(id) => {
-  const row = document.getElementById(id);
-  const label = row.querySelector('.manager-nav-label');
-  const badge = row.querySelector('.manager-nav-issue-badge');
-  const range = document.createRange();
-  range.selectNodeContents(label);
-  const lines = new Set([...range.getClientRects()].map((rect) => Math.round(rect.top)));
-  const rowBox = row.getBoundingClientRect();
-  const labelBox = label.getBoundingClientRect();
-  const badgeBox = badge.getBoundingClientRect();
-  return {
-    lines: lines.size,
-    clipped: label.scrollWidth > label.clientWidth,
-    wrap: getComputedStyle(label).overflowWrap,
-    labelWidth: +labelBox.width.toFixed(1),
-    labelFirstLineBottom: Math.min(...[...range.getClientRects()].map((rect) => rect.bottom)),
-    badgeWidth: +badgeBox.width.toFixed(1),
-    badgeHeight: +badgeBox.height.toFixed(1),
-    badgeClipped: badge.scrollWidth > badge.clientWidth,
-    badgeCentreY: +(badgeBox.top + badgeBox.height / 2).toFixed(1),
-    badgeInsideRow:
-      badgeBox.left >= rowBox.left - 0.5 &&
-      badgeBox.right <= rowBox.right + 0.5 &&
-      badgeBox.top >= rowBox.top - 0.5 &&
-      badgeBox.bottom <= rowBox.bottom + 0.5,
-    badgeClearsLabel: badgeBox.left >= labelBox.right - 0.5,
-    rowHeight: +rowBox.height.toFixed(1),
-    rowCentreY: +(rowBox.top + rowBox.height / 2).toFixed(1),
-    rowVerticallyClipped: row.scrollHeight > row.clientHeight + 1,
-  };
-}`;
 
 // -- The companion Downtime panel's layout contract (issue 1213) -------------------------
 //
