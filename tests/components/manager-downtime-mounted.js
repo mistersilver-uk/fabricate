@@ -28,6 +28,7 @@ import {
   managerComponents,
   settleBetweenTests,
   settleRouteExit,
+  compareStrings,
 } from './manager-mounted-shared.js';
 
 let Component;
@@ -2120,7 +2121,7 @@ export function registerDowntimeCases() {
       assert.equal(contexts.length, 1);
       const [context] = contexts;
       assert.ok(Object.isFrozen(context), 'the context is frozen, so it cannot be written back');
-      assert.deepEqual(Object.keys(context).sort(), [
+      assert.deepEqual(Object.keys(context).sort(compareStrings), [
         'craftingSystemId',
         'isGM',
         // The runtime route-chrome channel is FUNCTIONS on the frozen context, never mutable

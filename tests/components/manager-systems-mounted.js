@@ -30,7 +30,7 @@ import {
   createManagerQueries,
 } from '../helpers/manager/managerQueries.js';
 import { createManagerMounts } from '../helpers/manager/managerMount.js';
-import { managerComponents, settle, settleBetweenTests } from './manager-mounted-shared.js';
+import { managerComponents, settle, settleBetweenTests, compareStrings } from './manager-mounted-shared.js';
 
 let Component;
 let SystemEditViewComponent;
@@ -1851,8 +1851,8 @@ export function registerSystemsCases() {
       'every drop zone lives inside the single-row container'
     );
     assert.deepEqual(
-      [...dropzones].map((zone) => zone.getAttribute('data-world-currency-macro-dropzone')).sort(),
-      [...CURRENCY_MACRO_KEYS].sort(),
+      [...dropzones].map((zone) => zone.getAttribute('data-world-currency-macro-dropzone')).sort(compareStrings),
+      [...CURRENCY_MACRO_KEYS].sort(compareStrings),
       'and each zone is bound to a declared slot'
     );
     // The removed nested inventory-mode select must not render.

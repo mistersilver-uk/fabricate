@@ -22,7 +22,7 @@ import {
   waitForQueuedAnnouncement,
 } from '../helpers/manager/managerQueries.js';
 import { createManagerMounts } from '../helpers/manager/managerMount.js';
-import { managerComponents, settle, settleBetweenTests } from './manager-mounted-shared.js';
+import { managerComponents, settle, settleBetweenTests, compareStrings } from './manager-mounted-shared.js';
 
 let Component;
 let mounted;
@@ -417,7 +417,7 @@ export function registerBulkCases() {
 
     const applyCalls = calls.filter((call) => call[0] === 'applyComponentBulkEdit');
     assert.equal(applyCalls.length, 1, 'ONE set-apply write for the whole selection');
-    assert.deepEqual(applyCalls[0][1].sort(), ['c1', 'c2']);
+    assert.deepEqual(applyCalls[0][1].sort(compareStrings), ['c1', 'c2']);
     assert.deepEqual(applyCalls[0][2], {
       category: 'Reagent',
       addTags: ['ore'],
@@ -568,8 +568,8 @@ export function registerBulkCases() {
     const applyCalls = calls.filter((call) => call[0] === 'applyComponentBulkEdit');
     assert.equal(applyCalls.length, 1, 'ONE write for the whole cross-page selection');
     assert.deepEqual(
-      [...applyCalls[0][1]].sort(),
-      ['c1', offPageId].sort(),
+      [...applyCalls[0][1]].sort(compareStrings),
+      ['c1', offPageId].sort(compareStrings),
       'the off-page id reaches the write, not just the count'
     );
   });
@@ -1219,7 +1219,7 @@ export function registerBulkCases() {
     const deleteCall = calls.find((call) => call[0] === 'deleteEssences');
     assert.ok(deleteCall, 'the SECOND click performs the delete');
     assert.deepEqual(
-      [...deleteCall[1]].sort(),
+      [...deleteCall[1]].sort(compareStrings),
       ['earth', 'water'],
       'and it deletes EVERY selected member, carried or not'
     );

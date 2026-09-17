@@ -32,6 +32,7 @@ import {
   managerComponents,
   settleBetweenTests,
   settleRouteExit,
+  compareStrings,
 } from './manager-mounted-shared.js';
 
 let Component;
@@ -1230,7 +1231,7 @@ export function registerGatheringCases() {
     const afterAddPillIds = Array.from(afterAddPills).map((node) =>
       node.getAttribute('data-gathering-task-required-tool-pill')
     );
-    assert.deepEqual(afterAddPillIds.sort(), ['tool-lantern', 'tool-pickaxe']);
+    assert.deepEqual(afterAddPillIds.sort(compareStrings), ['tool-lantern', 'tool-pickaxe']);
     assert.equal(
       target.querySelectorAll('[data-gathering-task-required-tools-card]').length,
       0,

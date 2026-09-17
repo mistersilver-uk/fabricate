@@ -175,3 +175,13 @@ export const booksScrollsFixtures = [
     caps: { learn: { limitLearning: false } },
   },
 ];
+
+/**
+ * Order string lists deterministically. The default `sort()` coerces to string and compares
+ * UTF-16 units, which is what these id and key lists want, but leaving it implicit reads as an
+ * oversight and trips the bug rule that cannot tell a string array from a numeric one. Each call
+ * site compares the result against an expected array, so a real ordering change fails its own test.
+ */
+export function compareStrings(a, b) {
+  return a.localeCompare(b);
+}

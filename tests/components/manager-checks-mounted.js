@@ -21,6 +21,7 @@ import {
   managerComponents,
   settleBetweenTests,
   settleRouteExit,
+  compareStrings,
 } from './manager-mounted-shared.js';
 
 let Component;
@@ -3349,7 +3350,7 @@ export function registerChecksCases() {
         '[data-checks-validation-section="crafting"] [data-issue-severity="critical"]'
       ),
     ].map((row) => row.getAttribute('data-issue'));
-    assert.deepEqual(reported.sort(), ['noSuccessOutcome', 'unnamedOutcome']);
+    assert.deepEqual(reported.sort(compareStrings), ['noSuccessOutcome', 'unnamedOutcome']);
   });
 
   it('marks and SAVES an alchemy-tiered edit, which lands on the routed draft', async () => {
