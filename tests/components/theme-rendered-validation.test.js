@@ -125,6 +125,19 @@ function themePage(theme, width, height, body) {
             color: var(--fab-text-muted);
             line-height: 1.35;
           }
+          /* The solid fab-info fill and the ink the premium companion paints on it. The baseline
+             ink is a sentinel rather than an inherited theme token: foundry-native gives
+             fab-on-info and fab-text one value, so an inherited baseline would read a correct
+             sheet as a rule that never applied. */
+          .preview-info-baseline {
+            color: rgb(1 2 3);
+          }
+          .preview-info-solid {
+            background: var(--fab-info);
+            color: var(--fab-on-info);
+            font-size: 10px;
+            font-weight: 600;
+          }
           /* NO preview helper stands in for a bulk panel's background. There used to be one
              (.preview-bulk-surface, --fab-bg-2) because contrastSample jumped
              straight from a sample's own fill to [data-surface-backdrop], so a probe with no
@@ -293,6 +306,13 @@ function managerFixture(theme, width, height) {
           <button type="button" class="fabricate-button manager-button fab-manager-button is-dashed" data-contrast-quiet-dashed data-boundary>Add outcome tier</button>
           ${bulkEditSubhint()}
           ${bulkBookPickCard()}
+          <!-- The solid fab-info fill inked by fab-on-info, which no rule in this repository
+               paints: the pair belongs to the premium companion's selected segmented-control
+               label, at 10px/600, so the bar is 4.5:1 and not the large-text 3:1 (issue 1765).
+               Its own hook, because contrastSample reads the first node matching a selector. -->
+          <div class="preview-info-baseline">
+            <span class="preview-info-solid" data-contrast-info-solid>Gather 3</span>
+          </div>
         </aside>
       </div>
     </section>`);
@@ -361,8 +381,8 @@ function assertRenderedResult(result, theme, surfaceId, width) {
     assert.ok(ratio >= 4.5, `${theme}/${surfaceId}/${width} the ${role} role's label should pass WCAG AA against the surface it recedes into, got ${ratio.toFixed(2)}:1`);
   }
   // The bulk edit panels' muted copy (issue 1015), one probe per COLUMN it renders on.
-  assertScopedSamplePassesAA(result, '[data-contrast-bulk-muted]', `${theme}/${surfaceId}/${width} bulk edit muted copy on the rail fill`);
-  assertScopedSamplePassesAA(result, '[data-contrast-bulk-bg-muted]', `${theme}/${surfaceId}/${width} bulk edit book pick meta on the card fill`);
+  assertOwnRulePassesAA(result, '[data-contrast-bulk-muted]', `${theme}/${surfaceId}/${width} bulk edit muted copy on the rail fill`);
+  assertOwnRulePassesAA(result, '[data-contrast-bulk-bg-muted]', `${theme}/${surfaceId}/${width} bulk edit book pick meta on the card fill`);
   // The rail's bare-numeral `.manager-nav-count` (issue 1304), one probe per GROUND it
   // renders on: the idle rail's own `--fab-bg-0` fill, and `--fab-surface-active` under the
   // active row. A 0.625rem/600 numeral is not large text, so the bar is 4.5:1 on both — and
@@ -373,25 +393,30 @@ function assertRenderedResult(result, theme, surfaceId, width) {
   assert.ok(idleCountRatio >= 4.5, `${theme}/${surfaceId}/${width} the idle rail's nav count should pass WCAG AA, got ${idleCountRatio.toFixed(2)}:1`);
   const activeCountRatio = contrastSample(result, '[data-contrast-nav-count-active]');
   assert.ok(activeCountRatio >= 4.5, `${theme}/${surfaceId}/${width} the active row's nav count should pass WCAG AA against --fab-surface-active, got ${activeCountRatio.toFixed(2)}:1`);
+  // --fab-on-info is derived per theme from that theme's --fab-on-success, so it is measured here.
+  assertOwnRulePassesAA(result, '[data-contrast-info-solid]', `${theme}/${surfaceId}/${width} --fab-on-info on the solid --fab-info fill`);
 }
 
 /*
- * A Svelte-SCOPED sample: its rule must be the one that actually won, or the ratio is the
- * ratio of the panel's PRIMARY text and says nothing about the muted scale being asserted.
+ * A sample whose own rule must be the one that actually won, or the ratio is the ratio of the ink
+ * it would have inherited and says nothing about the token being asserted. Two kinds qualify: a
+ * Svelte-scoped rule, and a `var()` read of a token that might not resolve — an unresolvable
+ * `var()` in an inherited property computes the inherited value rather than failing.
  *
  * `contrastSamples.find` is looked up here rather than dereferenced inline because a drifted
  * selector list would otherwise throw a TypeError instead of naming the missing probe —
  * `contrastSample` already states that with `assert.ok`, and this check has to state it too.
  */
-function assertScopedSamplePassesAA(result, selector, label) {
+function assertOwnRulePassesAA(result, selector, label) {
   const sample = result.contrastSamples.find(entry => entry.selector === selector);
   assert.ok(sample, `expected contrast sample for ${selector} (${label})`);
   assert.notEqual(
     sample.color,
     sample.inheritedColor,
-    `${label} computed the inherited --fab-text (${sample.color}) — its scoped rule did not apply, so the ratio would prove nothing`
+    `${label} computed the inherited ink (${sample.color}) — its own rule did not apply, so the ratio would prove nothing`
   );
-  assert.ok(contrastSample(result, selector) >= 4.5, `${label} contrast should pass WCAG AA`);
+  const ratio = contrastSample(result, selector);
+  assert.ok(ratio >= 4.5, `${label} contrast should pass WCAG AA, got ${ratio.toFixed(2)}:1`);
 }
 
 async function inspectRenderedSurface(page) {
@@ -450,7 +475,7 @@ async function inspectRenderedSurface(page) {
       }
       return layers;
     };
-    const contrastSamples = ['[data-contrast-surface]', '[data-contrast-soft]', '[data-contrast-solid]', '[data-contrast-solid-armed]', '[data-contrast-quiet-ghost]', '[data-contrast-quiet-dashed]', '[data-contrast-bulk-muted]', '[data-contrast-bulk-bg-muted]', '[data-contrast-nav-count-idle]', '[data-contrast-nav-count-active]'].map(selector => {
+    const contrastSamples = ['[data-contrast-surface]', '[data-contrast-soft]', '[data-contrast-solid]', '[data-contrast-solid-armed]', '[data-contrast-quiet-ghost]', '[data-contrast-quiet-dashed]', '[data-contrast-bulk-muted]', '[data-contrast-bulk-bg-muted]', '[data-contrast-nav-count-idle]', '[data-contrast-nav-count-active]', '[data-contrast-info-solid]'].map(selector => {
       const element = document.querySelector(selector);
       const style = getComputedStyle(element);
       return {
