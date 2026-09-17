@@ -1,67 +1,13 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  The world Tools Catalogue (issue 1373, epic 1357).
-
-  IT COMPOSES `EntityCatalogueShell` AND BUILDS NO SECOND LIST. The list, its filters, its
-  sort, its bulk selection and its inspector column are all the shell's; what this file owns
-  is the tool-shaped configuration around them - the search text, the breakage sort, the row
-  badges, the seeded-section panel - and the one control that is not part of any list.
-
-  == THE WORLD BREAKAGE DEFAULT SITS ABOVE THE SHELL, NOT INSIDE IT ========================
-  It is neither a row nor an entity: it is one value for every Tool in the world, and this is
-  the ONLY surface at world scope that authors it. The shell takes no scope-level header
-  snippet, so the card is a SIBLING of the shell inside this page's own `<main>` - a card and
-  a list, not a second catalogue composition, and it defines no list, filter or inspector
-  structure of its own.
-
-  == THE TWO-TRACK LAYOUT IS REDECLARED, BECAUSE THE SPAN HAD NOTHING TO SPAN ==============
-  An earlier revision spanned rows instead of redeclaring, on the premise that
-  `styles/fabricate.css` gives every `.manager-main` `grid-template-rows: auto auto 1fr`.
-  That is true of the shared rule and FALSE of this view: `styles/fabricate.css:7254-7267`
-  overrides every world-scope view to `grid-template-rows: minmax(0, 1fr)` — ONE track. Against
-  one track the card took the `1fr`, the list opened an implicit second row that claimed the
-  height, the `1fr` resolved to 0px, and the card rendered its own head, segments and note
-  outside an 18px box. The View Lab caught it as
-  `[data-world-tool-break-segment=toolSpecific] is clipped or extends outside
-  [data-world-tool-break-mode]`.
-
-  The old note was right that redeclaring from an all-class scoped selector is a specificity
-  TIE resolved on injection order. Adding the element selector settles it on specificity
-  instead: `main.manager-main[data-scoped-page]` is (0,3,1) against the shipped rule's (0,3,0),
-  so it wins wherever it is injected.
-
-  == AND THE OVERRIDE COUNT IS CONDITIONAL, WHICH IS A REPORTED GAP RATHER THAN A CHOICE ===
-  The prototype's card states `{n} systems override it`, counting systems whose OWN authored
-  token differs from the world's. That needs each crafting system's `toolBreakage` block, and
-  the roster this page receives is `$viewState.systems` - a hand-built allowlist in
-  `adminStore.js` that does not carry it, in a file `### GM World Scoped Entity Routes`
-  requirement 7 closes to this lane. Reading an absent field answers `0` for every world,
-  which reads as "nothing overrides it" and is a WRONG number rather than a missing one. So
-  `breakModeOverridesKnown` gates the line: when the roster cannot answer, the card states
-  nothing there rather than guessing.
-
-  == THE INSPECTOR SAYS NOTHING ABOUT REPAIR MATERIALS, AND THAT IS THE ANSWER ============
-  The shell renders one inherit count per `scope.sections`, which is
-  `['breakage', 'onBreak', 'prerequisites', 'bonus']` since `1.31.0`. `repairRequirements` is
-  deliberately absent from that list - it is SEEDED once when a tool joins a system and then
-  diverges - so the section loop never reaches it. It used to be restored as an `extraCards`
-  entry reading `{n} groups / Copied once when a system adopts this Tool`.
-
-  That card is gone (issue 1373). The design draws four world-default cards and no fifth at
-  either scope, and a group COUNT is the only thing world scope can state about a seed whose
-  contents name components in the OWNING SYSTEM - which `toolScope.js` says world scope cannot
-  address. `1 group` is not a fact a GM can check anything against, so the panel states it no
-  more. `extraCards` stays the shell's slot for a card the section loop cannot produce; this
-  lane has none to put in it.
-
-  == THE WORLD DEFAULTS ARE THE SHELL'S CARDS, NOT A SECOND PANEL UNDER THEM ==============
-  They were this page's own `inspectorBody` snippet, headed `World defaults` and drawn below
-  everything the shell renders. The shell states those facts itself now - a glyph, the value
-  the default resolves to, and the line that qualifies it, one card per section - so the
-  snippet had become a second `World defaults` heading in one panel, and it overflowed the
-  inspector besides. `sectionIcons`, `sectionTitles`, `sectionNotes` and `extraCards` are the
-  seam that replaces it, so one meaning is drawn once and every scoped catalogue draws it the
-  same way.
+  The world Tools Catalogue (issue 1373, epic 1357). IT COMPOSES `EntityCatalogueShell` AND
+  BUILDS NO SECOND LIST; what this file owns is the tool-shaped configuration around it. THE
+  WORLD BREAKAGE DEFAULT is neither a row nor an entity — one value for every Tool in the world —
+  so it is the frame's `columnLead`, chrome above the toolbar inside the list's own column. THE
+  OVERRIDE COUNT IS CONDITIONAL, a reported gap rather than a choice: the roster carries no
+  per-system `toolBreakage`, and an absent field answers `0`, which is a WRONG number. THE
+  INSPECTOR SAYS NOTHING ABOUT REPAIR MATERIALS, since `repairRequirements` is SEEDED and a bare
+  group count is not a fact a GM can check anything against.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
@@ -90,50 +36,29 @@
     actions = null,
     systems = [],
     // THE GAME-WORLD ITEM ROSTER. A world Tool's `description` is a SNAPSHOT taken when the link
-    // was made, and a record created any other way carries an empty one — so every row on the one
-    // screen whose premise is that the world record IS the Item read `No description` while
-    // wearing a `Linked` chip. This is the roster that resolves the live document.
+    // was made, so rows read `No description` under a `Linked` chip; this resolves the live Item.
     worldItems = [],
     onOpenEntry = () => {},
     onOpenSystemRules = null,
-    // CREATE A WORLD TOOL FROM A DROPPED ITEM. The zone is on THIS screen because a Tool is a
-    // world record: it exists once, every system adopts the same one, and the system Tool
-    // Rules list — which is where the zone used to live — can only ever author RULES for a
-    // record the world already holds.
-    //
-    // The resolution is the SHELL's, not this page's. Turning a dropped payload into
-    // `{name, img, description, originItemUuid}` needs `services.resolveToolSource`, which
-    // reads a Foundry global; `worldScopeActions` deliberately reads none, and a page cannot
-    // reach the services bag. So the page raises the raw drag data and the root resolves,
-    // creates and navigates.
+    // CREATE A WORLD TOOL FROM A DROPPED ITEM, on THIS screen because a Tool is a world record.
+    // The resolution is the SHELL's: `services.resolveToolSource` reads a Foundry global, so the
+    // page raises the raw drag data and the root resolves, creates and navigates.
     onCreateFromItemDrop = () => {},
   } = $props();
 
-  // INITIALISED, and that is not optional: `EntityCatalogueShell` declares `selectedId` as a
-  // bindable prop, and Svelte 5 THROWS `props_invalid_value` when a bindable prop has a setter
-  // and the incoming value is `undefined`. `$state()` with no initialiser kills the mount.
+  // INITIALISED, and not optionally: Svelte 5 THROWS `props_invalid_value` when a bindable prop
+  // has a setter and the incoming value is `undefined`.
   let selectedId = $state('');
 
-  // AN IN-FLIGHT BULK WRITE. It inerts the panel's track and its Apply for the duration, which is
-  // what stops a second selection's instruction racing the first across the same setting: every
-  // `setWorldEnabled` is a read-modify-write of the WHOLE world tool payload, so two overlapping
-  // runs would each persist a snapshot taken before the other's writes.
+  // AN IN-FLIGHT BULK WRITE, which inerts the panel for the duration: every `setWorldEnabled` is
+  // a read-modify-write of the WHOLE payload, so two overlapping runs would each persist a
+  // snapshot taken before the other's writes.
   let bulkApplying = $state(false);
 
   /**
    * Write the staged world master switch across every ticked Tool, then drop the selection.
-   *
-   * SEQUENTIAL, and that is not caution. `worldScopeActions` mutates by loading the persisted
-   * payload, editing it and writing it back, so a `Promise.all` over twelve ids would have twelve
-   * writers racing one setting and the last one home would carry only its own edit.
-   *
-   * The selection is cleared on the way out because the instruction has LANDED: leaving twelve
-   * rows ticked under a panel whose staged axis has reset reads as an edit still pending.
-   *
-   * @param {string[]} entityIds the ticked rows, in list order.
-   * @param {string} status `'on'` or `'off'`.
-   * @param {() => void} clearSelection the frame's own selection reset.
-   * @returns {Promise<void>}
+   * SEQUENTIAL: each write loads, edits and writes back one payload, so a `Promise.all` would
+   * have twelve writers racing it. Ticked rows under a reset axis read as an edit still pending.
    */
   async function applyBulkWorldStatus(entityIds, status, clearSelection) {
     if (bulkApplying) return;
@@ -163,15 +88,8 @@
   }
 
   /**
-   * One world default read as a TOOL-SHAPED record, for the shipped summary helpers.
-   *
-   * The world default's sections carry the same field names an in-system record does -
-   * `breakage.mode`, `onBreak.mode` - because they are the values a membership record
-   * inherits verbatim. `checkBreakable` is a TOP-LEVEL tool field rather than part of the
-   * `breakage` section, so it is read from the world default's own top level.
-   *
-   * @param {object|null} entry
-   * @returns {{breakage: object|null, onBreak: object|null, checkBreakable: boolean}}
+   * One world default read as a TOOL-SHAPED record: its sections carry the field names an
+   * in-system record does, and `checkBreakable` is read from the default's own top level.
    */
   function worldDefaultTool(entry) {
     const defaults = entry?.defaults ?? {};
@@ -183,14 +101,8 @@
   }
 
   /**
-   * The breakage badge one row wears.
-   *
-   * CALLED WITH THE WORLD'S OWN RESOLVED AUTHORITY, because a world catalogue row has no
-   * system: what it can truthfully state is what the world default means under the world's
-   * break mode. `toolBreakageSummary` is the shipped derivation and is not restated here.
-   *
-   * @param {object|null} entry
-   * @returns {string}
+   * The breakage badge one row wears, called with the WORLD's own resolved authority: a world
+   * catalogue row has no system, so what it can truthfully state is the world's break mode.
    */
   function breakageLabel(entry) {
     const tool = worldDefaultTool(entry);
@@ -218,12 +130,7 @@
     return text('FABRICATE.Admin.Manager.Tools.SummaryUnlimitedUses', 'Unlimited uses');
   }
 
-  /**
-   * The on-break badge one row wears.
-   *
-   * @param {object|null} entry
-   * @returns {string}
-   */
+  /** The on-break badge one row wears. */
   function onBreakLabel(entry) {
     return {
       destroy: text('FABRICATE.Admin.Manager.Tools.OnBreakDestroys', 'Destroys'),
@@ -233,26 +140,15 @@
   }
 
   /**
-   * How many crafting systems actually HAVE this Tool.
-   *
-   * Read off the projection's own JOIN and filtered on `member`, never `entry.systems.length`:
-   * that array carries one row per system in the world, member or not, so its length is the
-   * SYSTEM COUNT and would state the same number on every row.
-   *
-   * @param {object|null} entry
-   * @returns {number}
+   * How many crafting systems actually HAVE this Tool: the projection's JOIN filtered on
+   * `member`, never `entry.systems.length`, which is the SYSTEM COUNT on every row.
    */
   function memberCount(entry) {
     const rows = Array.isArray(entry?.systems) ? entry.systems : [];
     return rows.filter((row) => row?.member === true).length;
   }
 
-  /**
-   * What one tool's world default DOES when it breaks, in words rather than as a badge.
-   *
-   * @param {object|null} entry
-   * @returns {string}
-   */
+  /** What one tool's world default DOES when it breaks, in words rather than as a badge. */
   function onBreakActionLabel(entry) {
     return {
       destroy: text('FABRICATE.Admin.Manager.Tools.OnBreakDestroy', 'Destroy the item'),
@@ -262,17 +158,14 @@
   }
 
   const worldAuthority = $derived(scope?.toolBreakage?.authority ?? '');
-  // The world break mode with the shipped fallback applied, which is what every read of it
-  // here needs: a world that has authored nothing is tool-specific, not modeless.
+  // The world break mode with the shipped fallback: an unauthored world is tool-specific.
   const worldCheckDriven = $derived((worldAuthority || 'toolSpecific') === 'checkDriven');
   const breakModeOptions = $derived(worldBreakModeOptions(worldAuthority, text));
   const overridesKnown = $derived(breakModeOverridesKnown(systems));
   const overrideCount = $derived(breakModeOverrideCount(systems, worldAuthority));
 
-  // Read by `manager-contract.test.js`'s SWAP DETECTOR against the title `viewTitle` renders
-  // for this route. A page that still DELEGATES its body states these four as attributes on
-  // the shared placeholder; a page with its own body states them as module constants, and
-  // this is one of those. See the twin block in `WorldEssenceCataloguePage.svelte`.
+  // Read by `manager-contract.test.js`'s SWAP DETECTOR against the title `viewTitle` renders for
+  // this route; a page with its own body states them as module constants.
   const PAGE_ID = 'world-tools';
   const PAGE_ICON = 'fas fa-screwdriver-wrench';
   const TITLE_KEY = 'FABRICATE.Admin.Manager.Scoped.ToolCatalogueTitle';
@@ -283,15 +176,10 @@
 
   const sorts = $derived(worldToolSorts(text, breakageLabel));
 
-  // ── THE WORLD-DEFAULT CARDS, THROUGH THE SHELL RATHER THAN BESIDE IT ───────────────────
-  // The card TITLE names the value and the NOTE qualifies it, which is the shell’s own
-  // emphasis: a card titled `Breakage` says which row it is and nothing about what a GM would
-  // be changing by opening it. The inherit count is still hooked by
-  // `data-scoped-list-inherit-count`, so nothing that could read it before has lost it.
-  //
-  // The BREAKAGE GLYPH follows the world break mode, because that mode decides whether this
-  // section is consulted at all: a die when the crafting roll decides it, an hourglass when
-  // the Tool tracks its own.
+  // THE WORLD-DEFAULT CARDS, THROUGH THE SHELL RATHER THAN BESIDE IT: the TITLE names the value
+  // and the NOTE qualifies it, and the inherit count keeps its `data-scoped-list-inherit-count`
+  // hook. The BREAKAGE GLYPH follows the world break mode, because that mode decides whether
+  // this section is consulted at all.
   const sectionIcons = $derived({
     breakage: worldCheckDriven ? 'fas fa-dice-d20' : 'fas fa-hourglass-half',
     onBreak: 'fas fa-heart-crack',
@@ -300,13 +188,8 @@
   });
 
   /**
-   * The world-default `prerequisites` card's title: how many gates a character must pass.
-   *
-   * The wording is the SHIPPED preview copy `projectToolBehaviorFacts` uses for the same fact at
-   * system scope, so the catalogue and the editor cannot describe one rule two ways.
-   *
-   * @param {object|null} entry
-   * @returns {string}
+   * The `prerequisites` card's title. The wording is the SHIPPED preview copy for the same fact
+   * at system scope, so the catalogue and the editor cannot describe one rule two ways.
    */
   function prerequisiteLabel(entry) {
     const prerequisites = entry?.defaults?.prerequisites;
@@ -326,12 +209,7 @@
     );
   }
 
-  /**
-   * The world-default `bonus` card's title: what the Tool adds to the check.
-   *
-   * @param {object|null} entry
-   * @returns {string}
-   */
+  /** The world-default `bonus` card's title: what the Tool adds to the check. */
   function bonusLabel(entry) {
     const bonus = entry?.defaults?.bonus;
     const expression = String(bonus?.expression ?? '').trim();
@@ -358,8 +236,7 @@
       : {}
   );
 
-  // The note says what the rule DOES rather than restating the arithmetic above it, which is
-  // the prototype's own emphasis on these cards (`PROTO-tools-catalogue.png`).
+  // The note says what the rule DOES rather than restating the arithmetic above it.
   const sectionNotes = $derived(
     selectedEntry
       ? {
@@ -400,26 +277,13 @@
       : {}
   );
 
-  // NO EXTRA CARD. `repairRequirements` used to be one: `{n} groups` over `Copied once when a
-  // system adopts this Tool`, drawn under the four world-default cards through `extraCards`.
-  //
-  // IT WENT WITH THE ENTRY EDITOR'S SECTION (issue 1373). The design draws four cards here and
-  // no repair card at either scope, and the reason is the same one the entry's own removal
-  // note gives: a repair group names ingredient quantities over the OWNING SYSTEM's components,
-  // which world scope cannot address, so a bare group COUNT is not a number a GM can check
-  // anything against. `extraCards` itself is untouched and stays the shell's slot for a card
-  // the section loop cannot produce; this lane simply has none.
+  // NO EXTRA CARD: `repairRequirements` went with the entry editor's section (issue 1373), for
+  // the reason that removal gives — a repair group names quantities over the OWNING SYSTEM's
+  // components, which world scope cannot address. `extraCards` stays the shell's slot.
 
   /**
-   * The LINKED ITEM's own description, for the frame's second description rung.
-   *
-   * `toolSourceSnapshot` is the shipped resolution and is not restated: it prefers the live Item
-   * and falls back to the record's own snapshot, so this answers `''` only when there is genuinely
-   * nothing to say. The frame owns the PRECEDENCE — the world record's authored description
-   * first, this second, the literal last.
-   *
-   * @param {object|null} entry
-   * @returns {string}
+   * The LINKED ITEM's own description, for the frame's second description rung; the frame owns
+   * the PRECEDENCE — the authored description first, this second, the literal last.
    */
   function describeFromLinkedItem(entry) {
     const entity = entry?.entity ?? null;
@@ -428,18 +292,9 @@
   }
 
   /**
-   * One row's NAME, when the record's own display label is blank.
-   *
-   * The world Tool entry draws that label as an OPTIONAL field - empty, with the linked Item's
-   * name as its placeholder, under `Leave blank to use the linked Item name.` (issue 1373) - so
-   * a Tool that takes the Item's name stores nothing, and the shipped `scopedEntryName` would
-   * print the record id on the row. Only this page holds the Item roster that answers it.
-   *
-   * `toolSourceSnapshot` is not used here, deliberately: it substitutes `Unlinked Tool` for a
-   * missing name, which is right for a tile and wrong for a fallback.
-   *
-   * @param {object|null} entry
-   * @returns {string}
+   * One row's NAME when the display label is blank: the entry draws that label as OPTIONAL, so
+   * `scopedEntryName` would print the record id, and only this page holds the Item roster.
+   * `toolSourceSnapshot` is not used: its `Unlinked Tool` is right for a tile, wrong for a name.
    */
   function nameFromLinkedItem(entry) {
     const uuid = String(entry?.entity?.registeredItemUuid || entry?.entity?.originItemUuid || '');
@@ -506,16 +361,8 @@
 </main>
 
 <!--
-  THE INSPECTOR'S BULK FACE (issue 1373, maintainer feedback round 2).
-
-  The frame swaps the identity panel for this the moment a row is ticked, and it never had one to
-  swap to: `bulk` is a lane snippet and this page passed none, so a screen whose toolbar counted
-  `4 selected` went on saying `Nothing selected` beside it. See `ToolCatalogueBulkPanel` for why
-  the world master switch is the one axis a world Tool can stage across a selection.
-
-  `ctx.clearSelection` is the FRAME's, threaded through the row context: the ticked set belongs to
-  the frame, and a panel that received only the ids could not undo the selection its own header
-  offers to clear.
+  THE INSPECTOR'S BULK FACE (issue 1373): the frame swaps the identity panel for this the moment
+  a row is ticked and had none to swap to. `ctx.clearSelection` is the FRAME's own.
 -->
 {#snippet toolBulkEdit(selectedIds, ctx)}
   <ToolCatalogueBulkPanel
@@ -527,23 +374,9 @@
 {/snippet}
 
 <!--
-  THE SCOPE BAND: the world break mode, above the list and INSIDE THE LIST'S OWN COLUMN.
-
-  == IT USED TO SPAN THE WHOLE ROUTE, AND THAT COST THE INSPECTOR ITS HEIGHT =================
-  This page drew the card as a SIBLING of the shell in its own `<main>` grid row, which is
-  edge-to-edge across the content area — so the band stood over the inspector's track as well as
-  the list's, and the inspector started a card's height below the app header bar instead of
-  running the whole route. The design draws the two columns as one grid under the header, the
-  card inside the left one and the panel beside it full height (`proto:1956`-`1959`).
-
-  So it is the frame's `columnLead` now. That is the same seam, one level down, that `listLead`
-  already is for the creation zone: the card is chrome above the toolbar rather than a row, and
-  the column owns it. `<main>` therefore holds ONE child again and needs no grid of its own —
-  the world-scope rule in the host sheet gives this view a single `minmax(0, 1fr)` track, which
-  is exactly what one shell wants.
-
-  The zone stays where it is: `listLead` renders it INSIDE the list's scroller, above the first
-  row, which is the design's placement and costs the inspector column nothing at all.
+  THE SCOPE BAND: the world break mode, above the list and INSIDE THE LIST'S OWN COLUMN. As a
+  sibling of the shell it stood over the inspector's track too, starting the panel a card's
+  height below the header. It is the frame's `columnLead` now, so `<main>` holds ONE child.
 -->
 {#snippet toolScopeBand()}
   <InspectorCard class="manager-world-tool-break-card" data-world-tool-break-mode="">
@@ -588,10 +421,8 @@
         </label>
       {/each}
     </div>
-    <!-- WHAT THE SELECTED MODE MEANS, not a sentence naming the segment already highlighted
-       two lines above it. The old copy read `Every crafting system uses Tool-specific unless
-       it overrides the break mode in its own Tool Rules`, which restates the control and the
-       override count on either side of it and says nothing about the rule itself. -->
+    <!-- WHAT THE SELECTED MODE MEANS, not a sentence naming the segment already highlighted two
+       lines above it and the override count on either side of it. -->
     <p class="manager-muted manager-world-tool-break-note">
       {(worldAuthority || 'toolSpecific') === 'checkDriven'
         ? text(
@@ -607,26 +438,13 @@
 {/snippet}
 
 <!--
-  THE LIST'S FIRST ELEMENT: the surface that makes a Tool.
-
-  The design opens the list with it, full width, directly under the toolbar
-  (`tmp/proto/tool-catalogue.png`). It is on THIS screen because a Tool is a world record - it
-  exists once, every system adopts the same one, and the system Tool Rules list can only ever
-  author RULES for a record the world already holds.
-
-  The resolution is the SHELL's, not this page's. Turning a dropped payload into
-  `{name, img, description, originItemUuid}` needs `services.resolveToolSource`, which reads a
-  Foundry global; `worldScopeActions` deliberately reads none, and a page cannot reach the
-  services bag. So the page raises the raw drag data and the root resolves, creates and
-  navigates.
+  THE LIST'S FIRST ELEMENT: the surface that makes a Tool, on THIS screen because a Tool is a
+  world record. The resolution is the SHELL's, since `resolveToolSource` reads a Foundry global.
 -->
 {#snippet toolCreateZone()}
-  <!-- `data-tool-create-card` IS A STYLING HOOK, not a test hook (issue 1509).
-       `styles/fabricate.css` declares `.fabricate-manager [data-tool-create-card] { flex: 0 0
-       auto; width: 100% }`, so dropping it narrows this prompt from the list's full width. That
-       rule is application-rooted and outside the `manager-item-drop-zone*` family, which is what
-       leaves `fabricate-link-field` host-dependent for THIS caller alone — a named residue for
-       issue 1507. `data-tool-create-drop-prompt` is the mounted absence assertion's selector. -->
+  <!-- `data-tool-create-card` IS A STYLING HOOK, not a test hook (issue 1509): the host sheet
+       widens this prompt to the list's full width through it. That rule is application-rooted,
+       which leaves `fabricate-link-field` host-dependent for THIS caller alone — issue 1507. -->
   <ItemDropZone
     kind="tool-create"
     hookAttrs={{
@@ -645,17 +463,12 @@
 {/snippet}
 
 <!--
-  THE INSPECTOR'S ONE PRIMARY ACTION, PINNED TO ITS FOOT.
-
-  The reference pins a full-width `Edit tool` under the panel's scroll region
-  (`PROTO-tools-catalogue.png`), which is what makes the panel a place a GM ACTS from rather
-  than only reads. The frame owns the pinning; this snippet owns the verb, which is the split
-  the essence catalogue beside it already makes with the same primitive.
+  THE INSPECTOR'S ONE PRIMARY ACTION, PINNED TO ITS FOOT, which is what makes the panel a place a
+  GM ACTS from. The frame owns the pinning and this snippet owns the verb.
 -->
 {#snippet toolInspectorFoot(entry)}
-  <!-- NO GLYPH. The design's pinned action is the verb alone; the external-link mark belongs to
-       the ROW buttons, which leave the catalogue for a different screen, and this one opens the
-       record the panel above it is already describing (issue 1373). -->
+  <!-- NO GLYPH: the external-link mark belongs to the ROW buttons, which leave the catalogue;
+       this opens the record the panel above it is already describing. -->
   <InspectorActionButton
     tone="primary"
     label={text('FABRICATE.Admin.Manager.Scoped.Tool.OpenEntry', 'Edit tool')}
@@ -665,17 +478,12 @@
 {/snippet}
 
 <!--
-  THE INSPECTOR'S STATE PILL, which is the slot the design fills under the Tool's name.
-
-  It states the WORLD master switch, and it is the only honest thing this panel can say about a
-  Tool's state: a world catalogue has no system, and `enabled` per system is what the rows below
-  answer. World off wins over every one of them, so this is the fact that decides whether the Tool
-  is usable anywhere at all.
+  THE INSPECTOR'S STATE PILL states the WORLD master switch, the only honest thing this panel can
+  say about a Tool's state: world off wins over every system's own flag.
 -->
 {#snippet toolInspectorCaption(entry)}
-  <!-- THE WORD ALONE. The design's state pill under the Tool's name is a bare `On`, and a
-       leading dot on a two-letter label is a mark carrying no information the word does not
-       (issue 1373). The TONE still separates the two states. -->
+  <!-- THE WORD ALONE: a leading dot on a two-letter label carries nothing the word does not.
+       The TONE still separates the two states. -->
   <Chip
     tone={entry?.worldEnabled === false ? 'neutral' : 'positive'}
     data-world-tool-inspector-state={entry?.worldEnabled === false ? 'off' : 'on'}
@@ -690,9 +498,8 @@
   <span class="manager-world-tool-row-badges" data-world-tool-row-badges={entry.id}>
     <Chip tone="neutral" data-world-tool-row-breakage>{breakageLabel(entry)}</Chip>
     <Chip tone="neutral" data-world-tool-row-onbreak>{onBreakLabel(entry)}</Chip>
-    <!-- HOW MANY SYSTEMS HAVE IT, as plain text rather than a third chip. The two chips
-         beside it are what the Tool DOES; this is how far it reaches, which is a different
-         kind of fact, and the design sets it as a muted count for that reason. -->
+    <!-- HOW MANY SYSTEMS HAVE IT, as plain text rather than a third chip: the chips beside it
+         are what the Tool DOES, and this is how far it reaches. -->
     <span class="manager-world-tool-row-reach" data-world-tool-row-systems={entry.id}>
       {format(
         memberCount(entry) === 1
@@ -706,15 +513,9 @@
 {/snippet}
 
 <!--
-  THE WORLD MASTER SWITCH, which is a DIFFERENT control from the per-system toggle the
-  inspector's membership rows carry. This one is the world record's own: off here means the
-  Tool is off in every crafting system that has it, whatever each of them says, because
-  `resolveScopedDefinition` ANDs the two flags and world off wins.
-
-  IT IS THE `rowTrailing` SNIPPET RATHER THAN PART OF `rowMeta`, and the split is structural
-  rather than stylistic: the design puts the row's CHIPS under the name, which places `rowMeta`
-  inside the identity `<button>`, and a `<button>` inside a `<button>` is invalid DOM the browser
-  silently reparents. Interactive content therefore stays in the trailing column.
+  THE WORLD MASTER SWITCH, a DIFFERENT control from the per-system toggle: `resolveScopedDefinition`
+  ANDs the two flags. It is `rowTrailing` rather than part of `rowMeta`, and the split is
+  structural: `rowMeta` sits inside the identity `<button>`, and a nested `<button>` is invalid.
 -->
 {#snippet rowTrailing(entry)}
   {#if scope?.worldEnableable}
@@ -737,25 +538,15 @@
 {/snippet}
 
 <style>
-  /* STATIC class names, so Svelte can prove each selector is used and `lint:svelte:warnings`
-     stays at zero. `styles/fabricate.css` is closed to this lane, so every rule this page
-     needs is authored here - which is also the right home, because nothing else renders this
-     markup. `.manager-main`, `.manager-inspector-card` and `.manager-muted` are shipped and
-     reused rather than restated. */
+  /* STATIC class names, so `lint:svelte:warnings` stays at zero. `styles/fabricate.css` is closed
+     to this lane, and nothing else renders this markup. */
 
-  /* NO GRID OF ITS OWN ANY MORE (issue 1373, maintainer feedback round 2). This page used to
-     redeclare `grid-template-rows: auto minmax(0, 1fr)` to place a band above the shell, and
-     carried two wrapper rules to put each of them in a track. The band is the frame's
-     `columnLead` now, so `<main>` holds exactly one child and the world-scope rule in the host
-     sheet — one `minmax(0, 1fr)` track — is already the right template for it. */
+  /* NO GRID OF ITS OWN ANY MORE: the band is the frame's `columnLead`, so `<main>` holds exactly
+     one child and the host sheet's single `minmax(0, 1fr)` track is already right for it. */
 
-  /* `:global()` AND CHAINED (issue 1427's rule, applied here by issue 1373): this class now
-     sits on an `<InspectorCard>` tag rather than on an element this component writes, so Svelte
-     stamps no `svelte-<hash>` onto it and prunes the local selector outright -
-     `lint:svelte:warnings` fails on the `css_unused_selector` that produces.
-     `.manager-inspector-card` is chained for the specificity the dropped hash carried, exactly
-     as `BulkDeleteCard.svelte` does, so the rule still beats the shipped card box and nothing
-     moves on screen. */
+  /* `:global()` AND CHAINED (issue 1427's rule): this class sits on an `<InspectorCard>` tag, so
+     Svelte stamps no hash onto it and prunes the local selector, which `lint:svelte:warnings`
+     fails on. `.manager-inspector-card` is chained for the specificity the hash carried. */
   :global(.manager-inspector-card.manager-world-tool-break-card) {
     display: flex;
     flex-direction: column;
@@ -783,8 +574,7 @@
     overflow-wrap: break-word;
   }
 
-  /* PUSHED to the trailing edge rather than absolutely positioned, so a long localized count
-     wraps under the title instead of overlapping it. */
+  /* PUSHED to the trailing edge rather than absolutely positioned, so a long count wraps under. */
   .manager-world-tool-break-count {
     margin-left: auto;
     color: var(--fab-text-muted);
@@ -793,36 +583,11 @@
     text-align: right;
   }
 
-  /* The shipped segmented-control treatment, matched to `.manager-tools-authority-segments`
-     so a GM sees one break-mode control across the two scopes. */
-  /* WRAPS rather than shrinking, as a floor under a narrow card — but this is NOT what the
-     capture gate was reporting. An earlier note here read the failure as segments shrinking
-     below their content width. Measured, the card was 18px tall and the segment sat 36px
-     BELOW its bottom edge, on a 1026px-wide card carrying two short labels: the overflow was
-     vertical, from the 0px grid row the header now explains, and wrapping alone left the case
-     failing with the identical message. The world control has TWO segments, never three —
-     `worldToolStudio.js` states why — so `Inherit · …` is not among its labels.
-
-     The labels keep `flex: 1 1 0` and `min-width: 0` so the two segments stay equal width,
-     which is the parity with `.manager-tools-authority-segments` the note above commits to. */
-  /* ── THE OBSERVATION WAS RIGHT AND THE CONCLUSION DID NOT FOLLOW (issue 1373) ───────────
-     The note here read: "sampled pixel by pixel, the design's segmented track paints the PANE
-     colour inside a card one rung lighter" - and `proto:1965` confirms it exactly, declaring
-     `background: var(--bg1)` on a track inside a `--bg2` card. `--bg1` is this theme's
-     `--fab-bg-0`, which is what `[data-manager-view='world-tools'] .manager-main` paints, so
-     the design's track really is the pane's own colour.
-
-     What did not follow is "so the fill goes". A track with NO fill does not show the pane; it
-     shows whatever is behind it, and behind it is the card - `.manager-inspector-card`'s
-     lightening overlay. Removing the declaration therefore painted the track the CARD's colour,
-     which is the one value `proto:1965` says it is not. The rung the earlier note went looking
-     for is stated rather than inherited.
-
-     `--fab-overlay-dark-08`, the value before that, was a different miss: it moved the track
-     about eight units off its card where the design has a whole ramp rung.
-
-     The border names `--fab-border` directly, since the legacy alias it used to be written
-     with was collapsed into that token (issue 1399). */
+  /* The shipped segmented-control treatment, matched to `.manager-tools-authority-segments`, and
+     WRAPPING rather than shrinking as a floor under a narrow card. THE TRACK'S FILL IS STATED
+     RATHER THAN INHERITED: `proto:1965` paints it `--bg1` inside a `--bg2` card, and removing the
+     declaration shows not the pane but the card's own lightening overlay — the one value the
+     design says the track is not. */
   .manager-world-tool-break-segments {
     display: flex;
     flex: 1 1 auto;
@@ -880,8 +645,7 @@
     min-width: 0;
   }
 
-  /* A muted count rather than a chip: the two chips beside it name what the Tool does, and a
-     third pill would read as a third property of the Tool instead of its reach. */
+  /* A muted count rather than a chip: a third pill would read as a third property of the Tool. */
   .manager-world-tool-row-reach {
     color: var(--fab-text-muted);
     font-size: 0.6rem;

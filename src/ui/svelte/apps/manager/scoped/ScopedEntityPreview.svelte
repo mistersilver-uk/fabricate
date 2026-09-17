@@ -1,68 +1,13 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  The player-preview shell shared by the scoped-entity editors (issue 1362, epic 1357).
-
-  Five regions in a fixed order — kicker, identity block, live-update note, effective-rules
-  list, standing explainer — because that ORDER is the shared pattern. What each region holds
-  is the caller's: this component resolves no value, reads no scope and knows nothing about
-  sections. `tools/ToolBehaviorPreview` is converted onto it here and keeps every one of its
-  `data-tool-*` hooks and every one of its classes.
-
-  `EssenceBehaviorPreview` is DEFERRED, and the reason is stated rather than left implicit:
-  it composes `InventoryItemCard` + `Chip` + `buildEssencePreviewRow` into a genuinely
-  different shape — a real inventory tile with a per-essence row builder, not an identity
-  block with fact rows — so folding it in would mean widening this shell until it is a union
-  of two layouts rather than one pattern. (It composed the retired status pill until issue
-  1506 drew that badge as a chip; the shape it names is the same one.)
-
-  ── THE CLASS STEM IS A PROP ────────────────────────────────────────────────────────────
-  `classPrefix` derives the five class names (`<prefix>`, `<prefix>-identity`,
-  `<prefix>-chips`, `<prefix>-live`, `<prefix>-rules`). Passing the stem rather than
-  hard-coding one is what lets a converted site keep the rules that already target it:
-  `ToolBehaviorPreview` passes `manager-tool-preview`, whose rules predate this shell, and a
-  primitive that renamed them would strand every rule it did not also move.
-
-  BOTH STEMS ARE DECLARED IN `styles/fabricate.css` — the tool site's, and the DEFAULT. The
-  default shipped with no rules at all, so the shell rendered unstyled for any caller that did
-  not bring its own; the six scoped editors PRs 6a-c and 7 build are exactly those callers, and
-  `### GM World Scoped Entity Routes` requirement 7 closes that stylesheet to them. The rules
-  are global rather than a scoped `<style>` here because the stem is a DYNAMIC class: Svelte
-  cannot prove a scoped selector is used, and would emit the unused-selector warning
-  `lint:svelte:warnings` fails on.
-
-  Props:
-   - classPrefix: the site's class stem.
-   - hookAttribute / hookValue: the aside's own `data-*` hook; `hookValue` may be `true`.
-   - ariaLabel / kicker / rulesKicker: copy, already localized by the caller.
-   - identity: `{name, image, context, hookAttribute}`.
-   - statusChip: `{tone, icon, label}`, or `null` for a site with no on/off state.
-   - chips: `{tone, icon, label}[]` beside the status chip.
-   - liveNote / liveNoteHook: the "updates live" strip.
-   - rules: `{id, icon, title, subtitle, titleAttr}[]`, rendered through the shared
-     `IconFactRow`; `ruleHookAttribute` names the per-row `data-*` carrying the rule id.
-   - ruleTile: whether those rows draw `IconFactRow`'s bordered glyph tile. Opt-in and
-     forwarded verbatim, for the reason that primitive's own docblock gives: the reference
-     draws the tile on the Tool rails and a bare glyph one pane over, so it is a fact each
-     caller asserts about its own surface rather than a default this shell picks for all of
-     them.
-   - explainer: the shared `ExplainerCard`'s props, or `null`.
-   - children: a TRAILING snippet, rendered last inside the aside.
-
-  ── WHY ONE TRAILING SNIPPET AND NOT THREE MORE REGIONS ─────────────────────────────────
-  The world Tool entry and the Tool rules editor each own preview regions this shell has no
-  vocabulary for (issue 1373): a player-inventory tile with its own broken-copy toggle, a
-  `Preview as` actor selector with a resolved-prerequisite readout, and a `Required for`
-  list of the recipes and gathering tasks that name the Tool. Every one of them resolves
-  values, holds local state, or reads a corpus — precisely what the header above says this
-  shell does NOT do. Growing three typed region props for two callers would make it the
-  union of its callers, which is the failure the deferred `EssenceBehaviorPreview`
-  conversion is already recorded against.
-
-  It renders INSIDE the aside, not after it, because the rail is a grid item with its own
-  scroll box, border and background; siblings of the aside would be siblings of that grid
-  item and the rail would stop being one column. `ScopedValidationTab` already takes a
-  trailing snippet for the same reason, so this is the shell family's existing answer
-  rather than a new one. Absent by default, so every existing caller renders identically.
+  The player-preview shell shared by the scoped-entity editors (issue 1362, epic 1357): five
+  regions in a fixed ORDER — kicker, identity block, live note, effective-rules list, explainer.
+  What each holds is the caller's; this component resolves no value. `EssenceBehaviorPreview` is
+  DEFERRED, because folding its different shape in would make this a union of two layouts.
+  THE CLASS STEM IS A PROP, so a converted site keeps its rules; both stems live in
+  `styles/fabricate.css` rather than a scoped block, since a DYNAMIC class cannot be proven used
+  and Svelte would emit the warning `lint:svelte:warnings` fails on. `children` is a TRAILING
+  snippet rendered INSIDE the aside, because a sibling of it would stop the rail being one column.
 -->
 <script>
   import Chip from '../../../components/Chip.svelte';
@@ -84,36 +29,16 @@
     rules = [],
     ruleHookAttribute = '',
     ruleTile = false,
-    // THE HEAD BLOCK A CALLER DRAWS ITSELF (issue 1371, maintainer parity round 4).
-    //
-    // `identity` is a fixed anatomy — art, name, context, chips — and the reference's world
-    // Component rail is a different one: a 118px column holding a micro-label, an inventory TILE
-    // with a quantity badge and a status badge, and the name under it, beside a second column
-    // holding the resolved category, the effective tag chips and an art note. No arrangement of
-    // `identity` produces that, and `children` cannot either, because `children` renders at the
-    // very END of the rail, after the fact groups.
-    //
-    // A SNIPPET rather than another prop bag, because the block is markup the caller owns; the
-    // shell owns only where it sits. A caller passes `tile` or `identity`, never both.
+    // THE HEAD BLOCK A CALLER DRAWS ITSELF. `identity` is a fixed anatomy and the reference's
+    // world Component rail is a different one; `children` cannot serve either, because it
+    // renders at the very END of the rail. A SNIPPET rather than another prop bag, because the
+    // block is markup the caller owns. A caller passes `tile` or `identity`, never both.
     tile = undefined,
-    // TWO INDEPENDENTLY KICKERED FACT GROUPS, in place of one flat `rules` list.
-    //
-    // The reference draws `USED BY` and `PRODUCED BY` as two kickered lists in one rail, each
-    // with its own empty sentence. `rulesKicker` + `rules` can express exactly one, so the second
-    // group had nowhere to go and the whole `Produced by` half of the model was invisible.
-    //
-    // `[{ kicker, rows, emptyNote, hookAttribute }]`. Empty by default, so every shipped caller
-    // keeps the single-list path above it untouched. A group with no rows draws its own
-    // `emptyNote` rather than vanishing: an absent group and an empty one say different things,
-    // and the reference writes a sentence for the empty one.
-    //
-    // `hookAttribute` NAMES THE GROUP, not its rows (issue 1371, maintainer parity round 5). It
-    // used to land on the `<ul>`, with the kicker a SIBLING before it, so no selector reached a
-    // group's label at all and a parity lane had to report both rail kickers as unmeasurable.
-    // See the wrapper in the markup below for why it generates no box.
+    // TWO INDEPENDENTLY KICKERED FACT GROUPS in place of one flat `rules` list, which could
+    // express only the reference's first. `[{ kicker, rows, emptyNote, hookAttribute }]`; a group
+    // with no rows draws its `emptyNote`, and `hookAttribute` NAMES THE GROUP, not its rows.
     factGroups = [],
-    // A leading line under the head block, above the first fact group: the reference's
-    // `Across every system that has rules for it.` Empty renders nothing.
+    // A leading line under the head block, above the first fact group. Empty renders nothing.
     scopeNote = '',
     scopeNoteHook = '',
     explainer = null,
@@ -127,12 +52,7 @@
   const liveAttributes = $derived(liveNoteHook ? { [liveNoteHook]: true } : {});
   const scopeNoteAttributes = $derived(scopeNoteHook ? { [scopeNoteHook]: true } : {});
 
-  /**
-   * One fact group's own hook, so a mounted assertion can name the group it means.
-   *
-   * @param {object} group
-   * @returns {object}
-   */
+  /** One fact group's own hook, so a mounted assertion can name the group it means. */
   function groupAttributes(group) {
     return group?.hookAttribute ? { [group.hookAttribute]: true } : {};
   }
@@ -179,18 +99,9 @@
     <ul class={`${classPrefix}-rules`}>
       {#each rules as rule (rule.id)}
         <li {...ruleAttributes(rule)}>
-          <!-- `density="rule"` IS THE VARIANT THIS ROW IS, and it already shipped unasked-for
-               (issue 1373). `IconFactRow` publishes it for exactly "the reference's
-               EFFECTIVE-RULES inset on the two Tool inspector rails", and this shell has exactly
-               two callers, both of which ARE those rails: the world Tool entry's and
-               `tools/ToolBehaviorPreview`'s. Taking the default missed five of the six values
-               `proto:2559` states - gap 10, padding 10/11, radius 10, an 11.5px/600 title and a
-               9.5px `--fab-text-subtle` note - and missed the FILL by a rung, raising the inset
-               where `proto:2014` recesses it below the aside that holds it.
-
-               It is stated here rather than made a prop because it is a fact about the ROW, not
-               about a caller's surface the way `tile` is: both callers draw the same effective-
-               rules inset, so a prop would be one value passed twice. -->
+          <!-- `density="rule"` IS THE VARIANT THIS ROW IS: `IconFactRow` publishes it for the
+               reference's EFFECTIVE-RULES inset, and both callers of this shell ARE those rails.
+               Stated here rather than made a prop, since it is a fact about the ROW. -->
           <IconFactRow
             icon={rule.icon}
             title={rule.title}
@@ -204,30 +115,11 @@
     </ul>
   {/if}
   <!--
-    THE KICKERED FACT GROUPS. Each draws its own kicker, its own rows and — when it has none —
-    its own sentence, because "no recipe requires it yet" and "this rail has no `Used by` group"
-    are different claims and only the first is ever true here.
-
-    THE GROUP'S OWN HOOK IS ON THIS WRAPPER, so `[hook]` means the group and `[hook] .manager-kicker`
-    reaches its label. On the `<ul>` it named the ROWS: the kicker was a sibling before it, nothing
-    could select it, and an empty group's hook and a populated one's landed on different elements.
-
-    `display: contents` IS WHY THE WRAPPER COSTS NOTHING. The rail is a column flexbox with its own
-    gap, so a wrapper that generated a box would make each group ONE flex item and collapse the
-    space between a kicker and its own rows to zero. With `display: contents` the wrapper generates
-    no box at all and both children stay direct participants in the rail's layout, so every
-    rendered pixel is what it was.
-
-    IT IS AN INLINE STYLE BECAUSE THIS COMPONENT HAS NO SCOPED BLOCK AND MUST NOT GROW ONE. The
-    class stem is a PROP — see the note at the top of this file — so a scoped selector over
-    `${classPrefix}-…` cannot be proven used and Svelte emits the unused-selector warning
-    `lint:svelte:warnings` fails on; and adding ANY `<style>` here would restamp every element in
-    this shell with a new scope class, which is a rendering change to six editors to buy one
-    declaration. The host sheet is closed to this lane by `### GM World Scoped Entity Routes`
-    requirement 7, and a `${classPrefix}-` class here would need a rule under BOTH stems.
-
-    ONE CONSEQUENCE FOR CALLERS: the rows are now a GRANDCHILD of the hook, so a selector written
-    `[hook] > li` no longer resolves and has to be `[hook] li`.
+    THE KICKERED FACT GROUPS. The GROUP'S hook is on this wrapper, so `[hook]` means the group
+    and `[hook] .manager-kicker` reaches its label. `display: contents` is why the wrapper costs
+    nothing — the rail is a column flexbox, and a box would make each group one flex item — and
+    it is INLINE because the class stem is a prop and any `<style>` here would restamp every
+    element. One consequence: the rows are a GRANDCHILD of the hook, so `[hook] li`, not `>`.
   -->
   {#each factGroups as group, index (group.kicker || index)}
     <div style="display: contents" {...groupAttributes(group)}>

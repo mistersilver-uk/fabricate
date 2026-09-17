@@ -1,29 +1,10 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  THE SHARED-DEFINITION CALLOUT (issue 1372, maintainer parity round 7).
-
-  The first thing a system-scope rules editor says, and the reason the screen has the shape it
-  has: the entity's name, glyph and colour are WORLD vocabulary that every crafting system holding
-  it resolves the same one of, and only what it does on craft is authored here.
-
-  It is a CALLOUT WITH AN EXIT, not a banner. The shipped screen stated the fact in a bare
-  paragraph and offered no way to act on it, so a GM who wanted to fix a typo in the name had
-  nowhere to go and the screen's own identity form — which this change removes — was the nearest
-  thing to an answer. `Edit shared definition` opens the world entry editor that owns those
-  fields, which is the only surface allowed to write them.
-
-  ── IT NAMES THE ENTITY, AND THAT IS THE POINT OF THE MEDALLION ───────────────────────────────
-  The reference leads the card with the entity's own tile and name (`proto:5091`). Without them
-  the callout is a sentence about "the shared definition" of something it never identifies, one
-  screen away from a list where every row looks the same.
-
-  Props are all PRE-LOCALIZED by the caller, because the sentence is counted and system-named and
-  this component holds neither the roster size nor the selected system.
-   - name / icon / tint: the entity's identity, from the WORLD record.
-   - pillLabel: the layer marker, `World definition`.
-   - note: the counted sentence.
-   - actionLabel: the exit's words.
-   - onOpen(): performs the navigation; the shell owns it, because a page cannot route.
+  THE SHARED-DEFINITION CALLOUT (issue 1372): the entity's name, glyph and colour are WORLD
+  vocabulary every crafting system resolves the same one of, and only what it does on craft is
+  authored here. A CALLOUT WITH AN EXIT rather than a banner — `Edit shared definition` opens the
+  world entry that owns those fields, and the medallion names the entity the sentence is about.
+  Every prop is PRE-LOCALIZED; `onOpen()` navigates, because a page cannot route.
 -->
 <script>
   import ManagerButton from '../../../components/ManagerButton.svelte';
@@ -64,9 +45,8 @@
 </section>
 
 <style>
-  /* INFO-TONED, exactly as the browser inspector's twin of this block is: it is the one card on
-     the screen that explains a layer rather than authoring one. The geometry is
-     `.manager-edit-card`'s; only the tint is restated, so no second card shape enters the route. */
+  /* INFO-TONED, as the browser inspector's twin is: the geometry is `.manager-edit-card`'s and
+     only the tint is restated, so no second card shape enters the route. */
   .manager-scoped-shared-card {
     border-color: var(--fab-info-border);
     background: var(--fab-info-soft);
@@ -87,9 +67,8 @@
     flex: 1 1 auto;
   }
 
-  /* The name and its layer pill share a line, and the name TRUNCATES rather than wrapping: the
-     pill is the shorter, fixed half and a wrapped name would push it onto its own row and break
-     the head into three lines for a long entity name. */
+  /* The name TRUNCATES rather than wrapping: the pill is the shorter, fixed half, and a wrapped
+     name would push it onto its own row and break the head into three lines. */
   .manager-scoped-shared-title-row {
     display: flex;
     align-items: center;
@@ -103,16 +82,11 @@
     white-space: nowrap;
   }
 
-  /* SENTENCE CASE, AT FULL INK, IN THE DISPLAY FACE. `.manager-card-title` is the manager's
-     UPPERCASE micro-label, which is right for a flat section heading and wrong for a card that
-     names an entity: the reference reads `Earth`, not `EARTH`. The Checks Studio retired the same
-     treatment from its own cards for the same reason (`.manager-checks-card-title`); this is that
-     precedent applied to the scoped-entity cards rather than a second global edit.
-
-     Compounded with `.manager-card-title` so the rule is (0,3,0) once Svelte stamps this
-     component's scope class, and therefore beats the global `.fabricate-manager
-     .manager-card-title` at (0,2,0) outright rather than tying it and being decided by
-     stylesheet injection order. */
+  /* SENTENCE CASE, AT FULL INK, IN THE DISPLAY FACE: `.manager-card-title` is the manager's
+     UPPERCASE micro-label, wrong for a card that names an entity (the Checks Studio retired the
+     same treatment). Compounded so the rule is (0,3,0) once Svelte stamps the scope class and
+     beats the global `.fabricate-manager .manager-card-title` at (0,2,0) outright, rather than
+     tying it and being decided by stylesheet injection order. */
   .manager-card-title.manager-scoped-entity-title {
     color: var(--fab-text);
     font-size: 0.95rem;
@@ -120,9 +94,8 @@
     text-transform: none;
   }
 
-  /* The exit never wraps and never shrinks. `Edit shared definition` broke onto two lines the
-     moment the sentence beside it needed a second, which turned a 34px control into a 48px one
-     and pushed the card taller than every other card on the route. */
+  /* The exit never wraps and never shrinks: a two-line label turns a 34px control into a 48px one
+     and pushes the card taller than every other card on the route. */
   .manager-scoped-shared-head :global(.manager-button) {
     flex: none;
     white-space: nowrap;
