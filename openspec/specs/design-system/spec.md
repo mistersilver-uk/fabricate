@@ -1345,6 +1345,25 @@ A draw is ROLLED by definition, so `draw N` pins the chooser and hides it rather
 The group header reads LEFT TO RIGHT as one sentence — award strategy, N, replacement, chooser — with a help line beneath it restating the resolved behaviour in prose.
 Four controls in a row are read faster as a sentence than as a form.
 
+The SELECTION EXPRESSION is the group's OWN roll and not the craft's check.
+A routed craft has already rolled once to reach this set, and reading that same total here would leave the group's authored expression with nothing to do.
+It resolves against the CRAFTING CHARACTER, the actor every other rolled amount in the craft resolves against, so a group is authored once and reads correctly for whoever crafts.
+
+Under `draw N` the selection expression is rolled ONCE PER DRAW rather than once for the group.
+A single roll would select the same alternative on every draw, which is not a draw at all.
+
+A roll that lands outside every authored range CLAMPS to the nearest one: below the lowest it selects the lowest alternative, above the highest it selects the highest.
+The ranges are a LADDER the roll is read against rather than a set of independent windows, so no authored group can produce nothing.
+This is deliberately unlike outcome-tier routing, where a value no tier claims is a blocking GAP — a craft that has already succeeded must still award what it was routed to, so the group clamps rather than failing at the last step.
+
+A result-side choice group is NOT legal inside a `progressive` result group, and the surface MUST NOT offer its controls there.
+Progressive walks an ordered result list against a check-value budget and awards every entry the roll affords, with no per-entry choice and no per-entry quantity.
+A bundle that states who chooses and how many it hands over has nothing to mean inside that walk, so offering the chooser or the award strategy would author a setting the engine cannot honour.
+The other four modes are unaffected: each routes to exactly one result set, and what a group inside that set awards is a within-group concern.
+
+A FAILURE-ROLE result set MAY carry a chooser and an award strategy on the same terms as any other result set.
+What a failed check awards is as authorable as what a successful one does, and the reserved role is a statement about ROUTING — that the set is selected by role rather than named by a tier — rather than about the shape of what the set holds.
+
 A container-level group adder MUST NOT exist.
 A set's adders create ROWS, and a group is always something an existing row BECAME, reached through the convert control that row already carries.
 An "add group" button beside "add result" would ask a GM to state what the alternatives are before stating what the first one replaces, and would leave two paths to one construct.
@@ -1380,6 +1399,30 @@ The persisted shape of the chooser, the award strategy, N and replacement is out
 - **WHEN** a choice group is rendered inside an ingredient set
 - **THEN** it renders neither a chooser nor an award strategy
 - **AND** it resolves as one-of, decided by the crafter
+
+#### Scenario: A selection roll lands outside every authored range
+
+- **WHEN** a rolled choice group's selection expression returns a value above its highest authored range
+- **THEN** the group awards the alternative that range names
+- **AND** it does not report a gap, because a craft that has been routed here still awards something
+
+#### Scenario: A draw of three selects three times
+
+- **WHEN** a group set to draw 3 resolves
+- **THEN** its selection expression is rolled once for each of the three draws
+- **AND** the draws may land on different alternatives
+
+#### Scenario: A GM authors a progressive recipe
+
+- **WHEN** a result group belongs to a recipe resolving in progressive mode
+- **THEN** the surface offers neither a chooser nor an award strategy inside it
+- **AND** it states that progressive awards every entry the roll affords rather than selecting one
+
+#### Scenario: A failed check awards one of several things
+
+- **WHEN** a GM adds alternatives to a failure-role result set
+- **THEN** the group carries the chooser and the award strategy any other result set carries
+- **AND** the set stays selected by role rather than named by a tier
 
 ### Requirement: Every select renders the app’s own option list
 
