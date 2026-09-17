@@ -1,8 +1,8 @@
-scripts	7493
-scripts/foundry	26
-scripts/lib	14882
-scripts/visual-parity	163
-scripts/visual-parity/lib	651
+scripts	2748
+scripts/foundry	13
+scripts/lib	3261
+scripts/visual-parity	51
+scripts/visual-parity/lib	129
 src	1248
 src/canvas	385
 src/canvas/linkedVisuals	64
