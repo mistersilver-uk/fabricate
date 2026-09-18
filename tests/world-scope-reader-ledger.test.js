@@ -16,9 +16,10 @@ import { collectSources, repoRoot, stripComments } from './helpers/sourceScan.js
 const MATCHER =
   /(?:\.|[\w$)\]]\[\s*['"])(?:components|essenceDefinitions|tools)\b/g;
 
-/** The directories the sweep did not enter, and the file whose 47 hits are JSON-path constants. */
+/** The directories the sweep did not enter, and the file whose bare string constants are JSON paths. */
 const EXCLUDED_PREFIXES = Object.freeze(['src/ui/', 'src/migration/']);
-const EXCLUDED_FILES = Object.freeze(new Set(['src/systems/worldScopeReferenceRewrite.js']));
+const PATH_CONSTANT_FILES = Object.freeze(new Set(['src/systems/worldScopeReferenceRewrite.js']));
+const STRING_CONSTANT_LINE = /^\s*'[^']*',?\s*$/;
 
 /** Every reason a raw read may still be here, each drawn from the delta's `#### D5`. */
 const REASONS = Object.freeze({
@@ -36,6 +37,9 @@ const REASONS = Object.freeze({
     'a destructive prune basis: widening or narrowing it deletes real data, so it reads the ' +
     'persisted record',
   import: 'the import path builds the system from the in-system arrays for every field',
+  'rewrite-walk':
+    'the shared reference walk rewrites the raw payload in place, so it reads the in-system ' +
+    'arrays that payload carries',
   export: 'the export path writes the in-system arrays at schema 6',
   guard:
     'an `Array.isArray` GUARD whose consequent IS repointed; the guard asks what the record ' +
@@ -61,10 +65,10 @@ const BASE_SCAN = Object.freeze({
  */
 const SCAN_TOTALS = Object.freeze({
   // #1648: eight unique tool/receipt reads in two engine files; #1666: four relocated files.
-  matches: 179,
-  lines: 161,
-  files: 22,
-  pairs: 132,
+  matches: 183,
+  lines: 165,
+  files: 23,
+  pairs: 136,
   collisionGroups: 17,
   collisionSites: 46,
 });
@@ -197,6 +201,10 @@ const LEDGER = Object.freeze([
   ['src/systems/importReferenceResolver.js', "for (const tool of arrayOf(slice.tools)) reportToolComponentRefs(tool);", 1, 'import'],
   ['src/systems/importReferenceResolver.js', "for (const component of arrayOf(system.components)) {", 1, 'import'],
   ['src/systems/importReferenceResolver.js', "for (const def of arrayOf(system.essenceDefinitions)) {", 1, 'import'],
+  ['src/systems/worldScopeReferenceRewrite.js', "for (const component of arrayOf(system.components)) {", 1, 'rewrite-walk'],
+  ['src/systems/worldScopeReferenceRewrite.js', "for (const definition of arrayOf(system.essenceDefinitions)) {", 1, 'rewrite-walk'],
+  ['src/systems/worldScopeReferenceRewrite.js', "for (const tool of arrayOf(system.tools)) {", 1, 'rewrite-walk'],
+  ['src/systems/worldScopeReferenceRewrite.js', "for (const tool of arrayOf(slice.tools)) {", 1, 'rewrite-walk'],
   ['src/systems/remapWorldScopeIdentityFlags.js', "for (const [oldId, newId] of Object.entries(perSystem?.components ?? {})) {", 1, 'not-a-system'],
   ['src/systems/remapWorldScopeIdentityFlags.js', "const remapComponent = legLookup(perSystem.components);", 1, 'not-a-system'],
   ['src/systems/remapWorldScopeIdentityFlags.js', "const remapTool = legLookup(perSystem.tools);", 1, 'not-a-system'],
@@ -231,8 +239,9 @@ function scan() {
   const files = new Set();
   for (const [file, text] of Object.entries(sources)) {
     if (EXCLUDED_PREFIXES.some((prefix) => file.startsWith(prefix))) continue;
-    if (EXCLUDED_FILES.has(file)) continue;
+    const skipConstants = PATH_CONSTANT_FILES.has(file);
     for (const line of stripComments(text).split('\n')) {
+      if (skipConstants && STRING_CONSTANT_LINE.test(line)) continue;
       const found = line.match(MATCHER);
       if (!found) continue;
       totals.matches += found.length;
