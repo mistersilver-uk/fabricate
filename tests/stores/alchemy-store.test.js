@@ -7,6 +7,7 @@ import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { CraftingEngine } from '../../src/systems/CraftingEngine.js';
 import { SignatureValidator } from '../../src/systems/SignatureValidator.js';
 import { createSvelteModuleCompiler } from '../helpers/compile-svelte-module.js';
+import { expectedMemberKinds, storeMemberKinds } from '../helpers/storeMemberKinds.js';
 import { toAlchemyRecords } from '../helpers/alchemySubmissionRecords.js';
 
 let compiler;
@@ -119,6 +120,20 @@ async function loadedStore(setup = {}) {
   return { store, ...harness };
 }
 
+const ALCHEMY_STORE_SHAPE = {
+  getters: [
+    'activeSystemId', 'benchChips', 'benchEmpty', 'benchEssences', 'benchKey', 'brewEnabled',
+    'brewInFlight', 'canSwitch', 'componentSearch', 'components', 'denied', 'error',
+    'hasOwnedComponents', 'knownCount', 'knownRecipes', 'lastBrew', 'listing', 'loadedOnce',
+    'loading', 'missing', 'mode', 'needsChooser', 'search', 'selectedRecipe', 'selectedRecipeId',
+    'systems', 'target', 'undiscoveredCount',
+  ],
+  methods: [
+    'add', 'brew', 'chooseSystem', 'clear', 'load', 'removeAll', 'removeOne', 'selectRecipe',
+    'setComponentSearch', 'setSearch', 'signatureKey', 'switchDiscipline',
+  ],
+};
+
 // ---------------------------------------------------------------------------
 
 describe('alchemyStore', () => {
@@ -132,6 +147,14 @@ describe('alchemyStore', () => {
   });
 
   after(() => compiler.cleanup());
+
+  it('returns exactly the 40 public members the alchemy view reads, each still a getter', () => {
+    const store = createAlchemyStore({ services: makeServices().services });
+    const shape = expectedMemberKinds(ALCHEMY_STORE_SHAPE);
+
+    assert.deepEqual(Object.keys(store).sort(), Object.keys(shape));
+    assert.deepEqual(storeMemberKinds(store), shape);
+  });
 
   it('loads the listing scoped to the active system and sets loadedOnce', async () => {
     const { store, calls } = await loadedStore();

@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 
 import { createSvelteModuleCompiler } from '../helpers/compile-svelte-module.js';
+import { expectedMemberKinds, storeMemberKinds } from '../helpers/storeMemberKinds.js';
 import { progressiveStageThresholds } from '../../src/utils/progressiveStageThresholds.js';
 import { resolveProgressiveAward } from '../../src/utils/progressiveAward.js';
 
@@ -118,6 +119,26 @@ async function setupCraftingStoreCompiler(prefix) {
   return { compiler, createCraftingStore };
 }
 
+const CRAFTING_STORE_SHAPE = {
+  getters: [
+    'availableCategories', 'availableSystems', 'categoryFilter', 'craftInFlight', 'craftableOnly',
+    'error', 'essenceScopeKey', 'favouriteIds', 'favouritesOnly', 'lastRollResult', 'listing',
+    'loadedOnce', 'loading', 'openSlotId', 'orderAnnouncement', 'orderedProgressiveStages',
+    'page', 'pageCount', 'pageItems', 'pageSize', 'progressiveOrders', 'railSlots', 'search',
+    'selectedCraftability', 'selectedEssenceAllocation', 'selectedIngredientOptions',
+    'selectedIngredientSetId', 'selectedRecipe', 'selectedRecipeId', 'selectedSet',
+    'selectedSummary', 'shoppingAggregate', 'shoppingEntries', 'slotAnnouncement', 'systemFilter',
+    'visibleRecipes', 'worldTimeTick',
+  ],
+  methods: [
+    'addToShoppingList', 'chooseIngredientOption', 'chooseIngredientSet', 'clearShoppingList',
+    'craft', 'decrementShoppingList', 'flushProgressiveOrder', 'load', 'openSlot', 'pickForMe',
+    'removeFromShoppingList', 'reorderProgressiveStage', 'select', 'setCategoryFilter',
+    'setCraftableOnly', 'setEssenceAllocation', 'setFavouritesOnly', 'setPage', 'setPageSize',
+    'setSearch', 'setSystemFilter', 'tickWorldTime', 'toggleFavourite',
+  ],
+};
+
 describe('craftingStore', () => {
   let compiler;
   let createCraftingStore;
@@ -128,6 +149,14 @@ describe('craftingStore', () => {
 
   after(() => {
     compiler.cleanup();
+  });
+
+  it('returns exactly the 60 public members the crafting view reads, each still a getter', () => {
+    const store = createCraftingStore({ services: makeServices().services });
+    const shape = expectedMemberKinds(CRAFTING_STORE_SHAPE);
+
+    assert.deepEqual(Object.keys(store).sort(), Object.keys(shape));
+    assert.deepEqual(storeMemberKinds(store), shape);
   });
 
   it('load fetches the listing with the current actor + source ids and sets loadedOnce', async () => {

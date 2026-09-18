@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 
 import { createSvelteModuleCompiler } from '../helpers/compile-svelte-module.js';
+import { expectedMemberKinds, storeMemberKinds } from '../helpers/storeMemberKinds.js';
 import {
   SYS_A,
   SYS_B,
@@ -42,6 +43,24 @@ function makeServices(overrides = {}) {
   return { services, calls };
 }
 
+const INVENTORY_STORE_SHAPE = {
+  getters: [
+    'bulkActive', 'bulkBlocked', 'bulkCounts', 'bulkDestroying', 'bulkEntries', 'bulkProgress',
+    'bulkReport', 'bulkRunning', 'bulkSalvageable', 'bulkSelectedKeys', 'bulkSelectedRows',
+    'bulkYieldPreview', 'error', 'filter', 'filterCounts', 'hasActor', 'learningRecipeId',
+    'listing', 'loadedOnce', 'loading', 'orderedSalvageStages', 'page', 'pageCount', 'pageItems',
+    'pageSize', 'rows', 'salvageOrderAnnouncement', 'salvageOrderIsCustom', 'salvageResult',
+    'salvagingKey', 'search', 'selectedItem', 'selectedKey', 'selectedParticipation',
+    'selectedSystemId', 'sort', 'visibleItems', 'worldTimeTick',
+  ],
+  methods: [
+    'bulkDestroy', 'bulkSalvage', 'clearBulkSelection', 'flushSalvageOrder', 'learn', 'learnAll',
+    'load', 'reloadOnDocumentChange', 'removeFromBulkSelection', 'reorderSalvageStage',
+    'resetSalvage', 'resetSalvageOrder', 'salvage', 'select', 'selectSystem', 'setFilter',
+    'setPage', 'setPageSize', 'setSearch', 'setSort', 'tickWorldTime', 'toggleBulkSelection',
+  ],
+};
+
 describe('inventoryStore', () => {
   before(async () => {
     compiler = createSvelteModuleCompiler('fabricate-inventory-store-');
@@ -53,6 +72,14 @@ describe('inventoryStore', () => {
 
   after(() => {
     compiler.cleanup();
+  });
+
+  it('returns exactly the 60 public members the inventory view reads, each still a getter', () => {
+    const store = createInventoryStore({ services: makeServices().services });
+    const shape = expectedMemberKinds(INVENTORY_STORE_SHAPE);
+
+    assert.deepEqual(Object.keys(store).sort(), Object.keys(shape));
+    assert.deepEqual(storeMemberKinds(store), shape);
   });
 
   it('load fetches the listing with the current actor + source ids and sets loadedOnce', async () => {

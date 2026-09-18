@@ -13,6 +13,7 @@ import { pathToFileURL } from 'node:url';
 import { compileModule } from 'svelte/compiler';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { rewriteClientImports } from '../helpers/rewriteClientImports.js';
+import { expectedMemberKinds, storeMemberKinds } from '../helpers/storeMemberKinds.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -143,6 +144,24 @@ async function loadedStore(setup) {
   return store;
 }
 
+const JOURNAL_STORE_SHAPE = {
+  getters: [
+    'activeCount', 'activeCounts', 'activePage', 'activePageItems', 'activePageSize',
+    'activeRuns', 'activeSort', 'activeStatusFilter', 'busyRunId', 'busyRunKey', 'commandError',
+    'commandResult', 'error', 'historyCount', 'historyPage', 'historyPageItems',
+    'historyPageSize', 'historyPageSizes', 'historySort', 'kindFilter', 'listing', 'loadedOnce',
+    'loading', 'navCount', 'pageSizes', 'recentTerminalRuns', 'search', 'selectedRun',
+    'selectedRunId', 'selectedRunKey', 'viewedStage', 'viewedStageIndex', 'worldTime',
+  ],
+  methods: [
+    'advance', 'beginStep', 'cancel', 'dismiss', 'execute', 'load', 'pause', 'resume',
+    'retryCommandError', 'returnToCurrentStage', 'select', 'setActivePage', 'setActivePageSize',
+    'setActiveSort', 'setActiveStatusFilter', 'setCompletionMode', 'setHistoryPage',
+    'setHistoryPageSize', 'setHistorySort', 'setKindFilter', 'setSearch', 'setSelection',
+    'tickWorldTime', 'viewStage',
+  ],
+};
+
 describe('journalStore', () => {
   before(async () => {
     tempRoot = mkdtempSync(join(tmpdir(), 'fabricate-journal-'));
@@ -159,6 +178,14 @@ describe('journalStore', () => {
 
   after(() => {
     rmSync(tempRoot, { recursive: true, force: true });
+  });
+
+  it('returns exactly the 57 public members the journal view reads, each still a getter', () => {
+    const store = createJournalStore({ services: makeServices().services });
+    const shape = expectedMemberKinds(JOURNAL_STORE_SHAPE);
+
+    assert.deepEqual(Object.keys(store).sort(), Object.keys(shape));
+    assert.deepEqual(storeMemberKinds(store), shape);
   });
 
   it('correlates a trusted completed command notice and clears it on reselect', async () => {
