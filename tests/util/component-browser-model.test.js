@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 
 import {
   COMPONENT_DEFAULT_PAGE_SIZE,
+  buildComponentBrowserModel,
   COMPONENT_ESSENCE_FILTER_ANY,
   COMPONENT_ESSENCE_FILTER_NONE,
   COMPONENT_SORT_KEYS,
@@ -341,5 +342,42 @@ describe('the system rules list draws the reference’s essence predicates and T
       'Dust',
       'Ember',
     ]);
+  });
+});
+
+describe('component browser model — the assembled model (issue 1688)', () => {
+  const MIXED = [
+    { id: 'z', name: 'Zinc Ingot', category: 'Metal' },
+    { id: 'a', name: 'Amber', category: 'Gem' },
+    { id: 'm', name: 'Mud' },
+  ];
+
+  it('holds `filtered` UNSORTED and `sorted` as the whole ordered cohort', () => {
+    const model = buildComponentBrowserModel(MIXED, { sortKey: 'name', pageSize: 2 });
+    assert.deepEqual(names(model.filtered), ['Zinc Ingot', 'Amber', 'Mud'], 'input order kept');
+    assert.deepEqual(names(model.sorted), ['Amber', 'Mud', 'Zinc Ingot']);
+    // `sorted` is the WHOLE cohort, not the page: the view slices its own window out of it.
+    assert.deepEqual(names(model.page), ['Amber', 'Mud']);
+  });
+
+  it('emits NO groups when grouping is off, because the view groups its own window', () => {
+    assert.deepEqual(buildComponentBrowserModel(MIXED, { groupByCategory: false }).groups, []);
+    assert.deepEqual(
+      buildComponentBrowserModel(MIXED, { groupByCategory: true }).groups.map(
+        (group) => group.category
+      ),
+      ['Gem', 'Metal', 'general'],
+      'and the reserved bucket stays last when it does group'
+    );
+  });
+
+  it('reads its sort from `sortKey` / `sortDirection`, not from `key` / `direction`', () => {
+    const model = buildComponentBrowserModel(MIXED, {
+      sortKey: 'name',
+      sortDirection: 'desc',
+      key: 'category',
+      direction: 'asc',
+    });
+    assert.deepEqual(names(model.sorted), ['Zinc Ingot', 'Mud', 'Amber']);
   });
 });

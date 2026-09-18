@@ -20,6 +20,7 @@ import {
 import {
   buildEssenceBrowserModel,
   createEssenceBrowserState,
+  describeActiveEssenceFilters,
   essenceStatusCounts,
   filterEssences,
   sortEssences,
@@ -443,6 +444,14 @@ describe('1036 — essenceBrowserModel', () => {
     assert.deepEqual([model.rangeStart, model.rangeEnd, model.totalCount], [0, 0, 0]);
   });
 
+  it('negative control: an unrecognised source filter matches everything rather than nothing', () => {
+    // Without the allowed-list coercion an unknown value falls through to the broken-source
+    // branch, which would show `water` and `earth` instead of the whole library.
+    assert.equal(filterEssences(ROWS, { source: 'sideways' }).length, ROWS.length);
+    assert.equal(filterEssences(ROWS, { source: '' }).length, ROWS.length);
+    assert.equal(filterEssences(ROWS, {}).length, ROWS.length);
+  });
+
   it('counts each status over every filter EXCEPT the status axis, so a segment says what it would find', () => {
     const model = buildEssenceBrowserModel(ROWS, { status: 'enabled' });
     assert.deepEqual(
@@ -458,6 +467,35 @@ describe('1036 — essenceBrowserModel', () => {
         .statusCounts,
       { all: 2, enabled: 0, disabled: 2 }
     );
+  });
+
+  it('charts the active filters as chips, status before source and the search term last', () => {
+    assert.deepEqual(describeActiveEssenceFilters({ status: 'disabled' }), [
+      { id: 'status', value: 'disabled' },
+    ]);
+    assert.deepEqual(
+      describeActiveEssenceFilters({ source: 'linked', status: 'enabled', search: '  ore  ' }),
+      [
+        { id: 'status', value: 'enabled' },
+        { id: 'source', value: 'linked' },
+        { id: 'search', value: 'ore' },
+      ],
+      'the chip row renders in this order, whatever order the state happens to carry'
+    );
+  });
+
+  it('charts nothing for a neutral, empty or absent filter', () => {
+    assert.deepEqual(describeActiveEssenceFilters({ status: 'all', source: 'all' }), []);
+    assert.deepEqual(describeActiveEssenceFilters({ status: '', source: null, search: '   ' }), []);
+    assert.deepEqual(describeActiveEssenceFilters(), []);
+  });
+
+  it('charts the RAW filter value, because a chip the GM cannot see is a filter they cannot clear', () => {
+    // The allowed lists coerce the FILTER to `all`; the chip still reports what the state holds.
+    assert.equal(filterEssences(ROWS, { status: 'sideways' }).length, ROWS.length);
+    assert.deepEqual(describeActiveEssenceFilters({ status: 'sideways' }), [
+      { id: 'status', value: 'sideways' },
+    ]);
   });
 });
 
