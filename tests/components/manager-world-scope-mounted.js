@@ -618,6 +618,72 @@ export function registerWorldScopeCases() {
   });
 
   // Realms became WORLD geography in issue 1282.
+  // The travel leaf's own two writers (issue 1707 phase 2). Both reach the store through the
+  // shell, and neither was acted on anywhere: the realms column could go inert and ship green.
+  it('renames and deletes the selected realm from the travel inspector', async () => {
+    const calls = [];
+    mountManager(calls, { gatheringRealmsEnabled: true });
+    target.querySelector('#manager-travel-toggle').click();
+    await settle();
+    worldTravelItem('realms').click();
+    await settleRouteExit();
+
+    const inspector = target.querySelector('.manager-travel-inspector');
+    assert.equal(
+      inspector.getAttribute('aria-label'),
+      'Selected realm',
+      'the realms route renders the realm inspector, not the map one'
+    );
+    // Both of this card's own hooks, which nothing in the repository asserted before issue 1707
+    // phase 2: renaming either shipped green, and one of them names the tab it is drawing.
+    assert.ok(
+      inspector.hasAttribute('data-gathering-inspector-travel'),
+      'the travel inspector marks itself as the travel branch of the inspector chain'
+    );
+    assert.equal(inspector.getAttribute('data-travel-inspector'), 'realms');
+    assert.equal(
+      inspector.querySelector('.manager-inspector-name').textContent.trim(),
+      'Green March',
+      'the inspector heads on the selected realm'
+    );
+
+    const nameInput = inspector.querySelector('[data-manager-realm-name-field] input');
+    assert.ok(Boolean(nameInput), 'the realm inspector renders its inline name field');
+    setInputValue(nameInput, 'Emerald March');
+    nameInput.dispatchEvent(new Event('blur'));
+    await settle();
+    assert.deepEqual(
+      calls.findLast((call) => call[0] === 'renameRealm'),
+      ['renameRealm', 'realm-forest', 'Emerald March'],
+      'the committed name reaches the store under the selected realm id'
+    );
+    assert.equal(
+      inspector.querySelector('.manager-inspector-name').textContent.trim(),
+      'Emerald March',
+      'and the republished name reaches this inspector rather than only the list'
+    );
+
+    const remove = [...inspector.querySelectorAll('.manager-travel-inspector-actions button')].find(
+      (button) => button.textContent.includes('Delete realm')
+    );
+    assert.ok(Boolean(remove), 'the realm inspector renders its delete action');
+    remove.click();
+    await settle();
+    assert.deepEqual(
+      calls.findLast((call) => call[0] === 'deleteRealm'),
+      ['deleteRealm', 'realm-forest'],
+      'the delete action reaches the store under the selected realm id'
+    );
+
+    worldTravelItem('map').click();
+    await settleRouteExit();
+    assert.equal(
+      target.querySelector('.manager-travel-inspector').getAttribute('data-travel-inspector'),
+      'map',
+      'the one card follows the tab rather than being two cards'
+    );
+  });
+
   it('keeps the realm library and the party list global across a scope switch', async () => {
     mountManager([], {
       gatheringRealmsEnabled: true,

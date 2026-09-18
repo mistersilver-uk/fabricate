@@ -77,7 +77,6 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   // THE SHIPPED TWO-STEP DESTRUCTIVE CONTROL, for the world Tool entry's HEADER `Delete` (issue
   // 1373's parity round).
   '../../components/ArmedDangerButton.svelte',
-  '../../components/ChanceSlider.svelte',
   // MOVED BY ISSUE 1506, not added.
   '../../components/Chip.svelte',
   // Moved by issue 1710, not added.
@@ -110,7 +109,6 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   './ImportReportModal.svelte',
   './ItemPageInspector.svelte',
   './KnowledgeView.svelte',
-  './RealmNameField.svelte',
   './RecipeEditView.svelte',
   './RecipeItemEditor.svelte',
   './RecipesBrowserView.svelte',
@@ -132,11 +130,14 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   './downtime/WorldDowntimeExtensionHost.svelte',
   './downtime/routeChromeChannel.js',
   './downtime/worldDowntimePreviewProvider.js',
-  // ADDED BY ISSUE 1707, which wrote the twice-authored gathering modifier panel once and
-  // REMOVED `./environment/CharacterModifierBoundsRow.svelte`: both of its root call sites were
-  // inside the two spans that moved, so the root no longer renders it at all.
-  './environment/GatheringModifierEditor.svelte',
-  './environment/GatheringRuleLimitStepper.svelte',
+  // Added by issue 1707, which moved the gathering, event, rules and travel branches of the
+  // inspector chain into four leaves. Each one took its own imports with it, so the root no
+  // longer renders `GatheringModifierEditor` (the task and event leaves render it),
+  // `GatheringRuleLimitStepper`, `ChanceSlider`, `RealmNameField` or
+  // `CharacterModifierBoundsRow`, and no longer reads `DEFAULT_GATHERING_EVENT_IMG`.
+  './environment/GatheringEventInspector.svelte',
+  './environment/GatheringRulesInspector.svelte',
+  './environment/GatheringTaskInspector.svelte',
   './essences/EssenceBehaviorPreview.svelte',
   './essences/EssenceBrowserInspector.svelte',
   './essences/EssenceBulkEditPanel.svelte',
@@ -163,6 +164,7 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   './scoped/scopedEntryDraft.js',
   './scoped/scopedEntryRoutes.js',
   './tools/ToolBrowserInspector.svelte',
+  './world/TravelInspector.svelte',
   './world/WorldCurrencyTab.svelte',
   './world/WorldModifiersTab.svelte',
   './world/WorldPrerequisitesTab.svelte',
