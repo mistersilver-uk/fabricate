@@ -9,9 +9,7 @@
  * @typedef {{ id: string, severity: 'critical' | 'warning' | 'info', blocks?: 'enable', recordKind?: 'task' | 'event', recordId?: string, recordName?: string }} ReadinessIssue
  */
 
-function trimmed(value) {
-  return typeof value === 'string' ? value.trim() : '';
-}
+import { trimString as trimmed } from '../../../../../utils/scalars.js';
 
 function tagList(value) {
   return Array.isArray(value) ? value.filter(Boolean) : [];

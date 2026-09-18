@@ -11,6 +11,7 @@ import { readLearnedRecipeEntries } from '../systems/recipeKeyedFlagEntries.js';
 import { selectWritableActors } from '../systems/writableActors.js';
 
 import { recipeItemDefinitionsContaining } from './recipeItemMembership.js';
+import { stringOrEmpty as trimmed } from './scalars.js';
 
 const ZERO_IMPACT = Object.freeze({
   deletable: 0,
@@ -20,10 +21,6 @@ const ZERO_IMPACT = Object.freeze({
   learnersAffected: 0,
   learnerIds: [],
 });
-
-function trimmed(value) {
-  return String(value ?? '').trim();
-}
 
 function toArray(value) {
   return Array.isArray(value) ? value : [];

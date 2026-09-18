@@ -12,6 +12,8 @@
  *     authoring `enabled`/`values` overrides).
  */
 
+import { trimString as trimmed } from '../utils/scalars.js';
+
 import { normalizeCharacterPrerequisiteList } from './characterPrerequisites.js';
 import { normalizeWorldCurrencyConfig } from './currencyProfile.js';
 import { normalizeTravelConfig } from './gatheringRealms.js';
@@ -215,10 +217,6 @@ export function assembleScopedEntityBundle(scopeValue, systemId) {
 
 function isRecord(value) {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
-function trimmed(value) {
-  return typeof value === 'string' ? value.trim() : '';
 }
 
 /**

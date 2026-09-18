@@ -73,16 +73,13 @@ import {
   routedTierOptionsForPolicy,
   routedOutcomeTierNames,
 } from '../utils/routedOutcomeKeywords.js';
+import { trimString as trimmed } from '../utils/scalars.js';
 
 import { ResolutionModeService } from './ResolutionModeService.js';
 import { SignatureValidator } from './SignatureValidator.js';
 
 function asArray(value) {
   return Array.isArray(value) ? value : [];
-}
-
-function trimmed(value) {
-  return typeof value === 'string' ? value.trim() : '';
 }
 
 /**

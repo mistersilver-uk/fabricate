@@ -3,13 +3,11 @@
  * replacing five copies that had already drifted. Membership is canonically the definition's
  * `recipeIds[]`; the recipe's legacy scalar resolves it only while `membershipResolvesByRecipeIds`
  * is unset, and that marker is a PARAMETER, never inferred from the arrays (issue 1011). A PRESENT
- * `recipeItemId` never falls through to the uuid leg. A LEAF that imports nothing: the `recipeIds[]`
+ * `recipeItemId` never falls through to the uuid leg. A LEAF but for `scalars.js`: the `recipeIds[]`
  * lookup is injected so `definitionIndex.js` can serve it, while the rule itself never is.
  */
 
-function trimmed(value) {
-  return String(value ?? '').trim();
-}
+import { stringOrEmpty as trimmed } from './scalars.js';
 
 function toArray(value) {
   return Array.isArray(value) ? value : [];

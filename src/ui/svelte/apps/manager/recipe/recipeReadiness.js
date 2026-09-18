@@ -23,10 +23,7 @@
  */
 
 import { getMatchHandler } from '../../../../../models/match/matchTypes.js';
-
-function trimmed(value) {
-  return typeof value === 'string' ? value.trim() : '';
-}
+import { trimString as trimmed } from '../../../../../utils/scalars.js';
 
 function asArray(value) {
   return Array.isArray(value) ? value : [];

@@ -1,5 +1,7 @@
 /** Pure validation and offer-list model for the GM Essence Studio (issue 1036). */
 
+import { stringOrEmpty as trimmed } from './scalars.js';
+
 /** The add-new offer list: every essence a GM may ADD to a component or a recipe now. */
 export function selectableEssenceOptions(essenceOptions) {
   return (Array.isArray(essenceOptions) ? essenceOptions : []).filter(
@@ -85,10 +87,6 @@ const SYSTEM_MEMBERSHIP_CHECKS = Object.freeze([
   'systemMacro',
   'systemCarrier',
 ]);
-
-function trimmed(value) {
-  return String(value ?? '').trim();
-}
 
 /** Evaluate an essence draft for the editor's Validation tab. */
 export function essenceEditorValidation(essence, context = {}) {

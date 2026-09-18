@@ -6,6 +6,8 @@
  * and must not be promoted to blocking — a component with neither is a legitimate authored state.
  */
 
+import { stringOrEmpty as trimmed } from './scalars.js';
+
 /** The check ids, in render order. */
 export const COMPONENT_SCOPE_VALIDATION_CHECKS = Object.freeze([
   'source',
@@ -69,10 +71,6 @@ export const COMPONENT_SCOPE_VALIDATION_GROUPS = Object.freeze([
     icon: 'fas fa-screwdriver-wrench',
   }),
 ]);
-
-function trimmed(value) {
-  return String(value ?? '').trim();
-}
 
 /** Whether one check is answerable on the state the screen is holding. */
 function checkApplies(id, { systemKnown, member }) {
