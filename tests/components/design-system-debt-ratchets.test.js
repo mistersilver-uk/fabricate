@@ -1,60 +1,8 @@
 /**
- * Six design-system rules the spec states and nothing enforced (issue 1497), and two invariants
- * of the module sheet beside them (issue 1501).
- *
- * `openspec/specs/design-system/spec.md` is normative. Until this file, three of its rules had a
- * gate — the control-height ladder, the spacing scale and the token generation — and the rest were
- * prose that shipped whatever the last change happened to write. Measured against that silence:
+ * Six design-system rules the spec states and nothing enforced (issue 1497).
  * 24 bare `:focus` selectors, five viewport breakpoints, 40 wrong font weights, 26 off-token
  * shadows, 99 native `<select>` elements in templates and four more in dialog bodies, and 318
  * off-ladder corner values.
- *
- * This file FREEZES all of it. It does not require any of it to be fixed, and it cannot decide on
- * its own that a given value is wrong — a ratchet is not a linter. What it does is make every NEW
- * offence an edit to a pinned number that a reviewer has to accept, and make every PAYMENT an
- * edit too, so debt cannot be quietly discharged without the slot closing behind it. The table is
- * `design-system-known-debt.json`; the reasons each row exists are in the `.js` beside it.
- *
- * ── THE TWO CLAUSES THAT ARE NOT DEBT AT ALL ────────────────────────────────────────────
- * Gates 7 and 8 read `styles/fabricate.css` ALONE and hold down something the six do not.
- * Gate 7 asserts that each module-rooted UTILITY, and each half of the module focus PAIR, is
- * declared exactly once — the property issue 1501 bought by collapsing per-application copies
- * onto `.fabricate`, and the one a later per-area copy would quietly take back — and that each
- * class that issue measured and WITHDREW is still absent, with issue 1523 named in the failure
- * so the child that declares one meets a gate saying removing it is the intended outcome.
- * Gate 8 pins how often the sheet writes one selector into more than one comma-separated LIST.
- *
- * Neither is a defect count: `design-system/spec.md` prohibits nothing either one measures, and
- * `selector-repetition-baseline.js` records why its pin is EXACT rather than a ceiling. They
- * live in this file rather than a sibling because gate 7 recognises the reset through
- * `focusResetRoot`, which is module-private and is gate 1's own allow-list, and because gate 8
- * reads the sheet gate 1 already read.
- *
- * ── WHAT THE SIX GATES SHARE, AND WHY IT IS ONE FILE ────────────────────────────────────
- * Five of the six read the same corpus in the same way: `styles/fabricate.css` plus every Svelte
- * scoped `<style>` block, through `collectStyleCorpus` and `rulesIn`. That corpus is built ONCE
- * here and handed to each clause. Splitting them into six files would walk it six times and, more
- * importantly, would tempt a sixth hand-written CSS walk — which is the failure
- * `tests/helpers/styleBlockScan.js` exists to prevent and whose line-citation defect its docblock
- * records.
- *
- * ── EVERY ALLOW-LIST HAS BOTH POLARITIES PROVED ─────────────────────────────────────────
- * Three of these gates carry an exemption, and an exemption proved only by the tree passing is an
- * exemption that can silently widen to everything. So each is exercised against a SYNTHETIC
- * fixture asserting both directions inside `npm test`: the `:focus` reset shape admits the five
- * real blocks and rejects a seventh that merely mentions a root; the native-select marker comment
- * admits an element and its absence fails; and a `var()` radius resolves rather than being skipped
- * for being indirection. A red-proof in a PR description proves a gate fired once, on one day; a
- * both-polarity fixture proves it can still fire on the day the allow-list is widened.
- *
- * ── NON-VACUITY IS PER GATE, NOT PER FILE ───────────────────────────────────────────────
- * An absence check over an empty corpus passes forever and reports itself satisfied. Two controls
- * stand against that and they answer different questions. The corpus reach clause asserts BOTH
- * halves are being read — one `.css` and more than 100 Svelte blocks — because a total has slack
- * and cannot see the scoped half dropping out. And every ratchet passes its own `scanned`/`floor`
- * over the population IT looked at: font weights for the weight gate, radius declarations for the
- * radius gate, parsed templates for the select gate. A shared floor would be satisfied by a gate
- * whose own filter had stopped matching.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -106,25 +54,7 @@ import {
 
 /* ─────────────────────────────── the shared corpus ─────────────────────────────── */
 
-/**
- * The CSS corpus, its rules and its custom-property definitions, built once.
- *
- * Lazily, so a walk failure is reported as a failing test rather than as an unattributed
- * module-load throw that escapes the `# fail` count entirely — the arrangement
- * `spacing-scale-ratchet.test.js` uses for the same reason.
- *
- * A rule's DECLARATIONS are read out of `rule.body` rather than out of the whole file, which
- * costs the line number and buys two things. It buys the selector, without which none of these
- * gates can say which control is wrong. And it excludes at-rule bodies and stray selector text:
- * `declarationsIn` matches at a `;`, `{` or `}` boundary, so run over a whole file it reads
- * `button:hover,` — the first line of a two-line selector list — as a declaration of `button`.
- * Two such phantoms exist in this corpus and neither reaches any clause below.
- *
- * The cost is real and is paid deliberately: a finding cites `file:line` of its RULE, not of its
- * declaration. For a hand-written rule of five declarations that is the same screen; for the
- * 300-line manager blocks it is a few lines up. The baseline keys carry the selector and the
- * value, which is what a reader searches on anyway.
- */
+/** The CSS corpus, its rules and its custom-property definitions, built once. */
 let cachedCorpus = null;
 function corpus() {
   if (cachedCorpus === null) {
@@ -197,21 +127,7 @@ test('both stylesheet corpora are still being read', () => {
 /** `:focus`, and not the start of `:focus-visible` or `:focus-within`. */
 const BARE_FOCUS = /:focus(?!-(?:visible|within))(?![\w-])/u;
 
-/**
- * The element targets a Foundry-core focus reset names, and the three shapes those blocks take.
- *
- * The allow-list is by ROOT PLUS SHAPE, never by line. FIVE blocks in the sheet suppress core's
- * orange focus ring so the Fabricate accent can be drawn by the `:focus-visible` block beneath
- * them, and every one of them is written as one root class crossed with this target list. A
- * line-range allow-list would need re-measuring on every edit to a 20,000-line file — and worse,
- * would silently start exempting whatever moved into the range.
- *
- * The three shapes are the whole permission. `.fabricate` — the module root, which issue 1501
- * collapsed the app and manager pairs onto — includes `a` because the manager renders links;
- * `.fabricate-roll-prompt-dialog` is a DialogV2 body with no textarea and no `[tabindex]` target,
- * so it names three. A block that suppressed the ring for one more element than its shape allows
- * is NOT this pattern and is not exempt.
- */
+/** The element targets a Foundry-core focus reset names, and the three shapes those blocks take. */
 const RESET_SHAPES = Object.freeze(
   [
     'button input select textarea [tabindex]',
@@ -228,16 +144,6 @@ const RING_COMPOUND = /^(\.[\w-]+) (\[tabindex\]|[a-z]+):focus-visible$/u;
 
 /**
  * The root class a rule writes one half of the core-focus pair for, or `null` when it is not one.
- *
- * EVERY compound has to fit, under ONE root, and the target set has to be exactly one of the
- * published shapes. Each of those three conditions is load-bearing: without the first, appending
- * `.manager-thing:focus` to a reset block's list exempts it; without the second, a list spanning
- * two areas is exempt in both; without the third, the shape stops being a shape.
- *
- * The half is a PARAMETER because the two halves are the same shape by requirement rather than by
- * coincidence: issue 1501's module-rooted pair is only sound while the ring names exactly the
- * elements the reset suppressed, so the clause asserting that the ring is declared once has to
- * recognise it by the same shape rather than by its text.
  *
  * @param {string} selector A rule's whole selector list.
  * @param {RegExp} compoundPattern {@link RESET_COMPOUND} or {@link RING_COMPOUND}.
@@ -262,44 +168,7 @@ function focusResetRoot(selector) {
   return focusPairRoot(selector, RESET_COMPOUND);
 }
 
-/**
- * The seven primitive families that root their own focus chrome, and the compounds they may write
- * for the STRIP half of it — eight, because one family declares two (issues 1502 and 1508).
- *
- * THREE SHAPES, and the split is the family root's relationship to the control rather than a
- * style. `ManagerButton` and `IconButton` ARE the control, so their compound is the root alone.
- * `Pagination`, `Field`, `ManagerSearchField` and `ChanceSlider` are not: the root is a
- * `<section>`, a `<label>`/`<div>`/`<fieldset>` or a `<span>` and the controls it strips for are
- * the elements inside it, so each of those compounds carries an element as well. `StatusToggle` is
- * BOTH, which is why it has two members: its `button` and `indicator` hosts ARE the control and
- * take the root-plus-hook compound, while its `checkbox` host is a `<label>` — an element that
- * never matches `:focus` at all — so the strip for that host is written on the transparent
- * `<input type="checkbox">` the label wraps, which is the element that actually takes focus. Its
- * repaint is a `:has()` ring on the label, so the pair's two halves are on two DIFFERENT elements
- * by construction rather than by choice, and `design-system/spec.md` records that case.
- *
- * `Field`'s member is the one `:is()` on the list, and it is deliberately not two legs: this
- * recogniser accepts exactly ONE list member, while the RING half is governed by
- * {@link bareElementRingRoot}, which reads `<root> <element>:focus-visible` PER MEMBER and would
- * not see an `:is()` at all. So Field's strip is one `:is(input, textarea):focus` member and its
- * repaint is two comma-separated legs — the two forms differ because two different recognisers
- * govern them, and neither may be "unified" into the other.
- *
- * `RadioCardGroup` joined at issue 1509 phase 3 and is the SECOND family to bring a pair it
- * already declared, after `StatusToggle` — but it is the first whose strip had to be SPLIT out of
- * a selector list before this recogniser could see it. The rule paired the option row's radio with
- * the Tool Requirements bonus row's, and a list is not this shape: `primitiveFocusStrip` accepts
- * exactly ONE compound. So the split is the precondition rather than a tidy-up, and the bonus
- * row's leg stays a booked bare-`:focus` row rooted at the manager, which is what
- * `design-system-known-debt.json` records.
- *
- * `EditorTabs` joined at issue 1509 with a NEW pair rather than a re-rooted one: the tab strip had
- * no focus chrome of its own at all, because inside a Fabricate window the module pair reached its
- * buttons and nothing else was needed. Rooted at the class it emits, the strip renders in hosts
- * carrying no `.fabricate` root, so it declares both halves — the module pair's declarations
- * verbatim, at the module pair's own (0,2,1), which is what keeps the two identical wherever both
- * reach. `.fabricate-pagination button:focus` is the precedent for the shape.
- */
+/** The seven primitive families that root their own focus chrome. */
 const PRIMITIVE_FOCUS_STRIPS = Object.freeze([
   '.fabricate-button:focus',
   '.fabricate-field :is(input, textarea):focus',
@@ -318,16 +187,6 @@ const FOCUS_STRIP_DECLARATIONS = Object.freeze({ outline: 'none', 'box-shadow': 
 
 /**
  * The primitive family compound a rule strips core focus chrome for, or `null` when it is not one.
- *
- * A SECOND exemption beside the area resets above, and it exists for the same reason they do.
- * Foundry core paints `a.button, button:focus` with an outline and a 4px glow. The five reset
- * blocks remove that inside an application root; a family rooted at a class the primitive emits
- * renders in hosts carrying no application root at all, where the repaint half alone would draw
- * the accent ring ON TOP of core's treatment rather than in place of it. `design-system/spec.md`
- * states the consequence as a rule: the chrome a primitive declares is the PAIR. The strip half
- * is therefore required chrome, not debt, and booking it in the baseline would file a
- * requirement as a defect.
- *
  * Narrow on all three axes, so it cannot become somewhere to hide a real bare `:focus`: ONE
  * compound (a list is not this shape), that compound named exactly, and the declaration set
  * exactly `outline: none; box-shadow: none`. A strip that PAINTS anything — a colour, a border,
@@ -351,10 +210,7 @@ function primitiveFocusStrip(rule) {
     : null;
 }
 
-/**
- * Every selector matching bare `:focus`, split three ways: the allow-listed area resets, the
- * primitive families' strip halves, and everything else — which is what the ratchet holds down.
- */
+/** Every selector matching bare `:focus`, split three ways: the allow-listed area resets. */
 function bareFocusSelectors() {
   const gated = [];
   const exempt = [];
@@ -374,9 +230,6 @@ function bareFocusSelectors() {
 
 test('the five Foundry-core focus resets are recognised, and a look-alike is not', () => {
   // BOTH POLARITIES OF THE ONLY EXEMPTION THIS GATE HAS. The positive half is the live corpus:
-  // five roots, named, so a block being renamed or split shows up here rather than as 24 rows
-  // arriving in the baseline at once. The negative half is synthetic, because the tree contains no
-  // look-alike today — and a permission with no counterexample is a permission nobody has tested.
   const { exempt } = bareFocusSelectors();
 
   assert.deepEqual(
@@ -436,12 +289,7 @@ test('the five Foundry-core focus resets are recognised, and a look-alike is not
 });
 
 test('a primitive family’s focus STRIP half is recognised, and a look-alike is not', () => {
-  // THE SECOND EXEMPTION, BOTH POLARITIES, in the shape the clause above uses. The positive half
-  // is the live corpus — eight compounds over seven families, named, so a strip being renamed,
-  // split or deleted shows up here rather than as eight rows quietly arriving in the baseline.
-  // The negative half is
-  // synthetic, because the tree holds no look-alike today, and a permission nobody has tested
-  // against a counterexample is a permission that will eventually exempt something real.
+  // THE SECOND EXEMPTION, BOTH POLARITIES.
   const { strips } = bareFocusSelectors();
 
   assert.deepEqual(
@@ -590,11 +438,6 @@ test('no viewport breakpoint is introduced, and user-preference queries stay exe
 
   // THE EXEMPTION, PROVED LIVE. A predicate that quietly matched everything would empty this
   // baseline wholesale, which reads like debt paid down rather than like a gate switched off.
-  //
-  // It doubles as this clause's proof that the MEDIA WALK still walks, and it is the right shape
-  // for that job in the way `ratchetBaseline.js` insists on: the three user-preference queries it
-  // counts are precisely the part of the population this gate is NOT asserting the absence of, so
-  // a broken `MEDIA_AT_RULE` reds here rather than reporting an empty tree as a clean one.
   assert.ok(
     all.length - gated.length > 0,
     'no `@media` query tests a user preference any more, so the exemption this gate grants is ' +
@@ -602,14 +445,7 @@ test('no viewport breakpoint is introduced, and user-preference queries stay exe
       'other reading and the worse one, the at-rule scan has stopped matching anything at all'
   );
 
-  // THE FLOOR IS OVER THE CORPUS, NOT OVER THE QUERIES, and the two differ by three orders of
-  // magnitude. This tree holds EIGHT `@media` queries, five of which are the rows below, so a
-  // floor stated on that population is a floor stated on the debt: it can only be set low enough
-  // to be meaningless. At four it accepted a collector that had lost HALF of what it should see,
-  // and a corpus truncation — a lost root, a `<style>` extractor that stopped matching — would
-  // have reached this clause as VANISHED rows, which reads as debt paid down and gets banked.
-  // Floored on the rules the walk actually reads, that same truncation reds as what it is. It is
-  // the corpus and the floor gate 1 uses, because it is literally the same walk.
+  // THE FLOOR IS OVER THE CORPUS, NOT OVER THE QUERIES.
   assertRatchet({
     label: 'viewport `@media` breakpoints',
     baseline: KNOWN_VIEWPORT_MEDIA_QUERIES,
@@ -686,11 +522,7 @@ function monoSelectors() {
 }
 
 test('no mono rule asks for a weight the shipped face does not have', () => {
-  // MATCHED BY SELECTOR TEXT WITHIN A FILE, not only within the rule, and that is deliberate
-  // rather than loose. The corpus repeatedly sets the family in a base rule and the weight in an
-  // `@media`-nested twin carrying the IDENTICAL selector, which is one control written as two
-  // rules; a rule-local test would exempt every one of them. The cost is that two unrelated rules
-  // sharing a selector in one file are read as one control — which is what the cascade does too.
+  // MATCHED BY SELECTOR TEXT WITHIN A FILE, not only within the rule.
   const mono = monoSelectors();
   const weights = fontWeights();
   const heavy = weights.filter((declaration) => {
@@ -728,14 +560,7 @@ test('no mono rule asks for a weight the shipped face does not have', () => {
 /** The three published elevation tokens. */
 const SHADOW_TOKEN = /^var\(\s*--fab-shadow-(sm|md|lg)\s*\)$/iu;
 
-/**
- * An inset ring: a border drawn as a shadow so it costs no layout.
- *
- * Allowed because it is not elevation at all — a ring has no offset and no blur, so it neither
- * claims a z-height nor competes with the three published shadows. The token reference is
- * required: `0 0 0 2px rgb(0 0 0 / 40%)` is a colour written by hand, which the token foundation
- * requirement prohibits for its own reasons.
- */
+/** An inset ring: a border drawn as a shadow so it costs no layout. */
 const INSET_RING = /^(?:inset )?0 0 0 \d+(?:\.\d+)?px var\(\s*--fab-[\w-]+\s*(?:,[^)]*)?\)$/iu;
 
 test('no box-shadow is written outside the published elevation set', () => {
@@ -811,10 +636,7 @@ function nativeSelects(templates) {
 }
 
 test('an unmarked native <select> is debt, and the marker comment is what exempts one', () => {
-  // BOTH POLARITIES, SYNTHETIC, because no file in the tree carries the marker: the exemption
-  // exists for a decision nobody has yet had to make, and an unexercised exemption is one nobody
-  // has proved works in EITHER direction. Two `BulkEditSelect`-shaped fixtures, one with the
-  // comment and one without.
+  // BOTH POLARITIES, SYNTHETIC, because no file in the tree carries the marker.
   const withMarker = [
     '<!-- native select: the Foundry drop-down is the only control a DialogV2 body can host. -->',
     '<select bind:value={choice}><option>a</option></select>',
@@ -847,25 +669,6 @@ test('an unmarked native <select> is debt, and the marker comment is what exempt
 
 test('a converted select did not pay its ratchet with a marker', () => {
   // THE THIRD POLARITY (issue 1504), and the one the two clauses above cannot express.
-  //
-  // The pin fell 100 -> 96 because three shared primitives stopped rendering a native `<select>`.
-  // A marker on any of those files would have moved the SAME number the SAME way while the OS
-  // drop-down went on shipping — the debt paid by exemption rather than by conversion, with a
-  // green gate over it. Neither the ratchet nor the marker's own both-polarity proof above can
-  // see that: the ratchet counts UNMARKED elements, so a marked one is simply absent, and the
-  // proof above runs on synthetic fixtures rather than on the corpus.
-  //
-  // So the converted files are named and their marker COUNT is pinned at zero. Named rather than
-  // derived, because the property is about these files specifically: they are the ones whose rows
-  // a conversion deleted, and a file that later regains a `<select>` legitimately — under a
-  // marker, with a reason — is a decision someone must take deliberately by editing this list.
-  //
-  // ISSUE 1511 ADDED THE PLAYER APP'S FIVE, and it is the payment with the sharpest version of
-  // this hazard: `InventorySystemSelector.svelte` had carried a DOCBLOCK reason for its native
-  // select since issue 766, so it was the one file in the tree where turning that prose into a
-  // marker would have looked like tidying rather than like exempting. The pin fell 84 -> 78
-  // because six elements converted, and this clause is what says none of the six was paid for
-  // with a comment.
   const CONVERTED = [
     'src/ui/svelte/components/Select.svelte',
     'src/ui/svelte/components/Pagination.svelte',
@@ -897,15 +700,7 @@ test('a converted select did not pay its ratchet with a marker', () => {
   }
 });
 
-/**
- * The one phrase both published documents state the ratchet's pin in.
- *
- * Each numeral is captured BOUND TO ITS NOUN rather than searched for loose in the sentence.
- * The loose form — "does the pin sentence contain the number 78 anywhere" — is satisfied by a
- * sentence that has the element total and the file count the wrong way round, and by one whose
- * file count happens to equal an unrelated figure beside it; both are exactly the drift this
- * clause exists to catch.
- */
+/** The one phrase both published documents state the ratchet's pin in. */
 const PIN_PHRASE = /(\d+) elements across (\d+)\s*(?:<code>)?`?\.svelte`?(?:<\/code>)? files/u;
 
 /** The `### Requirement:` section that owns the select pin, so a fragment cannot match elsewhere. */
@@ -951,20 +746,10 @@ function assertPinPhrase(where, sentence) {
 }
 
 test('both published pin sentences state the two numerals this ratchet measures', () => {
-  // THE SENTENCE, NOT THE SECTION. The requirement's next line carries HISTORICAL figures — the
+  // THE SENTENCE, NOT THE SECTION. The requirement's next line carries HISTORICAL figures.
   // pin's earlier values — so a stale pin could match one of those and read as green. The slice
   // is therefore the one sentence that begins "The figure is the RATCHET'S PIN", which is the
   // only sentence in the spec making a claim about today's constants.
-  //
-  // Precedent: `control-height-ladder.test.js` asserts the ladder's rungs FROM its constants for
-  // exactly this reason. It is worth a clause of its own here because this sentence has ALREADY
-  // rotted once: it read "96 elements across 36 `.svelte` files" against a pin of 84 across 33,
-  // and nothing in `npm test` could see it.
-  //
-  // AND THE SPECIMEN CARRIES THE SAME CLAIM, which is why it is read here too. `library.html` is
-  // the published shape of this capability and its select entry states the pin in the identical
-  // phrase; guarding only the prose leaves a second copy that rots on its own schedule, and the
-  // specimen is the one a reader is shown.
   const requirement = selectRequirement();
   const pin = requirement.match(/^The figure is the RATCHET'S PIN[^\n]*$/mu)?.[0];
   assert.ok(
@@ -1023,11 +808,6 @@ function nativeSelectsInJavaScript() {
 test('no new native <select> is written into a JavaScript template string', () => {
   // THE CHANNEL THE TEMPLATE WALK CANNOT SEE. A DialogV2 body is an HTML string built in a `.js`
   // module, so `svelte/compiler` never reads it and the clause above is blind to all four of them.
-  //
-  // COMMENTS ARE STRIPPED FIRST, and that is not tidiness: nine docblocks under `src/**` name
-  // `<select>` in prose to say what a bulk-edit model binds to. A text scan that counted them
-  // would report thirteen findings, nine of which cannot be fixed, and would be answered with a
-  // file-level exemption for exactly the modules the gate exists to police.
   const found = nativeSelectsInJavaScript();
   const sources = collectWorkingTreeSources(['src'], ['.js']);
 
@@ -1055,13 +835,7 @@ const RADIUS_PROPERTY =
 /** The published radius ladder, plus the two keywords that defer rather than choose. */
 const RADIUS_LADDER = Object.freeze(['0', '6px', '7px', '9px', '11px', '999px', '50%', 'inherit']);
 
-/**
- * A shorthand value split into the corner values it sets.
- *
- * Space AND slash, because `border-radius: 6px / 11px` sets a horizontal and a vertical radius
- * and both have to be on the ladder. Depth-aware, so `var(--a, 1px 2px)` is one token rather than
- * three.
- */
+/** A shorthand value split into the corner values it sets. */
 function radiusTokens(value) {
   const tokens = [];
   let depth = 0;
@@ -1083,20 +857,7 @@ function radiusTokens(value) {
 /**
  * Whether one corner value is on the ladder, resolving `var()` through the corpus.
  *
- * RESOLUTION IS WHAT KEEPS THE RATCHET FROM BEING PAYABLE BY RENAMING. With a text-only scan the
- * cheapest way to clear a row is `--panel-radius: 8px; border-radius: var(--panel-radius)` — the
- * corner does not move and the gate goes green. So an indirect value is followed, and it is
- * compliant only when EVERY definition it can reach is on the ladder: a token defined twice, once
- * per theme, is two answers and the cascade picks between them by specificity, which a text
- * scanner does not know.
- *
- * A candidate still containing `var(` is dropped rather than judged. It is the unexpanded text —
- * `resolveValueCandidates` unions the raw with the resolved — and a token this corpus does not
- * define at all (one is set from Svelte markup) contributes only its fallback, which is the one
- * value a stylesheet reader can actually see.
- *
  * @returns {{ok: boolean, resolved: string|null}} `resolved` names the offending value when the
- *   token is indirect, so the row can be pinned as `raw => resolved` rather than as a name.
  */
 function radiusCompliance(token, definitions) {
   if (RADIUS_LADDER.includes(token)) return { ok: true, resolved: null };
@@ -1144,8 +905,7 @@ test('a radius written into a token still resolves, so the ladder cannot be paid
   assert.deepEqual(radiusCompliance('var(--fixture-off)', definitions), {
     ok: false,
     resolved: '5px',
-    // The row is pinned as `raw => resolved` for exactly this: the cited line carries no pixel
-    // value anywhere on it, and a reader given only the token name cannot adjudicate the finding.
+    // The row is pinned as `raw => resolved` for exactly this.
   });
   assert.deepEqual(radiusCompliance('var(--fixture-on)', definitions), {
     ok: true,
@@ -1195,22 +955,7 @@ test('no corner radius leaves the published ladder', () => {
 /** The four rungs the icon-chip size ladder publishes. */
 const ART_SIZE_LADDER = new Set([22, 26, 30, 38]);
 
-/**
- * The components that ARE the art tile, each against the `size` it renders at when a call site
- * names none.
- *
- * TWO names since issue 1506 shipped the avatar, and the map rather than a set is what that
- * arrival forced: the two primitives default to different rungs — 40 for the icon chip, which is
- * historical, and 32 for the avatar, which is the specimen's single-mark size — so a set would
- * have recorded a future default-size avatar at a rung it does not draw. The absent-`size` branch
- * below reads this table rather than a constant for that reason.
- *
- * The population is keyed by CALL SITE, not by primitive, so retiring one of the two into the
- * other moves no key; what moves a key is a call site changing file or size. That is also why
- * adding a name here is load-bearing rather than cosmetic: with the avatar missing, the two
- * knowledge sites that converted to it would leave this scan silently and `assertRatchet` would
- * report two VANISHED rows.
- */
+/** The components that ARE the art tile. */
 const ART_TILE_COMPONENTS = new Map([
   ['Medallion', 40],
   ['Avatar', 32],
@@ -1218,15 +963,6 @@ const ART_TILE_COMPONENTS = new Map([
 
 /**
  * Every art-tile render site, as `{ file, size }` with `size` a number or the string `dynamic`.
- *
- * `dynamic` is a RECORDED value rather than a skip. Two sites forward a `size` from a prop or a
- * caller-supplied descriptor, and dropping them would make them invisible to the `scanned` floor
- * as well as to the table — a scan that had stopped reading expression attributes would look
- * exactly like a tidier tree.
- *
- * Read from the parsed template rather than by a text scan, for the reason every gate in this
- * file is: the attribute this reads sits among expression attributes whose `>` ends a naive
- * match early, and a truncated tag reports clean rather than failing.
  *
  * @returns {{ file: string, size: number|'dynamic' }[]}
  */
@@ -1236,8 +972,7 @@ function artTileSizes() {
     walkElements(ast.fragment ?? ast, (element) => {
       if (element.type !== 'Component' || !ART_TILE_COMPONENTS.has(element.name)) return;
       const text = attributeText(source, element, 'size');
-      // An absent `size` takes the primitive's OWN default, which differs between the two and is
-      // recorded beside its name above rather than written here as one number.
+      // An absent `size` takes the primitive's OWN default.
       if (text === null) {
         found.push({ file, size: ART_TILE_COMPONENTS.get(element.name) });
         return;
@@ -1287,20 +1022,7 @@ test('no new art tile renders at an off-ladder size', () => {
 
 /* ─────────────── gate 7: one declaration each, over the module sheet alone ─────────────── */
 
-/**
- * The module sheet's own rules, censused once.
- *
- * READ OVER `styles/fabricate.css` ALONE, and that is the whole reason this clause is not written
- * over `corpus()`. `SegmentedControl.svelte` restates the visually-hidden set byte-identically in
- * its own scoped block, deliberately and correctly — a scoped block is the component's, not the
- * module's — so a check by declaration SHAPE over the combined corpus would report two copies of a
- * utility that is declared once. The question this gate asks is about the module sheet: is there
- * one rule in it that declares this class.
- *
- * `censusRules` rather than `rulesIn`, because it is the walk that already reports a rule's
- * declarations and its normalised selector list, and issue 1501's ratchet below reads the same
- * value. Two walks over one file would be two answers to `how many rules does this sheet have`.
- */
+/** The module sheet's own rules, censused once. */
 let cachedSheetRules = null;
 function sheetRules() {
   if (cachedSheetRules === null) {
@@ -1347,16 +1069,7 @@ const declarationMap = (rule) =>
     ])
   );
 
-/**
- * The utilities issue 1501 shipped, each declared ONCE and rooted at the module root.
- *
- * `.fabricate` is the class every Fabricate application root emits, so one rule there reaches the
- * player app, the manager, the three interactables windows and the roll-prompt dialog. The
- * assertion is by CLASS NAME rather than by declaration shape for the reason `sheetRules` gives,
- * and it pins the whole selector rather than only the count: a second copy under
- * `.fabricate-manager` is the defect this collapse removed, and it would satisfy a bare count of
- * one if the module-rooted rule were the one deleted.
- */
+/** The utilities issue 1501 shipped, each declared ONCE and rooted at the module root. */
 const MODULE_UTILITIES = Object.freeze([
   { name: 'visually-hidden', selector: '.fabricate .visually-hidden' },
   { name: 'fab-truncate', selector: '.fabricate .fab-truncate' },
@@ -1364,14 +1077,7 @@ const MODULE_UTILITIES = Object.freeze([
   { name: 'fab-cluster', selector: '.fabricate .fab-cluster' },
 ]);
 
-/**
- * The two halves of the module-rooted focus pair, recognised by SHAPE rather than by text.
- *
- * The reset half runs through {@link focusResetRoot}, which gate 1 already uses as its allow-list,
- * so this clause cannot be satisfied by a look-alike that merely mentions the root — and cannot
- * drift from the exemption, because a rule recognised here is by construction a rule exempted
- * there.
- */
+/** The two halves of the module-rooted focus pair, recognised by SHAPE rather than by text. */
 const MODULE_FOCUS_PAIR = Object.freeze([
   {
     half: 'the Foundry-core focus reset',
@@ -1388,14 +1094,6 @@ const MODULE_FOCUS_PAIR = Object.freeze([
     compound: RING_COMPOUND,
     declarations: { outline: '2px solid var(--fab-accent)', 'outline-offset': '2px' },
     // EMPTY SINCE ISSUE 1520. Three area roots wrote a copy of this half and all three are gone.
-    // The roll-prompt dialog was never in this list even while it carried a ring, and the reason
-    // survives the deletion and now matters more: it writes `button, input` in one block and
-    // `select` alone in another, and neither list is one of `RESET_SHAPES`, so this recogniser
-    // never saw either as a copy of the pair. Issue 1520 deleted the `button, input` block as a
-    // copy and KEPT the `select` one, which paints an INSET `box-shadow` where the module ring
-    // paints an OUTSET `outline` — a variant rather than a copy, because an outset ring on a
-    // `<select>` flush to that dialog's overflow-clipped edge is clipped. `RING_ROOTS` below
-    // still names the dialog for exactly that surviving rule.
     areaRoots: [],
   },
 ]);
@@ -1405,28 +1103,6 @@ const SELF_RING_COMPOUND = /^(\.[\w-]+):focus-visible$/u;
 
 /**
  * Every root that may write a `:focus-visible` ring over BARE ELEMENTS, at ANY element shape.
- *
- * WHY A SECOND, SHAPE-FREE POPULATION. The clause pinning the pair recognises a half only when its
- * element set is one of `RESET_SHAPES`, and that allow-list is opt-in in the wrong direction: a
- * ring naming two elements — `.fabricate-manager a:focus-visible, .fabricate-manager
- * button:focus-visible` — is not a published shape, so `focusPairRoot` returns `null` and the
- * clause cannot see it. Gate 1 reads bare `:focus` and never looks at `:focus-visible` at all. So
- * the RESET half is protected at every shape and, without this clause, the RING half only at
- * three.
- *
- * THE POPULATION IS KEYED ON ELEMENTS, NOT ON DECLARATIONS. What makes a block a copy of the
- * module ring is that it reaches the same elements at the same rank; the declarations are the part
- * a copy can vary — the roll-prompt dialog's `select` ring writes an inset `box-shadow` where the
- * module ring writes an outset `outline` — while still deciding the same state by source order.
- * Two selector shapes are a ring: `<root> <element>:focus-visible` ({@link RING_COMPOUND}) and
- * {@link SELF_RING_COMPOUND}, and every member of the list has to share one root.
- *
- * A ring on a WIDGET CLASS is NOT in this population and must not be. `.fabricate-manager
- * .manager-nav-button:focus-visible` is per-widget chrome the design system allows, and the sheet
- * holds 37 selector members of the shape `<root> .widget-class:focus-visible` against these 10
- * blocks — pinning them would pin the manager's whole widget inventory to this list. The shape is
- * named so the figure is checkable; an earlier reading published 30 under no stated shape.
- *
  * Derived from the sheet rather than asserted: 9 roots over 9 blocks, every one of them
  * legitimate today, which is exactly why a tenth would not stand out to a reader. It was 9
  * over 10 until issue 1508 rooted `Field` and `ManagerSearchField` at the classes they emit and
@@ -1443,36 +1119,7 @@ const SELF_RING_COMPOUND = /^(\.[\w-]+):focus-visible$/u;
  * `box-shadow` against the module's outset `outline`, written because an outset ring on a select
  * flush to an overflow-clipped container is clipped — and it was deleted rather than narrowed
  * because the player app's last native select converted and no carrier is left under that root.
- * A variant with no carrier is a rule, not a decision, which is what makes 10 over 10 nine over
- * nine.
- *
- * BOTH FIGURES ARE RE-MEASURED HERE RATHER THAN CARRIED FORWARD, and the block half needed it: the
- * count published before this rebase read 15 where the walk over the same sheet produces 14, an
- * off-by-one that had been restated across three changes because nothing derives it. Only the
- * ROOT half is gated — the clause below asserts {@link RING_ROOTS} against the sheet — so the
- * block figure is the one a reader has to re-run to trust, and the rungs above the last two
- * restate what each change reported rather than a re-measurement of its head.
- *
- * `.fabricate-roll-prompt-dialog` STAYS, and the asymmetry is the point of this population's own
- * keying: its reset half went with the other copies, so it left the exemption list in the same
- * commit, while its `select` ring paints an INSET `box-shadow` against the module's OUTSET
- * `outline` and is a VARIANT the module cannot cover. Membership here is not a licence to
- * delete — the population is keyed on ELEMENTS, and elements are the part a variant shares.
- *
- * `Field`'s is TWO comma-separated legs — `.fabricate-field
- * input:focus-visible, .fabricate-field textarea:focus-visible` — rather than one
- * `:is(input, textarea)` member, and that is a requirement of this population rather than a
- * preference: {@link RING_COMPOUND} targets `[tabindex]` or a bare element name, so an `:is()`
- * form would fall out of the list by accident of the recogniser while ringing exactly the same
- * elements at exactly the same rank as the module ring. The STRIP half is the mirror image and
- * carries the `:is()`; see {@link PRIMITIVE_FOCUS_STRIPS}.
- *
  * `StatusToggle` is NOT here and must not be, for a structural reason rather than an oversight:
- * both of its repaints escape the two recognised shapes. One is a two-class compound
- * (`.fabricate-toggle.manager-status-toggle:focus-visible`), which {@link SELF_RING_COMPOUND}'s
- * single `.[\w-]+` cannot match; the other is a `:has()` compound on the checkbox host's
- * `<label>`. Neither rings a BARE ELEMENT, which is the population this list is about — each
- * paints on the family's own class — so neither belongs on it.
  */
 const RING_ROOTS = Object.freeze(
   [
@@ -1504,16 +1151,7 @@ function bareElementRingRoot(selector) {
   return roots.size === 1 ? [...roots][0] : null;
 }
 
-/**
- * The classes issue 1501 considered, measured, and did NOT declare.
- *
- * EVERY MESSAGE NAMES ISSUE 1523, and that is the point of the clause rather than a courtesy. The
- * child that declares one of these meets a gate saying, in the failure text, that removing it is
- * the intended outcome — so a later author cannot land a zero- or one-adopter class without
- * reopening the decision that withdrew it. A utility with one adopter is a RENAME rather than a
- * shared treatment, and a declared class nothing carries is a dead rule
- * `tests/styles-dead-classes.test.js` would fail on anyway.
- */
+/** The classes issue 1501 considered, measured, and did NOT declare. */
 const WITHDRAWN_UTILITIES = Object.freeze([
   {
     name: 'fab-list-reset',
@@ -1549,11 +1187,7 @@ const WITHDRAWN_UTILITIES = Object.freeze([
 ]);
 
 test('each module utility is declared exactly once, at the module root', () => {
-  // BY CLASS NAME OVER THE MODULE SHEET ALONE. The subject compound has to BE the class, so the
-  // `[data-gap]` rungs — `.fabricate .fab-stack[data-gap='1']` and its four siblings — are
-  // variants of the utility rather than second declarations of it, while a re-introduced
-  // `.fabricate-manager .visually-hidden` is caught: its subject compound is `.visually-hidden`
-  // too, and the count goes to two.
+  // BY CLASS NAME OVER THE MODULE SHEET ALONE. The subject compound has to BE the class.
   for (const { name, selector } of MODULE_UTILITIES) {
     const declared = declarationsOfClass(name);
     assert.deepEqual(
@@ -1592,14 +1226,7 @@ const gapRungsOf = (classText, gapText) =>
 /** An element written into a JavaScript template string, with its whole tag captured. */
 const JAVASCRIPT_GAP_ELEMENT = /<[a-z][^<>]*\bdata-gap="[^"]+"[^<>]*>/giu;
 
-/**
- * Every `data-gap` the product writes, over BOTH channels a rung can be emitted through.
- *
- * The Svelte templates are the obvious one. `rollPrompt.js` builds its dialog body as an HTML
- * string in a `.js` module, which `svelte/compiler` never reads — the same blind spot the native
- * `<select>` clause above records — and it writes two rungs, so a template-only scan would report
- * a smaller emitted set than the tree holds and clear a rung nothing declares.
- */
+/** Every `data-gap` the product writes, over BOTH channels a rung can be emitted through. */
 function emittedGapRungs() {
   const found = [];
   for (const { file, source, ast } of parsedTemplates()) {
@@ -1626,14 +1253,7 @@ function emittedGapRungs() {
   return found;
 }
 
-/**
- * The two utilities whose BASE rule sets a rung default, and the rung that default must equal.
- *
- * Named here rather than left implicit, because an implicit default is the drift this clause
- * exists to stop: `data-gap="2"` renders correctly only while `--fab-stack-gap` happens to be
- * `var(--fab-space-2)`, and re-rung the base and every site writing `2` moves while its markup
- * still says `2`.
- */
+/** The two utilities whose BASE rule sets a rung default, and the rung that default must equal. */
 const DEFAULT_GAP_RUNGS = Object.freeze([
   { utility: 'fab-stack', property: '--fab-stack-gap', rung: '2' },
   { utility: 'fab-cluster', property: '--fab-cluster-gap', rung: '2' },
@@ -1732,12 +1352,7 @@ test('no area root writes a copy of either half of the module focus pair', () =>
 });
 
 test('every root ringing bare elements on `:focus-visible` is a named one', () => {
-  // THE SHAPE ALLOW-LIST IS THE HOLE THIS FILLS, and it is a hole in the ROOT list rather than in
-  // the shapes: `.fabricate-manager` is absent below precisely because issue 1501 collapsed the
-  // manager's element ring onto the module root, so a two-element copy under it reds here at any
-  // shape the clause above would not recognise. Roots rather than blocks, because a root may
-  // legitimately write two of these — the roll-prompt dialog rings `button, input` with an outline
-  // and `select` with an inset shadow.
+  // THE SHAPE ALLOW-LIST IS THE HOLE THIS FILLS.
   const roots = sheetRules()
     .map((rule) => bareElementRingRoot(rule.selector))
     .filter((root) => root !== null);
@@ -1753,9 +1368,7 @@ test('every root ringing bare elements on `:focus-visible` is a named one', () =
 });
 
 test('a withdrawn utility or skin class is not declared, and issue 1523 owns each one', () => {
-  // NON-VACUITY IS THE CLAUSE ABOVE. An absence check over an empty sheet passes forever, and this
-  // one reads the same `sheetRules()` the two positive clauses do — so a walk that had stopped
-  // matching would red there before it could report these as clean here.
+  // NON-VACUITY IS THE CLAUSE ABOVE. An absence check over an empty sheet passes forever.
   for (const { name, why } of WITHDRAWN_UTILITIES) {
     assert.deepEqual(
       rulesNamingClass(name).map((rule) => `${MODULE_SHEET}:${rule.line}`),
@@ -1777,14 +1390,7 @@ const SKIN_CENSUS_TUPLE = Object.freeze({
 /** The comment every carrier of that tuple publishes, and the string this clause looks for. */
 const SKIN_CENSUS_MARKER = 'skin census (issue 1523)';
 
-/**
- * The module sheet as it is WRITTEN, comments intact.
- *
- * `corpus().styles` cannot serve this clause: `styleTextFor` runs every corpus entry through
- * `stripCssComments`, which is right for a declaration walk and fatal for a marker walk — the
- * census comment this clause looks for is exactly what that strip removes. The strip preserves
- * line numbering, so a rule's `line` is the same in both texts.
- */
+/** The module sheet as it is WRITTEN, comments intact. */
 let cachedSheetText = null;
 function sheetText() {
   if (cachedSheetText === null) {
@@ -1800,14 +1406,7 @@ function sheetText() {
   return cachedSheetText;
 }
 
-/**
- * The comment block written IMMEDIATELY above `line`, or `''` when the rule opens without one.
- *
- * Adjacency is the whole point rather than a convenience: a lookback window would let a marker
- * written for one rule vouch for the next rule somebody adds beneath it, which is exactly the
- * silent adoption the census exists to make visible. So a blank line between the comment and the
- * selector reads as NO marker, and the fix is to move the comment onto the rule it describes.
- */
+/** The comment block written IMMEDIATELY above `line`, or `''` when the rule opens without one. */
 function commentAbove(line) {
   const lines = sheetText().split('\n');
   const end = line - 2;
@@ -1818,11 +1417,7 @@ function commentAbove(line) {
 }
 
 test('every carrier of the withdrawn skin tuple carries its census marker', () => {
-  // THE WITHDRAWAL ABOVE STATES A POPULATION AND A SPLIT, and until this clause nothing derived
-  // either. The census went from ten carriers to fifteen across a single merge with every gate
-  // green, which is why both `why` texts had to be rewritten by hand afterwards. Marker adjacency
-  // is what makes the population re-derivable: a sixteenth carrier now lands with no marker and
-  // reds HERE, rather than in the grep of whichever reviewer next reads the withdrawal.
+  // THE WITHDRAWAL ABOVE STATES A POPULATION AND A SPLIT.
   const carriers = sheetRules().filter((rule) => {
     const declarations = declarationMap(rule);
     return Object.entries(SKIN_CENSUS_TUPLE).every(
@@ -1855,20 +1450,10 @@ test('every carrier of the withdrawn skin tuple carries its census marker', () =
 const repetitionKey = (entry) =>
   rowKey(entry.atContext.length > 0 ? entry.atContext.join(' >> ') : '(top level)', entry.selector);
 
-/**
- * The six contextual figures `selector-repetition-baseline.js` publishes about the sheet.
- *
- * Each is `[the label the docblock writes it under, how to measure it]`. They are read out of the
- * docblock's SOURCE TEXT because that is where they are stated: a figure quoted in prose and
- * derived nowhere is exactly the mirror that rots, and this is the file that can measure it.
- */
+/** The six contextual figures `selector-repetition-baseline.js` publishes about the sheet. */
 const PUBLISHED_REPETITION_FIGURES = Object.freeze([
   ['keyed on the selector alone', /ALONE the sheet holds ([\d,]+) repeated selectors/],
   // THE COPY IN THIS FILE, which the first shape of this gate exempted (issue 1503, review r2).
-  // The clause below reads the ledger AND this file, because the ratchet's own comment restates
-  // two of the ledger's figures and was therefore the one unguarded copy left: changed to 2,999 /
-  // 2,111 it kept the suite green, which is the finding this gate exists for reproduced one file
-  // over. The patterns match across the `//` line break the comment wraps at.
   [
     'every (at-context, selector) key',
     /Unfiltered the sheet holds ([\d,]+) `\(at-context, selector\)`\n {2}\/\/ keys under this very keying/,
@@ -1912,11 +1497,7 @@ test("the repetition ledger publishes the figures the sheet actually produces", 
     ],
   ]);
 
-  // BOTH FILES THAT PUBLISH THESE FIGURES, joined. The ledger's docblock is where they are
-  // stated for a reader; this file's own ratchet comment restates two of them to explain why it
-  // filters, and a figure restated and derived nowhere is exactly the mirror this gate exists to
-  // catch. Reading the union means either copy going stale reds, and the labels above say which
-  // measurement each pattern is a copy of.
+  // BOTH FILES THAT PUBLISH THESE FIGURES.
   const source = ['./selector-repetition-baseline.js', './design-system-debt-ratchets.test.js']
     .map((path) => readFileSync(new URL(path, import.meta.url), 'utf8'))
     .join('\n');
@@ -1949,10 +1530,6 @@ test("the module sheet's cross-list selector repetition does not move", () => {
   // by key, so an unfiltered table would report every singleton as new debt the first time anybody
   // added a rule. Filtering both sides keeps a selector FALLING to one appearance visible: it
   // leaves the observed tally, and a baseline row nothing matches is a VANISHED failure.
-  //
-  // THE FLOOR IS THE SHEET'S OWN RULE COUNT, not `corpus().rules` — the sibling gates' 3,000 is
-  // stated over the sheet plus ~195 Svelte scoped blocks, and would be satisfied here by a walk
-  // that had lost the sheet entirely and kept the components.
   const rules = sheetRules();
   const repeated = [...selectorAppearances(rules).values()].filter(
     (entry) => entry.appearances.length > 1
