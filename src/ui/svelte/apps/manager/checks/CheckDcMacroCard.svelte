@@ -14,7 +14,7 @@
   import { localize } from '../../../util/foundryBridge.js';
   import { resolveDropData } from '../../../util/dropUtils.js';
   // The shared macro-name resolver, which owns the `fromUuid` indirection and the latch.
-  import { resolveMacroName } from '../../../../../utils/macroReference.js';
+  import { resolveMacroName } from '../../../../model/macroReference.js';
   import ItemDropZone from '../../../components/ItemDropZone.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';
 

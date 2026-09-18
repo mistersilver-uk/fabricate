@@ -40,8 +40,8 @@
     worldVocabularyComponentCategories,
     worldVocabularyComponentTags,
   } from './componentScoped.js';
-  import { componentScopeValidationPresentation } from '../../../../../utils/componentScopeValidation.js';
-  import { visibleEssenceOptions } from '../../../../../utils/essenceValidation.js';
+  import { componentScopeValidationPresentation } from '../../../../model/componentScopeValidation.js';
+  import { visibleEssenceOptions } from '../../../../model/essenceValidation.js';
   // issue 1371 r20-entry3: the refused-save sentence is composed in the shared studio module, so
   // the three world entry editors cannot drift on what a step of a Save is called.
   import { reportRefusedScopedEntrySave } from './scopedStudio.js';

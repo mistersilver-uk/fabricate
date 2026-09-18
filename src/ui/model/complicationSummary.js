@@ -6,7 +6,7 @@
  * local table. It is GM-FACING: player surfaces render the authored `description` instead.
  */
 
-import { operatorMeta } from '../systems/characterPrerequisites.js';
+import { operatorMeta } from '../../systems/characterPrerequisites.js';
 
 /** Every string this builder reads, as `[key, fallback]` pairs. */
 export const COMPLICATION_SUMMARY_STRINGS = Object.freeze({

@@ -89,7 +89,7 @@
     setBulkRecipeCheckTier,
     setBulkRecipeLock,
     setBulkRecipeStatus,
-  } from '../../../../../utils/recipeBulkEditModel.js';
+  } from '../../../../model/recipeBulkEditModel.js';
 
   let {
     count = 0,

@@ -34,7 +34,7 @@ import {
 import { isGatheringRealmsEnabled } from '../../../systems/gatheringRealms.js';
 import { readLearnedRecipeEntries } from '../../../systems/recipeKeyedFlagEntries.js';
 import { recipeReferencesEssence } from '../../../utils/recipeEssenceReferences.js';
-import { describeEssenceDeleteImpact } from '../../../utils/essenceBulkEditModel.js';
+import { describeEssenceDeleteImpact } from '../../model/essenceBulkEditModel.js';
 import { describeComponentDeleteImpact } from '../../../utils/recipeComponentReferences.js';
 import {
   buildLearnedRecipeActorIndex,
@@ -55,7 +55,7 @@ import {
   planComponentCategoryReassignments,
   planTagRemovals,
   planRecipeTagRemovals,
-} from '../../../utils/vocabularyCascade.js';
+} from '../../model/vocabularyCascade.js';
 import {
   canAddCurrencySubUnit,
   CURRENCY_MACRO_KEYS,
@@ -90,7 +90,7 @@ import {
   localizeRecipeActivationParts,
   localizeRecipePersistenceError,
 } from '../../../utils/recipeActivationMessages.js';
-import { resolveRecipeAccessRoster } from '../../../utils/recipeAccessRoster.js';
+import { resolveRecipeAccessRoster } from '../../model/recipeAccessRoster.js';
 import { authoredFailureOutcome } from '../../../utils/gatheringFailureOutcome.js';
 import {
   activityFailureResultPolicy,
@@ -1691,7 +1691,7 @@ export function createAdminStore(services) {
     showVisibilitySummary: false,
     worldUsers: [],
     // EVERY world actor (not the player-character roster), each carrying its control set; the recipe
-    // editor's context rail resolves granted character ids over it. See `src/utils/recipeAccessRoster.js`.
+    // editor's context rail resolves granted character ids over it. See `src/ui/model/recipeAccessRoster.js`.
     accessCharacters: [],
     // The derived `evaluateSystemValidation` report for the selected system, consumed by the system
     // overview, its rail count badge and the blocker banner. Derived — nothing is persisted.

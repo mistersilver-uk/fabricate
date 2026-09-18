@@ -39,14 +39,14 @@
     MACRO_DROP_REJECTED_NOT_SCRIPT,
     evaluateMacroDrop,
     resolveMacroName,
-  } from '../../../../../utils/macroReference.js';
+  } from '../../../../model/macroReference.js';
   import {
     COMPLICATION_ACTIVITIES,
     DEFAULT_COMPLICATION_MATCH_MODE,
     DEFAULT_COMPLICATION_SEVERITY,
     DEFAULT_COMPLICATION_VISIBILITY,
   } from '../../../../../utils/componentComplications.js';
-  import { complicationSummary } from '../../../../../utils/complicationSummary.js';
+  import { complicationSummary } from '../../../../model/complicationSummary.js';
   import {
     PREREQUISITE_OPERATORS,
     isValuelessOperator,

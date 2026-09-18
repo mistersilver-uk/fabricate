@@ -12,7 +12,7 @@
   // whitelist rebuild the in-manager editor does — `handleSave` hands `essenceDraft`
   // straight to `buildComponentEditorUpdates` — so the draft stays whole and only the
   // rendered grid narrows.
-  import { visibleEssenceOptions } from '../../../utils/essenceValidation.js';
+  import { visibleEssenceOptions } from '../../model/essenceValidation.js';
 
   let {
     editorState = {

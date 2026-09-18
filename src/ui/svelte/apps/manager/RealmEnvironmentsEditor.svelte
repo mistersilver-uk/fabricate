@@ -12,7 +12,7 @@
   import Pagination from '../../components/Pagination.svelte';
   import IconButton from '../../components/IconButton.svelte';
   import ManagerSearchField from '../../components/ManagerSearchField.svelte';
-  import { createRealmEnvironmentsBrowserState } from '../../../../utils/managerBrowserViewState.js';
+  import { createRealmEnvironmentsBrowserState } from '../../../model/managerBrowserViewState.js';
 
   let {
     realm = null,

@@ -16,7 +16,7 @@
   import RealmEnvironmentsEditor from './RealmEnvironmentsEditor.svelte';
   import ManagerSearchField from '../../components/ManagerSearchField.svelte';
   import ManagerToolbar from '../../components/ManagerToolbar.svelte';
-  import { createTravelRealmsBrowserState } from '../../../../utils/managerBrowserViewState.js';
+  import { createTravelRealmsBrowserState } from '../../../model/managerBrowserViewState.js';
 
   let {
     realms = [],

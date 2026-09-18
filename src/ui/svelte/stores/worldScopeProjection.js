@@ -43,7 +43,7 @@ import {
   WORLD_VOCABULARY_KINDS,
   worldDefaultsAffectedByDeletion,
 } from '../../../systems/worldVocabulary.js';
-import { buildVocabularyUsage } from '../../../utils/vocabularyUsage.js';
+import { buildVocabularyUsage } from '../../model/vocabularyUsage.js';
 
 /**
  * The three entity types, in the order the rail lists their world screens.
