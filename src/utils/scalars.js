@@ -43,3 +43,83 @@ export function normalizeConditionId(value) {
     .filter(Boolean)
     .join('-');
 }
+
+/** A finite number, or `null` for nullish, empty-string and non-finite input. */
+export function numberOrNull(value) {
+  if (value == null || value === '') return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+/** A finite number, or `null`; `null`, `undefined` and `''` become `0`, because `Number('')` is `0`. */
+export function laxNumberOrNull(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+/** `value` stringified and trimmed, and the empty string for nullish input. */
+export function stringOrEmpty(value) {
+  return value == null ? '' : String(value).trim();
+}
+
+/** `value` stringified without trimming, and the empty string for nullish input. */
+export function untrimmedStringOrEmpty(value) {
+  return value == null ? '' : String(value);
+}
+
+/** `value` stringified and trimmed, and `null` for nullish or blank input. */
+export function stringOrNull(value) {
+  return value == null ? null : String(value).trim() || null;
+}
+
+/** `value` stringified without trimming, and `null` for nullish or empty input. */
+export function untrimmedStringOrNull(value) {
+  const text = untrimmedStringOrEmpty(value);
+  return text.length > 0 ? text : null;
+}
+
+/** `value` trimmed when it is a string, and `null` for a blank string or any non-string. */
+export function trimStringOrNull(value) {
+  return trimString(value) || null;
+}
+
+/** `value` when it is an array, and an empty array otherwise. */
+export function arrayOrEmpty(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+/** An array as-is, `[]` for nullish, `[value]` otherwise — admitting the `0` and `''` that `normalizeIdList`'s falsy wrap drops. */
+export function arrayOrWrapped(value) {
+  if (Array.isArray(value)) return value;
+  if (value == null) return [];
+  return [value];
+}
+
+/** A plain array from an array, a `Map`, a `.values()` source or any iterable, and `[]` otherwise. */
+export function iterableToArray(value) {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  if (value instanceof Map) return [...value.values()];
+  if (typeof value.values === 'function') return [...value.values()];
+  if (typeof value[Symbol.iterator] === 'function') return [...value];
+  return [];
+}
+
+/** De-duplicated trimmed ids, accepting a bare truthy value as a one-item list and dropping blanks. */
+export function normalizeIdList(value) {
+  const values = Array.isArray(value) ? value : value ? [value] : [];
+  return [...new Set(values.map((entry) => stringOrEmpty(entry)).filter(Boolean))];
+}
+
+/** De-duplicated trimmed ids from an array's string entries only; `normalizeIdList` stringifies the rest. */
+export function stringOnlyIdList(value) {
+  if (!Array.isArray(value)) return [];
+  return [
+    ...new Set(
+      value
+        .filter((entry) => typeof entry === 'string')
+        .map((entry) => entry.trim())
+        .filter(Boolean)
+    ),
+  ];
+}
