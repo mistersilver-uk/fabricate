@@ -9,10 +9,10 @@
 import {
   normalizeBulkStatus,
   normalizeSelectionIds as normalizeBookIds,
-} from './bulkSelectionModel.js';
+} from '../../utils/bulkSelectionModel.js';
 
 /** The Status axis's three segments, in the panel's segmented-control order. */
-export { BULK_STATUS_VALUES as RECIPE_BULK_STATUS_VALUES } from './bulkSelectionModel.js';
+export { BULK_STATUS_VALUES as RECIPE_BULK_STATUS_VALUES } from '../../utils/bulkSelectionModel.js';
 
 /** The Lock axis's three segments, in the panel's segmented-control order. */
 export const RECIPE_BULK_LOCK_VALUES = Object.freeze(['unchanged', 'lock', 'unlock']);
@@ -214,4 +214,4 @@ export {
   toggleBulkSelection as toggleRecipeSelection,
   setBulkSelection as setRecipeSelection,
   pruneBulkSelection as pruneRecipeSelection,
-} from './bulkSelectionModel.js';
+} from '../../utils/bulkSelectionModel.js';

@@ -274,4 +274,4 @@ export {
   toggleBulkSelection as toggleComponentSelection,
   setBulkSelection as setComponentSelection,
   pruneBulkSelection as pruneComponentSelection,
-} from './bulkSelectionModel.js';
+} from '../../utils/bulkSelectionModel.js';

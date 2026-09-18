@@ -23,7 +23,7 @@
   import ManagerButton from '../../components/ManagerButton.svelte';
   import IconButton from '../../components/IconButton.svelte';
   import ManagerSearchField from '../../components/ManagerSearchField.svelte';
-  import { createVocabularyBrowserState } from '../../../../utils/managerBrowserViewState.js';
+  import { createVocabularyBrowserState } from '../../../model/managerBrowserViewState.js';
 
   let {
     label = '',

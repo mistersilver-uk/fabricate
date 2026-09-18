@@ -45,29 +45,29 @@
   import { summariseCondition } from './checks/checkTriggerSummary.js';
   import { normalizePreviewSandbox } from '../../../../systems/progressiveCheckSandbox.js';
   import { activeEnvironmentsForRecord } from '../../../../systems/gatheringComposition.js';
-  import { buildVocabularyUsage } from '../../../../utils/vocabularyUsage.js';
-  import { createRecipeBrowserState } from '../../../../utils/recipeBrowserModel.js';
+  import { buildVocabularyUsage } from '../../../model/vocabularyUsage.js';
+  import { createRecipeBrowserState } from '../../../model/recipeBrowserModel.js';
   import {
     componentCategoryOptions,
     createComponentBrowserState,
-  } from '../../../../utils/componentBrowserModel.js';
+  } from '../../../model/componentBrowserModel.js';
   import {
     createComponentBulkDraft,
     toBulkComponentEdit,
-  } from '../../../../utils/componentBulkEditModel.js';
+  } from '../../../model/componentBulkEditModel.js';
   import {
     countBlockedRecipeEnables,
     countRecipeBookMembership,
     createRecipeBulkDraft,
     describeRecipeCheckTierAxis,
     toBulkRecipeEdit,
-  } from '../../../../utils/recipeBulkEditModel.js';
-  import { createEssenceBrowserState } from '../../../../utils/essenceBrowserModel.js';
-  import { createManagerBrowserViewStates } from '../../../../utils/managerBrowserViewState.js';
+  } from '../../../model/recipeBulkEditModel.js';
+  import { createEssenceBrowserState } from '../../../model/essenceBrowserModel.js';
+  import { createManagerBrowserViewStates } from '../../../model/managerBrowserViewState.js';
   import {
     createEssenceBulkDraft,
     toBulkEssenceEdit,
-  } from '../../../../utils/essenceBulkEditModel.js';
+  } from '../../../model/essenceBulkEditModel.js';
   import { resolveRecipeImage } from '../../util/craftingImageDefaults.js';
   import Medallion from '../../components/Medallion.svelte';
   import ManagerButton from '../../components/ManagerButton.svelte';

@@ -50,7 +50,7 @@ import { ingredientSetToolsAreActive } from '../../../systems/toolCheckBonus.js'
 import { normalizeRecipeCategory } from '../../../utils/recipeCategories.js';
 import { recipeItemDefinitionsContaining } from '../../../utils/recipeItemMembership.js';
 import { diceEngine } from '../../../utils/rollFormulaRollability.js';
-import { countRecipeTagPlaceholderUsage } from '../../../utils/vocabularyUsage.js';
+import { countRecipeTagPlaceholderUsage } from '../../model/vocabularyUsage.js';
 
 /**
  * Build a human-readable visibility summary for a recipe row.

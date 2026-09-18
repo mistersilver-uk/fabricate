@@ -35,7 +35,7 @@
   import Avatar from '../../components/Avatar.svelte';
   import KnowledgeTabs from './knowledge/KnowledgeTabs.svelte';
   import KnowledgeRoster from './knowledge/KnowledgeRoster.svelte';
-  import { createKnowledgeRosterBrowserState } from '../../../../utils/managerBrowserViewState.js';
+  import { createKnowledgeRosterBrowserState } from '../../../model/managerBrowserViewState.js';
   import KnowledgeRecipeItemsTab from './knowledge/KnowledgeRecipeItemsTab.svelte';
   import KnowledgeLearnedRecipesTab from './knowledge/KnowledgeLearnedRecipesTab.svelte';
   import {

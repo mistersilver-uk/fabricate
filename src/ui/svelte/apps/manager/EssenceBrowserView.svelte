@@ -27,13 +27,13 @@
     buildEssenceBrowserModel,
     createEssenceBrowserState,
     describeActiveEssenceFilters,
-  } from '../../../../utils/essenceBrowserModel.js';
+  } from '../../../model/essenceBrowserModel.js';
   import {
     describeEssenceSelection,
     pruneEssenceSelection,
     setEssenceSelection,
     toggleEssenceSelection,
-  } from '../../../../utils/essenceBulkEditModel.js';
+  } from '../../../model/essenceBulkEditModel.js';
   import { ESSENCE_VIEW_MODE_SEGMENTS } from './essences/essenceStudio.js';
   import { essenceShortValueName, essenceSystemState } from './scoped/essenceScoped.js';
   import ManagerSearchField from '../../components/ManagerSearchField.svelte';

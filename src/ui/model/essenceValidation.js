@@ -1,6 +1,6 @@
 /** Pure validation and offer-list model for the GM Essence Studio (issue 1036). */
 
-import { stringOrEmpty as trimmed } from './scalars.js';
+import { stringOrEmpty as trimmed } from '../../utils/scalars.js';
 
 /** The add-new offer list: every essence a GM may ADD to a component or a recipe now. */
 export function selectableEssenceOptions(essenceOptions) {

@@ -1,7 +1,7 @@
 /** Cascade planning for vocabulary deletion (issue 689). */
 
-import { GENERAL_COMPONENT_CATEGORY } from './componentCategories.js';
-import { GENERAL_RECIPE_CATEGORY } from './recipeCategories.js';
+import { GENERAL_COMPONENT_CATEGORY } from '../../utils/componentCategories.js';
+import { GENERAL_RECIPE_CATEGORY } from '../../utils/recipeCategories.js';
 
 function vocabularyKey(value) {
   return String(value || '')

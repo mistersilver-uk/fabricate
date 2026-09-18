@@ -21,7 +21,7 @@
   // The one complication summary row, in its `readonly-gm` variant: six call sites share that
   // shape, and SonarCloud's copy-paste detector reads `.svelte`.
   import ComplicationSummaryRow from './ComplicationSummaryRow.svelte';
-  import { complicationSummary } from '../../../../utils/complicationSummary.js';
+  import { complicationSummary } from '../../../model/complicationSummary.js';
   // The shared essence quantity card (issue 772). It lives under `components/` because the
   // browser's bulk-edit panel renders it too, and the screenshot evidence map names it there.
   import EssenceQuantityCard from './components/EssenceQuantityCard.svelte';
@@ -38,7 +38,7 @@
   } from '../../util/componentEditor.js';
   // The add-new offer projection (issue 1036): only what this grid RENDERS is narrowed. The draft
   // stays unfiltered — it is the sole source `buildComponentEditorUpdates` rebuilds essences from.
-  import { visibleEssenceOptions } from '../../../../utils/essenceValidation.js';
+  import { visibleEssenceOptions } from '../../../model/essenceValidation.js';
   import {
     SALVAGE_DC_CUSTOM,
     buildSalvageDcOptions,

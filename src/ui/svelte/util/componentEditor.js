@@ -34,7 +34,7 @@ function toEssenceQuantityMap(currentEssences) {
 // This row shape is a WHITELIST rebuild, exactly like the normalizer it mirrors: a field
 // the definition carries but this map does not name is silently absent downstream. That is
 // why `enabled` is here (issue 1036) — without it every option row reads as enabled, and
-// `selectableEssenceOptions` (src/utils/essenceValidation.js) can withhold NOTHING no
+// `selectableEssenceOptions` (src/ui/model/essenceValidation.js) can withhold NOTHING no
 // matter how correct the persisted field, the normalizer and the store projection are.
 // The rows stay UNFILTERED: `buildComponentEditorUpdates` rebuilds `updates.essences`
 // SOLELY from these rows, so dropping a disabled essence here would destroy its authored

@@ -15,7 +15,7 @@
   import {
     DEFAULT_BROWSER_PAGE_SIZE,
     createGatheringTasksBrowserState,
-  } from '../../../../utils/managerBrowserViewState.js';
+  } from '../../../model/managerBrowserViewState.js';
 
   let {
     tasks = [],

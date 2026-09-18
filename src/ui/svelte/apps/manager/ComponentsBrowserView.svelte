@@ -16,7 +16,7 @@
     pruneComponentSelection,
     setComponentSelection,
     toggleComponentSelection,
-  } from '../../../../utils/componentBulkEditModel.js';
+  } from '../../../model/componentBulkEditModel.js';
   import {
     COMPONENT_DEFAULT_PAGE_SIZE,
     COMPONENT_ESSENCE_FILTER_ANY,
@@ -27,7 +27,7 @@
     componentEssenceRun,
     createComponentBrowserState,
     groupComponentsByCategory,
-  } from '../../../../utils/componentBrowserModel.js';
+  } from '../../../model/componentBrowserModel.js';
   import { getComponentCategoryLabel } from '../../../../utils/componentCategories.js';
   import {
     componentCohortCountText,

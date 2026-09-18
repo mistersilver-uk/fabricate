@@ -33,7 +33,7 @@
   import Chip from '../../../components/Chip.svelte';
   import SegmentedControl from '../SegmentedControl.svelte';
   import { localize } from '../../../util/foundryBridge.js';
-  import { paginateRows } from '../../../../../utils/browserPagination.js';
+  import { paginateRows } from '../../../../model/browserPagination.js';
   import {
     componentBulkApplyLabel,
     componentBulkDeleteNote,
