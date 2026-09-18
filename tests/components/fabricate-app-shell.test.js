@@ -53,9 +53,7 @@ describe('FabricateAppRoot shell', () => {
       rootSource.includes('showAlchemy,') && rootSource.includes('buildPlayerNavTabs({'),
       'the shell should hand showAlchemy to the one shared rail derivation'
     );
-    // The gate itself moved into the UI-free leaf (issue 1198) so the shell, the application
-    // host and the View Lab read ONE answer instead of three hand-maintained mirrors. Assert
-    // it where it now lives, or this case silently stops covering anything.
+    // The gate itself moved into the UI-free leaf (issue 1198) so the shell.
     assert.ok(
       navModelSource.includes("tab.requires !== 'alchemy' || showAlchemy"),
       'the alchemy tab should only render when showAlchemy is true'
@@ -110,9 +108,7 @@ describe('FabricateAppRoot shell', () => {
     });
 
     it('subscribes to nothing: the snapshot arrives as a prop', () => {
-      // Two subscribers within one window disagree about what that window renders, so the
-      // application host is the player window's single subscriber and this shell is a pure
-      // projection of what it pushes down.
+      // Two subscribers within one window disagree about what that window renders.
       assert.ok(
         rootSource.includes('extensionSurfaces = []'),
         'the shell takes the frozen snapshot as a prop'
@@ -129,8 +125,6 @@ describe('FabricateAppRoot shell', () => {
   });
 
   // AC12 / maintainer decision A1. Scope prose expires when an issue closes; this does not.
-  // The player window carries NO companion-product signal in any state — no badge, no
-  // padlocked entry, no teaser tab, no upgrade offer, no subscription call to action.
   it('carries no premium signal of any kind, in either player-side component', () => {
     const forbidden = [
       'premiumInstalled',
@@ -153,8 +147,7 @@ describe('FabricateAppRoot shell', () => {
   });
 
   it('threads the active canvas tool into the shared header bar instead of a chip bar above the content', () => {
-    // The standalone chip bar above the tab content was removed; the chip now
-    // rides in ActorSelectTopBar's right-side context cluster.
+    // The standalone chip bar above the tab content was removed.
     assert.ok(
       !rootSource.includes('fabricate-app-tool-chip-bar'),
       'the standalone tool-chip bar should be gone from the app shell'
@@ -175,8 +168,7 @@ describe('FabricateAppRoot shell', () => {
       rootSource.includes('subscribeInventoryChange'),
       'the shell should subscribe to owned-item changes'
     );
-    // Only reload for actors this app reads from — the selected crafting actor or a
-    // component-source actor, resolved at fire time.
+    // Only reload for actors this app reads from.
     assert.ok(
       rootSource.includes('isRelevantCraftingActor'),
       'inventory refresh should be filtered to relevant actors'
@@ -189,22 +181,8 @@ describe('FabricateAppRoot shell', () => {
   });
 
   // WHICH STORES EACH SUBSCRIPTION REACHES IS PROVED BY MOUNTING, NOT BY READING THE SOURCE.
-  //
-  // Two source-text guards used to live here, each slicing a 400-character window after the
-  // FIRST occurrence of a `subscribe*(` call and asserting the store seams it named. Both were
-  // provably vacuous: that window spans four subscription sites, so review demonstrated all
-  // five of their assertions passing against routing that was simultaneously wrong in three
-  // ways — the journal subscribed to `narrative`, every store was handed every domain, and
-  // every domain token was misspelled. They are replaced by the table-driven mounted case in
-  // `fabricate-app-root-mounted.test.js`, which drives one single-domain payload per domain
-  // through the real `Hooks` seam and asserts the exact set of store seams invoked.
   it('never calls the inventory store load seam directly, anywhere in the shell', () => {
-    // The one claim of the deleted pair a mount cannot make cheaply, because it is about the
-    // WHOLE file rather than about one code path. `inventoryStore.reloadOnDocumentChange`
-    // drops a hook-driven listing reload while a bulk salvage/destroy run is in flight (issue
-    // 859), leaving the run's own terminal reload to pick it up; a direct `load(true)` from
-    // the shell rebuilds the listing under the open bulk panel roughly once per queued row
-    // and makes the guard dead code.
+    // The one claim of the deleted pair a mount cannot make cheaply.
     assert.ok(
       !/services\?\.inventory\?\.load\?\.\(/.test(rootSource),
       'the shell must never call the inventory store load seam directly'
@@ -233,12 +211,6 @@ describe('FabricateAppRoot shell', () => {
     // whether THIS view uses the same set, because this view's subscription is not what it
     // drives. Pinned at the source, and the guard is not vacuous — mutating the derived set to
     // an inline list reddens it.
-    //
-    // A mounted proof is genuinely available and was weighed rather than assumed away:
-    // `GatheringView` is already mounted by three suites, all of which now carry
-    // `invalidationDomains.js` in their allowlists, so what is missing is a `Hooks` fake and a
-    // `load` counter rather than a harness. It is worth adding when one of those suites next
-    // needs a `Hooks` fake for its own reasons; standing one up for this single line is not.
     assert.match(
       gatheringSource,
       /subscribeCraftingDataChange\([\s\S]{0,120}domains: STORE_DOMAINS\[INVALIDATION_STORES\.GATHERING\]/,
@@ -270,7 +242,6 @@ describe('FabricateAppRoot shell', () => {
     );
     // The tab stop falls back to the first entry when the active tab names no rendered entry,
     // so it is bound to focusableTab rather than activeTab; aria-selected stays on activeTab.
-    // The behavioural pin for the fallback lives in fabricate-app-root-mounted.test.js.
     assert.ok(
       rootSource.includes('tab.routeKey === focusableTab?.routeKey ? 0 : -1'),
       'the rail uses a roving tabindex'
@@ -367,8 +338,7 @@ describe('SvelteFabricateApp shell window', () => {
     });
 
     it('a plain show(tab) CLEARS any existing active canvas tool (no stale station inherit)', () => {
-      // nextCanvasTool is null when no options are supplied, and re-show assigns it
-      // unconditionally — so a plain re-open clears a prior station context.
+      // nextCanvasTool is null when no options are supplied.
       assert.ok(
         appSource.includes('const nextCanvasTool = activeCanvasTool ?? null;'),
         'plain show resolves to null'
@@ -411,9 +381,7 @@ describe('SvelteFabricateApp shell window', () => {
         appSource.includes('const toolId = this._activeCanvasTool?.toolId;'),
         'the threading boundary also reads the library tool id (issue 1119)'
       );
-      // Issue 1119: an item-sourced Tool carries `componentId: null`, so a componentId-only
-      // payload was inert for every station the Tool Studio can author. The payload now
-      // carries BOTH id kinds, still scoped by systemId (both ids are per-system).
+      // Issue 1119: an item-sourced Tool carries `componentId: null`.
       assert.ok(
         appSource.includes('if (!systemId || (!componentId && !toolId)) return null;'),
         'the payload is inert only when the system or BOTH ids are missing'
@@ -513,17 +481,11 @@ describe('SvelteFabricateApp shell window', () => {
       'the Core tab set should still be the known nav tabs'
     );
     // The WHOLE guard expression, not the bare `isOfferedTab(tab)` this used to look for:
-    // `static show`'s own site matches that substring too, so dropping the predicate out of
-    // `_selectTab` left this case green under the name of the thing it had stopped covering.
     assert.ok(
       appSource.includes('if (!isOfferedTab(tab) || tab === this._activeTab) {'),
       '_selectTab should guard against tabs nothing offers'
     );
-    // `isCoreTabId` is STRUCTURAL — it answers "this is not a provider route key", which is
-    // true of any non-empty string — so the predicate must intersect it with this window's own
-    // Core ids. Without the intersection `isOfferedTab('bogus')` is true and the constructor,
-    // `_selectTab` and `static show` all silently accept it, which is looser than the shipped
-    // `VALID_TABS` set this replaced.
+    // `isCoreTabId` is STRUCTURAL — it answers "this is not a provider route key".
     assert.ok(
       /if \(isCoreTabId\(tab\)\) return CORE_TABS\.has\(tab\);/.test(appSource),
       'a Core-shaped id must still be checked against the Core set'
@@ -541,22 +503,18 @@ describe('SvelteFabricateApp shell window', () => {
     }
   });
 
-  // Issue 1198. Every claim here is one a mounted test cannot make, because the class extends
-  // ApplicationV2 and cannot be instantiated headless.
+  // Issue 1198. Every claim here is one a mounted test cannot make.
   describe('companion navigation surfaces', () => {
     it('SEEDS the snapshot in _prepareSvelteProps, derived rather than read off a field', () => {
       const start = appSource.indexOf('_prepareSvelteProps() {');
       const body = appSource.slice(start, appSource.indexOf('_selectTab(tab) {'));
       assert.ok(start >= 0, '_prepareSvelteProps exists');
-      // `_registerHooks()` runs from `_onRender` — AFTER this method — and returns early once
-      // the hook bag exists, so without the seed a companion registering during its own init
-      // has no tabs on first open and, if it never re-registers, never at all.
+      // `_registerHooks()` runs from `_onRender` — AFTER this method.
       assert.ok(
         body.includes('extensionSurfaces: deriveExtensionSurfaces(playerExtensions, {'),
         'the first frame props must DERIVE the snapshot'
       );
-      // The temporary player Downtime gate (issue 1257): the snapshot is derived under the
-      // world's opt-in, so the first frame cannot advertise a withheld surface either.
+      // The temporary player Downtime gate (issue 1257).
       assert.ok(
         body.includes('experimentalFeaturesEnabled: isExperimentalFeaturesEnabled()'),
         'and must state the experimental gate it is derived under'
@@ -610,8 +568,7 @@ describe('SvelteFabricateApp shell window', () => {
       const superClose = closeBody.indexOf('const result = await super.close(options);');
       assert.ok(dispose >= 0, 'close() disposes the companion');
       assert.ok(superClose >= 0, 'and awaits super.close');
-      // Targeted at the AWAITED call, not at a returned expression: unlike the manager, this
-      // class assigns the result and returns it afterwards.
+      // Targeted at the AWAITED call, not at a returned expression: unlike the manager.
       assert.ok(
         dispose < superClose,
         'the companion must tear down while its mount target is still connected'
@@ -660,10 +617,7 @@ describe('SvelteFabricateApp shell window', () => {
     );
   });
 
-  // The window teardown is the ONLY net either progressive-order writer has: a player
-  // who reorders and immediately closes, refreshes, or logs out inside the debounce
-  // window loses the write silently otherwise. Source-contract, because the class
-  // extends ApplicationV2 and cannot be instantiated headless.
+  // The window teardown is the ONLY net either progressive-order writer has.
   describe('_flushPendingOrderWrite (issues 651, 675)', () => {
     it('flushes BOTH progressive-order writers on teardown', () => {
       assert.ok(

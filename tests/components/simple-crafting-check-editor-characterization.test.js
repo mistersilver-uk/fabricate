@@ -1,25 +1,6 @@
 /**
  * CHARACTERIZATION suite for `SimpleCraftingCheckEditor`'s dynamic-DC macro drop zone
  * (issue 1036, criterion 14).
- *
- * It is landed BEFORE the editor is converted onto the shared `ItemDropZone` primitive and
- * must pass UNCHANGED afterwards. A characterization test written after the change proves
- * nothing: it can only describe what the new code already does.
- *
- * Everything asserted here is therefore a CONTRACT rather than an implementation detail —
- * the `data-check-macro-dropzone` and `data-unlink-macro` hooks (both pinned elsewhere:
- * `manager-mounted.test.js` queries the first, and the View Lab checks case navigates the
- * section), the emitted `onChange` payloads, and the three macro-name resolution states.
- * The zone's internal markup is deliberately NOT asserted, because replacing it with the
- * primitive is the whole point of the conversion.
- *
- * ONE deliberate exception, called out so a reader does not mistake it for an oversight:
- * the shipped editor already routes its drop through `resolveDropData`, so a COMPENDIUM
- * macro payload (`{ pack, id }`, no `uuid`) is accepted today. `ItemDropZone`'s own guard
- * is currently STRICTER than that — it reads `data.uuid` directly — so the conversion is
- * only behaviour-neutral once that guard widens to `resolveDropUuid`. The compendium case
- * below is the assertion that catches an unwidened conversion, and it is the common case
- * for a module-shipped macro rather than an edge one.
  */
 
 import { after, before, describe, it } from 'node:test';
@@ -39,8 +20,6 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/stepperLabels.js',
     'src/utils/craftingCheckExpression.js',
     // Added by the conversion, and ONLY the dependency manifest: no assertion below moved.
-    // The harness closure validator throws for an undeclared static import rather than
-    // hanging, so this list has to name what the tree imports.
     'src/utils/macroReference.js',
     'src/ui/svelte/util/dropUtils.js',
     'src/ui/svelte/actions/dragDrop.js',
@@ -57,8 +36,7 @@ const harness = createMountedComponentHarness({
     // authored formula from it (issue 1096). Manifest only.
     'src/utils/rollExpressionAverage.js',
     'src/utils/rollFormulaRollability.js',
-    // A trigger's own summary and the common-trigger presets (issue 1096), both pure and
-    // both imported by `CheckTriggers.svelte`. Manifest only.
+    // A trigger's own summary and the common-trigger presets (issue 1096).
     'src/ui/svelte/apps/manager/checks/checkTriggerSummary.js',
     'src/ui/svelte/apps/manager/checks/checkTriggerPresets.js',
   ],
@@ -66,8 +44,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/ItemDropZone.svelte',
     'src/ui/svelte/apps/manager/SegmentedControl.svelte',
     'src/ui/svelte/components/RadioCardGroup.svelte',
-    // The shared numeric stepper the DC, tier-DC and trigger fields are built on
-    // (issue 1050). Omitting it HANGS this suite (# cancelled) rather than failing it.
+    // The shared numeric stepper the DC.
     'src/ui/svelte/components/Stepper.svelte',
     // The shared icon fact row, which joined this tree when issue 1096 gave the simple
     // check its Outcomes section (the two-outcome pass/fail statement). ONLY the dependency
@@ -75,9 +52,6 @@ const harness = createMountedComponentHarness({
     // deleted — this suite's whole value is that it did not move while the tree around it
     // did. `tests/components/mounted-harness-primitive-allowlist.test.js` is what turned
     // the omission into a failure here rather than a hung suite.
-    // `Chip.svelte` travels with it since issue 1371: `IconFactRow` renders the manager's ONE
-    // chip for its trailing badge, so it is now in the row's STATIC closure. Omitting it does
-    // not fail a suite, it HANGS it and reports `# cancelled`.
     'src/ui/svelte/apps/manager/IconFactRow.svelte',
     'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/components/Field.svelte',
@@ -89,9 +63,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/InspectorCard.svelte',
     'src/ui/svelte/apps/manager/checks/CheckDcMacroCard.svelte',
     'src/ui/svelte/apps/manager/checks/CheckDifficultyCard.svelte',
-    // An issue 1097 addition, and ONLY the dependency manifest: the simple check's Outcomes
-    // section gained the two-band `ThresholdBandStrip` (its single boundary IS the DC). No
-    // assertion below moved — this suite's whole value is that it did not.
+    // An issue 1097 addition, and ONLY the dependency manifest.
     'src/ui/svelte/components/ThresholdBandStrip.svelte',
     'src/ui/svelte/apps/manager/checks/CheckFormulaFields.svelte',
     'src/ui/svelte/apps/manager/checks/CheckRecipeTiers.svelte',

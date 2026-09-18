@@ -1,27 +1,4 @@
-/**
- * THE NOTICE'S CONTRACT (issue 1505), pinned at the PRIMITIVE rather than through a caller.
- *
- * ── WHY THE UNREACHED PROPS ARE THE POINT OF THIS FILE ───────────────────────────────────────
- * `library.html:1060` states this component's API in full, so it ships whole rather than trimmed
- * to what two callers happen to need — and neither shipped caller reaches `action`,
- * `dismissable` or `blocking`. The alchemy banner is a glyph and one sentence; the bulk report
- * is a glyph, a title and a summary. A prop no caller reaches and no test ACTS on is unreachable
- * configuration, which is the rule that withdrew `size`, `unit`, `warning` and `accent` from
- * `StatBox` in this same change. So this file clicks the action, clicks the dismiss control and
- * asserts what each one did, rather than asserting that a button exists.
- *
- * The same rule is why all five tones are exercised here and not only the four two callers
- * reach: `warning` and `info` are alchemy-banner states, and that banner is drawn by no frame
- * today, so the frames are not their discharge either.
- *
- * ── AND WHY TWO CLAUSES READ THE SOURCE ──────────────────────────────────────────────────────
- * The per-tone ink is one rule in the specimen — `.k-notice.<tone> .i, .k-notice.<tone> .ttl` set
- * the glyph and the title together at `library.html:226`, `:228` and `:230` — and a build that
- * split them would render identical markup in every state. A scoped `<style>` block injected into
- * happy-dom is not something `getComputedStyle` can be trusted to resolve, so the pairing and the
- * one deviation from it (`accent` inks `--fab-accent-text`, not `--fab-accent`, because inking an
- * accent band with the accent itself measures 4.48:1 under AA) are asserted against the source.
- */
+/** THE NOTICE'S CONTRACT (issue 1505), pinned at the PRIMITIVE rather than through a caller. */
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -54,11 +31,7 @@ function authoredClasses(node) {
   return [...node.classList].filter((name) => !name.startsWith('svelte-'));
 }
 
-/**
- * The source with every comment blanked, because a rule is read by finding its closing brace and
- * a `/* ... { box-sizing } ... *\/` note would end it early — silently returning a fragment that
- * matches nothing and reads as a real failure.
- */
+/** The source with every comment blanked. */
 const declarationsOnly = noticeSource.replaceAll(/\/\*[\s\S]*?\*\//gu, '');
 
 /** The declaration body of one rule in the component's scoped `<style>` block. */
@@ -249,8 +222,7 @@ describe('1505 Notice — the API the library states', () => {
       ['warning', '--fab-warning-text'],
       ['info', '--fab-info-text'],
       ['success', '--fab-success-text'],
-      // The one deviation: the specimen declares no accent notice, and the accent itself
-      // measures 4.48:1 on an accent band in `ironblood-forge`.
+      // The one deviation: the specimen declares no accent notice.
       ['accent', '--fab-accent-text'],
     ]) {
       const body = ruleBody(
@@ -291,10 +263,7 @@ describe('1505 Notice — the API the library states', () => {
   });
 
   it('carries the evidence as a band across the padding box, not a third line of the body', () => {
-    // Issue 1648. The band is TABULAR — a caller renders a consumed/produced grid into it — so
-    // starting it after the glyph column made those rows disagree with the identical rows drawn
-    // by the card beside them. The markup half is asserted here because a band nested back
-    // inside `.fab-notice-body` would satisfy every CSS assertion below and render inset again.
+    // Issue 1648. The band is TABULAR — a caller renders a consumed/produced grid into it.
     const emittedAt = noticeSource.indexOf('class="fab-notice-evidence"');
     assert.ok(emittedAt > 0, 'the band is emitted');
     assert.ok(

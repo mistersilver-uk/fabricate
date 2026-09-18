@@ -1,9 +1,5 @@
 /**
  * The Component Studio's COMPLICATIONS authoring section, mounted (issue 1286).
- *
- * It pins the decisions that cost a review round each, because every one of them is
- * invisible in a screenshot and cheap to undo:
- *
  * - the section's own VISIBILITY GATE (no progressive activity, no section);
  * - the sub-line, which must say a complication fires when the component is PRODUCED as a
  *   progressive stage, must disclose that a component being salvaged or spent is not
@@ -17,10 +13,6 @@
  *   prerequisite table;
  * - the disclosure being a real `<button>` that is not nested inside another one;
  * - the injected `random` mint, so no `Math.random()` literal enters new code (S2245).
- *
- * The section is a CONTROLLED component: it never mutates the array it is handed, it emits
- * a whole new one, and the draft lives in `ComponentEditView`. So most assertions here read
- * what `onChange` was called with rather than what the DOM did next.
  */
 
 import { after, before, beforeEach, describe, it } from 'node:test';
@@ -46,15 +38,7 @@ const effectRowSource = readFileSync(
   'utf8'
 );
 
-/**
- * The declaration body of one CSS rule in a component's scoped `<style>`.
- *
- * A component's own style block is the ONLY place some of these rulings are stated —
- * spacing that no mounted assertion can read (the harness mounts markup, not a stylesheet)
- * and that the visual-parity harness does not record either, because it measures no
- * `margin` property. `manager-layout.test.js` reads `Chip.svelte`'s block the same way and
- * for the same reason.
- */
+/** The declaration body of one CSS rule in a component's scoped `<style>`. */
 function blockIn(source, selector) {
   const start = source.indexOf(`${selector} {`);
   assert.notEqual(start, -1, `expected a \`${selector}\` rule`);
@@ -99,8 +83,6 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/SelectionCheckbox.svelte',
     'src/ui/svelte/components/RowDisclosure.svelte',
     // The roll condition's comparand is the shared signed-integer stepper (issue 1286).
-    // Import-free leaf, so it needs no `rawModules` entry — but omit it HERE and the suite
-    // does not fail, it HANGS and is reported as `# cancelled`.
     'src/ui/svelte/components/Stepper.svelte',
     sectionPath,
   ],
@@ -229,17 +211,12 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
     );
   });
 
-  // ── The header pills, the Applies-to chips, and the open row's edge ──────────────────
-  //
-  // Every one of these is a two-state signal whose WRONG state is the one that renders on
-  // the case the signal exists for, which is exactly the class of defect a screenshot of
-  // the happy path cannot show.
+  // ── The header pills, the Applies-to chips.
 
   it('suppresses a ZERO on a progressive pill, and keeps the count in its title', async () => {
     const { target } = await mountSection({
       activityProgressive: { crafting: true, salvage: true, gathering: false },
-      // Enabled for crafting only, so salvage is progressive AND empty — the case the
-      // prototype writes as bare "Salvage", never "Salvage · 0".
+      // Enabled for crafting only, so salvage is progressive AND empty.
       complications: [complication()],
     });
     const pill = (activity) =>
@@ -251,8 +228,7 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
       'a zero earns no counter — the empty state below already says there is nothing here'
     );
     assert.match(pill('crafting').textContent, /Crafting · 1/, 'a real count still shows');
-    // The count the label drops on the empty pill is not lost anywhere it matters: the
-    // title carries it, and agrees in number.
+    // The count the label drops on the empty pill is not lost anywhere it matters.
     assert.match(pill('crafting').getAttribute('title'), /1 complication\b/);
     assert.doesNotMatch(pill('crafting').getAttribute('title'), /1 complications/);
     assert.doesNotMatch(
@@ -264,11 +240,6 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
 
   it('dims a NOT-PROGRESSIVE Applies-to chip whether or not the GM has chosen it', async () => {
     // The prototype composes two INDEPENDENT axes on this chip: `background: on ?
-    // accent-soft : surface-soft`, and `opacity: prog ? 1 : .6` written OUTSIDE the `on`
-    // branch. Collapsed into one ternary the warning inverts — the case worth flagging is
-    // an activity the GM HAS selected and the system will not resolve progressively, and a
-    // single ternary paints exactly that one at full accent strength while receding the
-    // harmless unselected one.
     const { target } = await mountSection({
       activityProgressive: { crafting: true, salvage: false, gathering: false },
       complications: [
@@ -380,20 +351,14 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
       'never the neutral one a checked condition wears'
     );
 
-    // A condition keeps the neutral treatment: five rows in one list want to read as a
-    // set, and an accent edge on each would make every one of them look singular.
+    // A condition keeps the neutral treatment.
     const condition = target.querySelector('[data-complication-condition="stageMissed"]');
     assert.ok(condition.classList.contains('is-on-neutral'));
     assert.equal(condition.classList.contains('is-on-accent'), false);
   });
 
   it('draws an EFFECT row to the effect geometry and a CONDITION row to the condition one', async () => {
-    // Two shapes in the prototype, not a rounding difference: a condition is `9px 11px`,
-    // radius 8, `flex-start`, transparent until checked; an effect is `11px 12px`, radius
-    // 9, `center`, and sits on the raised fill whether it is on or off — because an effect
-    // is a standing affordance in the "Then" card while a condition is one item in a
-    // checklist. `form` is an explicit prop rather than derived from `control`, because
-    // "Tell the player" is a `switch` that is NEITHER shape.
+    // Two shapes in the prototype, not a rounding difference.
     const { target } = await mountSection({ complications: [complication()] });
     await openFirstRow(target);
     const form = (selector) => {
@@ -406,8 +371,7 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
     assert.equal(form('[data-complication-effect-roll]'), 'effect');
     assert.equal(form('[data-complication-macro] .fab-complication-effect'), 'effect');
 
-    // The macro row has no on-FLAG at all — it is enabled by whether a macro is LINKED —
-    // so it must not wear the enabled edge while still revealing its drop zone.
+    // The macro row has no on-FLAG at all.
     const macro = target.querySelector('[data-complication-macro] .fab-complication-effect');
     assert.equal(
       macro.classList.contains('is-on'),
@@ -421,12 +385,7 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
   });
 
   it('draws "Tell the player" as the prototype’s inline PILL, not as a row', async () => {
-    // It shares a line with Name and Severity in the prototype: a fixed 34px control sized
-    // to its own content, not a full-width row of its own. Drawn in the `condition` form it
-    // took a condition’s padding and stretched across the remainder of the field row, and
-    // `align-items: flex-start` on a switch row with NO detail line left the label riding
-    // high of the knob and the whole control hanging proud of the 34px inputs beside it.
-    // This was the largest single contributor to the region’s parity gap.
+    // It shares a line with Name and Severity in the prototype.
     const { target } = await mountSection({
       complications: [complication({ visibility: 'visible' })],
     });
@@ -439,8 +398,7 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
       'and not either of the two row shapes'
     );
 
-    // The geometry itself: the harness mounts markup rather than a stylesheet, so the block
-    // is read the way `manager-layout.test.js` reads `Chip.svelte`'s.
+    // The geometry itself: the harness mounts markup rather than a stylesheet.
     const block = blockIn(effectRowSource, '.fab-complication-effect.is-form-pill');
     assert.match(block, /height:\s*34px/, 'flush with the inputs it shares a line with');
     assert.match(block, /padding:\s*0 12px/);
@@ -457,11 +415,7 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
   });
 
   it('draws an EFFECT row’s revealed strip FLUSH, because it has no control column', async () => {
-    // The 24px indent aligns a revealed strip with its head's copy, PAST a leading
-    // checkbox — and an effect row has no checkbox: its control is the switch on the far
-    // side, and the macro row (`control="none"`) has no control at all. So the indent
-    // referred to a column that does not exist, and the prototype draws the effect-roll
-    // reveal and the macro drop zone flush with the row's own padding.
+    // The 24px indent aligns a revealed strip with its head's copy.
     assert.match(
       blockIn(
         effectRowSource,
@@ -470,8 +424,7 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
       /margin-left:\s*0/,
       'the effect form cancels the indent'
     );
-    // Non-vacuity: a CONDITION row keeps it, because a condition head really does open with
-    // a checkbox and its revealed inputs read as belonging under the label.
+    // Non-vacuity: a CONDITION row keeps it.
     assert.match(
       blockIn(effectRowSource, '.fab-complication-effect-reveal'),
       /margin:\s*10px 0 0 24px/,
@@ -479,8 +432,7 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
     );
 
     const { target } = await mountSection({
-      // The effect roll must be ON for its strip to be revealed at all; the macro row has
-      // no flag and reveals unconditionally.
+      // The effect roll must be ON for its strip to be revealed at all.
       complications: [complication({ effectRoll: { enabled: true, expr: '1d6', label: '' } })],
     });
     await openFirstRow(target);
@@ -503,11 +455,7 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
   });
 
   it('lets the panel GRID own the spacing around the list', async () => {
-    // The section root is `.manager-component-panel`, which is `display: grid` with a 12px
-    // gap. A grid gap and an item margin ADD, so a 9px margin on the list rendered as
-    // 12 + 9 + 9 = 30px when populated against 12 + 9 = 21px when empty: one section
-    // disagreeing with itself, and both far past the prototype's own 9px. Nothing else
-    // catches it — the visual-parity harness records no `margin` property.
+    // The section root is `.manager-component-panel`.
     assert.doesNotMatch(
       blockIn(sectionSource, '.fab-complications-list'),
       /margin/,
@@ -525,17 +473,13 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
     // exists to end — so this checks the two GLOBAL rules that give the control its geometry
     // instead: `is-dashed` and `is-full-width` neither one adds a `margin`, which is what
     // lets the panel's grid gap alone set the space above it.
-    // Matches the CSS rule and the markup usage, not the docblock prose explaining the
-    // retirement, which still names the class for a future reader.
     assert.doesNotMatch(
       sectionSource,
       /\.fab-complications-add\s*\{|class="[^"]*\bfab-complications-add\b/,
       'the retired class is gone from CSS and markup'
     );
     const globalCss = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
-    // Both selectors moved in issue 1502: the family is rooted at the class `ManagerButton`
-    // emits, so the leading `.fabricate-manager` DESCENDANT is now a `.fabricate-button`
-    // COMPOUND on the same element, at the same (0,3,0).
+    // Both selectors moved in issue 1502.
     for (const selector of [
       '.fabricate-button.manager-button.fab-manager-button.is-dashed',
       '.fabricate-button.manager-button.fab-manager-button.is-full-width',
@@ -622,8 +566,7 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
 
   it('offers exactly the six NUMERIC comparators', async () => {
     const { target } = await mountSection({
-      // The revealed input strip renders only while the row is ON, which is also what keeps
-      // a disabled effect's inputs out of the tab order.
+      // The revealed input strip renders only while the row is ON.
       complications: [
         complication({ rollCondition: { enabled: true, expr: '1d20', cmp: 'eq', value: '1' } }),
       ],
@@ -650,11 +593,7 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
   }
 
   it('draws the comparand as the shared Stepper, still typeable, and commits a STRING', async () => {
-    // The primitive's whole point is that its input stays a real field — a click-only stepper
-    // is a keyboard regression, and its own header says so. What THIS call site has to get
-    // right is the boundary: `Stepper` speaks numbers, the persisted comparand is text (it is
-    // `text()`-coerced by `authoredComplications`), so a commit that leaked a number through
-    // would change the persisted shape while every visible thing still looked right.
+    // The primitive's whole point is that its input stays a real field.
     const { target, emitted } = await openRollCondition();
     const input = target.querySelector('[data-complication-roll-condition-value]');
     assert.ok(Boolean(input), 'the hook rides `inputProps` onto the real input, not the wrapper');
@@ -719,10 +658,7 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
   });
 
   it('mutes the trigger clause and makes it UNINTERACTABLE when the system names no triggers', async () => {
-    // Defect 4. `disabled` is a real attribute rather than `pointer-events: none`, because the
-    // latter leaves the control in the tab order and reachable by keyboard — a worse bug than
-    // the one being fixed. The muting itself copies the Applies-to chips' not-progressive
-    // treatment, which is the panel's existing answer to "visible but unusable".
+    // Defect 4. `disabled` is a real attribute rather than `pointer-events: none`.
     const { target } = await mountSection({
       complications: [complication()],
       triggerOptions: [],
@@ -928,10 +864,7 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
   });
 
   it('carries NO `Math.random()` literal, which is the whole reason `random` is a prop', () => {
-    // COMMENTS ARE STRIPPED FIRST, and that is not a loophole: the header docblock QUOTES
-    // the sibling idiom in order to say why this section does not use it, and a naive
-    // substring match over the whole file would fail on the explanation rather than on the
-    // code. What must not appear is the CALL.
+    // COMMENTS ARE STRIPPED FIRST, and that is not a loophole.
     const code = sectionSource
       .replace(/<!--[\s\S]*?-->/g, '')
       .replace(/\/\*[\s\S]*?\*\//g, '')
@@ -987,17 +920,7 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
   });
 });
 
-/**
- * The HOST half (issue 1286). The section is a controlled component, so the half that
- * decides whether a GM's work survives lives in `ComponentEditView`: the draft, the dirty
- * signature and `buildUpdates()`.
- *
- * This is not belt-and-braces. The identical defect has shipped TWICE from that file — an
- * authored field left out of the signature allowlist persisted correctly and could never be
- * SAVED, because nothing was ever dirty and the Save button never enabled (issue 651 for
- * `allowPlayerResultReorder`, issue 676 for `enabled`). A section that emits a perfect array
- * into an editor that drops it on exit is the same bug a third time.
- */
+/** The HOST half (issue 1286). The section is a controlled component. */
 const editorHarness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-complications-editor-',
@@ -1117,24 +1040,7 @@ describe('1286 ComponentEditView — the complications draft survives Save', () 
   });
 });
 
-/*
- * THE SHARED ROW MUST NOT HARD-CODE ONE TYPE TREATMENT, and the effect roll's LABEL is not
- * an expression. Both are the same failure seen twice: a declaration that reads as belonging
- * to the element it is on, while the element is shared with a context that wants the other
- * value.
- *
- * `ComplicationSummaryRow` serves SIX call sites. The prototypes draw its name two ways —
- * the Component Studio's accordion in the serif display face at 12.5px, and both GM
- * read-only strips in the host sans, smaller — so the row carried one of the two and the
- * other two screens drifted from a single root cause. The fix is a prop, not a call-site
- * override: an override would put the treatment in the consumer's stylesheet, where the next
- * consumer cannot find it and the primitive still claims to own it.
- *
- * The `fontFamily` axis is why these are pinned in SOURCE: the harness mounts markup, not a
- * stylesheet, and a face is exactly what happy-dom cannot compute. The part a DOM CAN answer
- * — which class each context renders, and which class the label does not wear — is asserted
- * mounted, in the suite above that owns the harness.
- */
+/* THE SHARED ROW MUST NOT HARD-CODE ONE TYPE TREATMENT. */
 describe('1286 the complication row exposes its name treatment, and prose is not mono', () => {
   const componentEditViewSource = readFileSync(
     resolve(repoRoot, 'src/ui/svelte/apps/manager/ComponentEditView.svelte'),
@@ -1182,8 +1088,7 @@ describe('1286 the complication row exposes its name treatment, and prose is not
       );
     }
 
-    // Non-vacuity: the ACCORDION deliberately passes nothing and takes the default, so the
-    // scan above cannot be passing because every call site spells the prop.
+    // Non-vacuity: the ACCORDION deliberately passes nothing and takes the default.
     assert.doesNotMatch(
       sectionSource,
       /nameEmphasis/,

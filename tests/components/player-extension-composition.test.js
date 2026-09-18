@@ -7,8 +7,6 @@ import {
 } from '../helpers/extension-composition-harness.js';
 
 // The provider declares its OWN tab ids, and three of them rather than a copy of Core's five.
-// A fixture mirroring Core's list cannot tell "the seam accepts what the companion declares"
-// apart from "the seam happens to accept Core's own ids".
 function provider(id = 'downtime') {
   return {
     apiVersion: 1,
@@ -33,8 +31,7 @@ test('the production init/ready replay preserves a provider registered through g
       const initApi = globalThis.game.fabricate.api.playerExtensions;
       unregister = initApi.registerPlayerNavProvider(provider());
 
-      // The late-evaluated-entry recovery `ready` owns: the init-bound facade has gone, but
-      // the page-session registry still holds the companion provider.
+      // The late-evaluated-entry recovery `ready` owns: the init-bound facade has gone.
       globalThis.game.fabricate = { stale: true };
       await ready();
       const readyApi = globalThis.game.fabricate.api.playerExtensions;
@@ -54,8 +51,7 @@ test('the production init/ready replay preserves a provider registered through g
         /already registered/,
         'the provider registered between the actual lifecycle callbacks must survive ready'
       );
-      // The two registries hold SEPARATE surface-id namespaces, so one companion may claim
-      // the same surface id in both windows.
+      // The two registries hold SEPARATE surface-id namespaces.
       const unregisterManagerSurface =
         globalThis.game.fabricate.api.managerExtensions.registerWorldNavProvider({
           apiVersion: 1,
@@ -83,13 +79,7 @@ test('the production init/ready replay preserves a provider registered through g
   });
 });
 
-// AC9. `_registerHooks()` runs from `_onRender` — AFTER the render pipeline has built the
-// first frame's props — and returns early once the hook bag exists, while `show()` reuses the
-// singleton. So a companion that follows the documented contract (register during your own
-// `init`, before the window is ever opened) gets its tabs on the first open only if
-// `_prepareSvelteProps()` DERIVES the snapshot rather than reading a field something else
-// seeded. This test never publishes after registration: it registers, then asks the
-// production class for the props of a first render, and reads the rail model off them.
+// AC9. `_registerHooks()` runs from `_onRender`.
 test('a provider registered before the window is first opened is in the first frame props', async () => {
   await withFabricateLifecycleReplay(async ({ init, loadModule }) => {
     let unregister = null;
@@ -102,9 +92,7 @@ test('a provider registered before the window is first opened is in the first fr
 
       const { SvelteFabricateApp } = await loadModule('/src/ui/SvelteFabricateApp.svelte.js');
       const { buildPlayerNavTabs } = await loadModule('/src/ui/playerNavModel.js');
-      // The lab's own "borrow the prototype" shape: a first render's props with no
-      // ApplicationV2 involved, and — critically — with `_hookIds` still null, so nothing has
-      // subscribed and no publication has occurred.
+      // The lab's own "borrow the prototype" shape.
       const app = Object.assign(Object.create(SvelteFabricateApp.prototype), {
         _activeTab: 'crafting',
         _services: null,
@@ -149,12 +137,7 @@ test('a provider registered before the window is first opened is in the first fr
   });
 });
 
-// The validity guard on `_selectTab` was asserted only as source text, and the enumeration of
-// guarded sites left this one out — so removing the predicate from the method the case is NAMED
-// for left 49 tests green. The prototype borrow above is what makes a real behavioural claim
-// possible: `_selectTab` reads nothing but `isOfferedTab`, `this._activeTab` and
-// `this.updateProps`, so a headless instance is a faithful subject for it and the
-// "cannot be instantiated headless" premise the source-regex block rests on does not reach here.
+// The validity guard on `_selectTab` was asserted only as source text.
 test('_selectTab refuses every route the window does not currently offer', async () => {
   await withFabricateLifecycleReplay(async ({ init, loadModule }) => {
     let unregister = null;
@@ -173,8 +156,7 @@ test('_selectTab refuses every route the window does not currently offer', async
       });
 
       for (const refused of [
-        // Core-SHAPED — `isCoreTabId` says "not a provider route key", which is true of any
-        // non-empty string — but not one of this window's own Core ids.
+        // Core-SHAPED — `isCoreTabId` says "not a provider route key".
         'bogus',
         // The LIVE provider, and a tab it does not declare.
         'ext:downtime:nope',
@@ -202,8 +184,7 @@ test('_selectTab refuses every route the window does not currently offer', async
         'a Core tab and a registered companion route both still move the window, exactly once each'
       );
 
-      // The predicate is LIVE, not a set frozen at construction: the very same route stops
-      // being selectable the moment its provider goes.
+      // The predicate is LIVE, not a set frozen at construction.
       unregister();
       unregister = null;
       app._activeTab = 'crafting';
@@ -220,9 +201,7 @@ test('_selectTab refuses every route the window does not currently offer', async
   });
 });
 
-// The player Downtime experimental gate (issue 1257), asserted against the production host
-// rather than against the leaf, because the host is what reads the setting. It is TEMPORARY: the
-// case goes when the premium Downtime Studio ships and the gate with it.
+// The player Downtime experimental gate (issue 1257).
 test('the downtime surface is withheld from the player window until the world opts in', async () => {
   await withFabricateLifecycleReplay(async ({ init, loadModule }) => {
     const releases = [];
@@ -261,8 +240,7 @@ test('the downtime surface is withheld from the player window until the world op
         'the gated surface is absent from the frame while the ungated companion still renders'
       );
 
-      // UNREACHABLE, not merely unlinked: the rail has no entry, and the programmatic route
-      // Core offers everything else through refuses it too.
+      // UNREACHABLE, not merely unlinked: the rail has no entry.
       app._selectTab('ext:downtime:board');
       assert.equal(app._activeTab, 'crafting', '_selectTab must refuse a gated companion route');
       assert.deepEqual(pushed, [], 'and must push nothing to the mounted component');
@@ -273,9 +251,7 @@ test('the downtime surface is withheld from the player window until the world op
         'while an ungated companion route is selectable exactly as it always was'
       );
 
-      // THE STALE-RAIL CASE the spec's gate section states: a window whose snapshot was derived
-      // while the gate was OPEN keeps rendering the tab until the next snapshot, and the live
-      // route test is what stops that stale entry putting a player back on a withheld surface.
+      // THE STALE-RAIL CASE the spec's gate section states.
       await globalThis.game.settings.set('fabricate', 'experimentalFeatures', true);
       const stale = headless();
       assert.ok(
@@ -315,9 +291,7 @@ test('the production player window closes a mounted companion before Application
     disposeMethod: 'disposePlayerProvidersBeforeRemoval',
   });
 
-  // The ordering assertion targets the AWAITED `super.close(options)`: unlike the manager,
-  // this class assigns the result and returns it afterwards, so a check that only looked at
-  // the returned expression would be looking at the wrong statement.
+  // The ordering assertion targets the AWAITED `super.close(options)`.
   assert.deepEqual(lifecycle, [
     ['companion-dispose', true],
     ['application-close', { force: true }, true],

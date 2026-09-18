@@ -31,11 +31,9 @@ const harness = createMountedComponentHarness({
   ],
   compiledModules: [
     'src/ui/svelte/components/Medallion.svelte',
-    // Issue 1506: the have/need tag retired into the shared chip, which this list reaches
-    // through the `<Select>` closure rather than by a hand-written literal of its own.
+    // Issue 1506: the have/need tag retired into the shared chip.
     ...SELECT_COMPILED_MODULES,
-    // The shared eyebrow (issue 1505). The Alternatives title is a `<Kicker>`, so
-    // omitting it HANGS this suite (# cancelled), never fails it.
+    // The shared eyebrow (issue 1505). The Alternatives title is a `<Kicker>`.
     'src/ui/svelte/components/Kicker.svelte',
     'src/ui/svelte/apps/crafting/detail/IngredientOptionSelector.svelte',
   ],
@@ -92,8 +90,7 @@ describe('IngredientOptionSelector mounted behavior', () => {
     };
     const target = await harness.mount({ choices: [choice], onChoose: null });
     const radio = target.querySelectorAll('[role="radio"]')[1];
-    // Issue 1506 retired the crafting essence tile into the ONE shared tile, so the glyph
-    // face is now a `[data-medallion="glyph"]` rather than a class of its own.
+    // Issue 1506 retired the crafting essence tile into the ONE shared tile.
     const thumb = radio.querySelector('[data-medallion="glyph"]');
     assert.ok(thumb, 'essence alternative uses a glyph tile');
     assert.match(thumb.getAttribute('style'), /40px/, 'alternative glyph keeps 40px geometry');
@@ -122,10 +119,7 @@ describe('IngredientOptionSelector mounted behavior', () => {
     assert.deepEqual(calls.at(-1), ['g1', { optionIndex: 1 }], 'commits the clicked option');
   });
 
-  // Issue 917 moved this component behind the requirement rail, where it renders ONE
-  // focused group instead of a stack of every group. The roving-tabindex keyboard
-  // model is preserved byte-for-byte, and it had no test of its own before — so a
-  // regression in it would have surfaced only as a silently unusable keyboard path.
+  // Issue 917 moved this component behind the requirement rail.
   it('keeps the roving-tabindex keyboard model when rendering a single focused group', async () => {
     const calls = [];
     const target = await harness.mount({

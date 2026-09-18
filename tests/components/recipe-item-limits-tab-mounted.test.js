@@ -99,8 +99,7 @@ describe('RecipeItemLimitsTab (mounted)', () => {
     );
     assert.deepEqual(patches.at(-1), { caps: { learn: { characterPrerequisiteIds: ['p1'] } } });
 
-    // Re-mount with p1 already selected: it shows as a chip, and only the remaining
-    // prerequisite is offered; picking it appends.
+    // Re-mount with p1 already selected: it shows as a chip.
     harness.remount();
     root = await harness.mount({
       ...props,

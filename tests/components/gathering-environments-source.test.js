@@ -89,8 +89,7 @@ describe('GatheringView 3-column layout and states', () => {
   });
 
   it('reflows every player layout at the reachable shared narrow-width breakpoint', () => {
-    // Container query, not a viewport media query: the app width (not the
-    // viewport) is what matters because the window is resizable/dockable.
+    // Container query, not a viewport media query.
     assert.ok(
       viewSource.includes('container-type: inline-size;'),
       'the grid should establish a size container so the columns reflow against the app width'
@@ -161,15 +160,6 @@ describe('GatheringView 3-column layout and states', () => {
     // The drag-resize floor lives on `.fabricate.fabricate-app-window` in the global stylesheet —
     // the PLAYER-ONLY class, not the shared `.fabricate-app` area class the three canvas
     // interactables windows adopted in issue 1520.
-    //
-    // THESE TWO CLAUSES ARE SELECTOR-BLIND AND ARE NOT THE AUTHORITATIVE FLOOR GUARD. They are
-    // bare substring reads over the whole sheet, so they pass wherever the declarations sit —
-    // including on the shared class, which is the one place they must not be, because a floor
-    // there inflates three 420-560px windows to the player window's size. The authority is the
-    // PAIR in `tests/view-lab-app-options-parity.test.js`: the declarations are on the
-    // `-window` rule AND the shared rule declares neither. What survives here is the weaker but
-    // still useful claim these clauses were written for — that the sheet floors the player
-    // window at the same two numbers the app's own constants above name.
     assert.ok(cssSource.includes('min-width: 1024px;'), 'the sheet should floor the player window width');
     assert.ok(cssSource.includes('min-height: 640px;'), 'the sheet should floor the player window height');
   });
@@ -399,11 +389,7 @@ describe('EnvironmentCard markup contracts', () => {
   });
 
   it('uses base tokens only (no area-scoped --fab-manager-* properties)', () => {
-    // `--fab-manager-*` is the prefix for an area-scoped custom property, declared inside
-    // `.fabricate-manager`. These three files render in the PLAYER app, where such a
-    // property is out of scope: the declaration is invalid at computed-value time and the
-    // value silently falls back to inheritance (issue 1399 retargeted this from the
-    // retired manager alias generation, which no longer exists to name).
+    // `--fab-manager-*` is the prefix for an area-scoped custom property.
     assert.equal(cardSource.includes('--fab-manager-'), false, 'no area-scoped properties in the player card');
     assert.equal(listSource.includes('--fab-manager-'), false, 'no area-scoped properties in the list');
     assert.equal(viewSource.includes('--fab-manager-'), false, 'no area-scoped properties in the view');

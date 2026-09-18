@@ -1,17 +1,4 @@
-/**
- * THE ANCHOR GATE (issue 1096).
- *
- * A `routedByCheck` check of `fixed` type matches a roll against absolute value ranges, so it
- * has no DC — nothing to meet or exceed, and nothing for a recipe's difficulty tier to move.
- * Three surfaces are withheld together and for that one reason: the `Difficulty` card, the
- * recipe difficulty tier list, and the Outcomes section's `PREVIEW AGAINST` selector.
- *
- * This pins the condition on ALL FOUR CORNERS of (mode, type) rather than asserting the two
- * states that happen to ship. Both halves of the condition are load-bearing, and a test that
- * only checked the hidden case would pass just as well on `hide everything fixed` (too wide,
- * taking the difficulty away from a salvage check that has one) or on `hide everything routed`
- * (too narrow, hiding the DC a relative routed check is defined by).
- */
+/** THE ANCHOR GATE (issue 1096). */
 import { after, afterEach, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -87,9 +74,7 @@ async function render({ type, resolutionMode }) {
 
 function anchoredSurfaces(target) {
   return {
-    // The DC-SOURCE CHOOSER is part of the anchored set now (issue 1096): a routed relative
-    // check is defined as bands offset from a DC, so it has one — and it is the same named
-    // `bandsAreAbsolute` gate, not a fourth spelling of the condition.
+    // The DC-SOURCE CHOOSER is part of the anchored set now (issue 1096).
     dcSource: target.querySelector('[data-dc-mode-option="dynamic"]') !== null,
     difficulty: target.querySelector('[data-check-difficulty-card]') !== null,
     tiers: target.querySelector('[data-routed-tiers]') !== null,

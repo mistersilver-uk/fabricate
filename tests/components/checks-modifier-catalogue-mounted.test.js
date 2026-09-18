@@ -1,34 +1,4 @@
-/**
- * The modifier SELECTION card and the Validation tab's per-activity wiring, MOUNTED
- * (issues 1095, 1117, 1096).
- *
- * ISSUE 1096's PARITY ROUND rebuilt this surface against the design prototype, and what it
- * changed is mostly INVISIBLE to a frame, which is why so much of it is pinned here: the
- * eligibility pill became the real control (a checkbox went away, and the accessible name, the
- * pressed state and the description all moved onto the pill), the deep link moved into the card
- * head, the library note moved to the foot, `How they combine` became its own card, and the
- * `bySubject` eligibility vocabulary collapsed onto `playerPicks`'s.
- *
- * Two further things shipped unpinned and are pinned here:
- *
- *  1. THE READ-ONLY LIBRARY ROWS. Issue 1117 removed the entry editor from this card on
- *     EVERY activity, crafting included: the library has one authoring surface (System
- *     settings › Modifiers) and this screen selects over it. What is pinned is that no
- *     activity renders an editor, that every activity renders the identity/expression/bounds
- *     read-out, and that each carries the deep link to the surface that does author it. The
- *     per-row bounds FAULT note stays — it is the only place a GM is told, on the screen that
- *     applies the entry, that it now contributes nothing.
- *  2. THE `modifierContext` WIRING. `ChecksView` builds one context per activity and hands it
- *     to that activity's readiness section. The three rules are proven as RULES in
- *     `checks-readiness.test.js`, but the seam that delivers them was not: setting any of the
- *     three to `null`, or pointing salvage and gathering at `'crafting'`, survived the suite —
- *     and the second one is invisible from a screenshot too, because the three activities
- *     usually select the same entries.
- *
- * The wiring assertions are built so the activities DISAGREE: crafting selects a well-formed
- * entry and salvage/gathering each select a broken one. An activity reading another's
- * selection therefore reports the wrong answer rather than the same one.
- */
+/** The modifier SELECTION card and the Validation tab's per-activity wiring. */
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -73,12 +43,7 @@ const harness = createMountedComponentHarness({
 
 const SIMPLE_CHECK = { rollFormula: '1d20', dc: 15, thresholdMode: 'meet', dcMode: 'static' };
 
-/**
- * A catalogue with one well-formed entry and one of each blocking bounds fault.
- *
- * `inverted` is `min > max`; `huge` is finite but not expressible as a dice-grammar
- * `Constant`, which is a DIFFERENT repair and therefore a different issue.
- */
+/** A catalogue with one well-formed entry and one of each blocking bounds fault. */
 const CATALOGUE = [
   { id: 'med', label: 'Medicine', expression: '@abilities.med.mod', min: -1, max: 5 },
   { id: 'inverted', label: 'Inverted', expression: '@abilities.alch.mod', min: 5, max: -1 },
@@ -123,10 +88,7 @@ describe('the check-modifier catalogue card (mounted)', () => {
   before(() => harness.setup());
   after(() => harness.teardown());
 
-  // ISSUE 1117 — NO ACTIVITY AUTHORS AN ENTRY, and the assertion runs over all three so
-  // "crafting is special" cannot come back on one of them. The editor's absence is asserted
-  // by its own hooks, not by the presence of the read-only row: a card rendering BOTH would
-  // pass a read-only-row-only check.
+  // ISSUE 1117 — NO ACTIVITY AUTHORS AN ENTRY.
   for (const activity of ['crafting', 'salvage', 'gathering']) {
     it(`renders the library READ-ONLY on ${activity}, with no entry editor at all`, async () => {
       const target = await mountChecks({ activity });
@@ -224,11 +186,7 @@ describe('the check-modifier catalogue card (mounted)', () => {
     harness.remount();
   });
 
-  // THREE WORDS, one per KIND of rule (issue 1096). It was four: `bySubject` owned `Picked per
-  // subject` / `Not picked by default`. The prototype gives both DEFERRING rules the same pair,
-  // and that is forced rather than preferred — its `By recipe` description, which this card now
-  // ships verbatim, reads "from the modifiers you mark SELECTABLE", so a row saying anything
-  // else makes the sentence beside it untrue about the control it names.
+  // THREE WORDS, one per KIND of rule (issue 1096). It was four.
   it('gives the not-selected state one word per KIND of rule, and the two deferring rules share', async () => {
     const seen = new Map();
     for (const [policy, on, off] of [
@@ -263,11 +221,7 @@ describe('the check-modifier catalogue card (mounted)', () => {
     harness.remount();
   });
 
-  // THE PILL IS THE CONTROL (issue 1096). It was presentational, sat beside a
-  // `SelectionCheckbox`, and was hidden from assistive technology because the checkbox already
-  // carried the state word. The prototype draws one control per row, so the checkbox is gone and
-  // the pill is a real toggle button — which means the accessible name, the pressed state and
-  // the description all have to move onto it, and none of that is visible in a frame.
+  // THE PILL IS THE CONTROL (issue 1096). It was presentational.
   it('makes the pill the real control: a toggle button, named, pressed and described', async () => {
     const target = await mountChecks();
     const card = target.querySelector('[data-crafting-modifier-catalogue="crafting"]');
@@ -346,16 +300,6 @@ describe('the check-modifier catalogue card (mounted)', () => {
   });
 
   // -- THE VARIANTS ADDED FOR THE TOOL TAB DO NOT REACH THIS SCREEN (issue 1373, round 6) ----
-  //
-  // `ModifierLibraryRow` gained a LEADING control slot and a STACKED text option so the Tool
-  // Requirements tab's prerequisite list can draw `proto:2331`-`2333` while its bonus list keeps
-  // `proto:2361`-`2364`. Both default to the shipped rendering, and this screen is the reason
-  // that matters: it is a measured surface whose frame and parity regions are pinned, and it
-  // passes neither prop.
-  //
-  // ASSERTED ON THIS SCREEN'S OWN DOM rather than on the component's defaults, because a default
-  // is only half the claim - the other half is that nothing between here and the row starts
-  // passing one.
   it('keeps the shipped row anatomy: trailing control, inline text, no variant class', async () => {
     const target = await mountChecks();
     const card = target.querySelector('[data-crafting-modifier-catalogue="crafting"]');
@@ -442,17 +386,6 @@ describe('the check-modifier catalogue card (mounted)', () => {
 });
 
 // ── The `WHAT ACTUALLY GETS ROLLED` chips NAME their modifiers ────────────────────────
-//
-// Reported from a live build: the inset read `1d20 + @abilities.dex.mod + @prof + [icon] +
-// [icon] + [icon]`. `ChecksView`'s `appliedModifiers` handed the RAW CATALOGUE ENTRIES to
-// `CheckFormulaFields`, whose prop contract is `[{ id, name, icon }]` — a persisted entry's
-// display field is `label`, so `{modifier.name}` was `undefined` in every chip.
-//
-// THIS SUITE, not `check-formula-card-mounted.test.js`. That one already asserts the chip
-// text and stayed green through the whole defect, because it mounts the component with a
-// hand-built `{ id, name, icon }` fixture — a test of the contract, driven by a fixture that
-// honours it, cannot see the caller that does not. So the assertion has to run down the real
-// derivation, which means mounting `ChecksView` with a real catalogue.
 describe('the formula inset names each applied modifier (issue 1097 follow-up)', () => {
   before(() => harness.setup());
   after(() => harness.teardown());

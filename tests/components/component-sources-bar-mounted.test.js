@@ -106,20 +106,7 @@ describe('ComponentSourcesBar mounted behavior', () => {
     assert.deepEqual(calls.remove, ['b'], 'right-click did NOT remove the required source');
   });
 
-  /**
-   * THE PANEL IS `SearchablePopover`'S NOW, AND IT IS PORTALED (issue 1513).
-   *
-   * Every selector here reads from the mount TARGET rather than from the bar: the primitive
-   * moves its panel to the resolved application root, so `[data-crafting-sources]` is no longer
-   * an ancestor of it. The two caller hooks are what keep these assertions about THIS panel —
-   * `popoverClass` puts `crafting-sources-popover` on the portaled node and `optionClass` puts
-   * `crafting-source-option` on the primitive's row.
-   *
-   * `assert.ok(!node)` rather than `assert.equal(node, null)` for the closed state: on failure
-   * `node:assert` serialises the actual value to build its diff and walks a mounted happy-dom
-   * element's circular tree until the heap dies, so a two-second failure would surface as an
-   * OOM with no message.
-   */
+  /** THE PANEL IS `SearchablePopover`'S NOW, AND IT IS PORTALED (issue 1513). */
   it('opens the add/edit picker listing every owned actor to toggle, and commits on choose', async () => {
     const { store, calls } = craftingSources();
     const target = await harness.mount({ services: { craftingSources: store } });
@@ -162,13 +149,6 @@ describe('ComponentSourcesBar mounted behavior', () => {
   /**
    * THE MULTI-SELECT ANNOUNCEMENT, which is the single most important thing the conversion had
    * to preserve.
-   *
-   * The hand-rolled panel wrote `aria-selected={selectedIds.has(actor.id)}` per row and was
-   * CORRECT: it was true on every chosen actor at once. Routing it onto a primitive that
-   * announces one-of-N would have been an accessibility regression shipped as a design-system
-   * adoption, so this asserts the exact strings on every row rather than the presence of the
-   * attribute — the primitive emits `aria-selected` unconditionally, so a presence check passes
-   * straight over the defect.
    */
   it('announces every chosen source actor at once, not one of N', async () => {
     const { store } = craftingSources();
@@ -199,20 +179,7 @@ describe('ComponentSourcesBar mounted behavior', () => {
     );
   });
 
-  /**
-   * THE SECOND STAY-OPEN HAZARD: A RE-PROJECTION UNDER AN OPEN PANEL (issue 1513, review r1).
-   *
-   * The clause above proves the panel survives a CHOICE. It does not prove it survives the thing
-   * the choice causes: `store.toggle` writes through to the crafting store, and every surface
-   * reading the selection re-derives — so the bar is handed a NEW services object, a NEW
-   * `available` array and a changed `selectedSourceIds` while its panel is still open. Three
-   * things could go wrong there and none of them is visible in the choose test: the panel could
-   * unmount and take the GM's query with it, the rows could be re-created (losing the DOM the
-   * keyboard cursor addresses by id), or the marks could stay on the pre-toggle selection.
-   *
-   * A NEW OBJECT AT EVERY LEVEL is the point of the fixture. Mutating the existing store proves
-   * nothing here — `$derived` reads the same identity and would re-run for the wrong reason.
-   */
+  /** THE SECOND STAY-OPEN HAZARD: A RE-PROJECTION UNDER AN OPEN PANEL (issue 1513, review r1). */
   it('survives a re-projection while open, keeping the query and re-marking the rows', async () => {
     const { store } = craftingSources();
     const target = await harness.mount({ services: { craftingSources: store } });
@@ -228,8 +195,7 @@ describe('ComponentSourcesBar mounted behavior', () => {
     assert.equal(before.length, 1, 'the query narrows the owned-actor list to Cy');
     assert.equal(before[0].getAttribute('aria-selected'), 'false');
 
-    // What toggling `c` does to this component's inputs: a fresh store object carrying a fresh
-    // `available` array and a selection that now holds `c`.
+    // What toggling `c` does to this component's inputs.
     const { store: next } = craftingSources({
       available: [
         { id: 'a', name: 'Aria', img: 'icons/svg/mystery-man.svg' },
@@ -268,13 +234,7 @@ describe('ComponentSourcesBar mounted behavior', () => {
     );
   });
 
-  /**
-   * THE PANEL AND ITS LIST BOTH ANNOUNCE A NAME (issue 1513, review r1).
-   *
-   * `dialogAriaLabel` feeds BOTH the portaled `role="dialog"` and the `role="listbox"` inside it,
-   * and the source contract cannot finish that job: a call site's string is present and non-empty
-   * in the text while resolving to `''` at runtime. Only the rendered attribute can say it.
-   */
+  /** THE PANEL AND ITS LIST BOTH ANNOUNCE A NAME (issue 1513, review r1). */
   it('names the portaled panel and the listbox inside it', async () => {
     const { store } = craftingSources();
     const target = await harness.mount({ services: { craftingSources: store } });
@@ -292,10 +252,6 @@ describe('ComponentSourcesBar mounted behavior', () => {
 
   /**
    * THE SEARCH FIELD AND THE MATCHED-OF-TOTAL COUNT, neither of which this control has ever had.
-   *
-   * `Sources.SearchCharacters` is the placeholder AND the field's accessible name, taken
-   * verbatim from the GM-side `Access.SearchCharacters` so one control does not read differently
-   * in two windows.
    */
   it('renders a query field and a matched-of-total count over the owned-actor list', async () => {
     const { store } = craftingSources();
@@ -324,12 +280,9 @@ describe('ComponentSourcesBar mounted behavior', () => {
 
   /**
    * THE NO-OWNED-ACTORS LINE, in the slot it has always occupied.
-   *
    * `Sources.Empty` is a body SENTENCE. The primitive's `emptyHint` feeds `EmptyState`'s `<h3>`
    * and `emptyDetail` feeds its `<p>`, so the sentence routes to `emptyDetail` — which is the
    * same `EmptyState note` slot the deleted `<EmptyState note hint={...}/>` markup put it in.
-   * Demoting it into a heading would have been the visible cost of taking the nearer-looking
-   * prop name.
    */
   it('draws the no-owned-actors sentence as a body line, not as a heading', async () => {
     const { store } = craftingSources({ available: [] });
@@ -347,15 +300,7 @@ describe('ComponentSourcesBar mounted behavior', () => {
     );
   });
 
-  /**
-   * BOTH ACTOR PORTRAITS ARE THE SHARED `Avatar` (issue 1514).
-   *
-   * Asserted on the RENDERED DOM rather than on the source text, because the interesting half is
-   * the FALLBACK: this file's fixtures give Aria a portrait and Borin none, so one of each state
-   * is on screen in every mount here. That is the state neither shipped `Avatar` caller reached
-   * before this change, and no View Lab frame can draw it — every lab actor carries an image —
-   * so these are the only assertions that hold it.
-   */
+  /** BOTH ACTOR PORTRAITS ARE THE SHARED `Avatar` (issue 1514). */
   it('draws both actor portraits as the shared square Avatar, initials fallback included', async () => {
     const { store } = craftingSources();
     const target = await harness.mount({ services: { craftingSources: store } });
@@ -407,14 +352,7 @@ describe('ComponentSourcesBar mounted behavior', () => {
     );
   });
 
-  /**
-   * THE TWO RULES THE CONVERSION HAD TO MOVE, and both are CSS claims happy-dom cannot compute.
-   *
-   * Source text with comments stripped in both syntaxes: the record of each move is a comment
-   * beside the rule it replaced and each NAMES the declaration it removed, so a raw scan reads
-   * the note as the thing it forbids. Measured, not anticipated — the sibling clause in
-   * `essence-pool-panel-mounted` failed exactly that way before its own strip was added.
-   */
+  /** THE TWO RULES THE CONVERSION HAD TO MOVE, and both are CSS claims happy-dom cannot compute. */
   it('draws ONE hairline around the portrait button, and keeps the required actor`s accent ring', () => {
     const source = readFileSync(
       resolve(repoRoot, 'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte'),
@@ -448,23 +386,7 @@ describe('ComponentSourcesBar mounted behavior', () => {
     );
   });
 
-  /**
-   * THE FOCUS RING IS DRAWN OUTSIDE THE FILTER, and this is the clause that keeps it there.
-   *
-   * The dim above is `filter: brightness(0.5)` on the BUTTON, which is where it had to move
-   * when the `<img>` went inside `Avatar`. A CSS `filter` renders its element as a GROUP and
-   * dims everything the group paints — content, background, border and OUTLINE alike — so a
-   * ring painted on that same button paints at half brightness. Measured on the default
-   * `fabricate` theme: the accent over the surface is 10.17:1, and at half brightness it is
-   * 2.84:1, under the 3:1 floor SC 1.4.11 sets for a focus indicator. It is the ONLY keyboard
-   * affordance on the row and NO View Lab case focuses it, so no frame can catch this.
-   *
-   * Asserted on the SOURCE, following `shopping-list-mounted`'s own ring clause, because
-   * happy-dom computes no cascade and cannot answer whether a filtered ancestor dims an
-   * outline. Both halves are required and the second is the one that is easy to lose: without
-   * the suppression the button still matches `.fabricate button:focus-visible` in
-   * `styles/fabricate.css`, which paints the same ring on the same filtered element.
-   */
+  /** THE FOCUS RING IS DRAWN OUTSIDE THE FILTER, and this is the clause that keeps it there. */
   it('draws the keyboard focus ring on the UNFILTERED row wrapper, not on the dimmed button', () => {
     const source = readFileSync(
       resolve(repoRoot, 'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte'),

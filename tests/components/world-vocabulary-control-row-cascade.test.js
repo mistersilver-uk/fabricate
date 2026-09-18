@@ -1,36 +1,4 @@
-/*
- * THE `wvocab` CONTROL ROW AND ITS COLLAPSE, ARBITRATED IN A REAL BROWSER (issue 1392).
- *
- * ── WHY A BROWSER, AND WHY THIS SCREEN IN PARTICULAR ────────────────────────────────────────
- * happy-dom computes no cascade, so a mounted suite can say this page renders a `<select>` inside
- * a `.manager-scoped-list-toolbar` and never which declaration decides its width. Two defects on
- * this screen are decided entirely by that question, and neither is visible to any other gate:
- *
- *  1. Foundry core sizes EVERY `<select>` to `width: 100%` in `@layer elements.forms`. The
- *     module sheet's `.fabricate-manager .manager-scoped-list-toolbar select` block declares no
- *     width at all, so core's rule stands — and the only shipped repair lives in
- *     `EntityListInspectorFrame.svelte`'s scoped block, which is injected when that component
- *     RENDERS. This route never renders it. Measured before the repair: 481px on a cold open of
- *     `world-vocabulary`, 1002px on the full-width tag panel, wrapping the control row onto three
- *     lines — and 62px for the rest of the session as soon as the GM happened to visit a world
- *     entity catalogue first. A layout that depends on which route was opened before it is not a
- *     layout, and a session-order-dependent defect is exactly what a frame cannot photograph.
- *  2. The 1120px collapse is a `@container` query, which needs a REGISTERED container with a real
- *     inline size. Nothing in a mounted tree registers one.
- *
- * ── THE FIXTURE IS PRODUCTION'S CASCADE, NOT AN APPROXIMATION OF IT ────────────────────────
- * The harvested `foundry2.css` is loaded verbatim — it declares its own layer ORDER, in which
- * `modules` follows `elements` — then `styles/fabricate.css` inside `@layer modules`, exactly as
- * Foundry imports an unlayered module sheet, then the page's own scoped CSS unlayered and last,
- * exactly as `css: 'injected'` puts it in `document.head`. `tests/view-lab/cascade.css` is the
- * reference this mirrors. `EntityListInspectorFrame`'s CSS is deliberately ABSENT: its absence
- * IS the cold open.
- *
- * The markup is hand-built, on the sibling row-state oracle's precedent, because only the control
- * row and the grid are under measurement. What keeps it honest is that the page's REAL scope hash
- * is stamped onto the elements its own rules name, so a rule that stopped matching in production
- * stops matching here too.
- */
+/* THE `wvocab` CONTROL ROW AND ITS COLLAPSE, ARBITRATED IN A REAL BROWSER (issue 1392). */
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import { existsSync, readFileSync } from 'node:fs';
@@ -47,12 +15,6 @@ const PAGE_PATH = 'src/ui/svelte/apps/manager/scoped/WorldVocabularyPage.svelte'
 
 /**
  * The harvested core sheet, through the SHIPPED resolver rather than a relative path.
- *
- * A hand-written `../../../.foundry-chrome/<pinned>/…` resolves only from a lane worktree three
- * levels under the clone: from the maintainer's own checkout and in CI it names a directory
- * outside the repository, `existsSync` answers false, and every test in this file SKIPS while
- * reporting green. A version pin has the same shape of failure one harvest later.
- *
  * The ANCESTOR WALK is for the worktree case specifically. A lane worktree shares ONE harvest
  * with the clone it was created from rather than duplicating a ~90MB tree into every lane, so the
  * cache sits at the clone root while `repoRoot` is the lane. Walking up asks the shipped resolver
@@ -76,16 +38,7 @@ const CORE_SHEET = chrome ? join(chrome.dir, 'css', 'foundry2.css') : null;
 const sheet = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
 const page = scopedComponentCss(resolve(repoRoot, PAGE_PATH));
 
-/*
- * CORE'S OWN SHEET, OR NOTHING.
- *
- * The defect this file exists for is a contest between core's `select { width: 100% }` and the
- * module sheet, so a run without core's sheet is not a weaker version of this gate — it is a gate
- * that cannot fail, and it would report clean on the exact tree that shipped the defect. The
- * harvest is a gitignored working directory, so the honest answer when it is absent is to SKIP
- * loudly rather than to hand-write a stand-in rule: a stub looser than core's real one produces
- * a false pass, and one written from memory is a claim about a file nobody read.
- */
+/* CORE'S OWN SHEET, OR NOTHING. */
 const CORE_AVAILABLE = Boolean(CORE_SHEET) && existsSync(CORE_SHEET);
 const skip = CORE_AVAILABLE
   ? false
@@ -93,49 +46,21 @@ const skip = CORE_AVAILABLE
 
 const KINDS = ['recipeCategories', 'componentCategories', 'componentTags'];
 
-/**
- * The capture case's OWN declared frame, read from the registry rather than restated.
- *
- * The delta's screenshot criterion is that one frame shows all three panels populated, and the
- * tag band is the one that falls off the bottom: it is a SIBLING of the 2-up grid, so its head,
- * control row, add card, search row and first row all sit below the taller category panel. A
- * number restated here would let the frame and this assertion drift in opposite directions.
- */
+/** The capture case's OWN declared frame, read from the registry rather than restated. */
 const CAPTURE_CASE = VIEW_LAB_CASES.find((entry) => entry.id === 'world-vocabulary');
 
-/**
- * What the manager draws ABOVE `.manager-body` in the real app, MEASURED IN THE LAB rather than
- * budgeted: the header band and the second `auto` row of `.fabricate-manager`'s
- * `grid-template-rows: auto auto 1fr` come to 168px on this route.
- *
- * The first version of this constant guessed 110 and was 58px optimistic, which is exactly the
- * margin by which the tag band's first row then missed the frame. It carries a stated margin on
- * top so that a header that grows by a line reds here rather than in a published frame.
- */
+/** What the manager draws ABOVE `.manager-body` in the real app. */
 const MEASURED_CHROME = 168;
 const CHROME_MARGIN = 24;
 const CHROME_ALLOWANCE = MEASURED_CHROME + CHROME_MARGIN;
 
-/**
- * The ROW COUNTS the View Lab fixture actually seeds, per kind — DERIVED from that fixture.
- *
- * The fold assertion below is a height measurement, so this fixture has to hold the same number
- * of rows the photographed corpus does. Restating `{3, 4, 3}` would let a shrunken seed silently
- * disarm the guard: the frame would lose rows, the measurement would lose the height they take,
- * and the assertion would keep passing about a screen nobody is capturing.
- */
+/** The ROW COUNTS the View Lab fixture actually seeds, per kind — DERIVED from that fixture. */
 const LAB_VOCABULARY = buildLabContent().worldVocabulary;
 const FIXTURE_ROWS = Object.fromEntries(
   KINDS.map((kind) => [kind, (LAB_VOCABULARY[kind] ?? []).length])
 );
 
-/**
- * One panel, with EVERYTHING the primitive draws inside it.
- *
- * The hint, the add card and the search row are the primitive's own and are the bulk of a panel's
- * height above its first row; the two width assertions do not need them, but the fold assertion is
- * measuring exactly that stack.
- */
+/** One panel, with EVERYTHING the primitive draws inside it. */
 function panel(kind) {
   const cards = Array.from(
     { length: FIXTURE_ROWS[kind] },
@@ -164,15 +89,11 @@ function panel(kind) {
     '<i class="fas fa-arrow-down-a-z"></i><span>Asc</span></button>' +
     '</section>' +
     '<section class="manager-vocabulary-panel">' +
-    // EMPTY, because the page passes `hint={NO_PANEL_HINT}`: the head subline above already says
-    // what this paragraph would. Rendering it with text here would measure a screen the product
-    // does not draw, and would put the fold 46px per panel lower than it really is.
+    // EMPTY, because the page passes `hint={NO_PANEL_HINT}`.
     '<p class="manager-vocabulary-desc manager-muted"></p>' +
     '<form class="manager-vocabulary-form"><div class="manager-vocabulary-form-fields">' +
     '<label class="fabricate-field manager-field"><span class="manager-field-label">Name</span>' +
-        // `fab-manager-button` is the primitive's OWN class, and a fixture that wrote the contract
-    // class without it is measuring markup `ManagerButton` may have stopped emitting —
-    // `tests/manager-button-source-contract.test.js` refuses that.
+        // `fab-manager-button` is the primitive's OWN class.
     '<input type="text"></label>' +
     '<button class="fabricate-button manager-button fab-manager-button">Add</button></div></form>' +
     '<div class="manager-vocabulary-search-row">' +
@@ -234,8 +155,7 @@ test('the fixture layers core, the module sheet and the page the way the product
         coreDeclaresOrder: core.cssRules[0]?.constructor?.name ?? 'none',
         moduleKind: first?.constructor?.name ?? 'none',
         moduleRules: first?.cssRules?.length ?? 0,
-        // Core's own `select { width: 100% }` must be PRESENT, or the contest this file
-        // arbitrates does not exist in the fixture at all.
+        // Core's own `select { width: 100% }` must be PRESENT.
         coreSelectWidth: [...core.cssRules].length,
       };
     });
@@ -295,16 +215,6 @@ test('the sort select keeps its whole shipped skin after the toolbar rules narro
   // select`. They are NARROWED onto this route rather than deleted, because THIS page still
   // renders a native `<select data-wvocab-sort>` and takes its entire skin from them — its own
   // scoped block repairs width only.
-  //
-  // NOTHING IN THIS SUITE COULD HAVE CAUGHT THE DELETION. The row-height clause below is a WRAP
-  // guard, and its height is pinned by the direction button's own `height: 34px` /
-  // `min-height: 34px` whatever the select does; the width clause above is repaired by this
-  // page's own scoped block. A narrowing that stopped matching would drop all three sort selects
-  // to Foundry's own select treatment beside a 34px button with both of them green. So the skin
-  // is measured directly: height, corner, fill and type size, on the select itself.
-  //
-  // The fixture needs no change — it already carries the area root and the route attribute — and
-  // that is the point: the narrowing is written so it still matches this page and nothing else.
   const { tab, close } = await open(1280);
   try {
     const measured = await tab.evaluate((kinds) => {
@@ -319,9 +229,7 @@ test('the sort select keeps its whole shipped skin after the toolbar rules narro
           fontSize: style.fontSize,
         };
       });
-      // The token is read from a probe inserted BESIDE the select rather than at the body, so it
-      // resolves under the same theme root the select does. A body-level probe reads the default
-      // palette and the comparison becomes a claim about two different scopes.
+      // The token is read from a probe inserted BESIDE the select rather than at the body.
       const host = globalThis.document.querySelector(`[data-wvocab-sort="${kinds[0]}"]`)
         .parentElement;
       const probe = globalThis.document.createElement('div');
@@ -345,12 +253,6 @@ test('the sort select keeps its whole shipped skin after the toolbar rules narro
         `${select.kind}: the row's 9px corner, from the same narrowed rule`
       );
       // AND THE FILL IS THIS PAGE'S OWN, WHICH IS WORTH MEASURING FOR THE OPPOSITE REASON.
-      // The narrowed sheet rule declares `--fab-bg-1`, the shipped control rung. On THIS route
-      // it never lands: the page's own scoped block puts every control in a panel one ramp rung
-      // BELOW it, at `--fab-bg-0`, and an unlayered scoped declaration beats a layered one at
-      // any specificity. So the fill is not the narrowing's proof — the height, the corner and
-      // the type size are — and this clause pins the page's override so a later reader cannot
-      // mistake the sheet's declaration for what renders.
       assert.equal(
         select.background,
         measured.expectedFill,
@@ -398,9 +300,6 @@ test('the EMPTY status region takes no height at all', { skip }, async () => {
   // `height: 0` does not beat: `min-height` clamps the USED height upwards whatever `height`
   // says. Measured before the repair, this box was 16px tall, so the page carried a dead strip
   // above its first panel and the reclaim it was credited with never landed.
-  //
-  // No mounted suite can see it: happy-dom computes no cascade, so it would report the declared
-  // `height: 0` and never the clamp that overrides it.
   const { tab, close } = await open(CAPTURE_CASE.position.width);
   try {
     const measured = await tab.evaluate(() => {
@@ -434,8 +333,7 @@ test('the category grid collapses to ONE track below the manager’s 1120px rung
         globalThis.getComputedStyle(globalThis.document.querySelector('.wvocab-grid'))
           .gridTemplateColumns
     );
-    // The positive control: at 1280 it is genuinely TWO tracks, so the assertion below is a
-    // measurement of the query rather than of a grid that was never two-up.
+    // The positive control: at 1280 it is genuinely TWO tracks.
     assert.equal(tracks.split(' ').length, 2, `expected two tracks above the rung, got "${tracks}"`);
   } finally {
     await wide.close();
@@ -483,8 +381,7 @@ test('all three panels’ first rows fit inside the frame the capture case decla
       });
     }, KINDS);
 
-    // NON-VACUITY: the three panels must be at DIFFERENT depths, or the fixture has collapsed to
-    // one column and the tag band — the only one that can fall off — is not being measured.
+    // NON-VACUITY: the three panels must be at DIFFERENT depths.
     assert.equal(
       new Set(bottoms.map((entry) => Math.round(entry.bottom))).size,
       2,

@@ -1,50 +1,4 @@
-/**
- * The END STATE of the editor validation surface's adoption, pinned in source (issue 1444).
- *
- * ── WHAT IT PINS AND WHY ────────────────────────────────────────────────────────────────
- * The validation surface was two things at once: a component, and a CONVENTION — write the
- * `manager-recipe-val-*` and `manager-recipe-rail-*` classes and the global sheet paints the
- * arrangement, whether or not you rendered the component. Two editors still took the second
- * route as issue 1444 opened, so `spec.md`'s "Validation is one screen everywhere" was a
- * sentence three copies of the markup were free to drift from. This file is what makes it an
- * enforceable claim: with the copies gone, a returning raw `.manager-recipe-val-row` is a
- * fourth copy starting, and the only thing that can report it is a source gate.
- *
- * ── WHICH CLASS IS THE CONTRACT, AND THE PREFIX PROBLEM ─────────────────────────────────
- * TWO contracts rather than one, because the surface has two halves that a partial conversion
- * could take separately: `manager-recipe-val-row` is the grouped row stack and
- * `manager-recipe-rail-count` is the aggregate header's count tile.
- *
- * Neither `manager-recipe-val` nor `manager-recipe-rail` is used, and that is a measurement
- * rather than a preference: neither exists as a class on any element in the corpus. They are
- * PREFIXES of the real ones and nothing more, so a contract stated over either would count
- * zero everywhere and both clauses would pass vacuously over an empty domain — the exact
- * failure `tests/helpers/primitiveAdoptionContract.js`'s docblock records the detector
- * shipping with.
- *
- * The two that ARE used are each a prefix of a real sibling, which is why the factory's
- * `(?![\w-])` termination is load-bearing here in both of its forms: `manager-recipe-val-row`
- * is a prefix of `manager-recipe-val-rows`, terminated by a WORD character, and
- * `manager-recipe-rail-count` is a prefix of both `manager-recipe-rail-counts` and
- * `manager-recipe-rail-count-label`, terminated by a word character and by a HYPHEN
- * respectively. A `\b`-terminated pattern counts the hyphenated one, and a substring test
- * counts all four. The detector fixtures below drive every one of those cases.
- *
- * ── WHERE THE FIVE SHARED CLAUSES LIVE ──────────────────────────────────────────────────
- * `tests/helpers/primitiveAdoptionContract.js`, shared with `field-source-contract.test.js`
- * and `manager-filter-bar-source-contract.test.js`. It supplies the raw-element clause, the
- * self-cleaning allowlist, the detector's own discrimination fixture, the valueless-attribute
- * clause and the corpus floors.
- *
- * ── AND THE CLAUSES THAT EARN THIS FILE ─────────────────────────────────────────────────
- * Both are about the surface's two attribute BAGS, and both exist for one reason: a bag keyed
- * by name is silent about a name it does not recognise. `hookAttrs={{ summaryrow: … }}` spreads
- * nothing, renders identically to a site that passed no hook at all, and takes the site's
- * DOM contract with it — which is issue 1116's defect class exactly, unreachable configuration
- * that looks identical to working configuration. The keys are read out of the PRIMITIVE's own
- * source (its `hooksFor('…')` call sites and its `COUNT_ORDER`) rather than re-typed here, so
- * widening the surface widens the gate and a call site cannot be greened by editing this file.
- */
+/** The END STATE of the editor validation surface's adoption, pinned in source (issue 1444). */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -65,19 +19,6 @@ const TAG = 'EditorValidationSurface';
 /**
  * The allowlist for BOTH contracts, and its one entry is the primitive itself.
  *
- * `Field` and `ManagerToolbar` need no such entry because each builds its contract class in a
- * `class={classes}` expression, so the raw-element detector — which reads the `class`
- * attribute's SOURCE TEXT — never sees the token. This surface writes both of its contract
- * classes as literals inside the template, on the row `<li>` and the tile `<li>`, which is the
- * legible thing for the file that OWNS them to do; making them invisible to the detector would
- * mean computing them in the script purely to satisfy a test.
- *
- * So the entry is the owner rather than deferred debt, and unlike every other entry on any of
- * these allowlists it will never reach zero. It is still an exact-count pin and still earns its
- * place: a second raw element in this file carrying either class means the surface has grown a
- * second row stack or a second count rail, which is precisely the drift both clauses exist to
- * refuse.
- *
  * @param {string} contractClass
  * @returns {ReadonlyArray<{path: string, sites: number, why: string}>}
  */
@@ -97,13 +38,7 @@ function ownerAllowlist(contractClass) {
 }
 
 /**
- * A synthetic source for the raw-element detector, written per contract because the tokens are
- * what is being discriminated.
- *
- * Three negatives, and each is a real class in this corpus rather than an invented one: the
- * `s`-suffixed sibling (`…-rows`, `…-counts`), the hyphen-suffixed sibling (`…-row-label`,
- * `…-count-label`) and the component tag. A substring test counts four sites here, a
- * `\b`-terminated pattern counts three, and the correct one counts two.
+ * A synthetic source for the raw-element detector.
  *
  * @param {{contract: string, suffixed: string, hyphenated: string}} tokens
  * @returns {string}
@@ -130,8 +65,7 @@ function detectorSource({ contract, suffixed, hyphenated }) {
 }
 
 /**
- * Register one contract. Both halves of the surface get the identical five clauses, and the
- * differences between them are the two tokens and the fixture's negatives.
+ * Register one contract. Both halves of the surface get the identical five clauses.
  *
  * @param {{contract: string, suffixed: string, hyphenated: string, half: string}} spec
  * @returns {{callSites: object[]}}
@@ -183,15 +117,9 @@ defineHalf({
 /**
  * The keys of the object literal a call site passes to one of the surface's bag props.
  *
- * Parsed from the AST rather than from the attribute's source text: a brace-counting scan over
- * `hookAttrs={{ root: { 'data-x': 'y' } }}` has to know which `{` opens a nested object and
- * which closes a string, and getting that subtly wrong yields an EMPTY key list, which makes
- * every clause below pass over nothing.
- *
  * @param {string} file repo-relative component path
  * @param {string} attributeName the prop to read
  * @returns {string[]|null} the literal's top-level keys, or null when the site passes no such
- *   prop or passes something that is not an object literal
  */
 function bagKeys(file, attributeName) {
   const source = SOURCES[file];
@@ -214,16 +142,6 @@ function bagKeys(file, attributeName) {
 
 /**
  * The attribute names one file writes on `<EditorValidationSurface>`.
- *
- * HAYSTACK, STATED, because the thing it replaces got this wrong. This reads `Attribute` nodes on
- * `Component` nodes named {@link TAG} in the PARSED template — nothing else. Docblock prose,
- * `<!-- … -->` blocks, `<style>` contents and string literals in the `<script>` are all outside
- * it, because the parser puts them in nodes this never visits.
- *
- * A text scan over `SOURCES[file]` has the opposite haystack and this corpus makes the difference
- * concrete: `recipe/RecipeValidationTab.svelte`'s own header NAMES `viewDataAttr` in prose, and
- * survives a `\bviewDataAttr=` scan only by not writing the `=`. Moving the real attribute into an
- * HTML comment left that scan green.
  *
  * @param {string} file repo-relative component path
  * @returns {Set<string>} empty when the file renders no `<EditorValidationSurface>` at all
@@ -276,10 +194,6 @@ test('the count vocabulary is the closed three, in the order the rail draws them
  * Every call-site key of one bag prop that is not in the vocabulary the primitive declares,
  * with how many sites were examined.
  *
- * ONE walk shared by the two clauses below rather than two copies of it: the shape is
- * identical, and the site count it returns is what keeps each clause from passing over an
- * empty domain when the bag prop is renamed or the tag scan stops resolving.
- *
  * @param {string} attributeName the bag prop to read
  * @param {string[]} vocabulary the keys the primitive recognises
  * @returns {{offenders: string[], sites: number}}
@@ -301,8 +215,7 @@ function unknownBagKeys(attributeName, vocabulary) {
 test('every hook region a call site names is one the surface actually spreads', () => {
   const regions = declaredRegions();
   const { offenders, sites } = unknownBagKeys('hookAttrs', regions);
-  // Non-vacuity. A bag prop nothing passes, or an AST walk that stopped resolving the tag,
-  // reads as zero sites and greens this clause over an empty domain.
+  // Non-vacuity. A bag prop nothing passes.
   assert.ok(sites >= 2, `only ${sites} <${TAG}> call sites pass \`hookAttrs\`, so this is moot`);
   assert.deepEqual(
     offenders,
@@ -352,20 +265,11 @@ test('every call site that hooks a count also reports it', () => {
 });
 
 test('the sites hooking the row action are the two producers and the shell, and none restates its name', () => {
-  // `viewDataAttr` is the surface's one-caller hook prop, and this is the clause that keeps
-  // that honest rather than merely true. `viewLabel` USED to be its pair — a site hooking the
-  // action also had to hand the surface a localized verb, and a site that hooked without
-  // labelling shipped an untranslated word beside translated ones. Issue 1517 ended that
-  // obligation by moving it INTO the surface: the name is a key the surface resolves itself,
-  // so the correct number of call sites restating it is zero.
-  //
-  // READ FROM THE AST, not from the file's text. See {@link surfaceAttributeNames} for the
-  // haystack and for the measured way the text scan this replaces could be greened.
+  // `viewDataAttr` is the surface's one-caller hook prop.
   const rendered = Object.keys(SOURCES)
     .map((file) => [file, surfaceAttributeNames(file)])
     .filter(([, attributes]) => attributes.size > 0);
-  // NON-VACUITY, because both clauses below are ABSENCE claims over this population: a walk that
-  // stopped resolving the component would report the empty set and read as two clean gates.
+  // NON-VACUITY, because both clauses below are ABSENCE claims over this population.
   assert.ok(
     rendered.length >= 4,
     `only ${rendered.length} files were seen passing an attribute to <${TAG}>; the walk has ` +
@@ -413,23 +317,10 @@ test('the sites hooking the row action are the two producers and the shell, and 
 
 /**
  * The surface's own `$props()` defaults, and its View button node, read from the AST.
- *
  * HAYSTACK, stated, because it is the whole reason this is a parser rather than a regex: the
  * `ObjectPattern` of the `let { … } = $props()` declaration, and the template's element tree.
- * Comments, docblocks, `<!-- … -->` blocks and `<style>` are NOT in either — the parser drops
- * them into `ast.comments` or into nodes this never visits. THIS SURFACE'S HEADER EXPLAINS ITS
- * `viewLabel` default and its `localize()` call in prose, naming both the key and the function,
- * so every text-shaped matcher over `SOURCES[SURFACE_PATH]` reports what the DOCUMENTATION says
- * and never reads the code at all. Slices below are taken from AST node ranges for the same
- * reason: a range names exactly one expression.
- *
- * `constants` is the third population and is read for the same reason as the first two: the
- * subject-bearing accessible name is a MODULE constant rather than a prop — a caller must not be
- * able to swap it — so there is no `$props()` default to read it from, and its literal appears in
- * this file's header prose as well as in the declaration.
  *
  * @returns {{defaults: Map<string, object|null>, constants: Map<string, unknown>, button: object,
- *   source: string}}
  */
 function surfaceRowAction() {
   const source = SOURCES[SURFACE_PATH];
@@ -523,9 +414,6 @@ test("the View button's name is a translatable key, in a shared namespace, resol
   // a sibling element and the `data-*` hook holds the ROUTE, which assistive technology never
   // reads. One producer routes at eleven sites, and this is the one place a default name for
   // every surface that renders this primitive can be installed.
-  //
-  // WHITESPACE-NORMALISED, because the expression is wrapped by the formatter and its line breaks
-  // are Prettier's decision rather than a contract. The TOKENS are the contract.
   assert.equal(
     expressionAttribute(button, 'aria-label', source)?.replaceAll(/\s+/gu, ' '),
     'localize(VIEW_NAMED_LABEL, { action: localize(row.viewLabel ?? viewLabel), subject: row.title, })',
@@ -552,8 +440,7 @@ test("the View button's name is a translatable key, in a shared namespace, resol
 });
 
 test('no call site restates a count label the surface would draw unlabelled', () => {
-  // The corpus floor for the two bag clauses above, stated over the call-site scan the shared
-  // factory already built rather than over a second walk of its own.
+  // The corpus floor for the two bag clauses above.
   const files = new Set(rowContract.callSites.map((site) => site.file));
   assert.ok(
     files.has('src/ui/svelte/apps/manager/recipe/RecipeValidationTab.svelte') &&
@@ -566,15 +453,7 @@ test('no call site restates a count label the surface would draw unlabelled', ()
 });
 
 test('the shipped name pattern still has somewhere to put the visible verb', () => {
-  // THE OTHER HALF OF THE LABEL-IN-NAME CONTRACT, and the half no source pin above can see. The
-  // template passes `action` and `subject`; whether either reaches the screen is decided by the
-  // STRING, and `lang/en.json` is data rather than code. Edit that value back to a pattern with
-  // no `{action}` and `Localization#format` silently drops the argument — the button goes back to
-  // announcing "View: …" beside a visible "View task", which is the exact WCAG 2.5.3 failure the
-  // composition exists to make unrepresentable. Nothing else in the tree reads this key's shape.
-  //
-  // HAYSTACK: the parsed `lang/en.json` object, resolved by the key the surface declares rather
-  // than by a path re-typed here — so moving the key moves this clause with it.
+  // THE OTHER HALF OF THE LABEL-IN-NAME CONTRACT.
   const { constants } = surfaceRowAction();
   const key = String(constants.get('VIEW_NAMED_LABEL'));
   const english = JSON.parse(

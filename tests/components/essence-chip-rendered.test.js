@@ -1,36 +1,4 @@
-/**
- * THE TINTED ESSENCE CHIP STAYS READABLE ON EVERY THEME (issue 1371 r18-colour, M29).
- *
- * `Chip`'s `tint` inks the label in the essence's own `--fab-tag-*` token, which is the
- * reference's face for a row's essence dot (`proto:5502`). A palette token is a pastel chosen for
- * a glyph on a dark tile, so inking TEXT in it is exactly the kind of decision that reads fine on
- * the theme the author looked at and fails on the one they did not. This suite renders the real
- * primitives — the essence chip through `Chip`, the card tile through `Medallion` — in Chromium
- * under the real sheet, for EVERY theme block the sheet declares and every tint the picker offers,
- * composites each chip's fill over the surface it stands on, and asserts the WCAG ratio:
- *
- *   - the chip's label against its composited fill clears 4.5:1 (AA for text under 18px) on an
- *     ORDINARY row, whose `--fab-bg-1` is opaque;
- *   - and again on a SELECTED row, whose `--fab-surface-active` is 10–12% white-ish over
- *     `--fab-bg-2` and is therefore the LIGHTER, worse surface of the two;
- *   - the tile's glyph against `--fab-bg-3` clears 3:1 (AA for a non-text mark);
- *
- * and it proves each measurement is live before trusting it: with the tint removed the computed ink
- * is the base chip's, so a sheet that never reached the chip would fail here rather than pass, and
- * the selected row is asserted to composite LIGHTER than the ordinary one, so the second surface
- * cannot quietly become a second reading of the first.
- *
- * WHICH SURFACE A PIN HOLDS IS SAID, BECAUSE THE TWO DIFFER BY ABOUT A THIRD. `foundry-native`'s
- * `mauve` is a mid grey-purple — the theme derivation that `design-system/spec.md` records as
- * inverting mauve's hue by 160 degrees — and it measures 3.38:1 as a label on an ordinary row,
- * 2.74:1 as a glyph on that theme's slate tile, and 1.85:1 as a label on a selected row. Nine
- * theme/tint pairs across four themes fall under AA on the selected row; one does on the ordinary
- * one. That is the palette's defect and not the chip's: the same tokens paint the world bulk
- * panel's essence tiles today, and the spec already records re-deriving the eight offered tints as
- * a planned migration. So every short pair is held as a RATCHET at its measured value rather than
- * waived, in the list for the surface it was measured on, and the day the palette moves those pins
- * move with it and say so.
- */
+/** THE TINTED ESSENCE CHIP STAYS READABLE ON EVERY THEME (issue 1371 r18-colour, M29). */
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -63,31 +31,11 @@ const THEMES = [
 const LABEL_MIN_RATIO = 4.5;
 const MARK_MIN_RATIO = 3;
 
-/**
- * The pairs measured below a floor at the base of issue 1371 r18-colour, pinned two hundredths
- * UNDER the ratio they measured (3.38:1 and 2.74:1) so the pin holds the palette where it is
- * without failing on the third decimal. A pair listed here must not fall below its pinned value;
- * a pair that clears the floor must be removed, so the list can only shrink.
- */
+/** The pairs measured below a floor at the base of issue 1371 r18-colour. */
 const KNOWN_BELOW_LABEL_FLOOR = new Map([['foundry-native/mauve', 3.36]]);
 const KNOWN_BELOW_MARK_FLOOR = new Map([['foundry-native/mauve', 2.72]]);
 
-/**
- * THE SELECTED ROW'S OWN RATCHET (issue 1371 r19-gates2, UX review round 5 F-P5).
- *
- * The pinned list above is the ORDINARY row's, and it is the friendlier of the two surfaces the
- * chip stands on: `.is-selected` replaces the row's opaque `--fab-bg-1` with a 10–12% white-ish
- * `--fab-surface-active` over `--fab-bg-2`, and a lighter surface takes roughly a third off a
- * pastel label's ratio — the same peach chip reads 9.37:1 on a `fabricate` row and 6.34:1 on the
- * selected one. Nine of the fifty-six pairs fall under AA there, on four of the seven themes.
- *
- * They are PINNED AT THEIR MEASURED VALUES rather than waived, on the same terms as the pair
- * above: the shortfall is the palette's — `design-system/spec.md:211-214` already records
- * re-deriving the eight offered tints as a planned migration — and not this chip's, which draws
- * whatever token the picker offers. `foundry-native` is where it bites hardest, and that theme's
- * tokens are the ones the spec's migration names. A pair listed here must not fall further; a pair
- * that reaches 4.5:1 must be removed, so the list can only shrink.
- */
+/** THE SELECTED ROW'S OWN RATCHET (issue 1371 r19-gates2, UX review round 5 F-P5). */
 const KNOWN_BELOW_SELECTED_LABEL_FLOOR = new Map([
   ['foundry-native/mauve', 1.83],
   ['foundry-native/aqua', 2.99],
@@ -101,8 +49,7 @@ const KNOWN_BELOW_SELECTED_LABEL_FLOOR = new Map([
 ]);
 
 /**
- * Hold every pair above its floor, or — for a pinned pair — above its pinned ratchet, and report
- * the worst pair per theme as a diagnostic so a run's output carries the measurement.
+ * Hold every pair above its floor, or — for a pinned pair — above its pinned ratchet.
  *
  * @param {import('node:test').TestContext} t
  * @param {(sample: object) => number} ratioOf
@@ -156,17 +103,7 @@ function scopedCss() {
   }).join('\n');
 }
 
-/*
- * THE TWO SURFACES A ROW CHIP STANDS ON, both drawn (issue 1371 r19-gates2, UX review round 5
- * F-P5). `.probe-surface` is the ORDINARY row: `.manager-components-list .manager-component-row`
- * declares `background: var(--fab-bg-1)`, which is opaque, so nothing behind it reaches the chip.
- * `.probe-selected-row` is the SELECTED row, which is a different and LIGHTER surface: the
- * `.is-selected` rule replaces that fill with `var(--fab-surface-active)`, and every theme
- * declares that token at 10–12% alpha — so what the chip actually composites over is the
- * translucent fill over `.manager-main`'s `var(--fab-bg-2)`, measured in the shipped list as
- * rgb(27,40,51) under the row's own rgb(21,33,43). A lighter surface is a WORSE surface for a
- * pastel-inked chip, so measuring only the unselected row pins the friendlier of the two.
- */
+/* THE TWO SURFACES A ROW CHIP STANDS ON. */
 function page(theme, tint, chipMarkup, tileMarkup, scoped) {
   return `<!doctype html><html><head><meta charset="utf-8">
     <style>${fabricateCss}</style><style>${scoped}</style>
@@ -238,7 +175,6 @@ function labelRatioOnRow(sample) {
 
 /**
  * The same label on a SELECTED row, which is three translucent layers rather than one opaque one:
- * the chip's fill over `--fab-surface-active` over `--fab-bg-2`, composited in that order.
  */
 function labelRatioOnSelectedRow(sample) {
   const row = composite(sample.selectedRowFill, composite(sample.selectedRowHost, [0, 0, 0]));
@@ -274,9 +210,7 @@ describe('the tinted essence chip and tile, rendered on every theme (issue 1371 
     } finally {
       medallion.teardown();
     }
-    // The tint is a bare key validated by the primitives, so `TINT` was DROPPED by both — the
-    // markup above is the untinted control. The tinted variants are made by re-stamping the two
-    // vehicles the primitives emit, which keeps every other byte of the render identical.
+    // The tint is a bare key validated by the primitives, so `TINT` was DROPPED by both.
     const scoped = scopedCss();
     const browser = await chromium.launch();
     try {

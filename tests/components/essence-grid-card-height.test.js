@@ -1,50 +1,10 @@
 /*
  * The essence GRID card's equal-height contract (issue 1036, maintainer review round 2).
- *
  * ── WHY THIS IS A REAL BROWSER AND NOT A SOURCE ASSERTION ────────────────────────
  * The maintainer read the defect off a published frame: in `manager-essences-grid.png` the
  * `Water` card is 4px taller than the two cards beside it, its footer 4px lower, with no
  * content difference to explain it. A previous round answered "the cards are equal height"
  * by looking at that same image, which is how the defect survived a review.
- *
- * Nothing in the source says otherwise. `.manager-essences-table.is-grid` already declared
- * `align-items: stretch`, and a source assertion on that declaration passes today and passed
- * while the frame was wrong. happy-dom computes no cascade, so a mounted test cannot measure
- * a height either. The only instrument that can settle it is a real engine, which is what
- * `component-studio-font-size.test.js` and `recipe-studio-font-size.test.js` already use.
- *
- * ── THE CAUSE, AND WHY THE FIXTURE MUST CARRY FOUNDRY'S LIST RULES ───────────────
- * Foundry core (`css/foundry2.css`, @layer elements) declares `ul li { margin-bottom:
- * 0.25rem }` and `ul li:last-child { margin-bottom: 0 }`, and neutralises it only for AppV1.
- * The manager is an ApplicationV2, so every essence `<li>` carries 4px of bottom margin and
- * the LAST one does not. In a grid, `align-items: stretch` sizes an item's MARGIN box to the
- * row, so the exempted last card converts its neighbours' margin into 4px of extra border
- * box — the exact asymmetry in the frame, and one that appears only when the last card
- * happens to share a row with others.
- *
- * `tests/fixtures/foundry-core-min.css` therefore reproduces those three rules. Remove them
- * and this gate goes green against a page the product never draws.
- *
- * ── WHAT IT MEASURES ─────────────────────────────────────────────────────────────
- * Two adversarial rows, chosen so that content variance is the ONLY thing left that could
- * move a height:
- *
- *  - row one mixes a 3-line description, a 1-line description and a two-chip header;
- *  - row two ends with a card carrying a 90-character name, which is the growth vector the
- *    maintainer named ("name should be truncated") and which, unclamped, wraps to three
- *    lines and re-sizes its whole row.
- *
- * Every card in a row must have the SAME border-box height, and the long-name card must be
- * no taller than the same row's shortest name — that second assertion is what fails if the
- * single-line clamp is ever dropped, because equal-height-within-a-row would still hold
- * while every card in the row grew together.
- *
- * ── THE FIXTURE IS A MIRROR, AND MIRRORS ROT ─────────────────────────────────────
- * The markup below stands in for `EssenceRow.svelte`'s card branch. Change that component's
- * card markup and update this fixture in the same commit: a green run against stale markup
- * proves nothing. The CLASSES are stamped with the components' real Svelte scope hashes and
- * their real compiled CSS is appended after the global sheet, so the cascade this measures is
- * the one the app ships.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -61,8 +21,7 @@ const SCOPED_COMPONENTS = [
   'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/components/Medallion.svelte',
   'src/ui/svelte/components/SelectionCheckbox.svelte',
-  // The card's own CSS lives in the shared primitive now; without it this fixture measures
-  // an unstyled stack and every gate below passes vacuously.
+  // The card's own CSS lives in the shared primitive now.
   'src/ui/svelte/apps/manager/library/LibraryCard.svelte',
   'src/ui/svelte/apps/manager/essences/EssenceRow.svelte',
   'src/ui/svelte/apps/manager/EssenceBrowserView.svelte',
@@ -70,14 +29,6 @@ const SCOPED_COMPONENTS = [
 
 // The contract classes are DERIVED from each component's own emitted CSS rather than
 // hand-listed, so renaming a scoped class cannot leave an element silently unstamped.
-//
-// BOTH of Svelte's scoping forms are collected, which the font-size gates' copies of this
-// helper do not do. Svelte writes the SUBJECT of a rule as `.name.svelte-hash` but every
-// ANCESTOR-QUALIFIED descendant as `.name:where(.svelte-hash)`, so a pattern that reads only
-// the first form silently skips every rule of the shape
-// `.manager-essence-row.is-card .manager-system-name` — which is most of what this file
-// measures. A missed class does not fail; the rule simply never matches and the gate
-// measures the unstyled element.
 function stampScopedClasses(fixture, { css, hashClass }) {
   const subjects = new RegExp(String.raw`\.([\w-]+)\.` + hashClass + String.raw`\b`, 'g');
   const descendants = new RegExp(
@@ -113,15 +64,7 @@ function card(essence) {
   const disabledPill = essence.off
     ? chip('Disabled', { tone: 'subtle', icon: 'fas fa-circle-pause' })
     : '';
-  // The card is the shared `LibraryCard` anatomy: a header pairing the medallion with the
-  // name to its right, a badges row, the fixed 2-line description box, the recessed facts
-  // well, then a divided footer carrying the enable toggle and the edit pencil. The
-  // selection box is the body button's SIBLING, pinned into the top-right corner.
-  //
-  // Both class vocabularies are stamped, exactly as the app renders them: the primitive's
-  // own `fab-library-card-*` (which is where the LOOK lives) and the essence hooks the
-  // smoke walk and the View Lab navigate by. Dropping either half would measure an element
-  // the app does not ship.
+  // The card is the shared `LibraryCard` anatomy.
   return `
 <li class="fab-library-card manager-essence-row is-card${essence.off ? ' is-off' : ''}" data-essence-id="${essence.id}" data-essence-variant="grid">
   <button type="button" class="fab-library-card-body manager-essence-identity">
@@ -205,8 +148,7 @@ const ESSENCES = [
   },
 ];
 
-// 734px is the essence library's list column at the 1280px capture width, which is what
-// makes this three tracks wide — the same three the published frame shows.
+// 734px is the essence library's list column at the 1280px capture width.
 const FIXTURE = `
 <div class="application theme-dark">
   <section class="window-content">
@@ -255,8 +197,7 @@ test('essence grid cards are the same height in a row regardless of content', as
       };
     });
 
-    // The fixture must actually be a three-column grid, or "same height in a row" is a
-    // statement about rows of one and the gate is vacuous.
+    // The fixture must actually be a three-column grid.
     assert.equal(measured.columns, 3, 'the fixture renders three tracks, as the frame does');
 
     const rows = new Map();
@@ -289,9 +230,7 @@ test('essence grid cards are the same height in a row regardless of content', as
       );
     }
 
-    // And the growth vector the maintainer named: a 90-character name is ONE line, so it
-    // cannot re-size its row. Without the clamp this name wraps and every card in its row
-    // grows with it — which the equal-height assertion above would happily allow.
+    // And the growth vector the maintainer named: a 90-character name is ONE line.
     const byId = new Map(measured.cards.map((measurement) => [measurement.id, measurement]));
     assert.equal(
       byId.get('longname').nameHeight,

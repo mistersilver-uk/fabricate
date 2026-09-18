@@ -65,9 +65,7 @@ describe('GatheringRealmsTab mounted behavior', () => {
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     for (const modulePath of SEARCHABLE_POPOVER_RAW_MODULES) writeRawModule(modulePath);
     writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');
-    // Issue 1504: the shared `<Select>`'s whole compiled closure — also covers the shared
-    // no-state primitive (issue 785) and the manager's ONE chip (issue 883) — spread rather
-    // than copied.
+    // Issue 1504: the shared `<Select>`'s whole compiled closure.
     for (const selectModule of SELECT_COMPILED_MODULES) {
       writeCompiledSvelte(selectModule);
     }

@@ -1,18 +1,4 @@
-/**
- * The Checks Studio's simulator, odds histogram and previewed record, MOUNTED (issue 1097).
- *
- * The unit suites (`tests/check-preview.test.js`, `tests/check-odds.test.js`) grade the
- * two modules. What can only be graded here is the WIRING: that the rail's "Preview as"
- * selection is the same selection the Outcomes section's band strip is drawn against, that
- * the roll button reaches the engine's own runner, and that the readout renders what came
- * back rather than a parallel model.
- *
- * The record binding is the one worth stating. Issue 1096 shipped `ThresholdBandStrip`
- * with a `previewLabel` prop NO CALLER SUPPLIED, so the strip announced against the check's
- * own DC and its group label named no record at all — a prop forwarded as `''` from every
- * call site is a claim the surface cannot honour. Both halves of that are asserted below:
- * the label reaches the strip, and switching records MOVES the ticks.
- */
+/** The Checks Studio's simulator, odds histogram and previewed record, MOUNTED (issue 1097). */
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -56,14 +42,7 @@ const harness = createMountedComponentHarness({
   componentPath: 'src/ui/svelte/apps/manager/checks/ChecksView.svelte',
 });
 
-/**
- * The world's actors — two player characters and one that is not.
- *
- * The bestiary entry is the point rather than padding: the "Preview as" list is filtered by
- * the shared player-character predicate (maintainer ruling on issue 1097), and a fixture of
- * nothing but characters would let a filter that dropped ALL of them, or none of them, pass
- * unchallenged. `Balehound` is what a real world has twenty-five of.
- */
+/** The world's actors — two player characters and one that is not. */
 const WORLD_ACTORS = [
   { id: 'sera', name: 'Sera Vane', type: 'character', getRollData: () => ({ prof: 3 }) },
   { id: 'bare', name: 'Bare Hands', type: 'character', getRollData: () => ({}) },
@@ -211,12 +190,6 @@ async function choose(select, value) {
 /**
  * Pick an actor in the "Preview as" control the way a GM does.
  *
- * TWO CLICKS, because that control is a `SearchablePopover` rather than a `<select>`: open
- * the trigger, then press the option by its own `data-popover-option` identity handle. The
- * popover PORTALS to the nearest `.fabricate-manager`, and a mounted tree has none, so the
- * action degrades to a no-op and the options stay inside `root` — which is what makes a
- * query rooted there correct here and wrong in the running app.
- *
  * @param {HTMLElement} root The mounted tree.
  * @param {string} actorId The actor id, or `no-actor`.
  */
@@ -233,10 +206,7 @@ async function choosePreviewActor(root, actorId) {
 
 describe('the Preview-as control (issue 1096 shipped it as a SLOT; this fills it)', () => {
   it('offers the PLAYER CHARACTERS only, behind an explicit "No actor" option', async () => {
-    // This inverts what the control shipped as. It listed `game.actors` unfiltered, on the
-    // ground that a GM owns every actor — which answers a question about authority, not the
-    // one a preview picker asks. A world's directory is mostly bestiary, so `Balehound` is
-    // present in the fixture and must be ABSENT from the list.
+    // This inverts what the control shipped as. It listed `game.actors` unfiltered.
     const root = await mountChecks();
     const trigger = root.querySelector('[data-checks-preview-actor]');
     assert.ok(Boolean(trigger), 'the actor picker is a real control');
@@ -277,8 +247,6 @@ describe('the Preview-as control (issue 1096 shipped it as a SLOT; this fills it
     // label took Foundry's 14px app base while every converted button in the studio read at
     // the primitive's 11.52px. `fab-manager-button` is what `ManagerButton` emits and is the
     // only class the type-scale rule keys on, so its presence IS the conversion.
-    // `manager-layout.test.js` measures what that class then renders as; this pins that the
-    // component still asks for it.
     const root = await mountChecks();
     const roll = root.querySelector('[data-checks-simulator-roll]');
     assert.equal(roll.tagName, 'BUTTON', 'it is one button, not a button inside a button');
@@ -351,13 +319,7 @@ describe('the previewed record drives the band strip, not the check’s own DC',
   });
 
   it('is ONE selection: the Outcomes card’s own PREVIEW AGAINST writes the rail’s', async () => {
-    // The Outcomes card ships its own record selector, on the stated reading that the record
-    // is the bands' subject and the actor is the rail's. Both halves of that are right; a
-    // SECOND COPY OF THE STATE is not, because the simulator this change ships previews
-    // against the same record. Two copies is how a strip anchored to `Rare Craft` comes to
-    // sit beside a readout rolling against `Uncommon Craft`, on one screen, with no data
-    // change between them — the same class of defect as a histogram that charts a formula
-    // nothing rolls. So the selection is the route's, and both controls report to it.
+    // The Outcomes card ships its own record selector.
     const root = await mountChecks({ requestedSection: 'outcomes', requestedSectionNonce: 1 });
     await choose(root.querySelector('[data-preview-against-select]'), 'rare');
     assert.equal(
@@ -401,9 +363,7 @@ describe('the outcome-preview readout', () => {
       'Success',
       '9 + 3 = 12 lands on the Success tier against DC 12'
     );
-    // The medallion carries the ROLLED FACE and its denomination. Both are asserted, and
-    // the denomination is read off the result's own dice bag rather than re-parsed from
-    // the formula — a second parse is a second thing to disagree with the roll.
+    // The medallion carries the ROLLED FACE and its denomination. Both are asserted.
     const faceTile = root.querySelector('[data-checks-simulator-face-value]');
     assert.equal(faceTile.querySelector('strong').textContent.trim(), '9');
     assert.equal(faceTile.querySelector('span').textContent.trim(), 'd20');
@@ -533,18 +493,13 @@ describe('the simple check’s two-band strip', () => {
     const handles = root.querySelectorAll('[data-simple-band-strip] [data-band-strip-handle]');
     assert.equal(handles.length, 1, 'two bands, one boundary');
     assert.equal(handles[0].getAttribute('aria-valuenow'), '10', 'and it sits on the DC');
-    // The track has ROOM. `null` bounds are ABSENT, not zero: coercing them collapsed the
-    // domain to `[0, dc + 1]`, which left the one handle with nowhere to move to.
+    // The track has ROOM. `null` bounds are ABSENT, not zero.
     assert.equal(handles[0].getAttribute('aria-valuemin'), '1');
     assert.equal(handles[0].getAttribute('aria-valuemax'), '19');
   });
 
   it('scales the track to the REACHABLE TOTALS once a formula resolves', async () => {
-    // The fallback above is a window around the DC, drawn because the formula does not reduce
-    // for "No actor". With one chosen it does, and the track is then the enumerated space's
-    // own floor and ceiling — `1d20 + @prof` at `prof: 3` reaches 4 through 23. It is read
-    // off the enumeration rather than computed as `1 + remainder .. faces + remainder`,
-    // because a formula carrying a bounded rolling modifier has no single remainder to add.
+    // The fallback above is a window around the DC.
     const root = await mountChecks({
       resolutionMode: 'simple',
       craftingCheck: null,
@@ -554,9 +509,7 @@ describe('the simple check’s two-band strip', () => {
     });
     await choosePreviewActor(root, 'sera');
     const handle = root.querySelector('[data-simple-band-strip] [data-band-strip-handle]');
-    // The HANDLE's range is the track inset by one on each side — a boundary that sat on the
-    // track's own floor would leave the failure band no width at all — so a track of `4..23`
-    // reads `5..22` here.
+    // The HANDLE's range is the track inset by one on each side.
     assert.equal(handle.getAttribute('aria-valuemin'), '5', 'a track floored at the total 4');
     assert.equal(handle.getAttribute('aria-valuemax'), '22', 'and ceilinged at the total 23');
   });
@@ -652,9 +605,7 @@ describe('the progressive PREVIEW SANDBOX', () => {
   });
 
   it('buckets the histogram by AWARD COUNT over the GM’s own order', async () => {
-    // `1d20 + @prof` for Sera is `1d20 + 3`, so totals run 4..23. Against 6/9/14/40 the
-    // cumulative cost is 6/15/29/69: an award of NOTHING is reachable (totals 4-5), one and
-    // two are, three and four are not.
+    // `1d20 + @prof` for Sera is `1d20 + 3`.
     const root = await mountProgressive({ difficulties: [6, 9, 14, 40] });
     await choosePreviewActor(root, 'sera');
     const rows = [...root.querySelectorAll('[data-checks-odds-row]')].map((row) => [
@@ -706,12 +657,7 @@ describe('the progressive PREVIEW SANDBOX', () => {
     assert.equal(changes[0].rollFormula, '1d20 + @prof', 'the rest of the draft rides along');
   });
 
-  // The field's "keeps the GM's own text" guard is NOT graded here, deliberately. This
-  // harness mounts `ChecksView` with STATIC props, so the order never round-trips back
-  // through the draft — and the guard only does anything on a round trip. A test here
-  // would pass with the guard deleted, which is the definition of a vacuous one. It is
-  // graded in `tests/components/manager-mounted.test.js`, the only suite that mounts the
-  // root and therefore the only one where the draft answers back.
+  // The field's "keeps the GM's own text" guard is NOT graded here.
 });
 
 describe('the source contract these hooks are pinned by', () => {

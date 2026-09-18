@@ -139,13 +139,7 @@ describe('SearchBar debounce logic', () => {
 
 // --- SearchBar DOM structure tests ---
 
-// The class strings below are this file's OWN synthetic markup: it builds a SearchBar shell with
-// `document.createElement` to assert element order and attributes, and no component renders it.
-// They are `demo-search*` rather than `fabricate-search*` because issue 1508 made
-// `fabricate-search` the namespace ROOT that `ManagerSearchField.svelte` emits. A fixture
-// writing a primitive's root claims that primitive's family, and every reader that counts
-// root-carrying fixture markup would count these — a hand-built shell that models no shipped
-// control and measures none of its rules. The prefix names what the fixture is instead.
+// The class strings below are this file's OWN synthetic markup.
 describe('SearchBar DOM structure', () => {
   before(() => setupDOM());
   after(() => teardownDOM());

@@ -1,64 +1,4 @@
-/*
- * Component Studio font-size gate (issue 676) — the sibling of
- * `recipe-studio-font-size.test.js`.
- *
- * happy-dom cannot compute the CSS cascade, so a mounted test can never prove the
- * RENDERED font-size. This gate renders the real Component Studio classes in Chromium
- * under a minimal-but-faithful stand-in for Foundry V13 core CSS (tests/fixtures/
- * foundry-core-min.css — the @layer reset + 14px app base) plus the real
- * styles/fabricate.css, and asserts the computed px per role.
- *
- * It also proves the cascade context: a bare <input> inherits the 14px Foundry app
- * base (the bleed baseline). A studio role landing on 14 is the signature of a rule
- * that stopped applying and let Foundry's default through.
- *
- * ── THE PHASE 0 RESOLVED SCALE ───────────────────────────────────────────────────
- * The brief's §2 type scale contains RANGES ("eyebrow labels 700 9–9.5px",
- * "filter/sort selects 500 11.5–12px", "micro-labels 700 7.5–8.5px") and then resolves
- * them with "read it off the prototype". A gate needs ONE number per role, and if the
- * implementer picks, the guess acquires the authority of a committed test forever.
- *
- * So the ranges were resolved ONCE, by extracting the prototype's own declarations
- * (`tmp/GM Component Studio.html`). Its resolved per-role scale is:
- *
- *   browser page title (h2)        600 22px   serif
- *   browser page subtitle          400 12.5px sans
- *   breadcrumb                     600 11px   sans
- *   rail eyebrow ("GM MANAGEMENT") 700 9px    sans, letter-spacing .14em
- *   toolbar micro-label            700 8.5px  sans, letter-spacing .08em
- *   filter / sort select           500 11.5px sans
- *   search input                   400 12.5px sans
- *   row name                       600 13.5px serif
- *   row description                400 11px   sans
- *   row badge / chip               600 9px    sans
- *   panel title (h3)               600 14px   serif
- *   panel sub (p)                  400 10px   sans
- *   editor title (h2)              600 20px   serif
- *   primary button                 700 12.5px sans
- *
- * That is the DESIGN INTENT. What this gate pins is what Fabricate RENDERS, because
- * the studio is built from Fabricate's existing shared manager classes (`.manager-title`,
- * `.manager-chip`, `.manager-system-name`, …) whose rem-based sizes are already
- * established and shared with six other editors. Decision 1 accepts small drift from
- * the prototype for exactly this reason: re-authoring those shared sizes to hit the
- * prototype's px exactly would silently re-type every other manager surface.
- *
- * The EXPECTED map below is therefore measured from the real cascade and cross-checked
- * against the scale above; each entry notes the prototype target it corresponds to.
- * Change a size on purpose -> update this map on purpose.
- *
- * ── THE FIXTURE IS A MIRROR, AND MIRRORS ROT ─────────────────────────────────────
- * The fixture below is hand-maintained markup standing in for the real components. That
- * makes this gate able to measure a cascade the DOM can't — and able to go on happily
- * measuring markup the product no longer renders. It did exactly that: it pinned a
- * `.manager-filter` span and a `.manager-button.manager-component-group-toggle` (a class
- * with no CSS anywhere), and its own comments recorded the resulting drift as if it were
- * a finding rather than a defect. Issue 676 rebuilt the browser on the Recipe Studio's
- * toolbar and this fixture was re-derived from the shipped markup and re-measured.
- *
- * So: when you change the Component Studio's markup, UPDATE THIS FIXTURE FIRST, then
- * re-measure. A green run against stale fixture markup proves nothing at all.
- */
+/* Component Studio font-size gate (issue 676). */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -70,9 +10,7 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 const foundryCss = readFileSync(resolve(repoRoot, 'tests/fixtures/foundry-core-min.css'), 'utf8');
 const fabricateCss = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
 
-// One representative element per role, using the exact Component Studio classes,
-// wrapped in the Foundry app shell so `.application`'s 14px base + the @layer reset
-// apply. Both routes are represented: the browser list and the editor column.
+// One representative element per role.
 const FIXTURE = `
   <div class="application theme-dark">
     <section class="window-content">
@@ -364,24 +302,7 @@ const FIXTURE = `
     </section>
   </div>`;
 
-// See the twin note in `recipe-studio-font-size.test.js`: the chip's appearance moved into
-// `Chip.svelte`'s scoped block (issue 883), so this gate reproduces Svelte's real delivery
-// — the component's compiled CSS appended after the global sheet, and the real scoping hash
-// on the fixture's elements — rather than dropping those roles and losing the coverage.
-//
-// Issue 772 added four more scoped components to this studio (the selection box, the
-// selection toolbar, the extracted essence card and the bulk edit panel), and every one of
-// them needs BOTH halves of the treatment: appending the CSS without the hash class makes
-// the rules match nothing, and adding the hash without the real ordering proves the wrong
-// winner. A role that gets neither silently measures Foundry's 14px app base and trips the
-// anti-bleed loop at the end of this file.
-//
-// Issue 1010 split the toolbar and the panel's chrome into four shared primitives under
-// `apps/manager/`, so the list below grew rather than moved: the panel still owns the
-// essence grid and the DC row, while the header, hero, section scales, select and Apply are
-// emitted by their own components and therefore carry their own scope hashes. Miss one and
-// its roles fall to 14px — which is why no `EXPECTED` value needed touching to make this
-// pass, and why a green run is evidence the extraction preserved the cascade.
+// See the twin note in `recipe-studio-font-size.test.js`.
 const SCOPED_COMPONENTS = [
   'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/components/SelectionCheckbox.svelte',
@@ -389,10 +310,7 @@ const SCOPED_COMPONENTS = [
   'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
   'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
   'src/ui/svelte/apps/manager/BulkEditSection.svelte',
-  // `BulkEditSelect.svelte` is NOT here any more (issue 1504): it has no `<style>` block at
-  // all now, and `scopedComponentCss` refuses a component that emits none rather than pairing
-  // the fixture with an empty string. Its control's whole appearance is the `.fabricate-select*`
-  // family in `styles/fabricate.css`, which this page already loads.
+  // `BulkEditSelect.svelte` is NOT here any more (issue 1504).
   'src/ui/svelte/apps/manager/components/EssenceQuantityCard.svelte',
   'src/ui/svelte/apps/manager/components/ComponentBulkEditPanel.svelte',
 ].map((componentPath) => scopedComponentCss(resolve(repoRoot, componentPath)));
@@ -463,9 +381,7 @@ const EXPECTED = {
   // (The cite read `proto:1084`, which is the row's bulk-select checkbox, until issue 1371
   // revision 8; a cite nobody can check is a pin taken on trust.)
   'row-name': 13.5,
-  // `proto:1088` (`font:400 11px var(--sans)`) — the C5 rebuild writes the row description at
-  // the reference's own 11px. The pin read 12.48 while its own comment named 11. (The cite
-  // read `proto:1087`, which is the 13.5px serif NAME line above, until revision 8.)
+  // `proto:1088` (`font:400 11px var(--sans)`).
   'row-description': 11,
   'row-badge': 9.92, // 0.62rem — prototype row badge/chip 9px sans (was 12)
   'row-difficulty': 9.92, // same chip family
@@ -493,32 +409,9 @@ const EXPECTED = {
   // itself, so the anti-bleed loop below still proves the size is stated and not inherited.
   // (px, not rem: a font size is a literal — `design-system/spec.md:218-222`.)
   'field-select': 12,
-  // ── The identity STRIP (issue 676, rebuilt at 1371). It is display, not a form: the
-  // read-only boxed Name/Description fields it replaced are gone, and with them
-  // `readonly-value`.
-  //
-  // FOUR MORE ROLES RETIRED THE SAME WAY AT ISSUE 1371, and they are named here rather than
-  // silently dropped, because a role that leaves this map with no note reads as coverage
-  // someone chose to give up:
-  //
-  //   `identity-lock`        the lock badge; the strip states provenance in the world pill
-  //                          and the note now, and no source emits the class.
-  //   `identity-description` the description paragraph; the rebuilt strip carries the name
-  //                          row and the attribution note only.
-  //   `drop-target`          the 186px dashed source drop target; replacing a source is the
-  //                          shared `ItemDropZone` primitive's job now.
-  //   `info-banner`          the hand-rolled roll-budget strip; `proto:1374` is the shared
-  //                          `Callout`, which `ComponentEditView` renders instead.
-  //
-  // Each of the four had its rule DELETED from `styles/fabricate.css` in the same change,
-  // because nothing under `src/` emitted the class any more. Keeping the pins would have
-  // meant a fixture drawing markup the product does not render, measured against rules that
-  // paint nothing — the rot this gate exists to catch, wearing the gate's own clothes.
-  // 0.94rem. `proto:1313` is `font:600 15px var(--serif)`: the D3 rebuild reads the identity
-  // name off the callout, where the retired strip had sized it as a page-level heading.
+  // ── The identity STRIP (issue 676, rebuilt at 1371). It is display, not a form.
   'identity-name': 15.04,
-  // 0.72rem. `proto:1314` is `font:400 11.5px/1.55 var(--sans)`: the note is the attribution
-  // SENTENCE now, prose rather than a glyph-led hint, so it reads a rung above a micro-label.
+  // 0.72rem. `proto:1314` is `font:400 11.5px/1.55 var(--sans)`.
   'identity-note': 11.52,
   // ── The salvage panel.
   'salvage-mode-pill': 9.92, // 0.62rem — prototype mode pill 9.5px sans (was 12)
@@ -586,8 +479,7 @@ const EXPECTED = {
   // 0.78rem, matching `.manager-component-browser-inspector-edit` — the button this one
   // SWAPS PLACES with in the rail's bottom slot. The swap must not re-type the slot.
   'bulk-apply': 12.48,
-  // The cascade context. A bare control inherits Foundry's 14px app base; any role
-  // above landing on 14 means its rule stopped applying and Foundry bled through.
+  // The cascade context. A bare control inherits Foundry's 14px app base.
   'bleed-baseline': 14,
 };
 
@@ -640,8 +532,6 @@ test('component studio font-sizes are pinned under real Foundry core CSS', async
     // boxes rather than as two independent constants: the values come from different
     // mechanisms (a global rule in styles/fabricate.css vs BulkEditPanelShell.svelte's
     // scoped block), so only a comparison can catch a cascade change that moves one side.
-    // Wrapping Apply in the sticky dock is exactly such a change, which is why it is
-    // pinned here rather than assumed.
     assert.equal(
       measured['bulk-apply'].minHeight,
       measured['inspector-edit'].minHeight,

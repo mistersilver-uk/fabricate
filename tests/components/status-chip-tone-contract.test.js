@@ -1,44 +1,5 @@
 /**
  * THE CONVERTED SITES READ THEIR TONE THROUGH THE MAP, AND ONE CHIP WEARS THE PLATE (issue 1506).
- *
- * Two source contracts over the same corpus, both guarding a failure that is SILENT in the
- * rendered DOM and invisible to every mounted suite in the repository.
- *
- * ── WHY THE DOMAIN IS DERIVED FROM DISK AND NOT LISTED ──────────────────────────────────────
- * "The converted set" cannot be "every `<Chip tone={…}>` in `src/`": about thirty chip callers
- * bind an opaque tone that never came from a status pill and never needs mapping. And it cannot
- * be a hand-typed list of the converted files either — that is a second copy of the very
- * enumeration whose incompleteness is the risk. So the corpus is every `src/` file that IMPORTS
- * the map, read from disk at run time, with the file COUNT pinned: a domain that can silently
- * shrink is not a guard, so a converted file dropping its import reds here rather than quietly
- * leaving the population this file quantifies over.
- *
- * Nothing here reads git history. The comparison that could only be made while both components
- * existed — the pill's tones against the chip's — was made in the phase that deleted the pill and
- * pasted into the PR; on the integrated branch its second side does not exist, so a test shaped
- * that way would be green for one commit and red forever after.
- *
- * ── THE TONE FAILURE ────────────────────────────────────────────────────────────────────────
- * `Chip` DROPS a tone it does not know — no class, no error, no failing test — while the retired
- * pill resolved one to `subtle`. The projections behind these sites emit the pill's vocabulary,
- * in which `success` is the commonest name and is not a chip tone at all. A site that binds a
- * projected tone straight onto a chip therefore renders an untoned chip on a green suite: the
- * salvage yields, the bulk report's outcomes, the recipe row pills and the Tool player preview
- * lose their green and nothing anywhere says so.
- *
- * ── THE SHRINK FAILURE, WHICH IS A MIRROR RATHER THAN A DROP ────────────────────────────────
- * The journal's retired run pill declared `flex: 0 0 auto` on ITSELF. `Chip` declares no flex at
- * all, because position is the caller's and geometry is the primitive's — so the property has to
- * be restated once per call site, and four copies of one rule is a mirror that rots the first time
- * a fifth row renders the chip and nobody remembers. The clause below is what keeps them honest.
- *
- * ── THE EMPHASIS FAILURE, WHICH IS THE OPPOSITE SHAPE ───────────────────────────────────────
- * `emphasis="outlined"` is RECOGNISED on the chip and means the opposite of what it meant on the
- * pill: the pill's outlined face superseded the tone's edge and ink and kept its fill, and the
- * chip's supersedes the FILL and draws a flat `--fab-bg-1` plate. So a site carrying that prop
- * forward from the pill does not fall back to the shipped face — it draws the WRONG face, and
- * only a census can see it. Exactly one chip in `src/` asks for the plate, and it is the caller
- * that has always meant it.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -62,25 +23,8 @@ const COMPONENTS = toRepositoryPaths(repoRoot, COMPONENT_FILES).map((path, index
 /** The corpus: every component that imports the map. */
 const MAP_READERS = COMPONENTS.filter(({ source }) => source.includes(MAP_MODULE));
 
-/**
- * THE CONVERTED SITES, COUNTED, so the clause below cannot pass over nothing.
- *
- * Twelve of the retired status pill's 36 sites bound their tone dynamically — six opaque
- * projection reads and six ternaries — and every one of them routes through the map. The four
- * journal run sites join them: each reads a `RunModel.derivedStatus` through the run-status
- * vocabulary, whose `ready`, `succeeded` and `cancelled` entries emit `success` and `neutral`,
- * neither of which is a chip tone under that spelling. The two recipe browse-status sites join
- * them on the same fact, from the crafting vocabulary's `AVAILABLE` and `LOCKED`, and so do the
- * six have/need readings, four of which pass `success` inline from a satisfied-or-not ternary.
- *
- * The floor is stated rather than derived because the clause it guards is a NEGATIVE: "no chip in
- * this corpus binds a tone the map never sees" is satisfied by a corpus with no dynamic chips in
- * it at all, which is exactly what a regression that reverted the conversion would produce.
- */
-// #1648 replaces HistoryRow's mapped status chip with a labeled outcome glyph, and adds the
-// run-attention chip (M10) beside the status chip in BOTH journal run surfaces — the Active
-// list row and the run header. Both route through the map, so the floor rises by two rather
-// than the negative clause above quantifying over a corpus that quietly lost them.
+/** THE CONVERTED SITES, COUNTED, so the clause below cannot pass over nothing. */
+// #1648 replaces HistoryRow's mapped status chip with a labeled outcome glyph.
 const MAPPED_TONE_SITES = 25;
 
 /** The one shipped chip that asks for the flat plate. */
@@ -234,9 +178,7 @@ describe('1506 the journal run chip — its shrink protection is restated per ca
   });
 
   it('is not satisfied by a comment mentioning the selector above an unrelated rule', () => {
-    // The defect this guards against: a comment mentioning `:global(.journal-run-status)`
-    // immediately above an unrelated rule that happens to carry `flex: 0 0 auto;` used to pass,
-    // because the old check searched the whole block rather than only the text before `{`.
+    // The defect this guards against.
     const trap = `
       /* :global(.${RUN_CHIP_CLASS}) is mentioned here but this rule is unrelated */
       .something-else {
@@ -264,18 +206,7 @@ describe('1506 the journal run chip — its shrink protection is restated per ca
   });
 });
 
-/**
- * THE ICON-ONLY CHIP CARRIES A NAME (issue 1506).
- *
- * `iconOnly` suppresses the label, and the glyph the chip draws is `aria-hidden`, so an icon-only
- * chip with no `aria-label` is announced as nothing at all. The primitive states `role="img"`
- * where it can, but it cannot supply a name it was never given — the `title` the retired badge
- * carried is a tooltip, and a tooltip is not an accessible name.
- *
- * This is a CALL-SITE census rather than a mounted case for that reason: the defect is a caller
- * omitting a prop, which renders perfectly and fails nothing. The floor is stated beside it so the
- * negative cannot pass over an empty corpus — exactly one converted caller ships today.
- */
+/** THE ICON-ONLY CHIP CARRIES A NAME (issue 1506). */
 describe('1506 the icon-only chip — the accessible name it must carry', () => {
   it('ships with an `aria-label` at every one of its call sites', () => {
     const sites = [];

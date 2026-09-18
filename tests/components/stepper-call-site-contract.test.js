@@ -1,33 +1,8 @@
 /**
  * What every `<Stepper>` CALL SITE has to pass (issue 1050).
- *
- * The primitive's own behaviour is pinned by `stepper-unset-fill.test.js`, which mounts it. This
- * file is the other half: 39 call sites across 19 components, none of which that suite can see.
- * Three rules, each closing a gap where a defect would otherwise ship green:
- *
- *   D8  every `data-*` hook rides `inputProps` onto the real `<input>`, never the wrapper. The
- *       smoke harness calls Playwright's `fill()` / `inputValue()` on three of them, and neither
- *       resolves against a `<div>`; a failing smoke step is not waivable.
  *   D9  `disabled` is the TOP-LEVEL prop, never an `inputProps` key. The adjuncts read the
  *       top-level prop, so `inputProps={{ disabled }}` disables only the input — and every DOM
  *       assertion that checks `input.disabled` still passes while `−`/`+` stay live.
- *   D1a `allowUnset` is passed if and only if the field's domain admits absence. Nothing else in
- *       the change asserts which call site is which.
- *
- * ── ONE TABLE, NOT TWENTY-SEVEN `it()` BLOCKS ──────────────────────────────────────
- * The call sites are near-identical by construction — that is the point of migrating them onto one
- * primitive — so a per-field test block would be near-identical too, and SonarCloud's Automatic
- * Analysis counts duplication in `tests/**` exactly as it does in `src/`. Every rule below is one
- * assertion driven over a hoisted table in `tests/helpers/stepperSourceContract.js`.
- *
- * ── WHY THESE ARE SOURCE ASSERTIONS ────────────────────────────────────────────────
- * Mounting all nineteen components would need nineteen harnesses and nineteen fixtures, which is
- * the duplication this file exists to avoid, and several of them (the manager root) are not
- * mountable at a useful cost. The behavioural halves that a source scan genuinely cannot state are
- * mounted instead, next to the components that already have a harness: the unset/cosmetic-zero
- * commit behaviour in `gathering-task-editor-stepper-mounted.test.js` and
- * `gathering-economy-view-mounted.test.js`, and the primitive's own contract in
- * `stepper-unset-fill.test.js`.
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -95,8 +70,7 @@ describe('Stepper call sites (issue 1050)', () => {
       'data-tier-dc',
       'and the real spelling still resolves'
     );
-    // Brace-balanced, not lazy: Prettier prints these multi-line over expression values, so a
-    // `\{\{[\s\S]*?\}\}` terminator closes inside the value and drops every later key.
+    // Brace-balanced, not lazy: Prettier prints these multi-line over expression values.
     assert.deepEqual(
       objectLiteralKeys(
         inputPropsExpression("<Stepper inputProps={{ 'data-a': fn({ x: 1 }), 'data-b': '' }} />")
@@ -114,15 +88,13 @@ describe('Stepper call sites (issue 1050)', () => {
       for (const key of props ? objectLiteralKeys(props) : []) {
         if (MIGRATED_INPUT_HOOKS.includes(key)) owners.set(key, `${path} (inputProps)`);
       }
-      // The same tag with its `inputProps` expression removed: whatever hook is left is a bare
-      // attribute on the wrapper `<div>` the component renders, which `fill()` cannot resolve.
+      // The same tag with its `inputProps` expression removed.
       const withoutProps = props ? tag.replace(props, '') : tag;
       for (const hook of MIGRATED_INPUT_HOOKS) {
         if (asToken(hook).test(withoutProps)) bare.push(`${hook} on a <Stepper> tag in ${path}`);
       }
     }
-    // Checked against the delta's FIXED list, never a list derived from the tree: a derived list
-    // shrinks with the code, so a dropped hook would pass vacuously.
+    // Checked against the delta's FIXED list, never a list derived from the tree.
     assert.deepEqual(
       MIGRATED_INPUT_HOOKS.filter((hook) => !owners.has(hook)),
       [],
@@ -133,13 +105,7 @@ describe('Stepper call sites (issue 1050)', () => {
   });
 
   it('names both adjuncts and the input at every call site', () => {
-    // `Stepper` is an import-free leaf and localizes NOTHING itself, so an omitted label ships an
-    // anonymous button rather than an English one. Three spellings count. Explicit props; shorthand
-    // (`{decrementLabel}`), which the two pass-through wrappers `EssenceQuantityCard` and
-    // `ComponentBulkEditPanel` use; and a spread of the shared `stepperLabels(label)` derivation,
-    // which supplies all three at once and is what the ~20 migrated fields now use. The spread only
-    // counts as coverage because `tests/util/stepper-labels.test.js` pins that the helper returns
-    // exactly those three props — without that this rule would be reading a `{...}` as a promise.
+    // `Stepper` is an import-free leaf and localizes NOTHING itself.
     const named = (tag, prop) =>
       new RegExp(String.raw`(?:\b${prop}=|\{\s*${prop}\s*\})`).test(tag);
     const anonymous = CALL_SITES.filter(
@@ -201,8 +167,7 @@ describe('Stepper call sites (issue 1050)', () => {
 });
 
 describe('Stepper unset-value split (issue 1050, D1a)', () => {
-  // The fixture IS D1a's two tables. Every entry resolves to exactly one tag, so a formatting
-  // change that breaks an anchor fails here loudly rather than silently matching nothing.
+  // The fixture IS D1a's two tables. Every entry resolves to exactly one tag.
   const resolved = UNSET_VALUE_CALL_SITES.map((entry) => {
     const matches = stepperTags(markup[entry.path] ?? '').filter((tag) =>
       entry.anchor.every((needle) => tag.includes(needle))
@@ -224,11 +189,6 @@ describe('Stepper unset-value split (issue 1050, D1a)', () => {
     // (pinned in `stepper-unset-fill.test.js` and by the closure assertion below), and the
     // behavioural half — that the call site's own handler forwards it rather than coercing it — is
     // mounted for the gathering task editor and the economy view.
-    //
-    // For a cosmetic-zero field the testable invariant is NOT that clearing persists `0`, which
-    // `allowUnset={false}` cannot do: `onInput` returns early on `''` and `onBlur` re-asserts the
-    // prior value, so nothing is committed at all. It is that the update function can never
-    // RECEIVE `null` — which follows from this assertion plus the closure one below.
     const wrong = resolved
       .filter(({ entry, matches }) => {
         if (matches.length !== 1) return false;
@@ -251,11 +211,7 @@ describe('Stepper unset-value split (issue 1050, D1a)', () => {
   });
 
   it('routes both character-modifier scopes through the one shared bounds row', () => {
-    // D1a names FOUR genuine-absence fields here — drop min/max and event min/max — and the
-    // table above can only carry one entry for them now that the row is a single shared
-    // component with a single `<Stepper>` inside it. This is the rest of that coverage: the
-    // drop scope and the event scope both reach `allowUnset` through this component, and
-    // neither has grown a second copy that the one table entry would not see.
+    // D1a names FOUR genuine-absence fields here — drop min/max and event min/max.
     const root = markup['src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte'] ?? '';
     const rendered = [...root.matchAll(/<CharacterModifierBoundsRow\b[\s\S]*?\/>/g)].map(
       (tag) => tag[0]
@@ -283,8 +239,6 @@ describe('Stepper unset-value split (issue 1050, D1a)', () => {
 
   it('lets the primitive emit null only under allowUnset, which closes the cosmetic-zero half', () => {
     // This is what turns "passes no allowUnset" into "its update function never receives null".
-    // Without it, a future change could commit `null` from some other branch and every
-    // cosmetic-zero call site would start receiving one with nothing to say so.
     const nulls = stepperSource.match(/onChange\(null\)/g) ?? [];
     assert.equal(nulls.length, 1, 'the primitive has exactly one path that commits absence');
     assert.match(
@@ -296,10 +250,7 @@ describe('Stepper unset-value split (issue 1050, D1a)', () => {
 });
 
 describe('no <label> implicitly binds a Stepper (issue 1050)', () => {
-  // A `<label>` binds to its FIRST labelable descendant, and a Stepper's is the `−` button — so a
-  // caption above a Stepper made clicking the caption DECREMENT the value. Five such labels
-  // shipped in `GatheringTaskEditView.svelte` before this guard existed. Every migrated Stepper
-  // carries its own `ariaLabel`, so the fix is a `<div>` and nothing is lost.
+  // A `<label>` binds to its FIRST labelable descendant, and a Stepper's is the `−` button.
   it('detects the pattern it is looking for, on a fixture that has it', () => {
     // The positive control. A detector that matched nothing would report a clean tree whether or
     // not the tree was clean, which is exactly how this defect survived four phases.
@@ -313,10 +264,7 @@ describe('no <label> implicitly binds a Stepper (issue 1050)', () => {
       [],
       'and a label whose first labelable descendant is a real control is not'
     );
-    // An explicit `for` is a DIFFERENT binding, not this one. HTML consults descendants only
-    // when `for` is absent, so a `for` label cannot make its caption a decrement button — and
-    // where the id names the Stepper's own input it is the correct spelling, focusing the
-    // typeable field. Reporting it would be a false positive rather than a stricter rule.
+    // An explicit `for` is a DIFFERENT binding.
     assert.deepEqual(
       labelsBindingAStepper(
         '<label class="f" for="dc">\n<span>DC</span>\n<Stepper inputProps={{ id: "dc" }} />\n</label>'

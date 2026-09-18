@@ -1,25 +1,4 @@
-/**
- * The recipe browser's BULK EDIT panel (issue 1010).
- *
- * What is tested here is the staging semantics, not the pixels: the book picker and its
- * accumulating staged list, the Apply enablement rule (including the removal-only draft an
- * earlier design would have left inert), the three distinct instructions of the check-tier
- * axis, the five unavailability messages that render IN PLACE OF that control, and the
- * conditional blocked-enable warning.
- *
- * The panel does NOT own the draft — the manager root does, because the panel is unmounted
- * the moment the selection empties. So these tests drive it the way the root does: hand it
- * a draft, take the NEW draft back through `onDraftChange`, and re-render with it.
- *
- * That round-trip is the point. Every helper in `recipeBulkEditModel.js` is IMMUTABLE, so a
- * panel that called `setBulkRecipeBookOp(draft, id, op)` without reassigning would compile,
- * run, and silently do nothing — the control would simply look dead. Asserting on the
- * rendered staged list after the round-trip is what catches that.
- *
- * The ONE piece of state the panel does own is which book the pick card is composing, which
- * is view state and not an instruction; the accumulating `bookAdd` / `bookRemove` lists
- * still belong to the caller, so staging several books in turn is tested end to end here.
- */
+/** The recipe browser's BULK EDIT panel (issue 1010). */
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -43,9 +22,7 @@ const panel = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-recipe-bulk-panel-',
   rawModules: [
-    // The book axis is a `SearchablePopover`, so its portal / dismiss actions and popover
-    // layout util come with it. A missing entry here HANGS the suite (`# cancelled`)
-    // rather than failing it, which is why the list is hoisted and shared.
+    // The book axis is a `SearchablePopover`.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     // `BulkDeleteCard`'s shared focus/announce ordering rule (issue 1157).
     'src/ui/svelte/util/announceAfterFocus.js',
@@ -61,11 +38,7 @@ const panel = createMountedComponentHarness({
   compiledModules: [
     'src/ui/svelte/apps/manager/Callout.svelte',
     'src/ui/svelte/apps/manager/SegmentedControl.svelte',
-    // The shared bulk-edit chrome: this panel renders its header, hero, section headings,
-    // staged selects and Apply through these three, exactly as the Component Studio's does.
-    // Issue 1504: the shared `<Select>`'s whole compiled closure — also covers the manager's
-    // ONE labelled push-button (issue 1118), which `BulkEditPanelShell` renders its Apply
-    // through.
+    // The shared bulk-edit chrome: this panel renders its header, hero.
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/InspectorCard.svelte',
     'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
@@ -80,29 +53,7 @@ const panel = createMountedComponentHarness({
   componentPath: 'src/ui/svelte/apps/manager/recipes/RecipeBulkEditPanel.svelte'
 });
 
-/**
- * The books in the shape the PROJECTION actually emits.
- *
- * `books` is `selectedSystem.recipeItemDefinitions`, which is
- * `_projectRecipeItemDefinitionSync` in the phase-1 publish and
- * `_enrichRecipeItemLibrary`'s spread of it in the phase-2 publish. NEITHER emits a bare
- * `name`: the display string is `resolvedName`, because a recipe item's name is resolved
- * from its linked world item and only falls back to the stored one. The panel renders
- * against either publish, so a fixture that hand-builds `{id, name}` builds a shape no
- * publish produces — and that is precisely what let a `book?.name || book?.id` label ship
- * showing `book-alchemy` in place of `Alchemist Primer` on every option row.
- *
- * `resolvedImg` / `derivedType` / `linkMissing` / `recipes` / `learnedByCount` are the
- * projection's other fields, carried here so the fixture stays a faithful sample rather
- * than a second hand-built shape.
- *
- * EVERY `recipeIds` IS EMPTY, and that is load-bearing rather than lazy. It is the shape a
- * LEGACY-BASIS system projects — one whose `membershipResolvesByRecipeIds` marker is unset,
- * so membership resolves through the `recipe.recipeItemId` scalar and a book's own array
- * says nothing. The membership counts below are handed in separately, exactly as the
- * manager root derives them from the projected ROWS, so a panel that read `book.recipeIds`
- * would report "holds none selected" for every one of these books.
- */
+/** The books in the shape the PROJECTION actually emits. */
 const BOOKS = [
   {
     id: 'book-alchemy',
@@ -136,8 +87,7 @@ const BOOKS = [
  */
 const MEMBERSHIP = new Map([['book-alchemy', 2]]);
 
-// The second tier is deliberately UNNAMED: `resolveRecipeCheckTierOptions` returns tiers
-// raw, so the "Unnamed tier (DC n)" fallback is this panel's to render.
+// The second tier is deliberately UNNAMED.
 const TIERS = [
   { id: 'tier-easy', name: 'Easy', dc: 8 },
   { id: 'tier-unnamed', name: '', dc: 18 }
@@ -145,11 +95,7 @@ const TIERS = [
 
 const OPEN_AXIS = { available: true, reason: null };
 
-/**
- * Mount the panel the way the manager root drives it: the caller owns the draft, and every
- * `onDraftChange` REPLACES it and re-renders. Returns the live draft accessor so a test can
- * assert on what was actually staged as well as on what is rendered.
- */
+/** Mount the panel the way the manager root drives it: the caller owns the draft. */
 async function mountPanel(props = {}) {
   const state = { draft: props.draft || createRecipeBulkDraft(), applies: 0, clears: 0 };
   const root = await panel.mount({
@@ -190,13 +136,7 @@ const stagedState = (root, id) => stagedRow(root, id)?.getAttribute('data-bulk-b
 const stagedIds = (root) =>
   [...root.querySelectorAll('[data-bulk-book]')].map((row) => row.getAttribute('data-bulk-book'));
 
-/**
- * Activate a control the way a KEYBOARD user does: focus it, then press it.
- *
- * A bare `.click()` moves no focus, so every gesture below would start from
- * `document.body` and the focus assertions could not tell "the panel re-homed focus"
- * from "focus was never anywhere to lose".
- */
+/** Activate a control the way a KEYBOARD user does: focus it, then press it. */
 function press(node) {
   node.focus();
   node.click();
@@ -215,29 +155,13 @@ function stageBook(root, bookId, op) {
   press(op === 'add' ? addButton(root) : removeButton(root));
 }
 
-/**
- * Drain the microtask queue so a `queueMicrotask`-deferred focus hop has run.
- *
- * The panel re-homes focus the way `SearchablePopover.close()` does — after Svelte's own
- * flush, which is itself a microtask — so an assertion made synchronously after the press
- * would read the pre-hop `document.activeElement` and pass or fail for the wrong reason.
- */
+/** Drain the microtask queue so a `queueMicrotask`-deferred focus hop has run. */
 async function settleFocus() {
   await Promise.resolve();
   await Promise.resolve();
 }
 
-/**
- * What holds focus, as a SHORT STRING.
- *
- * Never the node: `node:assert` serialises the actual value to build its diff, and walking
- * a mounted happy-dom element's circular tree kills the heap — a two-second assertion
- * failure surfaces as a `# cancelled` suite with no message.
- *
- * `detached` is reported separately from the control's name because the failure this whole
- * block exists to catch has BOTH shapes: focus falling to `document.body`, and focus left
- * stranded on a node the re-render has already removed from the document.
- */
+/** What holds focus, as a SHORT STRING. */
 function focusHolder() {
   const active = document.activeElement;
   if (!active || active === document.body) return 'document.body';
@@ -259,8 +183,7 @@ function controlName(node) {
   return `<${String(node.tagName ?? 'unknown').toLowerCase()}>`;
 }
 
-// The segmented axes render REAL radios, so a segment is chosen by firing `change` on the
-// radio inside it rather than by clicking a styled label.
+// The segmented axes render REAL radios.
 function chooseSegment(root, axis, value) {
   root
     .querySelector(`[data-recipe-bulk-${axis}-option="${value}"] input`)
@@ -270,10 +193,6 @@ function chooseSegment(root, axis, value) {
 
 /**
  * Choose a value on a converted `<Select>` (issue 1504).
- *
- * `root` rather than the control, because the panel of rows is PORTALED out of the trigger's
- * subtree onto the nearest application root — which in a mounted suite is the harness's own
- * mount target. Reaching for a row through the trigger's container finds nothing.
  *
  * @param {HTMLElement} root The harness mount target.
  * @param {string} hook The control's own `data-*` hook, which rides across the conversion.
@@ -310,8 +229,7 @@ describe('RecipeBulkEditPanel book picker (issue 1010)', () => {
     );
   });
 
-  // The prototype's results list stays EMPTY until the GM types, which on a four-book system
-  // is a bare search box that shows nothing at all.
+  // The prototype's results list stays EMPTY until the GM types.
   it('lists every book with an empty query rather than waiting to be typed at', async () => {
     const { root } = await mountPanel();
     bookTrigger(root).click();
@@ -322,7 +240,7 @@ describe('RecipeBulkEditPanel book picker (issue 1010)', () => {
     assert.equal(root.querySelectorAll('[data-popover-option]').length, 2);
   });
 
-  // THE BASIS-AWARE COUNT. Every fixture book carries an EMPTY `recipeIds` — the shape a
+  // THE BASIS-AWARE COUNT. Every fixture book carries an EMPTY `recipeIds`.
   // legacy-basis system projects — so these numbers exist only in the membership map the
   // root derives from the projected ROWS. A panel that counted from `book.recipeIds` would
   // render "holds none of the 3 selected" here and, below, disable Remove.
@@ -379,9 +297,7 @@ describe('RecipeBulkEditPanel book picker (issue 1010)', () => {
     }
   });
 
-  // A book whose projection somehow carries no resolved name still gets SOMETHING: an
-  // unnamed option is unreadable and unnameable for speech input, so the id is the last
-  // resort rather than the first.
+  // A book whose projection somehow carries no resolved name still gets SOMETHING.
   it('falls back to the id only when no resolvable name exists at all', async () => {
     const { root } = await mountPanel({ books: [{ id: 'sm-book' }] });
     bookTrigger(root).click();
@@ -440,9 +356,7 @@ describe('RecipeBulkEditPanel book pick card (issue 1010)', () => {
     );
   });
 
-  // The failure this whole membership prop exists to prevent, stated as its own case: on a
-  // legacy-basis system a count read from `definition.recipeIds` is 0 for every book, which
-  // disables Remove and makes the axis one-way.
+  // The failure this whole membership prop exists to prevent, stated as its own case.
   it('leaves Remove LIVE for a legacy-basis book whose own recipeIds is empty', async () => {
     const { root } = await mountPanel();
     pickBook(root, 'book-alchemy');
@@ -500,8 +414,6 @@ describe('RecipeBulkEditPanel book pick card (issue 1010)', () => {
 
 describe('RecipeBulkEditPanel staged book list (issue 1010)', () => {
   // THE ACCUMULATION. One book on screen is a property of the CONTROL; the staged set grows.
-  // The prototype computes this list and never renders it, which leaves a
-  // one-book-at-a-time control with no record of what it was told about the others.
   it('accumulates across books, and the pick clears so the next one costs one gesture', async () => {
     const { root, state } = await mountPanel();
 
@@ -520,8 +432,7 @@ describe('RecipeBulkEditPanel staged book list (issue 1010)', () => {
     assert.deepEqual(stagedIds(root), ['book-alchemy', 'book-forge']);
   });
 
-  // The view-lab frame asserts an `add` state and a `remove` state as SIBLINGS, which is
-  // only satisfiable because the staged list holds both at once.
+  // The view-lab frame asserts an `add` state and a `remove` state as SIBLINGS.
   it('holds a mixed add/remove draft, one row each', async () => {
     const { root, state } = await mountPanel();
 
@@ -550,12 +461,7 @@ describe('RecipeBulkEditPanel staged book list (issue 1010)', () => {
     assert.ok(!/1 recipes/.test(row.textContent), 'never the plural at one');
   });
 
-  // "no change" is not reachable from the pick card — the action whose count is zero is
-  // disabled there — but it IS reachable, because the SELECTION moves under a draft that
-  // outlives it: stage Remove while the book holds one selected recipe, then untick that
-  // recipe, and the staged op now moves nothing. Apply would report a write that did
-  // nothing, and this row is the only warning before it. Driven by handing the panel that
-  // draft directly, which is exactly what the manager root does after such a change.
+  // "no change" is not reachable from the pick card.
   it('says "no change" for a staged op the selection has since emptied of work', async () => {
     const { root } = await mountPanel({
       draft: { ...createRecipeBulkDraft(), bookRemove: ['book-alchemy'] },
@@ -618,20 +524,7 @@ describe('RecipeBulkEditPanel staged book list (issue 1010)', () => {
   });
 });
 
-/**
- * KEYBOARD FOCUS ACROSS THE DESTRUCTIVE RE-RENDERS.
- *
- * Every gesture on this axis destroys the control holding focus — the popover unmounts on
- * a choice, the pick card is replaced by the trigger on Add / Remove / clear, and an
- * unstage removes its own row. Left unhandled, each one drops focus to `document.body` and
- * a keyboard-only GM staging three books tabs back in from the top of the Foundry document
- * six extra times. The retired chip run had no such cost, so this is the one property the
- * redesign could regress while improving everything else.
- *
- * Asserted against the REAL mounted DOM's `document.activeElement`, not by reasoning about
- * the handlers: the ordering these hops depend on (Svelte's flush microtask running ahead
- * of the panel's own) is exactly what reading the code got wrong the first time.
- */
+/** KEYBOARD FOCUS ACROSS THE DESTRUCTIVE RE-RENDERS. */
 describe('RecipeBulkEditPanel keyboard focus (issue 1010)', () => {
   it('lands on the pick card action after choosing, rather than on document.body', async () => {
     const { root } = await mountPanel();
@@ -796,7 +689,6 @@ describe('RecipeBulkEditPanel blocked-enable forecast (issue 1010)', () => {
     assert.match(
       // TRIMMED since issue 1505: the shared strip wraps its sentence in a body element so a
       // title can sit above it, which puts the template's own whitespace after the text node.
-      // The anchor is still the assertion — the sentence must END here, not merely contain this.
       warning.textContent.trim(),
       /applying reports the exact number\.$/,
       'the hedge names the post-apply report as the authority, making it a promise'
@@ -817,10 +709,7 @@ describe('RecipeBulkEditPanel blocked-enable forecast (issue 1010)', () => {
     assert.ok(!/1 of 1/.test(warning.textContent), 'the plural string is unreachable at one');
   });
 
-  // "At least 3 of 3" is degenerate: the lower bound equals the maximum, so "at least"
-  // states nothing and reads as a copy bug. It is reachable by the obvious route — select
-  // three drafts, stage Enable. The all-blocked forecast is EXACT, so it carries neither
-  // the hedge nor the authority clause the partial one needs.
+  // "At least 3 of 3" is degenerate: the lower bound equals the maximum.
   it('drops the bound entirely when every selected recipe is blocked', async () => {
     const { root } = await mountPanel({ count: 3, blockedCount: 3 });
     chooseSegment(root, 'status', 'enable');
@@ -863,9 +752,7 @@ describe('RecipeBulkEditPanel check-tier axis (issue 1010)', () => {
 
   it('renders a tier as {name} (DC {dc}), falling back to Unnamed tier', async () => {
     const { root } = await mountPanel();
-    // Read off the OPEN panel's rows, and with each row's HINT stripped: issue 1504 groups this
-    // list and gives its two instructions a second line each, so a row's whole text is now
-    // `label + hint` rather than the label alone.
+    // Read off the OPEN panel's rows, and with each row's HINT stripped.
     const HINT_JOIN = / (?:Every|Clears) .*$/;
     assert.deepEqual(
       selectOptionLabels(root, TIER_HOOK).map((text) => text.replace(HINT_JOIN, '')),
@@ -1022,8 +909,7 @@ describe('RecipeBulkEditPanel set delete (issue 1132)', () => {
       'the impact list keeps the `data-recipe-bulk-*` convention every other hook in this panel uses'
     );
     assert.ok(Boolean(root.querySelector('[data-recipe-bulk-delete-announce]')));
-    // The card is a SIBLING of the shell, not a child of it: a destructive action inside the
-    // shell would read as a second way of applying the staged edit.
+    // The card is a SIBLING of the shell, not a child of it.
     const panelEl = root.querySelector('[data-recipe-bulk-panel]');
     assert.ok(Boolean(panelEl), 'the shell is absent, so "sibling" would be unfalsifiable');
     assert.equal(
@@ -1042,8 +928,7 @@ describe('RecipeBulkEditPanel set delete (issue 1132)', () => {
       /Will be removed from 2 books & scrolls\./
     );
     assert.match(impactRow(root, 'learners').textContent, /Will be forgotten by 4 characters/);
-    // The qualifier is the load-bearing half of the learners sentence: the learn slot is
-    // spent by the same act the number counts.
+    // The qualifier is the load-bearing half of the learners sentence.
     assert.match(
       impactRow(root, 'learners').textContent,
       /spent learn slots are not given back/
@@ -1093,10 +978,7 @@ describe('RecipeBulkEditPanel set delete (issue 1132)', () => {
   });
 
   it('hands the confirm the RESOLVED ids, not the selection', async () => {
-    // A stale selected id names no recipe, `RecipeManager.deleteRecipe` throws for one, and
-    // the browser prunes it only when the projection republishes — a different moment from
-    // the click. `deletableIds` is the describer's answer to that, and this is the wiring
-    // that makes the button act on it.
+    // A stale selected id names no recipe, `RecipeManager.deleteRecipe` throws for one.
     const deleted = [];
     const { root } = await mountPanel({
       deleteImpact: { ...FULL_IMPACT, deletable: 2, deletableIds: ['r1', 'r3'] },

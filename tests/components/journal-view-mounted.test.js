@@ -335,9 +335,7 @@ describe('JournalView mounted behavior', () => {
     assert.equal(target.querySelector('[data-segment-badge="4"]').textContent, '4');
   });
 
-  // Issue 1648, D-029/M19. The filter vocabulary must not diverge from the badge vocabulary, and
-  // `Waiting` was the ONLY tab whose word the badge no longer uses. It carries the merged count,
-  // which is what makes a run between stages reachable by a tab at all.
+  // Issue 1648, D-029/M19. The filter vocabulary must not diverge from the badge vocabulary.
   it('offers All / Ready / In progress / Paused, with the merged count on the merged tab', async () => {
     const run = makeCraftingRun();
     const { store, calls } = makeJournal({
@@ -353,8 +351,7 @@ describe('JournalView mounted behavior', () => {
       'no tab names a badge the player is never shown'
     );
     const merged = target.querySelector('[data-journal-status-filter] label:has(input[value="inProgress"])');
-    // The harness localizes to the key, so the WORD parity between this tab and the badge is
-    // asserted against `lang/en.json` in `tests/journal-run-reasons.test.js`.
+    // The harness localizes to the key.
     assert.match(merged.textContent, /Filters\.Status\.InProgress/, 'the tab is the merged one');
     assert.match(merged.textContent, /4/, 'and carries the merged count');
 
@@ -593,8 +590,7 @@ describe('JournalView mounted behavior', () => {
     assert.equal(run.gatheringYield.rollModel, 'perRow');
     assert.equal(run.gatheringYield.roll, null, 'the record has no root roll to share');
     const target = await mountHistory(run);
-    // #1648 A8: two INDEPENDENT rolls, so the scale heading may not re-assert in words the
-    // single shared cut the per-row ruling already removed from the pixels.
+    // #1648 A8: two INDEPENDENT rolls.
     assert.equal(
       target.querySelector('[data-yield-scale] .fab-yield-kicker').textContent,
       `${HISTORY}ScalePerRow`

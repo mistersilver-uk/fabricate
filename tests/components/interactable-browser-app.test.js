@@ -2,11 +2,6 @@
  * Phase 7 — string-shape coverage for the GM Interactable browser app + root,
  * mirroring the `fabricate-app-shell.test.js` convention (the Svelte components
  * are not compiled in the Node test runner, so we assert their source shape).
- *
- * Covers: ApplicationV2 + SvelteApplicationMixin singleton semantics, the
- * services bag reusing the existing per-system Tool/Task library reads, the
- * click-to-place seam routing through the shared spawn pipeline, the drag-source
- * wiring, and the keyboard-actionable place button (a11y).
  */
 
 import { describe, it } from 'node:test';
@@ -36,15 +31,7 @@ const rootSource = readFileSync(
   'utf8'
 );
 
-/**
- * The primitives this window adopted (issue 1520), read so the clauses below can assert the
- * WHOLE chain rather than one end of it.
- *
- * A source-shape suite that only checked what this root PASSES would pass just as happily if
- * the primitive stopped honouring it, and one that only checked the primitive would say nothing
- * about this window. The icon-only and search clauses therefore read both: the props this root
- * writes, and what the primitive turns them into.
- */
+/** The primitives this window adopted (issue 1520). */
 const iconButtonSource = readFileSync(
   resolve(__dirname, '../../src/ui/svelte/components/IconButton.svelte'),
   'utf8'
@@ -75,9 +62,7 @@ describe('InteractableBrowserApp singleton window', () => {
   });
 
   it('coalesces concurrent show() calls to a single window (V13 re-entrancy guard)', () => {
-    // The scene-control button fires the launch handler 2–3× per activation; a
-    // second show() mid-render must NOT construct a competing instance (which
-    // collided in ApplicationV2 _updatePosition → "el.parentElement is null").
+    // The scene-control button fires the launch handler 2–3× per activation.
     assert.ok(appSource.includes('static _renderPromise = null'), 'tracks an in-flight render promise');
     assert.ok(appSource.includes('if (existing) {'), 'show() returns early whenever ANY instance exists');
     assert.ok(appSource.includes('await InteractableBrowserApp._renderPromise'), 'an in-flight render is awaited');
@@ -149,8 +134,7 @@ describe('InteractableBrowserRoot body', () => {
   });
 
   it('splits Tools and Gathering Tasks into an accessible two-tab switcher', () => {
-    // A real tablist of two keyboard-operable <button> tabs, each with
-    // aria-selected reflecting the active tab and a controlled tabpanel.
+    // A real tablist of two keyboard-operable <button> tabs.
     assert.ok(rootSource.includes("let activeTab = $state('tools')"), 'tracks the active tab in runes state');
     assert.ok(rootSource.includes('role="tablist"'), 'renders a tablist container');
     assert.ok((rootSource.match(/role="tab"/g) || []).length === 2, 'exactly two tabs');
@@ -162,8 +146,7 @@ describe('InteractableBrowserRoot body', () => {
   });
 
   it('filters BOTH tools and tasks by the shared search box', () => {
-    // matchesSearch is wired into both derived lists; with tabs the search
-    // applies to whichever tab is active (both kinds are filtered).
+    // matchesSearch is wired into both derived lists.
     assert.ok(
       rootSource.includes('.filter((tool) => tool.id && matchesSearch(tool.label))'),
       'tools list filters by the search term'
@@ -207,9 +190,7 @@ describe('InteractableBrowserRoot body', () => {
   });
 
   it('each row exposes a keyboard-actionable Place-on-scene button (a11y fallback)', () => {
-    // The affordance is `<IconButton>` now (issue 1520), which renders a real
-    // `<button type="button">` at every one of its sites - so the keyboard clause is asserted
-    // against the PRIMITIVE rather than against a `<button>` this file no longer writes.
+    // The affordance is `<IconButton>` now (issue 1520).
     assert.ok(
       rootSource.includes('data-interactable-browser-place=""'),
       'rows carry the place button, hooked for the smoke and the lab'
@@ -224,13 +205,6 @@ describe('InteractableBrowserRoot body', () => {
   });
 
   // THE ICON-ONLY RULE, WHICH IS THE SUBSTANCE THIS CLAUSE ALWAYS CARRIED (issue 1520).
-  //
-  // A control whose only visible content is a glyph has NO accessible name unless one is
-  // supplied, and it is IDENTICAL on screen either way - so no frame, no computed-style probe
-  // and no `data-*`-keyed assertion can see the defect. That is why this clause exists and why
-  // it survives the conversion in substance: what changed is that the name is a REQUIRED-SHAPED
-  // PROP on `IconButton` now, gated by its own source contract, rather than a convention this
-  // file had to remember.
   it('renders the place buttons icon-only with the localized title + aria-label, no visible text', () => {
     // WHOLE ELEMENTS, not opening tags. The hook is written LAST among the props but the GLYPH
     // is a CHILD, so a block cut at the hook carries the accessible name and not the face, and a
@@ -249,10 +223,7 @@ describe('InteractableBrowserRoot body', () => {
     const regionTags = elementsFor('data-interactable-browser-place-region=""');
     assert.ok(regionTags.length === 2, 'exactly two region-only buttons (tools + tasks rows)');
 
-    // EVERY KEY PATTERN IS TERMINATED BY ITS CLOSING QUOTE, and that is not tidiness: a key is a
-    // PREFIX of a longer key one edit away, so an unterminated pattern matches
-    // `…PlaceOnSceneSomethingElse` and reports a renamed key as an unchanged one. Proved by
-    // mutation - renaming the key to `PlaceOnSceneX` left the unterminated form green.
+    // EVERY KEY PATTERN IS TERMINATED BY ITS CLOSING QUOTE, and that is not tidiness.
     for (const tag of placeTags) {
       assert.ok(
         /title=\{text\(\s*'FABRICATE\.Canvas\.Browser\.PlaceOnScene',/.test(tag),
@@ -263,9 +234,7 @@ describe('InteractableBrowserRoot body', () => {
         'place button uses PlaceOnScene as the accessible name'
       );
       assert.ok(tag.includes('<i class="fas fa-cubes" aria-hidden="true">'), 'face is the cubes icon');
-      // The face is a GLYPH and nothing else. `IconButton` renders `children` verbatim, so a
-      // stray `<span>{text(...)}</span>` beside the icon would put the label back on the face
-      // while every assertion above kept passing.
+      // The face is a GLYPH and nothing else. `IconButton` renders `children` verbatim.
       assert.ok(!tag.includes('<span'), 'no visible text rendered on the place button face');
     }
     for (const tag of regionTags) {
@@ -280,12 +249,7 @@ describe('InteractableBrowserRoot body', () => {
       assert.ok(!tag.includes('<span'), 'no visible text rendered on the region-only button face');
     }
 
-    // The primitive's half: `ariaLabel` becomes the name, and an EMPTY one is dropped rather
-    // than emitted blank - `aria-label=""` names the control the empty string and suppresses the
-    // fallback a screen reader would otherwise derive, which is worse than passing nothing.
-    // THE ATTRIBUTE NAME IS ANCHORED AT ITS OWN LINE, not matched as a substring: `aria-label` is
-    // a suffix of `data-aria-label`, so `includes` reports a hook renamed onto a `data-*`
-    // attribute - which names nothing - as an unchanged accessible name. Proved by mutation.
+    // The primitive's half: `ariaLabel` becomes the name.
     assert.ok(
       /\n\s*aria-label=\{accessibleName\}/.test(iconButtonSource),
       'IconButton emits ariaLabel as the accessible name'
@@ -307,30 +271,14 @@ describe('InteractableBrowserRoot body', () => {
   });
 
   // THE WINDOW'S STYLING CONTRACT, STATED FORWARD (issue 1520).
-  //
-  // Every CONTROL family is a shared primitive imported from `src/ui/svelte/components/`, and
-  // the `fab-ib-*` names that survive are an EXACT allow-list of this window's own layout plus
-  // the one residue this phase declines to convert. The statement and this window's own
-  // allow-list both live in `tests/helpers/interactablesWindowContract.js`, shared with the
-  // config panel's and the manage panel's copies of this clause.
   it('renders the shared control primitives and keeps only its own layout classes', () => {
     assertWindowContract({ rootSource, contract: BROWSER_WINDOW_CONTRACT });
   });
 
   // THE TWO TAB PANELS DECLARE THEIR KEYBOARD FOCUS (issue 1520; the reason restated at review).
-  //
   // Both panels carry a STATIC `tabindex="0"`, which is what puts them - and only them - in
   // `design-system-keyboard-focus.test.js`'s `roleZero` population; the tab buttons above them
   // carry a roving `tabindex` EXPRESSION and land in the disjoint `roving` population instead.
-  // The `tabindex` is the ARIA tabs pattern's own requirement: from the active tab button, one
-  // Tab press lands on the panel, and that is how a keyboard user reaches the list.
-  //
-  // NEITHER PANEL IS A SCROLL CONTAINER, and this clause used to say both were. `.fab-ib-section`
-  // declares no `overflow` and no height; the window's scroll box is the root. Nothing in the
-  // component moves focus into a panel either - `focusActiveTab` focuses the TAB. What the
-  // declaration buys is unchanged: without it `KeyboardManager#hasFocus` returns false for the
-  // focused panel and Foundry keeps its own bindings live, so the arrows pan the canvas
-  // underneath, Space pauses the game and Tab is swallowed before it reaches the row actions.
   it('declares keyboard focus on both tabpanel containers', () => {
     const panels = rootSource.split('role="tabpanel"').slice(1);
     assert.ok(panels.length === 2, 'exactly two tabpanels');
@@ -420,11 +368,7 @@ describe('InteractableBrowserRoot body', () => {
   });
 
   it('surfaces a search filter and the Alt-override discoverability hint', () => {
-    // The bare `<input type="search">` is `ManagerSearchField` now (issue 1520), so the input
-    // itself is the primitive's - which is why the SHARED field's own markup is read for it.
-    // The chain matters in both directions: the caller must NAME the control, because the
-    // field's `<label>` wraps a glyph and an input and no text and so contributes no accessible
-    // name of its own; and the primitive must still render a search input under that name.
+    // The bare `<input type="search">` is `ManagerSearchField` now (issue 1520).
     assert.ok(
       rootSource.includes("ariaLabel={text('FABRICATE.Canvas.Browser.SearchLabel', 'Search')}"),
       'the caller names the search control'
@@ -441,29 +385,6 @@ describe('InteractableBrowserRoot body', () => {
   });
 
   // THE FILTER BAR IS ONE CONTROL RUNG AND ONE CONTROL WIDTH (issue 1520 review).
-  //
-  // Two defects the published frame showed, both of them a shared primitive doing exactly what
-  // it documents while the caller supplied neither of the two things it leaves to a caller.
-  //
-  // THE RUNG. The shared search field ships at 34px with a 6px corner; the shared select's form
-  // rung is 38px at 9px. A bar holding one of each therefore renders two heights and two radii
-  // unless the caller opts in, which is precisely what the field's `size` rung exists for - the
-  // sheet's own note calls it the opt-in a caller uses so a toolbar's search and filter share a
-  // rung. Both ends are read: the prop this window passes, and the rule that turns it into the
-  // select's own numbers, so a rung renamed on either side reds here.
-  //
-  // THE WIDTH. `Select` declares no `width` and no `min-width` by design, so a converted
-  // full-width control owes its own; the flex rule this window already had grows the FIELD and
-  // leaves the `<button>` inside it hugging its content, which is how a 144px trigger came to
-  // sit directly above a 394px search pill - the toolbar wraps at 420px, so the two are stacked
-  // and share a left edge, which is what makes the width difference impossible to miss.
-  //
-  // THE RUNG IS READ OFF THE TAG, over the EMITTING half of the file (issue 1520 review). A
-  // first draft of this clause asked whether the file contained `size={38}` anywhere, and this
-  // window's markup carries a paragraph explaining why the prop is passed - so changing the prop
-  // to `size={34}` left the clause green on its own justification. That is Q1's defect, made
-  // twice in one change, which is the argument for the shared stripper rather than for
-  // remembering.
   it('puts its filter controls on one rung and gives the picker trigger the field width', () => {
     const searchTag = /<ManagerSearchField\b[\s\S]*?\/>/.exec(emittingHalfOf(rootSource));
     assert.ok(searchTag, 'the filter bar still renders the shared search field');
@@ -484,10 +405,7 @@ describe('InteractableBrowserRoot body', () => {
       'the picker trigger fills the field, not just the field the bar'
     );
 
-    // AND THE PANEL FOLLOWS THE TRIGGER, which only becomes necessary once the trigger is full
-    // width: the primitive's `form` rung caps its panel at 340px, so the widened trigger would
-    // otherwise hang a short panel under itself in the one browser frame that opens this picker.
-    // The same statement the config panel and the Manage panel make, for the same reason.
+    // AND THE PANEL FOLLOWS THE TRIGGER.
     const selectTag = /<Select\b[\s\S]*?\/>/.exec(emittingHalfOf(rootSource));
     assert.ok(selectTag, 'the filter bar still renders the shared select');
     assert.ok(
@@ -505,19 +423,8 @@ describe('InteractableBrowserRoot body', () => {
   });
 
   // EVERY LOCATOR THE FOUNDRY SMOKE WOULD DRIVE AGAINST THIS WINDOW (issue 1520 review).
-  //
   // The config panel's copy of this clause scopes its scan with
   // `data-interactable-(?!manager-|browser-)`, and the manage panel's takes the `manager-` half.
-  // Nothing took the `browser-` half, so that lookahead handed a hook family to a scan that did
-  // not exist - harmless while the answer is zero, and silently harmless in the wrong direction
-  // the day it stops being zero.
-  //
-  // THE FLOOR IS ZERO HERE, WHICH IS VACUOUS ON ITS OWN AND IS THE WHOLE REASON FOR THE SECOND
-  // ASSERTION. The smoke never opens this window - it is the one window of the three it does not
-  // drive - so the loop above runs over nothing today. The equality is a TRIPWIRE rather than a
-  // property worth having: the day a smoke step addresses a browser hook, this reds and whoever
-  // wrote that step raises the floor to a real number and gets a real guard, instead of adding a
-  // locator to a scan that would have passed either way.
   it('has no smoke locators of its own, and reds here the day it gains one', () => {
     const locators = prefixedTokensIn(SMOKE_SOURCE, 'data-interactable-browser-');
     assertLocatorsEmitted({
@@ -535,17 +442,7 @@ describe('InteractableBrowserRoot body', () => {
     );
   });
 
-  // THE REDUCTION EVERY SCAN ABOVE STANDS ON, PINNED AGAINST ITS OWN TWO FAILURE MODES
-  // (issue 1520 review round 2). `emittingHalfOf` is now the corpus for the View Lab's selector
-  // and driver-hook scans as well as this file's, so it is load-bearing for ~101 cases and has
-  // no test of its own — and it shipped with a defect in the direction that matters least here
-  // and most there: the style strip ran over the RAW text and is non-greedy, so a docblock that
-  // merely names `<style>` in prose opened the match and closed it at the real block, deleting
-  // every line of markup between them. `components/Chip.svelte` is the shipped case, and its
-  // `data-chip-tint` root attribute is what the View Lab scan reported as absent.
-  //
-  // Both polarities are asserted, because a reduction that returned the file unchanged would
-  // satisfy the first clause alone and is precisely the weakening this helper exists to prevent.
+  // THE REDUCTION EVERY SCAN ABOVE STANDS ON.
   it('keeps markup after a prose mention of a style block, and still drops the real one', () => {
     const source = [
       '<!-- Its CSS lives in this scoped `<style>`, not the global sheet. -->',

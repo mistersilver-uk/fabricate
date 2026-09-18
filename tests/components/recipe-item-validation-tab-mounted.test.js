@@ -47,23 +47,7 @@ function summary(root) {
 }
 
 describe('EditorValidationSurface emits the namespace root its rules are anchored on (issue 1509)', () => {
-  /*
-   * THE ONE ASSERTION IN THIS REPOSITORY THAT READS THE SURFACE'S RENDERED ROOT.
-   *
-   * Every other guard on this family reads SOURCE TEXT: the area-scope gate reads the composed
-   * `const classes = $derived([...])` array, the sheet census reads the selectors, the fixture
-   * clauses read strings in `tests/`. All of them are satisfied by a component that DECLARES
-   * `fabricate-validation` in that array and stops rendering it on its root element -- at which
-   * point every re-rooted rule in `styles/fabricate.css` matches nothing and the summary card,
-   * the medallion, the count rail and the row stack draw unstyled in every host, including the
-   * manager.
-   *
-   * Read off the mounted DOM, in the shape `manager-button-mounted.test.js:83` uses, in a suite
-   * that already mounts the surface. THIS suite rather than one of the other seven, because this
-   * caller is the ONE that passes a `class` of its own -- so the same reading proves both halves
-   * of the contract: the root leads, and a caller's classes append after the surface's own
-   * instead of replacing them.
-   */
+  /* THE ONE ASSERTION IN THIS REPOSITORY THAT READS THE SURFACE'S RENDERED ROOT. */
   it('writes `fabricate-validation` first on its root section, ahead of a caller`s own classes', async () => {
     const root = await harness.mount({ recipeItem: draft(), linkedItem: null, visibilityMode: 'item' });
     const surface = root.querySelector('[data-editor-validation-surface]');
@@ -81,11 +65,6 @@ describe('EditorValidationSurface emits the namespace root its rules are anchore
 
   it('writes the root on the SECTION and not on the summary row inside it', async () => {
     // THE MUTATION CONTROL'S TARGET, stated as an assertion so the control has something to flip.
-    // Moving `class={classes}` off the section and onto the inner summary row leaves the array
-    // intact, so `composedClassRegion` still finds `fabricate-validation` as its first literal
-    // and the area-scope gate's `rootless`, `gated` and emission clauses all stay green. Only a
-    // reading of WHICH element carries it can see that move -- and it is the difference between
-    // a root that is an ancestor of the whole family and one that is a sibling of most of it.
     const root = await harness.mount({ recipeItem: draft(), linkedItem: null, visibilityMode: 'item' });
     const row = root.querySelector('.manager-recipe-validation-summary-row');
     assert.ok(Boolean(row), 'the summary row must render, or this control has no subject');
@@ -119,10 +98,7 @@ describe('RecipeItemValidationTab (mounted)', () => {
     // Summary card reads blocked; the two count tiles reflect 1 passing / 2 blocking,
     // and the critical-count observable now lives on the blocking tile.
     assert.equal(summary(root).getAttribute('data-recipe-item-validation-summary'), 'blocked');
-    // The HOOK keeps this editor's own word; the CLASS is the surface's, and there are only
-    // three of those (issue 1373). `is-blocked` was painted by nothing on four of the six
-    // editors that draw this card, so the surface now resolves any caller's word to one of
-    // `is-pass`/`is-warn`/`is-block` — the same three the check ROWS above already assert.
+    // The HOOK keeps this editor's own word; the CLASS is the surface's.
     assert.ok(summary(root).classList.contains('is-block'));
     assert.equal(root.querySelector('[data-recipe-item-count-passing]').textContent.trim(), '1');
     assert.equal(blockingTile(root).textContent.trim(), '2');
@@ -183,21 +159,6 @@ describe('RecipeItemValidationTab (mounted)', () => {
 });
 
 // ── THE ROW ACTION'S TWO ADDRESSES (issue 1517) ─────────────────────────────────────────────
-//
-// A validation row carries `target` — the ROUTE, the editor tab that hosts the gap — and
-// `focusTarget` — the CONTROL, the value of the `data-validation-target` attribute the offending
-// control carries in that tab. `RecipeItemValidationTab` is the producer for this editor; the
-// three tab files below are the destinations; `RecipeItemEditor` is the host that resolves both.
-//
-// WHY THE HOST IS PROVEN FROM SOURCE HERE RATHER THAN MOUNTED. This suite's harness mounts the
-// VALIDATION TAB, which is what makes the producer half directly clickable — the tab takes
-// `onSelectIssue` as a prop, so the exact `(target, focusTarget)` pair a row hands the host is
-// read from a real click rather than inferred. Mounting `RecipeItemEditor` instead would need a
-// second harness carrying that editor's whole compiled closure — the embedded player inventory
-// detail, the salvage tree, the shared select and popover stacks — which
-// `recipe-item-editor-mounted.test.js` already declares, and a copy of it here is exactly the
-// near-identical block the new-code duplication gate refuses. So the host's three obligations are
-// read off its source, and the ADDRESSES are joined to the destinations that carry them below.
 describe('the recipe-item validation row action addresses a control (issue 1517)', () => {
   const viewButton = (root, id) =>
     root.querySelector(`[data-recipe-item-check="${id}"] [data-recipe-item-validation-view]`);
@@ -280,14 +241,6 @@ describe('the recipe-item validation row action addresses a control (issue 1517)
 });
 
 // ── THE PAIR, AND THE HOST THAT JOINS IT (issue 1517) ───────────────────────────────────────
-//
-// Both contracts below are registered from `tests/helpers/validationAddressContracts.js`, driven
-// by THIS editor's facts: the producer's own table, the destination declared for each address it
-// emits, and the host's own route call. The machinery those facts feed — the comment stripping
-// that keeps a scan from finding an address in the sentence explaining it, both attribute
-// spellings, the focusability read that a mounted assertion cannot make, and the ordering — is
-// written once there and explained in its docblock. It was a per-suite copy until the SonarCloud
-// new-code duplication gate counted this file's copy and the Checks studio's as one shape.
 describeValidationAddressPairing({
   title: 'every recipe-item address the producer emits is carried by a real control',
   producerFile: 'recipe-item/RecipeItemValidationTab.svelte',
@@ -296,9 +249,7 @@ describeValidationAddressPairing({
   addressPattern: /focusTarget: '([^']+)'/gu,
   expectedAddressCount: 4,
   expectation: 'the four checks',
-  // WHICH FILE IS SUPPOSED TO CARRY WHICH ADDRESS. This is the half a producer cannot check: an
-  // address no control carries is a View button that changes tab and focuses nothing, and neither
-  // half alone can see it.
+  // WHICH FILE IS SUPPOSED TO CARRY WHICH ADDRESS. This is the half a producer cannot check.
   destinations: {
     'recipe-item-source': 'recipe-item/RecipeItemOverviewTab.svelte',
     'recipe-item-link-recipe': 'recipe-item/RecipeItemContentsTab.svelte',
@@ -307,21 +258,7 @@ describeValidationAddressPairing({
   },
   routeNoun: 'tab',
   destinationNoun: 'tab',
-  // TWO OF THE FOUR RIDE AN ATTRIBUTE BAG — the Item drop zone's `hookAttrs.root` and the
-  // link-recipe popover's `triggerData` — so the element they land on belongs to a primitive and
-  // cannot be read from this tab's source. Declared here rather than skipped so that a stamp
-  // moving from a written attribute to a bag, which silently drops the static proof, has to be
-  // acknowledged.
-  //
-  // WHERE THE PROOF ACTUALLY IS, named because this list used to assert one that did not exist
-  // (issue 1517, review r1). `recipe-item-source` rides `linkHooks.root` with `tabindex: '-1'`
-  // and `'data-keyboard-focus': 'true'` as BAG KEYS — object properties, which
-  // `design-system-keyboard-focus`'s AST walk cannot see any more than this scan can — so
-  // deleting both left the whole repository green while a real browser focused nothing. It is now
-  // read off the RENDERED element by `RecipeItemEditor — the validation row action reaches the
-  // control` in `recipe-item-editor-mounted.test.js`, which is the only place those two
-  // attributes exist to be read. `recipe-item-link-recipe` is `SearchablePopover`'s trigger, a
-  // real `<button>`, which needs no tabindex to hold focus.
+  // TWO OF THE FOUR RIDE AN ATTRIBUTE BAG.
   focusProvenElsewhere: ['recipe-item-link-recipe', 'recipe-item-source'],
 });
 

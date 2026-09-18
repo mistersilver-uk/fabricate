@@ -1,13 +1,4 @@
-/**
- * Issue 877 — the post-import reference report, converted from a raw-HTML DialogV2 into
- * a Svelte modal that renders through the SHARED `ManagerModal` chrome (the same one the
- * folder-mapping step in the very same import flow uses).
- *
- * These tests pin the two things the conversion is for: the report wears the shared
- * chrome (compact title + subtitle, round close, right-aligned footer) rather than
- * Foundry's dialog defaults, and it presents `buildImportReportContent` output as
- * bordered per-kind cards instead of raw `<ul>` bullets.
- */
+/** Issue 877 — the post-import reference report. */
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -23,8 +14,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/actions/dismissOnOutsideClick.js',
     'src/ui/svelte/actions/portal.js',
-    // The shared portal-host resolver (issue 1466): `ManagerModal` imports it to find the
-    // application root it portals its dialog into.
+    // The shared portal-host resolver (issue 1466).
     'src/ui/svelte/util/overlayHost.js',
   ],
   compiledModules: [
@@ -34,7 +24,6 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/apps/manager/ManagerModal.svelte',
     // THE manager's labelled push-button (issue 1118). The footer Close renders it.
-    // Omitting a rendered `.svelte` HANGS the suite (# cancelled) rather than failing it.
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/apps/manager/ImportReportModal.svelte',

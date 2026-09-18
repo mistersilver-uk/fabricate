@@ -19,22 +19,13 @@ const repoRoot = resolve(__dirname, '../..');
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-checks-validation-',
-  // The ONE shared checks-tree manifest (issue 1095, BM9), imported rather than
-  // re-typed. A `.js` or `.svelte` the tree renders but the harness omits HANGS the
-  // suite (# cancelled) rather than failing it, so a per-file copy of this list is a
-  // per-file chance to be silently unrunnable.
+  // The ONE shared checks-tree manifest (issue 1095, BM9).
   rawModules: CHECKS_TREE_RAW_MODULES,
   compiledModules: CHECKS_TREE_COMPILED_MODULES,
   componentPath: 'src/ui/svelte/apps/manager/checks/ChecksValidationTab.svelte',
 });
 
 // ── THE ROUTED FIXTURES, BUILT RATHER THAN RE-TYPED ─────────────────────────────────────────
-//
-// Six of the clauses below mount one of two routed checks, and typed out in full each time they
-// are a near-identical block — which the new-code duplication gate counts, and which hides the
-// one field that actually differs from clause to clause behind twenty that do not. Built here,
-// each call site reads as the STATE it needs: an unfinished tier, or a trigger naming a tier
-// target. Fresh objects per call, so no two mounts share a fixture by reference.
 
 /** A routed check whose only tier is unnamed and not a Success: raises both outcome issues. */
 const unfinishedRoutedSection = (subsystem, rollFormula, tierName) => ({
@@ -132,14 +123,7 @@ describe('ChecksValidationTab (mounted)', () => {
   });
 
   it('draws a critical issue ABOVE the ticks of its own subsystem group (issue 1517)', async () => {
-    // THE ONE ROUTE WHERE TWO KINDS OF ROW SHARE A GROUP, and therefore the only place the
-    // shared surface's in-group sort is observable end to end. `rowsFor` builds ticks first and
-    // issues second; `EditorValidationSurface` ranks `block` at 0 and everything else at 1, and
-    // this tab maps a `critical` issue to `block` — so the built order and the drawn order
-    // deliberately differ, and BOTH files' comments say so in as many words.
-    //
-    // Asserted on POSITION rather than on presence: `filter`/`some` over the same rows is what
-    // every other clause in this file does, and not one of them can see an order.
+    // THE ONE ROUTE WHERE TWO KINDS OF ROW SHARE A GROUP.
     const target = await harness.mount({
       sections: [unfinishedRoutedSection('crafting', '1d20', '  ')],
     });
@@ -198,11 +182,7 @@ describe('ChecksValidationTab (mounted)', () => {
     const target = await harness.mount({
       sections: [{ subsystem: 'crafting', mode: 'simple', check: { rollFormula: '1d20' } }],
     });
-    // The per-section "No issues detected." note retired with the hand-rolled markup: the
-    // shared surface says the same thing with its three counters, which are a stronger
-    // statement because they are also what the rail badge and the section dots are summed
-    // from. Asserting on them rather than on the note keeps the claim ("this check is
-    // clean") and drops only the sentence that used to carry it.
+    // The per-section "No issues detected." note retired with the hand-rolled markup.
     assert.equal(
       target.querySelector('[data-editor-validation-count="blocking"]').textContent.trim(),
       '0'
@@ -219,16 +199,7 @@ describe('ChecksValidationTab (mounted)', () => {
   });
 
   it('counts the synthesised result row of a subsystem with no tick and no issue', async () => {
-    // THE STATE THE RAIL'S REWRITE WAS FOR, and nothing in this file reached it before. A
-    // subsystem whose mode rolls no check at all — `mode: 'none'` on gathering — returns NO
-    // checks and NO issues from `evaluateCheckReadiness`, so `rowsFor` synthesises the
-    // "No issues detected." PASS row rather than drawing a heading over emptiness. The old rail
-    // counted `readiness.checks.filter(satisfied)` and the issues, which is zero of each: the
-    // GM read "Passing: 0" above a green row saying everything was fine.
-    //
-    // It is the SECOND of the two divergences the rewrite closed; the first — an unsatisfied
-    // check whose subsystem raises no matching issue — needs a check the evaluator can fail
-    // without also raising something, and this producer has none today.
+    // THE STATE THE RAIL'S REWRITE WAS FOR.
     const target = await harness.mount({
       sections: [{ subsystem: 'gathering', mode: 'none', check: {} }],
     });
@@ -281,21 +252,6 @@ describe('ChecksValidationTab (mounted)', () => {
   });
 
   // ── THE ROW ACTION'S TWO ADDRESSES (issue 1517) ─────────────────────────────────────────────
-  //
-  // A validation row carries `target` — the ROUTE, here the `{ activity, section }` pair the
-  // studio's router opens — and `focusTarget` — the CONTROL, the value of the
-  // `data-validation-target` attribute the offending control carries in that section.
-  // `ChecksValidationTab` is the producer for this route; `CheckFormulaFields` and `CheckTriggers`
-  // are its destinations; `ChecksView` is the host that resolves both.
-  //
-  // WHY THE HOST IS PROVEN FROM SOURCE HERE RATHER THAN MOUNTED. This suite's harness mounts the
-  // VALIDATION TAB, which is what makes the producer half directly clickable — the tab takes
-  // `onSelectIssue` as a prop, so the exact `(target, focusTarget)` pair a row hands the host is
-  // read from a real click rather than inferred. Mounting `ChecksView` instead is what
-  // `checks-must-not-regress-characterization.test.js` and two sibling suites already do with the
-  // shared checks manifest, and a fourth copy of that whole studio closure here is exactly the
-  // near-identical block the new-code duplication gate refuses. So the host's three obligations
-  // are read off its source, and the ADDRESSES are joined to the destinations that carry them.
   describe('the Checks validation row action addresses a control (issue 1517)', () => {
     const viewButton = (root, id) =>
       root.querySelector(`[data-issue="${id}"] .manager-recipe-val-view`);
@@ -348,14 +304,6 @@ describe('ChecksValidationTab (mounted)', () => {
 });
 
 // ── THE PAIR, AND THE HOST THAT JOINS IT (issue 1517) ───────────────────────────────────────
-//
-// Both contracts below are registered from `tests/helpers/validationAddressContracts.js`, driven
-// by THIS route's facts: the producer's own table, the destination declared for each address it
-// emits, and the host's own route call. The machinery those facts feed — the comment stripping
-// that keeps a scan from finding an address in the sentence explaining it, both attribute
-// spellings, the focusability read that a mounted assertion cannot make, and the ordering — is
-// written once there and explained in its docblock. It was a per-suite copy until the SonarCloud
-// new-code duplication gate counted this file's copy and the recipe-item editor's as one shape.
 describeValidationAddressPairing({
   title: 'every Checks address the producer emits is carried by a real control',
   producerFile: 'checks/ChecksValidationTab.svelte',
@@ -364,9 +312,7 @@ describeValidationAddressPairing({
   addressPattern: /'([^']+)',/gu,
   expectedAddressCount: 2,
   expectation: 'the roll field and the trigger list',
-  // WHICH FILE IS SUPPOSED TO CARRY WHICH ADDRESS. This is the half a producer cannot check: an
-  // address no control carries is a View button that changes route and focuses nothing, and
-  // neither half alone can see it.
+  // WHICH FILE IS SUPPOSED TO CARRY WHICH ADDRESS. This is the half a producer cannot check.
   destinations: {
     'checks-roll-formula': 'checks/CheckFormulaFields.svelte',
     'checks-triggers': 'checks/CheckTriggers.svelte',

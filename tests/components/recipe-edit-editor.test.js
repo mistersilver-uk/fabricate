@@ -4,8 +4,7 @@ import { dirname, resolve } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-// The one place the aside/column pairing is asked, shared with recipe-edit-placeholder
-// and with the scoped-entity suites PRs 6a-c add (issue 1362).
+// The one place the aside/column pairing is asked.
 import { assertFullWidthRoute } from '../helpers/fullWidthRoute.js';
 import { openingTagsNamed } from '../helpers/svelteTagScan.js';
 
@@ -16,8 +15,7 @@ const overviewPath = resolve(
   repoRoot,
   'src/ui/svelte/apps/manager/recipe/RecipeOverviewTab.svelte'
 );
-// Issue 676 deleted RecipeContextRail; its content lives in these two tabs (plus the
-// Step-mode control on Overview above).
+// Issue 676 deleted RecipeContextRail.
 const accessTabPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/recipe/RecipeAccessTab.svelte');
 const booksTabPath = resolve(
   repoRoot,
@@ -30,10 +28,7 @@ const browserInspectorPath = resolve(
   repoRoot,
   'src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte'
 );
-// The Access SURFACE (the Crafting nav's grant list + its inspector) — NOT
-// `accessTabPath` above, which is the recipe EDITOR's own Access tab. The two are
-// different components; only these two ever borrowed a containing book's image, so a
-// negative image guard written against the editor tab would pass while proving nothing.
+// The Access SURFACE (the Crafting nav's grant list + its inspector).
 const accessSurfacePath = resolve(repoRoot, 'src/ui/svelte/apps/manager/AccessTabView.svelte');
 const grantAccessInspectorPath = resolve(
   repoRoot,
@@ -116,8 +111,7 @@ function assertScopedRuleHasNoMaxWidth(source, selector, { mustContain = [] } = 
 
 describe('RecipeEditView identity-only single column', () => {
   it('renders the identity card in the standard manager-main, with no bespoke workspace', () => {
-    // The editor is fully controlled now: no <form> wrapper, the root's header Save
-    // button commits the staged draft.
+    // The editor is fully controlled now: no <form> wrapper.
     assert.equal(
       editSource.includes('manager-recipe-edit-form'),
       false,
@@ -288,9 +282,7 @@ describe('RecipeBooksScrollsTab (issue 676: rehomed from the deleted context rai
     );
   });
 
-  // The book rows must NOT borrow the gathering environment editor's vocabulary, which
-  // is what the rail did. A book is not a scene, and borrowing a neighbour's classes is
-  // how a surface silently inherits that neighbour's ramp (issue 676's amber tag pills).
+  // The book rows must NOT borrow the gathering environment editor's vocabulary.
   it('uses its own row vocabulary, not the gathering scene-widget classes', () => {
     assert.equal(
       booksTabSource.includes('manager-environment-scene-linked'),
@@ -358,8 +350,7 @@ describe('RecipeBooksScrollsTab (issue 676: rehomed from the deleted context rai
   it('carries the linked-list a11y contract and the missing state', () => {
     assert.ok(booksTabSource.includes('data-recipe-item-links'), 'renders the linked-items list');
     assert.ok(booksTabSource.includes('aria-label='), 'the list has an aria-label');
-    // `<IconButton class="is-danger">` since issue 1422 — the primitive emits
-    // `manager-icon-button`, the call site passes only the danger modifier.
+    // `<IconButton class="is-danger">` since issue 1422.
     assert.ok(
       /<IconButton\s+class="is-danger"/.test(booksTabSource),
       'visible danger unlink button'
@@ -388,12 +379,6 @@ describe('RecipeBooksScrollsTab (issue 676: rehomed from the deleted context rai
 
   // The original bug capped BOTH the list and the empty state. Without this symmetric
   // guard a re-cap of only the empty panel would ship green.
-  //
-  // Issue 785 moved the panel itself into the shared `EmptyState` primitive, so the cap
-  // guard follows it: the tab passes `contextClass="manager-recipe-tab-empty"` and the
-  // uncapped full-width rule lives in the global sheet, which is where a rule reached
-  // through the tab-body ancestor has to live (a scoped block cannot style a child
-  // component's root element).
   it('keeps the empty state a full-width uncapped panel', () => {
     assert.ok(
       booksTabSource.includes('contextClass="manager-recipe-tab-empty"'),
@@ -415,8 +400,7 @@ describe('RecipeAccessTab (issue 676: rehomed from the deleted context rail)', (
   });
 
   it('never resolves access ids itself and never mutates the grant', () => {
-    // The store resolves (over EVERY world actor, not the PC roster); the tab takes
-    // resolved rows. Unresolvable ids are dropped from display, never persisted away.
+    // The store resolves (over EVERY world actor, not the PC roster).
     assert.ok(accessTabSource.includes('accessPlayers'), 'takes resolved players');
     assert.ok(accessTabSource.includes('accessCharacters'), 'takes resolved characters');
     assert.equal(
@@ -460,8 +444,7 @@ describe('RecipeEditorTabs gates Access / Books & Scrolls on craftingEffect (iss
   it('is MODE-CONDITIONAL off craftingEffect, and offers neither tab under global', () => {
     assert.ok(tabsSource.includes('visibilityEffect?.showAccess'), 'restricted branch');
     assert.ok(tabsSource.includes('visibilityEffect?.showBooksScrolls'), 'item/knowledge branch');
-    // The prop must NOT be called `effect`: the compiler then reads `$effect(...)` as
-    // a store subscription (`$` + `effect`) and the component throws at mount.
+    // The prop must NOT be called `effect`.
     assert.equal(
       /^\s*effect = /m.test(tabsSource),
       false,
@@ -469,9 +452,7 @@ describe('RecipeEditorTabs gates Access / Books & Scrolls on craftingEffect (iss
     );
   });
 
-  // The gate is on the tab BUTTON, not just the panel: a tab that opens an empty panel
-  // is worse than no tab. RecipeEditView derives TAB_IDS from the SAME effect so a
-  // deep-link cannot select a tab the strip does not render.
+  // The gate is on the tab BUTTON, not just the panel.
   it('derives the editor TAB_IDS from the same visibilityEffect the strip reads', () => {
     assert.ok(
       editSource.includes("visibilityEffect?.showAccess ? ['access'] : []"),
@@ -496,15 +477,13 @@ describe('Step mode lives on the Overview tab (issue 676: rehomed from the delet
       overviewSource.includes('data-recipe-section="recipe-step-mode"'),
       'carries the step-mode section marker'
     );
-    // The rail was the ONLY consumer of these two handlers; without the rehome,
-    // multi-step recipes would be unreachable for every system with the feature on.
+    // The rail was the ONLY consumer of these two handlers.
     assert.ok(overviewSource.includes('onEnterMultiStep'), 'wires the enter-multi-step handler');
     assert.ok(overviewSource.includes('onRevertToSingleStep'), 'wires the revert handler');
     assert.ok(overviewSource.includes('multiStepEnabled'), 'gated on the system feature');
   });
 
-  // Recipe complexity is emergent from the ingredient-set count (issue 643): no editor
-  // surface carries a Simple/Complex control.
+  // Recipe complexity is emergent from the ingredient-set count (issue 643).
   it('carries NO Recipe mode toggle', () => {
     assert.equal(
       overviewSource.includes('data-recipe-mode-option'),
@@ -526,11 +505,7 @@ describe('RecipeModeBanner (issue 643 §5)', () => {
     'utf8'
   );
 
-  // Retargeted for issue 1055: the banner is now FULLY PROP-DRIVEN, so a second instance
-  // (the Overview tab's check-modifier summary) can reuse the chrome without forking the
-  // component. The canonical option table therefore moved UP to the resolution-mode call
-  // site — `RecipeEditView` — and the pin moved with it. The invariant it protects is
-  // unchanged: exactly one such table exists in the tree.
+  // Retargeted for issue 1055: the banner is now FULLY PROP-DRIVEN.
   it('reuses the canonical resolution-mode option list rather than re-authoring one', () => {
     assert.ok(
       editSource.includes("import { resolutionModeOptions } from './resolutionModeOptions.js'"),
@@ -573,11 +548,6 @@ describe('RecipeModeBanner (issue 643 §5)', () => {
   // Two banners can stack on the Overview tab (issue 1055). `dataAttr` carries the
   // reported VALUE, so a shared hook would resolve to whichever rendered first, and the
   // two value spaces (`simple`/`progressive`/… vs `noCheck`/`noFormula`/…) are disjoint.
-  //
-  // The prop-ification stays load-bearing after the redesign dropped the neutral
-  // delegation banner: the inert warning's copy lives at ITS call site, so folding the
-  // lookup back into the component would re-create the mode-table drift it was extracted
-  // to prevent.
   it('takes its capture hook as a prop so two banners on one tab cannot collide', () => {
     assert.ok(bannerSource.includes('dataAttr'), 'the container hook is a prop');
     assert.ok(bannerSource.includes('actionDataAttr'), 'so is the action chip hook');
@@ -597,8 +567,7 @@ describe('RecipeModeBanner (issue 643 §5)', () => {
         `${attr} belongs to the call site, not the component`
       );
     }
-    // The rejected design's neutral "the system decides" banner is GONE, not merely
-    // unrendered: no hook for it survives on either side.
+    // The rejected design's neutral "the system decides" banner is GONE.
     for (const retired of ['data-recipe-modifier-banner-checks', 'data-recipe-modifier-banner=']) {
       assert.equal(
         overviewSourceLocal.includes(retired),
@@ -609,8 +578,6 @@ describe('RecipeModeBanner (issue 643 §5)', () => {
   });
 
   // Visual differentiation was promised by the design and is delivered as COLOUR ONLY:
-  // two stacked banners of identical geometry read as duplicated chrome otherwise, and
-  // changing the geometry would move the tab's layout depending on system config.
   it('differentiates a second banner by tone without moving its geometry', () => {
     assert.ok(bannerSource.includes("tone = 'info'"), 'tone defaults to the primary reading');
     for (const toneClass of ['is-neutral', 'is-warning']) {
@@ -650,8 +617,7 @@ describe('RecipeModeBanner (issue 643 §5)', () => {
   });
 
   it('lets the description WRAP — it is the one sentence the banner exists to deliver', () => {
-    // It was `white-space: nowrap` + ellipsis, so at 900px (and for any longer localized
-    // string) the sentence was truncated to a few words.
+    // It was `white-space: nowrap` + ellipsis.
     const desc = bannerSource.slice(bannerSource.indexOf('.manager-recipe-mode-banner-desc'));
     const block = desc.slice(0, desc.indexOf('}'));
     assert.equal(block.includes('white-space: nowrap;'), false, 'the sentence is not truncated');
@@ -752,8 +718,7 @@ describe('CraftingSystemManagerRoot recipe-edit machinery', () => {
       /function patchRecipeDraft\(/.test(rootSource),
       'patchRecipeDraft stages edits into the draft'
     );
-    // Adding a recipe to a book is authored on Books & Scrolls (issue 643 §2c), so
-    // the recipe-side add/link handlers are gone; per-book REMOVAL is retained.
+    // Adding a recipe to a book is authored on Books & Scrolls (issue 643 §2c).
     assert.equal(rootSource.includes('handleAddRecipeItem'), false, 'no recipe-side book-add path');
     assert.equal(
       rootSource.includes('handleSetRecipeItem'),
@@ -795,8 +760,7 @@ describe('CraftingSystemManagerRoot recipe-edit machinery', () => {
       'editor no longer calls store.revertRecipeToSingleStep'
     );
     assert.ok(rootSource.includes('canSaveRecipeEdit'), 'canSaveRecipeEdit derived');
-    // The rail's composition keys off the CANONICAL visibilityMode matrix, not the
-    // legacy recipeVisibility.knowledge.mode the old inspector gate read.
+    // The rail's composition keys off the CANONICAL visibilityMode matrix.
     assert.equal(
       rootSource.includes('recipeKnowledgeMode'),
       false,
@@ -820,9 +784,7 @@ describe('CraftingSystemManagerRoot recipe-edit machinery', () => {
   });
 
   it('never seeds an alchemy routing provider on Complex (the per-recipe provider is retired)', () => {
-    // Alchemy now routes on the system-level alchemy.checkMode, so the per-recipe
-    // resultSelection.provider is retired: entering Complex seeds NOTHING, and the
-    // Complex toggle is hidden for alchemy (its shape derives from checkMode).
+    // Alchemy now routes on the system-level alchemy.checkMode.
     assert.ok(
       !rootSource.includes(
         "import { chooseSeedProvider } from '../../../../migration/migrateRecipeForModeChange.js'"
@@ -833,9 +795,7 @@ describe('CraftingSystemManagerRoot recipe-edit machinery', () => {
       !rootSource.includes('chooseSeedProvider('),
       'root no longer seeds an alchemy resultSelection.provider'
     );
-    // The Simple/Complex toggle is gone entirely (issue 643): complexity is emergent
-    // from structure, and alchemy already forced a single set, so there is no toggle
-    // to hide any more.
+    // The Simple/Complex toggle is gone entirely (issue 643).
     assert.equal(
       rootSource.includes('hideComplexToggle'),
       false,
@@ -846,8 +806,7 @@ describe('CraftingSystemManagerRoot recipe-edit machinery', () => {
       false,
       'Overview declares no hideComplexToggle prop'
     );
-    // Alchemy forbids adding ingredient sets; the emergent add-set affordance is gated
-    // on recipeCanAddSet, which excludes alchemy.
+    // Alchemy forbids adding ingredient sets.
     assert.ok(
       rootSource.includes("recipeMultiSetAllowed && selectedSystem?.resolutionMode !== 'alchemy'"),
       'recipeCanAddSet excludes alchemy from the add-ingredient-set affordance'
@@ -862,7 +821,6 @@ describe('CraftingSystemManagerRoot recipe-edit machinery', () => {
       'revert content keeps the bold name placeholder'
     );
     // The Simple/Complex toggle (and its Switch-to-simple confirm) is gone (issue 643):
-    // complexity is emergent, so those keys are retired.
     assert.equal(
       recipeLang.SwitchToSimpleTitle,
       undefined,
@@ -962,17 +920,6 @@ describe('CraftingSystemManagerRoot recipe-edit machinery', () => {
       'Delete button uses Recipe.Delete'
     );
     // The destructive role, read off THE Delete element rather than off a source slice.
-    //
-    // This asked `rootSource.slice(<branch start>, <branch end>).includes('is-danger')`, and
-    // both halves of that were fragile in the same way. The literal went when the toolbar
-    // moved onto `ManagerButton` (issue 1118) — but note WHY it was invisible to a
-    // whole-file check: `is-danger` still occurs in this component, on four
-    // `manager-icon-button` sites that are a different primitive entirely. A token surviving
-    // somewhere else in the file is exactly what hides its disappearance from the region you
-    // meant, so the region is the wrong unit. And the slice's own bounds are two `indexOf`
-    // calls on branch preludes that no longer resolve the moment a route is renamed or
-    // reordered, at which point the assertion reads a garbage span instead of failing.
-    //
     // `onclick={deleteRecipeFromEdit}` occurs exactly once in the component and names this
     // control and no other, so it addresses the element without needing a slice at all. The
     // open tag is bounded by `[^<>]`, so the match stops at this element's own `>` and
@@ -1045,16 +992,7 @@ describe('CraftingSystemManagerRoot recipe-edit machinery', () => {
       rootSource.includes('store.resolveRecipeAccess?.('),
       'access ids are resolved in the STORE, never in the tab'
     );
-    // Issue 676: the aside IS suppressed on recipe-edit now, and that suppression plus the
-    // two-column override in styles/fabricate.css are ONE decision expressed twice —
-    // suppress without releasing and a 300px empty box holds the strip open; release
-    // without suppressing and the empty aside wraps to a row under the editor.
-    //
-    // ASKED AS SET MEMBERSHIP since issue 1362, which replaced the twelve-clause boolean
-    // guard this used to slice with a single read of `FULL_WIDTH_VIEWS`. That is the
-    // stronger question — the chain could name a route the stylesheet never released — and
-    // the helper asserts every index before it slices, which is the vacuous-green failure
-    // the comment this replaces named and did not actually defend against.
+    // Issue 676: the aside IS suppressed on recipe-edit now.
     assertFullWidthRoute({ rootSource, css, routeId: 'recipe-edit' });
   });
 
@@ -1065,8 +1003,7 @@ describe('CraftingSystemManagerRoot recipe-edit machinery', () => {
     assert.equal(block.includes('knowledgeMode'), false, 'no knowledgeMode prop on the view');
     assert.equal(block.includes('onAddRecipeItem'), false, 'no add-recipe-item prop on the view');
     assert.equal(block.includes('onSetRecipeItem'), false, 'no set-recipe-item prop on the view');
-    // The Books & Scrolls tab (issue 676) needs the library + the unlink; the rail took
-    // exactly these before it was deleted.
+    // The Books & Scrolls tab (issue 676) needs the library + the unlink.
     assert.ok(
       block.includes('{recipeItemDefinitions}'),
       'the definition library reaches the books tab'
@@ -1121,10 +1058,6 @@ describe('recipe-edit CSS uses the standard shell, not a bespoke workspace', () 
   it('puts the context rail on the ONE shared right-hand-panel surface', () => {
     // Issue 643 put the Recipe Studio rail on the SAME surface as its main editor panel
     // (--fab-bg-2) while every other screen kept the lighter --fab-bg-3.
-    // Issue 881 removed that split: the Tool Studio's right panel is the same shade the
-    // Recipe Studio rail already used, so the odd one out was the shared rule, and the
-    // Tags & Categories rail read visibly lighter than the panel it must match. One shade
-    // now, so the per-view carve-out must be GONE, not merely unused.
     assert.match(
       css,
       /\.fabricate-manager\s+\.manager-inspector\s*\{[^}]*background:\s*var\(--fab-bg-2\);/,
@@ -1135,8 +1068,7 @@ describe('recipe-edit CSS uses the standard shell, not a bespoke workspace', () 
       /\[data-manager-view="(?:recipe-edit|recipes)"\]\s+\.manager-inspector\s*\{[^}]*background:/,
       'no per-view inspector background override survives'
     );
-    // The Tool Studio's own right-hand panel resolves through the same token, so the two
-    // panels cannot drift apart by having one written as a raw ramp step.
+    // The Tool Studio's own right-hand panel resolves through the same token.
     assert.match(
       css,
       /\.fabricate-manager\s+\.manager-tool-preview\s*\{[^}]*background:\s*var\(--fab-bg-2\);/,
@@ -1176,8 +1108,7 @@ describe('recipe-edit CSS uses the standard shell, not a bespoke workspace', () 
   });
 
   it('keeps the environment workspace inspector consistent at the standard 300px', () => {
-    // The BASE rule, which is the unindented one: the workspace's narrow override sets only
-    // the column token and is declared earlier in the sheet (issue 1096).
+    // The BASE rule, which is the unindented one.
     const block = css.match(/^\.fabricate-manager \.manager-environment-workspace\s*\{[^}]*\}/m);
     assert.ok(block, '.manager-environment-workspace rule exists');
     assert.match(
@@ -1225,8 +1156,7 @@ describe('linked scene/recipe-item name truncation (shared class)', () => {
     assert.match(block[0], /text-align:\s*left/, 'stays left-aligned');
   });
 
-  // Issue 676: the recipe's book rows no longer borrow this gathering class — a book is
-  // not a scene. The class remains the environment editor's own.
+  // Issue 676: the recipe's book rows no longer borrow this gathering class.
   it('is not borrowed by the recipe Books & Scrolls tab', () => {
     assert.equal(
       booksTabSource.includes('manager-environment-scene-name'),
@@ -1299,8 +1229,7 @@ describe('recipe default image is the blueprint, sourced from one canonical lite
   });
 
   it('keeps a single source-of-truth literal (no duplicated blueprint string in new code)', () => {
-    // The only places the literal path appears: the model definition, and the
-    // picker option filename list (a separate concern, not a default fallback).
+    // The only places the literal path appears: the model definition.
     const inModel = (modelSource.match(/blueprint-recipe-alchemical\.webp/g) || []).length;
     assert.equal(inModel, 1, 'exactly one literal in the model');
     // recipeImageIcons re-exports the constant rather than redeclaring the literal.
@@ -1410,9 +1339,7 @@ describe('recipe image readers resolve the recipe own image through the shared h
     }
   });
 
-  // The Access pair imported DEFAULT_CRAFTING_IMAGE for the deleted wrapper ALONE, so
-  // the import was SWAPPED rather than added. CI `lint` does not cover `src/ui`, so a
-  // left-behind dead import has no other guard.
+  // The Access pair imported DEFAULT_CRAFTING_IMAGE for the deleted wrapper ALONE.
   it('leaves no dead DEFAULT_CRAFTING_IMAGE import behind in the Access pair', () => {
     for (const [name, source] of [
       ['AccessTabView', accessSurfaceSource],
@@ -1426,19 +1353,7 @@ describe('recipe image readers resolve the recipe own image through the shared h
     }
   });
 
-  // Each call passes the identifier that surface actually binds: the browser inspector's
-  // prop is `selectedRecipe` and it has no `recipe` in scope at its render site at all.
-  //
-  // READ AS TAGS RATHER THAN AS A LITERAL PREFIX (issue 1506). These four assertions pinned
-  // `'<Medallion src={resolveRecipeImage(recipe)}'` and `'<img class="manager-recipe-thumb" …'`
-  // as substrings, which is a claim about the FORMATTING as much as about the call: renaming the
-  // prop `art` widened two of these tags past the print width and Prettier broke them over five
-  // lines, at which point the substring matched nothing and the guard reported a borrow that had
-  // not happened. The two Access surfaces went further and stopped being raw `<img>` elements at
-  // all when the art-tile unification converted them, so their DOM shape is no longer the
-  // distinguishing fact either. The property is unchanged — each surface resolves ITS OWN
-  // identifier through the one shared chokepoint — and it is now asked of the tag rather than of
-  // the line, over all four surfaces rather than over two shapes.
+  // Each call passes the identifier that surface actually binds.
   it('calls the resolver at each existing render site with that surface own identifier', () => {
     const bindsArtThrough = (source, expression) =>
       openingTagsNamed(source, 'Medallion').some((tag) =>
@@ -1490,8 +1405,7 @@ describe('recipe image readers resolve the recipe own image through the shared h
 });
 
 describe('RecipeEditView keeps the recipe image always editable', () => {
-  // A recipe can belong to many books & scrolls (recipeIds[] is many-to-many), so the
-  // image no longer mirrors or locks to a single linked recipe item (issue 643).
+  // A recipe can belong to many books & scrolls (recipeIds[] is many-to-many).
   it('drops the linked-state derivation and the linkedItemImage prop', () => {
     assert.equal(editSource.includes('isRecipeItemLinked'), false, 'no linked-state derivation');
     assert.equal(editSource.includes('linkedItemImage'), false, 'no linkedItemImage prop');
@@ -1622,16 +1536,7 @@ describe('recipe image picker no longer reuses the scene-locked visuals', () => 
   });
 });
 
-// Issue 1018. Two DIFFERENT predicates used to share the name `enableBlocked`: the recipe
-// ACTIVATION GATE (`RecipeManager.canActivateRecipe`, projected onto the GM browser rows)
-// and the recipe editor's enable-TOGGLE gate (a readiness forecast). They are
-// INCOMPARABLE — neither bounds the other — so the editor one was renamed to
-// `enableToggleBlocked` and the projection kept the original name.
-//
-// This guard is deliberately TWO-SIDED. "The editor pair contains no `enableBlocked`" is
-// satisfied just as well by deleting the editor predicate, or by renaming the PROJECTION
-// and leaving the editor alone — both of which would re-merge or destroy the distinction
-// while reading green. So the positive half pins BOTH names at BOTH ends.
+// Issue 1018. Two DIFFERENT predicates used to share the name `enableBlocked`.
 describe('the editor enable-toggle gate is named apart from the activation gate (issue 1018)', () => {
   it('leaves no `enableBlocked` anywhere in the editor pair', () => {
     // Substring, not word-boundary: `enableToggleBlocked` does not contain `enableBlocked`,
@@ -1649,8 +1554,7 @@ describe('the editor enable-toggle gate is named apart from the activation gate 
   });
 
   it('keeps the editor predicate declared and forwarded as `enableToggleBlocked`', () => {
-    // The declaration, not just the identifier: deleting the predicate and leaving a
-    // stray mention would otherwise pass.
+    // The declaration, not just the identifier.
     assert.ok(
       editSource.includes(
         'const enableToggleBlocked = $derived(!enabled && blocksEnable(readiness.issues))'

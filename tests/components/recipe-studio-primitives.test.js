@@ -11,9 +11,7 @@ import { createMountedComponentHarness } from '../helpers/svelte-component-harne
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
-// Every primitive is a leaf: no rawModules, no sibling components. If one of these
-// ever grows an import, this list is where the omission shows up — as a hang
-// (`# cancelled`), never a failure.
+// Every primitive is a leaf: no rawModules.
 const PRIMITIVES = ['Stepper', 'Medallion', 'CollapsibleGroupHeader'];
 
 const harnesses = new Map(
@@ -173,9 +171,7 @@ describe('Medallion (mounted)', () => {
     assert.match(style, /width:52px;height:52px/);
   });
 
-  // `art` renamed `src` in issue 1506, and the old name is kept as an alias for ONE release so
-  // an out-of-tree caller is not broken by a prop rename it never saw. An alias nothing exercises
-  // is an alias nobody notices is broken, so it is mounted here rather than only described.
+  // `art` renamed `src` in issue 1506.
   it('still answers to the DEPRECATED `src` alias, and lets `art` win over it', async () => {
     const aliased = await harnessFor('Medallion').mount({ src: 'icons/svg/book.svg' });
     assert.equal(
@@ -198,15 +194,6 @@ describe('Medallion (mounted)', () => {
 
 /**
  * THE GLYPH-CHIP VARIANT (issue 1371, parity round 5, UX finding F12).
- *
- * The reference's list rows draw their leading chip as a BORDERLESS rounded square carrying a
- * tinted glyph on one shared slate surface (`proto:600` at 38px, `proto:1078`'s cohort at 40px).
- * The shipped tile is that shape with a hairline around it and, once tinted, a per-category wash
- * behind the glyph. One parity run measured that single difference as fourteen `compare` lines
- * across three regions on three screens.
- *
- * The variant is OPT-IN, so the assertion that matters most is the negative one: a medallion that
- * does not ask for it must render exactly the tile ~40 call sites across the manager render today.
  * The rest of the geometry is the caller's — `size` and `glyph` are existing props and the variant
  * deliberately restates neither, because a primitive that took the row's dimensions as an
  * argument and then hard-coded them in a variant would hold two answers to one question.
@@ -219,8 +206,7 @@ describe('Medallion glyph-chip variant (mounted)', () => {
   const styleBlock = medallionSource.slice(medallionSource.search(/^<style>$/m));
 
   /**
-   * The declarations one rule states, comments stripped so a paragraph naming a property cannot
-   * answer for a declaration that states it.
+   * The declarations one rule states.
    *
    * @param {string} head the rule's full selector, e.g. `.fab-medallion.is-glyph-chip`
    * @returns {string[]} `property: value` pairs, in source order
@@ -287,25 +273,11 @@ describe('Medallion glyph-chip variant (mounted)', () => {
   });
 
   it('states the borderless edge as `border: 0`, so the STYLE goes too', () => {
-    // `border: 0` rather than `border-width: 0`, and the shorthand is the point rather than a
-    // shortening of one. `border-width: 0` shipped first and left the base rule's `solid` and
-    // its `var(--fab-border)` standing under a zero-width edge — invisible, and still two of the
-    // four properties the parity oracle reads for a `border` region, so it reported
-    // `borderTopStyle: solid !== none` against a reference chip that declares no border at all
-    // (`proto:5242`). The shorthand resets the style to `none` and the colour to `currentcolor`,
-    // which is what the reference computes.
-    //
-    // The assertion is the WHOLE declaration list, not a substring, for the same reason it was
-    // before: this rule states the edge and NO geometry: 38 and 40 are the CALLER's `size`, so a
-    // width or a height here would be a second copy of the row's geometry.
+    // `border: 0` rather than `border-width: 0`.
     assert.deepEqual(declarationsOf('.fab-medallion.is-glyph-chip'), ['border: 0']);
   });
 
-  // Issue 1506 deleted `cancels the tint WASH while keeping the tinted glyph`: it asserted the
-  // (0,3,0) rule that cancelled `.fab-medallion.has-tint`'s surface mix for this variant, and the
-  // wash it cancelled is gone from every medallion, so there is nothing left for the variant to
-  // cancel. The half of it worth keeping — that the GLYPH's colour survives the tint — moved into
-  // the composition case above, where it is now read off the rendered tile rather than off a rule.
+  // Issue 1506 deleted `cancels the tint WASH while keeping the tinted glyph`.
 });
 
 describe('CollapsibleGroupHeader (mounted)', () => {
@@ -328,10 +300,7 @@ describe('CollapsibleGroupHeader (mounted)', () => {
       'an expanded group shows the down chevron'
     );
 
-    // A tight LEFT CLUSTER: chevron, folder, name, count — then empty bar. `flex: 1 1 auto`
-    // on the name grew it to fill the row and flung the count to the far right edge, which
-    // made the bar read as a table header with a column of counts. The trailing spacer is
-    // what keeps the bar full-bleed while the cluster stays left.
+    // A tight LEFT CLUSTER: chevron, folder, name, count.
     const children = [...header.children].map((child) => child.classList[0]);
     assert.deepEqual(
       children.slice(-2),

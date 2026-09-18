@@ -19,19 +19,7 @@ test('manager establishes a positioning root for portaled picker overlays', () =
 });
 
 test('essence icon picker popover uses an absolute layered overlay', () => {
-  // RETARGETED (issue 1503). Both pickers render through `SearchablePopover` now, so the panel
-  // node carries `fabricate-picker-popover manager-travel-popover` as well as each caller's own
-  // pair — and the caller's own panel block, which used to own these three declarations, is gone.
-  // The panel box is the SHARED primitive's, and this is where that is pinned.
-  //
-  // `z-index` is the one figure that moved rather than merely relocating: 120 was the caller's,
-  // 4000 is the shared panel's, so the panel now stacks above anything between the two. Issue
-  // 1503's real-browser enumeration measures that band (`manager-layout.test.js`) rather than
-  // asserting it is empty; what this clause pins is the value itself.
-  //
-  // Issue 1470 had re-rooted the old rule off `.fabricate-manager` and onto the namespace class
-  // each primitive writes on the panel it portals; the same principle holds here, one primitive
-  // further out.
+  // RETARGETED (issue 1503). Both pickers render through `SearchablePopover` now.
   const match = css.match(/\.fabricate-picker-popover\.manager-travel-popover \{[\s\S]*?\}/);
 
   assert.ok(match, 'the shared picker panel block should exist');
@@ -59,9 +47,7 @@ test('essence icon picker options use a fixed icon column with compact padding',
 
   assert.ok(block.includes('grid-template-columns: var(--fab-icon-picker-chip) minmax(0, 1fr);'), 'option rows should reserve a fixed icon column');
   assert.ok(block.includes('padding: var(--fab-space-1) var(--fab-space-2);'), 'option rows should use compact row padding');
-  // Was `min-height: 34px`, pinned as "a stable row height" — which is how a row 4px too short
-  // for its own 28px chip stayed green for so long. The height is DERIVED now (issue 1280); the
-  // arithmetic behind the token is asserted at the bottom of this file.
+  // Was `min-height: 34px`, pinned as "a stable row height".
   assert.ok(block.includes('min-height: var(--fab-icon-picker-row);'), 'option rows should derive their height from the chip they contain');
 });
 
@@ -129,8 +115,7 @@ test('the row arithmetic actually holds: chip + padding + border fits', () => {
 });
 
 test('both the option row and the trigger size themselves from that token', () => {
-  // The trigger regressed alongside the row, at 36px for the same 38px of content, so both are
-  // pinned: fixing one and leaving the other is exactly what happened last time.
+  // The trigger regressed alongside the row, at 36px for the same 38px of content.
   for (const selector of [
     '.fabricate-icon-picker-popover.essence-icon-picker-popover .essence-icon-picker-option {',
     '.fabricate-icon-picker .essence-icon-picker-trigger {',
@@ -157,10 +142,7 @@ test('the chip column is the chip token too, so the grid cannot narrow it indepe
 });
 
 test('the chip itself is square and sized from the token', () => {
-  // TWO selectors share this block, and both are load-bearing (issue 1470): the chip is painted
-  // once in the trigger, which stays inside the picker's own root, and once per option row, which
-  // travels with the portaled panel and therefore loses that root. A single-rooted rule would
-  // size one of the two and leave the other at its intrinsic size.
+  // TWO selectors share this block, and both are load-bearing (issue 1470).
   const selector = '.fabricate-icon-picker-popover .essence-icon-picker-preview {';
   assert.ok(
     /\.fabricate-icon-picker \.essence-icon-picker-preview,\s*\.fabricate-icon-picker-popover \.essence-icon-picker-preview \{/.test(
@@ -179,29 +161,9 @@ test('the chip itself is square and sized from the token', () => {
 // reaches a `styles/fabricate.css` rule at all. A mounted harness compiles components with
 // `css: 'injected'` and never loads this sheet (`tests/helpers/scoped-component-css.js`), so a
 // `document.styleSheets` walk cannot see any of them, and happy-dom cannot compute a cascade.
-//
-// What this file CANNOT do is witness a rendered cascade: it reads rule text, not a resolved
-// winner. The composition these rules take part in — the active outline over the selected fill,
-// the list's computed `display` — is proved in the real browser by `manager-layout.test.js`.
 
 test('the keyboard cursor is an inset outline, and composes over the fill it does not own', () => {
-  // CRITERION 3(b). The cursor cannot be photographed: the View Lab's capture verbs are
-  // `Enter`/`Space` only, so no case can press an arrow key, and `activeIndex` starts at the -1
-  // sentinel — no row carries the marker until one is pressed. So the RULE is pinned here and
-  // its COMPOSITION is proved in the real browser.
-  //
-  // The three properties this asserts are the whole design decision. The interaction ladder has
-  // three FILL rungs — rest, hover, pressed/selected — and a listbox that also marks a current
-  // value has spent all three. A keyboard cursor is a fourth, orthogonal state (a row can be
-  // active AND selected AND hovered at once), so it takes a different CHANNEL rather than a
-  // fourth rung. Declaring a `background` or a `border-color` here would be that fourth rung,
-  // and on `IconPicker` it would land on the pinned resolved row — the row that IS the selected
-  // one — erasing exactly the fill a GM needs to see. So their ABSENCE is asserted, not implied.
-  //
-  // The negative offset is the second half: it draws the ring INSIDE the row's border box, which
-  // is what tells it apart from the positive-offset focus ring `.fabricate [tabindex]:focus-visible`
-  // paints. Options never take DOM focus, so the two never collide — but the sign is what makes
-  // that legible rather than lucky.
+  // CRITERION 3(b). The cursor cannot be photographed.
   const selector =
     ".fabricate-picker-popover.manager-travel-popover .manager-travel-option[data-active-option='true']";
   assert.ok(
@@ -232,10 +194,6 @@ test('the grid form is EMITTED by the sheet, not by an inline style', () => {
   // template nor the column count may ride an inline style — they would be replaced on the first
   // measure. The primitive stamps `data-picker-as` and `data-picker-columns` on the list element
   // instead, and these two rungs are what paint from them.
-  //
-  // Without them `as="grid"` would only re-map the arrow keys: the shared list rule declares
-  // `display: flex`, which ties the caller's old (0,2,0) rule and wins on source order, so the
-  // source picker's two-column panel would render as a single column.
   const display = css.match(
     /\.fabricate-picker-popover \.manager-travel-popover-options\[data-picker-as='grid'\] \{[\s\S]*?\}/
   );
@@ -254,20 +212,6 @@ test('the grid form is EMITTED by the sheet, not by an inline style', () => {
 
 test('the whole-row flooring counts every box the sheet puts between the rows', () => {
   // A HAND-MAINTAINED MIRROR, and this is the gate that stops it rotting (issue 1503).
-  //
-  // `IconPicker.measurePopoverMetrics` promises the shared panel measurements from which
-  // `computeIconPickerPopoverLayout` can floor the list to a WHOLE number of rows. `rowPitch` is
-  // a row's BORDER BOX (`getBoundingClientRect`) plus the list's `row-gap`, so any box the sheet
-  // puts between the rows that is OUTSIDE a border box — a margin — is height the list renders
-  // and the pitch cannot see. Uncounted it is height nothing knows about, and the panel clips the
-  // last row by exactly that many pixels: the published AFTER frame sliced 8 of row seven's 38,
-  // which is `--fab-space-2` to the pixel.
-  //
-  // The two facts live in different files and neither is derived from the other, so this reads
-  // both: every outer margin the sheet declares on a row inside the list must be measured by the
-  // component AND handed over as `listExtra`. Adding a margin rung to the sheet without measuring
-  // it reds here.
-  //
   // WHAT THIS CLAUSE DOES NOT DO, and why the arithmetic is not here. A text-presence check
   // proves a term is mentioned, never that the sum is right: folding the margin into
   // `chromeHeight` mentions it, and leaves the list exactly one margin too short, because chrome

@@ -35,11 +35,7 @@ describe('GatheringEventEditView source contract', () => {
     );
   });
 
-  // The 1..100 floor is an EVENT rule — the hint says "Chance from 1 to 100", `dropRateValid`
-  // enforces it and an error renders below it — so it survives the move to the shared
-  // control (issue 883) rather than being normalised away to the task-drop floor of 0. The
-  // clamp itself now lives one seam further out, in `ChanceSlider`, so the contract is
-  // asserted across BOTH halves: the editor asks for the floor, the control honours it.
+  // The 1..100 floor is an EVENT rule — the hint says "Chance from 1 to 100".
   it('clamps dropRate to 1..100 before dispatching the update', () => {
     assert.ok(/\bmin=\{1\}/.test(editorSource), 'editor should ask the shared slider for a floor of 1');
     assert.equal(
@@ -111,8 +107,7 @@ describe('GatheringEventEditView source contract', () => {
         `editor should render through the shared slider, not hand-rolled ${dead}`
       );
     }
-    // Matched as a definition and as a binding, not as a bare name: the source comment
-    // recording the removal names the handler on purpose.
+    // Matched as a definition and as a binding, not as a bare name.
     assert.equal(
       /function\s+onDropRateInput\s*\(/.test(editorSource),
       false,

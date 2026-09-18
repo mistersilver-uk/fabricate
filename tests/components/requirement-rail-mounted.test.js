@@ -1,12 +1,4 @@
-/**
- * RequirementRail + RequirementTile (issue 917).
- *
- * The claims under test are the ones a reviewer cannot check by reading: that the
- * rail is a DISCLOSURE (fixed slots expose a name without promising a selection,
- * selectable slots carry aria-expanded/aria-controls over the whole column), that
- * exactly one chooser reads as open, and that a read-only rail offers no controls
- * at all.
- */
+/** RequirementRail + RequirementTile (issue 917). */
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -25,18 +17,7 @@ import {
 const repoRoot = resolve(import.meta.dirname, '../..');
 const RAIL_PATH = 'src/ui/svelte/apps/crafting/detail/RequirementRail.svelte';
 
-// ---------------------------------------------------------------------------
 // Issue 1493 — the currency fixture is evaluated END TO END, not hand-written.
-//
-// The acceptance criterion is explicitly ONE test: a real `evaluateCraftability`
-// result, projected by the real `buildRequirementSlots`, rendered by the real rail. A
-// slot literal with an `issue` typed into it proves the projection and the markup, but
-// not that anything upstream ever produces the field — which is the whole capability.
-//
-// The Foundry globals and the manager import must therefore happen HERE, before the
-// harness replaces `game` with its i18n stub in `before()`; the craftability is a plain
-// object by then, so nothing below depends on these globals surviving.
-// ---------------------------------------------------------------------------
 globalThis.foundry = {
   utils: {
     randomID: () => 'fixed-id',
@@ -54,14 +35,10 @@ const { Recipe } = await import('../../src/models/Recipe.js');
 const CURRENCY_SYSTEM_ID = 'sys-1493-rail';
 
 /**
- * Evaluate a two-requirement recipe — one held item, one 100 gp cost — against the
- * given world ladder, with a player carrying both the plank and a thousand gold.
+ * Evaluate a two-requirement recipe — one held item, one 100 gp cost.
  *
  * @param {object[]} units The world's currency ladder. Omitting `actorPath` is the
- *   misconfiguration under test: the unit exists but cannot be read off any actor.
  * @param {number} [gp] The purse the cost is evaluated against. The default is ten times
- *   the toll, because the misconfiguration case is only a defect for a player who could
- *   plainly pay; a poor purse is what distinguishes a genuine shortfall from it.
  */
 function craftabilityFor(units, gp = 1000) {
   const manager = makeCurrencyRecipeManager(RecipeManager, {
@@ -118,8 +95,7 @@ const harness = createMountedComponentHarness({
   compiledModules: [
     'src/ui/svelte/components/Medallion.svelte',
     'src/ui/svelte/apps/crafting/detail/RequirementTile.svelte',
-    // The shared eyebrow (issue 1505). The rail's header title is a `<Kicker>`, so
-    // omitting it HANGS this suite (# cancelled), never fails it.
+    // The shared eyebrow (issue 1505). The rail's header title is a `<Kicker>`.
     'src/ui/svelte/components/Kicker.svelte',
     'src/ui/svelte/apps/crafting/detail/RequirementRail.svelte',
   ],
@@ -177,9 +153,7 @@ describe('RequirementRail mounted behavior', () => {
     );
   });
 
-  // A fixed slot is not selectable, so a tab or button role would promise a choice
-  // the surface does not offer; an aria-label on a non-focusable span exposes nothing
-  // at all, hence role="img".
+  // A fixed slot is not selectable.
   it('exposes a fixed slot as a labelled image, never as a control', async () => {
     const target = await harness.mount({ slots: slots() });
     const [fixed] = tilesIn(target);
@@ -252,28 +226,18 @@ describe('RequirementRail mounted behavior', () => {
     assert.ok(glyph.querySelector('i').classList.contains('fa-sun'));
   });
 
-  // One essence, ONE component — and since issue 1506 one component for the whole app, not just
-  // for the Crafting tab. The rail used to inline its own glyph box; then the crafting essence
-  // tile carried it; now the shared `Medallion` does, so the alternatives picker, the shopping
-  // list and this rail draw the same essence through the same tile as every manager screen.
-  //
-  // The smoke harness waits inside `[data-slot-kind="essence"]` on the tile's own data hook,
-  // which is what the retired caller-owned `requirement-slot-glyph` class used to provide; the
-  // shared tile has no `class` prop and needs none, so the hook must survive HERE.
+  // One essence, ONE component — and since issue 1506 one component for the whole app.
   it('draws the essence glyph with the shared tile', async () => {
     const target = await harness.mount({ slots: slots() });
     const glyph = tilesIn(target)[2].querySelector('[data-medallion]');
     assert.ok(Boolean(glyph), 'the shared tile renders it, and the smoke harness can find it');
     const style = glyph.getAttribute('style');
     assert.match(style, /width:\s*44px;\s*height:\s*44px/);
-    // 44 * 0.42 rounded to the 18px the retired tile computed, passed explicitly so the glyph
-    // does not fall back to the primitive's flat 0.9rem and shrink inside a 44px slot.
+    // 44 * 0.42 rounded to the 18px the retired tile computed.
     assert.match(style, /--fab-medallion-glyph:\s*18px/);
   });
 
-  // WCAG 2.5.3 Label in Name: the accessible name must CONTAIN the visible label, or
-  // speech activation by the visible label fails. Labelling the button with the hint
-  // sentence replaced "Pick for me" entirely.
+  // WCAG 2.5.3 Label in Name: the accessible name must CONTAIN the visible label.
   it('names Pick for me by its visible label and keeps the hint on the title', async () => {
     const target = await harness.mount({ slots: slots() });
     const wand = target.querySelector('[data-requirement-pick-for-me]');
@@ -322,8 +286,7 @@ describe('RequirementRail mounted behavior', () => {
     assert.ok(!settled.querySelector('[data-requirement-pick-for-me]'));
   });
 
-  // A later step's rail, or one whose time gate is armed, describes a craft the
-  // button will not fire, so it must offer nothing to press.
+  // A later step's rail, or one whose time gate is armed.
   it('renders read-only with no controls and an explanation', async () => {
     const target = await harness.mount({ slots: slots(), readOnly: true, openSlotId: 'g-choice' });
     assert.equal(target.querySelectorAll('button').length, 0, 'no control anywhere in the rail');
@@ -341,8 +304,7 @@ describe('RequirementRail mounted behavior', () => {
     assert.equal(live.getAttribute('role'), 'status');
     assert.match(live.textContent, /Slots\.NowShowing/);
 
-    // Auto-advance elsewhere in the rail changes the text, which is what a screen
-    // reader hears; focus is never moved.
+    // Auto-advance elsewhere in the rail changes the text.
     const advanced = await harness.setProps({ slots: slots(), openSlotId: 'essence-pool' });
     assert.match(advanced.querySelector('[data-requirement-rail-live]').textContent, /Radiant/);
   });
@@ -356,19 +318,15 @@ describe('RequirementRail mounted behavior', () => {
     assert.equal(target.querySelector('[data-requirement-rail-live]').textContent.trim(), 'Picked for you.');
   });
 
-  // -------------------------------------------------------------------------
   // Issue 1493. Every case below renders a REAL craftability through the real
   // projection: `buildRequirementSlots(evaluateCraftability(fixture))`.
-  // -------------------------------------------------------------------------
 
   it('draws no have/need pip on a currency tile, affordable or not', async () => {
     for (const ladder of [SPENDABLE_GOLD_UNITS, UNSPENDABLE_GOLD_UNITS]) {
       const target = await harness.mount({ slots: buildRequirementSlots(craftabilityFor(ladder)) });
       const [plank, toll] = tilesIn(target);
       assert.ok(plank.querySelector('.requirement-slot-pip'), 'an item tile keeps its ratio');
-      // `have` is always 0 and `need` is a PRICE, so "0/100" would state a shortfall a
-      // player holding 1000 gp does not have. assert.ok(!el) rather than an equality
-      // check on the element, which OOMs happy-dom.
+      // `have` is always 0 and `need` is a PRICE.
       assert.ok(!toll.querySelector('.requirement-slot-pip'), 'a currency tile draws none');
       assert.match(toll.querySelector('.requirement-slot-caption').textContent, /100 gp/);
       harness.remount();
@@ -402,8 +360,7 @@ describe('RequirementRail mounted behavior', () => {
 
   it('renders the world currency reason ONCE for the rail, not once per tile', async () => {
     const craftability = craftabilityFor(UNSPENDABLE_GOLD_UNITS);
-    // Two currency requirements from one broken world: the reason is a property of the
-    // configuration, so repeating it per tile would assert it of each.
+    // Two currency requirements from one broken world.
     const doubled = {
       ...craftability,
       ingredientStates: [
@@ -425,10 +382,7 @@ describe('RequirementRail mounted behavior', () => {
     );
   });
 
-  // -------------------------------------------------------------------------
-  // Issue 1493 (revision 2) — every currency accessible name is on a KEYED path, and
-  // the English fallbacks byte-match the shipped copy.
-  // -------------------------------------------------------------------------
+  // Issue 1493 (revision 2) — every currency accessible name is on a KEYED path.
 
   it('reads the unresolvable currency name through its localization key', async () => {
     // Proves the sentence is keyed rather than composed. The harness returns the key for
@@ -471,19 +425,7 @@ describe('RequirementRail mounted behavior', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Issue 1493 (revision 3) — the rail's currency copy, read from the REAL `lang/en.json`.
-//
-// The component carries no English fallbacks for these keys. Every one of them ships in
-// this same change and Foundry merges `en` under every other language, so a fallback could
-// only ever be a second wording of the same sentence that nothing forces to agree with the
-// first — and the guard for the pair covered two of the five keys, so drifting the other
-// three changed nothing anybody could see.
-//
-// Backing `game.i18n` with the shipped file instead makes the DOM itself the guard: a
-// renamed key renders as its dotted self, and reworded copy renders the new words. Both
-// fail the literals below.
-// ---------------------------------------------------------------------------
 
 describe('RequirementRail currency copy (issue 1493)', () => {
   let restoreI18n = () => {};

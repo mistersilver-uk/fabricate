@@ -27,10 +27,7 @@ describe('GatheringEventsBrowserView source contract', () => {
     // input itself — a source assertion left pointing at moved markup passes for the wrong
     // reason or fails for one.
     assert.ok(browserSource.includes('<ManagerSearchField'), 'browser should render the shared search field');
-    // The term is no longer this component's to own (issue 1438): it lives on the lifted
-    // `browserState` the manager root binds, so the field reads a `$derived` alias and writes
-    // back through `ui`. Both halves are asserted — a read with no writer renders a field the
-    // GM cannot type into, and passes a presence-only check.
+    // The term is no longer this component's to own (issue 1438).
     assert.ok(browserSource.includes('value={searchTerm}'), 'browser should render the search term');
     assert.ok(
       browserSource.includes('onInput={(next) => (ui.searchTerm = next)}'),
@@ -57,8 +54,7 @@ describe('GatheringEventsBrowserView source contract', () => {
     assert.ok(headBlockStart >= 0, 'head block should be present');
     const headBlockEnd = browserSource.indexOf('</div>', headBlockStart);
     const headBlock = browserSource.slice(headBlockStart, headBlockEnd);
-    // See `gathering-task-browser-redesign.test.js`: issue 1515 made this browser a list, so the
-    // strip is `aria-hidden` and its labels carry no `columnheader` role.
+    // See `gathering-task-browser-redesign.test.js`: issue 1515 made this browser a list.
     assert.ok(headBlock.includes('aria-hidden="true"'), 'the column strip should be aria-hidden');
     assert.equal(headBlock.includes('role="columnheader"'), false, 'no column headers in a list');
     const headerMatches = headBlock.match(/<span/g) || [];

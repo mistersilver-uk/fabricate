@@ -34,9 +34,7 @@ describe('assertNoElement keeps a failing DOM assertion bounded', () => {
   after(teardownDOM);
 
   it('states the case for the helper: inspecting a happy-dom node explodes with depth', () => {
-    // Twelve nodes. `node:assert` renders at depth 1000, so this curve is why handing a live
-    // element to `assert.equal(element, null)` can take a machine down when it FAILS — which
-    // is precisely while someone is developing a regression.
+    // Twelve nodes. `node:assert` renders at depth 1000.
     const element = buildChain(12).querySelector('[data-depth="5"]');
     const sizes = [2, 4, 6].map(
       (depth) => inspect(element, { ...ASSERT_INSPECT_OPTIONS, depth }).length

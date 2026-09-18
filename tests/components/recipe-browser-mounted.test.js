@@ -46,14 +46,6 @@ function rectOf(width) {
 /**
  * Stub the two boxes `anchoredPopover` measures, BEFORE the panel opens.
  *
- * BOTH, and in this order, because happy-dom lays nothing out and returns zeros for every rect.
- * The trigger's width is what the band resolves against; the HOST's is what caps it —
- * `computeIconPickerPopoverLayout` works in `availableWidth = hostWidth − 2 × viewportMargin` and
- * returns `null` outright for a zero-width viewport, at which point `anchoredPopover` writes an
- * EMPTY style attribute with or without a `maxWidth` and the assertion below would pass over the
- * defect it exists to catch. `sync()` measures at action mount, so both stubs must be installed
- * before the click rather than before the read.
- *
  * @param {HTMLElement} root The mount target, which is the overlay host.
  * @param {string} triggerSelector
  * @param {number} triggerWidth
@@ -231,9 +223,7 @@ describe('RecipeBrowser mounted behavior', () => {
     assert.equal(favToggles, 1, 'favourites toggle callback fired');
     assert.equal(craftToggles, 1, 'craftable toggle callback fired');
 
-    // DRIVEN THE WAY A PLAYER DRIVES IT (issue 1511): the control is a `<button>` opening a
-    // portaled list, so reading the offered values means opening the panel, and choosing one is
-    // two clicks rather than a `value` write and a synthetic `change`.
+    // DRIVEN THE WAY A PLAYER DRIVES IT (issue 1511).
     const trigger = '[data-crafting-system-filter]';
     assert.deepEqual(
       selectOptionValues(target, trigger),
@@ -373,10 +363,7 @@ describe('RecipeBrowser mounted behavior', () => {
     assert.match(empty.textContent, /Browser\.Empty/, 'uses the generic empty localization key');
   });
   it('names each converted filter by the caption it renders, not by a duplicated string', async () => {
-    // THE `aria-label` BOTH FILTERS CARRIED IS GONE, and this is the assertion that says what
-    // replaced it. `ariaLabelledBy` and `ariaLabel` are mutually exclusive on this primitive —
-    // a labelledby wins in the accessibility tree — so passing both would have left a string
-    // free to drift from the caption beside it.
+    // THE `aria-label` BOTH FILTERS CARRIED IS GONE.
     const target = await harness.mount({
       recipes: [recipe({ id: 'r1' })],
       totalCount: 1,
@@ -437,9 +424,6 @@ describe('RecipeBrowser mounted behavior', () => {
     // the half that says THIS caller's prop reaches the layout. Without the `maxWidth` the
     // `inline` rung's own 240 ceiling clamps a 280px trigger's panel to 240, so the figures below
     // differ with and without it.
-    //
-    // Read from `getAttribute('style')` rather than `style.cssText`: happy-dom drops a nested
-    // `var()` out of `cssText`, and the attribute is the verbatim string the action wrote.
     const target = await harness.mount({
       recipes: [recipe({ id: 'r1' })],
       totalCount: 1,
@@ -467,11 +451,7 @@ describe('RecipeBrowser mounted behavior', () => {
   });
 
   it('keeps both filters full-width by restating it, since a trigger hugs its value', async () => {
-    // THE REFUSAL HALF of the width axis, asserted on the RULE rather than on a computed box,
-    // because happy-dom computes no cascade. What is under contract is that the two full-width
-    // restatements are ancestor-qualified: a leading bare `:global(.fabricate-select-trigger)`
-    // is document-wide and would reach the pager's trigger one row below, which deliberately
-    // refuses a width floor.
+    // THE REFUSAL HALF of the width axis.
     const source = readFileSync(
       resolve(repoRoot, 'src/ui/svelte/apps/crafting/RecipeBrowser.svelte'),
       'utf8'
@@ -487,9 +467,7 @@ describe('RecipeBrowser mounted behavior', () => {
       'a leading bare :global() rule reaches every trigger in the document, including the ' +
         'pager one row below that refuses a width floor'
     );
-    // THE DECLARATIONS ARE READ FROM THE BLOCK, NOT FROM THE FILE. A file-wide `includes` for
-    // `background: var(--fab-surface);` cannot fail here: this component declares that fill at
-    // three other elements, so the clause was green whether or not the trigger rule carried it.
+    // THE DECLARATIONS ARE READ FROM THE BLOCK.
     const blockStart = source.indexOf('.crafting-browser-filter-category :global(');
     assert.ok(blockStart !== -1, 'the category filter no longer opens a scoped :global() block');
     const block = source.slice(blockStart, source.indexOf('}', blockStart) + 1);

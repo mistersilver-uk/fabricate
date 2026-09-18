@@ -45,15 +45,12 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/actions/anchoredPopover.js',
     'src/ui/svelte/util/overlayBounds.js',
     'src/ui/svelte/actions/dragDrop.js',
-    // `ActionMenu`'s own import-free leaves (issue 1515), reached only through the row menus the
-    // three browsers below now render. `portal.js` and `anchoredPopover.js` are already above.
+    // `ActionMenu`'s own import-free leaves (issue 1515).
     'src/ui/svelte/util/overlayHost.js',
     'src/ui/svelte/util/actionMenuLayout.js',
   ],
   compiledModules: [
-    // Issue 1504: the shared `<Select>`'s whole compiled closure — also covers the manager's
-    // ONE labelled push-button (issue 1118), rendered from EnvironmentsBrowserView and from
-    // the two gathering browsers it embeds.
+    // Issue 1504: the shared `<Select>`'s whole compiled closure.
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/IconButton.svelte',
     // THE shared overflow action menu (issue 1477). All three browsers in this tree render one
@@ -75,8 +72,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/RadioCardGroup.svelte',
     'src/ui/svelte/apps/manager/PartyNameField.svelte',
     'src/ui/svelte/apps/manager/RealmOverridePicker.svelte',
-    // The three card components the parties rebuild added (issue 1182), each imported
-    // by PartyExpandedBody, so each must be compiled before it.
+    // The three card components the parties rebuild added (issue 1182).
     'src/ui/svelte/apps/manager/PartyMemberRow.svelte',
     'src/ui/svelte/apps/manager/PartyAddMemberPanel.svelte',
     'src/ui/svelte/apps/manager/PartyTravelActorPanel.svelte',
@@ -137,12 +133,6 @@ async function mountSettingsTab() {
 // trigger's own DOM subtree, which would silently defeat the regression this suite
 // exists to catch, since the real bug only exists once the popover is portaled away
 // from the trigger.
-//
-// THE `.manager-main` RECT IS THE SECOND STUB, and it is what makes the panel take a
-// position at all rather than merely a parent. `bounds` here is the SELECTOR STRING
-// `MANAGER_MAIN_SELECTOR`, which the action resolves with `anchor.closest('.manager-main')`
-// (`anchoredPopover.js:185-190`) — not with `ancestorScrollerBounds`, whose skip-the-zero-
-// sized-candidate walk belongs to the callers that pass a resolver (`overlayBounds.js:65-72`).
 // happy-dom gives every element a zero rect and the string branch KEEPS it: minLeft becomes 16
 // and maxRight −16, a zero-width band that `computeIconPickerPopoverLayout` answers `null` for
 // (`iconPickerPopover.js:77-78`), and the action then CLEARS the style, so the panel renders
@@ -172,10 +162,7 @@ function stageManagerShell(target, triggerLeft = 140) {
   return trigger;
 }
 
-// Opening the popover also runs the effect that applies `anchoredPopover`, which portals
-// the panel and registers `window` resize / capture-`scroll` listeners (unrelated to the
-// dismissal bug this suite covers). That effect pass is scheduled a tick after the state
-// change, so a single synchronous `flushSync()` is not enough to settle it.
+// Opening the popover also runs the effect that applies `anchoredPopover`.
 async function openBiomePopover(trigger) {
   trigger.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
   flushSync();
@@ -194,11 +181,7 @@ describe('EnvironmentsBrowserView biome colour popover dismissal (issue 921)', (
     // out-of-scope effect does not crash this suite.
     window.addEventListener ??= () => {};
     window.removeEventListener ??= () => {};
-    // `defineProperty` and not `window.innerWidth = 1280`: happy-dom declares both as
-    // accessors with no setter, so a plain assignment is silently dropped in sloppy mode
-    // and they stay `undefined`. The positioning pass falls back to the window box when
-    // the host reports no size, so without a real viewport the layout has no answer and
-    // the panel is left unpositioned — see `stageManagerShell` for the other half.
+    // `defineProperty` and not `window.innerWidth = 1280`.
     Object.defineProperty(window, 'innerWidth', { value: 1280, configurable: true });
     Object.defineProperty(window, 'innerHeight', { value: 800, configurable: true });
   });
@@ -212,10 +195,7 @@ describe('EnvironmentsBrowserView biome colour popover dismissal (issue 921)', (
     await openBiomePopover(trigger);
     const opened = colorPopover(target);
     assert.ok(opened, 'first right-click opens the popover');
-    // `assert.ok(a === b)` and not `assert.equal(a, b)`: on failure node:assert serialises both
-    // operands to build its diff, and a happy-dom element's own enumerable state reaches its
-    // parents, its children and its owner document — so the failure allocates until the heap
-    // dies and the suite reports `# cancelled` with no message. The boolean fails in words.
+    // `assert.ok(a === b)` and not `assert.equal(a, b)`.
     assert.ok(
       opened.parentElement === target,
       'the popover is portaled out of the trigger row into the manager shell'
@@ -264,34 +244,12 @@ describe('EnvironmentsBrowserView biome colour popover dismissal (issue 921)', (
     assert.ok(!colorPopover(target), 'Escape still dismisses the popover');
   });
 
-  // THE POSITIONING HALF (issue 1500). Every case above is about DISMISSAL, and each of them is
-  // satisfied by a popover that opens, portals and is then laid out nowhere at all: the conversion
-  // deleted a hand-written measure/clamp/place block from this view and handed the job to
-  // `anchoredPopover` + `bounds: MANAGER_MAIN_SELECTOR`, and a conversion that portals correctly
-  // while measuring against the wrong box is exactly the regression a dismissal assertion cannot
-  // see.
-  //
-  // The string is not a golden value copied out of a run. It is the arithmetic of the deleted
-  // block over the two stubs, and every term is checkable by hand against
-  // `computeIconPickerPopoverLayout`:
-  //
+  // THE POSITIONING HALF (issue 1500). Every case above is about DISMISSAL.
   //   bounds  `.manager-main` at left 60 / right 1220, inset 16 → minLeft 76, maxRight 1204
   //   width   `minWidth: maxWidth: 220` from the view's own `layoutOptions` → 220
   //   left    horizontalAlign 'left' → the trigger's own 140, inside [76, 1204 − 220]
   //   height  preferred 380, and the space below the trigger (800 − 130 − 6 − 16 = 648) exceeds it
   //   top     the trigger's bottom 130 plus the 6px gap → 136, so the placement is 'bottom'
-  //
-  // A width option dropped, a flip to `top`, or a layout that stopped being applied at all
-  // therefore reds here with the offending term visible in the diff, rather than passing as "the
-  // popover opened". The CLAMP is not one of the terms this case can see — at a trigger 140px
-  // from the left of a 1160px column, the column's boundary and the window's agree on the answer
-  // — which is what the case below it exists for.
-  //
-  // The resolved width is now written as BOTH BOUNDS as well (issue 1520 review round 2), and this
-  // panel's box does not move: it asks for 220/220 against a rule that states `width: 220px` and
-  // no bounds at all, so the three declarations agree with each other and with the sheet. This
-  // suite and its sibling in `tests/actions/` are the two that pin the string, which is how the
-  // change's reach was measured rather than argued.
   it('positions the portaled panel where the deleted block would have', async () => {
     const target = await mountSettingsTab();
     const trigger = stageManagerShell(target);
@@ -311,16 +269,6 @@ describe('EnvironmentsBrowserView biome colour popover dismissal (issue 921)', (
   // both sides, where `bounds: MANAGER_MAIN_SELECTOR` and the action's default window margin
   // return the same number — so deleting the `bounds` option entirely leaves it green, and the
   // boundary the conversion had to carry over from the deleted block would be unguarded.
-  //
-  // A trigger 1020px in has 260px of window to its right and only 200px of COLUMN, so the two
-  // boundaries now disagree and the panel is placed by whichever one the action was given:
-  //
-  //   with `bounds`      maxRight 1204 → maxLeft 1204 − 220 = 984, and 1020 clamps back to 984
-  //   without it         maxRight 1264 → maxLeft 1044, and 1020 is left where it asked to be
-  //
-  // 984 is therefore a value only the column can produce. The manager column is the box the biome
-  // panel must not overhang — it scrolls, and a panel laid out past its right edge is the defect
-  // `MANAGER_MAIN_SELECTOR` names.
   it('clamps the panel to the manager column and not to the window', async () => {
     const target = await mountSettingsTab();
     const trigger = stageManagerShell(target, 1020);

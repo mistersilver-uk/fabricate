@@ -1,23 +1,4 @@
-/**
- * `Avatar`, an actor's portrait (issue 1506).
- *
- * The GM Knowledge surface drew its roster rows and its detail header with the RECORD tile and a
- * `fas fa-user` glyph, which is the icon chip answering a question it was not asked: a record
- * falls back to a glyph and an actor falls back to INITIALS, and a person's mark is round while a
- * party's, a vehicle's or a place's is a rounded square (`library.html:1425-1431`).
- *
- * ── WHAT THIS SUITE IS FOR, AND WHY IT IS NOT A FRAME ─────────────────────────────────────
- * Both shipped call sites pass a real `character.img`, and Foundry assigns default artwork on
- * creation, so no lab character is art-less and NO published View Lab case reaches the initials
- * state. The registry entry for this component says so rather than naming a frame that cannot
- * draw it. This suite is where that state is held instead — and the same is true of the TINTED
- * state, which neither shipped caller reaches because the redaction-safe actor projection carries
- * no tint at all.
- *
- * That makes two of the four clauses below coverage for states the pixel evidence cannot show,
- * which is the reason they read the rendered DOM and the component's own rules rather than
- * asserting that a prop was accepted.
- */
+/** `Avatar`, an actor's portrait (issue 1506). */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -41,13 +22,7 @@ after(() => harness.teardown());
 afterEach(() => harness.remount());
 
 const tileOf = (root) => root.querySelector('[data-avatar]');
-/**
- * The tile's `style` attribute with every space removed.
- *
- * happy-dom re-serialises a `style` attribute through its own CSS declaration model, so the
- * component's `width:32px;height:32px` arrives as `width: 32px; height: 32px;`. Comparing the
- * raw attribute would pin the DOM implementation's spacing rather than the component's output.
- */
+/** The tile's `style` attribute with every space removed. */
 const styleOf = (root) => tileOf(root).getAttribute('style').replaceAll(/\s+/g, '');
 const classesOf = (root) =>
   [...tileOf(root).classList].filter((name) => !name.startsWith('svelte-'));
@@ -65,8 +40,7 @@ describe('Avatar (mounted) — the two artwork states', () => {
     const image = tileOf(root).querySelector('img');
     assert.ok(Boolean(image), 'the art state renders an image');
     assert.equal(image.getAttribute('src'), 'icons/svg/mystery-man.svg');
-    // Asserted as the ATTRIBUTE and not as `.alt`, because the empty string is the correct
-    // decision at both shipped sites and the DOM property cannot tell it from an absent one.
+    // Asserted as the ATTRIBUTE and not as `.alt`.
     assert.equal(image.getAttribute('alt'), '');
     assert.ok(
       !tileOf(root).querySelector('.fab-avatar-initials'),
@@ -75,9 +49,7 @@ describe('Avatar (mounted) — the two artwork states', () => {
   });
 
   it('falls back to two initials when the caller passes no art, and never to a glyph', async () => {
-    // THE STATE NO FRAME REACHES. The trigger is the CALLER's — this component renders initials
-    // when it is handed no `art` and never compares against Foundry's default-artwork constant,
-    // which is what keeps it an import-free leaf.
+    // THE STATE NO FRAME REACHES. The trigger is the CALLER's.
     const root = await harness.mount({ art: '', name: 'Brenna Karrun', size: 34 });
 
     assert.equal(tileOf(root).dataset.avatar, 'initials');
@@ -116,9 +88,7 @@ describe('Avatar (mounted) — the two artwork states', () => {
   });
 
   it('sizes the box and the initials from `size`, in one style attribute', async () => {
-    // `size` is deliberately UNRESTRICTED, so the initials scale WITH the box rather than sitting
-    // at one published rung: a fixed 10px mark would read as a speck inside the 50px detail
-    // header portrait, which is the site that argued `size` open in the first place.
+    // `size` is deliberately UNRESTRICTED.
     for (const [size, box, mark] of [
       [32, '32px', '10px'],
       [34, '34px', '11px'],
@@ -190,8 +160,7 @@ describe('Avatar (mounted) — the tint is class-gated, and the ring is the edge
   });
 
   it('DROPS a tint that is not a palette key, rather than interpolating it', async () => {
-    // The value lands inside a `style` attribute, so a caller that could pass anything could
-    // compose a declaration. An unrecognised value renders the flat untinted tile.
+    // The value lands inside a `style` attribute.
     for (const tint of ['red; background: url(x)', 'rgb(1 2 3)', '  ']) {
       const root = await harness.mount({ art: '', name: 'Idrin', tint });
       assert.deepEqual(classesOf(root), ['fab-avatar'], `${JSON.stringify(tint)} is dropped`);
@@ -201,11 +170,7 @@ describe('Avatar (mounted) — the tint is class-gated, and the ring is the edge
   });
 
   it('states the tint as a SEPARATE rule, and the ring as the edge`s colour', () => {
-    // The DOM half above proves the vehicle is absent when unset; this proves the rules that read
-    // it are gated too, which is the other half of the same argument and is unreachable from a
-    // mounted tree. A `box-shadow` ring — which is how `library.html:1427-1428` draws it — would
-    // grow the tinted tile 1px per side relative to an untinted sibling in the same roster, so
-    // the ring REPLACES the border colour instead.
+    // The DOM half above proves the vehicle is absent when unset.
     const styles = /<style>([\s\S]*)<\/style>/.exec(
       readFileSync(resolve(repoRoot, PRIMITIVE), 'utf8')
     );

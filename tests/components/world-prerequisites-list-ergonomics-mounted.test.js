@@ -17,21 +17,7 @@ import {
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
-/**
- * World > Rules & Resources > Character prerequisites, mounted on its own.
- *
- * The prerequisite half of the settings-list ergonomics contract (issue 768). It used to be
- * asserted through a `SystemEditView` mount in `system-edit-list-ergonomics-mounted`, because
- * that page rendered this list beside the modifier library and the coin ladder. Issue 1278
- * moved the ladder out to `world-currency-list-ergonomics-mounted`; issue 1311 moves these two
- * out the same way, so this suite and `world-modifiers-list-ergonomics-mounted` replace that
- * file rather than mounting three components from one.
- *
- * The subject is the PAGE (`WorldPrerequisitesTab`), not the card it wraps, because the two
- * things the move changed are the page's: the polite reorder region it now owns — a page
- * cannot announce into a sibling route — and the cross-copy, which it can only hand upward
- * now that the destination is a different route.
- */
+/** World > Rules & Resources > Character prerequisites, mounted on its own. */
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-world-prerequisites-ergonomics-',
@@ -52,8 +38,6 @@ const harness = createMountedComponentHarness({
   ],
   compiledModules: [
     // THE APP'S ONE SELECT AND ITS WHOLE COMPILED CLOSURE (issue 1510), spread rather than copied.
-    // This tree renders `components/Select.svelte` now, and a `.svelte` the tree renders but the
-    // harness omits HANGS the suite (`# cancelled`) rather than failing it.
     ...SELECT_COMPILED_MODULES,
     // A `.svelte` the tree renders but the harness omits HANGS the suite (# cancelled) rather
     // than failing it, so every one is named.
@@ -97,8 +81,7 @@ const PREREQUISITES = Object.freeze([
   },
 ]);
 
-// happy-dom does not implement scrollIntoView; stub it after the harness builds the window so
-// the router-requested open's "reveal the target" half is observable.
+// happy-dom does not implement scrollIntoView.
 let scrollCalls = [];
 before(async () => {
   await harness.setup();
@@ -130,8 +113,7 @@ describe('world character-prerequisite list ergonomics (mounted, issue 768)', ()
   });
 
   it('renders a summary row that is collapsed by default and expands to the IconPicker editor', async () => {
-    // The per-ROW accordion survived the move; only the whole-SECTION collapse did not. This is
-    // the half of "collapse" that still has a subject, so it stays asserted.
+    // The per-ROW accordion survived the move.
     const root = await harness.mount({ library: PREREQUISITES });
 
     const row = root.querySelector('[data-world-character-prerequisite="pre-trained"]');
@@ -156,11 +138,7 @@ describe('world character-prerequisite list ergonomics (mounted, issue 768)', ()
   });
 
   it('carries NO whole-section collapse, because collapsing a whole route only blanks it', async () => {
-    // On the Settings tab the chevron yielded space to the sibling cards below it — the
-    // modifier library and the coin ladder. As a route there is nothing to make room for, so
-    // the same control would hide the page and leave a bare header row. This is the assertion
-    // that replaced `system-edit-list-ergonomics`' "collapses a whole section on its header
-    // toggle": the behaviour is gone from the product, not merely moved.
+    // On the Settings tab the chevron yielded space to the sibling cards below it.
     const root = await harness.mount({ library: PREREQUISITES });
 
     assertNoElement(
@@ -196,9 +174,7 @@ describe('world character-prerequisite list ergonomics (mounted, issue 768)', ()
     await flushRender();
     assert.deepEqual(calls, [[0, 1]], 'the reorder op fires with (index, index+1)');
 
-    // The announcement is the PAGE's now. It used to be the Settings tab's, shared with two
-    // other lists; the card reports the move and each route announces it, because a page cannot
-    // announce into a sibling route.
+    // The announcement is the PAGE's now. It used to be the Settings tab's.
     const announcement = root.querySelector('[data-list-reorder-announcement]');
     assert.ok(announcement, 'the page renders a polite live region');
     assert.equal(announcement.getAttribute('aria-live'), 'polite', 'polite, not assertive');
@@ -240,10 +216,7 @@ describe('world character-prerequisite list ergonomics (mounted, issue 768)', ()
   });
 
   it('hands the RAW prerequisite up on Copy to modifiers, and completes nothing itself', async () => {
-    // The whole point of the split. Across two sibling routes a copy is a NAVIGATION, which a
-    // page component cannot perform, so this page's entire contribution is the handoff: no
-    // destination write, no route change, no announcement. The round trip — mapping, add,
-    // navigate, open — is the manager root's and is asserted there.
+    // The whole point of the split. Across two sibling routes a copy is a NAVIGATION.
     const copied = [];
     const root = await harness.mount({
       library: PREREQUISITES,
@@ -326,9 +299,7 @@ describe('world character-prerequisite list ergonomics (mounted, issue 768)', ()
       'isFalse',
       'exists',
     ]);
-    // THE LABELS ARE THE `<option>` TEXT, VERBATIM: a comparison operator renders as
-    // `symbol · label` and a valueless one as its label alone, which is the join the template
-    // performed inline before the conversion moved it into a derived option list.
+    // THE LABELS ARE THE `<option>` TEXT, VERBATIM.
     assert.deepEqual(selectOptionLabels(root, operator), [
       '= · equals',
       '≠ · not equals',
@@ -384,13 +355,9 @@ describe('world character-prerequisite list ergonomics (mounted, issue 768)', ()
   });
 
   it('gives every row’s operator control its OWN caption to point at', async () => {
-    // A single component-level caption id would name every row in the library the same way, and
-    // nothing in the primitive reports that: it was given a name prop, so it does not warn, and
-    // the resolved name would be correct on every row while pointing every trigger at the first.
+    // A single component-level caption id would name every row in the library the same way.
     const root = await harness.mount({ library: PREREQUISITES, onUpdate: () => {} });
-    // ONE ROW AT A TIME, which is the card's own accordion contract: opening the second closes
-    // the first, so each pointer is read while its row is the open one rather than from a tree
-    // holding both.
+    // ONE ROW AT A TIME, which is the card's own accordion contract.
     const pointers = [];
     for (const id of ['pre-trained', 'pre-open']) {
       root

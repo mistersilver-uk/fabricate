@@ -8,9 +8,7 @@ import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
 import { rewriteClientImports } from '../helpers/rewriteClientImports.js';
-// The raw `.js` closure of `SearchablePopover`, which the shared `<Select>` composes
-// (issue 1504). Spread from the harness's own roster rather than copied, so a module added
-// there cannot go missing here.
+// The raw `.js` closure of `SearchablePopover`.
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
@@ -113,15 +111,7 @@ function quickAction(recordId, action) {
   return target.querySelector(`[data-record-id="${recordId}"] .manager-environment-comp-quick-action[data-action="${action}"]`);
 }
 
-/**
- * Open one row's overflow menu and return the PORTALED panel.
- *
- * The panel is no longer a descendant of the row (issue 1477): `<ActionMenu>` portals it to the
- * application root so it escapes `.manager-environment-tab-panel`'s `overflow: auto`. So the
- * trigger is still addressed inside the row — which is what proves the right row's menu opened —
- * and the panel is addressed at the host. Exactly one menu is open at a time, which the
- * single-panel assertion below holds rather than assumes.
- */
+/** Open one row's overflow menu and return the PORTALED panel. */
 async function openRowMenu(recordId) {
   target.querySelector(`[data-record-id="${recordId}"] .manager-icon-button[aria-haspopup="menu"]`).click();
   await tick();
@@ -140,9 +130,7 @@ describe('CompositionList mounted layout', () => {
       // THE manager's labelled push-button (issue 1118). Restore and the warning Force add
       // both render it. Omitting a rendered `.svelte` HANGS the suite (# cancelled).
       'src/ui/svelte/components/IconButton.svelte',
-      // THE shared overflow action menu (issue 1477), which the four row menus render and which
-      // renders `IconButton` above as its trigger. Omitting a rendered `.svelte` HANGS the suite
-      // (# cancelled), which is exactly how this conversion first reported.
+      // THE shared overflow action menu (issue 1477).
       'src/ui/svelte/components/ActionMenu.svelte',
       'src/ui/svelte/apps/manager/environment/CompositionList.svelte',
       'src/ui/svelte/apps/manager/environment/RuntimeStatePill.svelte',
@@ -154,9 +142,7 @@ describe('CompositionList mounted layout', () => {
     ]) {
       writeCompiledSvelte(component);
     }
-    // Issue 1504: the shared `<Select>`'s whole compiled closure — also covers the manager's
-    // ONE chip (issue 883) and the shared no-state primitive (issue 785) — spread from the
-    // harness's own roster rather than copied.
+    // Issue 1504: the shared `<Select>`'s whole compiled closure.
     for (const selectModule of SELECT_COMPILED_MODULES) {
       writeCompiledSvelte(selectModule);
     }
@@ -263,9 +249,7 @@ describe('CompositionList mounted layout', () => {
     includeQuick.click();
     assert.deepEqual(calls.at(-1), ['include', 'task', 'candidate']);
 
-    // A non-matching row in MANUAL mode is plainly added (issue #1315): manual composes exactly
-    // the GM's picked list with no match filter, so there is no filter for a force to override and
-    // the row offers the same Add as a matching one.
+    // A non-matching row in MANUAL mode is plainly added (issue #1315).
     const nonMatchingQuick = quickAction('nonmatching', 'include');
     assert.ok(nonMatchingQuick, 'non-matching available task rows render the same quick add action');
     assert.equal(nonMatchingQuick.getAttribute('title'), 'Add');
@@ -380,13 +364,7 @@ describe('CompositionList mounted layout', () => {
     nonMatchingQuick.click();
     assert.deepEqual(calls.at(-1), ['include', 'event', 'nonmatching']);
 
-    // The absence assertion this file has always carried, kept and re-scoped rather than deleted
-    // (issue #1315 settled the contradiction it described). The labelled Force add sits in the
-    // standalone Non-matching section, which is gated `mode !== 'manual'`; its own guard used to
-    // demand `mode === 'manual'`, so it rendered in NO state. The guard now takes its mode from
-    // the enclosing section, which makes this absence structural AND correct — manual mode has no
-    // filter for a force to override — and puts the control's presence, its amber class and its
-    // click-through in the automatic-mode test below, where they can be asserted for real.
+    // The absence assertion this file has always carried.
     assert.ok(
       !target.querySelector('.manager-environment-force-include'),
       'the labelled Force add belongs to automatic mode and must not render in manual mode'
@@ -509,12 +487,7 @@ describe('CompositionList mounted layout', () => {
     assert.ok(!target.querySelector('[data-section="excluded"] .manager-environment-comp-handle'), 'excluded rows reserve no rank handle');
     assert.ok(!target.querySelector('[data-section="non-matching"] .manager-environment-comp-handle'), 'non-matching rows reserve no rank handle');
 
-    // THE `warning` role's first reachable call site (issues 1118 and #1315), asserted from a
-    // MOUNT. It could only be pinned from source before, because the control rendered in no state
-    // at all: the section is gated `mode !== 'manual'` and the control's own guard demanded
-    // `mode === 'manual'`. That is also how it shipped asking for `is-warning`, a class the sheet
-    // declares nowhere — nobody ever saw it. The source-level guard in
-    // `tests/manager-button-source-contract.test.js` is retired in favour of these four lines.
+    // THE `warning` role's first reachable call site (issues 1118 and #1315).
     const forceAdd = target.querySelector('[data-record-id="nonmatching"] .manager-environment-force-include');
     assert.ok(Boolean(forceAdd), 'the automatic-mode Non-matching list renders the labelled Force add');
     assert.ok(forceAdd.textContent.includes('Force add'));

@@ -1,22 +1,5 @@
 /**
  * The shared player top bar, mounted (issue 1475 converted its picker onto `SearchablePopover`).
- *
- * TWO THINGS ABOUT THIS SUITE'S SETUP ARE LOAD-BEARING RATHER THAN TIDYING.
- *
- * It runs on `createMountedComponentHarness` instead of the inlined compile/mount boilerplate it
- * used to carry, because the conversion put five more components and six more modules into this
- * component's static graph. A `.svelte` missing from a hand-rolled allowlist does not fail a
- * mounted suite — it HANGS it, reported as `# cancelled N` and never as `# fail` — whereas the
- * shared harness walks the import closure in `before()` and throws by name.
- *
- * And it mounts into `fabricate-app`, not the harness default of `fabricate-manager`. The picker
- * PORTALS its panel to the nearest application root (`util/overlayHost.js`), so the root the
- * fixture wears decides where the panel actually lands; this component is reachable only from the
- * player window, and it is the first mounted suite in the corpus for which that is true.
- *
- * Every assertion that reads the OPEN panel therefore queries `document`, not `target`: the panel
- * is no longer a descendant of the bar. `.actor-bar-popover` is the hook the bar hands the
- * primitive through `popoverClass`, and is what keeps these queries pointed at THIS picker.
  */
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
@@ -56,9 +39,6 @@ const harness = createMountedComponentHarness({
     // reads it and the guard is not blind to it. Measured by dropping `Avatar` below: it reds
     // BY NAME, `not ok 2 - every hand-rolled mount harness names the shared primitives its tree
     // renders`, citing this file, that module and the tree that renders it.
-    // `validateMountedComponentDependencies` in this harness reds too, and earlier — in
-    // `before()`, as `not ok` on the suite with `# fail 0` — but it is the second line of
-    // defence here rather than the only one.
     'src/ui/svelte/components/Avatar.svelte',
     'src/ui/svelte/components/FillBar.svelte',
     'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte',
@@ -93,8 +73,6 @@ async function openPicker() {
 }
 
 // A plain (non-reactive) fake store mirroring the actorBarStore read surface.
-// The component is reactive on its own $props/$derived; for these structural
-// assertions a snapshot store at mount time is enough.
 function fakeStore(overrides = {}) {
   const selectableActors = overrides.selectableActors ?? [];
   const selectedActorId = overrides.selectedActorId ?? '';
@@ -149,8 +127,7 @@ describe('ActorSelectTopBar mounted behavior', () => {
     const bar = target.querySelector('[data-actor-bar-stamina]');
     assert.ok(bar, 'stamina bar renders on the gathering tab');
     assert.ok(bar.textContent.includes('4/10'), 'shows current/max');
-    // The track is `FillBar` since issue 1514, so the fill is the primitive's element and the
-    // percentage arrives through its `value` prop rather than through a hand-written `style`.
+    // The track is `FillBar` since issue 1514.
     const fill = bar.querySelector('.fab-fill-bar-fill');
     assert.ok(Boolean(fill), 'the shared fill bar renders inside the caller-owned width pin');
     assert.ok(/width:\s*40%/.test(fill.getAttribute('style') || ''), 'fill width reflects 4/10');
@@ -179,8 +156,7 @@ describe('ActorSelectTopBar mounted behavior', () => {
     const button = barTrigger();
     assert.ok(button, 'trigger renders');
     assert.equal(button.disabled, false, 'trigger enabled with actors');
-    // `manager-travel-portrait` is `SearchablePopover`'s tile, not this bar's — the bar hands the
-    // image through `triggerImg` and keeps only its own 40px sizing rule.
+    // `manager-travel-portrait` is `SearchablePopover`'s tile, not this bar's.
     const img = button.querySelector('.manager-travel-portrait img');
     assert.ok(img, 'portrait image renders for an actor with img');
     assert.equal(img.getAttribute('src'), 'icons/a.webp');
@@ -229,11 +205,7 @@ describe('ActorSelectTopBar mounted behavior', () => {
     assert.equal(barTrigger().getAttribute('aria-expanded'), 'true', 'trigger reports expanded');
   });
 
-  // THE PANEL IS PORTALED NOW (issue 1475), and this is the assertion that says so. The markup is
-  // identical whether the portal lands or not, so a query that walked down from `document` would
-  // pass either way; what changed is its PARENT. `overlay-portal-host-position.test.js` measures
-  // the geometry in a real browser — happy-dom computes no layout — and this pins the structural
-  // half in the suite that can see it cheaply.
+  // THE PANEL IS PORTALED NOW (issue 1475).
   it('portals the panel onto the player window frame, out of the bar', async () => {
     const { store } = fakeStore({ selectableActors: ACTORS, selectedActorId: 'a1' });
     await mountBar({ store, activeTab: 'crafting' });
@@ -241,8 +213,7 @@ describe('ActorSelectTopBar mounted behavior', () => {
 
     const dialog = panel();
     assert.ok(dialog, 'panel opens');
-    // `target` IS the application root here (the harness mounts into `.fabricate-app`), so the
-    // discriminating fact is that the panel left the BAR and became a child of that root.
+    // `target` IS the application root here (the harness mounts into `.fabricate-app`).
     assert.ok(
       !target.querySelector('.fabricate-app-actor-bar').contains(dialog),
       'the panel is still inside the bar, so the portal did not land and it would be clipped and ' +
@@ -326,8 +297,7 @@ describe('ActorSelectTopBar mounted behavior', () => {
     await openPicker();
     assert.ok(panel(), 'panel open before Escape');
 
-    // Dispatched on the DOCUMENT, because that is where the dismiss action listens — a handler
-    // bound to the portaled panel alone would never see a key pressed with focus elsewhere.
+    // Dispatched on the DOCUMENT, because that is where the dismiss action listens.
     document.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     flushSync();
     await tick();
@@ -382,9 +352,7 @@ describe('ActorSelectTopBar mounted behavior', () => {
   });
 
   it('keeps the popover open when clicking inside the portaled panel', async () => {
-    // The panel is no longer a descendant of the picker root, so "inside" has to be registered
-    // with the dismiss action explicitly. The primitive does that; without it every click on a
-    // search field or an option would first dismiss the panel that contains it.
+    // The panel is no longer a descendant of the picker root.
     const { store } = fakeStore({ selectableActors: ACTORS, selectedActorId: 'a1' });
     await mountBar({ store, activeTab: 'crafting' });
     await openPicker();
@@ -405,8 +373,7 @@ describe('ActorSelectTopBar mounted behavior', () => {
     await openPicker();
     assert.ok(panel(), 'popover open');
 
-    // The full-width bar is outside the picker region; a click on it (its empty area /
-    // right-side cluster) must dismiss the dropdown.
+    // The full-width bar is outside the picker region.
     const bar = target.querySelector('.fabricate-app-actor-bar');
     bar.dispatchEvent(new globalThis.MouseEvent('mousedown', { bubbles: true }));
     flushSync();
@@ -432,7 +399,7 @@ describe('ActorSelectTopBar mounted behavior', () => {
   });
 
   it('states the search-miss reason, not the no-player-character-type explanation', async () => {
-    // The shipped panel had one empty string and it was the wrong one: the long
+    // The shipped panel had one empty string and it was the wrong one.
     // "ask your GM to add its actor type" copy was the ONLY thing a filtered-to-nothing list
     // could say, while the state it names — zero selectable actors — cannot open the panel at
     // all, because the trigger is disabled there.
@@ -455,8 +422,7 @@ describe('ActorSelectTopBar mounted behavior', () => {
   });
 
   it('keeps the no-matches state out of the listbox', async () => {
-    // A listbox's only valid children are its options, so the empty panel must be a SIBLING of
-    // the list rather than a row inside it.
+    // A listbox's only valid children are its options.
     const { store } = fakeStore({ selectableActors: ACTORS, selectedActorId: 'a1' });
     await mountBar({ store, activeTab: 'crafting' });
     await openPicker();
@@ -576,9 +542,7 @@ describe('ActorSelectTopBar mounted behavior', () => {
 
     const realm = target.querySelector('.actor-bar-realm');
     assert.ok(realm, 'realm chip still renders with no resolved realm');
-    // #357: the no-current-realm placeholder reuses the Realm.None key, whose
-    // value is now "No current realm" (the realm is GM/travel-driven, not
-    // player-selected).
+    // #357: the no-current-realm placeholder reuses the Realm.None key.
     assert.ok(realm.textContent.includes('FABRICATE.App.ActorBar.Realm.None'), 'shows the no-current-realm label');
   });
 

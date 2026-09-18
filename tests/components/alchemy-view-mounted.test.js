@@ -1,16 +1,4 @@
-/**
- * The player Alchemy tab's host suite (issue 1514).
- *
- * `AlchemyView` was the ONE player view with no mounted suite at all: its branch set was
- * asserted nowhere, and `fabricate-app-root-mounted` reaches it only through the shell's tab
- * routing. That gap is why the `aria-busy` criterion for this view was unmeetable rather than
- * merely unmet — a source-text reader cannot see it, because a composition that declares the
- * attribute and stops rendering it passes every grep.
- *
- * It also states the branch SET this view can reach, which is the point of the shared
- * composition taking that set as data: Alchemy has loading, error and no-actor and NO empty
- * branch, because a discipline with no known recipes still renders the workbench.
- */
+/** The player Alchemy tab's host suite (issue 1514). */
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
@@ -28,10 +16,7 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-alchemy-view-',
   rawModules: ['src/ui/svelte/util/foundryBridge.js'],
   compiledModules: [
-    // The shared not-yet-ready chrome, the standing statement the workbench composes, and the
-    // tile, label and no-state panel the two columns draw — as ONE spread (issue 1514). Six
-    // hand-listed entries stood here before the third phase added three more to them; see
-    // `PLAYER_APP_COMPILED_MODULES` in the harness for why that became one roster.
+    // The shared not-yet-ready chrome, the standing statement the workbench composes.
     ...PLAYER_APP_COMPILED_MODULES,
     'src/ui/svelte/apps/alchemy/EssenceChips.svelte',
     'src/ui/svelte/apps/alchemy/AlchemyDisciplineChooser.svelte',
@@ -40,9 +25,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/alchemy/Workbench.svelte',
     'src/ui/svelte/apps/alchemy/AlchemyView.svelte',
   ],
-  // THE PRODUCTION HOST IS THE PLAYER WINDOW, not the manager: this view only ever renders
-  // inside `FabricateAppRoot`, and the default `fabricate-manager` root class would put the
-  // tree under an area it never sees in production.
+  // THE PRODUCTION HOST IS THE PLAYER WINDOW, not the manager.
   rootClass: 'fabricate-app',
   componentPath: 'src/ui/svelte/apps/alchemy/AlchemyView.svelte',
 });

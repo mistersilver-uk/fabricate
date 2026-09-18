@@ -1,25 +1,4 @@
-/*
- * Issue 772 — the manager's ONE selection control.
- *
- * PR #836 was rejected for rendering a default Foundry checkbox on the component row when
- * the Tool Studio's requirements tab already shipped the treatment one screen away. The fix
- * was to extract that box into this primitive and CONVERT the duplicate, so what this suite
- * has to hold is not "a checkbox works" — it is the four properties that make the extraction
- * a removal rather than a third variant:
- *
- *  1. There is a REAL `<input type="checkbox">` under the custom box. Replace it with a
- *     `<div role="checkbox">` and the keyboard, the label association, the form value and
- *     every `input[value=…]` selector the Tool Studio suite already uses go with it. It must
- *     not be a `<button>` either: the Foundry smoke walk reaches the component row's Edit
- *     action through `.manager-component-row button` selectors.
- *  2. The three states are DISTINGUISHABLE in the DOM. `indeterminate` is a DOM property
- *     with no HTML attribute, so a markup-only implementation renders the "some selected"
- *     page box identically to the empty one, silently.
- *  3. BOTH wrapper modes render the structure their host needs. `label` is for a host whose
- *     action group is a `<span>`; `contents` is for a host whose own root is already a
- *     `<label>`, where a nested label would be invalid HTML and an ambiguous click target.
- *  4. The size ladder is declared, and `sm` is the shipped Tool Studio box unchanged.
- */
+/* Issue 772 — the manager's ONE selection control. */
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -29,10 +8,7 @@ import { createMountedComponentHarness } from '../helpers/svelte-component-harne
 const repoRoot = resolve(import.meta.dirname, '../..');
 const componentPath = 'src/ui/svelte/components/SelectionCheckbox.svelte';
 const source = readFileSync(resolve(repoRoot, componentPath), 'utf8');
-// Only the scoped `<style>` block, comments stripped. Both invariants below are stated in
-// the component's own doc comments, so matching the raw file would assert that the rules are
-// DESCRIBED rather than that they are kept — and would fail the moment a comment named the
-// very token it forbids, which is exactly what these comments do.
+// Only the scoped `<style>` block.
 const styles = source
   .slice(source.lastIndexOf('\n<style>\n') + '\n<style>\n'.length, source.lastIndexOf('\n</style>'))
   .replace(/\/\*[\s\S]*?\*\//g, '');
@@ -73,8 +49,7 @@ describe('SelectionCheckbox', () => {
     assert.equal(input(target).indeterminate, false);
     assert.equal(box(target).classList.contains('is-checked'), false);
     assert.equal(box(target).classList.contains('is-indeterminate'), false);
-    // Unchecked shows the check glyph, painted transparent by the scoped rule — the box is
-    // never empty markup, so the glyph cannot shift the layout when it appears.
+    // Unchecked shows the check glyph, painted transparent by the scoped rule.
     assert.ok(box(target).querySelector('i.fa-check'));
 
     await harness.setProps({ checked: true });
@@ -82,8 +57,7 @@ describe('SelectionCheckbox', () => {
     assert.equal(box(target).classList.contains('is-checked'), true);
     assert.ok(box(target).querySelector('i.fa-check'));
 
-    // `indeterminate` has NO HTML attribute. If it is not applied as a DOM property, the
-    // tri-state page box renders exactly like the empty one and nothing fails.
+    // `indeterminate` has NO HTML attribute. If it is not applied as a DOM property.
     await harness.setProps({ checked: false, indeterminate: true });
     assert.equal(input(target).indeterminate, true);
     assert.equal(box(target).classList.contains('is-indeterminate'), true);
@@ -119,8 +93,7 @@ describe('SelectionCheckbox', () => {
   it('wrapper="contents" renders bare siblings, so a label host does not nest labels', async () => {
     const target = await harness.mount({ wrapper: 'contents', checked: true });
     assert.equal(target.querySelector('label'), null, 'no label of its own');
-    // Both land directly in the host's own element, which is what puts the box in a host
-    // grid's first column instead of inside an extra wrapper that would occupy the track.
+    // Both land directly in the host's own element.
     assert.equal(input(target).parentElement, target);
     assert.equal(box(target).parentElement, target);
     harness.remount();
@@ -140,10 +113,7 @@ describe('SelectionCheckbox', () => {
   });
 
   it('forwards disabled and the rest spread onto the real control', async () => {
-    // `value` is how the Tool Studio identifies a prerequisite, and that suite
-    // drives the tab through `input[value=…]`; the `data-*` hooks are how the component
-    // browser's toolbar controls are reached. Both ride the rest spread onto the INPUT,
-    // because the input is what a test clicks and what a form reads.
+    // `value` is how the Tool Studio identifies a prerequisite.
     const target = await harness.mount({
       disabled: true,
       value: 'expert',
@@ -157,10 +127,7 @@ describe('SelectionCheckbox', () => {
   });
 });
 
-/*
- * The contract this primitive exists to keep, asserted against its source rather than a
- * mounted DOM, because neither happy-dom nor a mounted assertion can see either property.
- */
+/* The contract this primitive exists to keep. */
 describe('SelectionCheckbox — the two invariants a mounted test cannot see', () => {
   it('uses theme-ROOT tokens only, never an area-scoped manager property', () => {
     // This primitive is area-agnostic. `--fab-manager-*` is the prefix for an area-scoped
@@ -175,14 +142,7 @@ describe('SelectionCheckbox — the two invariants a mounted test cannot see', (
       false,
       'an area-agnostic primitive cannot reach an area-scoped manager property'
     );
-    // ── THE CHECKED INK IS PER SIZE, AND `--fab-on-accent` IS THE SMALL BOX'S ALONE ────────
-    // This used to ban `--fab-on-accent` outright: it differs from `--fab-bg-1` in every theme,
-    // and the extraction's contract (issue 772) was that every size render byte-identically to
-    // the box it replaced. Issue 1373's round 5 gave the SMALL size the reference's own figures
-    // — `proto:4740` states `color: var(--on-accent)` over the accent fill — so an outright ban
-    // is no longer the invariant. The invariant is the SCOPE of that exception, which is what is
-    // asserted instead: the shared state keeps `--fab-bg-1`, so `md` and `lg` are untouched, and
-    // the only rule naming `--fab-on-accent` is the small size's own.
+    // ── THE CHECKED INK IS PER SIZE.
     assert.match(styles, /\.fab-selection-check\.is-checked \{[^}]*color: var\(--fab-bg-1\);/);
     const onAccentRules = [...styles.matchAll(/([^\n{}]+)\{[^}]*--fab-on-accent[^}]*\}/g)].map(
       (match) => match[1].trim()

@@ -6,9 +6,7 @@ import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
 
-// ---------------------------------------------------------------------------
 // Helpers: build DOM structures mirroring ItemPickerGrid output
-// ---------------------------------------------------------------------------
 
 function buildItemPickerGrid({ items = [], searchTerm = '', onSearch } = {}) {
   const aside = document.createElement('aside');
@@ -73,9 +71,7 @@ function buildItemPickerGrid({ items = [], searchTerm = '', onSearch } = {}) {
   return aside;
 }
 
-// ---------------------------------------------------------------------------
 // ItemPickerGrid: structure tests
-// ---------------------------------------------------------------------------
 
 describe('ItemPickerGrid: header structure', () => {
   before(() => setupDOM());
@@ -128,9 +124,7 @@ describe('ItemPickerGrid: header structure', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // ItemPickerGrid: search callback
-// ---------------------------------------------------------------------------
 
 describe('ItemPickerGrid: search input', () => {
   before(() => setupDOM());

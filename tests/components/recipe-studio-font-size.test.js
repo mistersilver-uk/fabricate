@@ -1,16 +1,4 @@
-/*
- * Recipe Studio font-size gate (issue 643).
- *
- * happy-dom cannot compute the CSS cascade, so a mounted test can never prove the
- * RENDERED font-size. This gate renders the real recipe-studio classes in Chromium
- * under a minimal-but-faithful stand-in for Foundry V13 core CSS (tests/fixtures/
- * foundry-core-min.css — the @layer reset + 14px app base) plus the real
- * styles/fabricate.css, and asserts the computed px against the prototype's scale.
- *
- * It also proves the cascade context: a bare <input> inherits the 14px Foundry app
- * base (bleed baseline), and `.manager-nav-label` must NOT be 14 — it once bled to
- * Foundry's default and is now pinned to the design.
- */
+/* Recipe Studio font-size gate (issue 643). */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -22,8 +10,7 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 const foundryCss = readFileSync(resolve(repoRoot, 'tests/fixtures/foundry-core-min.css'), 'utf8');
 const fabricateCss = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
 
-// One representative element per role, using the exact recipe-studio classes, wrapped
-// in the Foundry app shell so `.application`'s 14px base + the @layer reset apply.
+// One representative element per role, using the exact recipe-studio classes.
 const FIXTURE = `
   <div class="application theme-dark">
     <section class="window-content">
@@ -286,21 +273,7 @@ const FIXTURE = `
     </section>
   </div>`;
 
-// The chip owns its appearance in `Chip.svelte`'s scoped block (issue 883), so the global
-// sheet alone no longer styles it and every chip role here would fall to the 14px bleed
-// baseline. The gate keeps the coverage by reproducing what Svelte actually ships: the
-// component's real compiled CSS, appended AFTER the global sheet exactly as `css:
-// 'injected'` injects it, with the real scoping hash stamped onto the fixture's chips so
-// the SPECIFICITY matches too. Both halves matter — this is the only place in the repo
-// where a global rule that ties with the scoped block, and silently loses on source order,
-// can be caught.
-//
-// Issue 1010 made this a LIST rather than the single chip pairing it started as: the
-// browser's multi-select toolbar and its bulk edit panel are built from shared primitives
-// that each own their appearance in a scoped block, so every one of them needs BOTH halves
-// of the treatment. Appending the CSS without the hash class makes the rules match nothing;
-// adding the hash without the real ordering proves the wrong winner. A role that gets
-// neither silently measures Foundry's 14px app base, which the anti-bleed loop then catches.
+// The chip owns its appearance in `Chip.svelte`'s scoped block (issue 883).
 const SCOPED_COMPONENTS = [
   'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/apps/manager/Callout.svelte',
@@ -309,13 +282,7 @@ const SCOPED_COMPONENTS = [
   'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
   'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
   'src/ui/svelte/apps/manager/BulkEditSection.svelte',
-  // `BulkEditSelect.svelte` is NOT here any more (issue 1504): it has no `<style>` block at
-  // all now, and `scopedComponentCss` refuses a component that emits none rather than pairing
-  // the fixture with an empty string. Its control's whole appearance is the `.fabricate-select*`
-  // family in `styles/fabricate.css`, which this page already loads.
-  // The recipe panel's own block, which exists only because of the book axis (issue 1010):
-  // its pick card and staged list are surfaces no shared primitive supplies. Every other
-  // axis it renders still comes from the chrome above.
+  // `BulkEditSelect.svelte` is NOT here any more (issue 1504).
   'src/ui/svelte/apps/manager/recipes/RecipeBulkEditPanel.svelte',
 ].map((componentPath) => scopedComponentCss(resolve(repoRoot, componentPath)));
 
@@ -483,8 +450,7 @@ test('recipe studio font-sizes match the prototype scale under real Foundry core
       );
     }
 
-    // The bleed contract: the bare control proves Foundry's 14px base is in play, and
-    // the nav label must NOT sit at that base — it is now design-pinned, not bleeding.
+    // The bleed contract: the bare control proves Foundry's 14px base is in play.
     assert.equal(measured['bleed-baseline'], 14, 'bare <input> inherits the Foundry 14px app base');
     assert.notEqual(measured['nav-label'], 14, 'nav label must not bleed to the Foundry base');
 
@@ -500,9 +466,7 @@ test('recipe studio font-sizes match the prototype scale under real Foundry core
       );
     }
 
-    // The flat and stage component pickers SHARE one rule (issue 676), so they must read
-    // identically. Asserting the relationship (not just two equal constants) is what
-    // catches the sharing being broken by a new rule that only one of them matches.
+    // The flat and stage component pickers SHARE one rule (issue 676).
     assert.equal(
       measured['flat-picker'],
       measured['stage-picker'],

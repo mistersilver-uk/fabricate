@@ -1,8 +1,4 @@
-// Source-pin contract for the player Journal screen (Slice B), mirroring
-// gathering-environments-source.test.js. These string assertions fail at test
-// time when load-bearing wiring drifts: the shell branch + nav badge + shell
-// refresh, the two-zone container-query grid, the status vocabulary, and the global
-// CSS treatments. Keep names stable or update these in lockstep.
+// Source-pin contract for the player Journal screen (Slice B).
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -177,12 +173,9 @@ describe('Journal label mirrors resolve in lang/en.json (drift guard)', () => {
     }
   });
 
-  // The historical branch spells no whole key: `tests/ui-lang-keys-resolve.test.js` sees only the
+  // The historical branch spells no whole key.
   // interpolated prefix, resolves it to an object and checks nothing beneath it, so deleting
   // `History.RollNotRecorded` passed every gate. Prefix and leaves both come from the AST.
-  // The same `text(leaf)` idiom now appears in three places, so the checker is shared. A
-  // module that composes its own prefix is invisible to `ui-lang-keys-resolve`, which can
-  // only check that the BASE exists — these assertions are what check the leaves.
   const textHelperKeys = (ast) => {
     const leaves = (node) => {
       if (node?.type === 'Literal' && typeof node.value === 'string') return [node.value];
@@ -210,8 +203,7 @@ describe('Journal label mirrors resolve in lang/en.json (drift guard)', () => {
     ['the claim recovery dialog', '../../src/ui/svelte/apps/journal/runRecovery.js', 4],
   ]) {
     it(`resolves every prefixed label ${label} reads through its text helper`, () => {
-      // These two are plain .js modules, so they parse with parseModule; the historical
-      // branch below is a .svelte component and parses with parseComponent.
+      // These two are plain .js modules, so they parse with parseModule.
       const { prefix, keys } = textHelperKeys(parseModule(read(path)));
       assert.ok(prefix?.startsWith('FABRICATE.'), `the text helper localizes a prefix: ${prefix}`);
       assert.ok(keys.length >= floor, `extracted the text() call sites: ${keys.length}`);

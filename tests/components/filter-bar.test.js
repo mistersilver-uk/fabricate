@@ -2,9 +2,7 @@ import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
 
-// ---------------------------------------------------------------------------
 // Helpers: build DOM structures that mirror FilterBar output
-// ---------------------------------------------------------------------------
 
 function buildFilterBar({
   showCraftableOnly = false,

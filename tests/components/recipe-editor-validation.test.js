@@ -6,9 +6,7 @@ import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
 
-// ---------------------------------------------------------------------------
 // Helpers: build DOM structures mirroring component output
-// ---------------------------------------------------------------------------
 
 function buildValidationBanner(errors, onScrollToError) {
   if (!errors || errors.length === 0) return null;
@@ -103,9 +101,7 @@ function buildResultGroupPanel(group, hasError) {
   return section;
 }
 
-// ---------------------------------------------------------------------------
 // ValidationBanner tests
-// ---------------------------------------------------------------------------
 
 describe('ValidationBanner: renders error list', () => {
   before(() => setupDOM());
@@ -171,9 +167,7 @@ describe('ValidationBanner: renders error list', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Recipe name field-error class tests
-// ---------------------------------------------------------------------------
 
 describe('RecipeNameInput: field-error class', () => {
   before(() => setupDOM());

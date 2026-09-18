@@ -1,6 +1,5 @@
 import { describe, it } from 'node:test';
-// Shared with recipe-edit-editor.test.js: the aside/column pairing is ONE question, and
-// two copies of it are two things to let drift (issue 1362).
+// Shared with recipe-edit-editor.test.js: the aside/column pairing is ONE question.
 import { assertFullWidthRoute } from '../helpers/fullWidthRoute.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -41,9 +40,7 @@ function inspectorActionBlock() {
 
 describe('recipe row keeps a single Edit affordance; Duplicate/Delete stay inspector-only', () => {
   it('restores the row Edit pencil but keeps Duplicate/Delete off the row', () => {
-    // The row carries its own Edit pencil again (issue 643), matching the Books & Scrolls
-    // row edit — but Duplicate and Delete remain the inspector's job, so the row must not
-    // author those callbacks or the old three-icon action group.
+    // The row carries its own Edit pencil again (issue 643).
     assert.ok(browserSource.includes('onEditRecipe'), 'the row declares the onEditRecipe prop');
     assert.ok(browserSource.includes('data-recipe-edit={recipe.id}'), 'the row renders its Edit pencil');
     assert.equal(browserSource.includes('onDuplicateRecipe'), false, 'the row should not declare an onDuplicateRecipe prop');
@@ -51,8 +48,7 @@ describe('recipe row keeps a single Edit affordance; Duplicate/Delete stay inspe
     assert.equal(browserSource.includes('manager-recipe-actions'), false, 'the row action group markup should be gone');
     // The other two controls the row KEEPS.
     assert.ok(browserSource.includes('data-recipe-lock'), 'the row keeps the lock control');
-    // `<StatusToggle`, not the class literal (issue 1040): the shared primitive is the only
-    // thing under `src/` writing `manager-status-toggle`, so the class reads 0 at this call site.
+    // `<StatusToggle`, not the class literal (issue 1040).
     assert.ok(browserSource.includes('<StatusToggle'), 'the row keeps the enable toggle');
   });
 
@@ -71,9 +67,7 @@ describe('recipe row keeps a single Edit affordance; Duplicate/Delete stay inspe
     assert.ok(penIdx < trashIdx, 'Edit should come before Delete');
   });
 
-  // The three inspector actions are FULL-WIDTH buttons, not ghost icons and not a plain
-  // text link: Duplicate is a dark secondary, Edit the accent primary, Delete a dark
-  // danger button (issue 643).
+  // The three inspector actions are FULL-WIDTH buttons.
   it('renders the three inspector actions as full-width buttons', () => {
     const block = inspectorActionBlock();
     // The literal `class="manager-button ` is gone from this file entirely (issue 1118): the
@@ -97,22 +91,7 @@ describe('recipe row keeps a single Edit affordance; Duplicate/Delete stay inspe
       false,
       'and no site in this group writes the convention class by hand any more'
     );
-    // Each of the three is full width, and that is a CASCADE question: which rule wins
-    // `width` for this button. It used to be asked as `css.indexOf(<literal selector>)`,
-    // which is a question about spelling — and the spelling moved. The selectors chained
-    // `.manager-button` (0,3,0) to beat the base rule declared later in the sheet (issue
-    // 643); issue 1118 chained `.fab-manager-button` in beside it, because at (0,3,0) they
-    // only TIED the primitive's own control and held their geometry by source order. The
-    // literal lookup then returned -1 and the assertion failed on `start >= 0`, before
-    // `width` was ever read — a lookup breaking, reported as a stylesheet regressing.
-    //
-    // So this reads the rule by its SELECTOR, tolerant of the chain: the compound may carry
-    // the primitive marker, and a prelude long enough to wrap may be spread over lines.
-    //
-    // The spelling moved a third time in issue 1502: the family is now rooted at the class
-    // `ManagerButton` itself emits, so the leading `.fabricate-manager` DESCENDANT became a
-    // `.fabricate-button` COMPOUND on the same element. Specificity is unchanged — one class
-    // swapped for one class — and the tolerance below still absorbs the primitive marker.
+    // Each of the three is full width, and that is a CASCADE question.
     for (const selector of [
       '.fabricate-button.manager-button.manager-recipe-browser-inspector-duplicate',
       '.fabricate-button.manager-button.manager-recipe-browser-inspector-edit',
@@ -155,16 +134,7 @@ describe('inspector action button layout', () => {
     assert.ok(block.includes('flex-direction: column'), 'the inspector actions stack vertically');
   });
 
-  // The row is a card, not a column grid, so there is no fixed 118px actions column
-  // any more. The invariant it protected — the row actions never get squeezed —
-  // now lives on the control cluster: it does not shrink, and the identity cell is
-  // the only thing that gives way.
-  //
-  // The companion assertion that the retired `--fab-mv2-recipe-grid` column template does
-  // not come back is GONE, and deliberately (issue 1399). It named a token the sheet had
-  // already stopped declaring, so it could only ever pass; `tests/token-generation-gate.test.js`
-  // now bans that whole name shape across `src/` and `styles/` from a population that is
-  // not empty, which is the same guarantee from a gate that can actually fail.
+  // The row is a card, not a column grid.
   it('never shrinks the row control cluster', () => {
     const start = css.indexOf('.fabricate-manager .manager-recipe-cluster {');
     assert.ok(start >= 0, 'the recipe row control cluster should own a rule');
@@ -236,24 +206,13 @@ describe('CraftingSystemManagerRoot recipe-edit wiring', () => {
   });
 
   it('suppresses the inspector aside on recipe-edit, matching the released grid column', () => {
-    // Issue 676 deleted the context rail: recipe-edit is a TWO-column route now, and the
-    // 300px the rail held goes to the tab panel. Suppressing the aside here and adding
-    // recipe-edit to the two-column override list in styles/fabricate.css are ONE
-    // decision expressed twice — suppress without releasing and a 300px empty box still
-    // holds the strip open; release without suppressing and the (empty) aside wraps to
-    // an implicit grid row BELOW the editor. This pins both halves together.
+    // Issue 676 deleted the context rail: recipe-edit is a TWO-column route now.
     assert.equal(
       rootSource.includes('recipeInspectorVisible'),
       false,
       'no conditional-hide gate: the aside is unconditionally absent on this route'
     );
-    // ASKED AS SET MEMBERSHIP since issue 1362, which replaced the twelve-clause boolean
-    // guard this used to slice with a single read of `FULL_WIDTH_VIEWS`. The helper asserts
-    // every index before it slices: a stale `indexOf` returns -1, `slice(-1, n)` then reads
-    // from the END of the file, and an assertion over that empty string is green while
-    // checking nothing at all — the failure this test's own comment named and did not defend
-    // against. It pins both stylesheet rules too, because
-    // `.manager-body.is-rail-collapsed` out-specifies a single-class rule.
+    // ASKED AS SET MEMBERSHIP since issue 1362.
     assertFullWidthRoute({
       rootSource,
       css: readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8'),
@@ -282,8 +241,7 @@ describe('RecipeEditView empty-state regression guards', () => {
     assert.ok(editSource.includes('FABRICATE.Admin.Manager.Recipe.EditMissingHint'), 'null branch uses EditMissingHint');
   });
 
-  // Issue 785: the surface is a shared COMPONENT now, not a bare class the view hand-rolls
-  // markup against, so the reuse is proven by the import + the element, not by the string.
+  // Issue 785: the surface is a shared COMPONENT now.
   it('reuses the shared EmptyState primitive for the null-recipe state', () => {
     assert.ok(
       editSource.includes("import EmptyState from './EmptyState.svelte'"),

@@ -1,20 +1,4 @@
-/**
- * The system Tool Rules inspector, mounted (issue 1373, epic 1357).
- *
- * ## What this suite is FOR
- *
- * The design's panel ends in two actions and ours had neither:
- *
- *  - a full-width `Edit the world Tool`, which leaves this system entirely - identity, art,
- *    description and the world defaults are authored once, in the world catalogue;
- *  - `Add {tool} to {system}` pinned to the foot, for a world Tool this system has no rules
- *    record for.
- *
- * Both were reported blocked on the same two facts never reaching the component: the crafting
- * system's NAME, and whether the selected Tool is a MEMBER. The second is the sharper one - the
- * panel used to be fed this system's own library row alone, so for an unadopted Tool there was
- * nothing to render at all, which is exactly the state the second button exists to answer.
- */
+/** The system Tool Rules inspector, mounted (issue 1373, epic 1357). */
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 import { dirname, resolve } from 'node:path';
@@ -29,15 +13,12 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-tool-browser-inspector-',
   componentPath: 'src/ui/svelte/apps/manager/tools/ToolBrowserInspector.svelte',
-  // The panel is fed a system's own library row, so it needs the Tool model closure and
-  // nothing of the world scope stack the two catalogue screens project through.
+  // The panel is fed a system's own library row.
   rawModules: [...TOOL_TREE_RAW_MODULES],
   compiledModules: [
     ...TOOL_TREE_COMPILED_MODULES,
     'src/ui/svelte/apps/manager/EmptyState.svelte',
-    // THE PANEL'S CARD IS THE SHARED PRIMITIVE (issue 1427), not a hand-written
-    // `class="manager-inspector-card"` section, so it is in this tree's static graph. A
-    // rendered `.svelte` the harness omits HANGS this suite and reports `# cancelled`.
+    // THE PANEL'S CARD IS THE SHARED PRIMITIVE (issue 1427).
     'src/ui/svelte/components/InspectorCard.svelte',
     'src/ui/svelte/apps/manager/tools/ToolBrowserInspector.svelte',
   ],
@@ -144,9 +125,7 @@ describe('the system Tool Rules inspector (issue 1373)', () => {
   it('states what an UNADOPTED Tool WOULD inherit, under a heading that says so', async () => {
     const target = await harness.mount({ tool: null, unadopted: UNADOPTED, systemName: 'Forge' });
     const panel = target.querySelector('[data-tool-browser-inspector]');
-    // The cards are the WORLD defaults, and the kicker qualifies them. Stating "Effective rules
-    // here" over a system with no record would be a claim about rules that do not exist; stating
-    // nothing would leave a GM deciding whether to adopt with no idea what they would get.
+    // The cards are the WORLD defaults.
     assert.match(panel.textContent, /What it would inherit here/);
     assert.match(
       panel.querySelector('[data-tool-inspector-rule="breakage"]').textContent,

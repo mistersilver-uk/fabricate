@@ -8,9 +8,7 @@ import { compile } from 'svelte/compiler';
 import { flushSync, mount, tick, unmount } from '../../node_modules/svelte/src/index-client.js';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
 import { rewriteClientImports } from '../helpers/rewriteClientImports.js';
-// The raw `.js` closure of `SearchablePopover`, which the shared `<Select>` composes
-// (issue 1504). Spread from the harness's own roster rather than copied, so a module added
-// there cannot go missing here.
+// The raw `.js` closure of `SearchablePopover`.
 import {
   PLAYER_APP_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
@@ -181,8 +179,7 @@ describe('GatheringDetail (center column) mounted behavior', () => {
       readFileSync(resolve(repoRoot, 'src/ui/svelte/apps/gathering/selectionDefault.js'), 'utf8')
     );
 
-    // GatheringView also imports the pure scoped-selection helper; copy it into
-    // the temp tree so the compiled component can resolve it at import time.
+    // GatheringView also imports the pure scoped-selection helper.
     const scopedSelectionDestination = join(tempRoot, 'src/ui/svelte/apps/gathering/scopedSelection.js');
     writeFileSync(
       scopedSelectionDestination,
@@ -303,12 +300,10 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     const pips = target.querySelector('[data-gathering-pips]');
     assert.ok(pips, 'info pips render');
     assert.ok(pips.textContent.includes('Forest'), 'biome pip present');
-    // Region is no longer a composition/display axis: the legacy inert
-    // environment.region pip was removed with the gathering-regions unification.
+    // Region is no longer a composition/display axis.
     assert.ok(!pips.textContent.includes('Greenvale'), 'no legacy region pip');
     assert.equal(target.querySelector('.gathering-detail-pip i.fa-map-location-dot'), null, 'region pip icon removed');
-    // Danger is localized via the Risk.<value> key (not the raw enum); the i18n
-    // stub echoes the key, so the localized key path proves the lookup happened.
+    // Danger is localized via the Risk.<value> key (not the raw enum).
     assert.ok(pips.textContent.includes('Risk.safe'), 'danger pip uses the localized risk key');
 
     const hint = target.querySelector('[data-gathering-mode-hint]');
@@ -319,8 +314,7 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.equal(row.getAttribute('data-attemptable'), 'true');
     assert.equal(row.getAttribute('data-blocked'), 'false');
     assert.ok(row.querySelector('[data-gathering-success-value]'), 'success-chance bar present for d100 task');
-    // The center row is now read-only: no attempt button, and the description is
-    // shown in the always-visible underneath section.
+    // The center row is now read-only: no attempt button.
     assert.equal(row.querySelector('[data-gathering-attempt]'), null, 'center row has no attempt button');
     const desc = row.querySelector('[data-gathering-task-description]');
     assert.ok(desc && desc.textContent.includes('Dig for ore.'), 'description renders underneath the row');
@@ -460,9 +454,7 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     const safe = section.querySelector('[data-gathering-safe-hint]');
     assert.ok(safe, 'safe hint shown when chance is zero');
     assert.ok(safe.textContent.includes('EventSafeHint'), 'safe hint uses the localized message');
-    // THE CONVERSION ITSELF, which nothing asserted (issue 1514): reverting these sites to the
-    // bare `<p>` they were is green in every suite that reads them, because all five readers
-    // test hook presence and a bare `<p>` carrying the hook satisfies that.
+    // THE CONVERSION ITSELF, which nothing asserted (issue 1514).
     assert.equal(
       safe.getAttribute('data-callout-tone'),
       'info',
@@ -492,8 +484,7 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     const note = target.querySelector('[data-gathering-event-risk-note]');
     assert.ok(note, 'a risk note is shown above the tasks');
     assert.ok(note.textContent.includes('EventRiskNote'), 'the risk note uses the localized message');
-    // Converted for the same reason as its `EventSafeHint` twin, and asserted so the
-    // conversion cannot be silently reverted — see the clause on that twin.
+    // Converted for the same reason as its `EventSafeHint` twin.
     assert.equal(note.getAttribute('data-callout-tone'), 'info', 'drawn as an info callout');
     assert.ok(note.classList.contains('manager-callout'), 'and not as a bare paragraph');
     assert.ok(target.querySelector('[data-gathering-tasks-section]'), 'the tasks section still renders');
@@ -526,9 +517,7 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     const safe = summary.querySelector('[data-gathering-safe-hint]');
     assert.ok(safe, 'the safe hint is shown instead');
     assert.ok(safe.textContent.includes('EventSafeHint'), 'safe hint uses the localized message');
-    // THE CONVERSION ITSELF, which nothing asserted (issue 1514): reverting these sites to the
-    // bare `<p>` they were is green in every suite that reads them, because all five readers
-    // test hook presence and a bare `<p>` carrying the hook satisfies that.
+    // THE CONVERSION ITSELF, which nothing asserted (issue 1514).
     assert.equal(
       safe.getAttribute('data-callout-tone'),
       'info',
@@ -568,8 +557,7 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.equal(row.querySelector('[data-gathering-attempt]'), null, 'center row has no attempt button');
     assert.equal(row.querySelector('[data-gathering-blocked]'), null, 'no inline blocked detail in the center row');
 
-    // Nothing is attemptable, so no task is auto-selected; selecting the blocked
-    // task surfaces its conditions detail in the right-column inspector.
+    // Nothing is attemptable, so no task is auto-selected.
     row.querySelector('.gathering-task-summary').click();
     flushSync();
     const blocked = target.querySelector('[data-gathering-task-detail] [data-gathering-blocked]');
@@ -625,8 +613,7 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     const row = target.querySelector('[data-gathering-task-detail] [data-gathering-drop]');
     const tile = row.querySelector('.fab-medallion');
     assert.ok(Boolean(tile), 'the drop thumbnail is the shared art tile');
-    // The CONVERSION RULE the geometry requirement states: the rendered size is preserved and
-    // the off-ladder row is banked, rather than snapped to the nearest rung here.
+    // The CONVERSION RULE the geometry requirement states.
     assert.match(tile.getAttribute('style'), /width:\s*36px;\s*height:\s*36px/, 'at the 36px it already rendered');
     assert.equal(tile.getAttribute('data-medallion'), 'image', 'and it carries the drop artwork');
 
@@ -651,11 +638,6 @@ describe('GatheringDetail (center column) mounted behavior', () => {
   });
 
   // ─── THE THREE ERRORS THAT USED TO BE SWALLOWED (issue 1514) ────────────────────────────
-  //
-  // All three are asserted on the RENDERED DOM rather than on source text, because each defect
-  // was precisely that the component rendered its ORDINARY state after a failure: a source-text
-  // reader cannot tell "no drops" from "the drop fetch threw", which is the confusion being
-  // fixed.
 
   it('says so when the drop-breakdown fetch fails, instead of drawing an empty find list', async () => {
     const { services } = makeServices(listing([environment()]));
@@ -959,8 +941,7 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.equal(panel.getAttribute('data-detail-task-id'), 'task-2');
     assert.ok(panel.querySelector('[data-gathering-tool]'), 'inspector lists the selected task tools');
 
-    // Selection moved: task-2 selected, task-1 deselected — and the center row
-    // never renders requirements inline (they live only in the right column).
+    // Selection moved: task-2 selected, task-1 deselected.
     assert.equal(target.querySelector('[data-task-id="task-2"]').getAttribute('data-selected'), 'true');
     assert.equal(target.querySelector('[data-task-id="task-1"]').getAttribute('data-selected'), 'false');
     assert.equal(target.querySelector('[data-task-id="task-2"] [data-gathering-tools]'), null, 'center row has no inline requirements');
@@ -1137,9 +1118,7 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.ok(target.querySelector('[data-gathering-events-hidden]'), 'a "events hidden" hint is shown instead');
   });
 
-  // issue 301: permanently-exhausted (nonRegenerating) node state — the task ROW
-  // surfaces an "Exhausted" callout, and the DETAIL shows the permanent-exhaustion
-  // copy (no "replenishes over time" message and no respawn ETA).
+  // issue 301: permanently-exhausted (nonRegenerating) node state.
   it('row shows the Exhausted callout for a NODE_EXHAUSTED block', async () => {
     await renderRow({
       task: { id: 't1', name: 'Vein', attemptable: false, blockedReasons: [{ code: 'NODE_EXHAUSTED' }] }
@@ -1161,9 +1140,7 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.ok(callout, 'the depleted/exhausted callout renders');
     assert.ok(callout.textContent.includes('NodeExhaustedPermanent'), 'shows the permanent-exhaustion copy');
     assert.ok(!callout.textContent.includes('NodeDepletedRespawns'), 'does NOT show the replenishes-over-time copy');
-    // RETARGETED, not deleted (issue 1514). The ETA moved onto `Notice`'s `detail` line, whose
-    // hooks live on the banner ROOT alone, so `[data-gathering-node-respawn-eta]` no longer
-    // exists anywhere and this assertion would have gone on passing for the wrong reason.
+    // RETARGETED, not deleted (issue 1514). The ETA moved onto `Notice`'s `detail` line.
     assert.ok(!callout.querySelector('.fab-notice-detail'), 'no respawn ETA for a permanently exhausted node');
   });
 
@@ -1243,8 +1220,7 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     const scarce = target.querySelector('[data-gathering-node-scarce]');
     assert.ok(scarce, 'the permanence callout renders before exhaustion');
     assert.ok(scarce.textContent.includes('NodeScarcePermanent'), 'uses the permanence/scarcity key');
-    // The SECOND node banner, asserted on the same four axes as its sibling above, and the
-    // tone is the one thing that distinguishes them: this pool still has charges.
+    // The SECOND node banner, asserted on the same four axes as its sibling above.
     assert.equal(
       scarce.getAttribute('data-notice-tone'),
       'info',

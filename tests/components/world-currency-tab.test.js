@@ -17,16 +17,7 @@ import { installLangBackedI18n } from '../helpers/langBackedI18n.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
-/**
- * World > Currency (issue 1278), mounted on its own.
- *
- * The strategy branches, provider read-only list and macro drop zones are covered through the
- * whole-manager mount in `manager-mounted.test.js`, which is where the route and its chrome are
- * asserted. What this suite pins is what the RELOCATION changed about the card itself: it is a
- * page now rather than one section among several on a crafting system's Settings tab, so its
- * collapse state is its own, its reorder announcement travels with it, and it renders without any
- * crafting system in hand at all.
- */
+/** World > Currency (issue 1278), mounted on its own. */
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-world-currency-tab-',
@@ -48,8 +39,6 @@ const harness = createMountedComponentHarness({
   ],
   compiledModules: [
     // THE APP'S ONE SELECT AND ITS WHOLE COMPILED CLOSURE (issue 1510), spread rather than copied.
-    // This tree renders `components/Select.svelte` now, and a `.svelte` the tree renders but the
-    // harness omits HANGS the suite (`# cancelled`) rather than failing it.
     ...SELECT_COMPILED_MODULES,
     // A `.svelte` the tree renders but the harness omits HANGS the suite (# cancelled) rather
     // than failing it, so every one is named.
@@ -59,7 +48,6 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/components/Field.svelte',
     // THE manager's labelled push-button (issue 1118). The currency card header and each expanded unit render it.
-    // Omitting a rendered `.svelte` HANGS the suite (# cancelled) rather than failing it.
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte'
@@ -87,8 +75,6 @@ afterEach(() => harness.remount());
 describe('World > Currency tab (mounted)', () => {
   it('renders the ladder with NO crafting system in hand', async () => {
     // The point of the move. The tab takes no system prop at all, and it is deliberately ungated:
-    // a GM has to be able to author coins BEFORE any system can switch currency on, so gating this
-    // page on participation would be a chicken-and-egg lock-out.
     const root = await harness.mount({ currencyUnits: UNITS });
 
     assert.ok(root.querySelector('[data-world-currency-page]'), 'the page root renders');
@@ -115,9 +101,7 @@ describe('World > Currency tab (mounted)', () => {
   });
 
   it('gives the page a single section heading directly under the shell heading', async () => {
-    // The shell renders <h1>World Currency</h1>; the card's own title used to be an <h3> under
-    // the Settings tab's <h2>. Left as an h3 it would skip a level, which costs a screen-reader
-    // user the landmark they navigate the page by.
+    // The shell renders <h1>World Currency</h1>.
     const root = await harness.mount({ currencyUnits: UNITS });
     const heading = root.querySelector('.manager-card-title');
 
@@ -137,8 +121,7 @@ describe('World > Currency tab (mounted)', () => {
 
   it('disables Seed presets when the world ruleset has no preset bundle', async () => {
     const unsupported = await harness.mount({ currencyUnits: [], currencyPresetsSupported: false });
-    // Pinned by its label, not by "the first tooltipped button on the page" — that would pass on
-    // any other disabled control that happens to carry a tooltip.
+    // Pinned by its label, not by "the first tooltipped button on the page".
     const seedOff = [...unsupported.querySelectorAll('button')].find((button) =>
       button.textContent.includes('Seed presets')
     );
@@ -185,13 +168,7 @@ describe('World > Currency tab (mounted)', () => {
     assert.equal(root.querySelector('[data-move-currency-up="sp"]').disabled, false);
   });
 
-  /**
-   * The world profile's validation report (issue 1493).
-   *
-   * `validateCurrencyProfile` had no caller in the manager at all, so a ladder that could not be
-   * spent against looked perfectly healthy on the page that authors it. The errors arrive as plain
-   * strings from `adminStore`; this component deliberately does not import `currencyProfile.js`.
-   */
+  /** The world profile's validation report (issue 1493). */
   it('renders the validation errors, each one, where the ladder is authored', async () => {
     const root = await harness.mount({
       currencyUnits: UNITS,
@@ -213,12 +190,7 @@ describe('World > Currency tab (mounted)', () => {
   });
 
   it('renders a repeated validator message rather than throwing on it', async () => {
-    // The list is keyed on the INDEX, never on the message. Svelte 5 throws `each_key_duplicate`
-    // on a repeated key in BOTH its dev and production branches, and these rows are plain
-    // validator strings, so keying on the string itself would turn a duplicated message into a
-    // crash of the whole route. They are distinct today only because `validateCurrencyProfile`
-    // happens to return `[...new Set(errors)]`, an unpinned detail of a file this surface does
-    // not own. (Unkeyed is not on the table: `svelte/require-each-key` fails `lint:svelte`.)
+    // The list is keyed on the INDEX.
     const repeated = 'Currency unit "Gold" is missing an actor data path.';
     const root = await harness.mount({
       currencyUnits: UNITS,
@@ -261,14 +233,7 @@ describe('World > Currency tab (mounted)', () => {
   });
 
   it('hides the silent region with the shipped visually-hidden utility, not a margin hack', async () => {
-    // A permanently mounted live region has to be a REAL hidden element while it is silent, or it
-    // leaves a phantom row in the section's gapped flex column. `.visually-hidden`
-    // (`styles/fabricate.css`, under `.fabricate-manager`) is the shipped utility for exactly
-    // that, and it is the one the reorder announcer at the top of this same component already
-    // uses; it clips the element out of flow while leaving it in the accessibility tree.
-    //
-    // This asserts the CLASS, never a computed style: happy-dom cannot compute the cascade, so a
-    // `getComputedStyle` assertion here would pass against a stylesheet that was never loaded.
+    // A permanently mounted live region has to be a REAL hidden element while it is silent.
     const silent = await harness.mount({ currencyUnits: UNITS, currencyValidationErrors: [] });
     const hidden = silent.querySelector('[data-world-currency-validation]');
     assert.equal(
@@ -330,18 +295,7 @@ describe('World > Currency tab (mounted)', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Issue 1493 (revision 3) — the note has to be true of the screen it appears on.
-//
-// The published `currency-macro` frame shows this note above FIVE perfectly healthy units,
-// reporting two errors that are not about any unit at all: a missing "can afford" macro and
-// a missing "decrement" one. `validateCurrencyProfile` raises at least four non-unit-scoped
-// errors, so "these currency units can't be spent yet" and "fix the units below" named the
-// wrong thing and pointed the wrong way — the problems are listed ABOVE the sentence.
-//
-// `game.i18n` is backed by the real `lang/en.json` here, so these are assertions on the
-// shipped copy rather than on the component's inline fallbacks.
-// ---------------------------------------------------------------------------
 
 describe('WorldCurrencyTab validation copy (issue 1493)', () => {
   let restoreI18n = () => {};
@@ -397,11 +351,7 @@ describe('WorldCurrencyTab validation copy (issue 1493)', () => {
     );
   });
 
-  // The one lang<->fallback mirror this change keeps: `WorldCurrencyTab` predates the
-  // decision to drop these shims and uses `text(key, fallback)` throughout, so unwinding it
-  // here would leave the file half-converted. Guarded instead, because a fallback that
-  // drifts from the shipped copy silently changes the wording rather than degrading to it —
-  // which is exactly what this revision found: both fallbacks still held the OLD sentences.
+  // The one lang<->fallback mirror this change keeps.
   it('keeps its validation fallbacks byte-identical to the shipped copy', () => {
     const source = readFileSync(
       resolve(repoRoot, 'src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte'),
@@ -426,7 +376,7 @@ describe('WorldCurrencyTab validation copy (issue 1493)', () => {
   });
 
   it('names both converted currency controls by their captions, and keeps their option lists', async () => {
-    // THE PROVIDER CONTROL'S FIRST MOUNTED COVERAGE (issue 1510), and the pin for BOTH names this
+    // THE PROVIDER CONTROL'S FIRST MOUNTED COVERAGE (issue 1510).
     // change touched. The strategy control's wrapper demoted to `Field as="div"`; the provider's
     // was DELETED, its caption and its hint riding the primitive's own `label=`/`hint=` form —
     // which is `hint`'s first caller in the corpus.
@@ -448,19 +398,14 @@ describe('WorldCurrencyTab validation copy (issue 1493)', () => {
     ]);
     closeSelectPanel(root, provider);
 
-    // BOTH NAMES NARROWED, DELIBERATELY, and this is the assertion that records it. Each wrapper
-    // was a `<Field as="label">` holding the caption, the control AND a hint, so the containment
-    // named each control by its caption plus the whole hint paragraph — and for the strategy that
-    // name CHANGED with the value, because the hint reflects the chosen strategy. Both are named
-    // by their caption alone now.
+    // BOTH NAMES NARROWED, DELIBERATELY.
     assert.equal(assertSelectHasResolvedName(root, provider), 'Provider');
     assert.equal(
       assertSelectHasResolvedName(root, '[data-world-currency-strategy-select]'),
       'Spend strategy'
     );
 
-    // The provider's hint is the primitive's own note line, after the control rather than inside
-    // the name, and the strategy's stayed the caller's hooked `<small>`.
+    // The provider's hint is the primitive's own note line.
     assert.ok(
       root.querySelector(provider).closest('.manager-field').querySelector('.fabricate-select-note'),
       'the provider hint renders through `hint=`, under the control'

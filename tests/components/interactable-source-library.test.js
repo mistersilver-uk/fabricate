@@ -1,13 +1,4 @@
-/**
- * Unit coverage for the shared interactable SOURCE enumeration (issue 335) — the
- * single Tool + Gathering-Task catalogue the Interactable browser AND the
- * Manage-Interactables promote picker both read, so the two can never drift.
- *
- * The promote-picker "No sources in this system" regression came down to the
- * picker reading a divergent path; these tests pin that a system with a Tool
- * yields a NON-EMPTY tool source list through the shared enumeration, and that the
- * task path the browser already used keeps working.
- */
+/** Unit coverage for the shared interactable SOURCE enumeration (issue 335). */
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';

@@ -1,33 +1,4 @@
-/**
- * THE ACTION MENU'S CONTRACT (issue 1477), which is a KEYBOARD contract and an ANNOUNCEMENT
- * contract rather than a markup one.
- *
- * ── WHY THIS FILE HAS TO EXIST BESIDE THE CALLER SUITES ──────────────────────────────────────
- * The defect this primitive removes was invisible to every gate in the repository. The component
- * editor's identity strip opened a kebab over two commands through `SearchablePopover`, which
- * renders `role="listbox"` of `role="option"` rows under an `aria-haspopup="dialog"` trigger, so
- * "Unlink Source Item" was announced as an option a screen-reader user could SELECT. On screen it
- * is a kebab over two rows either way: no frame, no computed-style probe and no `data-*` selector
- * can tell the two apart. Issue 1458 adjudicated `CompositionList`'s four hand-rolled menus as NOT
- * convertible on exactly this ground and nobody looked in the other direction.
- *
- * So the announcement is asserted directly, in both directions — the menu roles are PRESENT and
- * the listbox roles are ABSENT — because a conversion that left a menu nested inside a listbox
- * would satisfy a presence-only check.
- *
- * ── AND WHY THE KEYBOARD HALF IS THE HARDER HALF ─────────────────────────────────────────────
- * A menu MOVES FOCUS to its items; a listbox keeps focus on one element and points at its options
- * with `aria-activedescendant`. That difference is the substantive reason this is a separate
- * primitive rather than a `role` prop on the picker, and it is expressed entirely in behaviour: a
- * build that dropped the arrow handling, the focus restore or the Escape branch renders
- * BYTE-IDENTICAL markup in every state. Measured on issue 1475, two such controls did exactly
- * that. Every clause below therefore reads `document.activeElement`, not the DOM.
- *
- * The contract is the W3C ARIA Authoring Practices Guide's MENU BUTTON pattern. The two
- * deliberate deviations — a native `disabled` item is skipped by arrow navigation, and Tab returns
- * focus to the trigger rather than continuing the tab sequence — are asserted here as the shipped
- * behaviour rather than left implicit, with the reasoning in `ActionMenu.svelte`'s header.
- */
+/** THE ACTION MENU'S CONTRACT (issue 1477). */
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { dirname, resolve } from 'node:path';
@@ -59,13 +30,7 @@ const harness = createMountedComponentHarness({
   componentPath: 'src/ui/svelte/components/ActionMenu.svelte',
 });
 
-/**
- * Three enabled verbs and one disabled note — the shape both callers produce between them.
- *
- * The note is THIRD rather than last on purpose: the composition list renders it first in two of
- * its four menus, so a build that skipped disabled items by slicing the ends of the list rather
- * than by asking whether each is focusable would pass on a note at either end.
- */
+/** Three enabled verbs and one disabled note — the shape both callers produce between them. */
 function items() {
   return [
     { id: 'first', label: 'Open source task', icon: 'fas fa-up-right-from-square' },
@@ -173,8 +138,7 @@ describe('1477 ActionMenu announces a MENU, never a listbox', () => {
       menuItems(target)[2].disabled,
       'and a note is a genuinely disabled button rather than an `aria-disabled` one'
     );
-    // The icon cell is rendered for EVERY item, which is what retired the note's `::before`
-    // spacer: without it a note's label would sit in the icon column.
+    // The icon cell is rendered for EVERY item.
     for (const item of menuItems(target)) {
       assert.equal(item.firstElementChild?.tagName, 'I', 'every item leads with its icon cell');
     }
@@ -278,9 +242,7 @@ describe('1477 ActionMenu keyboard contract (APG menu button)', () => {
   });
 
   it('an outside mousedown closes WITHOUT stealing focus back', async () => {
-    // The other half of the dismiss callback, and the reason the event is inspected rather than
-    // a second handler registered: Escape must return focus to the trigger and an outside click
-    // must leave it where the GM just put it.
+    // The other half of the dismiss callback.
     const target = await open(await harness.mount(props()));
     const doc = target.ownerDocument;
     const elsewhere = doc.createElement('button');

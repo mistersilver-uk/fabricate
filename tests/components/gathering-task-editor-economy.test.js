@@ -40,9 +40,7 @@ describe('Gathering task editor — economy sections are flag-gated and carded',
   });
 
   it('renders both economy cards independently (both guards present, no shared else)', () => {
-    // The two cards are gated by two independent {#if} blocks, so both render
-    // when both flags are on (the anti-dogpiling combination). The stamina guard
-    // is NOT chained to the nodes guard.
+    // The two cards are gated by two independent {#if} blocks.
     const staminaGuard = editorSource.indexOf('{#if staminaEnabled}');
     const nodesGuard = editorSource.indexOf('{#if nodesEnabled}');
     assert.ok(staminaGuard >= 0 && nodesGuard >= 0, 'both flag guards exist');
@@ -50,11 +48,9 @@ describe('Gathering task editor — economy sections are flag-gated and carded',
   });
 
   it('shows the guidance hint in the {:else} of the nodes guard (nodes disabled)', () => {
-    // The hint now lives in the {:else} of the nodesEnabled guard, so it renders
-    // whenever resource nodes are off — independent of the stamina toggle.
+    // The hint now lives in the {:else} of the nodesEnabled guard.
     const guardIdx = editorSource.indexOf('{#if nodesEnabled}');
-    // Prettier (issue 923) prints the section's attributes one per line, so match the {:else}
-    // and the hint card's class as a pattern rather than as a fixed two-line string.
+    // Prettier (issue 923) prints the section's attributes one per line.
     const elseMatch = /\{:else\}\s*<section\s+class="manager-task-nodes-card manager-task-nodes-hint-card"/.exec(
       editorSource.slice(guardIdx)
     );
@@ -123,9 +119,7 @@ describe('Gathering task editor — economy sections are flag-gated and carded',
   });
 
   it('authors depletedBehavior with a FilePicker swap-image (swap is the only behavior; no delete, no postfix)', () => {
-    // Only the swap-image picker survives — the "delete the linked marker" toggle
-    // and its warning chip were removed, and the postfix toggle is not offered for
-    // canvas tiles (tiles have no nameplate).
+    // Only the swap-image picker survives.
     for (const attr of [
       'data-gathering-task-depleted-behavior',
       'data-gathering-task-depleted-image'

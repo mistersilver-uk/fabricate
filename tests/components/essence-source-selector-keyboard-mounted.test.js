@@ -1,57 +1,4 @@
-/**
- * THE SOURCE PICKER KEEPS DOM FOCUS ON ONE ELEMENT (issue 1503).
- *
- * `openspec/specs/design-system/spec.md` requires a listbox to keep DOM focus on ONE element —
- * the HOLDER — and drive selection with `aria-activedescendant`, and forbids roving focus onto
- * the option rows because it re-arms Foundry's canvas bindings: with focus on a row, Space pauses
- * the game and the arrows pan the map behind the open window. There is a second, independent
- * reason the rows must not take focus, and it is visual: `styles/fabricate.css` rings any focused
- * `[tabindex]` under `.fabricate` with a 2px accent outline at a POSITIVE offset
- * (`.fabricate [tabindex]:focus-visible`), and every option row is now a `[tabindex]` element, so
- * a row that took focus would draw a competing ring around the keyboard cursor's own inset one.
- *
- * ── WHY THIS PICKER'S OWN SUITE, AND WHAT ONLY IT CAN SHOW ───────────────────────────────────
- * The arithmetic is proved in `tests/util/listbox-navigation.test.js` against the pure module,
- * with no compile and no DOM; the shared driver these cases run through lives in
- * `tests/helpers/listboxKeyboardDriver.js`. What is specific to THIS component is the GRID: its
- * panel is drawn `grid-template-columns: repeat(2, minmax(0, 1fr))`, so the vertical arrows must
- * step by TWO and the horizontal ones must mean something at all — a single-column key map would
- * make ArrowDown walk across the visual row rather than down the column the GM is reading.
- *
- * Five items in two columns is deliberate: it leaves a RAGGED last row, which a rectangular wrap
- * would strand and a flat-order wrap reaches.
- *
- * `EssenceSourceSelector`'s panel has ONE View Lab case as of issue 1503 —
- * `manager-essences-source-picker`, which opens it on the one lab essence with no linked source —
- * and that frame is a photograph. This suite remains the only instrument that sees the panel's
- * DOM: what a frame cannot show is an attribute, an id, an `aria-activedescendant` or which
- * element holds focus, and every clause below is about one of those.
- *
- * ── WHAT THIS SUITE ANSWERS FOR AFTER THE RE-PLATFORM (issue 1503) ─────────────────────
- * The panel, the query field, the list and every tile are now `SearchablePopover`'s elements, and
- * this component supplies a `trigger` snippet, an `option` snippet and its own class family. Three
- * things follow that only a mounted DOM can see, and each has its own case below.
- *
- *   1. THE TRIGGER SURVIVES THE SPREAD. The caller spreads the primitive's `attributes` LAST, so
- *      its own `aria-label`, `title` and `disabled` are the ones a defect would erase: Svelte's
- *      `set_attributes` REMOVES an attribute whose spread value is `undefined`, and a spread
- *      `disabled: false` would override a caller's `disabled={true}` mid-save. The primitive omits
- *      both classes of key; these cases are the runtime net for that, because a source read of the
- *      snippet cannot see an attribute erased at render time.
- *   2. THE LIST'S FORM IS EMITTED, not styled inline: `data-picker-as="grid"` and
- *      `data-picker-columns="2"` on the `role="listbox"` element, because `anchoredPopover`
- *      rewrites the list's whole `style` attribute on every measure. The sheet paints the grid
- *      from those attributes, and the class lists below are what lets it.
- *   3. THE MARKED ROW IS THE STORED ONE, which depends on `value={value?.id}` reaching the
- *      primitive — it marks with `option.id === value`, so without the mapping
- *      `[aria-selected='true']` matches nothing in a panel no frame photographs.
- *
- * What this suite CANNOT answer for: anything needing a resolved cascade. The harness compiles with
- * `css: 'injected'` and never loads `styles/fabricate.css` (`tests/helpers/scoped-component-css.js`
- * records that happy-dom cannot compute a cascade), and happy-dom returns zero-sized rects, so no
- * inline panel width is ever written here. The width band is read from the source instead, and the
- * sheet's own `max-width` is `icon-picker-layout.test.js`'s to read.
- */
+/** THE SOURCE PICKER KEEPS DOM FOCUS ON ONE ELEMENT (issue 1503). */
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -99,10 +46,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/actions/portal.js',
   ],
   compiledModules: [
-    // The primitive this component now renders, plus the three leaves it renders itself —
-    // `ManagerButton` among them since issue 1371 gave the popover a `triggerButton` trigger
-    // form. A `.svelte` the mounted tree reaches but the harness omits does not fail — the
-    // closure validator throws in `before()` and `node --test` reports `# cancelled`.
+    // The primitive this component now renders.
     'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/components/ManagerButton.svelte',
@@ -114,23 +58,7 @@ const harness = createMountedComponentHarness({
 
 const chosen = [];
 
-/**
- * The column count the SHEET draws this panel at, read rather than restated.
- *
- * The component's key map has to know how many columns the grid has — that is what makes
- * ArrowDown step down the column the GM is reading instead of sideways — so the count is a MIRROR
- * of `styles/fabricate.css`, and a mirror rots silently. Reading the sheet here and measuring the
- * cursor's real step against it is what makes a future re-tile of the panel fail this suite
- * instead of quietly transposing the arrow keys.
- *
- * RETARGETED at issue 1503, and the move is the point rather than an inconvenience. This caller
- * used to own a `grid-template-columns` of its own; the shared list rule's `display: flex` ties
- * it and wins on source order, so the template would have been INERT. The primitive emits
- * `data-picker-columns` on the list instead and the SHARED sheet carries one rung per shipped
- * count — so the mirror is now between the count this caller passes and the rung that paints it,
- * which is exactly the pair that can drift. A count with no rung renders one column while the key
- * map steps by two, and that is what this reads for.
- */
+/** The column count the SHEET draws this panel at, read rather than restated. */
 function sheetGridColumns() {
   const sheet = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
   const rungs = [
@@ -150,14 +78,7 @@ function sheetGridColumns() {
   return Number(rung[1]);
 }
 
-/**
- * The two trigger labels, by key rather than by sentence.
- *
- * The harness's `localize` returns the key it is handed, so a rendered label IS its key here —
- * which is what makes these assertions read the component's choice of string rather than a
- * translation. `ChangeSourceItem` carries the stored item's name after it, because a trigger whose
- * value is an IMAGE has no other way to say which item it is holding.
- */
+/** The two trigger labels, by key rather than by sentence. */
 const CHANGE_KEY = 'FABRICATE.Admin.Features.Essences.ChangeSourceItem';
 const DROP_OR_PICK_KEY = 'FABRICATE.Admin.Features.Essences.DropOrPickSourceItem';
 
@@ -398,14 +319,6 @@ describe('1503 EssenceSourceSelector — the listbox focus model', () => {
   });
 
   // ── THE TWO EMPTINESSES, AND WHERE THE NOTE NOW SITS (issue 1503) ───────────────────────
-  //
-  // A catalogue that holds nothing and a query that matched nothing are different facts, and this
-  // component always had two sentences for them — but it drew both as a `<p class="hint">` INSIDE
-  // its two-column grid, so the note rendered at roughly HALF the panel's width and reached
-  // `.fabricate-manager .hint` for its colour, which draws nothing at all outside the manager.
-  // The primitive's `EmptyState note` replaces both: one quiet line, full panel width, in a
-  // `role="status"` region that is a SIBLING of the list rather than a non-`option` child of a
-  // `role="listbox"`.
   it('says the catalogue is empty when nothing is authored, across the whole panel', async () => {
     const { panel } = await openPanel({ items: [] });
 
@@ -458,12 +371,6 @@ describe('1503 EssenceSourceSelector — the listbox focus model', () => {
   });
 
   // ── CRITERION 1: THE TRIGGER SURVIVES THE SPREAD ────────────────────────────────────────
-  //
-  // These two cases are the RUNTIME net for the primitive's omission rule, and they are mounted
-  // rather than source-read for a reason the source cannot see: the caller spreads `attributes`
-  // LAST, so an `aria-label: undefined` key in that object would REMOVE the label the snippet
-  // wrote, and a `disabled: false` key would override a caller's `disabled={true}`. Both are
-  // invisible to a reader of this component's markup and to the compiler.
   it('keeps the accessible name the snippet wrote, after the primitive spread', async () => {
     const stored = await mountSelector({ value: { id: 'cloth', name: 'Linen Cloth' } });
     const holding = trigger(stored);
@@ -480,8 +387,7 @@ describe('1503 EssenceSourceSelector — the listbox focus model', () => {
         'icon picker side of this same rule'
     );
 
-    // The primitive's own contract arrived through the same spread, which is what proves the
-    // spread ran at all rather than the assertions above passing on an un-spread button.
+    // The primitive's own contract arrived through the same spread.
     assert.equal(holding.getAttribute('type'), 'button');
     assert.equal(holding.getAttribute('aria-haspopup'), 'dialog');
     assert.equal(holding.getAttribute('aria-expanded'), 'false');
@@ -594,9 +500,7 @@ describe('1503 EssenceSourceSelector — the listbox focus model', () => {
   });
 
   it('asks the primitive for the shared width band rather than the withdrawn 420', () => {
-    // A SOURCE READ, and it is the only route there is: happy-dom returns zero-sized rects, so
-    // `computeIconPickerPopoverLayout` refuses and no inline width is ever written in a mounted
-    // DOM. The sheet's own governing `max-width` is `icon-picker-layout.test.js`'s to read.
+    // A SOURCE READ, and it is the only route there is: happy-dom returns zero-sized rects.
     const source = readFileSync(resolve(repoRoot, SOURCE_SELECTOR), 'utf8');
     assert.match(source, /minWidth=\{280\}/, 'the 280px floor is this picker own, and is kept');
     assert.match(
@@ -613,16 +517,6 @@ describe('1503 EssenceSourceSelector — the listbox focus model', () => {
 
   it('measures its own rows, so the grid floors to whole tiles instead of slicing one', () => {
     // A SOURCE READ PLUS A SHEET READ, and it is the only route there is in this harness:
-    // happy-dom returns zero-sized rects, so `getBoundingClientRect().height` is 0 here and the
-    // callback returns `{}` whatever it is written to do. The real-browser outcome — the pitch,
-    // the chrome and the floored height the panel actually resolves to — is measured in
-    // `tests/components/manager-layout.test.js`, which injects the sheet into Chromium.
-    //
-    // WHY IT MATTERS HERE AT ALL. Without a `measureListMetrics` the primitive derives no list
-    // height and registers no style target, so the grid fills a panel whose height came from the
-    // viewport and the last row is cut at whatever pixel the budget ran out on. On bordered tiles
-    // that reads as a rendering fault. The published `manager-essences-source-picker` frame
-    // showed exactly that: row seven clipped partway through its 44px box.
     const source = readFileSync(resolve(repoRoot, SOURCE_SELECTOR), 'utf8');
 
     assert.match(

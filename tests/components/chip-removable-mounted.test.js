@@ -1,13 +1,5 @@
 /**
  * `<Chip removable>` — the editable-set form of the app's one chip (issue 1515).
- *
- * `Chip` had a read-only form and nothing else: thirteen tones, three emphases, six densities and
- * an icon-only square, all of them faces of a badge you READ. Six manager surfaces nevertheless
- * render a membership token you can take back — the availability pill family — and every one of
- * them is hand-written markup with its own geometry, its own remove button and its own answer to
- * where focus goes afterwards. This suite covers the prop that lets those sites converge, and
- * every clause is a way for the CONTRACT to be wrong while the prop is declared:
- *
  *   - the remove control is a `<button>` OUTSIDE a form, which Foundry's `KeyboardManager#hasFocus`
  *     recognises only by its `form` — it literally returns `!!focused.form`. Without
  *     `data-keyboard-focus="true"` the window reads as unfocused while the control holds focus, so
@@ -27,19 +19,12 @@
  *     without a clipping box on the label and `flex: 0 0 auto` on the control the long label pushes
  *     the `x` out of the chip's visible box — an affordance that is still in the DOM, still
  *     focusable, and no longer on screen.
- *
  * ── WHY A COMPILED FIXTURE CALLER ─────────────────────────────────────────────────────────────
  * `tests/fixtures/chip/RemovableChipRow.svelte` is the call site, on the precedent
  * `tests/fixtures/searchable-popover/CapabilityHost.svelte` set. Three contracts here are about a
  * chip's relationship to the chips beside it and to markup the chip does not own — the sibling
  * chain, the caller's fallback trigger, and a label that arrives as a snippet — and a row of
  * hand-written look-alikes would let all three pass while the primitive emitted something else.
- *
- * ── WHY THE SOURCE-CONTRACT CLAUSES READ THE STYLE BLOCK ──────────────────────────────────────
- * happy-dom lays nothing out and computes no cascade, so the geometry this prop is about — a 20px
- * square hit box, a label that clips and a control that does not — has no DOM to be read back
- * from. Those clauses read the rules the way `chip-tone-matrix-characterization.test.js` reads the
- * density bands, and say what each rule is FOR rather than restating its declarations.
  */
 
 import assert from 'node:assert/strict';
@@ -109,15 +94,7 @@ const chipFor = (target, id) => target.querySelector(`[data-member="${id}"]`);
 /** @param {HTMLElement} target @param {string} id */
 const removeFor = (target, id) => chipFor(target, id).querySelector('[data-chip-remove]');
 
-/**
- * Let the caller's state change reach the DOM.
- *
- * A synthetic `click()` runs the handler synchronously, so the FOCUS move is observable the
- * instant it returns — that half is the point of moving focus before emitting. The caller
- * re-rendering without the removed member is a Svelte update, which is not, and a suite that
- * asserted the member had gone without flushing would be asserting against the tree the click
- * started from.
- */
+/** Let the caller's state change reach the DOM. */
 async function settle() {
   flushSync();
   await tick();
@@ -126,14 +103,6 @@ async function settle() {
 
 /**
  * Assert which element holds focus, WITHOUT ever handing two DOM nodes to `assert.equal`.
- *
- * This is not a style preference. On failure `node:assert` serialises both values to build its
- * diff, and a mounted happy-dom element is a circular tree with its whole document behind it, so
- * the process walks it until the heap dies. The suite then reports no failure at all — it hangs,
- * and a killed run leaves `# cancelled`, which is indistinguishable from a missing harness
- * allowlist entry. Measured here: removing the focus move from the component turned all three
- * clauses below from a failure into a hang.
- *
  * So the identity check is a boolean, and the DIAGNOSTIC is the destination’s own accessible
  * name — which is what a reader needs anyway ("focus is on Remove Survival, expected Remove
  * Athletics" says more than two serialised nodes ever would).
@@ -333,12 +302,7 @@ describe('1515 Chip — removable is REFUSED rather than dropped', () => {
   });
 
   it('leaves NO reachable state in which the control renders an empty name', async () => {
-    // The whole point of the refusal above, stated as the property it buys rather than as the
-    // mechanism. An `aria-label=""` does not fall back to the element's content — it REPLACES
-    // the name with nothing, so a rendered control carrying one is announced as an unnamed
-    // button. The gate at `tests/design-system-required-names.test.js` polices the SPELLING
-    // from the source; this polices the rendered result, which is the thing that matters and
-    // the thing a future default — localized or not — would silently change.
+    // The whole point of the refusal above.
     for (const removeLabel of ['', undefined, null]) {
       await assert.rejects(() => chip.mount({ ...REMOVABLE, removeLabel }));
       assert.ok(
@@ -452,12 +416,6 @@ describe('1515 Chip — the geometry the specimen publishes', () => {
 describe('1515 Chip — the specimen and the shipped props are one API', () => {
   /**
    * Every name `Chip.svelte` destructures out of `$props()`, minus the rest spread and `children`.
-   *
-   * DERIVED rather than restated, for the reason `declaredTones()` in the characterization suite
-   * is: a hand-copied list of fourteen prop names is a mirror, and a mirror of the specimen's own
-   * subject rots into agreeing with nothing. `children` is excluded because it is the default
-   * SNIPPET rather than an API the specimen enumerates, and `...rest` because the specimen states
-   * it as a sentence rather than as a name.
    *
    * @returns {string[]}
    */

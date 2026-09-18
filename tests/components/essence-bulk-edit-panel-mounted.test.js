@@ -1,15 +1,11 @@
 /**
  * `EssenceBulkEditPanel` mounted, in isolation (issue 1036) — criteria 11 and 17.
- *
  * The panel is where the maintainer's binding decision lands: *"Warn the GM about the impact
  * of the delete in the bulk edit sidebar and use the Arm/Confirm delete pattern on the bulk
  * delete button."* That DEVIATES from the `AGENTS.md` carve-out reserving `confirmDialog`
  * for bulk actions, and it is what this suite pins — including the two halves a
  * confirmDialog would have made unobservable: that the impact is stated BEFORE the action is
  * armed, and that it RECOMPUTES when the selection changes.
- *
- * The fixture is chosen so the three numbers all DIFFER. A statement that derived any one of
- * them from another would pass against equal numbers and fail here.
  */
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -57,9 +53,7 @@ const harness = createMountedComponentHarness({
     // so it is a STATIC import of the component under test; omitting it HANGS this suite as
     // `# cancelled` rather than failing it.
     'src/ui/svelte/apps/manager/BulkDeleteCard.svelte',
-    // Issue 1504: the shared `<Select>`'s whole compiled closure — also covers the manager's
-    // ONE labelled push-button (issue 1118), which `BulkEditPanelShell` renders its Apply
-    // through.
+    // Issue 1504: the shared `<Select>`'s whole compiled closure.
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/InspectorCard.svelte',
     'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte',
@@ -73,24 +67,7 @@ const harness = createMountedComponentHarness({
   componentPath: 'src/ui/svelte/apps/manager/essences/EssenceBulkEditPanel.svelte',
 });
 
-/**
- * Four essences, and every number the statement reports is a different one.
- *
- * ## Every selected essence is DELETABLE — the delete is warned, not blocked
- *
- * The maintainer's change: component usage no longer refuses a delete, so all four rows
- * delete and there is no blocked partition. The two carrier numbers are still UNIONS over
- * distinct identities, never sums, and the fixture is shaped so a union and a sum differ:
- *
- * - SELECTION SIZE 4, ALL deletable;
- * - CARRYING COMPONENTS over the whole selection: `comp-a`…`comp-d`, with `comp-b` carried by
- *   both `fire` and `water` — so the UNION is 4 where the SUM would be 5;
- * - REWRITTEN RECIPES over the whole selection: `r1`, `r2`, `r3`, with `r2` required by
- *   several — so the UNION is 3 where the SUM would be 6.
- *
- * 4, 4 and 3: the two carrier numbers are still distinct-carrier counts, and a statement
- * deriving either from a per-essence sum fails here.
- */
+/** Four essences, and every number the statement reports is a different one. */
 const SELECTION = [
   makeEssenceRow({
     id: 'fire',
@@ -167,9 +144,7 @@ describe('1036/17 EssenceBulkEditPanel — the delete impact statement', () => {
   });
 
   it('counts carrying components over the WHOLE selection as a distinct-carrier union', async () => {
-    // A component carrying two selected essences counts ONCE, because the cascade strips it
-    // in one pass. Over `[fire, water]` that is comp-a…comp-d with comp-b shared: four, not
-    // the five a per-essence sum would report.
+    // A component carrying two selected essences counts ONCE.
     const root = await harness.mount(props([SELECTION[0], SELECTION[1]]));
     assert.match(impactRow(root, 'essences'), /^2\b/, 'both are deletable');
     assert.match(
@@ -178,14 +153,7 @@ describe('1036/17 EssenceBulkEditPanel — the delete impact statement', () => {
       'comp-a…comp-d, comp-b unioned once — a SUM would say 5'
     );
 
-    // Negative control: a selection carried by nothing reports NO carriers, so the union
-    // above cannot be satisfied by a number that is simply always non-zero.
-    //
-    // Asserted as the row's ABSENCE, not as a rendered "0" (issue 1132). The shared card omits
-    // a consequence row whose count is zero, so the row this control used to read is gone —
-    // and because the old helper dereferenced `.textContent`, the control would have THROWN
-    // rather than failed, whose cheapest repair is deleting it. Absence is exactly as strong a
-    // negative control as a rendered nought, and it gates the new gating behaviour too.
+    // Negative control: a selection carried by nothing reports NO carriers.
     await harness.setProps(props([SELECTION[2], SELECTION[3]]));
     assert.ok(
       !impactRowEl(root, 'components'),
@@ -218,7 +186,6 @@ describe('1036/17 EssenceBulkEditPanel — the delete impact statement', () => {
     assert.match(impactRow(root, 'recipes'), /^3\b/);
 
     // Drop `fire` and `earth`: `water` is carried by comp-b/c/d, and `air` names only r2.
-    // All three numbers move.
     await harness.setProps(props([SELECTION[1], SELECTION[3]]));
     assert.match(impactRow(root, 'essences'), /^2\b/);
     assert.match(impactRow(root, 'components'), /^3\b/);
@@ -348,9 +315,7 @@ describe('1036/copy EssenceBulkEditPanel — the impact statement agrees at coun
   });
 
   it('the ARMED name opens with the armed visible label (WCAG 2.5.3)', async () => {
-    // It shipped as "Confirm deleting 4 essence definition(s)…", which does not CONTAIN
-    // "Confirm delete", so the armed half of a destructive two-step control was unactivatable
-    // by voice — the one state where being unable to speak the name is most consequential.
+    // It shipped as "Confirm deleting 4 essence definition(s)…".
     const root = await harness.mount(props(SELECTION, { deleteArmed: true }));
     const button = deleteButton(root);
     const visible = button.querySelector('span').textContent.trim();
@@ -385,8 +350,7 @@ describe('1036/11 EssenceBulkEditPanel — the armed delete', () => {
     assert.equal(armed.length, 1, 'the first click ARMS');
     assert.deepEqual(deleted, [], 'and writes nothing — this is the whole point of the pattern');
 
-    // The owner holds the armed latch, so the armed render is a PROP change, exactly as the
-    // manager root drives it.
+    // The owner holds the armed latch, so the armed render is a PROP change.
     assert.equal(isArmed, true);
     await harness.setProps(
       props(SELECTION, { deleteArmed: true, onDelete: (ids) => deleted.push(ids) })
@@ -428,11 +392,6 @@ describe('1036/11 EssenceBulkEditPanel — the armed delete', () => {
     // source-level font-size pin), but it CAN prove the structural half of that fix: the
     // button the scoped `.fab-bulk-delete-card :global(.manager-button)` rule targets is
     // actually a descendant of that card, in both the idle and armed states.
-    //
-    // The class is the SHARED primitive's now (issue 1132), not the essence panel's. That is
-    // the whole hazard the retarget exists for: the rule and the class moved together, and a
-    // studio still asserting on `manager-essence-bulk-delete` would be asserting that a
-    // selector matching nothing still matches the button.
     const root = await harness.mount(props(SELECTION));
     assert.ok(
       deleteButton(root).closest('.fab-bulk-delete-card'),
@@ -477,9 +436,7 @@ describe('1036/10 EssenceBulkEditPanel — the staged axes', () => {
   });
 
   it('marks nothing in the palette while the colour axis is UNSTAGED', async () => {
-    // `Leave unchanged` and `Clear colour` are both "no preset is selected", and the palette
-    // must not collapse them: marking the No-colour cell for an unstaged axis would paint
-    // `Clear colour` as staged directly above a sub-hint reading `Leave unchanged`.
+    // `Leave unchanged` and `Clear colour` are both "no preset is selected".
     const root = await harness.mount(props(SELECTION));
     const palette = root.querySelector('[data-essence-bulk-colour]');
     assert.equal(palette.querySelectorAll('[data-manager-color-token].is-selected').length, 0);
@@ -492,7 +449,7 @@ describe('1036/10 EssenceBulkEditPanel — the staged axes', () => {
   });
 
   it('stages a real colour token without naming it in the section sub-hint (maintainer feedback)', async () => {
-    // No colour-NAME copy in the essence editor, "unnecessary overhead for all theme and
+    // No colour-NAME copy in the essence editor.
     // colour combinations" — the palette cell (`[data-manager-color-token].is-selected`)
     // already marks which token is staged, so the sub-hint states the generic fact instead
     // of resolving and repeating the token's display name.
@@ -528,12 +485,7 @@ describe('1036/10 EssenceBulkEditPanel — the staged axes', () => {
 });
 
 describe('1371 r19 EssenceBulkEditPanel — the colour axis and the world catalogue', () => {
-  // M29 draws every system-scope essence in the colour the world Essence Catalogue gave it, and
-  // that overlay wins over the in-system row wherever the world authored one — which, since the
-  // `1.30.0` lift authored `colorToken` on the world entity for every essence whose donor had
-  // one, is almost everywhere. So this axis wrote a value the very next refresh hid: the rows
-  // snapped back and the GM's edit was gone with no message. The per-essence editor already
-  // withholds its colour control on exactly this condition (`scopedKnown`); this is that gate.
+  // M29 draws every system-scope essence in the colour the world Essence Catalogue gave it.
 
   it('WITHHOLDS the colour axis when the world corpus holds the selection, and says why', async () => {
     const root = await harness.mount(
@@ -563,8 +515,7 @@ describe('1371 r19 EssenceBulkEditPanel — the colour axis and the world catalo
   });
 
   it('keeps the axis when NO selected essence is world-known', async () => {
-    // The default path, and the other half of the pair above: an essence the world catalogue does
-    // not hold is an ordinary state, and its colour is this system's own to set.
+    // The default path, and the other half of the pair above.
     const root = await harness.mount(props(SELECTION));
 
     assert.ok(root.querySelector('[data-essence-bulk-colour]'), 'the palette is there');
@@ -583,7 +534,7 @@ describe('1371 r19 EssenceBulkEditPanel — the colour axis and the world catalo
   });
 
   it('names the CONDITION rather than the whole selection, because the gate is ANY', async () => {
-    // UX round 6, finding 5. The gate is `some(worldDefined)`, so on a mixed selection the old
+    // UX round 6, finding 5. The gate is `some(worldDefined)`.
     // copy — "Colour comes from the Essence Catalogue and is shared by every system" — made a
     // false statement about most of the set and told the GM nothing about which essence caused
     // the axis to go.
@@ -598,17 +549,7 @@ describe('1371 r19 EssenceBulkEditPanel — the colour axis and the world catalo
   });
 
   it('CLEARS a colour staged before the selection grew, so Apply and the write agree with the screen', async () => {
-    // Reviewer round 6, finding 3. Withholding the control did not disarm the instruction: stage a
-    // colour on a system-local essence, tick a world-known one as well, and the axis vanished while
-    // `colorTokenStaged` stayed true — so `Apply to 2` stayed enabled on the strength of an axis
-    // the panel no longer showed, and the write carried `colorToken` to every selected essence.
-    //
-    // The draft is fed back through `onDraftChange` exactly as the manager root feeds it back, so
-    // this drives the real loop rather than a description of it.
-    // The report is RECORDED and the prop fed back from the test body, never from inside the
-    // callback: `setProps` flushes, and flushing from inside an effect's own run re-enters
-    // Svelte's batch scheduler and throws. The manager root's own assignment is asynchronous in
-    // exactly the same way.
+    // Reviewer round 6, finding 3. Withholding the control did not disarm the instruction.
     const drafts = [];
     let live = createEssenceBulkDraft();
     const root = await harness.mount({

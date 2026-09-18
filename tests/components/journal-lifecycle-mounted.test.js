@@ -311,9 +311,7 @@ function makeBuilder(
     },
     recipeManager: {
       getRecipe: (id) => recipeById.get(id) ?? null,
-      // Production matches on the SOURCE-REFERENCE UNION, never on the owned uuid: a real owned
-      // item's uuid is `<actor.uuid>.Item.<id>` and its origin lives in `flags.core.sourceId`.
-      // Comparing `held.uuid` only ever worked while the lab double conflated the two.
+      // Production matches on the SOURCE-REFERENCE UNION, never on the owned uuid.
       ingredientMatchesItem: (_recipe, option, held) =>
         option?.match?.componentId === held?.componentId ||
         getItemSourceReferences(held).includes(
@@ -428,14 +426,7 @@ async function mountState(state, { prepare = null, initialLoad = true, builderOp
   return { ...runtime, store, target };
 }
 
-/**
- * The mounted detail card's REAL layout, measured in Chromium.
- *
- * happy-dom computes no cascade, so every earlier pin on this header could only read source
- * text. The markup and the injected component CSS are both taken from the mount, so the scope
- * hashes agree by construction rather than by a second compile that might not (issue 1648,
- * UX2-1).
- */
+/** The mounted detail card's REAL layout, measured in Chromium. */
 async function measureDetailLayout(target, { width = 1240 } = {}) {
   const styles = [...globalThis.document.head.querySelectorAll('style')]
     .map((node) => node.textContent)
@@ -553,8 +544,7 @@ function assertLockedStage(target) {
   );
 }
 
-// A missing key formats to the key, and the component renders the same key, so an expectation
-// built from one would match the defect. Refuse the key itself before it becomes the expectation.
+// A missing key formats to the key, and the component renders the same key.
 function localizedLabel(key, data = {}) {
   const value = globalThis.game.i18n.format(key, data);
   assert.notEqual(value, key, `${key} must resolve in lang/en.json`);
@@ -571,10 +561,7 @@ const quantitiesOf = (root) => textsOf(root, '.fabricate-list-row-quantity');
 const section = (target, kind) => target.querySelector(`[data-history-items="${kind}"]`);
 const yieldRows = (target) => [...target.querySelectorAll('[data-yield-entry]')];
 
-/**
- * What each history-data frame must prove, asserted on the rendered DOM of the selected record.
- * The registry selector names the same evidence structurally; these read the values it cannot.
- */
+/** What each history-data frame must prove, asserted on the rendered DOM of the selected record. */
 const HISTORY_DATA_WITNESS = {
   'history-data-legacy-row-rolls'(target) {
     const rows = yieldRows(target);
@@ -601,8 +588,7 @@ const HISTORY_DATA_WITNESS = {
     assert.ok(guidanceOf(target).includes(historyLabel('ClosedSuccess')));
   },
   'history-data-shared-roll-control'(target) {
-    // The control for #1648 A8: genuinely SHARED evidence has one cut to describe, so it keeps
-    // the heading that names one roll. Only `perRow`/`unknown` take the wording that does not.
+    // The control for #1648 A8: genuinely SHARED evidence has one cut to describe.
     assert.equal(
       target.querySelector('[data-yield-scale] .fab-yield-kicker').textContent,
       historyLabel('Scale')
@@ -783,8 +769,7 @@ function assertCaseWitness(target, capture) {
   );
   const history = target.querySelector('[data-journal-history-detail]');
   if (!history) return;
-  // A row id that names its recorded roll is a hand-maintained mirror of the record; the capture
-  // selector reads the id and only this reads the number, so drift between them fails here.
+  // A row id that names its recorded roll is a hand-maintained mirror of the record.
   for (const row of history.querySelectorAll('[data-yield-entry]')) {
     const recorded = /-roll-(\d+)$/.exec(row.getAttribute('data-yield-entry'));
     if (!recorded) continue;
@@ -937,14 +922,7 @@ describe('Journal versioned lifecycle (mounted)', () => {
     assert.ok(!gathering.target.querySelector('[data-journal-record]'));
   });
 
-  /**
-   * UX2-1. `.journal-actions` carried NO rule at all, so it was a shrink-to-fit flex item and
-   * `margin-left: auto` inside the bar pushed to that block's own edge rather than the card's.
-   * Both sides were flush right only when their content happened to saturate the line, which the
-   * long begin prompt does and the shorter cancel prompt does not. Measured in a real browser, at
-   * the width the reviewer's frame was taken at, because the broken element is OUTSIDE the
-   * `RunActionBar` the earlier pins mount.
-   */
+  /** UX2-1. `.journal-actions` carried NO rule at all. */
   it('keeps both the begin and the cancel decision on the card edge, at a real width', async () => {
     const begun = await mountPrototypeState('stage-not-started');
     const begin = await measureDetailLayout(begun.target);
@@ -1024,10 +1002,7 @@ describe('Journal versioned lifecycle (mounted)', () => {
     }
   });
 
-  // Issue 1648: the ledger is provisioned automatically, so the manual setup notice and its
-  // button are gone for EVERY viewer — including the active GM they existed for. The affordance
-  // described a state no world can now reach; the blocker's own REASON is what must survive on
-  // the very run that used to carry the button.
+  // Issue 1648: the ledger is provisioned automatically.
   it('shows the blocker reason and no manual setup control, for a GM as well as a player', async () => {
     for (const [isActiveGM, reason, key] of [
       [true, 'ledger-missing', 'LedgerMissing'],
@@ -1036,8 +1011,7 @@ describe('Journal versioned lifecycle (mounted)', () => {
       // The A1 code itself: minted at five `src/main.js` sites and one Svelte services bag,
       // outside the drift guard's reach, and unmapped for as long as it existed.
       [false, 'authority-unavailable', 'AuthorityUnavailable'],
-      // And an unwordable one, which must NOT fall through to the time-gate hint: that told a
-      // player to wait for world time while the authority was what was missing.
+      // And an unwordable one, which must NOT fall through to the time-gate hint.
       [false, 'a-reason-nobody-mapped', 'Unavailable'],
     ]) {
       let setupCalls = 0;
@@ -1203,15 +1177,9 @@ describe('Journal versioned lifecycle (mounted)', () => {
     assert.equal(mounted.commands.at(-1).action, 'beginStep');
   });
 
-  // Issue 1648, M21. The rail this used to assert is a LIVE held/needed probe, and a started
-  // stage has already emptied the inventory it probes — the maintainer read `0/0 Drop essence`
-  // against an essence the stage had spent. The receipt below deliberately contradicts the
-  // authored requirement (`Iron` x1) in both name and quantity, so every assertion can only
-  // pass by rendering the record rather than the requirement.
+  // Issue 1648, M21. The rail this used to assert is a LIVE held/needed probe.
   it('reads a started stage from its consumption receipt, not from a live inventory probe', async () => {
-    // One route with a component requirement AND an essence requirement, which is the shape
-    // M21 was reported against. `selectedRequirementSnapshot` is what the start commit itself
-    // persists, so a started stage always carries it.
+    // One route with a component requirement AND an essence requirement.
     const startedSet = ingredientSet('started-set', [
       { id: 'metal', name: 'Metal', options: [componentOption('iron', 'iron')] },
       { id: 'earth-group', name: 'Earth essence',
@@ -1395,9 +1363,6 @@ describe('Journal versioned lifecycle (mounted)', () => {
   });
 
   // Issue 1648, M10. `staleRoute` covers two different facts and used to say only one of them.
-  // Arriving at a stage that has never been given a route is ordinary play; a route that
-  // VANISHED is the error sentence, and reading the second at the first is the failure the
-  // maintainer named.
   it('tells a route nobody has chosen apart from one that vanished', async () => {
     const routes = ['iron', 'copper'].map((metal) =>
       ingredientSet(`${metal}-route`, [{ id: 'metal', options: [componentOption(metal, metal)] }]));
@@ -1583,7 +1548,6 @@ describe('Journal versioned lifecycle (mounted)', () => {
       const delayed = ['loading', 'error-retry'].includes(state);
       // `labWorld.js` reaches these by withholding the ledger and by seeding a retained claim
       // page; this harness has no ledger, so it states the answer the real authority derives.
-      // The claim itself is the ONE exported fixture, so the two routes cannot drift.
       const authority =
         state === 'authority-unavailable'
           ? { available: false, reason: 'active-gm-missing' }
@@ -1619,7 +1583,6 @@ describe('Journal versioned lifecycle (mounted)', () => {
       });
       await settleAction();
       // The committed producer walk owns selection as well as the defining action.
-      // No store.select shortcut may make a missing capture step pass here.
       const selectedId = LAB_JOURNAL_CASE_STATE_RUN_IDS[state];
       for (const action of capture.steps) {
         const control =
@@ -1650,8 +1613,7 @@ describe('Journal versioned lifecycle (mounted)', () => {
       assertCaseWitness(mounted.target, capture);
       if (HISTORY_DATA_WITNESS[state]) {
         HISTORY_DATA_WITNESS[state](mounted.target, {
-          // An alchemy attempt names no recipe: the whole roster is protected text, derived from
-          // the world rather than listed, so a renamed recipe cannot quietly leave the check.
+          // An alchemy attempt names no recipe: the whole roster is protected text.
           protectedText: content.recipes
             .filter((entry) => entry.craftingSystemId === LAB_SYSTEM_IDS.ALCHEMY)
             .flatMap((entry) => [entry.id, entry.name]),
@@ -1668,9 +1630,7 @@ describe('Journal versioned lifecycle (mounted)', () => {
         assert.ok([...cards].every((card) => card.querySelector('[data-list-row]')));
         assert.match(cards[1].textContent, /Missing requirements: 1/);
       }
-      // D-031, and the same happy-dom caveat as M10 below: the capture's positive `:has()` reads
-      // the fact row through a DESCENDANT, which passes open here, so the payment is asserted
-      // with a plain query as well.
+      // D-031, and the same happy-dom caveat as M10 below.
       if (state === 'stage-paid') {
         const receipt = mounted.target.querySelector('[data-journal-stage-consumed]');
         assert.ok(receipt, 'a currency-only started stage renders its receipt');
@@ -1698,10 +1658,6 @@ describe('Journal versioned lifecycle (mounted)', () => {
         // Issue 1648, M15: the begin control stays present (`atStageStart`) but is itself
         // refused — pressing it while the route is unchosen would reach the engine and be
         // told "The selected crafting requirements are unavailable."
-        // Issue 1648, F5: the ROUTE decision reports in its own words. `choiceRequired` now
-        // names only the option picks and the essence allocation made within a route already
-        // taken, which is not what this stage — advanced into two authored routes with no plan
-        // at all — is waiting for.
         assert.equal(mounted.store.selectedRun.actions.disabledReason, 'routeRequired');
         assert.equal(mounted.store.selectedRun.actions.atStageStart, true);
         assert.equal(mounted.store.selectedRun.actions.beginStep, false);
@@ -1717,10 +1673,7 @@ describe('Journal versioned lifecycle (mounted)', () => {
         assert.match(mounted.target.textContent, /No matching active runs/);
         assert.match(mounted.target.textContent, /No matching finished runs/);
       }
-      // Issue 1648. `waiting-auto-eligible` is NOT here any more: it is a stage counting its
-      // clock down, so under D-026/D-028 its inputs are spent and its allocation is locked, and
-      // a locked stage publishes no essence pool at all. The carrier controls belong to the
-      // unbegun blocker, which is the one of the two the player can still act on.
+      // Issue 1648. `waiting-auto-eligible` is NOT here any more.
       if (state === 'automatic-blocker') {
         assert.equal(
           mounted.target.querySelectorAll('[data-essence-source]').length,
@@ -1737,8 +1690,7 @@ describe('Journal versioned lifecycle (mounted)', () => {
       }
       if (suffix === 'history-checked-choice') proveTerminalWitness(mounted.target, capture);
       if (state === 'history-redacted') {
-        // Withheld: the protected set is derived from the record itself, so a fixture that stops
-        // carrying names or art cannot leave this passing on an empty comparison.
+        // Withheld: the protected set is derived from the record itself.
         const record = mounted.containers.craftingRuns.history.find(
           (entry) => entry.id === selectedId
         );
@@ -2243,10 +2195,7 @@ describe('Journal versioned lifecycle (mounted)', () => {
   });
 
   it('draws both resumed progress bars from the re-anchored gate, not elapsed wall time', async () => {
-    // Issue 1648, reported from manual testing: pause, advance world time past the original
-    // deadline, resume — and BOTH bars painted full while the TIME card and the list row still
-    // read hours to wait. `applyResume` re-anchors `availableAt` past the paused span and
-    // `initiatedAt` never moves, so a bar measuring `now - initiatedAt` banks the pause as work.
+    // Issue 1648, reported from manual testing: pause.
     const paused = await mountState('waiting-auto-eligible');
     const run = paused.containers.craftingRuns.active['lab-v1-waiting-auto-eligible'];
     const required = run.steps[0].timeGate.requiredSeconds;
@@ -2308,13 +2257,11 @@ describe('Journal versioned lifecycle (mounted)', () => {
       new RegExp(`\\b${english.FABRICATE.App.Journal.Summary.None}\\b`, 'u'),
       'never the matured-wait word'
     );
-    // The row above it is untouched: D-025 governs the FORMAT of the authored duration, and
-    // what the stage NEEDS is still stated in full.
+    // The row above it is untouched: D-025 governs the FORMAT of the authored duration.
     const needs = facts.find((row) => row.textContent.includes(english.FABRICATE.App.Journal.Summary.Needs));
     assert.doesNotMatch(needs.textContent, new RegExp(english.FABRICATE.App.Journal.Summary.NotStarted, 'u'));
 
-    // M18 on the Active row: the bar survives the missing gate, and the countdown does not
-    // pretend to one.
+    // M18 on the Active row: the bar survives the missing gate.
     const row = mounted.target.querySelector(
       '[data-journal-list="active"] [data-run-id="lab-v1-stage-not-started"]'
     );
@@ -2524,7 +2471,7 @@ describe('Journal versioned lifecycle (mounted)', () => {
     assert.equal(cancelled.notifications.length, 0);
   });
 
-  // Issue 1648, M15. `automatic-blocker` used to belong in the loop above: it has available
+  // Issue 1648, M15. `automatic-blocker` used to belong in the loop above.
   // essence carriers but no allocation — not a physical shortage — so a manual press used to
   // reach the command's own "selection-required" refusal. The primary must now refuse it
   // BEFORE that: no command is ever issued.
@@ -2555,8 +2502,7 @@ describe('Journal versioned lifecycle (mounted)', () => {
     assert.equal(availability.knownMaterialShortfall, false, 'the carrier ledger can cover it');
     assert.ok(availability.essencePool.carriers.length > 0);
     assert.equal(refused.store.selectedRun.actions.disabledReason, 'choiceRequired');
-    // The stage has NOT begun — starting is what would spend the essences — so the control on
-    // screen is the begin decision, and it is what must be refused (issue 1648).
+    // The stage has NOT begun — starting is what would spend the essences.
     assert.ok(
       !refused.target.querySelector('[data-run-action="primary"]'),
       'an unbegun stage offers no primary to refuse'
