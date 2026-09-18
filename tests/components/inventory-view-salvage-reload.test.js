@@ -38,7 +38,10 @@ const harness = createMountedComponentHarness({
     'src/utils/complicationPlan.js',
     'src/utils/componentComplications.js',
   ],
-  runeModules: ['src/ui/svelte/stores/inventoryStore.svelte.js'],
+  runeModules: [
+    'src/ui/svelte/stores/browseListing.svelte.js',
+    'src/ui/svelte/stores/inventoryStore.svelte.js',
+  ],
   compiledModules: [
     // The player window's own shared roster (issue 1514), spread rather than listed.
     ...PLAYER_APP_COMPILED_MODULES,

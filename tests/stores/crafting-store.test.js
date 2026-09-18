@@ -100,8 +100,6 @@ function recipe(id, name, extra = {}) {
  * Compiles the crafting store module with its non-mocked leaf dependencies copied in plain, and
  * returns the loaded `createCraftingStore` factory alongside the compiler (the caller owns
  * `compiler.cleanup()`).
- *
- * @param {string} prefix Unique tmp-dir prefix for this suite's compiled output.
  */
 async function setupCraftingStoreCompiler(prefix) {
   const compiler = createSvelteModuleCompiler(prefix);
@@ -115,6 +113,7 @@ async function setupCraftingStoreCompiler(prefix) {
   // The authority-refusal wording the store falls back to when a result carries a
   // `reason` and no `message` (issue 1648) — same rule again.
   compiler.copyPlain('src/ui/svelte/util/journalRunReasons.js');
+  compiler.compile('src/ui/svelte/stores/browseListing.svelte.js');
   const { createCraftingStore } = await compiler.load('src/ui/svelte/stores/craftingStore.svelte.js');
   return { compiler, createCraftingStore };
 }
@@ -174,6 +173,32 @@ describe('craftingStore', () => {
       rememberedActorId: 'hero',
       componentSourceActorIds: ['a1', 'a2'],
     });
+  });
+
+  it('seeds the favourites and stage orders BEFORE loadedOnce flips', async () => {
+    const listing = { summaries: [recipe('r1', 'Anvil')] };
+    const { services } = makeServices({ listing, favourites: ['r1'] });
+    const store = createCraftingStore({ services });
+    // Reading `loadedOnce` inside the seams is the only way to see the ORDER: seeding after the
+    // flag pairs the new listing with the old seeds, and every assertion below still passes.
+    const seenAtSeed = [];
+    const favouriteIds = services.getFavouriteRecipeIds;
+    services.getFavouriteRecipeIds = () => {
+      seenAtSeed.push(store.loadedOnce);
+      return favouriteIds();
+    };
+    services.getProgressiveResultOrder = () => {
+      seenAtSeed.push(store.loadedOnce);
+      return { 'recipe:r1': ['a', 'b'] };
+    };
+
+    await store.load();
+    flushSync();
+
+    assert.deepEqual(seenAtSeed, [false, false]);
+    assert.deepEqual(store.favouriteIds, ['r1']);
+    assert.deepEqual(store.progressiveOrders, { 'recipe:r1': ['a', 'b'] });
+    assert.equal(store.loadedOnce, true);
   });
 
   it('records the error message and clears loading when the fetch throws', async () => {

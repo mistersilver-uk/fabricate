@@ -212,6 +212,7 @@ describe('craftingStore requirement rail and essence pool', () => {
     compiler.copyPlain('src/ui/svelte/util/requirementSlots.js');
     // Issue 1648: the authority-refusal wording craftingStore falls back to.
     compiler.copyPlain('src/ui/svelte/util/journalRunReasons.js');
+    compiler.compile('src/ui/svelte/stores/browseListing.svelte.js');
     ({ createCraftingStore } = await compiler.load('src/ui/svelte/stores/craftingStore.svelte.js'));
   });
 

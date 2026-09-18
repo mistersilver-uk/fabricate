@@ -16,6 +16,7 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 // CraftingView's Svelte signal runtime — this exercises the ACTUAL bar → listing
 // wiring rather than a stubbed getSelectedCraftingActorId.
 const RUNE_MODULES = [
+  'src/ui/svelte/stores/browseListing.svelte.js',
   'src/ui/svelte/stores/actorBarStore.svelte.js',
   'src/ui/svelte/stores/craftingSourcesStore.svelte.js',
   'src/ui/svelte/stores/craftingStore.svelte.js'

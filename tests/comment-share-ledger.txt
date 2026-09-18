@@ -47,7 +47,7 @@ src/ui/svelte/apps/manager/system	75
 src/ui/svelte/apps/manager/tools	772
 src/ui/svelte/apps/manager/world	327
 src/ui/svelte/components	1245
-src/ui/svelte/stores	4635
+src/ui/svelte/stores	4625
 src/ui/svelte/util	1273
 src/utils	926
 styles	1045
