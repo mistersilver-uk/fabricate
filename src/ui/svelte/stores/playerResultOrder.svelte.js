@@ -129,7 +129,7 @@ function createOrderWriter({ write, revertMessage, debounceMs }) {
     commitTimer = null;
     const writeKey = pendingKey;
     pendingKey = null;
-    return writeKey ? commit(writeKey) : Promise.resolve({ ok: true });
+    return commit(writeKey);
   }
 
   return {
