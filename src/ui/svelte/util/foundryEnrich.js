@@ -45,7 +45,7 @@ export async function enrichToHtml(raw, { relativeTo = null } = {}) {
       relativeTo,
     });
     return typeof enriched === 'string' ? enriched : text;
-  } catch (_error) {
+  } catch {
     return text;
   }
 }
@@ -70,13 +70,13 @@ function groupUncachedCompendiumIds(rawTexts) {
     if (typeof raw !== 'string' || raw.length === 0) continue;
     for (const match of raw.matchAll(COMPENDIUM_UUID_CANDIDATE)) {
       const candidate = String(match[1] ?? match[2] ?? '')
-        .split('#')[0]
+        .split('#', 1)[0]
         .trim();
       if (!candidate.startsWith('Compendium.')) continue;
-      let parsed = null;
+      let parsed;
       try {
         parsed = parseUuid(candidate);
-      } catch (_error) {
+      } catch {
         parsed = null;
       }
       const pack = parsed?.collection;

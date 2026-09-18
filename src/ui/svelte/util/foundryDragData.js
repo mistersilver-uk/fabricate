@@ -8,7 +8,7 @@ export function getDragEventData(event) {
   try {
     const raw = event?.dataTransfer?.getData?.('text/plain');
     if (raw) return JSON.parse(raw);
-  } catch (_) {
+  } catch {
     // Not valid JSON: fall through to the null answer below.
   }
 

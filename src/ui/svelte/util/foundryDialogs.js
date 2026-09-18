@@ -13,13 +13,13 @@ function normalizeDialogOptions(options = {}) {
 
   // An explicit caller width always wins.
   normalized.position = {
-    ...(normalized.position || {}),
+    ...normalized.position,
     width: normalized.position?.width ?? FABRICATE_DIALOG_DEFAULT_WIDTH,
   };
 
   if (normalized.title && !normalized.window?.title) {
     normalized.window = {
-      ...(normalized.window || {}),
+      ...normalized.window,
       title: normalized.title,
     };
   }
@@ -65,9 +65,9 @@ function normalizeDialogOptions(options = {}) {
 // `buttons` is absent, and `DialogV2.confirm` unshifts its own pair, giving a THREE-button confirm.
 // Returns a fresh bag; the caller's object is never mutated.
 export function normalizeConfirmOptions(options) {
-  const normalized = { ...(options || {}) };
+  const normalized = { ...options };
   if (normalized.title && !normalized.window?.title) {
-    normalized.window = { ...(normalized.window || {}), title: normalized.title };
+    normalized.window = { ...normalized.window, title: normalized.title };
   }
   if (typeof normalized.yes === 'function') normalized.yes = { callback: normalized.yes };
   if (typeof normalized.no === 'function') normalized.no = { callback: normalized.no };
