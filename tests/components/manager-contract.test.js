@@ -16,6 +16,7 @@ import {
   walkNodes,
 } from '../helpers/moduleAst.js';
 import { componentAstOf, componentScopeOf, moduleAstOf } from '../helpers/parsedSource.js';
+import { walkElements } from '../helpers/svelteTemplateScan.js';
 import {
   containsLiteral,
   declaredConstant,
@@ -375,6 +376,38 @@ function extendsCallOf(node, name) {
   return false;
 }
 
+/** The props a component destructures from `$props()`, and those it declares with no default. */
+function declaredProps(ast) {
+  const declared = new Set();
+  const required = new Set();
+  for (const node of walkNodes(ast)) {
+    if (node.type !== 'VariableDeclarator' || calledName(node.init) !== '$props') continue;
+    for (const property of node.id?.properties ?? []) {
+      const name = property.key?.name ?? property.value?.left?.name ?? property.value?.name;
+      if (!name) continue;
+      declared.add(name);
+      if (property.value?.type !== 'AssignmentPattern') required.add(name);
+    }
+  }
+  return { declared, required };
+}
+
+/** Every name a module exports, whether declared inline or listed in an export clause. */
+function exportedNames(node) {
+  const names = new Set();
+  for (const inner of walkNodes(node)) {
+    if (inner.type !== 'ExportNamedDeclaration') continue;
+    for (const declarator of inner.declaration?.declarations ?? []) {
+      if (declarator.id?.name) names.add(declarator.id.name);
+    }
+    if (inner.declaration?.id?.name) names.add(inner.declaration.id.name);
+    for (const specifier of inner.specifiers ?? []) {
+      if (specifier.exported?.name) names.add(specifier.exported.name);
+    }
+  }
+  return names;
+}
+
 /** Whether a subtree calls `name` with a reference to `argument` among its arguments. */
 function callsWithArgument(node, [name, argument]) {
   for (const inner of walkNodes(node)) {
@@ -404,6 +437,9 @@ function structureOf(target) {
       prop: ([name, propName]) => passesProp(component, name, propName),
       reads: (path) => memberPaths(component).includes(path),
       calls: (name) => callNames(component).has(name),
+      callsWith: (pair) => callsWithArgument(component, pair),
+      declaresProp: (name) => declaredProps(component).declared.has(name),
+      requiresProp: (name) => declaredProps(component).required.has(name),
     };
   }
   const { ast } = moduleAstOf(file);
@@ -419,6 +455,7 @@ function structureOf(target) {
     calls: (name) => callNames(code).has(name),
     callsWith: (pair) => callsWithArgument(code, pair),
     extendsCall: (name) => extendsCallOf(code, name),
+    exports: (name) => exportedNames(code).has(name),
     hooks: (event) => hookNames(code).has(event),
     diffKeys: ([object, key]) => inOperatorKeys(code, object).has(key),
     compares: (value) => comparesToLiteral(code, value),
@@ -442,6 +479,13 @@ const CONTRACT_CLAIMS = Object.freeze({
   calls: { ask: 'calls', holds: true, says: (v) => `calls ${v}()` },
   callsNo: { ask: 'calls', holds: false, says: (v) => `never calls ${v}()` },
   callsWith: { ask: 'callsWith', holds: true, says: ([f, a]) => `calls ${f}() with ${a}` },
+  declaresProp: { ask: 'declaresProp', holds: true, says: (v) => `declares the ${v} prop` },
+  requiresProp: {
+    ask: 'requiresProp',
+    holds: true,
+    says: (v) => `declares ${v} with no fallback, so an unthreaded caller fails loudly`,
+  },
+  exports: { ask: 'exports', holds: true, says: (v) => `exports ${v}` },
   extendsCall: { ask: 'extendsCall', holds: true, says: (v) => `extends ${v}()` },
   hooks: { ask: 'hooks', holds: true, says: (v) => `registers the ${v} hook` },
   diffKeys: { ask: 'diffKeys', holds: true, says: ([o, k]) => `re-projects on a ${o}.${k} change` },
@@ -454,6 +498,11 @@ const CONTRACT_CLAIMS = Object.freeze({
 /** The `.js` targets this suite states contracts about, named once. */
 const APP_SHELL = 'src/ui/SvelteCraftingSystemManagerApp.svelte.js';
 const MAIN = 'src/main.js';
+const MANAGER_ROOT = 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte';
+const DOWNTIME_HOST = 'src/ui/svelte/apps/manager/downtime/WorldDowntimeExtensionHost.svelte';
+const MANAGER_EXTENSIONS = 'src/ui/managerExtensions.js';
+const DOWNTIME_PREVIEW_PROVIDER =
+  'src/ui/svelte/apps/manager/downtime/worldDowntimePreviewProvider.js';
 
 /** One target, one contract test; every converted structural pin is one row of `claims`. */
 function defineStructureContract(title, target, claims) {
@@ -473,136 +522,105 @@ function defineStructureContract(title, target, claims) {
 }
 
 describe('CraftingSystemManager source contract', () => {
-  it('injects the exact page-session manager extension registry into the Svelte root', () => {
-    assert.ok(appSource.includes("import { managerExtensions } from './managerExtensions.js';"));
-    assert.ok(appSource.includes('managerExtensions,'));
-    assert.ok(
-      rootSource.includes(
-        'let { store, services = null, managerExtensions = null, playerExtensions = null } = $props()'
-      )
-    );
-    assert.ok(rootSource.includes('<WorldDowntimeExtensionHost'));
-  });
-  it('keeps one owner of the active Downtime provider, and it is the shell', () => {
-    // The rail renders the active tab set while the host is UNMOUNTED.
-    assert.ok(
-      rootSource.includes('managerExtensions.subscribe(WORLD_DOWNTIME_SURFACE_ID'),
-      'the shell subscribes to the surface it renders'
-    );
-    assert.ok(
-      !hostSource.includes('.subscribe('),
-      'the Downtime host takes the live provider as a prop and subscribes to nothing'
-    );
-    assert.ok(
-      hostSource.includes('onProviderFault(activeProvider)'),
-      'a mount fault is reported UP to the shell rather than healed locally'
-    );
-    // Core's own tab id list is content, not contract: nothing on the seam may read it.
-    assert.ok(
-      !managerExtensionsSource.includes('CORE_DOWNTIME_PREVIEW_TAB_IDS'),
-      'the registry never enumerates the tab ids it will accept'
-    );
-    assert.ok(
-      previewProviderSource.includes('export const CORE_DOWNTIME_PREVIEW_TAB_IDS'),
-      "Core's preview tab ids live beside the copy and icons they index"
-    );
-  });
-  // The cross-component handoff that names the companion panel (issue 1213). Root owns the id
-  // and threads it down; the host consumes it. Every claim here was ungated at review, and the
-  // host's DEFAULT was itself the hand-maintained mirror its own comment forbids — a second
-  // copy of Root's literal, agreeing today and undetectable the day it stops. Deleting the
-  // thread-through at the call site survived the entire suite.
-  it('threads the rail label id into the Downtime host rather than mirroring the literal', () => {
-    assert.ok(
-      rootSource.includes(
-        'const downtimeNavLabelId = (tabId) => `manager-downtime-nav-label-${tabId}`;'
-      ),
-      'Root owns the rail label id, stated once'
-    );
-    assert.ok(
-      rootSource.includes('navLabelId={downtimeNavLabelId}'),
-      'and passes it to the host — without this the panel region has no name at all'
-    );
-    assert.ok(
-      hostSource.includes('aria-labelledby={navLabelId(tab.id)}'),
-      'the host names its region from the prop and derives no id of its own'
-    );
-    // REQUIRED, with no default. The host must not be able to answer the question itself.
-    assert.match(
-      hostSource,
-      /^\s{4}navLabelId,\s*$/m,
-      'navLabelId is declared with no fallback, so an unthreaded host fails loudly'
-    );
-    assert.ok(
-      !hostSource.includes('manager-downtime-nav'),
-      'and the host carries no copy of Root literal in any form'
-    );
-    // The region takes the SCREEN name.
-    assert.ok(
-      rootSource.includes('<span class="manager-nav-label" id={downtimeNavLabelId(item.id)}'),
-      'the id lands on the visible label element'
-    );
-    assert.match(
-      rootSource,
-      /aria-label=\{downtimeCoreFallback\s*\?\s*undefined\s*:\s*downtimeTabText\(item, 'accessibleName'\)\}/,
-      'and the sub-item consumes accessibleName in provider mode, so the seam does not require a field it discards'
-    );
-  });
-  // AC-15 — the mode guard on both badge render sites (issue 1302).
-  it('keeps both Downtime badge render sites inside the provider-mode branch', () => {
-    // The SUB-ITEM badge, opening immediately inside the mode guard. Asserted as adjacency
-    // rather than as "the file contains both strings", which any two unrelated lines satisfy.
-    assert.match(
-      rootSource,
-      /\{#if !downtimeCoreFallback\}\s*\{@const badge = downtimeSubitemBadge\(item\)\}\s*\{#if badge\}\s*<span\s+class="manager-nav-issue-badge"\s+data-world-downtime-badge=\{item\.id\}/,
-      'the sub-item badge renders inside `downtimeCoreFallback === false`, not beside it'
-    );
-    // The ROLLUP, the same way.
-    assert.match(
-      rootSource,
-      /\{#if !downtimeCoreFallback\}\s*\{#if downtimeNavRollupVisible\}\s*<span\s+class="manager-nav-issue-badge"\s+data-world-downtime-badge-total/,
-      'and so does the parent rollup'
-    );
-    // BOTH, and only those two. A third site added outside a guard would satisfy every
-    // assertion above and render a companion's count over Core's gold upsell.
-    assert.equal(
-      rootSource.split('data-world-downtime-badge').length - 1,
-      2,
-      'there are exactly two badge render sites, and the two matched above are them'
-    );
+  // The page-session registry is the SHELL's, threaded into the root as a prop; the root renders
+  // the Downtime host against it. What the root then does with it is mounted behaviour, proved
+  // across `tests/components/manager-downtime-mounted.js`.
+  defineStructureContract(
+    'injects the exact page-session manager extension registry into the Svelte root',
+    APP_SHELL,
+    { imports: ['./managerExtensions.js'] }
+  );
 
-    // The two DERIVATIONS behind those sites are guarded as well.
-    assert.ok(
-      rootSource.includes(
-        'return downtimeCoreFallback ? null : resolveNavTabBadge(item, downtimeNavTabBadges);'
-      ),
-      'the resolved sub-item badge is null in core-fallback, whatever the store holds'
-    );
-    assert.match(
-      rootSource,
-      /downtimeCoreFallback \? 0 : navTabBadgeTotal\(downtimeTabs, downtimeNavTabBadges\)/,
-      'and the rollup total is zero there, so the composed parent name cannot appear either'
-    );
-    assert.match(
-      rootSource,
-      /const downtimeNavRollupVisible = \$derived\(\s*!downtimeCoreFallback &&/,
-      'the rollup’s own visibility opens on the mode, before either of its other terms'
+  defineStructureContract(
+    'hands that registry to the root beside the player one',
+    { file: APP_SHELL, member: '_prepareSvelteProps' },
+    { names: ['managerExtensions', 'playerExtensions'] }
+  );
+
+  defineStructureContract(
+    'takes both registries as props and renders the Downtime host',
+    MANAGER_ROOT,
+    {
+      declaresProp: ['store', 'services', 'managerExtensions', 'playerExtensions'],
+      renders: ['WorldDowntimeExtensionHost'],
+    }
+  );
+
+  // ONE owner of the active Downtime provider, and it is the shell: the rail renders the active
+  // tab set while the host is UNMOUNTED, so the host takes the live provider as a prop and
+  // subscribes to nothing. A mount fault is reported UP rather than healed locally.
+  defineStructureContract('keeps one owner of the active Downtime provider', MANAGER_ROOT, {
+    reads: ['managerExtensions.subscribe'],
+    names: ['WORLD_DOWNTIME_SURFACE_ID'],
+  });
+
+  defineStructureContract('leaves the Downtime host subscribing to nothing', DOWNTIME_HOST, {
+    callsNo: ['subscribe'],
+    callsWith: [['onProviderFault', 'activeProvider']],
+  });
+
+  // Core's own tab id list is content, not contract: nothing on the seam may read it, and the ids
+  // live beside the copy and icons they index.
+  defineStructureContract(
+    'never enumerates the tab ids the registry will accept',
+    MANAGER_EXTENSIONS,
+    { namesNo: ['CORE_DOWNTIME_PREVIEW_TAB_IDS'] }
+  );
+
+  defineStructureContract(
+    "publishes Core's preview tab ids beside its copy",
+    DOWNTIME_PREVIEW_PROVIDER,
+    { exports: ['CORE_DOWNTIME_PREVIEW_TAB_IDS'] }
+  );
+
+  // The cross-component handoff that NAMES the companion panel (issue 1213). Root owns the rail
+  // label id, stated once, and threads it down; the host consumes it and derives no id of its own.
+  // That the panel region really resolves to the rail label is mounted in
+  // `tests/components/manager-downtime-mounted.js`, which reads the region's `aria-labelledby`
+  // back to the label span it points at, and the same file mounts the `accessibleName` the
+  // sub-item consumes in provider mode.
+  defineStructureContract(
+    'owns the rail label id and threads it into the Downtime host',
+    MANAGER_ROOT,
+    {
+      declares: ['downtimeNavLabelId'],
+      spells: ['manager-downtime-nav-label-'],
+      passesProps: [['WorldDowntimeExtensionHost', 'navLabelId']],
+    }
+  );
+
+  // REQUIRED, with no default: a default would BE the hand-maintained mirror this prop avoids —
+  // a second copy of Root's literal, agreeing today and undetectable the day it stops.
+  defineStructureContract(
+    'names its region from the prop and carries no copy of the literal',
+    DOWNTIME_HOST,
+    { requiresProp: ['navLabelId'], spellsNo: ['manager-downtime-nav'] }
+  );
+
+  // AC-15 — both badge render sites sit inside the provider-mode branch (issue 1302). That guard,
+  // the rollup's visibility and the zero-in-core-fallback derivations are mounted in the `AC-11`
+  // to `AC-15` cases of `tests/components/manager-downtime-mounted.js`, which assert that no badge
+  // and no rollup reach Core's preview row. What a mounted case cannot say is how MANY render
+  // sites exist: a third one added outside the guard would satisfy every one of them.
+  it('renders the Downtime badge at exactly two sites', () => {
+    const sites = [];
+    walkElements(componentAstOf(MANAGER_ROOT).fragment, (node) => {
+      const named = (node.attributes ?? []).some((attribute) =>
+        String(attribute.name ?? '').startsWith('data-world-downtime-badge')
+      );
+      if (named) sites.push(node.name);
+    });
+    assert.equal(
+      sites.length,
+      2,
+      `the sub-item badge and the parent rollup, and nothing else (found ${sites.join(', ')})`
     );
   });
-  it('disposes a Downtime companion before ApplicationV2 closes and removes its Svelte target', () => {
-    const closeStart = appSource.indexOf('async close(options) {');
-    const closeEnd = appSource.indexOf('  static show()', closeStart);
-    const closeSource = appSource.slice(closeStart, closeEnd);
-    const dispose = closeSource.indexOf('disposeDowntimeProviderBeforeRemoval?.()');
-    const superClose = closeSource.indexOf('return super.close(options);');
-    assert.ok(dispose >= 0, 'the production manager close invokes the root disposal bridge');
-    assert.ok(superClose > dispose, 'the bridge runs before ApplicationV2 removes the Svelte target');
-    assert.match(
-      closeSource,
-      /disposeDowntimeProviderBeforeRemoval\?\.\(\);[\s\S]*?return super\.close\(options\);/,
-      'the real manager close keeps disposal and ApplicationV2 close in one ordered composition'
-    );
-  });
+
+  // A Downtime companion is disposed BEFORE ApplicationV2 removes its Svelte target. That ordering
+  // is asserted against the real production class, on a recording ApplicationV2 base, by
+  // `tests/components/manager-extension-composition.test.js`.
+
   // The window's own height is owned by `scripts/lib/foundryChromeSpec.js` and deep-equalled
   // against the real `DEFAULT_OPTIONS` by `tests/view-lab-app-options-parity.test.js`.
   defineStructureContract('self-registers as the sole crafting system manager app', APP_SHELL, {
