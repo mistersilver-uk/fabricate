@@ -1370,19 +1370,20 @@ describe('inventoryStore', () => {
     });
 
     it('the store literal MATCHES the shared BULK_MAX_ITEMS it duplicates', async () => {
-      // The store declares its own `BULK_MAX_ITEMS` rather than importing the service's: importing
-      // pulls the bulk chat-card builder, `componentStacking.js` and `itemStackQuantity.js` into
-      // this harness's module graph for the sake of one integer.
+      // The bulk sub-store declares its own `BULK_MAX_ITEMS` rather than importing the service's:
+      // importing pulls the bulk chat-card builder, `componentStacking.js` and
+      // `itemStackQuantity.js` into this harness's module graph for the sake of one integer. The
+      // pin MOVED with the constant at issue 1695; it was re-anchored, never duplicated.
       const { readFileSync } = await import('node:fs');
       const { resolve } = await import('node:path');
       const { BULK_MAX_ITEMS } = await import('../../src/systems/BulkSalvageService.js');
       const storeSource = readFileSync(
-        resolve(import.meta.dirname, '../../src/ui/svelte/stores/inventoryStore.svelte.js'),
+        resolve(import.meta.dirname, '../../src/ui/svelte/stores/inventoryBulkActions.svelte.js'),
         'utf8'
       );
       assert.ok(
         storeSource.includes(`const BULK_MAX_ITEMS = ${BULK_MAX_ITEMS};`),
-        `the store must declare ${BULK_MAX_ITEMS}, matching BulkSalvageService`
+        `the bulk sub-store must declare ${BULK_MAX_ITEMS}, matching BulkSalvageService`
       );
     });
   });

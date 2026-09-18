@@ -402,8 +402,9 @@ const BULK_DEFAULTS = Object.freeze({
   kinds: ['player', 'inventory', 'bulk'],
   sourceMatches: [
     /^src\/ui\/svelte\/apps\/inventory\//,
-    /^src\/ui\/svelte\/stores\/inventoryStore/,
+    /^src\/ui\/svelte\/stores\/inventory/,
     /^src\/ui\/svelte\/stores\/playerResultOrder/,
+    /^src\/ui\/svelte\/util\/salvageYieldRows\.js$/,
     /^src\/utils\/progressiveResultOrder\.js$/,
   ],
 });
@@ -9029,7 +9030,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // `ActorSelectTopBar` on the same measurement.
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/inventory\//,
-      /^src\/ui\/svelte\/stores\/inventoryStore/,
+      /^src\/ui\/svelte\/stores\/inventory/,
       /^src\/ui\/svelte\/apps\/crafting\/ComponentSourcesBar\.svelte$/,
       PLAYER_VIEW_STATE,
     ],
@@ -9058,7 +9059,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['player', 'inventory'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/inventory\//,
-      /^src\/ui\/svelte\/stores\/inventoryStore/,
+      /^src\/ui\/svelte\/stores\/inventory/,
       ...ANCHORED_POPOVER_SOURCES,
     ],
   }),
@@ -9078,7 +9079,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['player', 'inventory'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/inventory\//,
-      /^src\/ui\/svelte\/stores\/inventoryStore/,
+      /^src\/ui\/svelte\/stores\/inventory/,
       ...ANCHORED_POPOVER_SOURCES,
     ],
   }),
@@ -9102,7 +9103,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['player', 'inventory'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/inventory\//,
-      /^src\/ui\/svelte\/stores\/inventoryStore/,
+      /^src\/ui\/svelte\/stores\/inventory/,
       /^src\/ui\/svelte\/stores\/playerResultOrder/,
       /^src\/utils\/progressiveResultOrder\.js$/,
     ],
@@ -9137,7 +9138,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['player', 'inventory'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/inventory\//,
-      /^src\/ui\/svelte\/stores\/inventoryStore/,
+      /^src\/ui\/svelte\/stores\/inventory/,
       /^src\/ui\/svelte\/stores\/playerResultOrder/,
       /^src\/utils\/progressiveResultOrder\.js$/,
     ],
@@ -9162,7 +9163,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['player', 'inventory'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/inventory\//,
-      /^src\/ui\/svelte\/stores\/inventoryStore/,
+      /^src\/ui\/svelte\/stores\/inventory/,
       /^src\/ui\/svelte\/stores\/playerResultOrder/,
       /^src\/utils\/progressiveResultOrder\.js$/,
     ],
@@ -9183,10 +9184,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       },
     ],
     kinds: ['player', 'inventory'],
-    sourceMatches: [
-      /^src\/ui\/svelte\/apps\/inventory\//,
-      /^src\/ui\/svelte\/stores\/inventoryStore/,
-    ],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/inventory\//, /^src\/ui\/svelte\/stores\/inventory/],
   }),
   playerCase({
     id: 'player-salvage-misconfigured',
@@ -9208,7 +9206,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['player', 'inventory'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/inventory\//,
-      /^src\/ui\/svelte\/stores\/inventoryStore/,
+      /^src\/ui\/svelte\/stores\/inventory/,
       /^src\/ui\/svelte\/stores\/playerResultOrder/,
       /^src\/utils\/progressiveResultOrder\.js$/,
     ],

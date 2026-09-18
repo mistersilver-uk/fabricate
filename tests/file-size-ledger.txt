@@ -212,9 +212,9 @@ src/ui/svelte/stores/alchemyStore.svelte.js::createAlchemyStore	633
 src/ui/svelte/stores/craftingSourcesStore.svelte.js::createCraftingSourcesStore	126
 src/ui/svelte/stores/craftingStore.svelte.js	905
 src/ui/svelte/stores/craftingStore.svelte.js::createCraftingStore	828
-src/ui/svelte/stores/inventoryStore.svelte.js	1536
-src/ui/svelte/stores/inventoryStore.svelte.js::createInventoryStore	1022
-src/ui/svelte/stores/inventoryStore.svelte.js::createInventoryStore>salvage	137
+src/ui/svelte/stores/inventoryBulkActions.svelte.js::createBulkActions	392
+src/ui/svelte/stores/inventorySalvageExecution.svelte.js::createSalvageExecution	230
+src/ui/svelte/stores/inventoryStore.svelte.js::createInventoryStore	482
 src/ui/svelte/stores/journalStore.svelte.js::createJournalStore	538
 src/ui/svelte/stores/worldScopeActions.js	881
 src/ui/svelte/stores/worldScopeActions.js::createWorldScopeEntityActions	467
