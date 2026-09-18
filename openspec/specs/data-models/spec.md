@@ -1927,6 +1927,8 @@ Ingredient = {
 ### Requirements
 
 1. `quantity` must be positive.
+   A requirement amount is always FIXED: there is no `quantityFormula` on this model, because a rolled requirement has no coherent moment to resolve.
+   The `design-system` capability records the ruling under "One requirement row serves both sides of a recipe".
 2. `match.type` is required.
 3. If `match.type === "component"`, `match.componentId` is required.
 4. If `match.type === "tags"`, `match.tags` must contain one or more tag IDs.
@@ -2983,17 +2985,91 @@ Represent one produced item.
 ```js
 Result = {
   id: string,
-  componentId: string,
+
+  // WHAT IS AWARDED. Absent reads as "component", which is what every result
+  // persisted before this change is, so the discriminator costs no migration.
+  kind?: "component" | "currency" | "knowledge",
+
+  componentId: string,        // kind = "component"
+  unit?: string,              // kind = "currency" — a configured world CurrencyConfig.units[].id
+  recipeId?: string,          // kind = "knowledge" — the recipe the craft teaches
+
+  // A CURRENCY reward's own name, and the reason the player is given it. Both
+  // optional; a reward is complete without either.
+  label?: string,
+  reason?: string,
+
+  // HOW MANY. `quantity` is the fixed amount. A non-empty `quantityFormula`
+  // means the amount is ROLLED and is that expression; `quantity` is then the
+  // authored fallback rather than the number awarded.
   quantity: number,
+  quantityFormula?: string,
+
   propertyMacroUuid: string | null,
+
+  // PRESENT = this result IS a choice group and these are its alternatives.
+  // The carrier's own `kind` and value fields are not read while it is set.
+  alternatives?: Result[],
+
+  // GROUP SETTINGS, read only where `alternatives` is present.
+  chooser?: "playerChooses" | "rolled",
+  awardStrategy?: "anyOne" | "upTo",
+  awardCount?: number,
+  awardCountFormula?: string,
+  withReplacement?: boolean,   // `upTo` under a rolled chooser only
+  selectionFormula?: string,
+
+  // AN ALTERNATIVE'S OWN selecting range, read only on a member of a rolled group.
+  selectionRange?: { from: number, to: number },
 };
 ```
 
 ### Requirements
 
-1. `componentId` is required.
+1. `componentId` is required where `kind` is `"component"` or absent.
 2. `quantity` must be positive.
 3. `propertyMacroUuid` is only valid when `features.propertyMacros` is true.
+4. `kind` is a closed set, and an absent `kind` IS `"component"`.
+   Every result persisted before this change carries no `kind` and reads unchanged, so the discriminator is additive and needs no migration.
+   An unrecognized `kind` is a misconfiguration rather than a new state, and is reported where an unknown resolution mode is.
+5. Where `kind` is `"currency"`, `unit` is required and is a configured world `CurrencyConfig.units[].id`; where it is `"knowledge"`, `recipeId` is required.
+   A `"knowledge"` result grants through `game.fabricate.grantRecipeKnowledge` rather than by writing an item.
+6. `label` and `reason` are valid only where `kind` is `"currency"`, and each is optional.
+   An amount of a currency states a quantity and no meaning, which is what they exist to supply; a component, an essence and a piece of recipe knowledge each name a record whose own name is the label.
+7. A non-empty `quantityFormula` means the amount is ROLLED, and `quantity` is not the number awarded.
+   The expression is the shared roll expression: dice plus optional actor data paths, resolved against the crafting character.
+   It is validated the way a crafting check's formula is: `Roll.validate` is parse-only and passes an expression that cannot evaluate, so a formula is usable only where it evaluates to a finite total.
+   An empty or absent `quantityFormula` leaves the amount fixed at `quantity`, which is the state every result persisted before this change is in.
+The authoring surface for all of it — the chooser as a segmented control in the group header, the award strategy, the range cell per alternative and the currency reward's naming body — is specified by the `design-system` capability, under the requirements "A result-side choice group states who chooses and how many it awards" and "One requirement row serves both sides of a recipe".
+This section states only what is persisted.
+
+8. `alternatives` PRESENT makes this result a choice group, and every member including the one the group was converted from is an entry in that array.
+   The carrier's own `kind`, `componentId`, `unit`, `recipeId`, `quantity` and `quantityFormula` are not read while `alternatives` is set, so a group is never also a result in its own right.
+   `alternatives` holds two or more entries; a group reduced to one is a plain result again.
+   Alternatives do not nest: a member MUST NOT carry `alternatives` of its own.
+9. `chooser` defaults to `"playerChooses"` and is read only on a group.
+   `"rolled"` requires a non-empty `selectionFormula`, and `"playerChooses"` ignores `selectionFormula` and every member's `selectionRange`.
+10. `awardStrategy` defaults to `"anyOne"` and is read only on a group.
+    `"upTo"` requires exactly one of `awardCount` or a non-empty `awardCountFormula`; `"anyOne"` reads neither.
+    `awardCount` must be positive.
+    `awardCountFormula` is the same roll expression a `quantityFormula` is, validated the same way.
+11. `withReplacement` is read only where `awardStrategy` is `"upTo"` AND `chooser` is `"rolled"`, and defaults to `false`.
+    It is meaningless in every other cell — there is nothing to repeat under `"anyOne"`, and a person picking from a list they can see does not repeat — where it MUST NOT be written.
+    `true` makes `awardCount` EXACT and permits the same alternative more than once; `false` awards distinct alternatives, and a count above the number of alternatives exhausts the bundle rather than erroring.
+12. No `awardStrategy` constrains `chooser`: every combination of the two is authorable.
+    A repeated draw is not a third strategy — it is `"upTo"` under `"rolled"` with `withReplacement` true — so there is no combination left to forbid.
+13. `selectionRange` is read only on a member of a group whose `chooser` is `"rolled"`, and `from` and `to` are inclusive.
+    The ranges of a group's members are read as an ORDERED LADDER rather than as independent windows: a roll below the lowest selects the lowest member and a roll above the highest selects the highest, so no authored group can produce nothing.
+    Where a roll awards more than one alternative, the `selectionFormula` is rolled once per award rather than once for the group.
+14. A choice group is NOT valid inside a `progressive` result group.
+    Progressive awards every ordered entry whose difficulty the roll affords and normalizes a result's quantity to 1, so neither a chooser nor an award strategy has anything to mean there.
+    A payload carrying one is a misconfiguration; the authoring surface does not offer it.
+15. A `ResultGroup` whose `role` is `"failure"` MAY hold choice groups on the same terms as any other result group.
+    The reserved role is a statement about ROUTING rather than about the shape of what the group holds.
+16. `Result.toJSON()` omits every key above whose value is the one the constructor rebuilds from absence, under the issue-1135 omission policy the `Ingredient` section states.
+    `id`, `componentId` where the kind is a component, and `quantity` are never omitted.
+    Absence is the pre-change on-disk state for all of them, so no reader gains a case it did not already have.
+17. The addition is LOSSLESS FORWARD and LOSSY BACKWARD: a payload written by an older build carries none of these keys and reads identically, while a downgrade drops a group's alternatives and settings rather than degrading them, and MUST say so at the point of downgrade.
 
 ## Versioned Run Lifecycle
 

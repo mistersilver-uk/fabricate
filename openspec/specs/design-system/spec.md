@@ -1117,10 +1117,17 @@ A unit renders to the RIGHT of the stepper it qualifies and never beneath the va
 A unit is a property of the amount, not of the thing: `currency` has one, and an `essence` amount is a bare number with no unit at all.
 
 A RESULT amount is either a fixed positive integer or a ROLLED expression, and the row toggles between the two in place.
+A REQUIREMENT amount is always FIXED, and an ingredient row MUST NOT offer the toggle.
+This is a ruling rather than an omission, and the reason is that a rolled requirement has no coherent moment to resolve.
+Resolve it at craft time and a crafter holding two of a thing is failed by a `1d4` that came up three, having been given no way to know what to bring.
+Resolve it when the recipe is first read and it either changes under the reader on the next look, or is re-rolled per look and means nothing.
+A result has one unambiguous moment — the award — which is why the toggle belongs to that side alone.
 Authoring has no previewed actor, so the rolled form shows NO resolved value: a number there would be fiction.
 The same expression control resolves against an actor wherever a real one is in scope, such as a player-side preview, and the presence of a resolved value is therefore a property of the surface rather than of the control.
 The rolled form is the shared expression control: dice plus optional actor data paths.
 The toggle selects which control occupies the quantity slot and MUST NOT be modelled as a third kind of quantity, so the amount keeps one meaning and one position in the row.
+A rolled result amount resolves ONCE, when the craft is awarded, and is not re-rolled while it is being read.
+The persisted shape of an amount is out of scope for this capability: it is `quantity` beside a `quantityFormula` on `Result`, specified in the `data-models` capability.
 
 A row with a kind but no value MUST render the catalogue search IN PLACE OF the subject cell, and that search is the only element in the row permitted to stretch, because it is the one thing the row is waiting for.
 The lead chip stays untinted until a value resolves, and the quantity and convert controls remain live so a GM can set an amount before choosing the thing.
@@ -1128,6 +1135,19 @@ When a value is picked the search is replaced by the subject cell at its fixed w
 
 The control that converts a standalone row into a choice group and the control that adds an alternative to an existing group MUST open the SAME menu, with the same options in the same order, because both answer the same question: what kind is the next alternative.
 That menu lists the offered kinds for the row’s context, each with its kind tint, and choosing one appends an EMPTY ROW OF THAT KIND rather than a blank the GM has to interpret.
+
+The offered subset belongs to the SURFACE and not to the row, and the kind select, the convert menu and the set's adders MUST all state the same subset.
+A downtime activity awards what a patron can hand over, so it offers `component`, `currency` and `knowledge` — teaching a recipe is a reward a patron can give.
+A gathering task offers `component` and `currency` alone: it hands over material the character carried back, and neither recipe knowledge nor a completed activity is something a wilderness task produces.
+A row that offers a kind its surface cannot award is authoring that validation has to reject later.
+
+A `currency` row on the RESULT side opens a body for what the reward is CALLED and why the player gets it, because an amount of a currency states a quantity and no meaning.
+Both fields are OPTIONAL and the row is complete without them.
+The body states what the player will see, and where neither field is filled it says so plainly rather than showing an empty preview.
+NO OTHER KIND opens this body: a component, an essence and a piece of recipe knowledge each name a record whose own name is the label, and a second name for them would be two names for one thing.
+
+An adder is named for WHAT IT ADDS rather than for the kinds it offers — `Alternative` inside a choice group, `Ingredient` in an ingredient set, `Result` in a result set — and it opens the same kind menu the convert control opens.
+Naming the adders after the kinds would state the menu's own list twice.
 
 #### Scenario: The same authoring surface is used for results
 
@@ -1140,6 +1160,12 @@ That menu lists the offered kinds for the row’s context, each with its kind ti
 - **WHEN** a GM adds a second tag to a tag row
 - **THEN** the row renders both as removable chips followed by the adder
 - **AND** the any-of / all-of control appears, having been absent while one tag was held
+
+#### Scenario: A GM looks for a rolled amount on a requirement
+
+- **WHEN** a row is rendered in an ingredient context
+- **THEN** its amount is a fixed integer and no fixed-or-rolled control is offered
+- **AND** the rolled form remains available on the result side alone
 
 #### Scenario: A GM adds a requirement before choosing what it is
 
@@ -1158,6 +1184,18 @@ That menu lists the offered kinds for the row’s context, each with its kind ti
 - **WHEN** a step lists requirements of several kinds
 - **THEN** each row leads with its kind-tinted chip
 - **AND** a tag row is purple, distinguishing the one abstract kind from the concrete ones
+
+#### Scenario: A GM awards a sum of money for a stated reason
+
+- **WHEN** a GM sets a result row's kind to currency
+- **THEN** the row opens a body for what the reward is called and why it is given
+- **AND** the row is complete whether or not either field is filled
+
+#### Scenario: A gathering task offers fewer kinds than a downtime activity
+
+- **WHEN** a result row is rendered inside a gathering task
+- **THEN** its kind select offers component and currency alone
+- **AND** its convert menu and the set's adder offer that same subset
 
 ### Requirement: Simple and alchemy carry a reserved failure set
 
@@ -1196,10 +1234,12 @@ A set MUST be renameable in the surface that shows it, because every other surfa
 A set addressable only by position is what makes reordering dangerous.
 
 A CHOICE GROUP is this document's name for the OR-alternative bundle `DOMAIN.md` calls an Ingredient Group, widened because the same bundle is valid on the result side where "ingredient" would be wrong.
+On the ingredient side it is exactly that OR: the crafter spends one alternative and the rest are untouched.
+On the RESULT side the bundle is not always exclusive — its award strategy states how many of its alternatives are handed over — so the name is retained for the shape the two sides share, which is a set of alternatives authored as one thing, rather than for the cardinality, which differs by side.
 Where the two documents are read together, they name one thing.
 A choice group is valid in BOTH containers and means something different in each, which the surface MUST make legible.
 In an ingredient set it is the crafter deciding what to spend.
-In a result set it is the player choosing which reward to take.
+In a result set it is the REWARD being selected — by the player, or by the roll, as the requirement "A result-side choice group states who chooses and how many it awards" specifies.
 A design that treats choice as ingredient-only cannot express a recipe that offers a reward the player picks.
 
 The ROUTED modes select exactly one result set per craft attempt, which is what makes the group and not the individual result row their unit of routing.
@@ -1241,7 +1281,7 @@ A mode change that would reduce the permitted cardinality MUST state what it wil
 
 - **WHEN** a GM authors alternatives inside a result set
 - **THEN** the group renders the same choice group used on the ingredient side
-- **AND** the player picks one of those alternatives when the craft resolves
+- **AND** the player picks one of those alternatives when the craft resolves, the group being set to player-chooses
 
 #### Scenario: A GM opens a result set two tiers share
 
@@ -1260,6 +1300,142 @@ A mode change that would reduce the permitted cardinality MUST state what it wil
 - **WHEN** two check outcome tiers should produce the same reward
 - **THEN** both tiers name the same result set
 - **AND** the group is not duplicated to serve them
+
+### Requirement: A result-side choice group states who chooses and how many it awards
+
+A choice group in a RESULT set carries two settings its ingredient-side twin does not, and both belong to the GROUP rather than to its rows.
+An ingredient-side group is always one-of and always the crafter's decision, so neither setting has anything to select there and an ingredient-side group MUST NOT render either one.
+Offering a choice the model does not have is worse than offering none.
+
+THE CHOOSER names who picks the alternative, and it has exactly two values: the PLAYER chooses, or the ROLL decides.
+It is a different mechanism from `playerPicks`, which names who selects a check MODIFIER and is specified by the resolution-modes capability, and the two MUST NOT be unified: they decide over different objects, at different points, with different cardinalities.
+It MUST be a segmented control and MUST NOT be a toggle.
+Both values are live behaviour and neither is the absence of the other, so a two-state switch would state one of them as an off position it does not have.
+It sits in the group HEADER because it governs the whole bundle, and a copy on each row would invite a reader to set it per alternative.
+
+The chooser decides which controls the rows carry, and the surface MUST show only the ones the current value can fire.
+Under `rolled` the group states its SELECTION EXPRESSION in the header and each alternative carries a RANGE cell naming the values that select it.
+Under player-chooses both are hidden, because a range with no roll behind it is authoring that can never fire.
+The rows are otherwise the same row in both states: only the range cell appears and disappears.
+
+A range cell and an amount are different facts and MUST stay separately controlled.
+The range says WHICH alternative the roll selects; the amount says HOW MANY of it are awarded, and keeps the fixed-or-rolled control every result amount carries.
+
+THE AWARD STRATEGY states how many alternatives the group hands over, and it is a closed set of two:
+
+- `any one of` awards exactly one.
+- `up to N` awards more than one, bounded by N.
+
+It is called a STRATEGY and not an award mode deliberately: `awardMode` is already canon on `progressive`, where it carries `partial`, `equal` and `exceed` and decides how a check-value budget is spent across an ordered result list.
+Two policies about what gets awarded, sharing one name, is a collision the persisted shape would inherit.
+
+`up to N` is a CEILING and never more than N, whatever else is set.
+Under player-chooses it is the player's ceiling and fewer is a legal outcome.
+Under a roll it is a ceiling for the reason the pool can run out — an N above the alternative count awards all of them — unless repeats are allowed, where the pool never runs out and N is exact.
+
+A REPEATED DRAW IS NOT A THIRD STRATEGY, and MUST NOT be modelled as one.
+A draw of N is `up to N` under a roll: the same count, the same ceiling, differing only in whether the same alternative may come up twice — which is one setting, not one operation.
+Two ways to author one behaviour is the drift the closed set exists to prevent.
+
+N takes the SAME fixed-or-rolled control a result amount takes — a stepper, or the shared expression control — switched in place in one slot.
+A rolled N states its expression and NO resolved value, for the reason a rolled amount does: the header has no actor in scope.
+
+REPEATS are a setting of ONE CELL of the matrix: `up to N` under a roll, and nowhere else.
+Under `any one of` there is nothing to repeat, and under player-chooses a person picking twice from a list of things they can see is not a repeat but a mistake the surface should not offer.
+A setting with no behaviour behind it invites a GM to hunt for a difference that does not exist, so it is ABSENT rather than disabled in the three cells that cannot use it.
+
+It defaults to NO REPEATS, and it states its own current value in plain terms rather than being read as a checked box or as the statistical name for it.
+A GM reads "up to 3, unique" and "up to 3, repeats allowed" without help; "with replacement" asks them to translate.
+With repeats allowed the same alternative may be awarded more than once and N is exact; without, the awards are distinct and an N above the alternative count exhausts the bundle rather than erroring.
+
+NO STRATEGY PINS THE CHOOSER.
+Every cell of the two-by-two is authorable, which is the point of folding the repeated draw into the one it duplicated: there is no combination left that needs forbidding, and so no control that has to be locked or hidden to keep one out.
+
+The group header reads LEFT TO RIGHT as one sentence — award strategy, N, repeats, chooser — with a help line beneath it restating the resolved behaviour in prose.
+Four controls in a row are read faster as a sentence than as a form.
+A setting the current combination cannot use is ABSENT rather than rendered inert, and every setting it can use sits where it sat before, so the controls a reader has learned stay put.
+The header states each setting ONCE, in the control that owns it.
+A badge or pill restating a value the control beside it already carries is FORBIDDEN: it says the same thing twice, and because its width tracks the value, editing N or the strategy moves every control after it.
+A caption that reads back the state is a help line beneath the header, where nothing is aligned to it.
+
+The SELECTION EXPRESSION is the group's OWN roll and not the craft's check.
+A routed craft has already rolled once to reach this set, and reading that same total here would leave the group's authored expression with nothing to do.
+It resolves against the CRAFTING CHARACTER, the actor every other rolled amount in the craft resolves against, so a group is authored once and reads correctly for whoever crafts.
+
+Where a roll awards more than one alternative, the selection expression is rolled ONCE PER AWARD rather than once for the group.
+A single roll would select the same alternative every time, which is not a selection at all.
+
+A roll that lands outside every authored range CLAMPS to the nearest one: below the lowest it selects the lowest alternative, above the highest it selects the highest.
+The ranges are a LADDER the roll is read against rather than a set of independent windows, so no authored group can produce nothing.
+This is deliberately unlike outcome-tier routing, where a value no tier claims is a blocking GAP — a craft that has already succeeded must still award what it was routed to, so the group clamps rather than failing at the last step.
+
+A result-side choice group is NOT legal inside a `progressive` result group, and the surface MUST NOT offer its controls there.
+Progressive walks an ordered result list against a check-value budget and awards every entry the roll affords, with no per-entry choice and no per-entry quantity.
+A bundle that states who chooses and how many it hands over has nothing to mean inside that walk, so offering the chooser or the award strategy would author a setting the engine cannot honour.
+The other four modes are unaffected: each routes to exactly one result set, and what a group inside that set awards is a within-group concern.
+
+A FAILURE-ROLE result set MAY carry a chooser and an award strategy on the same terms as any other result set.
+What a failed check awards is as authorable as what a successful one does, and the reserved role is a statement about ROUTING — that the set is selected by role rather than named by a tier — rather than about the shape of what the set holds.
+
+A container-level group adder MUST NOT exist.
+A set's adders create ROWS, and a group is always something an existing row BECAME, reached through the convert control that row already carries.
+An "add group" button beside "add result" would ask a GM to state what the alternatives are before stating what the first one replaces, and would leave two paths to one construct.
+
+The persisted shape of the chooser, the award strategy, N and replacement is out of scope for this capability: it is `Result.chooser`, `Result.awardStrategy`, `Result.awardCount`/`awardCountFormula` and `Result.withReplacement`, specified under §Result in the `data-models` capability.
+
+#### Scenario: A GM lets the dice decide which reward is awarded
+
+- **WHEN** a GM sets a result-side choice group's chooser to rolled
+- **THEN** the group states its selection expression in its header
+- **AND** each alternative carries the range cell that names the values selecting it
+
+#### Scenario: A GM offers the player a choice of two rewards
+
+- **WHEN** a GM sets that same group's chooser back to player-chooses
+- **THEN** the selection expression and every range cell are hidden
+- **AND** each alternative keeps its own fixed-or-rolled amount
+
+#### Scenario: A player is offered more than one reward
+
+- **WHEN** a GM sets a result-side group to up to N with the player choosing
+- **THEN** the header states N through the same fixed-or-rolled control an amount uses
+- **AND** the group renders no repeats setting, because a person picking from a visible list cannot repeat
+
+#### Scenario: A roll may award the same reward twice
+
+- **WHEN** a GM sets a result-side group to up to N and hands the choice to the roll
+- **THEN** the group offers the repeats setting, defaulting to unique
+- **AND** allowing repeats makes N exact rather than a ceiling
+
+#### Scenario: A GM authors an ingredient-side choice group
+
+- **WHEN** a choice group is rendered inside an ingredient set
+- **THEN** it renders neither a chooser nor an award strategy
+- **AND** it resolves as one-of, decided by the crafter
+
+#### Scenario: A selection roll lands outside every authored range
+
+- **WHEN** a rolled choice group's selection expression returns a value above its highest authored range
+- **THEN** the group awards the alternative that range names
+- **AND** it does not report a gap, because a craft that has been routed here still awards something
+
+#### Scenario: A rolled group of three selects three times
+
+- **WHEN** a group set to up to 3 resolves under a roll
+- **THEN** its selection expression is rolled once for each award
+- **AND** the awards may land on different alternatives
+
+#### Scenario: A GM authors a progressive recipe
+
+- **WHEN** a result group belongs to a recipe resolving in progressive mode
+- **THEN** the surface offers neither a chooser nor an award strategy inside it
+- **AND** it states that progressive awards every entry the roll affords rather than selecting one
+
+#### Scenario: A failed check awards one of several things
+
+- **WHEN** a GM adds alternatives to a failure-role result set
+- **THEN** the group carries the chooser and the award strategy any other result set carries
+- **AND** the set stays selected by role rather than named by a tier
 
 ### Requirement: Every select renders the app’s own option list
 

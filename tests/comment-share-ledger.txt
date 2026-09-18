@@ -49,7 +49,7 @@ src/ui/svelte/stores	4612
 src/ui/svelte/util	1273
 src/utils	1367
 styles	1045
-tests	19538
+tests	19543
 tests/actions	85
 tests/canvas	409
 tests/canvas/regions	210
