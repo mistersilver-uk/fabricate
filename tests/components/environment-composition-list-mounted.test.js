@@ -13,6 +13,7 @@ import {
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
 } from '../helpers/svelte-component-harness.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -165,7 +166,7 @@ describe('CompositionList mounted layout', () => {
       // reported as `# cancelled` behind one ERR_MODULE_NOT_FOUND in the hook.
       'src/utils/scalars.js',
       'src/ui/svelte/apps/manager/environment/compositionStateMeta.js',
-      'src/ui/svelte/util/foundryBridge.js',
+      ...FOUNDRY_BRIDGE_RAW_MODULES,
       'src/ui/svelte/util/listReorderAnnouncement.js',
       'src/ui/svelte/components/stepperLabels.js',
       'src/ui/svelte/actions/dismissOnOutsideClick.js',

@@ -6,13 +6,14 @@ import {
   describeValidationAddressPairing,
   describeValidationHostContract,
 } from '../helpers/validationAddressContracts.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-recipe-item-validation-',
-  rawModules: ['src/ui/svelte/util/foundryBridge.js'],
+  rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES],
   compiledModules: [
     // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the harness
     // omits HANGS the suite (# cancelled) rather than failing it.

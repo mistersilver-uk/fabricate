@@ -1,8 +1,10 @@
 /** The ONE dependency manifest every mounted CHECKS suite compiles against (issue 1095, BM9). */
 
 /** Raw `.js` modules the checks editor tree imports directly or transitively (issue 1095). */
+import { FOUNDRY_BRIDGE_RAW_MODULES } from './foundryBridgeModules.js';
+
 export const CHECKS_TREE_RAW_MODULES = Object.freeze([
-  'src/ui/svelte/util/foundryBridge.js',
+  ...FOUNDRY_BRIDGE_RAW_MODULES,
   'src/ui/svelte/util/listReorderAnnouncement.js',
   'src/ui/svelte/util/foundryIconVocabulary.js',
   'src/ui/svelte/util/foundryIconCatalogue.js',

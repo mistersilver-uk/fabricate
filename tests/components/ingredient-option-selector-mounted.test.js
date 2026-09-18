@@ -9,6 +9,7 @@ import {
   createMountedComponentHarness
 } from '../helpers/svelte-component-harness.js';
 import { chipToneOf } from '../helpers/chipTone.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -21,7 +22,7 @@ const harness = createMountedComponentHarness({
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     // Issue 1506: the tone map and the quantity readings the retired tag's six sites now use.
     ...STATUS_TONE_RAW_MODULES,
-    'src/ui/svelte/util/foundryBridge.js',
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/craftingImageDefaults.js',
     'src/ui/svelte/util/craftingArtResolution.js',

@@ -20,6 +20,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const previewPath = 'src/ui/svelte/apps/manager/scoped/ScopedEntityPreview.svelte';
@@ -28,7 +29,7 @@ const previewSource = readFileSync(resolve(repoRoot, previewPath), 'utf8');
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-scoped-preview-fact-groups-',
-  rawModules: ['src/ui/svelte/util/foundryBridge.js'],
+  rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES],
   compiledModules: [
     previewPath,
     'src/ui/svelte/components/Chip.svelte',

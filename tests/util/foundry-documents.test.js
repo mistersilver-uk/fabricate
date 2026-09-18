@@ -1,29 +1,57 @@
 import assert from 'node:assert/strict';
-import { afterEach, test } from 'node:test';
+import test from 'node:test';
 
-import { resolveDropUuid } from '../src/ui/svelte/util/dropUtils.js';
-import { resolveItemSourceSnapshot } from '../src/ui/svelte/util/foundryBridge.js';
+import { resolveDropUuid } from '../../src/ui/svelte/util/dropUtils.js';
+import {
+  resolveItemSourceSnapshot,
+  viewScene,
+} from '../../src/ui/svelte/util/foundryDocuments.js';
+import { installFoundryBridgeEnv } from '../helpers/foundryBridgeEnv.js';
 
-const previousFromUuid = globalThis.fromUuid;
+test('viewScene resolves the uuid and calls scene.view()', async () => {
+  let viewed = 0;
+  const env = installFoundryBridgeEnv({
+    fromUuid: async (uuid) =>
+      uuid === 'Scene.a'
+        ? {
+            view: async () => {
+              viewed += 1;
+            },
+          }
+        : null,
+  });
 
-afterEach(() => {
-  if (previousFromUuid === undefined) delete globalThis.fromUuid;
-  else globalThis.fromUuid = previousFromUuid;
+  assert.equal(await viewScene('Scene.a'), true);
+  assert.equal(viewed, 1);
+  env.restore();
+});
+
+test('viewScene is a no-op for empty uuid or missing resolver', async () => {
+  const bare = installFoundryBridgeEnv();
+  delete globalThis.fromUuid;
+  assert.equal(await viewScene(''), false);
+  bare.restore();
+
+  const env = installFoundryBridgeEnv({ fromUuid: async () => null });
+  assert.equal(await viewScene('Scene.missing'), false);
+  env.restore();
 });
 
 test('manager Item drops resolve world and compendium Items to one shared snapshot', async () => {
   const requested = [];
-  globalThis.fromUuid = async (uuid) => {
-    requested.push(uuid);
-    return {
-      documentName: 'Item',
-      uuid,
-      name: 'Smith Hammer',
-      img: 'hammer.webp',
-      type: 'tool',
-      system: { description: { value: 'A working hammer.' } },
-    };
-  };
+  const env = installFoundryBridgeEnv({
+    fromUuid: async (uuid) => {
+      requested.push(uuid);
+      return {
+        documentName: 'Item',
+        uuid,
+        name: 'Smith Hammer',
+        img: 'hammer.webp',
+        type: 'tool',
+        system: { description: { value: 'A working hammer.' } },
+      };
+    },
+  });
 
   const worldUuid = resolveDropUuid({ type: 'Item', uuid: 'Item.hammer' });
   const compendiumUuid = resolveDropUuid({
@@ -40,6 +68,7 @@ test('manager Item drops resolve world and compendium Items to one shared snapsh
   });
   assert.equal((await resolveItemSourceSnapshot(compendiumUuid))?.uuid, compendiumUuid);
   assert.deepEqual(requested, ['Item.hammer', 'Compendium.mythwright.items.Item.hammer']);
+  env.restore();
 });
 
 test('manager Item snapshots normalize nested HTML and top-level description fallbacks', async () => {
@@ -69,7 +98,7 @@ test('manager Item snapshots normalize nested HTML and top-level description fal
       },
     ],
   ]);
-  globalThis.fromUuid = async (uuid) => items.get(uuid) ?? null;
+  const env = installFoundryBridgeEnv({ fromUuid: async (uuid) => items.get(uuid) ?? null });
 
   assert.equal(
     (await resolveItemSourceSnapshot('Item.nested'))?.description,
@@ -79,15 +108,18 @@ test('manager Item snapshots normalize nested HTML and top-level description fal
     (await resolveItemSourceSnapshot('Item.top-level'))?.description,
     'A top-level fallback.'
   );
+  env.restore();
 });
 
 test('manager Item drops reject missing, malformed, and non-Item documents', async () => {
-  globalThis.fromUuid = async (uuid) => {
-    if (uuid === 'Actor.hero') return { documentName: 'Actor', uuid };
-    if (uuid === 'Folder.tools') return { documentName: 'Folder', uuid };
-    if (uuid === 'Item.missing') return null;
-    throw new Error('malformed UUID');
-  };
+  const env = installFoundryBridgeEnv({
+    fromUuid: async (uuid) => {
+      if (uuid === 'Actor.hero') return { documentName: 'Actor', uuid };
+      if (uuid === 'Folder.tools') return { documentName: 'Folder', uuid };
+      if (uuid === 'Item.missing') return null;
+      throw new Error('malformed UUID');
+    },
+  });
 
   assert.equal(resolveDropUuid({ type: 'Item', pack: 'mythwright.items' }), null);
   assert.equal(resolveDropUuid({ type: 'Item', id: 'hammer' }), null);
@@ -95,4 +127,5 @@ test('manager Item drops reject missing, malformed, and non-Item documents', asy
   assert.equal(await resolveItemSourceSnapshot('Folder.tools'), null);
   assert.equal(await resolveItemSourceSnapshot('Item.missing'), null);
   assert.equal(await resolveItemSourceSnapshot('not-a-uuid'), null);
+  env.restore();
 });

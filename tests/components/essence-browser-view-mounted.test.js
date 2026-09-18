@@ -20,6 +20,7 @@ import { chipToneOf } from '../helpers/chipTone.js';
 import { describeBrowserBulkSelection } from '../helpers/browserBulkSelectionCases.js';
 import { createEssenceBrowserState } from '../../src/ui/model/essenceBrowserModel.js';
 import { makeEssenceRow } from '../helpers/makeEssenceRow.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -29,7 +30,7 @@ const harness = createMountedComponentHarness({
   rawModules: [
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
-    'src/ui/svelte/util/foundryBridge.js',
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/managerColorTokens.js',
     'src/ui/model/essenceBrowserModel.js',

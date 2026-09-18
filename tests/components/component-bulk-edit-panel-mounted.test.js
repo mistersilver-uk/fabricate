@@ -9,6 +9,7 @@ import { describe, it, before, after, afterEach } from 'node:test';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { createComponentBulkDraft } from '../../src/ui/model/componentBulkEditModel.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -16,7 +17,7 @@ const panel = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-component-bulk-panel-',
   rawModules: [
-    'src/ui/svelte/util/foundryBridge.js',
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     // The remove leg's focus/announce ordering rule (issue 1157), ported from `BulkDeleteCard`.
     'src/ui/svelte/util/announceAfterFocus.js',

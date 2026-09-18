@@ -20,6 +20,7 @@ import {
   INVALIDATION_STORES,
 } from '../../src/systems/invalidationDomains.js';
 import { CRAFTING_DATA_CHANGED_HOOK } from '../../src/systems/craftingDataChange.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -92,7 +93,7 @@ const harness = createMountedComponentHarness({
   'src/ui/svelte/util/foundryIconCatalogue.js',
   'src/ui/svelte/util/foundryIconCatalogue.json',
     'src/ui/svelte/util/formatDuration.js',
-    'src/ui/svelte/util/foundryBridge.js',
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
     // Issue 1648: the shared authority-refusal wording the Journal panels and stores read.
     'src/ui/svelte/util/journalRunReasons.js',
     'src/ui/svelte/util/listReorderAnnouncement.js',

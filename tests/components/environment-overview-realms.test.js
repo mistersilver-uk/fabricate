@@ -8,6 +8,7 @@ import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
 import { createClassComponent } from '../../node_modules/svelte/src/legacy/legacy-client.js';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
 import { createSvelteCompiler, installComponentTestGlobals } from '../helpers/svelte-component-harness.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -63,7 +64,7 @@ describe('EnvironmentOverviewTab multi-realm selector', () => {
     tempRoot = mkdtempSync(join(tmpdir(), 'fabricate-env-overview-'));
     symlinkSync(resolve(repoRoot, 'node_modules'), join(tempRoot, 'node_modules'), 'junction');
 
-    writeRawModule('src/ui/svelte/util/foundryBridge.js');
+    for (const modulePath of FOUNDRY_BRIDGE_RAW_MODULES) writeRawModule(modulePath);
     writeRawModule('src/gatheringImageDefaults.js');
     writeRawModule('src/ui/svelte/util/gatheringFormat.js');
     writeCompiledSvelte('src/ui/svelte/components/StatusToggle.svelte');

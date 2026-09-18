@@ -11,13 +11,14 @@ import {
   projectKnowledgeSnapshot,
   projectLearnedRecipeRow,
 } from '../../src/ui/svelte/apps/manager/knowledge/knowledgeStudio.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-knowledge-view-',
   rawModules: [
-    'src/ui/svelte/util/foundryBridge.js',
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/utils/recipeCategories.js',
     // #1663: the ONE implementation behind both category shims; imports nothing.

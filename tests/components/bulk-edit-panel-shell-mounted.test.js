@@ -6,6 +6,7 @@ import { describe, it, before, after, afterEach } from 'node:test';
 
 import { createRawSnippet } from '../../node_modules/svelte/src/index-client.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const SHELL_PATH = 'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte';
@@ -13,7 +14,7 @@ const SHELL_PATH = 'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte';
 const shell = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-bulk-edit-panel-shell-',
-  rawModules: ['src/ui/svelte/util/foundryBridge.js'],
+  rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES],
   compiledModules: [SHELL_PATH, 'src/ui/svelte/components/ManagerButton.svelte'],
   componentPath: SHELL_PATH
 });

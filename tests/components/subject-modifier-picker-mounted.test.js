@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const PICKER_PATH = 'src/ui/svelte/apps/manager/SubjectModifierPicker.svelte';
@@ -21,7 +22,7 @@ const harness = createMountedComponentHarness({
     'src/utils/craftingCheckExpression.js',
     'src/utils/rollExpressionAverage.js',
     'src/utils/rollFormulaRollability.js',
-    'src/ui/svelte/util/foundryBridge.js',
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     // `ModifierPillSelect`'s add menu dismisses on an outside click.
     'src/ui/svelte/actions/dismissOnOutsideClick.js',

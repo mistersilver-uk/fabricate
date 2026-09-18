@@ -6,6 +6,7 @@ import { after, afterEach, before, describe, it } from 'node:test';
 import { flushSync, tick } from 'svelte';
 
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 /** Settle the component after a dispatched DOM event, the way the mounted suites do. */
 async function settle() {
@@ -19,7 +20,7 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-downtime-tabs-a11y-',
-  rawModules: ['src/ui/svelte/util/foundryBridge.js'],
+  rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES],
   compiledModules: ['src/ui/svelte/apps/manager/downtime/WorldDowntimeTabs.svelte'],
   componentPath: 'src/ui/svelte/apps/manager/downtime/WorldDowntimeTabs.svelte',
 });

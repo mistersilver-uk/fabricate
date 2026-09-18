@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { describeValidationHostContract } from '../helpers/validationAddressContracts.js';
 import { railCounts, tallyMatchingRail } from '../helpers/validationSurfaceReadings.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
@@ -13,7 +14,7 @@ const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-recipe-validation-',
   rawModules: [
-    'src/ui/svelte/util/foundryBridge.js',
+    ...FOUNDRY_BRIDGE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     // recipeReadiness dispatches through the match-type registry.
     'src/config/flags.js',
@@ -335,7 +336,7 @@ describe('EditorValidationSurface row action (mounted)', () => {
   const surfaceHarness = createMountedComponentHarness({
     repoRoot,
     tmpPrefix: 'fabricate-editor-validation-surface-',
-    rawModules: ['src/ui/svelte/util/foundryBridge.js'],
+    rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES],
     compiledModules: [
       'src/ui/svelte/components/Chip.svelte',
       'src/ui/svelte/components/ManagerButton.svelte',

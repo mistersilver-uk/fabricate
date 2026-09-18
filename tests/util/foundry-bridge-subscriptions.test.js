@@ -15,43 +15,19 @@ import {
   RUN_FLAG_DIFF_PATHS,
   readCraftingDataFallbackCount,
   resetCraftingDataFallbackCount,
-} from '../../src/ui/svelte/util/foundryBridge.js';
-
-// Minimal fake of Foundry's Hooks: records handlers per name so tests can fire them
-// and assert on/off wiring.
-function makeHooks() {
-  const handlers = new Map();
-  let nextId = 0;
-  return {
-    on(name, fn) {
-      if (!handlers.has(name)) handlers.set(name, new Map());
-      const id = ++nextId;
-      handlers.get(name).set(id, fn);
-      return id;
-    },
-    off(name, id) {
-      handlers.get(name)?.delete(id);
-    },
-    fire(name, ...args) {
-      for (const fn of [...(handlers.get(name)?.values() ?? [])]) fn(...args);
-    },
-    count(name) {
-      return handlers.get(name)?.size ?? 0;
-    },
-  };
-}
+} from '../../src/ui/svelte/util/foundryHooks.js';
+import { installFoundryBridgeEnv } from '../helpers/foundryBridgeEnv.js';
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 describe('subscribeInventoryChange', () => {
+  let env;
   let hooks;
   beforeEach(() => {
-    hooks = makeHooks();
-    globalThis.Hooks = hooks;
+    env = installFoundryBridgeEnv();
+    hooks = env.hooks;
   });
-  afterEach(() => {
-    delete globalThis.Hooks;
-  });
+  afterEach(() => env.restore());
 
   it('registers create/update/delete item hooks and unsubscribes cleanly', () => {
     const unsubscribe = subscribeInventoryChange(() => {});
@@ -153,15 +129,14 @@ describe('subscribeInventoryChange', () => {
 });
 
 describe('subscribeCraftingDataChange', () => {
+  let env;
   let hooks;
   beforeEach(() => {
-    hooks = makeHooks();
-    globalThis.Hooks = hooks;
+    env = installFoundryBridgeEnv();
+    hooks = env.hooks;
     resetCraftingDataFallbackCount();
   });
-  afterEach(() => {
-    delete globalThis.Hooks;
-  });
+  afterEach(() => env.restore());
 
   /** One well-formed scoped payload naming exactly the given domains. */
   const change = (...domains) => ({ source: 'recipes', scopes: [{ systemId: 'sys-a', domains }] });
@@ -220,9 +195,9 @@ describe('subscribeCraftingDataChange', () => {
   });
 
   it('mirrors the producer-side hook name exactly', () => {
-    // The consumer holds the name as a LITERAL rather than importing it, because ~75 mounted
-    // harnesses declare `foundryBridge.js` and one new static import would make every one of
-    // them fail until it declared the new transitive module. This is what stops the two drifting.
+    // The consumer holds the name as a LITERAL rather than importing it, because the mounted
+    // harnesses declare this module and one new static import would make every one of them fail
+    // until it declared the new transitive module. This is what stops the two drifting.
     assert.equal(CRAFTING_DATA_CHANGED_HOOK, PRODUCER_HOOK);
   });
 
@@ -285,28 +260,22 @@ describe('subscribeCraftingDataChange', () => {
 });
 
 describe('subscribeActorRunFlagChange', () => {
+  let env;
   let hooks;
   beforeEach(() => {
-    hooks = makeHooks();
-    globalThis.Hooks = hooks;
+    env = installFoundryBridgeEnv();
+    hooks = env.hooks;
     // hasProperty resolves a POSIX-dotted path against a nested change diff.
-    globalThis.foundry = {
-      utils: {
-        hasProperty: (object, path) =>
-          String(path)
-            .split('.')
-            .every((seg) => {
-              if (object == null || typeof object !== 'object' || !(seg in object)) return false;
-              object = object[seg];
-              return true;
-            }),
-      },
-    };
+    globalThis.foundry.utils.hasProperty = (object, path) =>
+      String(path)
+        .split('.')
+        .every((seg) => {
+          if (object == null || typeof object !== 'object' || !(seg in object)) return false;
+          object = object[seg];
+          return true;
+        });
   });
-  afterEach(() => {
-    delete globalThis.Hooks;
-    delete globalThis.foundry;
-  });
+  afterEach(() => env.restore());
 
   const craftingRunChange = {
     flags: { fabricate: { fabricate: { craftingRuns: { active: {} } } } },
@@ -381,7 +350,7 @@ describe('subscribeActorRunFlagChange', () => {
   };
 
   it('THE DRIFT GUARD: its mirrored path list equals runFlagInvalidation own derivation', () => {
-    // `foundryBridge.js` cannot import the matcher: it is declared by hand in ~102 mounted
+    // `foundryHooks.js` cannot import the matcher: it is declared by hand in the mounted
     // component manifests, and a manifest missing an entry hangs the suite (`# cancelled`) rather
     // than failing it.
     const derived = RUN_CONTAINER_FLAG_PATHS.flatMap(({ flagPath }) =>
@@ -391,7 +360,7 @@ describe('subscribeActorRunFlagChange', () => {
     assert.deepEqual(
       [...RUN_FLAG_DIFF_PATHS].sort(),
       [...derived].sort(),
-      'foundryBridge RUN_FLAG_DIFF_PATHS has drifted from runFlagInvalidation; mirror it'
+      'foundryHooks RUN_FLAG_DIFF_PATHS has drifted from runFlagInvalidation; mirror it'
     );
   });
 

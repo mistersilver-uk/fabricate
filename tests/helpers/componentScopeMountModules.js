@@ -5,6 +5,7 @@ import {
   createMountedComponentHarness,
 } from './svelte-component-harness.js';
 import { projectWorldScopeEntity } from '../../src/ui/svelte/stores/worldScopeProjection.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from './foundryBridgeModules.js';
 
 /** THE COMPONENT SCOPE LEAVES, which three separate manifests used to spell out longhand. */
 export const COMPONENT_SCOPE_LEAF_MODULES = Object.freeze([
@@ -39,7 +40,7 @@ export const COMPONENT_SCOPE_LEAF_MODULES = Object.freeze([
  */
 export const WORLD_COMPONENT_SCOPE_RAW_MODULES = Object.freeze([
   ...COMPONENT_SCOPE_LEAF_MODULES,
-  'src/ui/svelte/util/foundryBridge.js',
+  ...FOUNDRY_BRIDGE_RAW_MODULES,
   // The one tone map the converted status chips read (issue 1506).
   'src/ui/svelte/util/statusChipTone.js',
   'src/ui/model/componentScopeValidation.js',
@@ -301,7 +302,7 @@ export function createComponentsBrowserViewHarness({ repoRoot, tmpPrefix }) {
         // Issue 1504: the pager's own list is a `Select` over `SearchablePopover` now, so this
         // closure rides with `SCOPED_SHARED_COMPILED_MODULES`.
         ...SEARCHABLE_POPOVER_RAW_MODULES,
-        'src/ui/svelte/util/foundryBridge.js',
+        ...FOUNDRY_BRIDGE_RAW_MODULES,
         'src/ui/svelte/util/listReorderAnnouncement.js',
         'src/ui/svelte/actions/dragDrop.js',
         'src/utils/componentCategories.js',

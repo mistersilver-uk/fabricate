@@ -8,13 +8,14 @@ import {
   PLAYER_APP_COMPILED_MODULES,
 } from '../helpers/svelte-component-harness.js';
 import { assertViewErrorTreatment } from '../helpers/playerViewStateAssertions.js';
+import { FOUNDRY_BRIDGE_RAW_MODULES } from '../helpers/foundryBridgeModules.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-alchemy-view-',
-  rawModules: ['src/ui/svelte/util/foundryBridge.js'],
+  rawModules: [...FOUNDRY_BRIDGE_RAW_MODULES],
   compiledModules: [
     // The shared not-yet-ready chrome, the standing statement the workbench composes.
     ...PLAYER_APP_COMPILED_MODULES,
