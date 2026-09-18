@@ -25,7 +25,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/library\/LibraryShelf\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/InspectorActionButton\.svelte$/,
       /^src\/ui\/svelte\/util\/(?:essenceIcons|managerColorTokens)\.js$/,
-      /^src\/ui\/model\/essence(?:BrowserModel|BulkEditModel|Validation)\.js$/,
+      /^src\/ui\/model\/(?:entityBrowserModel|essenceBrowserModel|essenceBulkEditModel|essenceValidation)\.js$/,
     ],
   }),
   managerCase({
@@ -46,7 +46,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/library\/LibraryShelf\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/InspectorActionButton\.svelte$/,
       /^src\/ui\/svelte\/util\/(?:essenceIcons|managerColorTokens)\.js$/,
-      /^src\/ui\/model\/essence(?:BrowserModel|BulkEditModel|Validation)\.js$/,
+      /^src\/ui\/model\/(?:entityBrowserModel|essenceBrowserModel|essenceBulkEditModel|essenceValidation)\.js$/,
     ],
   }),
   managerCase({
@@ -70,7 +70,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/library\/LibraryShelf\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/InspectorActionButton\.svelte$/,
       /^src\/ui\/svelte\/util\/(?:essenceIcons|managerColorTokens)\.js$/,
-      /^src\/ui\/model\/essence(?:BrowserModel|BulkEditModel|Validation)\.js$/,
+      /^src\/ui\/model\/(?:entityBrowserModel|essenceBrowserModel|essenceBulkEditModel|essenceValidation)\.js$/,
     ],
   }),
   managerCase({
@@ -126,7 +126,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/library\/LibraryCard\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/InspectorActionButton\.svelte$/,
       /^src\/ui\/svelte\/util\/(?:essenceIcons|managerColorTokens)\.js$/,
-      /^src\/ui\/model\/essence(?:BrowserModel|BulkEditModel|Validation)\.js$/,
+      /^src\/ui\/model\/(?:entityBrowserModel|essenceBrowserModel|essenceBulkEditModel|essenceValidation)\.js$/,
     ],
   }),
   managerCase({
@@ -150,7 +150,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/Essence(?:Browser|Edit)View\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/essences\//,
       /^src\/ui\/svelte\/util\/(?:essenceIcons|managerColorTokens)\.js$/,
-      /^src\/ui\/model\/essence(?:BrowserModel|BulkEditModel|Validation)\.js$/,
+      /^src\/ui\/model\/(?:entityBrowserModel|essenceBrowserModel|essenceBulkEditModel|essenceValidation)\.js$/,
     ],
   }),
   managerCase({
@@ -175,7 +175,7 @@ export const CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/Essence(?:Browser|Edit)View\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/essences\//,
       /^src\/ui\/svelte\/util\/(?:essenceIcons|managerColorTokens)\.js$/,
-      /^src\/ui\/model\/essence(?:BrowserModel|BulkEditModel|Validation)\.js$/,
+      /^src\/ui\/model\/(?:entityBrowserModel|essenceBrowserModel|essenceBulkEditModel|essenceValidation)\.js$/,
       BULK_DELETE_CARD_PATTERN,
     ],
   }),

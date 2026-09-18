@@ -29,6 +29,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Component/,
       /^src\/ui\/svelte\/apps\/manager\/components?\//,
+      /^src\/ui\/model\/(?:component|entity)BrowserModel\.js$/,
     ],
   }),
   managerCase({
