@@ -9,6 +9,7 @@ import { join, resolve } from 'node:path';
 import { flushSync, tick } from 'svelte';
 
 import { VIEW_LAB_CASES } from '../../scripts/lib/viewLabCases.js';
+import { installFoundryUtilsEnv } from '../helpers/foundryEnv.js';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
 import {
   MANAGER_ROOT,
@@ -32,6 +33,21 @@ async function prepareManagerSuite() {
       localize: identityLocalize,
       format: (key) => key,
     },
+  };
+  // `randomID` through the shared installer rather than a local copy; it leaves `game` alone,
+  // which `installFoundryEnv` does not. Without these two the root's `newStepId` and
+  // `isEmbeddedItemUuid` take their undefined-parser fallbacks silently, and the second of those
+  // calls EVERY uuid embedded. `embedded` is derived here because that is the field the guard
+  // reads, and a stub without it answers "not embedded" for an embedded uuid instead.
+  installFoundryUtilsEnv();
+  globalThis.foundry.utils.parseUuid = (uuid) => {
+    const parts = String(uuid ?? '').split('.');
+    return {
+      collection: parts[0] ?? null,
+      documentId: parts.at(-1) ?? null,
+      id: parts.at(-1) ?? null,
+      embedded: parts.slice(2),
+    };
   };
   tempRoot = mkdtempSync(join(tmpdir(), 'fabricate-manager-'));
   const dependencyRoot = existsSync(resolve(repoRoot, 'node_modules'))
@@ -85,6 +101,9 @@ export function disposeManagerSuite() {
   rmSync(tempRoot, { recursive: true, force: true });
   teardownDOM();
   delete globalThis.game;
+  delete globalThis.foundry;
+  delete globalThis.ui;
+  delete globalThis.fromUuid;
 }
 
 /** Restore the localizer and yield, after each route module has torn its own mount down. */

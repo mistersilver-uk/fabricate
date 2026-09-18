@@ -1,12 +1,20 @@
 /**
- * Proves every predicate `tests/helpers/svelteStructureContract.js` exports, and that its header
- * still states the policy the helper exists to enforce (issue 1658).
+ * Proves every predicate `tests/helpers/svelteStructureContract.js` exports, the module-AST
+ * predicates beside them, and the AST-only read seam they are reached through — plus that each
+ * header still states the policy it exists to enforce (issues 1658, 1691).
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { test } from 'node:test';
 
+import {
+  componentAstOf,
+  componentAstsIn,
+  componentScopeOf,
+  moduleAstOf,
+  moduleAstsIn,
+} from './helpers/parsedSource.js';
 import {
   carriesSpread,
   declaresAttribute,
@@ -151,4 +159,43 @@ test('importedModules sees the module script, a re-export and a dynamic import',
   assert.ok(found.includes('./helper.js'), 'static import');
   assert.ok(found.includes('./reexported.js'), 're-export');
   assert.ok(found.includes('./dynamic.js'), 'dynamic import');
+});
+
+/** A real component and a real module, so the seam is proved against the tree it reads. */
+const ROOT_COMPONENT = 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte';
+const APP_MODULE = 'src/ui/SvelteCraftingSystemManagerApp.svelte.js';
+
+test('the read seam hands back each vocabulary, parses one file once, and returns no text', () => {
+  const component = componentAstOf(ROOT_COMPONENT);
+  assert.ok(Boolean(component.fragment), 'the component vocabulary carries a template fragment');
+  assert.equal(componentAstOf(ROOT_COMPONENT), component, 'and is parsed once, not per caller');
+  const scope = componentScopeOf(ROOT_COMPONENT);
+  assert.ok(Boolean(scope.scopeManager?.globalScope), 'the scope vocabulary resolves references');
+  const module = moduleAstOf(APP_MODULE);
+  assert.equal(module.ast.type, 'Program', 'a .js target is an ESTree program');
+  assert.ok(Boolean(module.scopeManager), 'with its own scope manager');
+  for (const value of [component, scope, module]) assert.notEqual(typeof value, 'string');
+});
+
+test('the directory forms answer one AST per file, by extension', () => {
+  const dir = 'src/ui/svelte/apps/manager/essences';
+  const components = componentAstsIn(dir);
+  assert.ok(components.length > 0, 'the Essence Studio directory holds components');
+  assert.ok(
+    components.every((ast) => Boolean(ast.fragment)),
+    'every entry is a parsed component, so a caller can quantify over them'
+  );
+  assert.ok(
+    moduleAstsIn(dir).every((parsed) => parsed.ast.type === 'Program'),
+    'and the .js half answers programs'
+  );
+});
+
+test('the seam header still forbids the one text-shaped route an AST return leaves open', () => {
+  const header = readFileSync(resolve(import.meta.dirname, 'helpers/parsedSource.js'), 'utf8').slice(
+    0,
+    1200
+  );
+  assert.match(header, /returns ASTs and never source\s+\* text/);
+  assert.match(header, /JSON\.stringify\(ast\)\.includes/);
 });

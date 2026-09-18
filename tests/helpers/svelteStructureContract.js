@@ -11,6 +11,7 @@
  * loop variable rather than a literal, i18n key strings, and `.js`/`.mjs` targets.
  */
 import { parse } from 'svelte/compiler';
+import { parseForESLint } from 'svelte-eslint-parser';
 
 import { walkNodes } from './moduleAst.js';
 import { attributeNamed, walkElements } from './svelteTemplateScan.js';
@@ -31,6 +32,20 @@ const SKIPPED_KEYS = Object.freeze(['parent', 'loc', 'range']);
 /** Parse one component's source into the AST the predicates below read. */
 export function parseComponent(source) {
   return parse(String(source ?? ''), { modern: true });
+}
+
+/**
+ * The same component in the OTHER vocabulary: an ESTree parse with a scope manager, which
+ * `parseComponent` does not produce and which `readsGlobal` cannot answer without.
+ */
+export function parseComponentScope(source) {
+  return parseForESLint(String(source ?? ''), {
+    filePath: 'probe.svelte',
+    ecmaVersion: 'latest',
+    sourceType: 'module',
+    loc: true,
+    range: true,
+  });
 }
 
 function collect(ast, predicate) {
