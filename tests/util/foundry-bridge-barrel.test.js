@@ -1,6 +1,6 @@
 /**
  * The barrel adds no symbol and renames none (issue 1668), and `FOUNDRY_BRIDGE_RAW_MODULES` names
- * exactly the modules it re-exports — a manifest short of one HANGS every suite that declares it.
+ * exactly the modules it re-exports — a manifest short of one hangs every suite that declares it.
  */
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';

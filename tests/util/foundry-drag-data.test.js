@@ -16,6 +16,7 @@ test('getDragEventData calls TextEditor.getDragEventData and returns result', ()
 
 test('getDragEventData without TextEditor returns null', () => {
   const env = installFoundryBridgeEnv();
+  delete globalThis.foundry;
 
   assert.equal(getDragEventData({}), null);
   env.restore();
@@ -27,6 +28,7 @@ test('getDragEventData without TextEditor falls back to text/plain JSON', () => 
     dataTransfer: { getData: (type) => (type === 'text/plain' ? JSON.stringify(payload) : '') },
   };
   const env = installFoundryBridgeEnv();
+  delete globalThis.foundry;
 
   assert.deepEqual(getDragEventData(event), payload);
   env.restore();
@@ -37,6 +39,7 @@ test('getDragEventData without TextEditor returns null for invalid JSON in text/
     dataTransfer: { getData: (type) => (type === 'text/plain' ? 'not-valid-json' : '') },
   };
   const env = installFoundryBridgeEnv();
+  delete globalThis.foundry;
 
   assert.equal(getDragEventData(event), null);
   env.restore();
@@ -44,6 +47,7 @@ test('getDragEventData without TextEditor returns null for invalid JSON in text/
 
 test('getDragEventData without TextEditor returns null when dataTransfer is absent', () => {
   const env = installFoundryBridgeEnv();
+  delete globalThis.foundry;
 
   assert.equal(getDragEventData({ dataTransfer: null }), null);
   env.restore();
@@ -51,6 +55,7 @@ test('getDragEventData without TextEditor returns null when dataTransfer is abse
 
 test('getDragEventData without TextEditor returns null when text/plain is empty', () => {
   const env = installFoundryBridgeEnv();
+  delete globalThis.foundry;
 
   assert.equal(getDragEventData({ dataTransfer: { getData: () => '' } }), null);
   env.restore();
@@ -58,6 +63,7 @@ test('getDragEventData without TextEditor returns null when text/plain is empty'
 
 test('getDragEventData without TextEditor returns null when event is null', () => {
   const env = installFoundryBridgeEnv();
+  delete globalThis.foundry;
 
   assert.equal(getDragEventData(null), null);
   env.restore();

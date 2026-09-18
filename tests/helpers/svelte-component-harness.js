@@ -175,9 +175,6 @@ export function createSvelteCompiler(repoRoot, getTempRoot) {
   return { writeCompiledSvelte, writeRawModule, writeCompiledModule };
 }
 
-// Re-exported so a mount suite reaches it through the harness; the leaf serves a non-mount caller.
-export { FOUNDRY_BRIDGE_RAW_MODULES } from './foundryBridgeModules.js';
-
 // The raw `.js` modules + compiled `.svelte` modules a `SearchablePopover`-based picker needs in a
 // mounted test. Shared so picker test files do not each repeat the dependency list verbatim.
 export const SEARCHABLE_POPOVER_RAW_MODULES = Object.freeze([

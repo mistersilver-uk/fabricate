@@ -43,6 +43,7 @@ test('confirmDialog calls DialogV2.confirm and returns result', async () => {
 
 test('confirmDialog without DialogV2 returns false', async () => {
   const env = installFoundryBridgeEnv();
+  delete globalThis.foundry;
 
   assert.equal(await confirmDialog({ title: 'Test' }), false);
   env.restore();
@@ -64,6 +65,7 @@ test('renderDialog constructs DialogV2 and calls render(true)', () => {
 
 test('renderDialog without DialogV2 returns null', () => {
   const env = installFoundryBridgeEnv();
+  delete globalThis.foundry;
 
   assert.equal(renderDialog({ title: 'Test' }), null);
   env.restore();
@@ -134,6 +136,7 @@ test("choiceDialog resolves 'cancel' when the dialog is closed", async () => {
 
 test("choiceDialog resolves 'cancel' when DialogV2 is unavailable", async () => {
   const env = installFoundryBridgeEnv();
+  delete globalThis.foundry;
 
   const result = await choiceDialog({ title: 'T', content: '<p>C</p>', choices: CHOICES });
 

@@ -53,7 +53,7 @@ import { ALL_INVALIDATION_DOMAINS } from './invalidationDomains.js';
 
 /**
  * The unpublished hook name. Mirrored as a literal in
- * `src/ui/svelte/util/foundryBridge.js` — which deliberately imports nothing, because ~75
+ * `src/ui/svelte/util/foundryHooks.js` — which deliberately imports nothing, because the
  * mounted-component harnesses declare that module and every one of them would have to declare
  * a new transitive dependency. `tests/util/foundry-bridge-subscriptions.test.js` pins the two
  * against each other.

@@ -33,6 +33,7 @@ test('localize(key, data) calls game.i18n.format and returns result', () => {
 
 test('localize without game.i18n returns key', () => {
   const env = installFoundryBridgeEnv();
+  delete globalThis.game;
 
   assert.equal(localize('MY.Key'), 'MY.Key');
   env.restore();
@@ -40,6 +41,7 @@ test('localize without game.i18n returns key', () => {
 
 test('localize with data without game.i18n returns key', () => {
   const env = installFoundryBridgeEnv();
+  delete globalThis.game;
 
   assert.equal(localize('MY.Key', { name: 'foo' }), 'MY.Key');
   env.restore();

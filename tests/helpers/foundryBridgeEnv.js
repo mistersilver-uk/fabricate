@@ -1,7 +1,7 @@
 /**
- * Install the Foundry globals the `foundry*.js` bridge modules read at call time. Each option is the
- * implementation installed: `labels` as `game.i18n`, `dialog` as `DialogV2`, `textEditor` as
- * `foundry.applications.ux.TextEditor`, `fromUuid` as the bare global; `restore()` undoes all five.
+ * Install the Foundry globals the `foundry*.js` bridge modules read at call time: `labels` as
+ * `game.i18n`, `dialog` as `DialogV2`, `textEditor` as `foundry.applications.ux.TextEditor`,
+ * `fromUuid` as the bare global. `restore()` undoes all five.
  */
 
 /** Foundry's own `deepClone` preserves functions, which dialog button callbacks depend on. */
