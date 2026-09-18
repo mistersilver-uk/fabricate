@@ -25,6 +25,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/overlayBounds.js',
     // Each vocabulary panel's lifted search term (issue 1438).
     'src/utils/managerBrowserViewState.js',
+    'src/utils/scalars.js',
   ],
   compiledModules: [
     // A `.svelte` the tree renders but the harness omits HANGS the suite (# cancelled)

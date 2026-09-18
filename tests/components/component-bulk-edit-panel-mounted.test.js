@@ -29,6 +29,7 @@ const panel = createMountedComponentHarness({
     'src/utils/bulkSelectionModel.js',
     // The add-new essence offer projection (issue 1036).
     'src/utils/essenceValidation.js',
+    'src/utils/scalars.js',
   ],
   compiledModules: [
     'src/ui/svelte/components/Chip.svelte',
