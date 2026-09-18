@@ -14,19 +14,14 @@ const essenceBrowserPath = resolve(
   'src/ui/svelte/apps/manager/EssenceBrowserView.svelte'
 );
 const essenceEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/EssenceEditView.svelte');
-// The GM Essence Studio's own components (issue 1036). They sit under `essences/` — the
-// BROWSER's directory, which the screenshot evidence map globs for the essence views — and
-// every one of them joins `managerSource` below. A `!managerSource.includes(...)` assertion
-// over markup that MOVED into one of these goes vacuous rather than red, which is why the
-// join has to move in lockstep with the extraction.
+// The GM Essence Studio's own components (issue 1036). They sit under `essences/`.
 const essenceStudioDir = resolve(repoRoot, 'src/ui/svelte/apps/manager/essences');
 const tagsCategoriesPath = resolve(
   repoRoot,
   'src/ui/svelte/apps/manager/TagsCategoriesView.svelte'
 );
 const systemEditPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/SystemEditView.svelte');
-// World > Currency (issue 1278): the relocated currency editor, whose contract used to be part
-// of SystemEditView's.
+// World > Currency (issue 1278): the relocated currency editor.
 const worldCurrencyPath = resolve(
   repoRoot,
   'src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte'
@@ -94,8 +89,7 @@ const toolBreakagePath = resolve(
   repoRoot,
   'src/ui/svelte/apps/manager/tools/ToolBreakageTab.svelte'
 );
-// The system-scope band that replaced the retired Overview tab (issue 1373), and the
-// inherit/override card every behaviour section of both tool editors is drawn as.
+// The system-scope band that replaced the retired Overview tab (issue 1373).
 const toolSystemScopePath = resolve(
   repoRoot,
   'src/ui/svelte/apps/manager/tools/ToolSystemScopeCards.svelte'
@@ -112,8 +106,7 @@ const toolValidationPath = resolve(
   repoRoot,
   'src/ui/svelte/apps/manager/tools/ToolValidationTab.svelte'
 );
-// The Checks Studio's own modifier catalogue, read here for ONE reason: it is the other caller
-// of the shared modifier row, and the claim below is that there is one row and not two.
+// The Checks Studio's own modifier catalogue, read here for ONE reason.
 const craftingModifierCataloguePath = resolve(
   repoRoot,
   'src/ui/svelte/apps/manager/checks/CraftingModifierCatalogueCard.svelte'
@@ -123,15 +116,13 @@ const mainPath = resolve(repoRoot, 'src/main.js');
 const langPath = resolve(repoRoot, 'lang/en.json');
 
 const rootSource = readFileSync(rootPath, 'utf8');
-// The reward and event limit counts are one shared component (issue 1050), so the marker the
-// root used to carry twice is emitted there from its `rule` prop.
+// The reward and event limit counts are one shared component (issue 1050).
 const gatheringRuleLimitStepperSource = readFileSync(
   resolve(repoRoot, 'src/ui/svelte/apps/manager/environment/GatheringRuleLimitStepper.svelte'),
   'utf8'
 );
 const essenceBrowserSource = readFileSync(essenceBrowserPath, 'utf8');
-// The paginated rows/columns are the shared studio-library shelf now, so the `<ul>` and its
-// `role="list"` are rendered there rather than in each browser view.
+// The paginated rows/columns are the shared studio-library shelf now.
 const libraryShelfSource = readFileSync(
   resolve(repoRoot, 'src/ui/svelte/apps/manager/library/LibraryShelf.svelte'),
   'utf8'
@@ -237,9 +228,7 @@ function staticTextCalls(source) {
 
 function isChangedManagerEnvironmentLocalizationKey(key) {
   return (
-    // The Knowledge surface's whole string tree is authored fresh in issue 785, so
-    // every fallback it renders is compared against en.json rather than only the
-    // keys an older change happened to touch.
+    // The Knowledge surface's whole string tree is authored fresh in issue 785.
     key.startsWith('FABRICATE.Admin.Manager.Knowledge.') ||
     key === 'FABRICATE.Admin.Manager.Nav.Knowledge' ||
     key.startsWith('FABRICATE.Admin.Manager.Environment.') ||
@@ -271,9 +260,7 @@ describe('CraftingSystemManager source contract', () => {
     assert.ok(rootSource.includes('<WorldDowntimeExtensionHost'));
   });
   it('keeps one owner of the active Downtime provider, and it is the shell', () => {
-    // The rail renders the active tab set while the host is UNMOUNTED, and a mount fault
-    // has to move the rail as well as the panel. Two subscribers to the same registry would
-    // disagree on both, so the shell subscribes and the host takes a prop.
+    // The rail renders the active tab set while the host is UNMOUNTED.
     assert.ok(
       rootSource.includes('managerExtensions.subscribe(WORLD_DOWNTIME_SURFACE_ID'),
       'the shell subscribes to the surface it renders'
@@ -326,8 +313,7 @@ describe('CraftingSystemManager source contract', () => {
       !hostSource.includes('manager-downtime-nav'),
       'and the host carries no copy of Root literal in any form'
     );
-    // The region takes the SCREEN name, so the id points at the label span rather than at the
-    // button — whose accessible name is the tab's `accessibleName`, an instruction.
+    // The region takes the SCREEN name.
     assert.ok(
       rootSource.includes('<span class="manager-nav-label" id={downtimeNavLabelId(item.id)}'),
       'the id lands on the visible label element'
@@ -339,12 +325,6 @@ describe('CraftingSystemManager source contract', () => {
     );
   });
   // AC-15 — the mode guard on both badge render sites (issue 1302).
-  //
-  // THE FALSIFIABLE FORM FOR AN UNREACHABLE CLAIM. Core's preview tabs are a frozen literal
-  // declaring no badge, so no REGISTERED badge can ever reach core-fallback and a client-mount
-  // assertion of that half passes against an implementation with the guard deleted outright.
-  // The reachable half — a RUNTIME badge stored against a faulted provider's tab, whose ids
-  // are Core's own — is driven in the mounted suite instead.
   it('keeps both Downtime badge render sites inside the provider-mode branch', () => {
     // The SUB-ITEM badge, opening immediately inside the mode guard. Asserted as adjacency
     // rather than as "the file contains both strings", which any two unrelated lines satisfy.
@@ -367,9 +347,7 @@ describe('CraftingSystemManager source contract', () => {
       'there are exactly two badge render sites, and the two matched above are them'
     );
 
-    // The two DERIVATIONS behind those sites are guarded as well, which is what makes the
-    // markup guards belt and braces rather than the only thing standing between a runtime
-    // badge and a preview row.
+    // The two DERIVATIONS behind those sites are guarded as well.
     assert.ok(
       rootSource.includes(
         'return downtimeCoreFallback ? null : resolveNavTabBadge(item, downtimeNavTabBadges);'
@@ -426,9 +404,7 @@ describe('CraftingSystemManager source contract', () => {
       !mainSource.includes("import './ui/SvelteRecipeManagerApp.svelte.js';"),
       'legacy manager side-effect import should be removed'
     );
-    // Issue 150: the GM-only manager subtree is deferred to a lazy chunk, so
-    // main.js must NOT statically side-effect-import it and must instead pull it
-    // in through a dynamic import() behind the memoized loader.
+    // Issue 150: the GM-only manager subtree is deferred to a lazy chunk.
     assert.ok(
       !mainSource.includes("import './ui/SvelteCraftingSystemManagerApp.svelte.js';"),
       'manager static side-effect import should be removed so it lands in a lazy chunk'
@@ -443,9 +419,7 @@ describe('CraftingSystemManager source contract', () => {
     );
   });
 
-  // The access rosters are the manager's only Foundry user/ownership surface, and every
-  // rule below is one a naive implementation gets WRONG in a way that silently
-  // UNDER- or OVER-reports who can craft a recipe (issue 643 §4b).
+  // The access rosters are the manager's only Foundry user/ownership surface.
   it('derives the access rosters from the non-GM roster, never by testing a GM', () => {
     // `Document#testUserPermission` short-circuits EVERY GM (Assistant included, since
     // `User#isGM` is `hasRole(ASSISTANT)`) to OWNER, so GMs must be filtered FIRST.
@@ -460,8 +434,6 @@ describe('CraftingSystemManager source contract', () => {
       'never uses the game.user-scoped Actor#isOwner (always true on a GM client)'
     );
     // The fallback must agree with `Users#players` (`!u.isGM && u.hasRole('PLAYER')`).
-    // A `!isGM` filter alone admits role-NONE users, offering the GM a grantable target
-    // the engine ignores.
     const fallback = appSource.slice(
       appSource.indexOf('_playerUsers() {'),
       appSource.indexOf('_userRoleLabel(role) {')
@@ -470,8 +442,7 @@ describe('CraftingSystemManager source contract', () => {
       fallback.includes("hasRole('PLAYER')") && fallback.includes('USER_ROLES?.PLAYER'),
       'the fallback applies the same role floor as the canonical roster'
     );
-    // Everything this labels comes from the GM-free roster, so a GAMEMASTER/ASSISTANT
-    // branch would be unreachable code claiming to handle a case that cannot arrive.
+    // Everything this labels comes from the GM-free roster.
     const roleLabel = appSource.slice(appSource.indexOf('_userRoleLabel(role) {'));
     assert.equal(
       roleLabel.slice(0, roleLabel.indexOf('_userColor')).includes('RoleGamemaster'),
@@ -496,8 +467,7 @@ describe('CraftingSystemManager source contract', () => {
   });
 
   it('resolves granted character ids over EVERY world actor, not the PC-filtered roster', () => {
-    // The runtime predicate applies no type filter, so a grant naming a non-PC actor is
-    // still honoured — resolving over the filtered roster would drop it from display.
+    // The runtime predicate applies no type filter.
     assert.ok(appSource.includes('getAccessCharacterActors:'), 'exposes the unfiltered roster');
     const unfiltered = appSource.slice(
       appSource.indexOf('getAccessCharacterActors:'),
@@ -538,13 +508,7 @@ describe('CraftingSystemManager source contract', () => {
   });
 
   it('hands the world VOCABULARY store to the manager, which nothing else can see', () => {
-    // THE FIFTH WIRING EDIT OF ISSUE 1392, and the only one with no other guard. `src/main.js`
-    // constructs, loads, publishes and replicates the store, and three loops in
-    // `tests/scoped-definition-read-and-basis.test.js` pin those. This line is what carries it
-    // into the MANAGER, and its omission is silent end to end: the vocabulary leg reads `null`,
-    // `projectWorldVocabulary` publishes `{available: false, total: 0}` — a legitimate shape —
-    // the rail badge reads 0, the screen is empty, and every adminStore unit test stays green
-    // because each one injects its own services bag.
+    // THE FIFTH WIRING EDIT OF ISSUE 1392.
     const services = appSource.slice(
       appSource.indexOf('  _buildServices() {'),
       appSource.indexOf('  _prepareSvelteProps(context) {')
@@ -618,9 +582,6 @@ describe('CraftingSystemManager source contract', () => {
   });
 
   // Issue 643 established the manager titlebar; issue 1185 reassigned its gold badge.
-  // The badge USED to name the selected crafting system — which the rail's crafting-system
-  // card already does on every screen, so the strip was repeating the rail. It now carries
-  // the premium signal instead, and only when a companion module is registered.
   it('renders a titlebar carrying the premium signal and the system resolution', () => {
     for (const snippet of [
       'class="manager-titlebar"',
@@ -635,8 +596,6 @@ describe('CraftingSystemManager source contract', () => {
       assert.ok(rootSource.includes(snippet), `root titlebar should include ${snippet}`);
     }
     // The layer-group icon and "Crafting Systems" product label are gone (issue 643):
-    // the Foundry window's own title bar already names the app, so a second copy inside
-    // the window was duplicated chrome.
     assert.equal(
       rootSource.includes('manager-titlebar-icon'),
       false,
@@ -660,8 +619,7 @@ describe('CraftingSystemManager source contract', () => {
       false,
       'and its marker attribute goes with it'
     );
-    // Issue 1185: the system name badge is gone in BOTH states, not merely hidden behind a
-    // flag. Its marker attribute and its lang key go with it.
+    // Issue 1185: the system name badge is gone in BOTH states.
     assert.equal(
       rootSource.includes('data-manager-titlebar-system'),
       false,
@@ -682,8 +640,7 @@ describe('CraftingSystemManager source contract', () => {
       false,
       '"Mythwright" is a prototype theme name and must never be hard-coded into the chrome'
     );
-    // The premium badge is driven by the REGISTRY, not by Core's Downtime route: a companion
-    // that ships some future surface is still installed and still lights the strip.
+    // The premium badge is driven by the REGISTRY, not by Core's Downtime route.
     assert.ok(
       rootSource.includes('const premiumInstalled = $derived(registeredSurfaceIds.length > 0)'),
       'the titlebar premium signal should read the whole registered surface set'
@@ -707,8 +664,7 @@ describe('CraftingSystemManager source contract', () => {
       'Fabricate Premium is installed and connected',
       'and the accessible name and tooltip that explain it'
     );
-    // The status line reports the SYSTEM's resolution mode, and counts outcome tiers
-    // only where tiers exist to count (routedByCheck).
+    // The status line reports the SYSTEM's resolution mode.
     assert.ok(
       rootSource.includes(
         "selectedSystem?.resolutionMode === 'routedByCheck'\n      ? routedOutcomeTierCount(selectedSystem?.craftingCheck?.routed)"
@@ -734,13 +690,7 @@ describe('CraftingSystemManager source contract', () => {
       lang.FABRICATE.Admin.Manager.Nav.SectionLabel === 'GM management',
       'the rail section label should be localized'
     );
-    // A rail count is a BARE NUMERAL, not a badge (issue 643). Borrowing `.manager-chip`
-    // meant every nav row wore a bordered, 24px-tall, button-shaped pill that the CSS then
-    // spent five declarations undoing; `.manager-nav-count` owns its own rule instead.
-    //
-    // And every mark still on that class is a numeral (issue 1515): the planned-view row's
-    // "Soon" was the one word drawn through the record-count vehicle, which made that
-    // vehicle's own definition false, and it has a name of its own now.
+    // A rail count is a BARE NUMERAL.
     assert.ok(
       rootSource.includes('<span class="manager-nav-count">{selectedCounts.components}</span>'),
       'a rail count should render as a bare numeral, not a chip'
@@ -787,14 +737,7 @@ describe('CraftingSystemManager source contract', () => {
     ]) {
       assert.ok(rootSource.includes(snippet), `root should include ${snippet}`);
     }
-    // `class="manager-empty"` is NOT in this list any more (issue 785): the manager's
-    // no-state panel is the shared `EmptyState` component, so the root imports and renders
-    // it rather than hand-rolling the dashed-panel markup.
-    // `class="manager-toolbar"` is NOT in this list any more (issue 1039), for the reason
-    // `class="manager-empty"` left it above: the manager's filter bar is the shared
-    // `ManagerToolbar` component, so these views render it rather than hand-rolling the
-    // `<section>`. The tag is what is probed instead, so the assertion still fails if a browser
-    // stops rendering a bar at all.
+    // `class="manager-empty"` is NOT in this list any more (issue 785).
     for (const snippet of [
       'class="manager-main"',
       '<ManagerToolbar',
@@ -804,12 +747,7 @@ describe('CraftingSystemManager source contract', () => {
     ]) {
       assert.ok(managerSource.includes(snippet), `manager source should include ${snippet}`);
     }
-    // `class={componentTableClass}` is GONE (issue 676): the rebuilt browser is a LIST
-    // of rows, not a `role="table"` grid, so the table scaffolding and the class that
-    // toggled its column template are dropped rather than left orphaned on a non-table
-    // structure. `.manager-component-drop-zone` still lives here; the row's own classes
-    // moved into the extracted ComponentRow and are pinned there — both are probed by
-    // managerLayoutGuards and the smoke harness.
+    // `class={componentTableClass}` is GONE (issue 676).
     for (const snippet of ['class="manager-component-drop-zone"', 'ComponentRow']) {
       assert.ok(
         componentsBrowserSource.includes(snippet),
@@ -833,14 +771,7 @@ describe('CraftingSystemManager source contract', () => {
     ]) {
       assert.ok(systemEditSource.includes(snippet), `SystemEditView should include ${snippet}`);
     }
-    // The modifier editor is formula-only: one labelled expression field, with no provider
-    // chip, provider-label helper, or macro UUID field. Since issue 1117 that field is
-    // `RollDataExpressionInput` — the control the retired Checks-tab editor used, adopted
-    // here because this is now the ONE surface that authors an expression — so the binding
-    // pinned is its `onChange`, not a raw `event.currentTarget.value` read.
-    //
-    // Read from `WorldModifiersTab.svelte` since issue 1311 moved the editor onto its own World
-    // page. The contract is unchanged; only the file that has to honour it moved.
+    // The modifier editor is formula-only: one labelled expression field.
     assert.ok(
       !worldModifiersSource.includes('ProviderExpressionInput'),
       'modifier editor should not import the deleted provider/expression component'
@@ -872,12 +803,9 @@ describe('CraftingSystemManager source contract', () => {
       'handleAddCurrencyUnit',
       'onSeedCurrencyPresets',
       'manager-currency-subunit-builder',
-      // The unit card's collapsed summary row reuses the character-modifier summary class; it
-      // moved with the card rather than staying behind on System Settings.
+      // The unit card's collapsed summary row reuses the character-modifier summary class.
       'manager-character-modifier-summary',
-      // The sub-unit token is the shared `Chip` as of issue 1515, and the amount input beside it
-      // is not a chip at all - a number a GM can change keeps its own control - so the pin
-      // follows the two CONSTRUCTS rather than the retired `manager-availability-*` names.
+      // The sub-unit token is the shared `Chip` as of issue 1515.
       'data-world-currency-subunit={contained.unitId}',
       'manager-currency-subunit-amount',
     ]) {
@@ -886,8 +814,7 @@ describe('CraftingSystemManager source contract', () => {
         `WorldCurrencyTab should include ${snippet}`
       );
     }
-    // Asserted as patterns rather than snippets in the list above: Prettier (issue 923) prints
-    // both calls one argument per line.
+    // Asserted as patterns rather than snippets in the list above.
     assert.ok(
       /onUpdateCurrencySubUnit\(\s*unit\.id,\s*contained\.unitId,\s*event\.currentTarget\.value\s*\)/.test(
         worldCurrencySource
@@ -902,10 +829,7 @@ describe('CraftingSystemManager source contract', () => {
       rootSource.includes('currencyUnits={selectedCurrencyUnits}'),
       'root should pass the world currency units to WorldCurrencyTab'
     );
-    // Shorthand for `onAddCurrencySubUnit={onAddCurrencySubUnit}` — prettier-plugin-svelte
-    // rewrites the long form to it (issue 923). Anchored on the leading whitespace that starts
-    // an attribute, so the needle cannot also be satisfied by the tail of a longer identifier
-    // such as `{noOnAddCurrencySubUnit}`.
+    // Shorthand for `onAddCurrencySubUnit={onAddCurrencySubUnit}`.
     assert.ok(
       rootSource.includes(' {onAddCurrencySubUnit}'),
       'root should pass currency sub-unit actions to WorldCurrencyTab'
@@ -929,8 +853,7 @@ describe('CraftingSystemManager source contract', () => {
     // Currency spend-strategy / provider / macro controls.
     for (const snippet of [
       'data-world-currency-strategy-select',
-      // Issue 1510: the shared `<Select>` hands the caller its OWN typed value, so the
-      // handler takes `next` rather than reading `event.currentTarget.value` off an element.
+      // Issue 1510: the shared `<Select>` hands the caller its OWN typed value.
       'onChange={(next) => onSetCurrencySpendStrategy(next)}',
       // The single shared strategy hint reflects the selected strategy.
       'data-world-currency-strategy-hint',
@@ -982,9 +905,7 @@ describe('CraftingSystemManager source contract', () => {
       worldCurrencySource.includes('manager-currency-macro-zones manager-currency-macro-row'),
       'macro drop zones should be wrapped in the single-row container'
     );
-    // Sub-units only drive the engine in actorProperty mode, so the whole sub-unit section (heading,
-    // add control, chips, no-eligible callout) is gated behind a derived macro-mode flag — it must
-    // not render in provider (read-only) or macro modes.
+    // Sub-units only drive the engine in actorProperty mode.
     assert.ok(
       worldCurrencySource.includes('const currencyMacroMode = $derived('),
       'currency editor should derive a macro-mode flag'
@@ -1006,8 +927,6 @@ describe('CraftingSystemManager source contract', () => {
       'macro mode should include the macro-conversion hint'
     );
     // The actorInventory strategy (with a provider) makes the units provider-owned and read-only:
-    // the Add/Seed header actions and the editable unit controls are gated behind a non-read-only
-    // condition, and a dedicated read-only branch with a provider-managed callout renders instead.
     assert.ok(
       worldCurrencySource.includes(
         'const currencyUnitsReadOnly = $derived(currencyShowProviderBranch)'
@@ -1051,8 +970,7 @@ describe('CraftingSystemManager source contract', () => {
       1,
       'sub-unit chips should appear only once (in the editable actorProperty branch)'
     );
-    // The read-only branch precedes the editable branch, so the editable controls (editable amount
-    // input, remove cross) live only after the provider-managed branch.
+    // The read-only branch precedes the editable branch.
     assert.ok(
       worldCurrencySource.indexOf('data-world-currency-provider-managed') <
         worldCurrencySource.indexOf('class="manager-currency-subunit-amount"'),
@@ -1062,8 +980,7 @@ describe('CraftingSystemManager source contract', () => {
       '{currencyProviderId}',
       '{currencyMacros}',
       '{currencyProviderOptions}',
-      // Shorthand, like the three above: prettier-plugin-svelte rewrites `attr={attr}` to
-      // Svelte's `{attr}` form (issue 923). The two are the same binding.
+      // Shorthand, like the three above.
       '{onSetCurrencySpendStrategy}',
       '{onSetCurrencyProvider}',
       '{onSetCurrencyMacro}',
@@ -1079,13 +996,6 @@ describe('CraftingSystemManager source contract', () => {
     // it. What makes it visible is a THREE-link join: `adminStore` publishes
     // `worldCurrencyValidation`, the root derives `currencyValidationErrors` off it, and the
     // root threads that to `WorldCurrencyTab`.
-    //
-    // Every link is asserted separately because a break in any of them is SILENT. The tab
-    // defaults the prop to `[]`, so a root that stops passing it renders a permanently healthy
-    // page — and the mounted suite passes the prop in by hand, so it cannot see that at all.
-    // The bare `rootSource.includes(...)` above is a WHOLE-FILE match on a 9,000-line component,
-    // so it stays green for a `{currencyValidationErrors}` written anywhere in it — including on
-    // some other child's tag. This one pins the attribute to the WorldCurrencyTab TAG.
     const worldCurrencyTag = /<WorldCurrencyTab\b[\s\S]*?\/>/.exec(rootSource)?.[0] ?? '';
     assert.ok(worldCurrencyTag.length > 0, 'root should render a self-closing <WorldCurrencyTab />');
     assert.ok(
@@ -1194,8 +1104,7 @@ describe('CraftingSystemManager source contract', () => {
         `RecipesBrowserView should include ${snippet}`
       );
     }
-    // The row Edit pencil reuses the Books & Scrolls icon-button + pen idiom, and the
-    // filter/sort/paging state is lifted (no local $state for those controls remains).
+    // The row Edit pencil reuses the Books & Scrolls icon-button + pen idiom.
     assert.ok(
       // `<IconButton class="manager-recipe-edit">` since issue 1422: the contract class is
       // emitted by the primitive, so asserting it at the call site would now assert the
@@ -1211,7 +1120,6 @@ describe('CraftingSystemManager source contract', () => {
     // The row DELEGATES its authoring-state pills to the shared activation predicate
     // (issue 1010), which the bulk panel's pre-flight count and the attention sort read
     // too — so the pilled rows and the counted rows are one set by construction.
-    //
     // Delegation is all this assertion may claim, because it is all the component's text
     // contains. The predicate is owned by `tests/util/recipe-browser-model.test.js`, and
     // the RENDERED pills by the `authoring-state pills` cases in
@@ -1236,8 +1144,6 @@ describe('CraftingSystemManager source contract', () => {
     );
     // The four row states are one component rather than four ad-hoc chips. The tones stay
     // distinguishable: warning = blocked but already enabled, danger = blocked AND off, i.e.
-    // enabling would be REFUSED (issue 643, repointed onto the shared activation predicate by
-    // issue 1010, and onto the one shared chip by issue 1506).
     assert.ok(
       recipesBrowserSource.includes("import Chip from '../../components/Chip.svelte'"),
       'the row should render its states through the shared Chip'
@@ -1295,9 +1201,7 @@ describe('CraftingSystemManager source contract', () => {
     assert.equal(lang.FABRICATE.Admin.Manager.Nav.ToolRules, 'Tool Rules');
     assert.equal(lang.FABRICATE.Admin.Manager.Nav.Components, undefined);
     assert.equal(lang.FABRICATE.Admin.Manager.Nav.Tools, undefined);
-    // `Nav.Essences` SURVIVES, and the difference is the point: its last consumer names the
-    // DOMAIN NOUN rather than the screen — the system inspector's essence count, which links
-    // to nothing.
+    // `Nav.Essences` SURVIVES, and the difference is the point.
     assert.equal(lang.FABRICATE.Admin.Manager.Nav.Essences, 'Essences');
     assert.equal(lang.FABRICATE.Admin.Manager.Nav.Environments, 'Gathering');
     assert.equal(lang.FABRICATE.Admin.Manager.Breadcrumbs, 'Breadcrumbs');
@@ -1368,14 +1272,7 @@ describe('CraftingSystemManager source contract', () => {
       'Drop items to add components'
     );
     assert.equal(lang.FABRICATE.Admin.Manager.Component.Origin, 'Origin');
-    // `SourceOriginCompendium` — and `SourceOriginWorld` / `-Missing` / `-Unknown` with it — are
-    // RETIRED (issue 1371, maintainer parity round 5). They labelled the browser row's origin
-    // column, which the C5 rebuild replaced with the reference's one-line row: the origin is now
-    // carried by the source filter and the linked/unlinked face, neither of which names a
-    // provenance in words. Nothing under `src/` reads any of the four, so `lang-keys-no-orphans`
-    // reds on the key the moment it is put back — asserting its ABSENCE is what keeps this
-    // inventory and that ratchet describing the same en.json. `SourceOriginLinked` survives only
-    // as an explicit `KNOWN_ORPHANS` debt entry, which is the baseline, not a live reference.
+    // `SourceOriginCompendium` — and `SourceOriginWorld` / `-Missing` / `-Unknown` with it.
     assert.equal(lang.FABRICATE.Admin.Manager.Component.SourceOriginCompendium, undefined);
     assert.equal(lang.FABRICATE.Admin.Manager.TagsCategories.Title, 'Tags & Categories');
     assert.equal(lang.FABRICATE.Admin.Manager.TagsCategories.Library, 'Tags & Categories');
@@ -1386,14 +1283,9 @@ describe('CraftingSystemManager source contract', () => {
     assert.equal(lang.FABRICATE.Admin.Manager.Essence.Title, 'Essences');
     // `Essence.Library` / `Essence.LibraryHint` / `Essence.Kicker` are RETIRED with the
     // duplicate page header the browser used to render above the shell's own (issue 1036).
-    // The route title is `Essence.Title`, which the shell owns and which is asserted above.
     assert.equal(lang.FABRICATE.Admin.Manager.Essence.EditTitle, 'Edit essence');
     assert.equal(lang.FABRICATE.Admin.Manager.Essence.EditBreadcrumb, 'Edit essence');
-    // `CreateBreadcrumb` — and `Create`, `CreateSubtitle` and `CreateNoSourceSubtitle` with it —
-    // are RETIRED (issue 1372, maintainer parity round 8): the system-scope create draft they
-    // titled had one entry point, the Essence Rules header's `+ Create essence`, and an essence's
-    // identity is a world record. `CreateTitle` survives because `EssenceEditView` still titles a
-    // draft it can be handed directly.
+    // `CreateBreadcrumb` — and `Create`.
     assert.equal(lang.FABRICATE.Admin.Manager.Essence.CreateBreadcrumb, undefined);
     // `SourceAll` / `SourceLinkedFilter` / `SourceNone` / `SourceNeedsAttention` and the status
     // segment's `Status.All` are RETIRED with the two toolbar filters issue 1372's round-8 parity
@@ -1532,13 +1424,9 @@ describe('CraftingSystemManager source contract', () => {
   });
 
   it('renames the recipe resolution-mode legend and offers a salvage resolution-mode card', () => {
-    // The recipe card legend is renamed; its consumer is now the Crafting Settings
-    // page (issue 511 moved the resolution cards off System Overview).
+    // The recipe card legend is renamed.
     assert.equal(lang.FABRICATE.Admin.SystemSettings.ResolutionMode, 'Recipe resolution mode');
-    // `legend=` since issue 1509 phase 3, which deleted the `ResolutionModeCard` shim and had
-    // these call sites render `RadioCardGroup` directly. The shim's `legendFallback` was its
-    // rename of the primitive's own `legend`, and no alias prop was kept: this is the SAME
-    // fallback string on the SAME control, under the name the primitive has always used.
+    // `legend=` since issue 1509 phase 3.
     assert.ok(
       craftingSettingsSource.includes('legend="Recipe resolution mode"'),
       'crafting settings inline fallback should match the renamed value'
@@ -1646,12 +1534,7 @@ describe('CraftingSystemManager source contract', () => {
       'no consumer references the removed Summary key'
     );
 
-    // The System Overview page is the renamed system-edit route, and since issue 1515 its
-    // breadcrumb tail and nav label read "System Overview" while its `<h1>` reads the SELECTED
-    // SYSTEM'S NAME. That split is deliberate rather than a drift: every other editor route in
-    // the Manager titles itself after the record it edits, and this one repeated the route name
-    // a third time under a trail that already said it twice. The trail names where you are; the
-    // title names what you are looking at.
+    // The System Overview page is the renamed system-edit route.
     assert.equal(
       lang.FABRICATE.Admin.Manager.SystemEdit.Nav,
       'System Overview',
@@ -1689,8 +1572,7 @@ describe('CraftingSystemManager source contract', () => {
       'the renamed nav item reads System Overview'
     );
 
-    // The standalone Overview route was folded into the system-edit page; its old
-    // nav item and routed view token are gone.
+    // The standalone Overview route was folded into the system-edit page.
     assert.ok(
       !rootSource.includes('data-nav-system-overview'),
       'the standalone Overview nav item is removed'
@@ -1715,12 +1597,7 @@ describe('CraftingSystemManager source contract', () => {
       'the renamed nav item carries the open-validation-issue badge'
     );
 
-    // The page is a full-width tabbed shell mirroring the environment editor: the
-    // shared inspector is skipped, and SystemEditView owns the tabs + workspace.
-    // Since issue 1362 the aside chain is BUILT from `FULL_WIDTH_VIEWS` rather than
-    // restated, so the question is whether the route is a MEMBER of that set — which is
-    // stronger than the old needle, which passed on a root that mentioned the token anywhere.
-    // `tests/manager-full-width-gate.test.js` asserts the whole set against the stylesheet.
+    // The page is a full-width tabbed shell mirroring the environment editor.
     assert.ok(
       /id: 'system-edit',\s*\n\s*layoutClass: 'full-width-2-track'/.test(rootSource) &&
         rootSource.includes('class="manager-inspector"'),
@@ -1763,9 +1640,7 @@ describe('CraftingSystemManager source contract', () => {
       'the Requires/Produces walk lives in the pure model, not in the component'
     );
 
-    // The inspector is ONE column on the panel background (issue 643): section labels are
-    // uppercase micro-labels directly on the panel, not five nested `.manager-inspector-card`
-    // boxes under `<h3>` titles, and there is no invented "Recipe details" heading.
+    // The inspector is ONE column on the panel background (issue 643).
     assert.equal(
       recipeBrowserInspectorSource.includes('manager-inspector-card'),
       false,
@@ -1777,8 +1652,7 @@ describe('CraftingSystemManager source contract', () => {
       'the invented "Recipe details" heading is gone'
     );
 
-    // `Edit recipe` is the point of the inspector: the accent-filled primary. There used to
-    // be no Edit at all, and Delete sat as a peer of Duplicate.
+    // `Edit recipe` is the point of the inspector.
     assert.ok(
       recipeBrowserInspectorSource.includes('data-recipe-action="edit"'),
       'the inspector exposes the primary Edit action'
@@ -1792,8 +1666,7 @@ describe('CraftingSystemManager source contract', () => {
       'Delete is a dark danger button below Edit, not a peer of Duplicate'
     );
 
-    // The reserved alchemy-Simple failure group is SHOWN (danger-toned), not filtered out —
-    // deleting it made an alchemy recipe's failure output invisible.
+    // The reserved alchemy-Simple failure group is SHOWN (danger-toned).
     assert.ok(
       recipeBrowserInspectorSource.includes(
         "data-recipe-produces={row.failure ? 'failure' : 'success'}"
@@ -1817,9 +1690,7 @@ describe('CraftingSystemManager source contract', () => {
       rootSource.includes('{viewKicker()}'),
       'and renders it in the page header rather than leaving the resolver unread'
     );
-    // NO EYEBROW ON `system-edit`, deliberately: its heading is the system's name and its trail
-    // already names both the system and the route, so a third statement of the same fact would be
-    // exactly the duplication the deleted assertions were aimed at.
+    // NO EYEBROW ON `system-edit`, deliberately.
     const kickerBody = rootSource.slice(
       rootSource.indexOf('function viewKicker'),
       rootSource.indexOf('function viewTitle')
@@ -1837,8 +1708,7 @@ describe('CraftingSystemManager source contract', () => {
       rootSource.includes('visiblePlaceholderViews'),
       'root should derive selected-system placeholder nav from selection and feature gates'
     );
-    // Issue 745: the Crafting group is unconditional (v1.3 headline); the experimental
-    // toggle now only gates the unimplemented Graph placeholder.
+    // Issue 745: the Crafting group is unconditional (v1.3 headline).
     assert.ok(
       rootSource.includes(
         'const experimentalFeaturesEnabled = $derived($viewState.experimentalFeaturesEnabled === true)'
@@ -1869,9 +1739,7 @@ describe('CraftingSystemManager source contract', () => {
       /id: 'graph',[\s\S]{0,600}?icon: 'fas fa-project-diagram'/.test(rootSource),
       'the Graph placeholder should remain in the planned placeholder list'
     );
-    // And it carries its rail id as a COMPLETE LITERAL (issue 1362), not a
-    // `manager-nav-${view.id}` template: both harnesses target every rail entry by id now, and
-    // an interpolated one is invisible to the gate that checks the id is rendered at all.
+    // And it carries its rail id as a COMPLETE LITERAL (issue 1362).
     assert.ok(
       rootSource.includes("navId: 'manager-nav-graph'"),
       'the Graph placeholder declares its rail id as a complete literal'
@@ -1889,8 +1757,7 @@ describe('CraftingSystemManager source contract', () => {
         rootSource.indexOf('class="manager-rail-block"'),
       'GM management should label the rail before the crafting-system scope card'
     );
-    // The rail card SELECTS (issue 643): before this the rail could name the selected
-    // system but offered no way at all to switch to another one.
+    // The rail card SELECTS (issue 643).
     assert.ok(
       rootSource.includes('data-manager-scope-select'),
       'the rail card should carry a real system select'
@@ -1985,22 +1852,7 @@ describe('CraftingSystemManager source contract', () => {
       !rootSource.includes('FABRICATE.Admin.Manager.QuickActions'),
       'inspector should not duplicate row actions'
     );
-    // The legacy system-library header rendered an admin launch button beside Import, wired
-    // to `openCurrentAdmin`. This guarded that by the pair's LITERAL MARKUP, which made an
-    // absence check hostage to formatting rather than to the thing it guards: the literal
-    // stopped matching the day Import gained `data-manager-import-system` and prettier
-    // reflowed the tag across five lines, and it can never match again now that Import is a
-    // `<ManagerButton>` (issue 1118). An absence assertion that cannot match does not go RED
-    // when its subject returns — it goes quietly meaningless, which is the more dangerous of
-    // the two failure modes.
-    //
-    // So: anchor on the HANDLER NAME, which is what the legacy control actually called and
-    // which no reformatting or primitive conversion can spell away, and put a floor under it
-    // that proves the branch still exists. Without the floor, deleting the whole
-    // system-library header would satisfy the absence check perfectly.
-    // The floor reads the Import control's OPEN TAG, not the bare hook name: the hook is also
-    // spelled out in the comment above the control, so a `rootSource.includes(...)` floor
-    // would survive deleting the button it is meant to prove exists.
+    // The legacy system-library header rendered an admin launch button beside Import.
     assert.ok(
       /<ManagerButton[^<>]*\bdata-manager-import-system\b[^<>]*onclick=\{importSystem\}[^<>]*>/.test(
         rootSource
@@ -2285,8 +2137,7 @@ describe('CraftingSystemManager source contract', () => {
       rootSource.includes('store.setCategoryIcon?.(name, icon)'),
       'category icon edits should delegate to the admin store'
     );
-    // The COMPONENT category vocabulary (issue 676) — the sibling of the two above,
-    // and a SEPARATE store action: it must never be folded into addCategory.
+    // The COMPONENT category vocabulary (issue 676).
     assert.ok(
       rootSource.includes('store.addComponentCategory?.(value, icon)'),
       'component category add should delegate to the admin store with its icon'
@@ -2364,9 +2215,7 @@ describe('CraftingSystemManager source contract', () => {
       !essenceBrowserSource.includes('manager-essence-action-band'),
       'browser should not duplicate the route-header create action'
     );
-    // The SOURCE COLUMN is retired with the table (issue 1036). It reported one bit — is
-    // there an image — in a column of its own; the row now carries an `Effects` capability
-    // pill instead.
+    // The SOURCE COLUMN is retired with the table (issue 1036). It reported one bit.
     assert.ok(
       !essenceBrowserSource.includes('manager-essence-source-cell-image'),
       'the source column and its image cell are retired with the table head'
@@ -2388,8 +2237,7 @@ describe('CraftingSystemManager source contract', () => {
       essenceBrowserSource.includes('data-essence-membership-filter'),
       'NON-VACUITY: the one filter the reference DOES draw is still on the bar'
     );
-    // Browser state is LIFTED to the root, which is criterion 12: search, filters, sort,
-    // presentation and page all survive the editor round-trip.
+    // Browser state is LIFTED to the root, which is criterion 12: search, filters.
     assert.ok(
       essenceBrowserSource.includes('browserState = $bindable(null)'),
       'the browser binds its view-state rather than owning it'
@@ -2449,10 +2297,7 @@ describe('CraftingSystemManager source contract', () => {
       !essenceEditSource.includes('IconClassHint'),
       'edit route should not expose raw icon class copy'
     );
-    // The Save button now lives in the SHARED `ComponentEditorHeader`, which submits by id
-    // through its `formId` prop. Both halves of that pairing still have to survive
-    // verbatim — drop either and Save silently stops working, with no test to catch it —
-    // so the pairing is asserted at both ends rather than at the literal attribute.
+    // The Save button now lives in the SHARED `ComponentEditorHeader`.
     assert.ok(
       rootSource.includes('formId="manager-essence-edit-form"'),
       'root header should own the primary save action for the edit form'
@@ -2461,18 +2306,12 @@ describe('CraftingSystemManager source contract', () => {
       rootSource.includes('saveAttr="data-essence-edit-save"'),
       'and it wears this studio own hooks rather than the component studio ones'
     );
-    // Edit, Duplicate and Delete are the INSPECTOR's, and the inspector is now an extracted
-    // component under `essences/` rather than ~200 lines inlined in the root. The row keeps
-    // the pencil alone; the assertions therefore move to the studio source, and asserting
-    // their ABSENCE from the root proves the extraction happened rather than being copied.
+    // Edit, Duplicate and Delete are the INSPECTOR's.
     assert.ok(
       !rootSource.includes('data-essence-action='),
       'the root no longer inlines any essence inspector action'
     );
-    // `duplicate` is NOT in this set (issue 1372, maintainer parity round 8): it wrote a
-    // system-owned essence with its own name, icon and colour from the rail whose own banner says
-    // identity is the Essence Catalogue's. Asserted absent below, so a re-added action fails here
-    // rather than reappearing under a passing loop.
+    // `duplicate` is NOT in this set (issue 1372, maintainer parity round 8).
     for (const action of ['edit', 'delete', 'copy-source', 'unlink-source']) {
       assert.ok(
         essenceStudioSource.includes(`data-essence-action="${action}"`),
@@ -2497,13 +2336,7 @@ describe('CraftingSystemManager source contract', () => {
       ),
       'inspector source changes should use updateEssence'
     );
-    // Criterion 23's four route-wiring items, pinned at the chokepoint rather than at a
-    // control: the same-view skip the other guards already have, the store's `cancel` half,
-    // and the `deleteEssence` boolean the root now consumes.
-    // The skip compares the ESSENCE, not only the view token. `essence-edit` is a "same
-    // token, different subject" route: `editEssence` early-returns on an unchanged id, so
-    // every call reaching the guard from inside the editor is a switch to a DIFFERENT
-    // essence, which a token-only skip waved through with the draft unsaved and no prompt.
+    // Criterion 23's four route-wiring items.
     assert.ok(
       rootSource.includes(
         "if (nextView === 'essence-edit' && nextEssenceId && nextEssenceId === selectedEssenceId)"
@@ -2528,12 +2361,7 @@ describe('CraftingSystemManager source contract', () => {
       rootSource.includes('importSingleManagedItemFromDrop'),
       'inspector source drops should reuse the managed-item import seam'
     );
-    // The armed BULK delete is a deliberate deviation from the `AGENTS.md` carve-out, under
-    // the maintainer's binding decision for this action. The SINGLE delete keeps the
-    // store-owned `confirmDialog`, so the two idioms do not collide on one screen.
-    // The arm is now reached through the shared `BulkDeleteCard` (issue 1132), which renders
-    // `ArmedDangerButton` itself. Retargeted rather than dropped: the assertion is about the
-    // IDIOM — this delete arms instead of opening a dialog — and the card is what carries it.
+    // The armed BULK delete is a deliberate deviation from the `AGENTS.md` carve-out.
     assert.ok(
       essenceStudioSource.includes('<BulkDeleteCard'),
       'the bulk delete arms rather than opening a dialog'
@@ -2580,17 +2408,7 @@ describe('CraftingSystemManager source contract', () => {
     );
   });
 
-  /**
-   * THE HALF OF THE COMPATIBILITY GUARANTEE THAT IS NOT BEHAVIOURAL.
-   *
-   * `confirmNavigation` answers `undefined` when no companion holds a guard, and its own suite
-   * pins that. What cannot be observed from a mounted test, because a single microtask of
-   * added latency is invisible through Svelte's own flush, is that BOTH callers actually read
-   * `undefined` as "take the branch you took before this seam existed". Written any other way
-   * — awaiting unconditionally, or comparing against `true` — every Manager close would pay an
-   * extra `await` and every route exit would hand `afterTruthyResult` a composed promise, for a
-   * question no companion asked. So the short-circuit is asserted where it lives.
-   */
+  /** THE HALF OF THE COMPATIBILITY GUARANTEE THAT IS NOT BEHAVIOURAL. */
   it('costs a companion that registers no navigation guard nothing on either exit path', () => {
     assert.ok(
       appSource.includes(
@@ -2669,8 +2487,7 @@ describe('CraftingSystemManager source contract', () => {
       'backToRecipesBrowse navigation should be defined'
     );
     assert.ok(rootSource.includes("'recipe-edit'"), 'recipe-edit route should be wired');
-    // saveRecipeDraft lives in the root (it commits the root-held draft), so scope
-    // the inline-save absence to the browser source instead.
+    // saveRecipeDraft lives in the root (it commits the root-held draft).
     assert.ok(
       !recipesBrowserSource.includes('saveRecipe'),
       'recipes browser should not introduce inline save behavior'
@@ -2708,11 +2525,6 @@ describe('CraftingSystemManager source contract', () => {
     // LOAD-BEARING ASYMMETRY. `confirmComponentRouteExit` deliberately LACKS the
     // `|| nextView === '<kind>-edit'` bypass its recipe and environment siblings carry
     // (`confirmRecipeRouteExit`: `if (activeView !== 'recipe-edit' || nextView === 'recipe-edit') return true;`).
-    //
-    // That omission is exactly what makes `editComponent` guard component -> component
-    // navigation — i.e. it is what makes the salvage "Edit ↗" deep link safe. An
-    // implementer told to "mirror the Recipe Studio" copies the bypass and silently
-    // discards a dirty draft on a deep-link jump, with nothing failing.
     const guard = rootSource.slice(
       rootSource.indexOf('function confirmComponentRouteExit'),
       rootSource.indexOf('function confirmEnvironmentRouteExit')
@@ -2726,8 +2538,7 @@ describe('CraftingSystemManager source contract', () => {
       !guard.includes("nextView === 'component-edit'"),
       'the component route guard must NOT gain the recipe/environment nextView bypass'
     );
-    // The sibling that DOES carry it, pinned so this test cannot pass vacuously by the
-    // bypass string simply having been renamed everywhere.
+    // The sibling that DOES carry it.
     assert.ok(
       rootSource.includes(
         "if (activeView !== 'recipe-edit' || nextView === 'recipe-edit') return true;"
@@ -2777,12 +2588,7 @@ describe('CraftingSystemManager source contract', () => {
       !rootSource.includes('forceEditorOpen'),
       'manager edit route should not force-open the legacy environment editor'
     );
-    // The v2 environment editor is a composition/wrapper editor: it composes
-    // reusable library tasks/events into one environment via include/exclude,
-    // ordering, and a shared automatic|manual composition mode. It does NOT
-    // author reusable source records (that lives in the standalone
-    // gathering-task-edit / gathering-event-edit routes), so it must wire the
-    // composition store actions rather than the inline task-authoring handlers.
+    // The v2 environment editor is a composition/wrapper editor.
     for (const snippet of [
       'store.updateEnvironmentDraft',
       'store.saveEnvironmentDraft',
@@ -2907,11 +2713,7 @@ describe('CraftingSystemManager source contract', () => {
       rootSource.includes('manager-rule-copy'),
       'root should render rule descriptions beside inspector icons'
     );
-    // The two limits are one shared component now (issue 1050), so the marker they were
-    // asserted through lives there and is driven by the `rule` prop. Both halves are pinned:
-    // the root still renders one of each, and the component still emits the marker from the
-    // prop — so a root that stopped rendering a limit, or a component that stopped marking
-    // it, fails here rather than one covering for the other.
+    // The two limits are one shared component now (issue 1050).
     for (const rule of ['rewardLimit', 'eventLimit']) {
       assert.match(
         rootSource,
@@ -3076,9 +2878,7 @@ describe('CraftingSystemManager source contract', () => {
     ]) {
       assert.ok(gatheringTaskEditSource.includes(snippet), `task editor should include ${snippet}`);
     }
-    // Asserted as a pattern rather than a snippet in the list above: Prettier (issue 923) prints
-    // this object literal one property per line with a trailing comma, so no single-line
-    // substring covers the whole payload.
+    // Asserted as a pattern rather than a snippet in the list above.
     assert.ok(
       /onUpdateDrop\(rowId, \{\s*componentId: data\.componentId,\s*itemUuid: '',\s*systemItemId: '',\s*name: '',\s*enabled: true,?\s*\}\)/.test(
         gatheringTaskEditSource
@@ -3309,16 +3109,6 @@ describe('CraftingSystemManager source contract', () => {
     // deleteGatheringTaskDraft/` matched a class string in one control and a handler in
     // another as readily as both in the same one, and the class literal it keyed on left the
     // file entirely when this toolbar moved onto `ManagerButton` (issue 1118).
-    //
-    // `data-gathering-task-delete` is the hook that makes the element addressable — it was
-    // added for exactly this, since the control carried no `data-*` handle of its own. The
-    // open tag is bounded by `[^<>]`, so the match cannot run past this element's own `>`
-    // into the next control's attributes; if it ever does stop resolving, `deleteTag` is
-    // null and the first assertion fails by name instead of the check going quiet.
-    //
-    // What this pins is that the SOURCE asks for the destructive role. That `role="danger"`
-    // renders `is-danger` is the primitive's own contract and is pinned where it belongs, in
-    // `tests/components/manager-button-mounted.test.js`.
     const deleteTag = /<ManagerButton[^<>]*\bdata-gathering-task-delete\b[^<>]*>/.exec(rootSource);
     assert.ok(
       deleteTag,
@@ -3353,23 +3143,12 @@ describe('CraftingSystemManager source contract', () => {
       'selectLibraryTool',
       'backToToolsBrowser',
       'saveSelectedToolDraft',
-      // `deleteSelectedLibraryTool` IS GONE, and its replacement is named rather than merely
-      // dropped (issue 1373). The system editor's bare `Delete` named no scope on a screen whose
-      // subject is one world Tool adopted by many crafting systems; the design puts `Delete` on
-      // the world entry and gives system scope an explained removal that takes THIS system's
-      // rules and leaves the world Tool and every other system untouched.
+      // `deleteSelectedLibraryTool` IS GONE.
       'removeFocusedToolFromSystem',
-      // The per-section inherit switch, which is a world MEMBERSHIP write composed with an
-      // in-system one — so the root owns it, exactly as it owns the enable switch.
+      // The per-section inherit switch.
       'setFocusedToolSectionInherited',
       'confirmToolsRouteExit',
-      // `store.createToolDraft?.` IS GONE FROM THIS LIST, and its absence is the change rather
-      // than an omission (issue 1373). Tool CREATION moved to the world Tools Catalogue: the
-      // root now resolves a dropped Item and writes a WORLD entity through
-      // `worldScope.tool.createEntity`, because a Tool is one world record every system
-      // adopts. The system Tool Rules route creates nothing, so a root that still referenced
-      // the system-scope draft creator would be carrying the surface this change removed.
-      // `createWorldToolFromItemDrop` below is what replaced it.
+      // `store.createToolDraft?.` IS GONE FROM THIS LIST.
       'store?.openToolDraft',
       'store?.saveToolDraft',
       // `store?.deleteToolDraft` GOES WITH THE HEADER BUTTON THAT CALLED IT. It deleted this
@@ -3382,10 +3161,7 @@ describe('CraftingSystemManager source contract', () => {
     ]) {
       assert.ok(rootSource.includes(snippet), `root should reference ${snippet}`);
     }
-    // TOOL CREATION IS A WORLD-SCOPE WRITE NOW. All four halves are pinned, because dropping
-    // any one of them leaves a drop that silently does nothing: the resolver seam that turns a
-    // drag payload into a name and an image, the world-scope create, the world-catalogue prop
-    // that raises the drop, and the navigation that lands the GM on the record just made.
+    // TOOL CREATION IS A WORLD-SCOPE WRITE NOW. All four halves are pinned.
     for (const snippet of [
       'createWorldToolFromItemDrop',
       'services?.resolveToolSource',
@@ -3401,11 +3177,7 @@ describe('CraftingSystemManager source contract', () => {
       !rootSource.includes('onCreateToolDrop'),
       'the system Tool Rules route passes no creation drop callback'
     );
-    // AND ADOPTION IS A NAMED HANDLER, not the inline world-scope call it started as (issue
-    // 1373). The second half is what the inline version could not do: `unadoptedToolId` is what
-    // routes the inspector to `No rules here` / `Add {tool} to {system}`, and nothing else
-    // clears it - so without the selection move the GM presses the button, the Tool becomes a
-    // member row behind the panel, and the panel goes on offering to add a Tool it already has.
+    // AND ADOPTION IS A NAMED HANDLER.
     for (const snippet of [
       'async function adoptWorldToolIntoSystem(entityId)',
       'onAddToSystem={(entityId) => adoptWorldToolIntoSystem(entityId)}',
@@ -3425,11 +3197,7 @@ describe('CraftingSystemManager source contract', () => {
       lang.FABRICATE.Admin.Manager.Tools && typeof lang.FABRICATE.Admin.Manager.Tools === 'object',
       'lang should expose a FABRICATE.Admin.Manager.Tools block'
     );
-    // `Tool Rules`, not `Tools` (issue 1373). The rail entry, the breadcrumb leaf and the
-    // page heading all read `Tool Rules` since the world catalogue took ownership of Tool
-    // identity, art and description; a heading reading `Tools` over a rail entry reading
-    // `Tool Rules` is the WCAG 2.5.3 "Label in Name" hazard that relabel had to avoid once
-    // already.
+    // `Tool Rules`, not `Tools` (issue 1373). The rail entry.
     assert.equal(lang.FABRICATE.Admin.Manager.Tools.Title, 'Tool Rules');
     assert.equal(lang.FABRICATE.Admin.Manager.Tools.Add, 'Add tool');
     assert.equal(lang.FABRICATE.Admin.Manager.Tools.Save, 'Save tool');
@@ -3464,17 +3232,7 @@ describe('CraftingSystemManager source contract', () => {
       toolRequirementsSource.includes('data-tool-bonus-modifier'),
       'Tool requirements should select the bonus from the world modifier library'
     );
-    // ── AND THE LIBRARY IS DRAWN AS ROWS, THROUGH THE CHECKS STUDIO'S OWN ROW ─────────────
-    // (issue 1373, maintainer round 4). The first pass drew it as a `RadioCardGroup` — a stack
-    // of option cards — and this app already draws the distinction the other way: the Checks
-    // Studio presents THIS SAME roster (`characterLibraries.modifiers[]`) as compact rows in
-    // `checks/CraftingModifierCatalogueCard.svelte`, and reserves `RadioCardGroup` for the
-    // closed four-option mode set (`How they combine`) directly beneath it. Library entries get
-    // rows; closed mode sets get cards.
-    //
-    // ASSERTED AS ONE COMPONENT WITH TWO CALLERS, not as "the tab emits the row's classes". A
-    // class-only assertion is satisfied by a second copy of the markup, which is exactly the
-    // third modifier row the maintainer's ruling forbids.
+    // ── AND THE LIBRARY IS DRAWN AS ROWS.
     assert.ok(
       toolRequirementsSource.includes('<ModifierLibraryRow'),
       'the bonus list should render the shared modifier row, not option cards'
@@ -3490,17 +3248,6 @@ describe('CraftingSystemManager source contract', () => {
     );
 
     // ── AND SO IS THE PREREQUISITE LIST DIRECTLY ABOVE IT (issue 1373, maintainer round 5) ─
-    //
-    // `proto:4741` gives the design's prerequisite row
-    // `display:flex; align-items:center; gap:11px; padding:10px 12px; border-radius:10px;
-    // background: bg1|surface-active; border: 1px solid (border|accent-border)` — which is
-    // `proto:4752`'s bonus row byte for byte. The two lists ARE one row in the reference, and
-    // ours drew them as two: `ChecklistCardRow` above, `ModifierLibraryRow` below, with
-    // different metrics, a different fill and a different selected treatment.
-    //
-    // ASSERTED AS ONE COMPONENT WITH THREE CALLERS, for the reason the bonus assertion above
-    // records: a class-only assertion is satisfied by a third copy of the markup, and a third
-    // modifier row is precisely what the ruling forbids.
     assert.equal(
       (toolRequirementsSource.match(/<ModifierLibraryRow/g) || []).length,
       2,
@@ -3510,9 +3257,7 @@ describe('CraftingSystemManager source contract', () => {
       toolRequirementsSource.includes("'data-tool-prerequisite-row': option.id"),
       'each prerequisite row names the entry it stands for, so a frame can select one'
     );
-    // The IMPORT and the ELEMENT, not the name: the tab's docblock records the ruling that
-    // retired that row, and an assertion that reds on a historical note is an assertion that
-    // gets satisfied by deleting the explanation.
+    // The IMPORT and the ELEMENT, not the name.
     assert.ok(
       !/import ChecklistCardRow|<ChecklistCardRow/.test(toolRequirementsSource),
       'the bespoke checklist row is gone from the tab, not merely unused beside the shared one'
@@ -3523,9 +3268,6 @@ describe('CraftingSystemManager source contract', () => {
         'left standing with no caller is how a fourth row comes back by copy'
     );
     // THE TRAILING CONTROL IS A REAL CHECKBOX, through the manager's one selection primitive.
-    // A multi-select list needs a checkbox per row with a label; the bonus list's radio would
-    // make the set single-select, and a `role="checkbox"` wrapper would be the nested-control
-    // trap the row's own header records.
     assert.ok(
       toolRequirementsSource.includes('<SelectionCheckbox'),
       'the prerequisite row trails the shared selection checkbox'
@@ -3536,12 +3278,6 @@ describe('CraftingSystemManager source contract', () => {
     );
 
     // ── TWO HEADINGS THE DESIGN DOES NOT DRAW (issue 1373, maintainer round 5) ────────────
-    //
-    // `proto:2326` goes from the section header row STRAIGHT to the list at `proto:2328`: there
-    // is no eyebrow between them. And `proto:2334` is a single muted sentence — "All selected
-    // prerequisites are required (AND). When a character fails them:" — immediately followed by
-    // the two-column grid at `proto:2336`, where ours split one sentence into a statement plus a
-    // second uppercase eyebrow above the pair.
     assert.ok(
       !toolRequirementsSource.includes('WhichPrerequisites'),
       'no `WHICH PREREQUISITES` eyebrow: the design heads the list with nothing'
@@ -3561,19 +3297,7 @@ describe('CraftingSystemManager source contract', () => {
       'All selected prerequisites are required (AND). When a character fails them:',
       '`proto:2334` states the AND rule and introduces the gate pair in ONE sentence'
     );
-    // ── THE ROW'S TWO VARIANTS ARE DECLARED, DEFAULTED AND NAMED FOR WHAT THEY MEAN ──────
-    // (issue 1373, maintainer round 6.)
-    //
-    // Round 5 recorded two DEVIATIONS from the reference on this row: `proto:2331` leads with the
-    // box where ours trailed it, and `proto:2333` stacks the name over the expression where ours
-    // set them on one line. The argument for recording rather than fixing them was that a row
-    // serving both lists would be "two rows wearing one name" — which holds against a single
-    // fixed shape and not against declared variants, the answer this epic already reached for a
-    // different primitive.
-    //
-    // So the row takes two props, both defaulted to the shipped rendering. NAMED FOR WHAT THEY
-    // MEAN: `controlPlacement` and `textLayout` describe the row, where a `variant="prerequisite"`
-    // would describe a CALLER and would have to grow a value per screen that ever adopts it.
+    // ── THE ROW'S TWO VARIANTS ARE DECLARED.
     const modifierRowSource = readFileSync(
       resolve(repoRoot, 'src/ui/svelte/apps/manager/ModifierLibraryRow.svelte'),
       'utf8'
@@ -3602,8 +3326,6 @@ describe('CraftingSystemManager source contract', () => {
     // AND THE PREREQUISITE LIST IS THE ONE THAT OPTS IN. The bonus list one section below and
     // the Checks Studio one screen away both pass NEITHER, which is what makes the defaults
     // load-bearing rather than decorative.
-    // READ OFF THE ELEMENTS, not off the file. The tab's own docblock names both props in prose,
-    // so a raw count of the attribute text counts the explanation as a call site.
     const modifierRowTags = toolRequirementsSource.match(/<ModifierLibraryRow[^>]*>/g) || [];
     assert.equal(modifierRowTags.length, 2, 'the tab draws the shared row twice');
     const optedIn = modifierRowTags.filter((tag) => /controlPlacement|textLayout/.test(tag));
@@ -3636,8 +3358,6 @@ describe('CraftingSystemManager source contract', () => {
       'the gate group keeps a legend for a screen reader even though nothing paints it'
     );
     // AND THE EMPTY LIBRARY NAMES ITS ROUTE, exactly as the bonus section below states its own.
-    // At SYSTEM scope the card head is spent on the inherit row, so the section's subtitle —
-    // the only other place the route is written — does not render at all there.
     assert.equal(
       lang.FABRICATE.Admin.Manager.Tools.Editor.NoPrerequisites,
       'No character prerequisites are defined in this world yet. They are defined under World, ' +
@@ -3661,7 +3381,7 @@ describe('CraftingSystemManager source contract', () => {
       2,
       'the manager root should pass the world modifier roster to BOTH Tool requirement scopes'
     );
-    // ── EVERY BEHAVIOUR SECTION IS A CARD, NOT A BARE HEADING (issue 1373) ────────────────
+    // ── EVERY BEHAVIOUR SECTION IS A CARD.
     // This used to require a `manager-tool-section-heading` block — an unenclosed `<h3>` with a
     // glyph and a hint, sitting on the page background above loose controls. The design encloses
     // each section in its own bordered, filled card whose head states the section, whether this
@@ -3690,8 +3410,7 @@ describe('CraftingSystemManager source contract', () => {
       ['prerequisites', 'bonus'],
       'and Requirements owns the other two'
     );
-    // THE SWITCH IS THE SHIPPED PRIMITIVE, not a second one. `stateChip={false}` is the essence
-    // rules editor's own use of it: the enclosing card already states the resolution in its pill.
+    // THE SWITCH IS THE SHIPPED PRIMITIVE.
     assert.ok(
       toolInheritCardSource.includes("import InheritRow from '../scoped/InheritRow.svelte';") &&
         toolInheritCardSource.includes('stateChip={false}'),
@@ -3706,13 +3425,7 @@ describe('CraftingSystemManager source contract', () => {
       !toolBreakageSource.includes('BreakageKicker'),
       'Breakage should not restore the redundant BREAKAGE kicker'
     );
-    // ── THE LINKED-ITEM CARD IS NOT AT SYSTEM SCOPE, AND THAT IS THE ASSERTION (issue 1373) ──
-    // These four used to require the drop zone, the copy-uuid action, the unlink action and the
-    // replace hint on THIS tab. They were a capability the model forbids: identity is
-    // world-scoped, so a crafting system must not be able to re-point which world Item a Tool
-    // IS. The card moved whole to the world Tool entry, and the requirements below follow it
-    // there rather than being deleted — a removed assertion proves nothing about where the
-    // capability went.
+    // ── THE LINKED-ITEM CARD IS NOT AT SYSTEM SCOPE.
     assert.ok(
       !toolSystemScopeSource.includes('<ItemDropZone'),
       'the system-scope band must not carry a source drop zone'
@@ -3723,16 +3436,12 @@ describe('CraftingSystemManager source contract', () => {
         !toolSystemScopeSource.includes('onCopySourceUuid'),
       'nor any of the three source-link callbacks'
     );
-    // THERE IS NO OVERVIEW TAB AT SYSTEM SCOPE AT ALL. The tab strip is three tabs, opening on
-    // Breakage: identity is world scope's, so a tab for it here would have nothing to put on it.
+    // THERE IS NO OVERVIEW TAB AT SYSTEM SCOPE AT ALL. The tab strip is three tabs.
     assert.ok(
       !toolEditorTabsSource.includes("'overview'"),
       'the system tab strip must not declare an Overview tab'
     );
-    // THE DECLARATION FORM IS THE `EditorTabs` PRIMITIVE'S (issue 1038), not the tuple array
-    // this strip hand-rolled: the primitive takes `{id, icon, labelKey, label}` records. What
-    // is asserted is unchanged - three tabs, in this order, and no fourth - because the SET is
-    // this file's contract and the shape it is written in is the primitive's.
+    // THE DECLARATION FORM IS THE `EditorTabs` PRIMITIVE'S (issue 1038).
     assert.match(
       toolEditorTabsSource,
       /const TABS = \[\s*\{\s*id: 'breakage'[\s\S]*?id: 'requirements'[\s\S]*?id: 'validation'/,
@@ -3747,8 +3456,7 @@ describe('CraftingSystemManager source contract', () => {
       toolEditorTabsSource.includes("activeTab = 'breakage'"),
       'and must default to Breakage rather than a tab that no longer exists'
     );
-    // NO BARE `Delete` IN THE SYSTEM HEADER, and an explained removal callout instead. `Delete`
-    // names the WORLD record; what system scope can do is stop using the Tool here.
+    // NO BARE `Delete` IN THE SYSTEM HEADER.
     assert.ok(
       !toolEditSource.includes('data-tool-editor-delete'),
       'the system header must not carry a bare Delete'
@@ -3794,8 +3502,6 @@ describe('CraftingSystemManager source contract', () => {
       'without reviving the removed source picker'
     );
     // THE SYSTEM LABEL FIELD SURVIVES, and names itself as an OVERRIDE of the world value.
-    // The maintainer's ruling keeps both fields; what was wrong was that neither scope's copy
-    // acknowledged the other.
     assert.ok(
       toolSystemScopeSource.includes('data-tool-label'),
       'the per-system display-label override still ships'
@@ -3891,10 +3597,6 @@ describe('CraftingSystemManager source contract', () => {
     }
     // The CSS column release and this aside suppression are ONE decision expressed
     // twice; doing only the first leaves an empty 300px inspector holding the strip.
-    // Issue 1362: a MEMBER of `FULL_WIDTH_VIEWS`, and specifically of its SELF-OWNED
-    // three-track class — Knowledge suppresses the aside AND keeps three tracks, repurposing
-    // the third column for its detail pane. Asserting the class is what stops a later change
-    // releasing its column to two tracks and clipping that pane at the 1024px minimum.
     assert.ok(
       /id: 'knowledge',\s*\n\s*layoutClass: 'self-owned-3-track'/.test(rootSource) &&
         rootSource.includes('class="manager-inspector"'),
@@ -3920,17 +3622,13 @@ describe('CraftingSystemManager source contract', () => {
     ]) {
       assert.ok(knowledgeSource.includes(snippet), `KnowledgeView should include ${snippet}`);
     }
-    // The default tab is seeded ONCE from the store, never derived live from the
-    // definition count: a GM authoring the system's first recipe item elsewhere
-    // would otherwise yank the open tab and silently disarm an armed row.
+    // The default tab is seeded ONCE from the store.
     assert.ok(
       knowledgeSource.includes('let tabSeeded = $state(false)'),
       'the default tab should be seeded once on surface entry'
     );
 
-    // The armed control is a REAL focusable button, and its token is keyed on the
-    // target document id — never a row index, which the asynchronous re-projection
-    // would turn into a destructive misfire.
+    // The armed control is a REAL focusable button.
     assert.ok(
       armedDangerButtonSource.includes('<button\n  bind:this={element}\n  type="button"'),
       'the armed confirmation should be a real button element'
@@ -4011,11 +3709,7 @@ describe('CraftingSystemManager source contract', () => {
       appSource.includes("if ('flags' in diff) {"),
       "updateActor re-projects knowledge only on a 'flags' diff"
     );
-    // `scheduleKnowledgeRefresh` is a TOTAL no-op unless the Knowledge surface is open, so
-    // the same diff must ALSO mark the Recipe Studio's learned-recipe index stale — that
-    // index is what the delete card's "Will be forgotten by N characters" counts through
-    // (issue 1132, review round). Marking is all it does: `updateActor` fires for every
-    // module's flag writes, so rebuilding here would be a world walk per foreign write.
+    // `scheduleKnowledgeRefresh` is a TOTAL no-op unless the Knowledge surface is open.
     assert.ok(
       appSource.includes(
         'const markLearnerIndexStale = () => this._adminStore?.markLearnedRecipeIndexStale?.();'
@@ -4026,8 +3720,7 @@ describe('CraftingSystemManager source contract', () => {
       appSource.includes('markLearnerIndexStale();\n        reprojectKnowledge();'),
       'and the flags branch does both'
     );
-    // Parent CRUD is load-bearing, not belt-and-braces: an `Actor.create` carrying
-    // `items[]` fires createActor and ZERO createItem.
+    // Parent CRUD is load-bearing, not belt-and-braces.
     assert.ok(
       appSource.includes(
         "...['createActor', 'deleteActor'].map((hook) => [hook, Hooks.on(hook, reprojectOnActorCrud)])"
@@ -4043,8 +3736,7 @@ describe('CraftingSystemManager source contract', () => {
       assert.ok(appSource.includes(`'${hook}'`), `${hook} is registered`);
     }
 
-    // EVERY `_userHooks` entry is an `[hookName, id]` tuple, and the unregister side
-    // destructures exactly that shape. A bare id makes it destructure `undefined`.
+    // EVERY `_userHooks` entry is an `[hookName, id]` tuple.
     const hooksBlock = appSource.slice(
       appSource.indexOf('this._userHooks = ['),
       appSource.indexOf('_unregisterUserHooks() {')
@@ -4064,9 +3756,7 @@ describe('CraftingSystemManager source contract', () => {
       'the unregister side destructures the tuple'
     );
 
-    // The GM gate is `isGM`, NOT `activeGM`: this is a single-client, user-initiated
-    // mutation from a GM-only Application, and `activeGM` would lock out the assistant
-    // GMs `show()` already admits.
+    // The GM gate is `isGM`, NOT `activeGM`: this is a single-client.
     assert.ok(
       appSource.includes('if (game.user?.isGM !== true)') &&
         appSource.includes('KNOWLEDGE_MESSAGES.gmOnly'),
@@ -4077,8 +3767,7 @@ describe('CraftingSystemManager source contract', () => {
       false,
       'the Knowledge seam must never gate on activeGM'
     );
-    // All four mutating methods reach that gate — directly, or through the shared
-    // `_knowledgeTarget` resolver which calls it first.
+    // All four mutating methods reach that gate — directly.
     for (const method of [
       '_expendRecipeItemUse({',
       '_deleteOwnedRecipeItem({',
@@ -4100,8 +3789,7 @@ describe('CraftingSystemManager source contract', () => {
       '_knowledgeTarget itself runs the GM gate before any document lookup'
     );
 
-    // The Foundry-free mutation bodies live in the collaborator, so the seam only
-    // resolves documents and delegates.
+    // The Foundry-free mutation bodies live in the collaborator.
     assert.ok(
       appSource.includes(
         "} from './svelte/apps/manager/knowledge/knowledgeMutations.js';"
@@ -4118,7 +3806,6 @@ describe('CraftingSystemManager source contract', () => {
     }
 
     // The roster is player characters only — the same predicate the Access roster uses.
-    //
     // ANTI-PIN (issue 1024). The old assertion pinned the exact
     // `game.fabricate?.isPlayerCharacterActor?.(actor) ?? actor?.type === 'character'`
     // reach-around this change deletes. Replacing it with a positive
@@ -4156,9 +3843,6 @@ describe('CraftingSystemManager source contract', () => {
   // `rawLearned` fixture, so it proves the ladder and the render but never the collection; the
   // Foundry step opens no Knowledge row for its throwaway actor; and the View Lab frame is a
   // screenshot, not a gate.
-  //
-  // The expected set is DERIVED from the ladder's own source rather than restated, so a field
-  // added to the ladder later cannot be forgotten here either.
   it('names every learned-entry field the display ladder reads', () => {
     const studioSource = readFileSync(resolve(knowledgeComponentDir, 'knowledgeStudio.js'), 'utf8');
     // Walked to a FIXED POINT from the projection the collected rows are fed to: every
@@ -4206,9 +3890,7 @@ describe('CraftingSystemManager source contract', () => {
         `the collector's allowlist drops \`${field}\`, which the learned-row ladder reads: the row falls silently to an earlier rung`
       );
     }
-    // Named for their own sake as well as by derivation: these two are the pair the ladder
-    // reads STRICTLY (`granted === true`, `typeof grantedBy === 'string'`), so they are also
-    // the pair a `String(...)` or `|| ''` default here would quietly make plausible.
+    // Named for their own sake as well as by derivation.
     assert.ok(
       readFields.has('granted') && readFields.has('grantedBy'),
       'the grant rungs are still part of the ladder this derivation walks'
@@ -4250,10 +3932,7 @@ describe('CraftingSystemManager source contract', () => {
       rootSource.includes('class="manager-rail-toggle manager-scope-collapse"'),
       'the scope-card header should render the shared collapse/expand control'
     );
-    // COUNTED, not merely present (issue 1213 review). The control is written TWICE, once per
-    // `{#if selectedSystem}` scope-card branch, and an `includes` check is satisfied by either
-    // one alone — which is how deleting the lock attributes from the no-system branch survived
-    // the whole suite. Both sites read the DISPLAYED state and both are inert under the lock.
+    // COUNTED, not merely present (issue 1213 review). The control is written TWICE.
     // `(?<![-\w])` because `aria-disabled={railLockedOpen}` CONTAINS `disabled={railLockedOpen}`,
     // so a plain substring count reports four sites for two and reads as a pass.
     const occurrences = (attribute) =>
@@ -4294,22 +3973,7 @@ describe('CraftingSystemManager source contract', () => {
   });
 });
 
-/**
- * The world scoped-entity shell's HAND-MAINTAINED MIRRORS (issue 1362, epic 1357).
- *
- * Every assertion here guards a mirror between two files that no compiler and no mounted test
- * can see, and each one has already been wrong once:
- *
- *  - `ScopedEntityPreview`'s class stem is a PROP, so the five class names it renders are built
- *    at runtime and Svelte cannot check them against a stylesheet. Its docblock asserted both
- *    stems were declared in `styles/fabricate.css` while the DEFAULT stem had no rules at all,
- *    and nothing failed - the only shipped caller passes the tool stem.
- *  - the seven placeholder pages are four-value mirrors of a route token, and `npm test` renders
- *    none of them: `data-scoped-page` appears only in the View Lab registry, which is a capture
- *    gate rather than a unit gate. A swapped `titleKey` between two pages ships green.
- *  - the entry routes' breadcrumb carries its catalogue's own lang key, which is a second copy
- *    of the key `viewTitle` resolves that catalogue's header with.
- */
+/** The world scoped-entity shell's HAND-MAINTAINED MIRRORS (issue 1362, epic 1357). */
 describe('world scoped-entity source contract (issue 1362)', () => {
   const scopedDir = resolve(repoRoot, 'src/ui/svelte/apps/manager/scoped');
   const previewSource = readFileSync(resolve(scopedDir, 'ScopedEntityPreview.svelte'), 'utf8');
@@ -4324,17 +3988,13 @@ describe('world scoped-entity source contract (issue 1362)', () => {
     'the manager root'
   );
 
-  // Every class the manager stylesheet declares a rule for, as a `.fabricate-manager .<class>`
-  // subject. Built FROM the sheet rather than grepped per name, so the non-vacuity control below
-  // can prove the lookup is capable of answering "no".
+  // Every class the manager stylesheet declares a rule for.
   const declaredManagerClasses = new Set(
     [...fabricateCss.matchAll(/\.fabricate-manager\s+\.([a-z0-9-]+)/g)].map((match) => match[1])
   );
 
   /**
-   * The SEVEN class names `ScopedEntityPreview` renders for a given stem, derived from the
-   * component's own markup rather than restated here: a list restated in this file would be a
-   * third copy of the mirror it exists to guard.
+   * The SEVEN class names `ScopedEntityPreview` renders for a given stem.
    *
    * @param {string} stem
    * @returns {string[]}
@@ -4352,12 +4012,7 @@ describe('world scoped-entity source contract (issue 1362)', () => {
       'the shell renders the bare stem as a class, which the derivation below depends on'
     );
     const defaultStem = previewSource.match(/classPrefix = '([a-z-]+)'/)?.[1];
-    // THE TOOL RAIL'S STEM IS ITS OWN PROP DEFAULT NOW, not a literal it hands down (issue 1373's
-    // parity round). `manager-tool-preview` carries the system Tool Studio's GRID PLACEMENT
-    // (`grid-column: 3; grid-row: 2 / 4`) and its filled panel surface, so handing it to the
-    // world Tool entry — whose column is a two-track grid — placed that rail in an implicit
-    // third column off the side of its own layout. The world entry passes the DEFAULT stem
-    // instead, which is why both stems still have to be declared.
+    // THE TOOL RAIL'S STEM IS ITS OWN PROP DEFAULT NOW.
     const toolStem = toolPreviewSource.match(/classPrefix = '([a-z-]+)'/)?.[1];
     assert.equal(defaultStem, 'manager-scoped-preview');
     assert.equal(toolStem, 'manager-tool-preview');
@@ -4366,9 +4021,7 @@ describe('world scoped-entity source contract (issue 1362)', () => {
       'the world Tool entry renders the shared rail under the placement-free default stem'
     );
 
-    // NON-VACUITY FIRST. The lookup is a set built by regex over a 20,000-line stylesheet, and a
-    // regex that stopped matching would make every assertion below pass against an empty
-    // question. So the set has to be large, and it has to be able to answer no.
+    // NON-VACUITY FIRST. The lookup is a set built by regex over a 20,000-line stylesheet.
     assert.ok(
       declaredManagerClasses.size > 200,
       'the stylesheet scan found almost nothing, so it cannot be trusted to find an omission'
@@ -4381,10 +4034,7 @@ describe('world scoped-entity source contract (issue 1362)', () => {
 
     for (const stem of [defaultStem, toolStem]) {
       const classes = renderedPreviewClasses(stem);
-      // SEVEN since issue 1371's parity round: the shell gained a `-scope-note` line under the
-      // head block and a `-fact-empty` sentence for a fact group with no rows. The number is
-      // pinned rather than derived so a region ADDED without a rule is a failure here rather
-      // than a silently unstyled block on six editors.
+      // SEVEN since issue 1371's parity round.
       assert.equal(
         classes.length,
         7,
@@ -4403,8 +4053,7 @@ describe('world scoped-entity source contract (issue 1362)', () => {
   });
 
   /**
-   * The `{key, fallback}` pair `viewTitle` declares for each world scoped-entity route, keyed by
-   * route token.
+   * The `{key, fallback}` pair `viewTitle` declares for each world scoped-entity route.
    *
    * @returns {Map<string, {key: string, fallback: string}>}
    */
@@ -4434,14 +4083,6 @@ describe('world scoped-entity source contract (issue 1362)', () => {
     // below to fewer than seven and reds a lane that did everything right — and reading only the
     // second would do the same to the four that have not been replaced yet. The swap detector has
     // to survive the transition it exists to police, so it resolves either.
-    //
-    // THE CONSTANT IS READ FIRST, and the order is load-bearing rather than arbitrary (issue
-    // 1373). The attribute regex is unanchored, so on a REPLACED page it matches the first
-    // `icon="…"` anywhere in the file — which on a page whose inspector pins an action button is
-    // that BUTTON'S glyph, not the route's. Two replaced pages that happen to pin the same verb
-    // then report the same icon and the distinctness assertion reds on markup that is correct.
-    // A page that declares the constant has stated the fact deliberately; a delegating page has
-    // no constant to find and still falls through to its attribute.
     const declared = (source, attribute, constant) =>
       source.match(new RegExp(`const ${constant} = '([^']+)'`))?.[1] ??
       source.match(new RegExp(`${attribute}="([^"]+)"`))?.[1];
@@ -4560,11 +4201,6 @@ describe('world scoped-entity source contract (issue 1362)', () => {
     // AND THE SUBJECT REACHES IT WITHOUT REOPENING THIS FILE. A catalogue row in PR 6a calls
     // `onOpenEntry(entityId)`; the shell records the subject, performs the navigation through
     // the confirm-discard gate, and resolves the name out of the published world corpus.
-    //
-    // THE DATA SEAM SITS BETWEEN THE TAG AND THE ROUTE SEAM (issue 1374), so it is matched
-    // rather than skipped over: a catalogue reached through `onOpenEntry` and handed no world
-    // corpus has no rows to open an entry FROM, which is the gap this pairing now records.
-    // WHICH bundle each site takes is `manager-scoped-prop-contract.test.js`'s subject.
     for (const [catalogue, entry] of [
       ['WorldComponentCataloguePage', 'world-component-entry'],
       ['WorldEssenceCataloguePage', 'world-essence-entry'],

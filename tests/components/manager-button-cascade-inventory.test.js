@@ -1,25 +1,5 @@
 /**
  * The cascade guard for the `manager-button` → `ManagerButton` sweep (issue 1118).
- *
- * ── WHY IT EXISTS ────────────────────────────────────────────────────────────────────────
- * Converting a hand-written manager button adds a second class, `fab-manager-button`, and
- * `styles/fabricate.css` declares `.fabricate-button.manager-button.fab-manager-button` at
- * (0,3,0). EVERY rule a converted button matches is therefore re-arbitrated, and a rule that
- * wins today only because it appears later in the sheet loses the moment the sweep is licensed
- * to move declarations around.
- *
- * Three rounds of plan review each enumerated that hazard BY HAND, and each round found a band
- * the previous had missed: bespoke classes at (0,2,0); then ancestor-context rules at (0,3,0)
- * that tie and lose on source order, across 27 sites in one `<div>`; then thirteen more
- * selectors at that level plus one inside a container everybody had certified as safe. The
- * defect is the method, not the diligence — so this file stops enumerating and starts
- * measuring. `tests/helpers/manager-button-cascade.js` derives the set by construction from
- * the real sheet, the real compiled scoped component sheets, and the real markup.
- *
- * ── IT IS A GUARD, AND IT GUARDS A NARROWER THING THAN IT LOOKS ──────────────────────────
- * The shape is `tests/components/mounted-harness-primitive-allowlist.test.js`'s: a reviewed
- * list held next to a mechanically derived one, asserted equal.
- *
  * BE PRECISE ABOUT WHAT ENTERS THE DERIVED SET, because this docblock used to claim more than
  * the file delivers and a reviewer proved it by experiment: append a fresh
  * `.fabricate-manager .manager-header-actions .manager-button.is-ghost { font-size: 3rem }`
@@ -27,83 +7,6 @@
  * finds a call site by the literal `class="manager-button…"`, task 9 removed the last of
  * those, so `convertingSites` is empty and `atRisk` is empty BY CONSTRUCTION — a new rule
  * derives no candidate to be missing from the reviewed list.
- *
- * What the derived ⊆ reviewed half actually catches is a RETURNING RAW SITE: a hand-written
- * `class="manager-button"` re-entering `src/`, which re-populates the site set, makes rules
- * at risk again, and reds on the ones nobody has reviewed. That is a real regression class
- * and worth guarding; it is simply not the same one.
- *
- * WHAT FORWARD COVER THERE IS COMES FROM TWO OTHER PLACES, and neither is here:
- *  - the `convertedReach` re-derivation below, which walks the real tree per reviewed entry,
- *    so a rule whose reach changes reds even with no literal sites left; and
- *  - `manager-layout.test.js`'s disabled-invariant probe, which DERIVES its container list
- *    from the sheet and renders all six roles in every one of them, so an ancestor-context
- *    rule added later is measured in a real browser with no edit there. That probe is what
- *    caught the two container rules beating `.manager-button:disabled` after this instrument
- *    had scored both of them and reported neither.
- *
- * That probe covers ONE invariant — the disabled paint is role- and container-independent —
- * and the 3rem experiment above is deliberately outside it, because container GEOMETRY
- * legitimately varies: the drop inspector's stack states 28px, the Checks Studio's preset row
- * 30px, and a probe asserting one height everywhere would be asserting a rule the design does
- * not hold. Re-run the mutation against that probe and it stays green too. So the honest
- * position is that a new ancestor-context rule stating a NEW GEOMETRY has no automated cover
- * in this repository today; a new one stating resting PAINT does.
- *
- * The honest summary is the one the TERMINAL STATE section below already gives; this heading
- * used to contradict it two paragraphs earlier.
- *
- * ── THE DISPOSITIONS ─────────────────────────────────────────────────────────────────────
- * - `RECHAIN`  — at risk on a converting site. Re-chain it above the primitive or retire it.
- * - `INTENDED` — at risk, and that is the POINT: the primitive is designed to SUPERSEDE this
- *                rule, so re-chaining it would undo the conversion. This disposition is not
- *                in the assignment's original four; the tool forced it, because the derived
- *                set includes the base control rules and the Foundry `button` reset that the
- *                primitive exists to supersede, and filing those as `EXCLUDE` would confuse
- *                "must not be re-chained because it serves unconverted sites" with "must not
- *                be re-chained because winning is the design".
- *
- *                The stylesheet reconciliation widened it, deliberately and once, to cover a
- *                CONTAINER rule that states a value the primitive re-states identically with
- *                no ancestor requirement. `.manager-header-actions .manager-button` and the
- *                two knowledge clusters are that shape: superseding them is the design, the
- *                residual tie is provably zero-pixel, and they are what types a button the
- *                primitive does not render — a hand-written one during the sweep, or an
- *                `ArmedDangerButton`, which is held out of the conversion for good. Each such
- *                entry carries its own proof in `why`; none is a RECHAIN filed quietly.
- * - `EXCLUDE`  — would be at risk, but every site it reaches is a `SearchablePopover`
- *                `triggerClass` site that never gains `fab-manager-button`. Re-chaining it
- *                would repaint a control the sweep is not converting.
- * - `NO_CONFLICT` — reaches converting sites and is derived NOT at risk. Documented because
- *                the delta reasons about these rules; the list is deliberately not exhaustive.
- * - `DEAD`     — a real rule in the sheet with zero call sites in any population.
- *
- * ── THE TERMINAL STATE, AND WHY IT MOVES DISPOSITIONS ────────────────────────────────────
- * This instrument finds a call site by the LITERAL `class="manager-button…"` — which is
- * exactly the thing a conversion removes. Task 9 converted the last of the (then) 128, and the
- * post-plan batch above converts the one literal site issue #1286 landed on `main` after that
- * — caught by this file naming it on rebase, per its own non-vacuity floor below — so the only
- * literal sites left in `src/` are the 17 population-B `SearchablePopover` triggers and
- * `ArmedDangerButton`, and every rule in the sheet is now judged against those 18 alone. Two
- * things follow, and both are re-filings rather than changes of fact:
- *
- *  - A rule that still reaches one of the 18 and would lose to the primitive derives EXCLUDE,
- *    because "every site it reaches is unconverted" is now true of it. Nine entries moved
- *    INTENDED or NO_CONFLICT → EXCLUDE for that reason alone, including the base control
- *    rules and Foundry's `button` reset. Their meaning is unchanged — superseding them on a
- *    CONVERTED button is still the design — and EXCLUDE now carries the operative half:
- *    re-chaining one would repaint the 18 controls the sweep deliberately did not convert.
- *  - A rule that reaches NONE of the 18 derives no candidate at all, and the instrument cannot
- *    tell "alive, but only on converted buttons" from "dead" without being told. Filing those
- *    as DEAD would be a lie that costs the guard its teeth, so each names its `convertedReach`
- *    instead — which components render the buttons it reaches, and how many — and the tests
- *    below re-derive that from the tree. `.manager-setup-links .manager-button` was the first
- *    of these (task 7); task 9 made it the normal case.
- *
- * ── WHAT IT DOES NOT DECIDE ──────────────────────────────────────────────────────────────
- * Nothing about pixels. Specificity here is computed, not measured; `manager-layout.test.js`
- * remains the real-browser gate. This file tells that gate, and the sweep, where to look — and
- * the inventory it prints names its own blind spots rather than hiding them.
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -117,25 +20,12 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
 const cascade = managerButtonCascade();
 
-/**
- * The conversion LEDGER: the batches whose sites no longer appear in the derived corpus.
- *
- * A converted site stops being a call site in this instrument's terms — it no longer writes
- * `class="manager-button…"`, so nothing keys on it — while remaining one of the 129 the sweep
- * is accountable for (128 across the planned tasks 1-9, plus the one post-plan site issue
- * #1286 landed on `main` mid-sweep and this guard caught on rebase). Recording each landed
- * batch here is what lets the non-vacuity floor keep asserting the WHOLE population instead of
- * shrinking with it.
- *
- * It is not merely bookkeeping: the floor verifies every entry against the tree, so a batch
- * cannot book sites it did not convert, and cannot book a file it emptied by deleting controls.
- */
+/** The conversion LEDGER: the batches whose sites no longer appear in the derived corpus. */
 const CONVERTED_BATCHES = Object.freeze([
   Object.freeze({
     task: 5,
     files: Object.freeze([
-      // 39 sites — 30 `<button>` and 9 `<a href>` — including the five `.manager-header-actions`
-      // Backs whose forgotten `ghost` role this batch repairs.
+      // 39 sites — 30 `<button>` and 9 `<a href>`.
       Object.freeze({
         file: 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
         sites: 39,
@@ -145,16 +35,7 @@ const CONVERTED_BATCHES = Object.freeze([
   Object.freeze({
     task: 6,
     files: Object.freeze([
-      // 23 sites across eight browser views. Two carried a forgotten `primary`: the inline
-      // `Add` submits in the environment Settings tab.
-      //
-      // The batch converted a NINTH file, `GatheringRealmQuickList.svelte`, and its 24th site
-      // went with it: that component was imported by nothing under `src/` — #1283 moved realm
-      // authoring to world scope, replaced the surface with `GatheringRealmsTab.svelte` and
-      // left the file behind — so issue 1118 deleted it rather than converting dead code
-      // twice. The totals below drop by one site and one component to match; a conversion the
-      // sweep is no longer accountable for must leave the conserved quantity, or the floor
-      // would be defending a component that does not exist.
+      // 23 sites across eight browser views. Two carried a forgotten `primary`.
       Object.freeze({
         file: 'src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte',
         sites: 7,
@@ -177,9 +58,7 @@ const CONVERTED_BATCHES = Object.freeze([
   Object.freeze({
     task: 7,
     files: Object.freeze([
-      // 14 sites across the two library inspectors and the four shared shells — 11
-      // `<button>` and 3 `<a href>`. Two carried a forgotten `danger`: the Delete at the foot
-      // of each inspector's stacked action column.
+      // 14 sites across the two library inspectors and the four shared shells.
       Object.freeze({
         file: 'src/ui/svelte/apps/manager/recipes/RecipeBrowserInspector.svelte',
         sites: 6,
@@ -209,12 +88,7 @@ const CONVERTED_BATCHES = Object.freeze([
   Object.freeze({
     task: 8,
     files: Object.freeze([
-      // 14 sites across the recipe editor tree, all `<button>` — 13 booked here now, the
-      // fourteenth having merged into the shared validation surface at issue 1444 (below).
-      // Ten already carried
-      // `is-dashed` and repaint accent -> muted under task 4's reconciliation, which is the
-      // ruled outcome rather than a casualty. One carried a forgotten `dashed`: the "Add a
-      // step" at the foot of the Step durations accordion.
+      // 14 sites across the recipe editor tree, all `<button>` — 13 booked here now.
       Object.freeze({
         file: 'src/ui/svelte/apps/manager/recipe/RecipeIngredientGroupCard.svelte',
         sites: 4,
@@ -233,18 +107,11 @@ const CONVERTED_BATCHES = Object.freeze([
       }),
       Object.freeze({ file: 'src/ui/svelte/apps/manager/RecipeStepsCard.svelte', sites: 1 }),
       // REMOVED at issue 1444, and the removal is recorded rather than performed silently.
-      //
       // The entry was `recipe/RecipeValidationTab.svelte`, booked for the ONE `<ManagerButton>`
       // its issue rows rendered as the View deep-link. That tab renders through
       // `EditorValidationSurface` now, and the surface already draws that button from its OWN
       // booked site (task 7 above) — so the control did not change file, it MERGED into one
       // the ledger already holds, and the recipe tab renders no button of its own at all.
-      //
-      // That is the "the site left the product" case the totals paragraph below licenses, so
-      // the conserved pins move 129 -> 128 and 42 -> 41 rather than this entry being
-      // repointed. Booking it against the primitive instead would claim two converted sites
-      // for one rendered button and buy back a total that legitimately shrank; leaving it here
-      // fails outright, because the file now renders `<ManagerButton>` zero times.
       Object.freeze({
         file: 'src/ui/svelte/apps/manager/recipe/RecipeBooksScrollsTab.svelte',
         sites: 1,
@@ -258,16 +125,7 @@ const CONVERTED_BATCHES = Object.freeze([
   Object.freeze({
     task: 9,
     files: Object.freeze([
-      // 38 sites across the remaining eighteen components, all `<button>` — the sweep's tail,
-      // and the batch that takes the derived population to zero. Eight carried a forgotten
-      // role and one carried a MISSPELT one: `CompositionList`'s second Force add wrote
-      // `is-warning`, which the sheet declares nowhere, so it shipped with no warning
-      // treatment at all while `.manager-button.is-warning-action` sat in the sheet with no
-      // call site. It is the defect that put a sixth role in the primitive's vocabulary.
-      //
-      // One of the 38 is population C — the sweep's single backtick-template `class={…}`
-      // attribute, `ImportFolderMappingModal`'s Skip toggle. It converts like the rest; the
-      // template survives on the primitive's appending `class` prop.
+      // 38 sites across the remaining eighteen components, all `<button>`.
       Object.freeze({
         file: 'src/ui/svelte/apps/manager/ComponentEditView.svelte',
         sites: 4,
@@ -305,10 +163,7 @@ const CONVERTED_BATCHES = Object.freeze([
       Object.freeze({ file: 'src/ui/svelte/apps/manager/ImportReportModal.svelte', sites: 1 }),
       Object.freeze({ file: 'src/ui/svelte/apps/manager/InlineVocabularyAdd.svelte', sites: 1 }),
       Object.freeze({ file: 'src/ui/svelte/apps/manager/SystemOverviewView.svelte', sites: 1 }),
-      // REBOOKED AT 0 BY ISSUE 1517, not dropped. See the fifth licensed movement below: the
-      // environment editor's Validation tab adopted `EditorValidationSurface`, whose own row
-      // action renders the button now, so this file renders none directly. The row stays so it
-      // keeps answering the two ledger checks below.
+      // REBOOKED AT 0 BY ISSUE 1517, not dropped. See the fifth licensed movement below.
       Object.freeze({
         file: 'src/ui/svelte/apps/manager/environment/EnvironmentValidationTab.svelte',
         sites: 0,
@@ -340,23 +195,17 @@ const CONVERTED_BATCHES = Object.freeze([
   }),
 ]);
 
-// Code point, not `localeCompare`, for the same reason `sourceScan.js` gives: locale-dependent
-// ordering would make one corpus compare in two orders on two machines.
+// Code point, not `localeCompare`, for the same reason `sourceScan.js` gives.
 const byCodePoint = (left, right) => (left === right ? 0 : left < right ? -1 : 1);
 
-// The nine entries that changed disposition at task 9 all changed it for ONE reason, and it is
-// a fact about the corpus rather than about any of them: the conversion emptied the population
-// they were judged against. Hoisted so the reason is stated once and cannot drift between the
-// entries that share it.
+// The nine entries that changed disposition at task 9 all changed it for ONE reason.
 const MOVED_POPULATION =
   'MOVED to EXCLUDE by task 9, on the POPULATION and not on the reasoning: superseding this ' +
   'rule on a converted button is still the design, but the last literal site converted, so ' +
   'every site the tool can still derive it to reach is one of the 18 the sweep holds back. ';
 
 const SHEET = 'styles/fabricate.css';
-// The sweep's one population-C site: the only `class={…}` template that ever carried the
-// contract. Named here because the vacuity floor asserts it survived the conversion as a
-// template rather than being flattened into a literal or deleted.
+// The sweep's one population-C site.
 /**
  * The one population-B site issue 1371 r10 converted onto `SearchablePopover`'s `triggerButton`
  * form, and the site issue 1371 r13 then DELETED under maintainer ruling M13. Named here so the
@@ -371,18 +220,7 @@ const SEARCHABLE_POPOVER_FILE = 'src/ui/svelte/components/SearchablePopover.svel
 const POPULATION_C_FILE = 'src/ui/svelte/apps/manager/ImportFolderMappingModal.svelte';
 const globalRule = (selector) => `${SHEET}#${selector}`;
 
-/**
- * The class the conversion REMOVES from a call site, and the tag-free probe for it.
- *
- * Written as a token test over class-attribute VALUES rather than as the
- * `source.includes('class="manager-button')` prefix these clauses used before issue 1502, for two
- * reasons that arrived together. The prefix is defeated by the re-root: a raw site returning today
- * spells `class="fabricate-button manager-button …"`, which the prefix cannot see, so a booked-as-
- * converted file could quietly regain a literal control with this gate green. And the prefix
- * spelled the literal IN THIS FILE, where the area-scope gate's fixture census then had to read it
- * as a fixture attribute no class could repair — the census counts elements, not intentions, and a
- * message string is neither.
- */
+/** The class the conversion REMOVES from a call site, and the tag-free probe for it. */
 const CONTRACT_CLASS = 'manager-button';
 const writesContractLiteral = (source) =>
   [...source.matchAll(/class="([^"]*)"/g)].some((match) =>
@@ -390,54 +228,9 @@ const writesContractLiteral = (source) =>
   );
 const scopedRule = (component, selector) => `src/ui/svelte/apps/manager/${component}#${selector}`;
 
-/**
- * The reviewed cascade list.
- *
- * Seeded from what plan review r3 established, then CORRECTED by the tool. Every correction is
- * called out in its `why`, because the corrections are the reason this file exists.
- *
- * It shrank from 34 entries to 16 when the stylesheet was reconciled against it, and the
- * shrinkage is the deliverable: a rule chained above the primitive keys on `fab-manager-button`
- * and therefore leaves the derived candidate set entirely, and a retired one leaves the sheet.
- * The list and the sheet move in ONE commit for that reason — every edit to either changes the
- * derived set, so a stale entry here reds this gate instead of shipping a silent repaint.
- */
+/** The reviewed cascade list. */
 const REVIEWED = [
   // ── RECHAIN: the three that live in a component's own <style> block ───────────────────
-  //
-  // Task 4 reconciled `styles/fabricate.css` and owns nothing else, so these three are the
-  // only RECHAIN entries left: each is authored inside the component it styles, and each
-  // travels with that component's conversion rather than with the sheet.
-  // `BulkEditPanelShell.svelte`'s `.fab-bulk-edit-apply` was the sharpest of these and is
-  // DISCHARGED (issue 1118, task 7). At (0,2,0) it lost min-height 38px and font-size 0.78rem
-  // outright, against a source comment forbidding exactly that because Apply swaps slots with
-  // the inspector's primary. It converted with its component and is now
-  // `:global(.fabricate-manager .manager-button.fab-manager-button.fab-bulk-edit-apply)` —
-  // (0,4,0), so it beats the primitive on specificity — and its key compound demands
-  // `fab-manager-button`, which makes it a PRIMITIVE rule here rather than a candidate.
-  // Its ancestor is the APPLICATION root, not the family root issue 1502 gave the sheet's own
-  // family rules. That is deliberate: this is a caller override authored in the component's
-  // own `<style>` block, one of four halves that only move together, and naming the ancestor
-  // is what its source comment argues for. (0,4,0) either way, so nothing above changes.
-  //
-  // The `:global()` half is the part this instrument could NOT have told anyone, and it is
-  // worth recording where the next batch will look: a SCOPED rule cannot reach a converted
-  // button at all, whatever its specificity, because Svelte stamps its hash onto the elements
-  // a component writes and not onto a child component's internals. That is a reach question
-  // rather than a cascade question, so it has its own guard —
-  // `tests/components/manager-button-scoped-class-reach.test.js` — which found the same
-  // mistake already shipped in `GatheringEconomyView`'s discharge above.
-  // `GatheringEconomyView.svelte`'s `.manager-economy-bulk-save` was the third of these and is
-  // DISCHARGED (issue 1118, task 6). It converted with its component and its scoped selector was
-  // re-chained onto `.manager-button.fab-manager-button.is-primary`, which compiles to (0,5,0)
-  // and so beats both the primitive control and its `is-primary` companion on specificity
-  // instead of on injection order. Its key compound now demands `fab-manager-button`, so it is
-  // a PRIMITIVE rule here rather than a candidate, and leaves the derived set entirely.
-  // `ImportFolderMappingModal.svelte`'s `:global(.manager-import-mapping-row .manager-button)`
-  // was the LAST RECHAIN entry and is DISCHARGED (issue 1118, task 9), so this list now holds
-  // none. It pinned a 28px control for the dense mapping row, tied the primitive at (0,3,0)
-  // and kept its geometry only on injection order.
-  //
   // It did NOT re-chain in one piece, and the reason is worth keeping: a third control inside
   // that row is `RecipeRoutingAssignment`'s "Add tag", a `SearchablePopover` trigger rendered
   // from a class STRING. It is population B, it never gains `fab-manager-button`, and a single
@@ -498,17 +291,7 @@ const REVIEWED = [
       {
         file: 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
         container: 'manager-header-actions',
-        // 28 -> 29 with issue 1372's ONE world-essence header action of this file's own — the
-        // catalogue's `+ New essence` — and back to 28 at its round-8 parity pass, which deleted
-        // the SYSTEM Essence Rules header's `+ Create essence`: the reference's Essence Rules
-        // header carries nothing on the right, because an essence is a world record and the only
-        // create is the catalogue's. The entry's `Back`/`Save` pair renders into this same
-        // container from `scoped/ScopedEntryHeaderActions.svelte`, which slots into the div and
-        // declares no region of its own, so it is the `ComponentEditorHeader` case the `why`
-        // below already records — reached by the rule, not attributable to this file by a static
-        // count. The number is the container's own population read from the tree, so it moves
-        // whenever a header branch gains or loses a control it renders itself.
-        //
+        // 28 -> 29 with issue 1372's ONE world-essence header action of this file's own.
         // 28 -> 29 with issue 1371's C1 `+ Add from catalogue` (`proto:1046`), the `components`
         // branch's first header action of its own: the system Components header carried nothing
         // on the right, so the only route to adopt a world component into the system was the
@@ -519,17 +302,7 @@ const REVIEWED = [
       {
         file: 'src/ui/svelte/apps/manager/ToolEditView.svelte',
         container: 'manager-header-actions',
-        // 3 -> 4 with issue 1373's `World Tool` header action: the rules LIST already
-        // advertised `Edit the world Tool`, and the editor behind `Edit rules` had no route to
-        // that record, so the list promised a destination the next screen could not reach.
-        //
-        // 4 -> 3 in the same issue, once the rules editor was rebuilt against its design. The
-        // header lost `Delete`: at SYSTEM scope the destructive verb is `Remove from system`,
-        // an explained callout at the foot of the Breakage tab, because removing a Tool from
-        // one system and deleting the world record are different acts and a bare header button
-        // could say which it was. `Delete` survives only on the world Tool entry, which is the
-        // scope that owns the record. So this container renders `World Tool`, `Back to Tool
-        // Rules` and `Save rules`.
+        // 3 -> 4 with issue 1373's `World Tool` header action.
         buttons: 3,
       },
     ],
@@ -552,14 +325,7 @@ const REVIEWED = [
         file: 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
         container: 'manager-header-actions',
         role: 'primary',
-        // 14 -> 15 with issue 1372's world-essence header create action, and back to 14 at its
-        // round-8 parity pass, which deleted the SYSTEM Essence Rules header's `+ Create essence`
-        // — the reference's Essence Rules header carries nothing on the right, and an essence's
-        // identity is a world record no system-scope screen authors.
-        //
-        // 14 -> 15 with issue 1371's C1 `+ Add from catalogue`, which is the header's loudest
-        // action on the Components route and is therefore booked in both this entry and the
-        // unqualified one above it.
+        // 14 -> 15 with issue 1372's world-essence header create action.
         buttons: 15,
       },
       {
@@ -640,27 +406,6 @@ const REVIEWED = [
   },
 
   // ── EXCLUDE: reaches only population-B triggers ───────────────────────────────────────
-  //
-  // The three bare `is-dashed` rules below were INTENDED until task 8, and the move is the
-  // reconciliation finishing rather than a change of mind. Task 4 copied the primitive's
-  // control geometry and paint down onto this selector precisely so that the dashed
-  // `SearchablePopover` triggers — rendered from a class STRING, so they never gain
-  // `fab-manager-button` — would keep a complete treatment while population B stays deferred.
-  // While ten literal dashed buttons were still awaiting conversion the rules also reached
-  // them, and losing to the primitive's (0,4,0) companion with identical values was the thing
-  // worth recording. Task 8 converted the last of those ten, so every site these rules now
-  // reach is a population-B trigger and re-chaining any of them would repaint a control the
-  // sweep is not converting. That is the definition of EXCLUDE, and the EXCLUDE assertion
-  // re-derives it: it demands each rule still reach a site, and that no site it reaches
-  // converts. They are NOT dead — a dead rule is one nothing renders, and four triggers do.
-  // ── EXCLUDE, arrived at by task 9 emptying the converted half ─────────────────────────
-  //
-  // These six are the base control band, and every one of them was INTENDED or NO_CONFLICT
-  // until the last literal site converted. Nothing about them changed: the primitive still
-  // supersedes them on a converted button, which is still the design. What changed is the only
-  // population the tool can derive for them — the 17 population-B triggers and
-  // `ArmedDangerButton` — and against THAT population the operative instruction is EXCLUDE's:
-  // do not re-chain, because the 18 controls left would be repainted by it.
   {
     id: globalRule('.fabricate-manager button'),
     disposition: 'EXCLUDE',
@@ -899,7 +644,6 @@ const REVIEWED = [
     why: 'Travel parties override popover trigger, population B.',
   },
   // REMOVED at issue 1371 r10, and the removal is recorded rather than performed silently.
-  //
   // The two entries were `.manager-button.manager-world-component-register-action` and its
   // `:not(:disabled):hover`, dispositioned EXCLUDE one revision earlier because the world
   // Component catalogue`s `+ Register item` was a `SearchablePopover` `triggerClass` site —
@@ -909,13 +653,6 @@ const REVIEWED = [
   // site`s paint and took no disposition here at all: the instrument derived no call site for
   // them, and EXCLUDE — whose whole content is `reaches a site, and no CONVERTING one` — could
   // no longer be asserted of them.
-  //
-  // AND AT ISSUE 1371 r13 THE RULES ARE GONE FROM THE SHEET. Maintainer ruling M13 removed the
-  // control itself ("Remove the `+ Register Item` button next to the drop zone … and make the
-  // drop zone full-width"), and a paint rule for a control no screen renders is a dead rule, so
-  // both were deleted rather than left to the dead-class gate. There is nothing for this
-  // register to describe; the entry stays as a record so the next reader does not go looking
-  // for two rules that were never silently dropped.
   {
     id: globalRule('.fabricate-picker .manager-travel-picker-trigger'),
     disposition: 'EXCLUDE',
@@ -926,33 +663,10 @@ const REVIEWED = [
       'issue 1464 unscoped the family, which is the same (0,2,0) at the same position.',
   },
   // REMOVED at issue 1427, and the removal is recorded rather than performed silently.
-  //
   // The entry was `BulkDeleteCard.svelte#.fab-bulk-delete-card .manager-button`, dispositioned
   // EXCLUDE because its only site is `ArmedDangerButton`, which never gains the primitive class.
-  // That rule still EXISTS and still reaches that button; what changed is that this instrument
-  // can no longer SEE it. The card's root `<section>` became an `<InspectorCard>`, so the rule's
-  // ancestor compound is now `.manager-inspector-card.fab-bulk-delete-card` and the element
-  // carrying it is written by the primitive, from a `class={…}` expression. `providersFor`
-  // resolves an ancestor by the STATIC class tokens a parent component writes, finds none, and
-  // `siteMatch` returns `impossible` — so the rule drops out of `candidates` entirely rather
-  // than into `blindSpots`, and no disposition in this register describes "live, and invisible
-  // to the instrument".
-  //
-  // It is left out rather than re-dispositioned as DEAD, which would be false and would invite
-  // the next reader to delete a live rule. The loss is bounded and inert: arbitration only
-  // matters for CONVERTING sites and this rule has none, its declaration is pinned by
-  // `essence-studio-fidelity.test.js`, and whether it still REACHES its button is
-  // `manager-button-scoped-class-reach.test.js`'s question — which covers `<InspectorCard>` and
-  // did catch this rule going dead. Teaching `providersFor` about a class forwarded through a
-  // child component's `class` prop is the real repair, and it belongs to this instrument rather
-  // than to a card extraction.
 
-  // ── NO_CONFLICT: derived NOT at risk, and still rendered ──────────────────────────────
-  //
-  // `.manager-button:disabled`, `.is-danger:not(:disabled)` and `.is-subtle` were filed here
-  // and moved to EXCLUDE at task 9, because the only sites they can still be derived to reach
-  // are unconverted ones. Their reasoning is preserved at their new entries rather than
-  // summarised here.
+  // ── NO_CONFLICT: derived NOT at risk.
   {
     id: globalRule('.fabricate-button.manager-button.is-warning-action:not(:disabled)'),
     disposition: 'NO_CONFLICT',
@@ -961,13 +675,6 @@ const REVIEWED = [
     // emits this class, and the control that always meant to render it now does. Named the same
     // way the other converted-reach entries are, by the role prop rather than by a container,
     // because the role IS the reach.
-    //
-    // ONE caveat, recorded because it is a second defect on the same control and the reason
-    // this entry cannot rest on a mounted assertion: that Force add does not currently render in
-    // any state. It sits in `CompositionList`'s standalone Non-matching section, which the
-    // markup gates on `mode !== 'manual'`, while its own guard demands `mode === 'manual'`.
-    // Reported with the sweep; repairing it is a product decision about where a manual
-    // force-add belongs.
     convertedReach: [
       {
         file: 'src/ui/svelte/apps/manager/environment/CompositionList.svelte',
@@ -985,11 +692,7 @@ const REVIEWED = [
   {
     id: globalRule('.fabricate-button.manager-button.is-primary:not(:disabled)'),
     disposition: 'NO_CONFLICT',
-    // The primary paint reaches no LITERAL site at all now — no population-B trigger is a
-    // primary — so it is named the same way `.manager-setup-links .manager-button` below is,
-    // by counting the `role="primary"` props that render it. Three components, chosen because
-    // each is a different shape of primary: a browser's create action, a card header's, and a
-    // modal footer's commit.
+    // The primary paint reaches no LITERAL site at all now.
     convertedReach: [
       { file: 'src/ui/svelte/apps/manager/SystemsBrowserView.svelte', role: 'primary', buttons: 1 },
       {
@@ -1007,26 +710,10 @@ const REVIEWED = [
   // `.fabricate-manager .manager-add-button` was NO_CONFLICT here and is DISCHARGED (issue 1118,
   // task 6). It was RECHAIN at r3: at (0,2,0) it lost its width, padding and font-size to the
   // primitive and the `is-primary` companion, inside a 48px grid track that clipped the label.
-  // Task 4 retired all three — the pinned 48px box went with them, and the trailing grid track
-  // is `max-content` now — leaving the one declaration that is neither restated nor overturned:
-  // the 36px height it shares with the sibling input. Task 6 then converted its only two call
-  // sites (rows 16 and 17, `EnvironmentsBrowserView.svelte`), which carry the class through the
-  // primitive's appending `class` prop, so the rule still styles exactly what it always did
-  // while no longer being derivable from a literal `class="manager-button"` anywhere.
   {
     id: globalRule('.fabricate-manager .manager-setup-links .manager-button'),
     disposition: 'NO_CONFLICT',
-    // The sweep has now converted EVERY site this rule reaches, so the instrument can no
-    // longer see one: it finds a site by the literal `class="manager-button…"`, which is
-    // exactly what a conversion removes. Re-asserting "it reaches a converting site" would
-    // have to be deleted or relaxed to nothing — the first loses the guard, the second keeps
-    // its name and its shape while proving nothing.
-    //
-    // So the population is named instead, and VERIFIED against the tree: each entry says
-    // which component renders the container and how many primitives sit inside it, and the
-    // test below re-derives both from source. A container that is renamed, a card that stops
-    // rendering its links, or a count someone adjusted to make a red go away all fail here.
-    // Same shape as the conversion ledger's own floor, one rule down.
+    // The sweep has now converted EVERY site this rule reaches.
     convertedReach: [
       {
         file: 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
@@ -1052,25 +739,6 @@ const REVIEWED = [
   },
 
   // ── DEAD: real rules, zero call sites ─────────────────────────────────────────────────
-  //
-  // Four entries left this list in task 4, retired rather than recorded:
-  // `.manager-region-add`, `.manager-tool-inspector-actions .manager-button` (with its
-  // `span` companion), `.manager-tools-row-editor .manager-button` and
-  // `.manager-tools-create-actions .manager-button`. The remaining container rules of those
-  // last three families are orphaned too — no component carries the classes at all.
-  // `.manager-tools-create-actions` was the exception that had to be finished rather than
-  // filed: that retirement MERGED the dead `.manager-button` rule's declarations into an
-  // equally dead `select` rule on the way past, so the class read as freshly maintained, and
-  // its three remaining rules are retired with it. `.manager-tool-inspector-actions` and
-  // `.manager-tools-row-editor` keep their orphaned container rules and are named in the
-  // handoff as a separate dead-CSS sweep, alongside `.manager-tools-create-prompt`,
-  // `.manager-tools-item-shortcuts` and `.manager-tools-library-toolbar`.
-  // The list is EMPTY, and that is the change task 9 made to it.
-  // `.manager-button.is-warning-action:not(:disabled)` was the one entry: DEAD and deliberately
-  // kept, because it corroborated the `warning` repair from the other side — the amber treatment
-  // existed and nothing rendered it, since the one control that meant to render it spelt the
-  // class `is-warning`, which the sheet declares nowhere. It has a call site now and has moved
-  // to NO_CONFLICT above, which is the outcome its own `why` asked for.
 ];
 
 const idsWith = (...dispositions) =>
@@ -1084,20 +752,6 @@ test('the reviewed cascade list has no duplicate entry', () => {
 
 /**
  * Both directions of the at-risk equality, stated separately because task 9 broke their symmetry.
- *
- * While literal sites remained, `derived === reviewed` said everything: a rule that entered the
- * derived set without an entry was a silent repaint, and an entry that left it was stale. With
- * the conversion complete the derived set is EMPTY — the tool finds a site by the literal
- * `class="manager-button…"` and there are none left to be at risk — so a plain equality would
- * pass over nothing in both directions at once and keep reporting itself satisfied forever.
- *
- * So the two halves are asserted against different things:
- *  - derived ⊆ reviewed keeps its teeth unchanged, and is the half that catches a returning
- *    raw SITE — a `class="manager-button"` literal re-entering `src/` — and NOT a new rule,
- *    which derives no candidate at all while the derived set is empty. See the docblock at
- *    the head of this file for what does cover a new rule.
- *  - reviewed ⊆ derived is replaced by the obligation each entry now carries — either it still
- *    derives at risk, or it names a `convertedReach` this file re-derives from the tree.
  */
 test('every mechanically derived at-risk rule is reviewed as RECHAIN or INTENDED', () => {
   const derived = [...new Set(cascade.atRisk.map((entry) => entry.rule.id))].sort(byCodePoint);
@@ -1144,9 +798,6 @@ test('every reviewed EXCLUDE rule would lose to the primitive but reaches no con
 /**
  * The end of an opening tag: the first `>` that is not the tail of an `=>`.
  *
- * These tags carry inline arrow handlers, so a `[^<>]*` bound cannot span one and would end
- * the match half way through the attribute list.
- *
  * @param {string} source component source text
  * @param {number} from an offset inside the opening tag
  * @returns {number} the offset of the tag's closing `>`, or -1
@@ -1161,7 +812,6 @@ function endOfOpeningTag(source, from) {
 
 /**
  * Container classes a shared primitive emits itself, mapped to the tag that emits them.
- *
  * One entry as this lands. It is a mapping rather than a fallback because the two things it
  * distinguishes must not be conflated: a class WRITTEN in a calling file is found by the marker
  * below, and a class a CHILD COMPONENT emits can only be found by its tag. Nothing derives this
@@ -1173,23 +823,10 @@ const CONTAINER_PRIMITIVES = Object.freeze({ 'manager-toolbar': 'ManagerToolbar'
 
 /**
  * Every region of `source` enclosed by an element whose class list holds `containerClass`.
- *
- * Bounded to that element, by walking its own tag name to a matching close rather than to the
- * next `</div>`: the containers here nest, and a count that ran past one into the section
- * below it would credit an entry with buttons the rule does not reach.
- *
  * The class attribute is matched by TOKEN rather than as the whole attribute value, because
  * `.manager-header-actions` is written bare in the manager root and composed with
  * `manager-tool-edit-actions` in the Tool Studio — and an exact-string match would silently
  * report the authority screen as rendering none of the buttons the rule types.
- *
- * A container class may live on a COMPONENT TAG rather than in a `class` attribute, and
- * {@link CONTAINER_PRIMITIVES} is what keeps this readable across that boundary (issue 1039).
- * `ComponentsBrowserView` renders `<ManagerToolbar class="manager-component-toolbar">`, so the
- * literal `manager-toolbar` the rule names is emitted by the primitive and appears nowhere in
- * the calling file. Without the mapping this walk finds no region, books zero buttons, and reds
- * a rule whose population has not changed at all — which reads as "the rule went dead" rather
- * than "the container became a component".
  *
  * @param {string} source component source text
  * @param {string} containerClass the container's own class token
@@ -1198,8 +835,7 @@ const CONTAINER_PRIMITIVES = Object.freeze({ 'manager-toolbar': 'ManagerToolbar'
 function regionsInside(source, containerClass) {
   const regions = [];
   const owner = CONTAINER_PRIMITIVES[containerClass];
-  // Both boundaries as lookarounds, never `\b`: `\b` matches before a hyphen AND after one, so a
-  // `\b`-delimited `manager-toolbar` matches `manager-toolbar-pills` and `fab-manager-toolbar`.
+  // Both boundaries as lookarounds, never `\b`: `\b` matches before a hyphen AND after one.
   const marker = new RegExp(
     owner
       ? String.raw`class="[^"]*(?<![\w-])${containerClass}(?![\w-])[^"]*"|<${owner}[\s/>]`
@@ -1232,10 +868,6 @@ function regionsInside(source, containerClass) {
 /**
  * How many `<ManagerButton>`s a component renders that a rule with this shape would reach.
  *
- * `container` narrows to an ancestor the rule names; `role` narrows to the role prop whose
- * emitted class the rule keys on. A rule can need either, both or neither — the header
- * cluster's `is-primary` companion needs both, a bare role paint needs only the role.
- *
  * @param {string} source component source text
  * @param {{container?: string, role?: string}} shape what the rule demands of the button
  * @returns {number} the count
@@ -1256,14 +888,6 @@ function primitivesMatching(source, { container, role }) {
 
 /**
  * The obligation an entry takes on when the tool can no longer derive a call site for its rule.
- *
- * The rule is not dead — every button it reaches renders through the primitive now — but
- * nothing in the tree says so, and "it reaches a converting site" cannot be re-asserted without
- * either deleting the guard or relaxing it to nothing. So the entry NAMES its population and
- * this re-derives it from source: which components render the buttons, how many, and that none
- * of those components still writes a literal `class="manager-button"`. A container that is
- * renamed, a card that stops rendering its links, a role prop that is dropped, or a count
- * someone adjusted to make a red go away all fail here.
  *
  * @param {{id: string, convertedReach: Array<object>}} entry the reviewed entry
  */
@@ -1302,9 +926,7 @@ test('every reviewed NO_CONFLICT rule still reaches a manager button and is deri
       continue;
     }
 
-    // No literal call site left. That is either "the sweep converted them all", which the
-    // entry has to have SAID in advance and which is checked against the tree below, or it is
-    // a rule that has quietly gone dead — the case this branch exists to keep separable.
+    // No literal call site left. That is either "the sweep converted them all".
     assert.ok(
       Array.isArray(entry.convertedReach) && entry.convertedReach.length > 0,
       `${entry.id} reaches no call site the instrument can see and names no converted ones, ` +
@@ -1325,19 +947,7 @@ test('every reviewed DEAD rule is a real rule in the sheet with no call site at 
 });
 
 test('a site the sweep does not convert is never modelled as carrying the primitive class', () => {
-  // The instrument used to hand `fab-manager-button` to everything outside population B, which
-  // included `ArmedDangerButton` — a component held out of the conversion on purpose, which
-  // writes the tokens `fabricate-button manager-button is-danger` in its own markup and will
-  // never gain the primitive class. It DOES carry the family root since issue 1502, and that is
-  // not the same permission: the root is what every re-rooted rule keys on, so a carrier writes
-  // it or renders unstyled, while `fab-manager-button` is the conversion's own marker and stays
-  // the primitive's alone. The error was invisible in the report: it changed no derived set and no
-  // printed line, because losses are only counted on CONVERTING sites. What it changed was the
-  // advice. `.manager-knowledge-row-actions .manager-button` derived as a plain RECHAIN, and
-  // re-chaining it would have left that row's Delete button at the ambient ~1rem beside the
-  // 0.72rem Expend button next to it — the exact regression the rule exists to prevent.
-  //
-  // So the model is pinned here rather than trusted, because nothing downstream would notice.
+  // The instrument used to hand `fab-manager-button` to everything outside population B.
   const unconverted = cascade.sites.filter((site) => !site.converting);
   const wrong = unconverted.filter((site) => site.classes.has('fab-manager-button'));
   assert.deepEqual(
@@ -1345,20 +955,13 @@ test('a site the sweep does not convert is never modelled as carrying the primit
     [],
     'a site the sweep does not convert must be scored on its literal classes alone'
   );
-  // Non-vacuity in the direction that actually rotted: population B is excluded by an obvious
-  // branch, and a held-back FILE is not. If this floor ever reads zero, the corpus has stopped
-  // containing the case this assertion was written for.
+  // Non-vacuity in the direction that actually rotted.
   const heldBack = unconverted.filter((site) => site.population !== 'B');
   assert.ok(
     heldBack.length > 0,
     'at least one non-population-B site is held back from the conversion, or this proves nothing'
   );
   // The other half used to read "every converting site IS scored with the primitive class".
-  // With the sweep complete there are none, so that assertion is vacuously true and says
-  // nothing; the fact it was defending is now stated positively instead. Every site the tool
-  // can still see is one of the 18 the sweep deliberately does not convert, and it is scored
-  // on its literal classes — so `converting` and `carries fab-manager-button` remain the SAME
-  // question rather than two that happen to agree on an empty set.
   assert.equal(
     unconverted.length,
     cascade.sites.length,
@@ -1387,12 +990,7 @@ test('every reviewed entry that claims a control would be stranded still reaches
 });
 
 test('the tie assertion is not silently skipping every entry it was written for', () => {
-  // `tieDivergence` is opt-in, and the loop below skips any entry without it — so an entry set
-  // that lost its last `tieDivergence` would leave that test passing over nothing. Task 9 took
-  // the count to zero legitimately: a tie is a relation between a rule and a CONVERTED button,
-  // and there is no longer a literal one for the tool to derive. The floor is therefore stated
-  // as an equality against the reason, not as `> 0`, so re-introducing a tie without an entry
-  // still reds.
+  // `tieDivergence` is opt-in, and the loop below skips any entry without it.
   const declared = REVIEWED.filter((entry) => Array.isArray(entry.tieDivergence)).length;
   const derivedTies = cascade.candidates.filter((candidate) =>
     candidate.losses.some((loss) => loss.verdict.startsWith('ties'))
@@ -1436,51 +1034,7 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
   // component\'s whole markup, and Svelte's scoping hash made every scoped rule match nothing.
   assert.ok(cascade.rules.length > 4000, `parsed ${cascade.rules.length} rules`);
 
-  // The sweep's total is a CONSERVED quantity, not a countdown, and this floor has to say so
-  // or it decays into one. The instrument finds a site by its literal `class="manager-button…"`,
-  // which is exactly the thing a conversion removes: after task 5 the derived population was 90
-  // across 40 of these components, after task 9 it is 0 across 0, and a floor pinned to
-  // whatever the last batch left would ratchet down to nothing while reporting itself
-  // satisfied.
-  //
-  // So the floor is stated over BOTH halves — the sites still awaiting conversion plus the
-  // sites already converted — and it stays 129 across 42 for the whole sweep plus its one
-  // post-plan catch. Each batch adds its own line to the ledger and touches neither total, and
-  // a batch that DELETED a control instead of converting it fails here rather than looking
-  // like progress.
-  //
-  // The totals were 129 across 42 when the sweep was planned, dropped to 128 across 41 when
-  // ONE of the 42 components turned out to be unreachable dead code — `GatheringRealmQuickList`,
-  // imported by nothing under `src/` since #1283 moved realm authoring to world scope — and
-  // was deleted rather than converted, and are 129 across 42 again because issue #1286 landed
-  // a new hand-written manager button, `ComponentComplicationsSection.svelte`'s "Add
-  // complication", on `main` while this sweep was in flight; this guard caught it on rebase by
-  // naming the file, and the post-plan batch above converts it — and are 128 across 41 once
-  // more, because issue 1444 merged `recipe/RecipeValidationTab`'s single View button into
-  // `EditorValidationSurface`'s, which task 7 already books: one rendered button where there
-  // were two, in a file the ledger already holds. All three are licensed ways to move
-  // these numbers, and all three are licensed precisely because the site left or entered the
-  // product rather than leaving or entering the instrument's view: the ledger assertions below
-  // re-read every booked file from the tree, so neither a deleted nor a booked-but-unconverted
-  // component can stay silently mismatched, and the paragraph above is the reason a number
-  // that moved needs a stated cause rather than a quiet edit.
-  //
-  // AND 128 -> 124 AT ISSUE 1371's C7.6, which is the fourth licensed movement and the largest:
-  // `ComponentBrowserInspector`'s four-button stacked action column collapsed to one
-  // `InspectorActionButton` plus an `ActionMenu`, so four SITES left the product on the same
-  // screen, in a file the ledger already holds. The component COUNT does not move with them —
-  // the file stays booked at 0 rather than being dropped, so it keeps answering the two ledger
-  // checks below — which is why 41 is unchanged while 128 is not.
-  //
-  // AND 124 -> 123 AT ISSUE 1517, the fifth licensed movement and the same shape as the fourth:
-  // the environment editor's Validation tab was converted onto `EditorValidationSurface`, so its
-  // one deep-link site left the product on this screen by being ABSORBED into a shared
-  // primitive's own row action — one rendered button where there was one, drawn by a different
-  // file. That is the same cause issue 1444 booked for `recipe/RecipeValidationTab` and it is
-  // licensed for the same reason: the site left the SCREEN rather than leaving the
-  // instrument's view, in a file the ledger already holds. The component count stays 41,
-  // because the file is rebooked at 0 rather than dropped and so keeps answering the two ledger
-  // checks below.
+  // The sweep's total is a CONSERVED quantity, not a countdown.
   const converted = CONVERTED_BATCHES.flatMap((batch) => batch.files);
   assert.equal(
     cascade.convertingSites.length + converted.reduce((total, file) => total + file.sites, 0),
@@ -1513,22 +1067,12 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
       `${file} is booked as converted but the instrument still derives call sites in it`
     );
   }
-  // Population B has no converted-ledger half — it is named DEBT, never converted by this
-  // sweep — so a new one is not a batch to book, only a count to move. #1286 landed a 17th
-  // alongside the literal button the post-plan batch above converts:
-  // `component/ComponentComplicationsSection.svelte`'s macro `SearchablePopover`'s "Browse
-  // macros" trigger (`triggerClass="manager-button"`), which the plan's 16-site enumeration
-  // could not have named because the file did not exist yet when it was written. It is left
-  // unconverted, exactly like the other 16, for the same reason: converting a `triggerClass`
-  // site changes `SearchablePopover`'s own trigger contract rather than this call site's.
-  //
-  // AN 18TH LANDED WITH `tools/ToolReplacementTarget.svelte` (issue 1373, maintainer round 2).
+  // Population B has no converted-ledger half — it is named DEBT.
   // That component is where the system Tool editor's one-line replacement picker went when the
   // design's full card — a drop zone with `Click to search`, or a filled tile with an unlink —
   // shipped at both scopes, and the two faces are two `triggerClass` sites where the block it
   // replaced had one. The count moves by one rather than by two for that reason. Both stay
   // unconverted on the standing argument above.
-  //
   // AND SIX LEFT AT ISSUE 1373's MAINTAINER ROUND 5, taking the count to 12. The repair and
   // ingredient row converged on the design's own anatomy (`proto:2248`), which is a kind
   // `<select>` plus a field the GM types into — so the row's three `SearchablePopover` triggers
@@ -1537,74 +1081,12 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
   // plain dashed `<ManagerButton>`s that create an empty row. The sixth is `+ Tag`, which the
   // design draws as a dashed tag-tinted PILL (`proto:2256`) and which is a `triggerChip` now,
   // writing no `manager-button` class at all.
-  //
-  // Licensed by the same rule as the entries above: each of the six SITES left the product,
-  // rather than leaving this instrument's view. Five of them are `<ManagerButton>` or an inline
-  // field in the same place on the same screen; none was silently unconverted.
-  // AND ISSUE 1371 MOVED IT TWICE, NET −1, TO 13 — and the first half of that is this note
-  // keeping the promise the version below it made.
-  //
-  // What stood here said TWO ARRIVED, taking the count to 14: the world Component catalogue's
-  // bulk panel staged its crafting systems and its world category as two `SearchablePopover`
-  // triggers, argued from "the recipe bulk panel's precedent". The paragraph under it then
-  // voided its own argument — a shipped sibling is not a reference — recorded that the
-  // reference draws both groups as an inline search with rows and a pager beneath it
-  // (`proto:590-697`), and committed this pin in as many words: when maintainer ruling M10 made
-  // those pickers inline, "both sites leave the product exactly as issue 1373's six did and
-  // THIS NUMBER GOES BACK TO 12 in the same change, with the sentence above rewritten to say
-  // the sites left rather than that they are licensed."
-  //
-  // M10 landed and they left. `ComponentCatalogueBulkPanel.svelte` writes no `triggerClass` at
-  // all now: all three staging groups are one inline inset rendered three times, with their own
-  // search field, row window and pager. That is −2, exactly as promised, and 12 is where the
-  // count would rest if nothing else had moved.
-  //
-  // ONE ARRIVED IN THE SAME RULING AND HAS SINCE LEFT, WHICH IS WHY THE NUMBER IS 12. M10 also
-  // built `+ Register item` beside the world-scope drop zone (`proto:570`), as a picker rather
-  // than a bare button because the prototype's own handler for it is `d.onStub` — there is no
-  // reference behaviour to copy and a control that opens nothing is the dead affordance that
-  // screen already refuses. `SearchablePopover` is the shipped chooser, so
-  // `WorldComponentCataloguePage.svelte` arrived as a 13th population-B site, and the note here
-  // said it stayed unconverted on the standing argument every entry above uses: converting a
-  // `triggerClass` site changes `SearchablePopover`'s own trigger contract rather than that call
-  // site's.
-  //
-  // ISSUE 1371 r10 CHANGED THAT CONTRACT, which is the one thing that legitimately empties this
-  // population, and the standing argument is what says so: the objection was never that the site
-  // should keep imitating the primitive, it was that the repair belongs in the popover. The
-  // reference draws this control at 38px, 38 is a published rung, and the rung's selector
-  // (`.manager-button.fab-manager-button.is-size-38`) demands a class only `ManagerButton`
-  // writes — so a `triggerClass` string could not reach it however it was spelt. The popover now
-  // takes `triggerButton={{ role, size, fullWidth }}` and renders the real primitive, and the
-  // catalogue became its first consumer: −1, to 12.
-  //
-  // AND AT ISSUE 1371 r13 THE SITE ITSELF LEFT THE PRODUCT (maintainer ruling M13): the
-  // catalogue's `+ Register item` was removed outright and its drop zone took the whole row.
-  // That moves NOTHING here — a converted site was already outside population B — and the
-  // primitive's `triggerButton` form stays, because a form is the primitive's and not its first
-  // consumer's; `searchable-popover-trigger-form-mounted.test.js` is its cover. What the proof
-  // below used to re-derive — "the site still renders the picker through the primitive form" —
-  // is no longer a fact about the tree, so it is REPLACED rather than left to match a control
-  // that does not exist: the count is 12 AND the page renders no popover at all AND the
-  // primitive still declares the form. A count of 12 satisfied by the page slipping back to a
-  // hand-written `manager-button` token would fail the second clause.
-  //
-  // THE OTHER TWELVE ARE NOT CONVERTED HERE, deliberately. Each of them carries a per-site sheet
-  // rule restating a height or a corner, so converting one re-arbitrates that site's own cascade
-  // and needs its own measurement; twelve at once would be twelve repaints inside a change about
-  // a trigger contract. They are a named follow-up rather than a silent remainder, and this
-  // number is what will move when it lands.
   assert.equal(
     cascade.sites.filter((site) => site.population === 'B').length,
     12,
     'plus the 12 SearchablePopover triggerClass sites still named as debt'
   );
-  // ...AND THE ONE THAT LEFT LEFT BY CONVERSION AND THEN BY RULING, not by slipping back. The
-  // count above is satisfied just as well by a site that re-wrote the population-B token, which
-  // is the failure mode every ledger assertion in this file is written against. So the retired
-  // site is re-derived from the tree: the page renders no `SearchablePopover` at all (M13), it
-  // writes no population-B token, and the primitive still carries the trigger form the site
-  // was the first consumer of.
+  // ...AND THE ONE THAT LEFT LEFT BY CONVERSION AND THEN BY RULING.
   const retiredSite = readFileSync(resolve(repoRoot, POPULATION_B_RETIRED_SITE_FILE), 'utf8');
   assert.ok(
     !/<SearchablePopover\b/.test(retiredSite),
@@ -1621,10 +1103,7 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
     `${SEARCHABLE_POPOVER_FILE} should still declare the \`triggerButton\` form: it is the ` +
       'primitive`s, and it outlives the consumer M13 removed'
   );
-  // Population C was the sweep's ONE backtick-template `class={…}` attribute, and task 9
-  // converted it, so a bare `=== 0` would be satisfied just as well by the site having been
-  // deleted. The pair is asserted instead: nothing writes the contract into a template any
-  // more, AND the component that used to now hands that same template to the primitive.
+  // Population C was the sweep's ONE backtick-template `class={…}` attribute.
   assert.equal(
     cascade.sites.filter((site) => site.population === 'C').length,
     0,
@@ -1647,10 +1126,7 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
     'at least one scoped component rule is in the derived comparison, or the scoped sheets are ' +
       'not being parsed at all'
   );
-  // A repaint is a winner change on an UNCONVERTED literal site, so with the sweep complete
-  // there can be none. That makes this the regression detector for the whole change.
-  // A bare `manager-button` class token landing anywhere under `src/` puts a site back in the
-  // corpus and reappears here as a measured repaint.
+  // A repaint is a winner change on an UNCONVERTED literal site.
   assert.deepEqual(
     cascade.repaints.map((change) => change.property),
     [],
@@ -1660,8 +1136,6 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
 });
 
 test('the manager-button cascade inventory', () => {
-  // The report is the deliverable, not a side effect: the sweep's conversion tasks read it
-  // instead of re-deriving the cascade in prose, which is what produced three rounds of missed
-  // bands. It is deterministic and grouped by mechanism so it diffs cleanly between runs.
+  // The report is the deliverable, not a side effect.
   console.log(cascade.renderInventory(dispositionById));
 });

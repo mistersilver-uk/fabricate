@@ -1,17 +1,10 @@
-/**
- * Fixtures and rendered-geometry readers for `manager-layout-browsers.js` (issue 1670).
- *
- * Component, essence, environment, system and Knowledge browser layout: the markup, the component sources and the
- * page readers that surface's tests measure through. Nothing here asserts.
- */
+/** Fixtures and rendered-geometry readers for `manager-layout-browsers.js` (issue 1670). */
 
 import { openLayoutContext } from '../helpers/layout-harness.js';
 
 import { chipCss, css, withChipHash } from './manager-layout-shared.js';
 
-// The one Knowledge hazard source text cannot prove: at 832-1000px three columns
-// still hold while the detail pane is at its narrowest, so a non-wrapping row clips
-// its action cluster with no scrollbar. Measured, not asserted from CSS text.
+// The one Knowledge hazard source text cannot prove.
 export async function readRenderedKnowledgeGeometry(width) {
   const context = await openLayoutContext({
     viewport: { width, height: 720 },
@@ -19,8 +12,7 @@ export async function readRenderedKnowledgeGeometry(width) {
   });
   const page = await context.newPage();
   try {
-    // Mirrors the shipped two-line rhythm: name + type (+ quantity) on line 1, the
-    // whole state vocabulary as chips on line 2.
+    // Mirrors the shipped two-line rhythm: name + type (+ quantity) on line 1.
     const row = `<li class="manager-knowledge-copy-row"><span class="manager-knowledge-copy-identity"><span class="manager-knowledge-copy-copy"><span class="manager-knowledge-copy-heading"><strong class="manager-knowledge-copy-name">An Exceptionally Long Localized Recipe Item Name</strong><span class="manager-chip">4 Recipe Book</span><span class="manager-chip">×3</span></span><span class="manager-knowledge-copy-chips"><span class="manager-chip is-warning">2 of 5 uses spent</span><span class="manager-chip is-danger">Inert</span></span></span></span><span class="manager-knowledge-row-actions"><button class="fabricate-button manager-button fab-manager-button">Expend use</button><button class="fabricate-button manager-button is-danger">Delete</button></span></li>`;
     await page.setContent(
       withChipHash(

@@ -1,12 +1,4 @@
-/**
- * The Tool routes: the compact library, the world catalogue and the focused editor.
- *
- * A route module of `manager-mounted.test.js` (issue 1690). It registers its cases INSIDE
- * that file's one `describe` rather than at module scope, so the split keeps the suite
- * name, the compiled manager tree and the one process the 26,709-line file had.
- * `manager-mounted-shared.js` owns the compile and the between-test yield; the mount state
- * below is this module's own, so its locators read its own `target`.
- */
+/** The Tool routes: the compact library, the world catalogue and the focused editor. */
 
 import { afterEach, before, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -25,8 +17,7 @@ let ToolsBrowserViewComponent;
 let mounted;
 let target;
 
-// The locators read `target` through a getter rather than a captured element, because the
-// module remounts per case and half these cases assign `target` themselves.
+// The locators read `target` through a getter rather than a captured element.
 const queries = createManagerQueries(() => target);
 const { navButton } = queries;
 
@@ -86,11 +77,7 @@ export function registerToolsCases() {
     });
     flushSync();
 
-    // THREE BANDS AND A LIST (issue 1373). The `create` band is GONE, and its absence is the
-    // change: the design puts the `Drag an Item here to make it a Tool` zone on the WORLD
-    // Tools Catalogue and puts NONE here, and the two screens carried it exactly inverted. A
-    // Tool is one world record every system adopts, so this screen can only ever author RULES
-    // for a record the world already holds.
+    // THREE BANDS AND A LIST (issue 1373). The `create` band is GONE.
     assert.deepEqual(
       [...target.querySelector('.manager-tools-main-content').children].map((element) =>
         element.hasAttribute('data-manager-tools-authority')
@@ -104,9 +91,7 @@ export function registerToolsCases() {
       ['authority', 'search', 'sort', 'list']
     );
     const authority = target.querySelector('[data-manager-tools-authority]');
-    // THREE, not two (issue 1373): `Inherit`, `Tool-specific`, `Check-driven`. This count is
-    // a guard in BOTH directions - shipping the tri-state without moving it reds, and
-    // claiming a tri-state while leaving it at 2 reds.
+    // THREE, not two (issue 1373): `Inherit`, `Tool-specific`.
     assert.equal(authority.querySelectorAll('[data-tool-authority-segment]').length, 3);
     assert.deepEqual(
       [...authority.children].map((element) =>
@@ -122,8 +107,7 @@ export function registerToolsCases() {
       !authority.querySelector('.manager-tools-authority-caption'),
       'the breakage card is a head and a track, with no caption restating the selected segment'
     );
-    // NO GLYPHS on the system card's segments, where the WORLD card's carry one. Asserted
-    // because the two cards look alike and the difference is the design's own composition.
+    // NO GLYPHS on the system card's segments.
     assert.equal(authority.querySelectorAll('[data-tool-authority-segment] i').length, 0);
     authority.querySelector('input[value="checkDriven"]').click();
     assert.deepEqual(authorityChanges, ['checkDriven']);
@@ -181,10 +165,7 @@ export function registerToolsCases() {
       'the breakage-source segments are a setting, not a filter'
     );
 
-    // THE ROW SWITCH IS THE SHARED PRIMITIVE (issue 1515, D2), and its own class SURVIVES the
-    // conversion rather than being replaced by it - `StatusToggle` composes `class` onto its
-    // own, which is what keeps the Foundry smoke's selector and the View Lab's steps pointing
-    // at the same control.
+    // THE ROW SWITCH IS THE SHARED PRIMITIVE (issue 1515, D2).
     const enabledSwitch = target.querySelector('.manager-tools-enabled-toggle');
     assert.ok(Boolean(enabledSwitch), 'the row still writes its enable switch');
     assert.equal(enabledSwitch.tagName, 'BUTTON');
@@ -201,10 +182,7 @@ export function registerToolsCases() {
       Boolean(switchTrack.querySelector('.manager-status-toggle-knob')),
       'and the knob INSIDE it - a track with no knob is a switch that cannot show its state'
     );
-    // The drop behaviour itself moved WITH the control, to
-    // `tests/components/world-tool-catalogue-mounted.test.js`, which drives the zone on the
-    // screen that now owns it - including the compendium `{pack, id}` payload that carries no
-    // `uuid` and the non-Item payloads the zone must refuse.
+    // The drop behaviour itself moved WITH the control.
 
     target.querySelector('.manager-tools-enabled-toggle').click();
     target.querySelector('.manager-tools-library-actions [data-tool-edit-rules]').click();
@@ -224,11 +202,6 @@ export function registerToolsCases() {
     // NO FOOT PAGER ON ONE PAGE (issue 1373). `PROTO-tool-rules.png` draws three rows and no bar
     // under them, and this list shipped a `persistent` one that could only ever read
     // `Showing 1-1 of 1 · Page 1 of 1` beside a result count already saying `1 shown`.
-    //
-    // THE SLOT IS ASSERTED PRESENT BESIDE IT, because it is not what came out: it is the
-    // bottom-pinned layout div, and it is what keeps the list card above from becoming
-    // `:last-child` and stretching to the foot of the pane. Without this line the absence below
-    // would also be satisfied by the whole browser failing to render.
     assert.ok(
       Boolean(target.querySelector('[data-tool-browser-pagination]')),
       'the bottom-pinned pager slot must survive the bar it no longer holds'
@@ -237,8 +210,7 @@ export function registerToolsCases() {
       !target.querySelector('[data-tool-browser-pagination] .manager-pagination'),
       'a one-page list must draw no foot pager at all'
     );
-    // NO ON-BREAK CHIP on a system row. The on-break action is a WORLD default, stated on the
-    // world catalogue's row; repeating it here says nothing this screen decides.
+    // NO ON-BREAK CHIP on a system row. The on-break action is a WORLD default.
     assert.equal(
       [...target.querySelectorAll('.manager-tools-library-chips .manager-chip')].filter((chip) =>
         /Destroys|Marks broken|Replaces/.test(chip.textContent)
@@ -248,10 +220,7 @@ export function registerToolsCases() {
   });
 
   it('draws the foot pager once the rules list runs to a SECOND page', () => {
-    // The negative above and this positive are the two halves of one rule, and neither is
-    // sufficient alone: a pager deleted outright satisfies the absence, and a `persistent` one
-    // satisfies the presence. The page size is eight, so nine rows is the first dataset that
-    // asks for a second page.
+    // The negative above and this positive are the two halves of one rule.
     const nineTools = Array.from({ length: 9 }, (unused, index) => ({
       ...toolRouteFixture,
       id: `tool-${index}`,
@@ -314,10 +283,7 @@ export function registerToolsCases() {
   });
 
   it('ends each rules row with the count of THIS system\u2019s recipes that require it', () => {
-    // C5 (issue 1373). The design's row ends `[N RECIPES] [Edit rules]`, and ours ended at the
-    // action. The number is READ OFF THE PROJECTION'S PER-SYSTEM ROW rather than counted here:
-    // this screen holds no recipe corpus, and a world-wide total under a heading that already
-    // names one system would be a wrong number rather than a missing one.
+    // C5 (issue 1373). The design's row ends `[N RECIPES] [Edit rules]`.
     target = document.createElement('div');
     document.body.appendChild(target);
     mounted = mount(ToolsBrowserViewComponent, {
@@ -448,12 +414,7 @@ export function registerToolsCases() {
   it('wires Tool library selection to the shell inspector without restoring an inline editor', async () => {
     const calls = await mountToolRoute();
 
-    // THE TITLE BAND RENDERS HERE NOW (issue 1373). It was suppressed on both Tool routes, so
-    // the two screens the reference draws it on most explicitly were the two that showed ~18px
-    // of empty ground where the selected system resolution is stated. `assert.ok(Boolean(...))`
-    // rather than an identity comparison: `node:assert` serialises a mounted happy-dom element
-    // to build its diff and walks the circular tree until the heap dies, so a one-line failure
-    // surfaces as an OOM with no message.
+    // THE TITLE BAND RENDERS HERE NOW (issue 1373). It was suppressed on both Tool routes.
     assert.ok(
       Boolean(target.querySelector('.fabricate-manager > .manager-titlebar')),
       'the Tool library draws the shared title band'
@@ -462,11 +423,7 @@ export function registerToolsCases() {
       '.fabricate-manager > .manager-header[data-tool-library-context]'
     );
     assert.ok(contextHeader, 'the Tool library owns one full-shell context header');
-    // THE WHOLE TRAIL, ROOT INCLUDED (issue 1328). This used to be a substring match, which is
-    // why the missing root survived it: `/Alchemy.*Crafting.*Tools/` is satisfied by a trail that
-    // begins anywhere. The Tool library has its own header rather than sharing the root nav, and
-    // it began at the system name — so of the two Tool screens, the EDITOR carried
-    // `Crafting Systems` and the library did not.
+    // THE WHOLE TRAIL, ROOT INCLUDED (issue 1328). This used to be a substring match.
     assert.deepEqual(
       Array.from(contextHeader.querySelectorAll('.manager-breadcrumbs > *'))
         .filter((node) => node.tagName.toLowerCase() !== 'i')
@@ -474,7 +431,6 @@ export function registerToolsCases() {
       // 'Tool Rules' is the Tool Studio's screen title since issue 1362 (see the rail
       // relabel). The crumb takes it too: a trail whose leaf disagrees with the heading
       // below it is the WCAG 2.5.3 "Label in Name" hazard the relabel had to avoid.
-      //
       // NO `Crafting` CRUMB (issue 1373). It claimed Tool Rules sits inside the Crafting group,
       // and the rail rendered in the same frame shows that group holding Recipes and Settings
       // with Tool Rules a sibling OUTSIDE it. Two navigations one pane apart disagreed about the
@@ -526,7 +482,7 @@ export function registerToolsCases() {
     const inspector = target.querySelector('[data-tool-browser-inspector]');
     assert.ok(inspector);
     assert.match(inspector.textContent, /Artisan Catalyst/);
-    // AN INLINE EDITOR is what this route must not restore, and it still does not. The
+    // AN INLINE EDITOR is what this route must not restore.
     // inspector's own route into the tool-edit ROUTE is a different thing and is asserted in
     // its own test below; `[data-manager-tool-editor]` is the inline one.
     assert.equal(target.querySelector('[data-manager-tool-editor]'), null);
@@ -538,12 +494,6 @@ export function registerToolsCases() {
   // renders `pagedTools`: the membership filter, the search term, the sort key and direction
   // and the page slice, applied in that order. Those two agreed until the design's
   // `SORT BY [Name] [Asc]` control shipped, and the Foundry smoke caught them disagreeing.
-  //
-  // The first two cases mount the ROOT, not the view, because the view does not own the
-  // selection: `onSelectTool` goes to the shell, which opens the draft and feeds
-  // `selectedToolId` back. Asserting the callback alone would stay green on a screen that
-  // never paints the selection, so these read `is-selected` and the inspector heading out of
-  // the DOM instead.
   const libraryRowNames = () =>
     [...target.querySelectorAll('.manager-tools-row .manager-tools-select-target strong')].map(
       (node) => node.textContent.trim()
@@ -565,14 +515,6 @@ export function registerToolsCases() {
   /**
    * The world Tool projection this screen widens its list with, built from `[id, name]` pairs.
    *
-   * ONE FACTORY FOR EVERY WIDENING CASE (issue 1373). `scope.entries[]` is the world corpus's
-   * per-entity join, its shape is fixed, and a second hand-written copy of it is a second place
-   * for that shape to drift — and one Sonar counts as duplicated however the names inside it
-   * differ, because CPD matches by shape and normalizes literals.
-   *
-   * `systems: []` is the state every widening case needs: no per-system row at all, which is
-   * exactly what makes an entry a GHOST in whichever system is mounted.
-   *
    * @param {Array<[string, string]>} entries Ordered `[id, name]` pairs.
    * @returns {object} A world tool scope projection.
    */
@@ -583,11 +525,7 @@ export function registerToolsCases() {
   });
 
   /**
-   * Mount the Tool rules list on its own, onto the shared `target`/`mounted` the suite tears
-   * down in `afterEach`. Mounting the VIEW rather than the root is what keeps a selection open
-   * while the membership filter moves; the root answers `onSelectTool` by feeding a valid
-   * `selectedToolId` back, and the auto-select effect's still-valid-selection early return would
-   * then stop before the widened list was ever consulted.
+   * Mount the Tool rules list on its own.
    *
    * @param {object} props Props overriding the shared defaults.
    * @returns {void}
@@ -613,15 +551,6 @@ export function registerToolsCases() {
 
   /**
    * THE PANE-LEVEL INVARIANT this defect broke, written once (issue 1373).
-   *
-   * `{shown}` in `3 shown · 0 of 3 in this system` IS `pagedTools.length`, and the list body
-   * draws `pagedTools`. So a toolbar claiming rows the body does not draw is the WHOLE class of
-   * defect in one comparison, rather than the single instance the cases below pin. The shipped
-   * bug made this summary read `3 shown` above a rendered zero state and nothing anywhere
-   * compared the two numbers.
-   *
-   * It holds in every state, including both zero states: with nothing to page, `{shown}` is `0`
-   * and the body draws no rows.
    *
    * @param {string} why What the pane was doing when the invariant was checked.
    * @returns {void}
@@ -723,11 +652,6 @@ export function registerToolsCases() {
     // rules record for. They are inspected through `selectedUnadoptedToolId`, so pushing one
     // through `onSelectTool` would misroute the panel AND latch: an unadopted selection
     // suppresses every later auto-select. The pick therefore skips every non-member row.
-    //
-    // Mounted on the VIEW here, because the selection must still be open when the `all` filter
-    // is applied: the shell answers `onSelectTool` by feeding a valid `selectedToolId` back,
-    // and the effect's still-valid-selection early return would then stop before the widened
-    // list was ever consulted.
     const selections = [];
     mountToolsBrowser({
       tools: [
@@ -768,14 +692,6 @@ export function registerToolsCases() {
   // never disagree; with none adopted, `tools.length === 0` is true and STAYS true whatever the
   // membership segment says, so the zero state won unconditionally and the ghost rows were
   // derived, counted, sorted, paged and then thrown away.
-  //
-  // Zero members is the only place the widened branch and the empty branch can disagree, and it
-  // is also the state a GM is in the first time they open this screen in a world-scoped world —
-  // where widening is the ONLY route in the product to adopting a world Tool into a system.
-  //
-  // TWO CONTROLS REACH IT AND BOTH ARE PINNED, because they are separate call sites: the
-  // segment sets the filter directly, and the zero state's own primary button sets it from
-  // INSIDE the branch the filter was supposed to leave. The maintainer reported both symptoms.
   const THREE_WORLD_TOOLS = [
     ['world-aegis', 'Aegis Crucible'],
     ['world-loom', 'Star Loom'],
@@ -793,9 +709,7 @@ export function registerToolsCases() {
     await tick();
     flushSync();
 
-    // THE BUTTON'S OWN PRESENCE IS THE PRECONDITION, so it is asserted rather than assumed: it
-    // renders only inside the empty branch and only when `ghostRows.length > 0`, so finding it
-    // here proves the mount really is in the state the defect was reported from.
+    // THE BUTTON'S OWN PRESENCE IS THE PRECONDITION, so it is asserted rather than assumed.
     const browseWorld = target.querySelector('[data-tool-empty-browse-world]');
     assert.ok(Boolean(browseWorld), 'the zero state offers its near route into the world Tools');
     assert.equal(browseWorld.dataset.toolEmptyBrowseWorld, '3');
@@ -806,9 +720,7 @@ export function registerToolsCases() {
     await tick();
     flushSync();
 
-    // PRESSING IT MUST DO SOMETHING, and this is the assertion that did not exist: the hook was
-    // named by two View Lab terminals and clicked by nothing, so it was proven to EXIST and
-    // never proven to ACT.
+    // PRESSING IT MUST DO SOMETHING, and this is the assertion that did not exist.
     assert.deepEqual(
       libraryRowStates(),
       WIDENED_GHOST_ROWS,
@@ -838,9 +750,7 @@ export function registerToolsCases() {
   });
 
   it('reaches the world Tools from the membership SEGMENT when the system has adopted none', async () => {
-    // THE SECOND SYMPTOM, and it is not inferable from the first: the button sets the same
-    // state, but a GM who never sees the button — or who reads the segment's `All world tools
-    // (3)` and clicks that instead — took a different route to the same broken body.
+    // THE SECOND SYMPTOM, and it is not inferable from the first.
     mountToolsBrowser({ tools: [], scope: worldToolScope(THREE_WORLD_TOOLS) });
     await tick();
     flushSync();
@@ -869,21 +779,7 @@ export function registerToolsCases() {
     await tick();
     flushSync();
 
-    // SELECTION IS READ FROM THE PRIMITIVE'S OWN STATE, not from the track's data attribute and not
-    // from the radio's `checked` (issue 1515). Three readings were available and two of them are
-    // wrong here:
-    //
-    //   - `data-tool-membership-filter` is `dataAttr`, which the primitive stamps `true` on the
-    //     track rather than the current value, so the retired `="all"` reading now passes for
-    //     every cohort;
-    //   - `input.checked` is written by the synthetic click ITSELF and by the browser's own radio
-    //     group exclusivity, so it reports the click rather than the component. Measured: pinning
-    //     `value` to a constant `'in'` — which is the whole defect this clause exists to catch —
-    //     leaves both `checked` readings unchanged and the suite green.
-    //
-    // `is-active` is the segment class the primitive derives FROM `value`, so it is the one
-    // reading the component has to re-render to satisfy. Read as the whole selected SET, because
-    // a per-segment check cannot see a track that lit two.
+    // SELECTION IS READ FROM THE PRIMITIVE'S OWN STATE.
     assert.deepEqual(
       [...target.querySelectorAll('[data-tool-membership-option]')]
         .filter((option) => option.classList.contains('is-active'))
@@ -896,8 +792,6 @@ export function registerToolsCases() {
     assertResultCountMatchesRows('after the membership segment is widened');
     // THE FOOT PAGER SLOT FOLLOWS THE COHORT TOO. It was gated on the same raw prop one layer
     // down, so the slot stayed absent for a zero-member system even once the rows above it drew.
-    // The slot is the bottom-pinned layout element that decides whether the browser card is
-    // `:last-child`; the BAR inside it stays `multiPageOnly` and three rows is one page.
     assert.ok(
       Boolean(target.querySelector('[data-tool-browser-pagination]')),
       'the widened list gets its layout slot back'
@@ -910,8 +804,6 @@ export function registerToolsCases() {
 
   // TWELVE world Tools, named so name-ascending order is the authored order and a page
   // boundary is readable at a glance. Twelve rather than nine because eight is the page size:
-  // nine proves two pages exist and twelve proves the SECOND page is a real slice rather than
-  // one stray row, which is the difference between a bar that renders and a bar that works.
   const TWELVE_WORLD_TOOLS = Array.from({ length: 12 }, (_, index) => [
     `world-page-${String(index + 1).padStart(2, '0')}`,
     `World Tool ${String(index + 1).padStart(2, '0')}`,
@@ -971,10 +863,6 @@ export function registerToolsCases() {
 
   it('LEAVES for the world catalogue when the zero state’s farther route is pressed', async () => {
     // THE TWIN OF THE DEFECT ABOVE, and it sat immediately beside it:
-    // `data-tool-empty-open-catalogue` was named by two View Lab cases as an `expectContained`
-    // target and clicked by nothing anywhere, which is the same "proven to EXIST, never proven
-    // to ACT" shape the maintainer found by hand on `data-tool-empty-browse-world`.
-    //
     // BOTH BRANCHES, because the panel renders two different shapes and each has its own View
     // Lab case: the ONE-CTA branch a freshly installed world is in, and the two-button branch
     // where this control is the fallback beside the widening primary.
@@ -1071,8 +959,7 @@ export function registerToolsCases() {
     flushSync();
     assert.ok(Boolean(target.querySelector('[data-tool-library-empty]')));
 
-    // A COHORT NARROWED TO NOTHING BY THE SEARCH IS THE FILTERED STATE, not the zero state —
-    // and that is what makes the zero state's primary route honest in every state it renders in.
+    // A COHORT NARROWED TO NOTHING BY THE SEARCH IS THE FILTERED STATE.
     unmount(mounted);
     mounted = null;
     target.remove();
@@ -1132,9 +1019,6 @@ export function registerToolsCases() {
     assert.deepEqual(libraryRowStates(), ['world-aegis:absent']);
 
     // AND AT THE COHORT'S ZERO POINT, which is the state that made the invariant worth writing:
-    // the shipped summary read `3 shown` above a body drawing nothing at all. Every state above
-    // holds a member, and with members present the two numbers cannot disagree — so without
-    // this remount the invariant would be green on the very defect it exists to catch.
     unmount(mounted);
     mounted = null;
     target.remove();
@@ -1199,14 +1083,7 @@ export function registerToolsCases() {
       inspector.querySelector('[data-tool-inspector-rule="bonus"]').textContent,
       /Adds @prof/
     );
-    // TWO REGIONS, EACH WITH ONE HEADING (issue 1373). This asserted ONE, against the four
-    // per-row headings it replaced. The second is `Inheritance`, and it is not a fifth rule: the
-    // rules above state what the Tool RESOLVES to here and cannot state where each answer came
-    // from, because a section overridden to the world's own value resolves identically to one
-    // inherited. The row one column left already claims `Overrides breakage, prerequisites,
-    // check bonus`, and the panel it opened listed four rules with no marking at all — so the
-    // claim was unverifiable on the screen that made it, and two of the four read `No...`, which
-    // made an overriding Tool indistinguishable from one authoring nothing.
+    // TWO REGIONS, EACH WITH ONE HEADING (issue 1373). This asserted ONE.
     assert.deepEqual(
       Array.from(inspector.querySelectorAll('.manager-tool-inspector-section-kicker')).map((node) =>
         node.textContent.trim()
@@ -1272,17 +1149,12 @@ export function registerToolsCases() {
     );
   });
 
-  // ── THE INSPECTOR CARRIES A ROUTE INTO THE EDITOR, AND THAT IS A REVERSAL ────────────────
+  // ── THE INSPECTOR CARRIES A ROUTE INTO THE EDITOR.
   // This test used to assert the opposite — `Edit` on the row and NOTHING in the inspector —
   // on the reasoning that a second pen beside the row's pen is a duplicate affordance. The
   // design says otherwise, and its picture is what settles it: the panel ends in a
   // full-width primary button pinned to the foot of the column, which is where a GM who has
   // just read four resolved rules is looking when they decide to change one.
-  //
-  // The two are not duplicates once they are not the same control. The row's is a labelled
-  // `Edit rules` button ON the row it edits, reachable without selecting anything; the
-  // panel's is the terminal action of the panel that describes the selection. Both are kept
-  // asserted here, and both must reach the same route.
   it('routes into the Tool editor from the row AND from the foot of the inspector', async () => {
     const calls = await mountToolRoute();
     target
@@ -1368,10 +1240,7 @@ export function registerToolsCases() {
       null,
       'the manager shell must not restore its generic Tool subtitle above the editor'
     );
-    // THREE TABS AND NO `Delete` (issue 1373). Identity is world scope's, so the system editor
-    // has no Overview tab to put it on; and a bare `Delete` on a screen whose subject is one
-    // world Tool adopted by many crafting systems names no scope, so system scope gets the
-    // explained `Stop using this Tool here` callout at the foot of Breakage instead.
+    // THREE TABS AND NO `Delete` (issue 1373). Identity is world scope's.
     assert.equal(editor.querySelectorAll('[role="tab"]').length, 3);
     assert.ok(editor.querySelector('[data-tool-editor-back]'));
     assert.ok(!editor.querySelector('[data-tool-editor-delete]'));
@@ -1392,9 +1261,7 @@ export function registerToolsCases() {
       },
     });
 
-    // NO CREATION SURFACE ON THIS ROUTE (issue 1373): it moved to the world Tools Catalogue,
-    // where the design puts it. What this test still governs is the half in its own name -
-    // replacement authoring stays Component-only.
+    // NO CREATION SURFACE ON THIS ROUTE (issue 1373).
     assert.ok(!target.querySelector('[data-item-drop-zone="tool-create"]'));
 
     await openFixtureToolEditor(calls);
@@ -1443,8 +1310,6 @@ export function registerToolsCases() {
     // RETARGETED, NOT DELETED (issue 1373). This test used to drop an Item on this route's own
     // creation zone and assert a system-scope draft opened. Creation moved to the world Tools
     // Catalogue, so what remains to govern here is the half a regression would quietly undo:
-    // that this route grew the zone back. The drop BEHAVIOUR moved with the control, to
-    // `tests/components/world-tool-catalogue-mounted.test.js`.
     const calls = await mountToolRoute({
       services: {
         resolveToolSource: async (uuid) => ({
@@ -1468,8 +1333,6 @@ export function registerToolsCases() {
   it('offers NO source drop zone on the system Tool editor, at any tab', async () => {
     // THE RELOCATION, MEASURED AT THE ROUTE (issue 1373). The system editor used to carry the
     // linked-item card, so a crafting system could re-point which world Item a Tool IS.
-    // Identity is world-scoped; the card and its resolve-then-write behaviour moved to the
-    // world Tool entry, where the block at the end of this file exercises them.
     const calls = await mountToolRoute({});
     await openFixtureToolEditor(calls);
 
@@ -1548,10 +1411,7 @@ export function registerToolsCases() {
         .startsWith('Validation'),
       true
     );
-    // THE IDENTITY FAILURE IS A ROUTED NOTICE, NOT A CHECK ROW (issue 1373). `Item source is
-    // required` is the world Tool's defect: this screen cannot link an Item, so asking it to
-    // clear a `LINKED ITEM` check was asking it to repair someone else's record. It states the
-    // fact and names where it is fixed, and it does not count toward the blocking total.
+    // THE IDENTITY FAILURE IS A ROUTED NOTICE.
     assert.ok(!target.querySelector('[data-tool-validation-check="source"]'), 'no identity check');
     assert.match(
       target.querySelector('[data-tool-identity-notice]').textContent,
@@ -1564,11 +1424,7 @@ export function registerToolsCases() {
   });
 
   it('arms its own removal, takes no second dialog, and returns to the library unprompted', async () => {
-    // THE CONFIRMATION IS THE CONTROL, NOT A DIALOG (issue 1373). This route's destructive action
-    // used to be a header `Delete` behind `confirmDeleteTool`, whose dialog asks `Delete <name>?`
-    // over a `Delete` button — the WORLD action's wording, on the screen that cannot perform it.
-    // What system scope does is stop using the Tool here, and the callout that does it is an
-    // `ArmedDangerButton`: two deliberate presses, with the whole consequence stated beside them.
+    // THE CONFIRMATION IS THE CONTROL.
     const calls = await mountToolRoute({
       services: {
         confirmDeleteTool: () => {

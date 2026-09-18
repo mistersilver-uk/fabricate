@@ -1,8 +1,5 @@
 /**
  * Shared Select, picker popover, browser toolbar control and pager layout, measured in a real browser (issue 1670).
- *
- * A surface module of `manager-layout.test.js`. It registers its tests on import and owns no
- * browser: `tests/helpers/layout-harness.js` holds the one Chromium every surface shares.
  */
 
 import test from 'node:test';
@@ -61,12 +58,6 @@ test('manager pagination footer uses scoped chrome with stable summary, nav, and
   // ISSUE 1504 RETARGETED THIS ASSERTION WITH THE RULE IT WAS WATCHING. The per-page control is
   // a shared `<Select size="inline">` now, so its height, corner, fill and type come from the
   // `.fabricate-select*` family and the pager states only the one thing that is still its own:
-  // a WIDTH FLOOR, so `Per page 10` and `Per page 100` do not sit at two widths in a manager
-  // footer of fixed-width neighbours. It is stated at the primitive's own root, and names the
-  // control by `Pagination`'s own hook rather than by `Select`'s class: the area-scope gate
-  // reads BOTH an area root and another primitive's `fabricate-` namespace as application
-  // roots in front of a class `Pagination` writes. The six pagers that do not want the floor
-  // refuse it in their own blocks, which is measured below.
   assert.ok(
     css.includes('.fabricate-pagination .manager-pagination-size [data-pagination-size]'),
     'pagination should floor its own per-page control from the primitive`s own root'
@@ -105,10 +96,7 @@ test('the manager themes select options, not just the closed select', () => {
   );
   assert.match(optionRule, /color:\s*var\(--fab-text\)/);
 
-  // The selected row must be marked the SAME way on both rendering paths — the engines
-  // that paint the list in-page and the customizable-select picker. An accent-filled bar
-  // on one and a subtle overlay on the other is one control reading as two designs
-  // depending on which browser the GM happens to run.
+  // The selected row must be marked the SAME way on both rendering paths.
   const checkedRule = blockFor('.fabricate-manager select option:checked');
   assert.ok(checkedRule, 'the selected row needs its own treatment');
   assert.match(
@@ -118,8 +106,7 @@ test('the manager themes select options, not just the closed select', () => {
   );
   assert.match(checkedRule, /color:\s*var\(--fab-accent\)/);
 
-  // `color-scheme` is the only layer here that reaches every engine: it is what makes the
-  // platform-drawn popup dark at all, and without it the rules above are cosmetic.
+  // `color-scheme` is the only layer here that reaches every engine.
   assert.match(
     blockFor('.fabricate-manager'),
     /color-scheme:\s*dark/,
@@ -180,16 +167,6 @@ test('every manager select paints an opaque background, so its popup opens dark'
   const offenders = [];
 
   // 1. The global sheet: rules whose selector ends at a bare `select` under the manager.
-  //
-  // THE `\b` BELOW WAS A LITERAL BACKSPACE (issue 1373, round 8, found while editing this file).
-  // U+0008 is what an editor writes when a `\b` is passed through a shell heredoc or a non-raw
-  // Python string, and it is invisible in every diff, every review and every editor. The pattern
-  // therefore required a control character between the selector and `select`, matched NOTHING,
-  // and half of this gate had been scanning an empty set: 0 rules against the 27 the repaired
-  // pattern finds. Only branch 2, the scoped-block correlation, was ever doing any work.
-  //
-  // Repaired rather than reported, because the repair is provably safe: neither branch reports an
-  // offender on this tree, so the gate goes from vacuous to real without moving.
   for (const [, selector, body] of css.matchAll(
     /(\.fabricate-manager[^{},]*\bselect)\s*\{([^}]*)\}/g
   )) {
@@ -243,9 +220,7 @@ test('all three browser sort-direction toggles render as one control', async () 
   try {
     const base = managerButtonClassesFor('neutral');
     const toggles = SORT_DIRECTION_PROBES.map(({ probe, attributes }) => {
-      // The bespoke class travels through the primitive's APPENDING `class` prop, so the
-      // rendered element carries both — build the string the way the component joins it
-      // rather than restating one of the two spellings.
+      // The bespoke class travels through the primitive's APPENDING `class` prop.
       const extra = /class="([^"]*)"/.exec(attributes)?.[1] ?? '';
       const hook = extra ? '' : ` ${attributes}`;
       return `<button type="button" class="${[base, extra].filter(Boolean).join(' ')}"${hook} data-probe="${probe}"><i class="fas fa-arrow-down-short-wide"></i><span>Asc</span></button>`;
@@ -262,20 +237,8 @@ test('all three browser sort-direction toggles render as one control', async () 
     // this probe carries the family ROOT and `manager-button` WITHOUT `fab-manager-button`, which
     // is what an unconverted hand-written button is and is still on the base rule's 6px. So the
     // corner is measured in a real browser on both sides of the conversion boundary instead.
-    //
-    // THE ROOT IS PART OF THE UNCONVERTED SPELLING SINCE ISSUE 1502, not a conversion. That
-    // change re-rooted the family at `fabricate-button`, so the base rule the 6px comes from is
-    // `.fabricate-button.manager-button`: a root-less probe would match no family rule at all and
-    // would measure Foundry's own button corner, which is not what M12a claims. `fab-manager-
-    // button` is still the conversion marker and is still absent here.
-    //
-    // IT MODELS A STRING THE PRODUCT STILL RENDERS, which is what earns it its row in
-    // `manager-button-source-contract.test.js`'s fixture allowlist rather than a conversion:
     // `ComponentComplicationsSection.svelte` passes `triggerClass="fabricate-button manager-button"`
     // to `SearchablePopover`, so this is population B as well as the unconverted half of a pair.
-    // That allowlist row names the file and the literal and READS them, so this fixture cannot
-    // outlive the call site it models. Converting this probe would make it measure 9px, the
-    // equality below would hold trivially, and M12a's blast-radius claim would be gone.
     const unconverted = `<button type="button" class="fabricate-button manager-button" data-probe="unconverted"><i class="fas fa-arrow-down-short-wide"></i><span>Asc</span></button>`;
 
     await page.setContent(`
@@ -323,9 +286,7 @@ test('all three browser sort-direction toggles render as one control', async () 
       assert.ok(measured[probe], `the ${probe} probe rendered`);
     }
 
-    // Non-vacuity: the rule reached the fixture at all. 9px and 600 are what it declares; the
-    // bare PRIMITIVE declares 700 and, since issue 1371's M12a ruling, the same 9px — so weight
-    // is the discriminator and the corner is now the thing the third probe measures.
+    // Non-vacuity: the rule reached the fixture at all. 9px and 600 are what it declares.
     assert.equal(measured.recipe.borderRadius, '9px', 'the toolbar rule reached the fixture');
     assert.equal(measured.bare.fontWeight, '700', 'and the bare primitive is at the base weight');
     assert.notEqual(
@@ -362,9 +323,7 @@ test('all three browser sort-direction toggles render as one control', async () 
 });
 
 test('the composed picker cascade resolves to the shared panel and the callers own boxes', async () => {
-  // 900 tall on purpose: the shared panel caps at `min(50vh, 360px)`, so a viewport under
-  // 720px would resolve that to 50vh and the residual below would read a viewport rather than
-  // the sheet's own ceiling.
+  // 900 tall on purpose: the shared panel caps at `min(50vh, 360px)`.
   const context = await openLayoutContext({ viewport: { width: 900, height: 900 } });
   const page = await context.newPage();
   try {
@@ -398,9 +357,7 @@ test('the composed picker cascade resolves to the shared panel and the callers o
         return left.order > right.order;
       };
 
-      // Every style rule in the sheet, flattened, in source order, with media queries that do
-      // not currently apply dropped: a rule that cannot match at this viewport is not in the
-      // cascade and would misreport the winner if it were counted.
+      // Every style rule in the sheet, flattened, in source order.
       const rules = [];
       const collect = (list) => {
         for (const rule of list) {
@@ -412,11 +369,7 @@ test('the composed picker cascade resolves to the shared panel and the callers o
       };
       for (const sheet of document.styleSheets) collect(sheet.cssRules);
 
-      // EVERY PROPERTY WHOSE WINNER THE BROWSER DISAGREES WITH, across every probe. The named
-      // assertions below pin ~40 properties by SELECTOR; the report printed under
-      // `FABRICATE_CASCADE_REPORT=1` — which is this change's acceptance evidence — covers every
-      // property on eleven surfaces, and none of those was checked against anything at all. This
-      // list is what makes the enumerator's own claim testable rather than asserted.
+      // EVERY PROPERTY WHOSE WINNER THE BROWSER DISAGREES WITH.
       const mismatches = [];
       // HOW MANY WINNERS THE CROSS-CHECK ACTUALLY COMPARED. `mismatches` being empty means
       // nothing on its own: it is empty both when every winner agrees with the browser and when
@@ -599,10 +552,6 @@ test('the composed picker cascade resolves to the shared panel and the callers o
     // ── THE ENUMERATOR IS PINNED ON THE LITERAL-VALUED CONTESTED WINNERS ────────────────
     // The named clauses below compare each winner's SELECTOR against a hard-coded expectation,
     // which is what makes a wrong enumerator red — but only over the ~40 properties they name.
-    // The report covers every property on eleven surfaces and was checked against nothing, so a
-    // confident wrong report was a state this file could reach. Every contested winner whose
-    // declared value is a LITERAL is now compared with the browser's own answer as it is
-    // enumerated — 33 of the ~175 contested pairs today, on five of the eleven probes.
     assert.deepEqual(
       report.mismatches,
       [],
@@ -640,10 +589,7 @@ test('the composed picker cascade resolves to the shared panel and the callers o
       );
     }
     assert.equal(panel['z-index'].computed, '4000');
-    // `--fab-bg-0`, resolved. The DECLARED value is unreadable at the longhand level — CSSOM
-    // expands `background: var(--fab-bg-0)` into a `background-color` whose declared text is
-    // empty because the custom property cannot be substituted per-longhand — so the token is
-    // proved by the colour it resolves to rather than by its name.
+    // `--fab-bg-0`, resolved. The DECLARED value is unreadable at the longhand level.
     assert.equal(panel['background-color'].computed, 'rgb(17, 26, 35)');
     assert.equal(
       report.tokens.bg0.toLowerCase(),
@@ -739,10 +685,7 @@ test('the composed picker cascade resolves to the shared panel and the callers o
     );
     assert.equal(row['box-sizing'].selector, SHARED_ROW, 'and its box-sizing');
 
-    // ── THE COMPOSITION: OUTLINE OVER FILL, ON ONE ROW ──────────────────────────────────
-    // Not "active beats selected". The two occupy different PROPERTIES and both render, which
-    // is the whole reason the cursor is an outline rather than a fourth fill rung. Proved on a
-    // row that is simultaneously the cursor and the current value.
+    // ── THE COMPOSITION: OUTLINE OVER FILL.
     const marked = report.surfaces['icon-row-active-selected'];
     for (const property of ['outline-style', 'outline-color', 'outline-width', 'outline-offset']) {
       assert.equal(
@@ -787,8 +730,7 @@ test('the composed picker cascade resolves to the shared panel and the callers o
           'be granted over nothing'
       );
     }
-    // THE CHIP, AT BOTH ROOTS. The popover member takes a caller-rooted override; the TRIGGER
-    // member must not, because that chip is in the closed-state frame of every importer.
+    // THE CHIP, AT BOTH ROOTS. The popover member takes a caller-rooted override.
     assert.equal(
       report.surfaces['row-chip']['background-color'].selector,
       '.fabricate-icon-picker-popover.essence-icon-picker-popover .essence-icon-picker-preview',
@@ -846,12 +788,6 @@ test('the composed picker cascade resolves to the shared panel and the callers o
     // z-index in [120, 4000) is one whose relationship to the panel changed. The delta expected
     // that set to be EMPTY. Measured, it is not: `ManagerColorPicker`'s panel is the one other
     // popover still on the old rung.
-    //
-    // Recorded rather than resolved, and pinned so it cannot grow. The two panels are opened by
-    // different triggers and each closes on an outside click, so they are not co-open in any
-    // reachable state, and no frame or case shows both. What the pin buys is that the NEXT rule
-    // parked in this band reds here and has to be reasoned about, instead of quietly landing
-    // underneath a panel that used to be its peer.
     assert.deepEqual(
       report.band,
       ['.fabricate-color-picker-popover.manager-color-picker-popover { z-index: 120 }'],
@@ -887,8 +823,7 @@ test('the source picker`s trigger fills its column, and only one of its two site
         inspector: widthOf('inspector-trigger'),
         editor: widthOf('editor-trigger'),
         ownRule: widthOf('own-rule-trigger'),
-        // Exactly what `EssenceSourceSelector.measurePopoverMetrics` reads, read the same way, so
-        // the floored height below is the product's own arithmetic on the product's own numbers.
+        // Exactly what `EssenceSourceSelector.measurePopoverMetrics` reads, read the same way.
         metrics: {
           rowHeight: tile.getBoundingClientRect().height,
           rowGap: px(listStyles.rowGap),
@@ -921,9 +856,7 @@ test('the source picker`s trigger fills its column, and only one of its two site
         `insets and the card's 12px insets and 1px edges (got ${measured.editor}px)`
     );
 
-    // ── WHAT THE WITHDRAWN CEILING BOUND, DERIVED THROUGH THE SHIPPED LAYOUT ───────────
-    // Not asserted in prose: the two bands are run through the real module on the two measured
-    // widths. The floor is this picker's own 280 and is unchanged by the withdrawal.
+    // ── WHAT THE WITHDRAWN CEILING BOUND.
     const panelWidthAt = (triggerWidth, maxWidth) =>
       computeIconPickerPopoverLayout(
         { top: 200, bottom: 284, left: 100, right: 100 + triggerWidth, width: triggerWidth, height: 84 },
@@ -991,11 +924,7 @@ test('the source picker`s trigger fills its column, and only one of its two site
 test('the shared Select paints identically in both areas, and beats the paint it inherits', async () => {
   const frameScoped = scopedComponentCss(framePath);
 
-  // `Select.svelte` has NO scoped block to compile: issue 1504 lifted the whole
-  // `.fabricate-select*` family into `styles/fabricate.css`, so every selector below — the row
-  // content included — is already in the `${css}` the fixture loads at `layer(modules)`, at the
-  // specificity the product ships. Only the frame's direction toggle is still scoped, and only it
-  // is stamped.
+  // `Select.svelte` has NO scoped block to compile.
   const stamp = (markup) =>
     withScopeHash(markup, 'manager-scoped-list-direction', frameScoped.hashClass);
 
@@ -1195,8 +1124,7 @@ test('the shared Select paints identically in both areas, and beats the paint it
       );
     }
 
-    // The literal's whole observable consequence, stated as its own clause: a rule reading the
-    // area-scoped control-font property would compute the player area's inherited 14px here.
+    // The literal's whole observable consequence, stated as its own clause.
     assert.equal(
       report.triggers['player-toolbar'].fontSize,
       '11.52px',
@@ -1258,11 +1186,7 @@ test('the shared Select paints identically in both areas, and beats the paint it
     );
     assert.equal(report.headings.untickedManager, report.headings.untickedPlayer, 'in both areas');
 
-    // ── THE WEIGHT SPLIT ON THE SHIPPED TOOLBAR ROW, AS A NUMBER ────────────────────────────
-    // Decision KK moves the two CONVERTED controls' weight from the shipped `normal` to 500, and
-    // no Fabricate rule declares a weight for anything on this row. So the split is real and the
-    // three neighbours are measured rather than reasoned about: the row is 11.52px throughout
-    // BEFORE and AFTER, and only the converted controls' weight moves.
+    // ── THE WEIGHT SPLIT ON THE SHIPPED TOOLBAR ROW.
     assert.equal(report.shipped.select.size, '11.52px', 'the shipped sort select`s type size');
     assert.equal(report.shipped.search.size, '11.52px', 'and its search field`s');
     assert.equal(report.shipped.direction.size, '11.52px', 'and its direction toggle`s');
@@ -1288,10 +1212,6 @@ test('the shared Select replaces Foundry`s focus ring rather than joining it, in
   // `:focus-visible` is what a keyboard leaves, and there the component's own rule has to beat
   // `.fabricate button:focus-visible`'s 2px accent OUTSET outline with the specimen's "border to
   // accent-border, no glow".
-  //
-  // Programmatic `.focus()` on a `<button>` does NOT match `:focus-visible` in Chromium, so the
-  // keyboard half focuses a preceding anchor and presses Tab — a real keyboard interaction, which
-  // is what sets the focus-visible modality.
   const context = await openLayoutContext({
     viewport: { width: 900, height: 400 },
     deviceScaleFactor: 1,
@@ -1415,17 +1335,6 @@ test('the shared Select replaces Foundry`s focus ring rather than joining it, in
 });
 
 // THE ONE LIFTED CONTEST THAT ONLY A HOVER CAN SETTLE (issue 1504).
-//
-// `.fabricate-picker-popover .manager-travel-option:hover { background: var(--fab-surface-raised) }`
-// is (0,3,0) and, since the `.fabricate-select*` family moved out of a scoped block and into this
-// sheet, it sits in the SAME `layer(modules)` as the family's selected-row fill. So the fill is
-// written at (0,3,0) too and wins on source order; at (0,2,0) — the shape it would naturally
-// take — a hovered current value would take the shared row's hover fill instead, which reads as
-// deselecting the very row a GM is pointing at.
-//
-// It gets its own fixture rather than a clause in the paint test above because that fixture stacks
-// two absolutely-positioned panels per area, so nothing in it is hoverable: Playwright's
-// actionability check reports the sibling panel intercepting pointer events. One panel, one row.
 test('a hovered SELECTED option row keeps the shared Select`s own fill', async () => {
   const context = await openLayoutContext({
     viewport: { width: 640, height: 320 },
@@ -1530,8 +1439,6 @@ test('every converted pager site retains its declared trigger fill and width flo
 
   try {
     // Each site's wrapper carries its OWN component's hash, because that is what Svelte compiles:
-    // the hash lands on the caller-owned wrapper and the `:global(…)` tail stays unhashed. Getting
-    // this wrong in either direction changes the specificity the assertion is about.
     const siteMarkup = (site, hash) => `
       <div class="${site.area === 'fabricate-manager' ? 'fabricate' : `fabricate ${site.area}`}">
         ${site.area === 'fabricate-manager' ? '<main class="fabricate-manager">' : ''}
@@ -1603,9 +1510,7 @@ test('every converted pager site retains its declared trigger fill and width flo
       // names what intercepted it when the answer is wrong.
       const hitOf = (name) => {
         const element = at(name);
-        // `elementFromPoint` is VIEWPORT-relative, and this fixture stacks seven sites down one
-        // page, so anything below the fold reads as `null` — a false failure rather than a
-        // real one. Scroll each into view first, then take its box.
+        // `elementFromPoint` is VIEWPORT-relative.
         element.scrollIntoView({ block: 'center' });
         const box = element.getBoundingClientRect();
         const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
@@ -1649,13 +1554,7 @@ test('every converted pager site retains its declared trigger fill and width flo
         '7px',
         `${site.probe}: and so does the corner, which is the axis the pager matches its arrows on`
       );
-      // THE TRIGGER'S OWN INLINE PADDING, which is the axis the conversion widened. The family
-      // declares `--fab-space-3` (12px) each side, and against the native control it replaced
-      // that is 12px of extra box — absorbed by the summary, which is the only shrinkable item
-      // in every one of these bars. Six bars have room for it; the crafting browser's is the
-      // narrowest column in either application and its summary truncated INSIDE the range
-      // number, so that site alone narrows to `--fab-space-2`. Asserted per site rather than
-      // once, because a family-wide change is the way this per-site licence gets lost.
+      // THE TRIGGER'S OWN INLINE PADDING.
       assert.equal(
         measured.paddingInline,
         site.padding,
@@ -1676,14 +1575,6 @@ test('every converted pager site retains its declared trigger fill and width flo
       // THE PAIR, WHICH IS THE WHOLE POINT OF THE MOVE. This change takes the arrows' RADIUS
       // and nothing else, so the bar reads as one control on the axis the specimen matches it
       // on while every arrow keeps the box it shipped at.
-      //
-      // AND THE BOX IT SHIPPED AT IS 28px AT ALL SEVEN SITES, WHICH IS NOT WHAT THE DECLARED
-      // HEIGHTS SAY. The manager rule and the journal's declare 28; the five player blocks
-      // declare 26 — and each of them also restates `min-height: var(--button-size, 2em)` to
-      // hold Foundry core's own floor, which is 28 at the 14px app base. A floor beats a
-      // height, so a declared 26 computes 28, exactly as `Pagination.svelte`'s own issue-1502
-      // note records ("that floor is what actually sizes the five 26px arrows to 28px today").
-      // So the converted 30px trigger stands 2px above its arrows, not 4.
       const arrow = report.arrows[site.probe];
       assert.equal(
         arrow.radius,
@@ -1719,21 +1610,6 @@ test('the stranded toolbar select rules are narrowed onto their last native carr
   // rules that painted a `.manager-scoped-list-toolbar select`. They are NARROWED onto the one
   // route that still renders one — the world-vocabulary sort select — rather than deleted,
   // because that select takes its ENTIRE skin from them.
-  //
-  // The numeric proof is a computed-style clause in
-  // `world-vocabulary-control-row-cascade.test.js`, and it CANNOT RUN IN CI: that suite skips
-  // itself whole unless a harvested Foundry chrome resolves, `.foundry-chrome/` is gitignored,
-  // and no workflow harvests it before `npm test`. So the same claim is asserted here, in a
-  // suite that never skips. Deleting either narrowed rule reds in CI as well as on a
-  // developer's machine.
-  //
-  // It reads the rule's SELECTOR PRELUDE rather than a substring of the file, because the
-  // formatter breaks a four-compound selector across four lines: a substring assertion would
-  // pass or fail on whitespace and would stop reading the moment prettier reflowed it.
-  // Comments out first, and not as tidiness: this sheet's prose quotes the very selector under
-  // test — the block header above these rules explains why `.fabricate-manager
-  // .manager-scoped-list-toolbar select` has to out-rank core — so a reader that kept comments
-  // would report the documentation as an unnarrowed rule.
   const declarations = css.replaceAll(/\/\*[\s\S]*?\*\//g, ' ');
   const preludes = declarations
     .split('}')
@@ -1766,22 +1642,7 @@ test('the stranded toolbar select rules are narrowed onto their last native carr
   }
 });
 
-// ══════════════════════════════════════════════════════════════════════════════════════════════
 // THE OTHER TWO CONVERTED SITE CLASSES OWN THEIR POINTER TARGETS (issue 1504)
-// ══════════════════════════════════════════════════════════════════════════════════════════════
-//
-// The pager's seven sites are hit-tested in the clause above, inside the fixture that already
-// renders them. The other two converted controls sit in containers of their own and are tested
-// here for the same reason: DOM presence proves nothing for a control that opens an OVERLAY.
-// A stacking context, a global Foundry rule or a full-width wrapper can swallow the press that
-// opens the panel while every computed style still reads correctly.
-//
-//   - `.fab-bulk-edit-select` — the bulk panel's `form` rung, in a 300px rail whose sheet rule
-//     stretches the TRIGGER to `width: 100%`. The failure this guards is the rule landing on the
-//     picker ROOT instead: the root would fill the rail, the button would hug its value, and the
-//     right two thirds of what looks like the control would do nothing.
-//   - the scoped catalogue's `toolbar` rung, on a wrapping flex row beside a search field, a
-//     segmented control and a direction toggle, any of which could overlap it at a narrow width.
 test('the bulk-panel and toolbar triggers own their own pointer targets', async () => {
   const context = await openLayoutContext({
     viewport: { width: 1100, height: 600 },
@@ -1876,9 +1737,7 @@ test('the bulk-panel and toolbar triggers own their own pointer targets', async 
       );
     }
 
-    // AND THE BULK RAIL'S WIDTH RULE LANDS ON THE BUTTON, not on the picker root around it. A
-    // root-width rule looks identical in a screenshot and leaves two thirds of the apparent
-    // control inert, which is the exact defect a pointer hit-test alone would not name.
+    // AND THE BULK RAIL'S WIDTH RULE LANDS ON THE BUTTON.
     assert.ok(
       Math.abs(report.bulk.width - report.bulk.railWidth) <= 1,
       `the bulk trigger fills its 300px rail (measured ${report.bulk.width.toFixed(1)}px against ` +
@@ -1893,27 +1752,12 @@ test('the bulk-panel and toolbar triggers own their own pointer targets', async 
 test('the pager names its per-page control with the words a GM can see', () => {
   // ── WCAG 2.5.3, LABEL IN NAME (issue 1504) ───────────────────────────────────────────────
   // The `<select>` this replaced read `aria-label="Rows per page"` beside a visible `Per page`.
-  // The name CONTAINED the visible text, so 2.5.3 was arguably met — but a speech-input user
-  // says what they can see, and "Per page" is not how that name begins. Two fixes were
-  // available: retype the label, or point the trigger at the caption. Pointing at it is the one
-  // the two strings cannot drift apart under, because there is only one string.
-  //
-  // MEASURED after the change: host `<span class="manager-pagination-size">`, trigger
-  // `<button role="combobox" aria-haspopup="listbox" aria-labelledby="…-per-page">`, no
-  // `aria-label` at all, accessible name `Per page`, trigger text the page size itself.
-  //
-  // This is a SOURCE clause rather than a mounted one because it pins the WIRING — which id
-  // points at which element — and a mounted assertion on the resolved name passes just as well
-  // with an `aria-label` string beside the caption, which is the arrangement this removed.
   const source = readFileSync(
     resolve(__dirname, '../../src/ui/svelte/components/Pagination.svelte'),
     'utf8'
   );
 
-  // THE HOST CLASS IS BUILT RATHER THAN SPELLED, and that is not fussiness: the fixture-ancestry
-  // clause in `searchable-popover-area-scope.test.js` scans this file's TEXT for markup copying
-  // a shared primitive's classes, and a literal `<span class="manager-pagination-size">` in an
-  // assertion reads to it as a hand-built fixture with no `fabricate-pagination` above it.
+  // THE HOST CLASS IS BUILT RATHER THAN SPELLED, and that is not fussiness.
   const HOST_CLASS = 'manager-pagination-size';
   assert.ok(
     !source.includes(`<label class="${HOST_CLASS}"`),

@@ -1,20 +1,10 @@
-/**
- * The bulk panels: the inspector swap, the two-press set delete and the set-apply write.
- *
- * A route module of `manager-mounted.test.js` (issue 1690). It registers its cases INSIDE
- * that file's one `describe` rather than at module scope, so the split keeps the suite
- * name, the compiled manager tree and the one process the 26,709-line file had.
- * `manager-mounted-shared.js` owns the compile and the between-test yield; the mount state
- * below is this module's own, so its locators read its own `target`.
- */
+/** The bulk panels: the inspector swap, the two-press set delete and the set-apply write. */
 
 import { afterEach, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { flushSync, mount, tick, unmount } from 'svelte';
-// Issue 1504: a converted control is a shared `<Select>`, so choosing a value is two clicks on a
-// panel PORTALED onto the manager root rather than a `change` on a native `<select>`. Every
-// lookup is therefore rooted on the mount target and not on the control's own container.
+// Issue 1504: a converted control is a shared `<Select>`.
 import { chooseSelectOption, selectOptionValues } from '../helpers/select-control.js';
 import { createStore } from '../helpers/manager/managerStoreFake.js';
 import {
@@ -28,8 +18,7 @@ let Component;
 let mounted;
 let target;
 
-// The locators read `target` through a getter rather than a captured element, because the
-// module remounts per case and half these cases assign `target` themselves.
+// The locators read `target` through a getter rather than a captured element.
 const queries = createManagerQueries(() => target);
 const { craftingParent, navButton } = queries;
 const { mountManager } = createManagerMounts({
@@ -146,23 +135,8 @@ export function registerBulkCases() {
   });
 
   // ── The armed set delete, end to end (issue 1129) ──────────────────────────────────
-  //
-  // The panel-level suite proves the CARD behaves; this proves the ROOT wires it — that the
-  // impact reaches the panel, that the two clicks reach the store, and above all that the
-  // armed token does not survive a change to the set it was armed for.
 
-  // ── Row 68: the component inspector's Delete, the same repair one column over ──────
-  //
-  // Same shape as the recipe inspector's, and deliberately asserted the same way: this
-  // column has FOUR controls, and Unlink is the one that makes the sibling check worth
-  // running. Unlink breaks the item linkage and keeps the component — it destroys nothing —
-  // so it is precisely the neighbour a `danger` role picked by feel would land on.
-  // REWRITTEN FOR ISSUE 1371's PARITY ROUND 4 (gap-list row 123). The four-button stack this
-  // case was written against — Edit, Copy source UUID, Unlink, Delete, all full-width and all
-  // inline in the scroll area — is what the reference replaces with ONE pinned primary and an
-  // overflow. Four commands at equal weight where the design pins one is a hierarchy change, not
-  // a variant, so the case moves with it: what survives is the claim it was really making, that
-  // Delete is marked destructive and its three neighbours are not.
+  // ── Row 68: the component inspector's Delete.
   it('pins ONE primary and puts the other three behind the kebab, Delete alone marked destructive', async () => {
     await openComponentsBrowser();
 
@@ -179,8 +153,7 @@ export function registerBulkCases() {
       'which is the act this whole screen exists to reach'
     );
 
-    // The other three are BEHIND the kebab and therefore absent until it is opened — which is
-    // itself the assertion the old stack could not make.
+    // The other three are BEHIND the kebab and therefore absent until it is opened.
     assert.ok(
       !target.querySelector('[role="menuitem"]'),
       'pre-condition: the overflow is closed, so none of its commands is on screen'
@@ -206,8 +179,7 @@ export function registerBulkCases() {
     }
   });
 
-  // The remove leg sits in the shell's dock since issue 1371 r16-list (M23): the reference's
-  // `Remove N components from {system}…`, not a delete card below the shell.
+  // The remove leg sits in the shell's dock since issue 1371 r16-list (M23).
   function componentDeleteButton() {
     return target.querySelector('[data-component-bulk-remove] .manager-button.is-danger');
   }
@@ -215,9 +187,7 @@ export function registerBulkCases() {
   it('offers the set delete the moment the bulk panel replaces the inspector', async () => {
     await openComponentsBrowser();
 
-    // The gap this issue closes: before it, ticking a row hid the ONLY delete affordance. The
-    // single-component delete is behind the inspector's kebab since issue 1371's parity round 4
-    // (gap-list row 123), so the pre-condition is asserted on the trigger that reaches it.
+    // The gap this issue closes: before it.
     assert.ok(
       Boolean(target.querySelector('[data-component-inspector-menu]')),
       'the single-component inspector offers its overflow, and Delete is in it'
@@ -260,9 +230,7 @@ export function registerBulkCases() {
   });
 
   it('DISARMS when the selection changes underneath the armed control', async () => {
-    // An arm is a statement about a SPECIFIC set. If the set moves, the impact sentence the
-    // GM read before arming is no longer the impact of confirming, so the second click must
-    // not still be a confirmation.
+    // An arm is a statement about a SPECIFIC set. If the set moves.
     const calls = [];
     await openComponentsBrowser(calls);
     tickComponentRow('c1');
@@ -308,9 +276,7 @@ export function registerBulkCases() {
     );
   });
 
-  // The post-delete toast is the ONLY feedback that survives the panel unmounting, on the
-  // same terms as the apply toast above. Both cases below install `ui.notifications` per
-  // test and remove it again, matching `applyBulkEditOverRows`.
+  // The post-delete toast is the ONLY feedback that survives the panel unmounting.
   async function deleteSelectedRows(ids, options = {}) {
     const messages = [];
     const calls = [];
@@ -332,8 +298,7 @@ export function registerBulkCases() {
   }
 
   it('reports the DISABLED recipes in the toast, the most consequential outcome', async () => {
-    // Components deleted and recipes rewritten are administrative; recipes disabled is the
-    // one the GM's players feel. It was the number the toast did not carry.
+    // Components deleted and recipes rewritten are administrative.
     const { messages } = await deleteSelectedRows(['c1', 'c2'], {
       deleteComponentsResult: { deleted: 2, recipesUpdated: 3, recipesDisabled: 1 },
     });
@@ -352,10 +317,7 @@ export function registerBulkCases() {
   });
 
   it('reports NO success and keeps the selection when the write deleted nothing', async () => {
-    // The store returns its zero result — an OBJECT, and therefore truthy — on a failed
-    // write, after raising its own error toast. A bare `if (!result)` guard let that through
-    // as success: the selection cleared and the GM read "Deleted 0 component(s)" underneath
-    // the error, with the rows still in the library.
+    // The store returns its zero result — an OBJECT, and therefore truthy.
     const { messages } = await deleteSelectedRows(['c1'], {
       deleteComponentsResult: { deleted: 0, recipesUpdated: 0, recipesDisabled: 0 },
     });
@@ -380,9 +342,7 @@ export function registerBulkCases() {
       target.querySelector('[data-component-bulk-delete-announce]').textContent.trim(),
       'Nothing was deleted. The selection is unchanged.'
     );
-    // `assert.ok` over a boolean, never `assert.equal` over two nodes: on failure
-    // `node:assert` serialises the actual value and walks a mounted happy-dom element's
-    // circular tree until the heap dies, which surfaces as `# cancelled` with no message.
+    // `assert.ok` over a boolean, never `assert.equal` over two nodes.
     assert.ok(
       document.activeElement === componentDeleteButton(),
       'and the keyboard is back on the control that was pressed'
@@ -445,8 +405,7 @@ export function registerBulkCases() {
     await openComponentsBrowser(calls);
     tickComponentRow('c1');
 
-    // The steppers cannot reach this state on a fresh draft — `Stepper` emits nothing at
-    // the zero boundary — so the staged-axis chip is the only path to it.
+    // The steppers cannot reach this state on a fresh draft.
     target.querySelector('[data-component-bulk-essences-staged]').click();
     flushSync();
     target.querySelector('[data-component-bulk-apply]').click();
@@ -496,9 +455,6 @@ export function registerBulkCases() {
   });
 
   // The count the GM is told is the count that actually CHANGED, not the count they ticked.
-  // The write primitive compares each component before and after, so ticking two and adding
-  // a tag one already carries updates ONE. Naming the selection size instead would report
-  // work that did not happen — and the toast is the only record of it.
   it('names the components that actually changed, not the ones selected', async () => {
     const messages = await applyBulkEditOverRows(['c1', 'c2'], {
       applyComponentBulkEditResult: { updated: 1, componentIds: ['c1'] },
@@ -516,8 +472,6 @@ export function registerBulkCases() {
   });
 
   // `store.applyComponentBulkEdit?.(…)` resolves to `undefined` when the action is absent.
-  // The root used to test `applied === false`, so `undefined` fell through to the success
-  // path: selection cleared, toast fired, nothing written. Any falsy result must abort.
   it('does not claim success when the store action is missing', async () => {
     const messages = await applyBulkEditOverRows(['c1'], {
       applyComponentBulkEditResult: null,
@@ -525,12 +479,7 @@ export function registerBulkCases() {
     assert.deepEqual(messages, [], 'no toast for a write that never happened');
   });
 
-  // A selection lives on the lifted browser state, not on the page, and the root builds the
-  // Apply payload from `itemCards` rather than from the rendered rows. Both halves were
-  // proved separately — the view suite pages away and asserts the COUNT survives, the model
-  // suite asserts the reducer is page-independent — but nothing drove the real Apply with a
-  // selection the current page cannot render. That is the composition a GM actually performs
-  // on the library size this feature exists for.
+  // A selection lives on the lifted browser state, not on the page.
   it('applies a selection that spans two pages, including the row page 2 cannot see', async () => {
     const calls = [];
     // Twelve rows over a ten-row page: `c1` sits on page 1, `pad-11` on page 2.
@@ -553,8 +502,7 @@ export function registerBulkCases() {
       !target.querySelector('[data-component-select="c1"]'),
       'pre-condition: page 2 does not render the first selection'
     );
-    // Whichever row page 2 happens to open on — the point is that it is NOT `c1`, not
-    // which padding row the sort produces.
+    // Whichever row page 2 happens to open on — the point is that it is NOT `c1`.
     const offPageId = target
       .querySelector('[data-component-select]')
       .getAttribute('data-component-select');
@@ -644,9 +592,7 @@ export function registerBulkCases() {
     ]);
   });
 
-  // `updated` counts recipes whose own FIELDS changed, so a book-only edit legitimately
-  // changes none. Leading with "No recipes needed changing" ahead of "3 additions" reads as
-  // a contradiction rather than as the two distinct facts it is.
+  // `updated` counts recipes whose own FIELDS changed.
   it('drops "No recipes needed changing" when the batch moved book membership', async () => {
     const messages = await applyRecipeBulkEditOverRows(['r1', 'r2'], {
       applyRecipeBulkEditResult: {
@@ -676,11 +622,7 @@ export function registerBulkCases() {
     assert.deepEqual(messages, ['Applied bulk changes to 1 recipe.']);
   });
 
-  // ── Issue 1132: the recipe set delete, end to end ─────────────────────────────────
-  //
-  // The panel suite proves the card is WIRED and the card suite proves it BEHAVES; this is
-  // the only place the ROOT's three additions can be proved at all — the second effect, the
-  // failure path and the busy flag. Each of the three is invisible to every other suite.
+  // ── Issue 1132: the recipe set delete.
 
   async function openRecipesBrowser(calls = [], options = {}) {
     mountManager(calls, options);
@@ -695,17 +637,6 @@ export function registerBulkCases() {
   }
 
   // ── Row 29: the recipe inspector's Delete is the DESTRUCTIVE verb (issue 1118) ─────
-  //
-  // It shipped role-less and got its danger-red ink and border from a BESPOKE rule that
-  // restated `.manager-button.is-danger`'s two tokens by hand. Two copies of one decision is
-  // the failure this conversion exists to end, so the copy went and the role arrived; the
-  // rule keeps only the panel SURFACE, which `is-danger` does not declare.
-  //
-  // Asserted on the RENDERED node, addressed by the hook the control already carried, and
-  // asserted against its two SIBLINGS in the same stacked column rather than on its own. A
-  // check that only reads Delete cannot tell "Delete is danger" from "this whole column is
-  // danger", and the column is exactly where a misplaced role would land: Duplicate and Edit
-  // are neighbours in the same `<div>`, one tag apart in the source.
   it('paints the recipe inspector Delete as danger, and only Delete', async () => {
     await openRecipesBrowser();
 
@@ -722,8 +653,7 @@ export function registerBulkCases() {
       remove.classList.contains('is-danger'),
       'Delete carries the danger role — the verb removes a record'
     );
-    // The pass-through class survives the conversion, because the sheet keys the panel's own
-    // surface and full-width geometry on it and `manager-contract.test.js` names it too.
+    // The pass-through class survives the conversion.
     assert.ok(
       remove.classList.contains('manager-recipe-browser-inspector-delete'),
       'and keeps the bespoke class the panel geometry is keyed on'
@@ -748,8 +678,7 @@ export function registerBulkCases() {
   }
 
   it('offers the set delete the moment the bulk panel replaces the inspector', async () => {
-    // The gap this issue closes, stated as the sequence a GM performs: Delete lived ONLY on
-    // the single-recipe inspector, so ticking the rows you wanted rid of hid it.
+    // The gap this issue closes, stated as the sequence a GM performs.
     await openRecipesBrowser();
     assert.ok(
       Boolean(target.querySelector('[data-recipe-action="delete"]')),
@@ -797,17 +726,7 @@ export function registerBulkCases() {
   });
 
   it('DISARMS when the selection changes underneath the armed control', async () => {
-    // The second effect. An arm is a statement about a SPECIFIC set: once the set moves, the
-    // impact sentence the GM read before arming is no longer the impact of confirming.
-    //
-    // WHAT THIS DOES NOT PROVE, said plainly so nobody reads more into it. It does not
-    // distinguish the effect's `Set` dependency from a `count` one: keying the effect on
-    // `recipeBulkSelectionCount` instead leaves this test GREEN, verified by mutation. That
-    // is not a hole in the test — no reachable control produces an equal-sized new set
-    // (untick-then-tick is two flushes, the browser's phantom prune assigns only when the
-    // size differs, and `Select all N results` is hidden once everything is selected), so
-    // there is no such case to write. The Set dependency is keyed on the reactive unit the
-    // state is; see the effect's own comment.
+    // The second effect. An arm is a statement about a SPECIFIC set: once the set moves.
     const calls = [];
     await openRecipesBrowser(calls);
     tickRecipeRow('r1');
@@ -957,10 +876,7 @@ export function registerBulkCases() {
   });
 
   it('returns the card to IDLE and keeps the selection when the write is refused', async () => {
-    // FAILURE IS NOT SILENT, and this path is reachable rather than theoretical: a GM whose
-    // `SETTINGS_MODIFY` has been revoked passes the client-side `_assertGM` gate and is then
-    // refused by the server. The store raises the error toast; the root must not announce a
-    // success on top of it, must not throw the selection away, and must not leave a spinner.
+    // FAILURE IS NOT SILENT, and this path is reachable rather than theoretical.
     const { messages } = await deleteSelectedRecipeRows(['r1'], {
       deleteRecipesResult: {
         deleted: 0,
@@ -988,14 +904,7 @@ export function registerBulkCases() {
     );
   });
 
-  // ── The impact is re-derived on a REPUBLISH, not only on a selection change ───────
-  //
-  // Everything `describeRecipeDelete` consults is invisible to the rune graph: the selected
-  // system id is a `svelte/store` read, the system comes out of a plain Map and the learner
-  // index is a plain `let`. So the selection was the derivation's only trigger, and the
-  // concrete drift was reachable inside this very panel — select three recipes, stage "add to
-  // Book X", Apply (the selection survives), and the card still stated the pre-apply book
-  // count while the confirm pruned the post-apply one (issue 1132, review round).
+  // ── The impact is re-derived on a REPUBLISH.
   it('re-derives the impact when the store republishes underneath a live selection', async () => {
     const calls = [];
     const storeOptions = {
@@ -1025,7 +934,6 @@ export function registerBulkCases() {
     assert.match(itemsRow().textContent, /2 books & scrolls/, 'pre-condition');
 
     // The world moves under the card and the store republishes, exactly as `refresh()` does.
-    // The SELECTION is untouched, which is the whole point.
     storeOptions.recipeDeleteImpact = {
       deletable: 1,
       deletableIds: ['r1'],
@@ -1045,13 +953,7 @@ export function registerBulkCases() {
     );
   });
 
-  // ── The refused delete is ANNOUNCED, not just toasted (issue 1132, review round) ──
-  //
-  // Confirming disables the control, which moves focus to `document.body` and empties the
-  // card's live region. On the refused or no-op path the card is still mounted with the
-  // selection intact, so an assistive-technology user was left on `<body>` beside a
-  // re-enabled button with nothing said: the store's Foundry toast is not a live region this
-  // module controls, and nothing distinguished "deleted" from "refused".
+  // ── The refused delete is ANNOUNCED.
   it('announces the reached-nothing outcome through the card live region and re-arms nothing', async () => {
     // The zero result is returned on BOTH a concurrent no-op and a refused write (the store
     // cannot tell them apart from here), and the store's own toast for the former says
@@ -1069,18 +971,14 @@ export function registerBulkCases() {
 
     const region = target.querySelector('[data-recipe-bulk-delete-announce]');
     assert.ok(Boolean(region), 'the card is still mounted, so the region is there to speak');
-    // The sentence is QUEUED BEHIND the focus restore (issue 1157): the card returns the
-    // keyboard to the re-enabled control first, because a focus change cancels pending polite
-    // speech, and only then writes the text.
+    // The sentence is QUEUED BEHIND the focus restore (issue 1157).
     await waitForQueuedAnnouncement();
     assert.match(region.textContent, /Nothing was deleted\. The selection is unchanged\./);
     assert.equal(recipeDeleteButton().getAttribute('data-armed'), 'false');
   });
 
   it('clears the busy flag even when the action REJECTS, so the card cannot stick', async () => {
-    // The store catches its own write failures, so a rejection reaching the root means the
-    // failure was elsewhere — and a `finally`-less handler would leave `recipeBulkDeleting`
-    // true forever, disabling the control the GM needs in order to try again.
+    // The store catches its own write failures.
     const { messages } = await deleteSelectedRecipeRows(['r1'], { deleteRecipesReject: true });
 
     assert.deepEqual(messages, []);
@@ -1093,14 +991,6 @@ export function registerBulkCases() {
   // Three props are computed HERE and handed down, and the view/panel suites all supply
   // them directly — so every one of them could be mis-wired with those suites still
   // green. This test mounts the root and reads the DOM the forwarding produces:
-  //  - `difficultyAxisProgressive` into the browser (the row badge), and
-  //  - `showProgressiveDifficulty` into the panel (the DC section), both of which regress
-  //    to the pre-issue-772 CRAFTING-only bug if re-derived from `resolutionMode`;
-  //  - `selectedCards` into the panel, which must be the SELECTION and not the library:
-  //    the overwrite warning counts authored essences over it, so the library would
-  //    overstate the hazard on rows the GM never ticked.
-  // The fixture is deliberately progressive for SALVAGE while `resolutionMode` is
-  // `routedByCheck`, because that is the only shape where the two predicates disagree.
   it('forwards the three-axis DC predicate and the SELECTED cards, not the crafting mode and the library', async () => {
     await openComponentsBrowser([], {
       alchemyResolutionMode: 'routedByCheck',
@@ -1177,15 +1067,13 @@ export function registerBulkCases() {
       'no member is ever blocked — deletion is warned, not blocked'
     );
 
-    // Adding the COMPONENT-CARRIED essence changes all three numbers, and the recipe number
-    // is a UNION rather than a sum: `earth` names r1+r2 and `water` names r2, so 2, not 3.
+    // Adding the COMPONENT-CARRIED essence changes all three numbers.
     target.querySelector('[data-essence-select="earth"]').click();
     await tick();
     flushSync();
     assert.ok(impactText('essences').startsWith('2'), 'the carried member is deletable too');
     assert.ok(impactText('recipes').startsWith('2'), 'r1 and r2, unioned rather than summed');
-    // And the row RETURNS the moment the count is non-zero, which is what stops the absence
-    // assertion above passing for a row that was simply removed.
+    // And the row RETURNS the moment the count is non-zero.
     assert.ok(
       impactText('components').startsWith('1'),
       'and its CARRIER is reported as impact, unioned over the whole selection'
@@ -1226,14 +1114,6 @@ export function registerBulkCases() {
   });
 
   // ── The essence root's two no-write exits (issue 1132, review round) ──────────────
-  //
-  // Both guards were CORRECTED for the essence path by this change and both shipped with
-  // ZERO coverage: the component twin is gated by its own zero-result case and the recipe
-  // twin by a zero result and a rejection, while `deleteEssencesResult` was exposed by the
-  // store double and supplied by nothing in the suite. Reverting
-  // `Number(result?.deleted) || 0; if (deleted === 0)` to `if (!result)`, and moving
-  // `essenceBulkDeleteArmed = false` out of the `finally` and back into the `try`, were both
-  // green mutations. A fix the suite cannot see is not closed.
   async function deleteSelectedEssenceRows(ids, options = {}) {
     const messages = [];
     const calls = [];
@@ -1293,10 +1173,7 @@ export function registerBulkCases() {
   });
 
   it('reports NO essence success and keeps the selection when the write deleted nothing', async () => {
-    // The store returns its zero result — an OBJECT, and therefore truthy — on a failed
-    // write, after raising its own error toast. A bare `if (!result)` guard lets that through
-    // as success: the selection clears and the GM reads "Deleted 0 essence(s)" underneath the
-    // error, with the rows still in the library.
+    // The store returns its zero result — an OBJECT, and therefore truthy.
     const { messages, button } = await deleteSelectedEssenceRows(['water'], {
       deleteEssencesResult: { deleted: 0, blocked: [], recipesUpdated: 0 },
     });
@@ -1312,8 +1189,7 @@ export function registerBulkCases() {
       'but the arm is spent — a still-armed button would delete on the next single click'
     );
 
-    // The twin of the component assertion (issue 1157, review round): the card survives this
-    // path, so it is the one surface that can say the delete reached nothing.
+    // The twin of the component assertion (issue 1157, review round).
     await waitForQueuedAnnouncement();
     assert.equal(
       target.querySelector('[data-essence-bulk-delete-announce]').textContent.trim(),
@@ -1326,8 +1202,7 @@ export function registerBulkCases() {
   });
 
   it('clears the essence arm even when the action REJECTS, so the card cannot stick', async () => {
-    // The disarm has to live in the `finally`: in the `try`, after the await, a rejection
-    // skips it and leaves an ARMED button that deletes on the next single click.
+    // The disarm has to live in the `finally`: in the `try`, after the await.
     const { messages, button } = await deleteSelectedEssenceRows(['water'], {
       deleteEssencesReject: true,
     });
@@ -1380,23 +1255,9 @@ export function registerBulkCases() {
   });
 
   // ── Issue 1157: emptying a bulk selection ─────────────────────────────────────────
-  //
-  // Every action that empties a bulk selection unmounts the panel it was performed from, and
-  // with it the control that was pressed. Focus fell to `document.body` and nothing was said,
-  // on all three studios, for Clear as well as for delete.
-  //
-  // This is the ONLY suite that mounts `CraftingSystemManagerRoot`, so it is the only place
-  // the manager-level live region and the focus hop can be proved at all: both belong to the
-  // root precisely because every panel-level suite's component is gone by the time they act.
-  //
-  // ONE TABLE, NOT THREE COPIED BLOCKS. The defect was identical on the three studios, so a
-  // per-studio suite would be three chances to fix two of them — and three near-identical
-  // blocks are what the SonarCloud duplication gate fails on besides.
   describe('emptying a bulk selection announces it and re-homes the keyboard', () => {
-    //
     // `stage` is per-studio because the AXES are: the two studios with a category select
     // stage through it, and the Essence Studio, which has none, stages its status radio.
-    // Everything else here is one hook name per studio.
     const BULK_STUDIOS = [
       {
         name: 'Essence',
@@ -1426,8 +1287,7 @@ export function registerBulkCases() {
         toolbarClear: 'data-component-clear-selection',
         panelClear: 'data-component-bulk-clear',
         panel: 'data-component-bulk-panel',
-        // The remove leg's hook and a category ROW (issue 1371 r16-list, M23): the component
-        // studio's category is an inline inset, so its stage is a click rather than a select.
+        // The remove leg's hook and a category ROW (issue 1371 r16-list, M23).
         deleteCard: 'data-component-bulk-remove',
         apply: 'data-component-bulk-apply',
         stage: () => {
@@ -1460,10 +1320,7 @@ export function registerBulkCases() {
 
     /** Stage the first real option of a bulk category select, so Apply becomes live. */
     function stageFirstCategory(attribute) {
-      // ISSUE 1504: the axis is a shared `<Select>`, so the offered values are rows in a
-      // PORTALED panel rather than `<option>`s inside the control. The sentinel's row is the
-      // one with the declared `__unchanged__` handle, so "the first real category" is the first
-      // row that is not it — which is what this used to mean by "the first option with a value".
+      // ISSUE 1504: the axis is a shared `<Select>`.
       const values = selectOptionValues(target, `[${attribute}]`).filter(
         (value) => value !== '__unchanged__'
       );
@@ -1476,17 +1333,7 @@ export function registerBulkCases() {
 
     const REGION = '[data-manager-bulk-selection-announce]';
 
-    /**
-     * What holds focus, as a SHORT STRING.
-     *
-     * Never the node: `node:assert` serialises the actual value to build its diff, and
-     * walking a mounted happy-dom element's circular tree kills the heap — a failing
-     * assertion surfaces as a `# cancelled` suite with no message.
-     *
-     * `detached` is reported apart from `document.body` because the two engines disagree
-     * about which one a removed focused node produces, and BOTH are the failure this block
-     * exists to catch.
-     */
+    /** What holds focus, as a SHORT STRING. */
     function focusHolder(studio) {
       const active = document.activeElement;
       if (!active || active === document.body) return 'document.body';
@@ -1506,10 +1353,7 @@ export function registerBulkCases() {
       return region ? region.textContent.trim() : null;
     }
 
-    // The focus hop is deferred a microtask past Svelte's own flush — the same ordering
-    // `RecipeBulkEditPanel.focusAfterRerender` relies on — so an assertion made synchronously
-    // after the click would read the pre-hop `document.activeElement` and pass or fail for
-    // the wrong reason.
+    // The focus hop is deferred a microtask past Svelte's own flush.
     async function settle() {
       await tick();
       flushSync();
@@ -1517,15 +1361,7 @@ export function registerBulkCases() {
       await Promise.resolve();
     }
 
-    /**
-     * `settle()`, plus the wait for the sentence that is QUEUED BEHIND THE FOCUS UTTERANCE.
-     *
-     * A `polite` region is queued speech and a focus change cancels queued speech, so the
-     * announcement is deliberately written after the hop rather than before it — see
-     * `src/ui/svelte/util/announceAfterFocus.js`, which owns that order for the root and for
-     * `BulkDeleteCard` alike. The delay is IMPORTED rather than restated here: a local copy of
-     * the number would silently start asserting the un-delayed state the moment it changed.
-     */
+    /** `settle()`, plus the wait for the sentence that is QUEUED BEHIND THE FOCUS UTTERANCE. */
     async function settleAnnouncement() {
       await settle();
       await waitForQueuedAnnouncement();
@@ -1638,9 +1474,6 @@ export function registerBulkCases() {
       // silently re-selected the whole page, with no visible focus ring, because the box's
       // only ring is `:focus-visible` and Chrome does not match it for programmatic focus
       // after a pointer interaction.
-      //
-      // The space bar is asserted as what it IS on a focused control: a click. On the
-      // `<section>` it is nothing; on the checkbox it was the whole page back.
       it(`${studio.name} Studio: the hop target cannot be operated by the space bar`, async () => {
         await openStudio(studio);
         await selectRows(studio);
@@ -1702,10 +1535,7 @@ export function registerBulkCases() {
         );
       });
 
-      // A write that legitimately changed nothing — every selected row already matched the
-      // staged values — is not a failure, and "Updated 0 essences." was reachable and being
-      // SPOKEN as the sole outcome of a successful action. Each studio states the zero case
-      // in its own words.
+      // A write that legitimately changed nothing.
       it(`${studio.name} Studio: an Apply that changed nothing says so, rather than reporting 0`, async () => {
         await openStudio(studio, [], { [studio.applyResultOption]: { updated: 0 } });
         await selectRows(studio);
@@ -1728,9 +1558,7 @@ export function registerBulkCases() {
 
         assert.equal(messages.length, 1, 'the delete really did complete and report');
         await settleAnnouncement();
-        // The two audiences are told the SAME thing, asserted as an identity rather than as
-        // three hardcoded sentences: a studio that re-words its toast cannot leave the
-        // screen-reader user on a stale copy of the old one.
+        // The two audiences are told the SAME thing.
         assert.equal(announcement(), messages[0]);
         assert.match(
           announcement(),
@@ -1745,10 +1573,7 @@ export function registerBulkCases() {
       });
 
       it(`${studio.name} Studio: an identical second announcement REPLACES the region's node`, async () => {
-        // Re-inserting identical text announces nothing the second time, and clearing a
-        // selection twice running is an ordinary gesture. The child node is keyed on the
-        // announcement object so each one is a genuine insertion rather than a rewrite —
-        // asserted as node IDENTITY, because the text is identical by construction.
+        // Re-inserting identical text announces nothing the second time.
         await openStudio(studio);
         await selectRows(studio);
         target.querySelector(`[${studio.toolbarClear}]`).click();

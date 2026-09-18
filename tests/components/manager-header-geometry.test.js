@@ -1,38 +1,8 @@
 /*
  * THE MANAGER PAGE HEADER'S TWO GEOMETRY CONTRACTS, measured in a real engine.
- *
- * Both defects were read off a running world, and neither can be seen from the source.
- *
  *  1. The `Unsaved` chip renders SHORTER than the Back / Delete / Save buttons it sits
  *     beside. The header cluster is a `space-between` flex row that centres its children, so
  *     a 20px chip beside 34px buttons reads as a label that fell out of the group.
- *
- *  2. A long identity subtitle — a faction's description, a component's blurb — WRAPS, and
- *     the heading block it grows takes the row's width with it. The action cluster is
- *     `flex-wrap: wrap`, so instead of overflowing it breaks, and `Save` drops onto a second
- *     line under `Delete`. The title beside it is already clamped to one line; the subtitle
- *     under it was not.
- *
- * ── WHY A REAL BROWSER, AND NOT A SOURCE ASSERTION ───────────────────────────────
- *
- * Because the cascade is the whole subject. `styles/fabricate.css` is imported at
- * `layer(modules)` and Svelte's `css: 'injected'` blocks land UNLAYERED, so an unlayered
- * author declaration beats every layered one at any specificity — which is why
- * `.manager-header-actions .manager-chip { min-height: 34px }` was written at three classes,
- * did nothing, and was retired in issue 1118. `Chip.svelte` records that finding at length.
- *
- * A source assertion cannot tell a rule that wins from one that is inert. happy-dom computes
- * no cascade, so a mounted test cannot either. This measures the composed page: Foundry's
- * own sheet, then the global one at its real layer, then the components' compiled blocks
- * unlayered — which is the order the product loads them in.
- *
- * ── THE FIXTURE IS A MIRROR, AND MIRRORS ROT ─────────────────────────────────────
- *
- * The markup below stands in for the identity-header branch of
- * `CraftingSystemManagerRoot.svelte` — `.manager-recipe-edit-heading` and
- * `.manager-header-actions`, which the recipe editor and every companion drill-down share.
- * Change that markup and change this in the same commit: a green run against a stale mirror
- * proves nothing.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -55,11 +25,6 @@ const SCOPED_COMPONENTS = [
 
 /**
  * Stamp every class a component's own CSS scopes onto the fixture.
- *
- * BOTH of Svelte's scoping forms are collected. It writes a rule's SUBJECT as
- * `.name.svelte-hash` and every ancestor-qualified descendant as `.name:where(.svelte-hash)`,
- * and a pattern reading only the first silently skips the second — which does not fail, it
- * simply leaves the element unstyled and the measurement vacuous.
  *
  * @param {string} fixture
  * @param {{css: string, hashClass: string}} component
@@ -176,8 +141,7 @@ async function measure(subtitle, title) {
         sublineLine: Number.parseFloat(style.lineHeight) || 0,
         sublineOverflows: subline.scrollWidth > subline.clientWidth,
         sublineWidth: Math.round(subline.getBoundingClientRect().width),
-        // 1ch OF THE SUBTITLE'S OWN FONT, so the limit can be asserted as the reading measure
-        // it is rather than as a pixel figure that a type-scale change would falsify.
+        // 1ch OF THE SUBTITLE'S OWN FONT.
         sublineCh: (() => {
           const ruler = document.createElement('span');
           ruler.style.cssText = 'position:absolute;visibility:hidden;white-space:pre';
@@ -203,9 +167,7 @@ async function measure(subtitle, title) {
 }
 
 test('the header status chip is the same height as the buttons it sits beside', async () => {
-  // 20px BESIDE 34px was what shipped. The cluster centres its children, so the chip floated
-  // in the middle of the button row and read as a stray label rather than as the first member
-  // of the group — which is where every Core editor puts its own `Unsaved`.
+  // 20px BESIDE 34px was what shipped. The cluster centres its children.
   const measured = await measure('Training · 8 days total');
 
   const heights = new Set(measured.buttonHeights);
@@ -218,23 +180,17 @@ test('the header status chip is the same height as the buttons it sits beside', 
 });
 
 test('a long identity subtitle truncates rather than wrapping the action cluster', async () => {
-  // THE DEFECT, IN THE ORDER IT HAPPENS. The subtitle wraps, so the heading block claims more
-  // of the row; both children of a `space-between` row may shrink, so the action cluster is
-  // squeezed; and because the cluster is `flex-wrap: wrap` it BREAKS rather than overflowing,
-  // dropping `Save faction` onto a second line under `Delete faction`.
+  // THE DEFECT, IN THE ORDER IT HAPPENS. The subtitle wraps.
   const measured = await measure(LONG_SUBTITLE);
 
-  // ONE LINE. Asserted against the computed line height rather than a pixel figure, so the
-  // gate survives a type-scale change and still fails on a wrap.
+  // ONE LINE. Asserted against the computed line height rather than a pixel figure.
   assert.ok(measured.sublineLine > 0, 'the subtitle has no computed line height to measure');
   assert.ok(
     measured.sublineHeight <= Math.ceil(measured.sublineLine) + 1,
     `the subtitle wrapped to ${measured.sublineHeight}px against a ${measured.sublineLine}px line`
   );
 
-  // AND IT IS REALLY BEING CLIPPED, which is what distinguishes a truncated subtitle from one
-  // that merely happened to fit: without this a shorter fixture would satisfy the height check
-  // and the clamp could be dropped unnoticed.
+  // AND IT IS REALLY BEING CLIPPED.
   assert.equal(measured.sublineOverflows, true, 'the fixture subtitle is not long enough to clip');
 
   // AND IT IS WIDTH-LIMITED, not merely clipped at whatever the row left over. One line of a
@@ -265,12 +221,6 @@ test('a long identity TITLE does not wrap the action cluster either', () =>
     // **A SEPARATE CASE, AND IT HAD TO BE.** The subtitle clamp above fixes the reported defect
     // on its own -- driven mutation proved that the header's two `flex` rules changed nothing
     // for it -- and they are not therefore redundant: they are what a long TITLE needs.
-    //
-    // The title is already clamped to one line, so it never grows the heading TALLER. What it
-    // grows is the heading's max-content WIDTH, and in a `space-between` row where both children
-    // may shrink, the action cluster shrinks with it -- and wraps, because it is allowed to.
-    // `flex: 0 0 auto` on the cluster and `flex: 1 1 auto` on the heading name which of the two
-    // is the one that yields. Measured without them: heading 753px, actions 243px, two rows.
     const tops = new Set(measured.actionTops);
     assert.equal(
       tops.size,

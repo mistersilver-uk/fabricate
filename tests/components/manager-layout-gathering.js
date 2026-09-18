@@ -1,8 +1,5 @@
 /**
  * Gathering rail, settings, task browser, chance slider and World Parties layout, measured in a real browser (issue 1670).
- *
- * A surface module of `manager-layout.test.js`. It registers its tests on import and owns no
- * browser: `tests/helpers/layout-harness.js` holds the one Chromium every surface shares.
  */
 
 import test from 'node:test';
@@ -56,12 +53,7 @@ test('manager gathering rail submenu controls clear host mouse focus and keep gr
     '.fabricate-manager .manager-nav-subitem:focus-visible'
   );
 
-  // AN EXPANDED GROUP IS INDENTED ROWS AGAINST A GUIDE, NOT A SECOND CARD (issue 1373). The
-  // filled, ring-inset box drew a panel around a run of nav rows in a rail that is otherwise a
-  // flat list — and on the Tool Rules screen the boxed `Crafting` group sits directly above
-  // `Tool Rules`, which is NOT in it, so the box read as a claim about membership that the
-  // breadcrumb had also been making and that was equally untrue. The reference indents the
-  // children and marks them with a thin vertical rule.
+  // AN EXPANDED GROUP IS INDENTED ROWS AGAINST A GUIDE.
   assert.equal(
     expandedGroupBlock.includes('border-radius: 8px;'),
     false,
@@ -275,11 +267,7 @@ test('manager gathering settings condition panels use a two-column responsive gr
     panelBlock.includes('height: 100%;'),
     'condition panel backgrounds should fill the stretched grid row'
   );
-  // The trailing track is `max-content`, not 48px (issue 1118). A number here sized the
-  // column to the two words the Add button happens to hold today; converted, that button
-  // takes the primary role's `0 var(--fab-space-4)` — 32px of padding in a 48px box — and
-  // clips its own label whatever it says. `.manager-region-add` re-templated this same grid
-  // for a region row and was retired in the same edit: no component carries the class.
+  // The trailing track is `max-content`.
   assert.ok(
     addBlock.includes('grid-template-columns: 36px minmax(0, 1fr) max-content;'),
     'condition add controls should reserve icon picker, label input, and a content-sized Add column'
@@ -293,8 +281,7 @@ test('manager gathering settings condition panels use a two-column responsive gr
     biomeAddBlock.includes('grid-template-columns: 36px 36px minmax(0, 1fr) max-content;'),
     'biome add controls should align icon, colour, input, and a content-sized Add column'
   );
-  // The one declaration `.manager-add-button` keeps: the height that lines it up with the
-  // input beside it. Its width, padding and font-size are the primitive's now.
+  // The one declaration `.manager-add-button` keeps.
   assert.ok(
     blockFor('.fabricate-manager .manager-add-button').includes('height: 36px;'),
     'the Add button still matches the sibling input height'
@@ -468,8 +455,7 @@ test('manager gathering task browser defines bounded toolbar and compact table g
     '.fabricate-manager .manager-task-component-browser-footer .manager-pagination'
   );
   const componentPillsBlock = blockFor('.fabricate-manager .manager-task-component-pills');
-  // Three classes since issue 883: the pill is a `Chip`, whose scoped block also sits at
-  // two classes and is injected after this sheet, so the two-class form would lose.
+  // Three classes since issue 883: the pill is a `Chip`.
   const selectedTagPillBlock = blockFor(
     '.fabricate-manager .manager-chip.manager-selected-tag-pill'
   );
@@ -708,10 +694,6 @@ test('manager gathering task browser defines bounded toolbar and compact table g
   // chosen row — and forbade the accent alongside it. The reference marks a selected row the
   // way it marks every other chosen thing on these screens: `--fab-accent-border` with
   // `--fab-surface-active`.
-  //
-  // THE INSET MARKER STAYS FORBIDDEN, and that half of the original ratchet is intact: an
-  // accent BORDER is the edge of the card, while `box-shadow: inset 3px 0 0` is a second
-  // vocabulary this list does not use anywhere else.
   assert.ok(
     toolsSelectedListRowBlock.includes('border-color: var(--fab-accent-border);') &&
       toolsSelectedListRowBlock.includes('background: var(--fab-surface-active);') &&
@@ -1354,7 +1336,7 @@ test('manager gathering task browser defines bounded toolbar and compact table g
   );
 });
 
-// EACH CONTROL IS WRAPPED IN A BARE `<span class="fabricate-slider">` (issue 1508), and the shape
+// EACH CONTROL IS WRAPPED IN A BARE `<span class="fabricate-slider">` (issue 1508).
 // of the repair is load-bearing rather than cosmetic. `ChanceSlider` writes
 // `manager-drop-rate-control` on a CHILD of its root span, so every rule this fixture depends on
 // re-roots to a DESCENDANT chain — `.fabricate-slider .manager-drop-rate-control`,
@@ -1364,11 +1346,6 @@ test('manager gathering task browser defines bounded toolbar and compact table g
 // reads an element's own classes as part of its ancestry — while leaving this test measuring an
 // unstyled span, and the `leftInset` assertion below is the only thing in the repository that can
 // tell the two repairs apart.
-//
-// The wrapper moves nothing it is measuring: no rule matches `.fabricate-slider` alone (every
-// family rule is either a compound with a `manager-*` class or a descendant chain), each control
-// keeps its own inline `width: 240px`, and every assertion below is relative to the control's own
-// rect.
 test('chance slider rails clip continuous Tool gradients at thumb-centre endpoints without changing Gathering fill', async () => {
   const context = await openLayoutContext({
     viewport: { width: 640, height: 240 },
@@ -1452,14 +1429,6 @@ test('chance slider rails clip continuous Tool gradients at thumb-centre endpoin
 // The chance slider paints a coloured fill in a 6px track BEHIND a transparent range
 // input, so anything that gives that input a background hides the bar completely and
 // leaves only the thumb — which reads as "the slider renders a dot and no bar".
-//
-// The gathering edit views carry a blanket field rule over `:is(input…, select, textarea)`
-// that computes to (0,4,1) and outranks the slider's own (0,3,1) reset. It excluded
-// checkbox and radio but not range, so every drop row in the task and event editors lost
-// its bar while the inspector — whose twin rule already excluded range — kept it.
-//
-// Asserted on the RENDERED background rather than on the selector text, so a future rule
-// that reintroduces a background by some other route fails too (issue 883).
 test('a range input inside the gathering edit views stays transparent for the slider fill', async () => {
   const context = await openLayoutContext({ viewport: { width: 900, height: 200 } });
   try {
@@ -1505,15 +1474,11 @@ test('a range input inside the gathering edit views stays transparent for the sl
   }
 });
 
-// The gathering task library's inspector rail stacks three cards: "Gathering task details",
+// The gathering task library's inspector rail stacks three cards.
 // "Drops summary" and "Used in environments". The middle one restated the whole
 // `.manager-inspector-card` contract and then diverged on the two values it changed — a
 // `--fab-bg-3` fill instead of the shell's, and 16px of horizontal padding instead
 // of 12px — so it read as a different KIND of card from its neighbours.
-//
-// Asserted on the RENDERED box rather than on the absence of a selector, so a fill
-// reintroduced by any route (a new rule, an ancestor, a different class) fails too, and so
-// this stays true if the shell's own values are ever retuned (issue 883).
 test('the gathering inspector rail cards render as one card, not three treatments', async () => {
   const context = await openLayoutContext({ viewport: { width: 420, height: 600 } });
   const page = await context.newPage();
@@ -1702,7 +1667,6 @@ test('both converted chance-slider sites render a real fill, not a bare thumb', 
 test('World Parties preserves the shared stacked rail and body layout at narrow widths', async () => {
   // The World route deliberately releases the unused inspector at desktop widths. Its route
   // rule is more specific than the shared 1120px stack, however, so this must be measured:
-  // a source-text assertion would pass while the cascade left the two desktop tracks alive.
   const wide = await readWorkspaceGrid(1280, 'world', 'parties');
   assert.equal(wide.bodyColumns, 2, 'wide World Parties keeps its rail beside the full-width body');
 
@@ -1719,7 +1683,6 @@ test('World Parties preserves the shared stacked rail and body layout at narrow 
 test('World Parties keeps its card scroller and sibling pager independently reachable at 1100px', async () => {
   // `gathering-parties-tab.test.js` mounts this component and pins the sibling DOM. This
   // source join keeps the Chromium geometry below attached to those real rendered classes:
-  // deleting or renaming either node fails here instead of leaving a stale layout fixture.
   const contentAt = partiesTabSource.indexOf('class="manager-travel-parties-content"');
   const footerAt = partiesTabSource.indexOf('class="manager-travel-parties-pagination"');
   assert.ok(contentAt > -1, 'the product component renders the card scroller class');
@@ -1751,14 +1714,7 @@ test('World Parties keeps its card scroller and sibling pager independently reac
       (_, index) =>
         `<button class="manager-nav-button"><span class="manager-nav-label">Section ${index + 1}</span></button>`
     ).join('');
-    // The component's OWN scoped CSS, after the global sheet — the same pairing every
-    // other probe in this file uses (see the components-route probe above) and matching
-    // `css: 'injected'`, which puts a component's block in `document.head` after Foundry's
-    // `<link>`. Omitting it is what disabled this test: the fixture carried the real hash
-    // class but nothing declared `.manager-travel-parties` or its content child, so the
-    // pane rendered `display: block; overflow: visible`, the scroller sized to its cards,
-    // and the opening `scrollRange > 100` precondition read 0 — a fixture that proved
-    // nothing rather than a product regression.
+    // The component's OWN scoped CSS, after the global sheet.
     await page.setContent(`<!doctype html><html><head><meta charset="utf-8">
       <style>${css}</style>
       <style>${partiesTabScoped.css}</style>

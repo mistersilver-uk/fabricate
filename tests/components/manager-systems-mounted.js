@@ -1,12 +1,4 @@
-/**
- * The crafting-system routes: the library, System Settings, System Overview and world rules.
- *
- * A route module of `manager-mounted.test.js` (issue 1690). It registers its cases INSIDE
- * that file's one `describe` rather than at module scope, so the split keeps the suite
- * name, the compiled manager tree and the one process the 26,709-line file had.
- * `manager-mounted-shared.js` owns the compile and the between-test yield; the mount state
- * below is this module's own, so its locators read its own `target`.
- */
+/** The crafting-system routes: the library, System Settings, System Overview and world rules. */
 
 import { afterEach, before, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -14,9 +6,7 @@ import { resolve } from 'node:path';
 import { flushSync, mount, tick, unmount } from 'svelte';
 import { assertNoElement } from '../helpers/svelte-dom.js';
 import { CURRENCY_MACRO_KEYS } from '../../src/systems/currencyProfile.js';
-// Issue 1504: a converted control is a shared `<Select>`, so choosing a value is two clicks on a
-// panel PORTALED onto the manager root rather than a `change` on a native `<select>`. Every
-// lookup is therefore rooted on the mount target and not on the control's own container.
+// Issue 1504: a converted control is a shared `<Select>`.
 import {
   assertSelectHasResolvedName,
   chooseSelectOption,
@@ -38,8 +28,7 @@ let CraftingSettingsViewComponent;
 let mounted;
 let target;
 
-// The locators read `target` through a getter rather than a captured element, because the
-// module remounts per case and half these cases assign `target` themselves.
+// The locators read `target` through a getter rather than a captured element.
 const queries = createManagerQueries(() => target);
 const {
   assertHeaderBackIsGhost,
@@ -169,8 +158,7 @@ export function registerSystemsCases() {
   });
 
   it('SystemEditView: refund-on-player-cancel renders after Time requirements and is disabled while it is off (issue 848)', () => {
-    // A player can only cancel a TIMED craft, so the refund toggle is inapplicable —
-    // greyed + non-interactive — while Time requirements is off.
+    // A player can only cancel a TIMED craft.
     mountSystemEditView({
       selectedSystem: {
         id: 'sys1',
@@ -358,15 +346,7 @@ export function registerSystemsCases() {
     const navLabels = Array.from(target.querySelectorAll('.manager-nav-label')).map((label) =>
       label.textContent.trim()
     );
-    // 'Parties', 'Travel' and 'Rules & Resources': all three World entries are ungated — Travel because
-    // realms are world geography and have to be authorable before any system opts in (issue
-    // 1282). The Downtime group is experimental-gated (issue 1257) and this fixture leaves
-    // `fabricate.experimentalFeatures` at its default off.
-    // The four world scoped-entity leaves (issue 1362) are ungated for the same reason and
-    // sit ABOVE Parties in the prototype's authored order. This case is the one that proves
-    // they are reachable with NO crafting system selected at all — the normal state for a
-    // world screen, and the state the router's `if (!system) return 'systems'` fallthrough
-    // would otherwise bounce every one of them out of.
+    // 'Parties', 'Travel' and 'Rules & Resources': all three World entries are ungated.
     assert.deepEqual(navLabels, [
       'Component catalogue',
       'Tags & Categories',
@@ -480,9 +460,7 @@ export function registerSystemsCases() {
         'Tags & Categories',
         'Tool Rules',
         'Checks',
-        // The four world scoped-entity leaves (issue 1362), in the prototype's authored order
-        // and ABOVE Parties. The lowercase `c` in `Component catalogue`, the plural in
-        // `Tools Catalogue` and the exact duplicate of `Tags & Categories` are all authored.
+        // The four world scoped-entity leaves (issue 1362).
         'Component catalogue',
         'Tags & Categories',
         'Essence Catalogue',
@@ -530,8 +508,7 @@ export function registerSystemsCases() {
       const plannedNav = navButton(label);
       assert.equal(plannedNav.disabled, true);
       assert.equal(plannedNav.querySelector('.manager-nav-planned')?.textContent.trim(), 'Soon');
-      // The planned-view word is NOT the record-count vehicle (issue 1515): a bare mono
-      // numeral standing for records is what that class means, and this row has neither.
+      // The planned-view word is NOT the record-count vehicle (issue 1515).
       assert.ok(
         !plannedNav.querySelector('.manager-nav-count'),
         'a placeholder row draws no record count'
@@ -553,15 +530,10 @@ export function registerSystemsCases() {
 
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'system-edit');
     assert.ok(target.querySelector('.manager-system-edit-form'));
-    // The lone header action on this route, and the weakest of the five ghost repairs for
-    // exactly that reason: there is no Save here for Back to be secondary TO. It is ghost on
-    // the verb, and this is what holds it there.
+    // The lone header action on this route.
     assertHeaderBackIsGhost('[data-system-edit-back]', 'system-edit');
 
-    // The rail's crafting-system card SELECTS (issue 643): a real `<select>` naming the
-    // current system and listing every other, so the GM can switch system without a
-    // round trip through the system library — which the old name + icon-button card had
-    // no way to do at all.
+    // The rail's crafting-system card SELECTS (issue 643).
     const scopeCard = target.querySelector('.manager-scope-card');
     assert.ok(scopeCard, 'selected system scope card should render');
     const scopeSelect = scopeCard.querySelector('[data-manager-scope-select]');
@@ -607,9 +579,6 @@ export function registerSystemsCases() {
       'true'
     );
     // The Crafting group is still open, and that is the fix rather than a leak (issue 1185):
-    // this route was reached by opening Recipes, and navigating AWAY from a group no longer
-    // slams it shut behind the GM. `craftingMenuExpanded = isCraftingRoute` used to force it
-    // closed here, discarding a choice the GM had deliberately made.
     assert.deepEqual(
       Array.from(target.querySelectorAll('.manager-nav-label')).map((label) =>
         label.textContent.trim()
@@ -628,9 +597,7 @@ export function registerSystemsCases() {
         'Checks',
         'Gathering',
         'Graph',
-        // The four world scoped-entity leaves (issue 1362), in the prototype's authored order
-        // and ABOVE Parties. The lowercase `c` in `Component catalogue`, the plural in
-        // `Tools Catalogue` and the exact duplicate of `Tags & Categories` are all authored.
+        // The four world scoped-entity leaves (issue 1362).
         'Component catalogue',
         'Tags & Categories',
         'Essence Catalogue',
@@ -641,14 +608,11 @@ export function registerSystemsCases() {
         'Downtime',
       ]
     );
-    // The system library's own page copy is the shell's, since issue 1515 deleted the second
-    // header this used to read `System library` from.
+    // The system library's own page copy is the shell's.
     assert.ok(target.textContent.includes('Select a row to view counts and enabled features.'));
   });
 
-  // Creating a crafting system already SELECTED it in the store, but the GM was left on
-  // the systems library — one more click from the thing they had just asked for, and with
-  // no signal about which row was the new one.
+  // Creating a crafting system already SELECTED it in the store.
   it('creating a crafting system opens the System Overview of the NEW system', async () => {
     const calls = [];
     target = document.createElement('div');
@@ -854,8 +818,7 @@ export function registerSystemsCases() {
       const plannedNav = navButton(label);
       assert.equal(plannedNav.disabled, true);
       assert.equal(plannedNav.querySelector('.manager-nav-planned')?.textContent.trim(), 'Soon');
-      // The planned-view word is NOT the record-count vehicle (issue 1515): a bare mono
-      // numeral standing for records is what that class means, and this row has neither.
+      // The planned-view word is NOT the record-count vehicle (issue 1515).
       assert.ok(
         !plannedNav.querySelector('.manager-nav-count'),
         'a placeholder row draws no record count'
@@ -1126,9 +1089,7 @@ export function registerSystemsCases() {
       .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     flushSync();
 
-    // Resolution mode moved to the gated Crafting > Settings page (issue 511), so
-    // System Overview no longer carries the resolution-mode card. Identity save and
-    // the optional-feature toggles still live here.
+    // Resolution mode moved to the gated Crafting > Settings page (issue 511).
     assert.equal(
       target.querySelector('#manager-system-resolution-mode'),
       null,
@@ -1158,10 +1119,7 @@ export function registerSystemsCases() {
     );
   });
 
-  // Mount the manager, capture its store, and open the System Overview → Settings
-  // tab so the identity form and its dirty-draft route-exit guard are live. Returns
-  // the store so a test can push a fresh `selectedSystem` through `viewState` (the
-  // admin store's two-phase re-publish) or read the recorded `calls`.
+  // Mount the manager, capture its store.
   async function mountSystemEditForDirtyGuard(options = {}) {
     const calls = [];
     const store = createStore(calls, options);
@@ -1388,9 +1346,7 @@ export function registerSystemsCases() {
     typeSystemName('Greater Alchemy');
     assert.ok(target.querySelector('[data-system-details-dirty]'), 'the form is dirty');
 
-    // The blocker link routes through confirmRouteExit('system-edit') — the SAME
-    // view — so the form stays mounted and its draft survives. Prompting here would
-    // put a spurious dialog in front of a GM who is not leaving the editor at all.
+    // The blocker link routes through confirmRouteExit('system-edit').
     target.querySelector('[data-system-edit-blocker-link]').click();
     await settle();
 
@@ -1418,8 +1374,7 @@ export function registerSystemsCases() {
     );
   });
 
-  // A report carrying a system blocker plus a deep-linkable recipe issue, so the
-  // Validation tab's grouped list and deep-link wiring are both exercised.
+  // A report carrying a system blocker plus a deep-linkable recipe issue.
   const overviewReport = {
     issues: [
       {
@@ -1517,38 +1472,14 @@ export function registerSystemsCases() {
       target.querySelector('[data-system-overview-blocker]'),
       'the validation list keeps its blocker note'
     );
-    // THE COUNTS STAY ON THE VALIDATION SURFACE, AND STAY IN ORDER (issue 1515). The route's page
-    // header moved to the manager shell and the section this row sat inside was deleted with it;
-    // the row itself is not header chrome — `openspec/specs/design-system/spec.md` requires the
-    // validation surface to carry the counts — so it is lifted to a direct child of the surface.
-    // Pinned by POSITION as well as presence, because "lifted out of the deleted section" is a
-    // claim a presence check alone cannot tell apart from "left inside something else".
+    // THE COUNTS STAY ON THE VALIDATION SURFACE.
     const overviewCounts = target.querySelector('[data-system-overview-counts]');
     assert.ok(overviewCounts, 'the warning/blocking summary badges render');
     assert.ok(
       overviewCounts.parentElement?.hasAttribute('data-system-overview'),
       'the counts row is a direct child of the validation surface, not of a page header'
     );
-    // THE VOCABULARY IS CLOSED AND THIS SURFACE RENDERS THE SUBSET IT CAN SUPPLY — the maintainer
-    // ruling of 2026-09-08 on issue 1515, applying `openspec/specs/design-system/spec.md`'s
-    // requirement "One blocking notice, and non-blocking notices stack" ("the validation surface
-    // ... carries passing, warning and blocking counts") and its ordering twin under "Validation
-    // is one screen everywhere" ("the pass, warning and blocking counts in that order"). Cited by
-    // REQUIREMENT rather than by line: both line cites had already rotted by the time the review
-    // read them, which is what a line number into a growing spec file does.
-    //
-    // The report this surface draws is `evaluateSystemValidation`'s, which counts ISSUES and never
-    // checks run, so no passing figure is derivable and none is invented: the row is `warning` then
-    // `blocking`, which is the spec's order with the underivable member omitted. `info` is a FOURTH
-    // word the closed vocabulary does not contain, so it gets no chip — and losing a chip loses no
-    // information, because the LIST below is severity-agnostic: it draws a row per issue carrying
-    // that issue's own severity chip, whatever the severity is, which is the second assertion here.
-    // (`info` additionally has no producer in `src/systems/systemValidation.js` today, so the chip
-    // this removes read "0 notes" on every report the surface can be handed.) No denominator is
-    // added either; a chip reading "2 of 40" would be the same invention wearing a different shape.
-    //
-    // Pinned as an ORDERED SET rather than by wording, so a re-spelling of the labels cannot
-    // silently reorder or re-admit a member.
+    // THE VOCABULARY IS CLOSED AND THIS SURFACE RENDERS THE SUBSET IT CAN SUPPLY.
     assert.deepEqual(
       [...overviewCounts.querySelectorAll('[data-overview-count]')].map((chip) =>
         chip.getAttribute('data-overview-count')
@@ -1590,9 +1521,6 @@ export function registerSystemsCases() {
     // at the base `.manager-button` weight it competed with the sentence explaining it. Ghost
     // is the ruling `component/ComponentEditorHeader.svelte` states for its own Back: a
     // secondary verb beside something that outranks it.
-    //
-    // Named by its own hook, and paired with the Save beside it in the same editor, which is
-    // the control a "the settings tab renders a ghost" assertion would have accepted.
     assert.ok(
       blockerLink.classList.contains('fab-manager-button'),
       `the blocker link renders through the ManagerButton primitive, got ${blockerLink.className}`
@@ -1804,11 +1732,7 @@ export function registerSystemsCases() {
       ['Actor data path', 'Actor inventory', 'Macro'],
       'and the same rendered text the `<option>` elements drew, fallback strings included'
     );
-    // THE NAME NARROWED, DELIBERATELY, and this is where that is recorded (issue 1510). The
-    // wrapper was a `<Field as="label">` holding the caption, the control AND the strategy hint,
-    // so the containment named this control "Spend strategy" plus the whole hint paragraph — a
-    // name that CHANGED every time the GM changed the value, because the hint reflects the
-    // strategy. The demoted `Field as="div"` points at the caption alone.
+    // THE NAME NARROWED, DELIBERATELY.
     assert.equal(assertSelectHasResolvedName(target, strategy), 'Spend strategy');
     // The single shared strategy hint reflects the selected strategy, and stays where it is.
     assert.ok(
@@ -1839,9 +1763,7 @@ export function registerSystemsCases() {
       macroRow.classList.contains('manager-currency-macro-row'),
       'the macro drop zones should share the single-row container'
     );
-    // Counted from the DECLARED vocabulary rather than from a literal, because the whole failure
-    // mode this covers is a slot a GM cannot author: adding a key to `CURRENCY_MACRO_KEYS` without
-    // adding its field renders one zone fewer, and a hardcoded 3 would have gone on passing.
+    // Counted from the DECLARED vocabulary rather than from a literal.
     const expected = CURRENCY_MACRO_KEYS.length;
     const dropzones = macroRow.querySelectorAll('[data-world-currency-macro-dropzone]');
     assert.equal(dropzones.length, expected, 'macro strategy should show one zone per macro slot');
@@ -1887,8 +1809,7 @@ export function registerSystemsCases() {
   });
 
   it('shows a no-provider callout for actorInventory on a no-provider system and keeps units editable', async () => {
-    // dnd5e has no registered provider; selecting actorInventory must surface the steer-to-macro
-    // callout and keep the GM's units editable rather than wiping them.
+    // dnd5e has no registered provider.
     await mountCurrencyEditor({
       foundrySystemId: 'dnd5e',
       selectedCurrency: {
@@ -2040,8 +1961,7 @@ export function registerSystemsCases() {
   }
 
   it('drives the add-sub-unit dropdown from disjoint reachable sets for chain, diamond, and cross-parent cases', async () => {
-    // Chain P->A->B->C: editing P must exclude C (deeper descendant), A (already contained), and B
-    // (deeper descendant) — none can be offered as a fresh sub-unit of P.
+    // Chain P->A->B->C: editing P must exclude C (deeper descendant), A (already contained).
     const chainUnits = [
       {
         id: 'P',
@@ -2065,9 +1985,7 @@ export function registerSystemsCases() {
         contains: [{ unitId: 'C', amount: 10 }],
       },
       { id: 'C', label: 'Copper', abbreviation: 'C', actorPath: 'system.currency.c', contains: [] },
-      // THE POSITIVE THIS SET OTHERWISE LACKS. Every other clause here is a negative, and a
-      // negative is satisfied by an empty list — so without one unit that MUST be offered, a
-      // helper that read nothing at all would report this case as green.
+      // THE POSITIVE THIS SET OTHERWISE LACKS. Every other clause here is a negative.
       {
         id: 'X',
         label: 'Unrelated',
@@ -2150,8 +2068,7 @@ export function registerSystemsCases() {
       'diamond: cp must not be offered when editing gp (already reachable gp->sp->cp)'
     );
 
-    // Cross-parent (allowed): a fresh unrelated unit pp (no contains) SHOULD be offered sp, since a
-    // node legitimately shared by two DIFFERENT parents is fine — the rule must not over-restrict.
+    // Cross-parent (allowed): a fresh unrelated unit pp (no contains) SHOULD be offered sp.
     const crossParentUnits = [
       ...diamondUnits,
       {
@@ -2315,10 +2232,7 @@ export function registerSystemsCases() {
   });
 
   it('counts PARTICIPATING systems in the World Currency subtitle (issue 1278)', async () => {
-    // The affordance exists to stop a GM misdiagnosing an unadopted ladder as a broken one, so a
-    // count that is always zero asserts the false half of that diagnosis to every GM. It reads
-    // the projected `currencyEnabled` flag; reaching for `requirements.currency.enabled` on this
-    // list silently yields undefined, because the projection is an allowlist without it.
+    // The affordance exists to stop a GM misdiagnosing an unadopted ladder as a broken one.
     await mountCurrencyEditor({
       selectedCurrency: {
         enabled: true,
@@ -2377,10 +2291,7 @@ export function registerSystemsCases() {
   });
 
   it('keeps the World Currency ladder ungated by any system\u2019s participation toggle (issue 1278)', async () => {
-    // Currency is WORLD scope now. The ladder is authored once, for the whole world, and a
-    // crafting system's `requirements.currency.enabled` decides only whether THAT system
-    // participates. Gating this page on participation would be a chicken-and-egg lock-out: a
-    // GM could never author the coins that a system has to enable in order to show them.
+    // Currency is WORLD scope now. The ladder is authored once, for the whole world.
     for (const enabled of [false, true]) {
       await mountCurrencyEditor({
         selectedCurrency: {
@@ -2396,8 +2307,7 @@ export function registerSystemsCases() {
         target.querySelector('[data-world-currency-units]'),
         `the Currency Units card should render with the system toggle ${enabled ? 'on' : 'off'}`
       );
-      // The participation toggle stays on System Settings, where the per-system decision is
-      // made; it is deliberately absent from the world page.
+      // The participation toggle stays on System Settings.
       assertNoElement(
         target,
         '[data-feature-key="currency"]',
@@ -2437,8 +2347,7 @@ export function registerSystemsCases() {
     assert.equal(target.querySelector('[data-feature-key="craftingChecks"]'), null);
     assert.equal(target.querySelector('[data-feature-key="outcomeRouting"]'), null);
 
-    // Resolution-mode rollback moved to the Crafting Settings page (issue 511); the
-    // optional-feature toggle rollback still lives on System Overview.
+    // Resolution-mode rollback moved to the Crafting Settings page (issue 511).
     const gathering = target.querySelector('[data-feature-key="gathering"] .manager-status-toggle');
     assert.equal(gathering.getAttribute('aria-pressed'), 'true');
     gathering.click();

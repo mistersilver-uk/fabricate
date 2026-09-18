@@ -1,20 +1,10 @@
-/**
- * The recipe routes: the browser, the editor, the overview tab and Books & Scrolls.
- *
- * A route module of `manager-mounted.test.js` (issue 1690). It registers its cases INSIDE
- * that file's one `describe` rather than at module scope, so the split keeps the suite
- * name, the compiled manager tree and the one process the 26,709-line file had.
- * `manager-mounted-shared.js` owns the compile and the between-test yield; the mount state
- * below is this module's own, so its locators read its own `target`.
- */
+/** The recipe routes: the browser, the editor, the overview tab and Books & Scrolls. */
 
 import { afterEach, before, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { flushSync, mount, tick, unmount } from 'svelte';
-// Issue 1504: a converted control is a shared `<Select>`, so choosing a value is two clicks on a
-// panel PORTALED onto the manager root rather than a `change` on a native `<select>`. Every
-// lookup is therefore rooted on the mount target and not on the control's own container.
+// Issue 1504: a converted control is a shared `<Select>`.
 import { chooseSelectOption } from '../helpers/select-control.js';
 import { createStore } from '../helpers/manager/managerStoreFake.js';
 import {
@@ -34,8 +24,7 @@ let RecipeOverviewTabComponent;
 let mounted;
 let target;
 
-// The locators read `target` through a getter rather than a captured element, because the
-// module remounts per case and half these cases assign `target` themselves.
+// The locators read `target` through a getter rather than a captured element.
 const queries = createManagerQueries(() => target);
 const {
   activeCraftingSubitemIds,
@@ -175,9 +164,7 @@ export function registerRecipesCases() {
       null,
       'the Locked card is not the recipe-item locked-image affordance'
     );
-    // The Locked card is a left-aligned status card (icon + copy + switch), not the
-    // 96px image-picker media stack (`.manager-task-core-status`), which centres its
-    // copy and 14ch-clamps it (issue 643).
+    // The Locked card is a left-aligned status card (icon + copy + switch).
     assert.ok(
       card.querySelector('.manager-recipe-status-card') ||
         card.classList.contains('manager-recipe-status-card'),
@@ -258,10 +245,7 @@ export function registerRecipesCases() {
     assert.ok(disabledRecipeToggle, 'disabled recipe row should render the shared status toggle');
     assert.equal(enabledRecipeToggle.getAttribute('aria-pressed'), 'true');
     assert.equal(disabledRecipeToggle.getAttribute('aria-pressed'), 'false');
-    // No "On"/"Off" TEXT in the row (issue 643): the track colour is the state, the
-    // aria-label names it, and the Disabled pill says it in words. A third copy on every
-    // row cost ~30px of the description. The label survives everywhere else in the manager,
-    // where a switch has no pill beside it.
+    // No "On"/"Off" TEXT in the row (issue 643): the track colour is the state.
     for (const toggle of [enabledRecipeToggle, disabledRecipeToggle]) {
       assert.equal(
         toggle.querySelector('.manager-status-toggle-label'),
@@ -281,9 +265,7 @@ export function registerRecipesCases() {
     assert.ok(target.querySelector('[data-recipe-id="r2"]').classList.contains('is-selected'));
     assert.ok(target.textContent.includes('Locked Elixir'));
     assert.ok(target.textContent.includes('Restricted (none selected)'));
-    // r2 is incomplete AND off, so enabling it would be REFUSED — the row says that
-    // rather than merely "incomplete" (issue 643 §2's four row states, rendered
-    // through the shared chip since issue 1506).
+    // r2 is incomplete AND off, so enabling it would be REFUSED.
     const r2Blocked = target.querySelector('[data-recipe-id="r2"] .manager-chip.is-danger');
     assert.ok(r2Blocked, "an incomplete, disabled recipe row should say it can't be enabled");
     assert.equal(r2Blocked.textContent.trim(), "Can't enable");
@@ -299,8 +281,7 @@ export function registerRecipesCases() {
       'pagination should hide while filtered row count is below the page size'
     );
 
-    // The status filter is a segmented control (all / on / off), defaulting to `all`
-    // — a default that hid rows would break the smoke harness's visible-row wait.
+    // The status filter is a segmented control (all / on / off).
     assert.equal(
       target.querySelector('[data-recipe-filter-chip="status"]'),
       null,
@@ -329,8 +310,6 @@ export function registerRecipesCases() {
     assert.equal(target.querySelectorAll('.manager-recipe-row').length, 2);
 
     // `Edit recipe` is the POINT of the inspector and its primary action (issue 643).
-    // The panel used to offer Duplicate and Delete as visual peers and no Edit at all,
-    // which made destroying the recipe the loudest thing on it.
     const inspectorActions = Array.from(
       target.querySelectorAll('.manager-recipe-browser-inspector-actions [data-recipe-action]')
     ).map((button) => button.dataset.recipeAction);
@@ -352,9 +331,7 @@ export function registerRecipesCases() {
       target.querySelector('.manager-recipe-stat-grid'),
       'recipe inspector should render the stat grid, not the generic fact list'
     );
-    // The inspector is ONE column on the panel background, not five nested boxes: it used
-    // to wrap every section in a `.manager-inspector-card` under its own <h3>, including an
-    // invented "Recipe details" heading over a stat grid that needs no title.
+    // The inspector is ONE column on the panel background, not five nested boxes.
     assert.equal(
       target.querySelectorAll('.manager-recipe-browser-inspector .manager-inspector-card').length,
       0,
@@ -379,10 +356,7 @@ export function registerRecipesCases() {
 
     target.querySelector('[data-recipe-id="r2"] .manager-status-toggle').click();
 
-    // Duplicate and Delete moved to the inspector (issue 643): SELECT r2 by clicking its
-    // identity, then drive the inspector's Duplicate and Delete actions, which operate on
-    // the selected recipe. Both keep the browser mounted; Edit is exercised separately
-    // below because it navigates to the recipe-edit route.
+    // Duplicate and Delete moved to the inspector (issue 643).
     target.querySelector('[data-recipe-id="r2"] .manager-recipe-identity').click();
     flushSync();
     target
@@ -419,8 +393,7 @@ export function registerRecipesCases() {
     assert.ok(flash, 'the refusal the store pushes back through the sink renders in-window');
     assert.equal(flash.getAttribute('role'), 'alert');
     assert.match(flash.textContent, /This recipe has no result groups\./);
-    // The dismiss control is the shared `<Notice>`'s own as of issue 1515 — the primitive takes
-    // no per-caller hook for it — while the root keeps the caller's `data-recipe-flash`.
+    // The dismiss control is the shared `<Notice>`'s own as of issue 1515.
     target.querySelector('[data-notice-dismiss]').click();
     flushSync();
     assert.ok(!target.querySelector('[data-recipe-flash]'), 'the flash is dismissible');
@@ -435,9 +408,7 @@ export function registerRecipesCases() {
       'recipes header should not call exportRecipes'
     );
 
-    // Edit moved to the inspector (issue 643): r2 is already selected above, so the
-    // inspector's Edit action navigates to the in-manager recipe-edit route rather than
-    // calling a service callback.
+    // Edit moved to the inspector (issue 643): r2 is already selected above.
     const editButton = target.querySelector(
       '.manager-recipe-browser-inspector [data-recipe-action="edit"]'
     );
@@ -457,10 +428,7 @@ export function registerRecipesCases() {
       target.querySelector('.manager-main [data-recipe-section="identity"]'),
       'recipe-edit renders the identity card in the central main'
     );
-    // The mock system carries no recipeVisibility.knowledge.mode, so the editor
-    // defaults to 'itemOrLearned' and the Books & Scrolls TAB is offered. Issue 676
-    // deleted the inspector rail that used to host this: recipe-edit is now a
-    // two-column route, so there is no `.manager-inspector` aside at all here.
+    // The mock system carries no recipeVisibility.knowledge.mode.
     assert.equal(
       target.querySelector('.manager-inspector'),
       null,
@@ -475,8 +443,7 @@ export function registerRecipesCases() {
       target.querySelector('.manager-main [data-recipe-section="recipe-item"]'),
       'the Books & Scrolls tab hosts the linked-book list'
     );
-    // The recipe-edit header now follows the task/environment convention: Back to
-    // recipes + Delete recipe + Save (no Cancel).
+    // The recipe-edit header now follows the task/environment convention.
     const recipeEditButtons = Array.from(
       target.querySelectorAll('.manager-header-actions .manager-button')
     );
@@ -582,15 +549,9 @@ export function registerRecipesCases() {
 
   // Issue 806: the category filter AND the current page are lost across the edit
   // round-trip when the reset sentinel is component-local (it re-fires on the remount).
-  // The lift now carries a persisted `systemId`, so the remount is not read as a system
-  // switch. This exercises the REAL root's `$state` proxy (unlike the isolated mounted
-  // browser tests, whose plain-object browserState cannot re-derive the page), so page
-  // preservation is faithful here. Fails on revert: category resets to All and the page
-  // returns to 1.
   it('preserves the recipe browser category filter and page across an edit round-trip', async () => {
     const calls = [];
-    // Twelve same-category recipes so a page-2 (size 10) view is reachable; cloned from
-    // the r1 fixture shape so the recipe editor renders the same way it does for r1.
+    // Twelve same-category recipes so a page-2 (size 10) view is reachable.
     const potions = Array.from({ length: 12 }, (_, index) => ({
       id: `p${String(index + 1).padStart(2, '0')}`,
       name: `Potion ${String(index + 1).padStart(2, '0')}`,
@@ -829,11 +790,6 @@ export function registerRecipesCases() {
     });
 
     // Switching a single-step recipe to multi-step seeds one step into the draft.
-    // It must carry an id up front: step-scoped edits route by step id, and an
-    // id-less step (undefined == null) misroutes to the recipe scope — looking
-    // like the per-step ingredient/result/tool/cost adds do nothing.
-    // Step mode lives on the Overview tab since issue 676 (it was in the deleted rail),
-    // beside the steps card it governs.
     target.querySelector('.manager-main [data-recipe-step-mode-option="multi"]').click();
     await tick();
     flushSync();
@@ -1093,8 +1049,7 @@ export function registerRecipesCases() {
       null,
       'the shared inspector aside is suppressed for the knowledge route'
     );
-    // The page header carries no roster roll-up pill: the count belongs in the nav-rail
-    // badge like every other browser surface, so its absence is the contract.
+    // The page header carries no roster roll-up pill.
     assert.equal(
       target.querySelector('[data-knowledge-header-pills]'),
       null,
@@ -1131,8 +1086,7 @@ export function registerRecipesCases() {
 
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'books-scrolls');
     assert.ok(target.querySelector('[data-books-scrolls]'), 'Books & Scrolls surface renders');
-    // The parent nav count totals the visible sub-tabs: 2 recipes + 2 books & scrolls
-    // items in the fixture (issue 643).
+    // The parent nav count totals the visible sub-tabs.
     assert.equal(craftingParent().querySelector('.manager-nav-count').textContent.trim(), '4');
 
     // Both recipe items are listed with their own recipe-count + learning chips.
@@ -1202,10 +1156,7 @@ export function registerRecipesCases() {
       target.querySelector('[data-recipe-item-editor]'),
       'the recipe-item editor body renders'
     );
-    // AND THE TRAIL NAMES THE ITEM (issue 1328), not the kind of screen. A recipe item has no
-    // name of its own — it is a world item plus the recipes it contains — so the leaf is the
-    // LINKED item's name, resolved through the same derivation the editor's own Overview preview
-    // uses rather than a second answer to "what is this thing called".
+    // AND THE TRAIL NAMES THE ITEM (issue 1328).
     assert.deepEqual(
       Array.from(target.querySelectorAll('.manager-breadcrumbs > *'))
         .filter((node) => node.tagName.toLowerCase() !== 'i')
@@ -1238,8 +1189,7 @@ export function registerRecipesCases() {
       'Save enables when dirty'
     );
 
-    // Saving commits the whole draft in one saveRecipeItem call, then returns to
-    // the Books & Scrolls surface.
+    // Saving commits the whole draft in one saveRecipeItem call.
     target.querySelector('[data-recipe-item-save]').click();
     await tick();
     flushSync();
@@ -1310,8 +1260,7 @@ export function registerRecipesCases() {
     await tick();
     flushSync();
 
-    // Attempting to leave via Back consults the confirm-discard guard; cancelling
-    // keeps us on the editor route.
+    // Attempting to leave via Back consults the confirm-discard guard.
     target.querySelector('[data-recipe-item-back]').click();
     await tick();
     flushSync();
@@ -1424,24 +1373,12 @@ export function registerRecipesCases() {
   });
 
   // ── Crafting route reconciliation across a scope switch (issue 1151) ──────────────
-  //
-  // The reported dead end: the rail drops the mode-conditional entry the newly selected
-  // system does not offer, while the router keeps rendering the route it owned. The GM
-  // is left on a surface the system cannot use, with no rail entry highlighted and no
-  // way back to it. Every case below drives a REAL `change` on the scope select through
-  // the one shared `switchScopeSystemTo` helper and reads the reconciled route.
-  //
-  // The two fixture systems carry their modes through `systemCraftingModes`, which
-  // writes into `systemDetails` per id — the switch republishes that map, so the mode
-  // under test survives the very navigation the case is about.
   const RESTRICTED_SIMPLE = { visibilityMode: 'restricted', resolutionMode: 'simple' };
   const KNOWLEDGE_SIMPLE = { visibilityMode: 'knowledge', resolutionMode: 'simple' };
   const GLOBAL_ALCHEMY = { visibilityMode: 'global', resolutionMode: 'alchemy' };
   const KNOWLEDGE_TO_RESTRICTED = { alchemy: KNOWLEDGE_SIMPLE, smithing: RESTRICTED_SIMPLE };
 
-  // Mount with per-system modes, open the Crafting group, and route to one submenu
-  // entry, asserting it exists first: a silently missing entry would leave every
-  // assertion afterwards reading the previous screen and passing for the wrong reason.
+  // Mount with per-system modes, open the Crafting group.
   async function openCraftingEntry(calls, systemCraftingModes, label, storeOptions = {}) {
     mountManager(calls, {
       experimentalFeaturesEnabled: true,
@@ -1459,8 +1396,7 @@ export function registerRecipesCases() {
     return target.querySelector('.fabricate-manager').dataset.managerView;
   }
 
-  // The shared arrangement for the three `recipe-item-edit` cases: a knowledge-mode
-  // system whose sibling is restricted, routed into the editor for `ri1`.
+  // The shared arrangement for the three `recipe-item-edit` cases.
   async function openRecipeItemEditorForSwitch(calls, storeOptions = {}) {
     await openCraftingEntry(calls, KNOWLEDGE_TO_RESTRICTED, 'Books & Scrolls', {
       recipeItemDefinitions: booksScrollsFixtures,
@@ -1514,8 +1450,6 @@ export function registerRecipesCases() {
     assert.equal(await openRecipeItemEditorForSwitch(calls), 'recipe-item-edit');
 
     // `recipe-item-edit` is owned by Books & Scrolls, so it collapses onto its parent:
-    // the scope change maps it to `books-scrolls`, which the restricted system does not
-    // offer either, and the router resolves that system's own first conditional entry.
     assert.equal(await switchScopeSystemTo('smithing'), 'access');
     assert.deepEqual(activeCraftingSubitemIds(), ['access']);
   });
@@ -1552,9 +1486,7 @@ export function registerRecipesCases() {
   });
 
   it('still guards a dirty recipe-item editor before reconciling (cancel keeps it open)', async () => {
-    // The route-exit guard is not weakened by the read-time normalization, and this is
-    // the case the issue calls doubly exposed: the guard runs on `books-scrolls` BEFORE
-    // `selectSystem`, so cancelling aborts the switch entirely and no redirect fires.
+    // The route-exit guard is not weakened by the read-time normalization.
     const calls = [];
     await openRecipeItemEditorForSwitch(calls, { confirmDiscardRecipeItemResult: 'cancel' });
     await dirtyOpenRecipeItem();

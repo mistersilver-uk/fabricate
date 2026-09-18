@@ -1,12 +1,4 @@
-/**
- * The gathering routes: the task and event editors, their pickers and their save failures.
- *
- * A route module of `manager-mounted.test.js` (issue 1690). It registers its cases INSIDE
- * that file's one `describe` rather than at module scope, so the split keeps the suite
- * name, the compiled manager tree and the one process the 26,709-line file had.
- * `manager-mounted-shared.js` owns the compile and the between-test yield; the mount state
- * below is this module's own, so its locators read its own `target`.
- */
+/** The gathering routes: the task and event editors, their pickers and their save failures. */
 
 import { afterEach, before, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -16,9 +8,7 @@ import {
   TOOL_DISPLAY_PRECEDENCE_CASES,
   TOOL_PRECEDENCE_MANAGED_ITEMS,
 } from '../helpers/toolDisplayPrecedenceCases.js';
-// Issue 1504: a converted control is a shared `<Select>`, so choosing a value is two clicks on a
-// panel PORTALED onto the manager root rather than a `change` on a native `<select>`. Every
-// lookup is therefore rooted on the mount target and not on the control's own container.
+// Issue 1504: a converted control is a shared `<Select>`.
 import { chooseSelectOption, selectTriggerText } from '../helpers/select-control.js';
 import { createStore } from '../helpers/manager/managerStoreFake.js';
 import {
@@ -39,8 +29,7 @@ let Component;
 let mounted;
 let target;
 
-// The locators read `target` through a getter rather than a captured element, because the
-// module remounts per case and half these cases assign `target` themselves.
+// The locators read `target` through a getter rather than a captured element.
 const queries = createManagerQueries(() => target);
 const {
   assertHeaderBackIsGhost,
@@ -78,25 +67,10 @@ export function registerGatheringCases() {
   });
 
 
-  // Site 10 (issue 1321): the gathering EVENT browser's "Active environments" fact, the task
-  // fact's twin one nav item over. Both now read `activeEnvironmentsForRecord(record, kind,
-  // scopedEnvironments)` through the root's `activeGatheringEventEnvironmentCount`, and this
-  // fixture is built to make three silent regressions loud rather than merely rendering SOME
-  // number:
-  //
-  //   1. `kind: 'event'` swapped for `'task'` — `includeDanger` goes false, so a `deadly`
-  //      event stops being excluded by a `safe` environment.
-  //   2. `conditionSettings` handed the converted `{weather, timeOfDay}` CURRENT shape
-  //      instead of the settings shape — `conditionSettingsToCurrent` reads `.current` off a
-  //      string, gets `undefined`, and falls back to its own hard-coded default. The fixture
-  //      moves the system's current weather off that default (`gatheringEventFactWeather`)
-  //      so the fallback is a wrong answer, not an accidental match.
+  // Site 10 (issue 1321): the gathering EVENT browser's "Active environments" fact.
   //   3. The `environment.enabled !== false` scoping filter regressing (covered by the
   //      `env-thorn-disabled` environment below, which composes on every other axis and must
   //      still read zero).
-  //
-  // Four composing candidates plus one disabled one, correct answer 2 — neither "all" nor
-  // "one" — so an off-by-everything mutation is visible in the rendered integer alone.
   it('computes the gathering event browser\'s "Active environments" fact through the shared seam', async () => {
     const calls = [];
     const gatheringEventFactEnvironments = [
@@ -128,8 +102,7 @@ export function registerGatheringCases() {
         biomes: ['forest'],
         dangerLevel: 'safe',
       },
-      // Wrong biome: excluded on every axis, a control against an accidental all-inclusive
-      // seam.
+      // Wrong biome: excluded on every axis.
       {
         id: 'env-thorn-cavern',
         craftingSystemId: 'alchemy',
@@ -138,8 +111,7 @@ export function registerGatheringCases() {
         biomes: ['cavern'],
         dangerLevel: 'deadly',
       },
-      // Matches biome, danger AND conditions, but is disabled: proves the component's own
-      // `environment.enabled !== false` scoping filter (not the shared seam) still applies.
+      // Matches biome, danger AND conditions, but is disabled.
       {
         id: 'env-thorn-disabled',
         craftingSystemId: 'alchemy',
@@ -157,9 +129,7 @@ export function registerGatheringCases() {
       enabled: true,
       dropRate: 15,
       biomes: ['forest'],
-      // Non-empty and satisfied only by the overridden current weather below: a
-      // `conditionSettings`-shape bug collapses `conditionsMet` to false for every
-      // environment, so this is what turns failure mode 2 into a visible `0`.
+      // Non-empty and satisfied only by the overridden current weather below.
       weather: ['heavy-rain'],
       timeOfDay: [],
       dangerTags: ['deadly'],
@@ -1273,10 +1243,6 @@ export function registerGatheringCases() {
   });
 
   // Issue 976. The gathering task editor carried the same defect as the recipe editor:
-  // it resolved a tool's name, image and description ONLY through `managedItem(componentId)`,
-  // so a first-class item-sourced tool (`componentId: null`) rendered "Unnamed tool", the
-  // item-bag sentinel and "No description has been added." Pinned against the SAME shared
-  // precedence table as `toolStudio.js` and `RecipeToolsSection`, so the three cannot drift.
   it('resolves every tool-display precedence case in the gathering task tool picker', async () => {
     const calls = [];
     target = document.createElement('div');
@@ -1480,17 +1446,6 @@ export function registerGatheringCases() {
   });
 
   // --- Failed-save alerts in the editor toolbars (issue 919) -----------------------
-  //
-  // All three of these editors used to compute a failure and render NOTHING: a GM whose
-  // save failed saw no change at all. Each test drives one editor to a dirty draft, fails
-  // its save, and asserts the RENDERED text — element presence alone would pass against an
-  // implementation that renders an empty `<p>`. Each then flips the same live options object
-  // to success and re-saves, and asserts the alert is gone afterwards. For the two gathering
-  // editors that is a real clearing assertion; the recipe-item pair leaves the route on
-  // success, so their absence follows from the whole toolbar branch unmounting instead.
-  //
-  // The `options` object is read at CALL time by the store fixture, so mutating it between
-  // two clicks on one mounted tree switches the outcome without a second mount.
 
   const SAVE_FAILED_MESSAGE = 'Save failed. Try again.';
 
@@ -1509,10 +1464,7 @@ export function registerGatheringCases() {
     },
   ];
 
-  // Two ticks: the save handlers await a store promise, so the state write that renders the
-  // alert lands a microtask after the click. Named apart from the `settle` the system-details
-  // dirty tests use — function declarations are var-scoped, so a second `settle` in this one
-  // describe would silently take over all of their call sites too.
+  // Two ticks: the save handlers await a store promise.
   async function settleSaveAttempt() {
     await tick();
     await tick();
@@ -1529,10 +1481,7 @@ export function registerGatheringCases() {
     await settleSaveAttempt();
   }
 
-  // Every one of these alerts is asserted THROUGH the toolbar, so the node an identity check
-  // compares is the same node the rendering check found. Querying one scoped and the other bare
-  // would still agree today, but would silently drift apart the moment anything carrying one of
-  // these data attributes rendered outside `.manager-header-actions`.
+  // Every one of these alerts is asserted THROUGH the toolbar.
   function saveErrorNode(selector) {
     return target.querySelector(`.manager-header-actions ${selector}`);
   }
@@ -1633,9 +1582,7 @@ export function registerGatheringCases() {
     });
   }
 
-  // Every destination this guard walks is a WORLD route since issue 1282 — Parties, Downtime
-  // and the Travel realms child alike — so the expected view is a flat lookup rather than the
-  // nested ternary the per-system Travel route needed.
+  // Every destination this guard walks is a WORLD route since issue 1282 — Parties.
   const WORLD_EXIT_DESTINATION_VIEWS = Object.freeze({
     parties: 'world',
     downtime: 'world-downtime',
@@ -1749,12 +1696,7 @@ export function registerGatheringCases() {
     await settleSaveAttempt();
   }
 
-  // The retry case: a GM whose save fails, changes nothing, and presses Save again gets the
-  // SAME message. `role="alert"` announces on a DOM mutation, and writing a byte-identical
-  // string is not one — $state sees no change, so nothing re-renders and a screen reader is
-  // silent from the second failure onwards. Presence therefore proves nothing here; node
-  // IDENTITY does. This passes only because the save clears its error before the awaited store
-  // call, so the alert leaves the DOM mid-flight and is re-inserted when the failure recurs.
+  // The retry case: a GM whose save fails, changes nothing.
   async function assertRepeatFailureReAnnounces(selector, save = clickHeaderSave) {
     await save();
     assertSaveErrorRendered(selector);
@@ -1902,8 +1844,7 @@ export function registerGatheringCases() {
     const storeOptions = { updateGatheringLibraryEventReject: true };
     await openDirtyGatheringEventEditor(calls, storeOptions);
 
-    // Before issue 919 `saveGatheringEventDraft` had no `catch` at all, so this rejection
-    // escaped as an unhandled rejection and set nothing.
+    // Before issue 919 `saveGatheringEventDraft` had no `catch` at all.
     await withSilencedConsoleError(clickHeaderSave);
     assert.equal(
       target.querySelector('.fabricate-manager').dataset.managerView,
@@ -1981,10 +1922,7 @@ export function registerGatheringCases() {
     );
   });
 
-  // `saveRecipeItemDraft` already reset `recipeItemSaveFailed` before its awaited store call, and
-  // that line carries exactly the invariant the two gathering saves were changed to hold — but
-  // deleting it left the whole suite green, so nothing was actually holding it. This pins it on
-  // the third editor too, driven through its own Save control rather than the header one.
+  // `saveRecipeItemDraft` already reset `recipeItemSaveFailed` before its awaited store call.
   it('re-announces a recipe-item save that fails the same way twice', async () => {
     await openDirtyRecipeItemEditor([], { saveRecipeItemResult: false });
     await assertRepeatFailureReAnnounces('[data-recipe-item-save-error]', clickRecipeItemSave);

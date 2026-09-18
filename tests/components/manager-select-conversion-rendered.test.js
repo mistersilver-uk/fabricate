@@ -1,42 +1,5 @@
 /*
  * THE THREE THINGS A MOUNTED SUITE CANNOT SEE ABOUT THE MANAGER SELECT CONVERSION (issue 1510).
- *
- * ── 1. WHY THE WRAPPER IS DEMOTED, AND WHY THE PRIMITIVE'S OWN FORM WAS REPAIRED ────────────
- * A `<label>` forwards a click on its caption into the control it wraps; the converted control
- * is a `<button>` toggling a portaled panel; and that panel's outside-click dismissal
- * (`actions/dismissOnOutsideClick.js`) listens on `mousedown`, IN THE CAPTURE PHASE, and only
- * while the panel is open. So the defect is asymmetric and the two legs measure different
- * things:
- *
- *   LEG 1, from CLOSED — the caption's mousedown meets no dismisser and the forwarded click
- *     reaches the trigger, so a `<label>` OPENS the panel. A demoted `<span>` forwards nothing,
- *     so it does not. This leg proves the forwarding is real and measures the demotion's
- *     ACCEPTED COST: the caption stops being a hit target.
- *   LEG 2, from OPEN — the caption's own mousedown is caught by the capture-phase dismisser and
- *     CLOSES the panel; the forwarded click then reaches the trigger and RE-OPENS it. In a
- *     `<label>` the list can therefore never be closed by clicking its caption.
- *
- * Issue 1511 proved both legs on a hand-wrapped `<label>` and reported leg 2 on the primitive's
- * OWN labelled form, which rendered `<Field as="label">` around the trigger. It failed there
- * too, at all twelve shipped `Select label=` call sites. The maintainer ruled the repair into
- * this issue rather than into a caller sweep: `Select`'s labelled form now hosts on
- * `Field as="div"`, its caption span carries the `id` the trigger's `aria-labelledby` already
- * pointed at, and the caption keeps its class and its layout. So the third subject below is
- * ASSERTED rather than reported — a labelled form failing leg 2 after that repair is a defect
- * in this change, not an open question. Its pre-repair red is recorded in this change's handoff.
- *
- * A synthetic `element.click()` proves nothing here: it dispatches a `click` and no `mousedown`
- * at all, so the dismisser never runs and every shape passes. The sequence below is the real one
- * a pointer produces, dispatched through Playwright's own mouse.
- *
- * ── 2. WHETHER A CONVERTED TRIGGER STILL FILLS ITS COLUMN ───────────────────────────────────
- * A native `<select>` in a `.fabricate-field.manager-field` column took `width: 100%` from the
- * sheet. The `<button>` that replaces it takes no width from that rule at all, because the rule
- * is element-typed. Whether it nonetheless fills the column is a CASCADE question — it depends
- * on the picker root's display and on the column's `align-items` — and happy-dom computes no
- * cascade, so a mounted suite cannot answer it. Each converted site is therefore measured
- * against its own column, on its shortest and its longest option, in a real browser.
- *
  * ── 3. WHETHER THE PANEL IS WIDE ENOUGH FOR THE LIST IT OPENS ───────────────────────────────
  * The panel band resolves to ONE number — `clamp(max(triggerWidth, minWidth), minWidth,
  * maxWidth)` — written by `actions/anchoredPopover.js` as an inline style at run time, so there
@@ -45,14 +8,6 @@
  * trigger can therefore truncate an option label the trigger itself renders whole. The
  * non-truncation clause below opens every converted panel and asserts no option label is
  * ellipsised, and its negative control proves the clause can see a panel that is too narrow.
- *
- * ── THE FIXTURE IS REAL CODE, AND ITS FACE IS DECLARED ──────────────────────────────────────
- * `tests/fixtures/manager-select/` is served by a Vite dev server with the real Svelte plugin,
- * so every component is imported from `src/` and compiled as the build compiles it, and
- * `styles/fabricate.css` is served RAW. The fixture declares `font-family: Arial, sans-serif`
- * and this suite asserts the declaration took effect, because every figure here is a text
- * measurement and the product's own face is Foundry's licensed Signika, which this repository
- * cannot ship.
  */
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
@@ -115,8 +70,7 @@ async function captionClickLegs(
     await pressPointerOn(page, captionSelector);
     const openedFromClosed = await panelIsOpen(page);
 
-    // LEG 2 — from open. If leg 1 did not open it, open it on the trigger itself so leg 2 is
-    // asked from the state it is about rather than skipped.
+    // LEG 2 — from open. If leg 1 did not open it.
     if (!openedFromClosed) await pressPointerOn(page, triggerSelector);
     assert.equal(await panelIsOpen(page), true, `${subject} is open before leg 2`);
     await pressPointerOn(page, captionSelector);
@@ -178,11 +132,7 @@ describe('a caption click cannot close a list it is wrapped in a <label> with (i
   });
 
   it('closes from open on a DEMOTED CONVERTED SITE, not only on the synthetic shape', async () => {
-    // THE SECOND SUBJECT acceptance 11 names: a site this change actually converted, rather than
-    // a shape built to have the property. The world currency spend strategy is the demote-and-
-    // point site in this phase whose caption is VISIBLE, so it is the one with a hit target to
-    // press; the other two demote behind a `visually-hidden` caption, which has no box a pointer
-    // can reach at all.
+    // THE SECOND SUBJECT acceptance 11 names: a site this change actually converted.
     const converted = await captionClickLegs(
       'currency',
       '[data-world-currency-strategy] .manager-field > span',
@@ -206,10 +156,6 @@ describe('a caption click cannot close a list it is wrapped in a <label> with (i
     // rendered `<Field as="label">` around its trigger until this change, so all twelve shipped
     // interactables callers carried the defect leg 2 measures. The host is `Field as="div"` now,
     // with the caption span carrying the id the trigger's `aria-labelledby` already pointed at.
-    //
-    // PRE-REPAIR THIS ASSERTION FAILED, measured on this very fixture: leg 1 opened and leg 2
-    // left the list OPEN. That red is what the repair answers, and it is recorded in this
-    // change's handoff rather than left as a report.
     const field = await captionClickLegs('field', '.fabricate-select-caption');
 
     assert.equal(
@@ -237,30 +183,7 @@ describe('a caption click cannot close a list it is wrapped in a <label> with (i
 
 /**
  * The converted sites this fixture can mount, and what each one's row is measured against.
- *
- * `values` are two option values the control is mounted on, shortest rendered label first: the
- * pair acceptance 12 compares. `column` says whether the trigger is expected to FILL its column —
- * the sites whose native `<select>` took `width: 100%` from `.fabricate-field.manager-field
- * select`, an element-typed rule that reaches no `<button>` — or to HUG its value behind a floor,
- * which is the one site whose row is `flex-wrap` rather than a column. `floor` is the figure that
- * site's own scoped rule declares, restated here so a failure says which number it is checking.
- *
- * A HUGGING SITE IS MEASURED ACROSS TWO ROWS RATHER THAN TWO VALUES (`secondHook`), because a
- * hug is a per-row measurement and `?value=` does not reach it: `ImportFolderMappingModal` seeds
- * each row's category from its own folder NAME, so the two rows already carry two different
- * states — the name matcher pre-fills row 1 and leaves row 2 on the `__unchanged__` sentinel —
- * and its widths are asserted against the floor rather than against each other. A hug that
- * exceeded the floor would fail an equality assertion while being exactly what the row asks for:
  * "Alchemical reagent" measures 152.08px in this fixture, above the 140px floor by design.
- *
- * TWO CONVERTED SITES ARE DELIBERATELY ABSENT and are named in this change's handoff rather
- * than left to be noticed: `WorldCurrencyTab`'s provider control is measured by the truncation
- * clause below but not by the width pair, because it renders only on the `actorInventory`
- * strategy and offers one roster; and `GatheringEconomyView`'s regeneration POLICY control
- * changes the branch its sibling renders in, so mounting it on its two values mounts two
- * different trees. The add-sub-unit control is two levels of state past `?value=` — an EXPANDED
- * currency unit with assignable sub-units — so it has its own clause below rather than a row
- * here.
  */
 const CONVERTED_SITES = Object.freeze([
   Object.freeze({
@@ -320,10 +243,6 @@ function readOpenPanel(page) {
 
 /**
  * Measure one site's trigger as it ships and with its width rule neutralised inline.
- *
- * The neutralised figure is the NEGATIVE CONTROL and it is what makes the shipped one refutable:
- * an inline width out-ranks the caller's scoped rule, so it is the same element with the
- * counterpart removed and nothing else changed.
  *
  * @param {string} subject
  * @param {string} hook
@@ -390,9 +309,7 @@ describe('a converted manager trigger keeps the width its native select had (iss
             'states the width itself.'
         );
       } else {
-        // A FLOOR, NOT AN EQUALITY. The row hugs its value by design, so the assertion is that
-        // no row falls BELOW the declared floor — the first row sits on it exactly, and a longer
-        // category legitimately sits above it.
+        // A FLOOR, NOT AN EQUALITY. The row hugs its value by design.
         assert.ok(
           Math.abs(shortest.shipped - site.floor) < EPSILON,
           `${site.name} measured ${shortest.shipped}px on its first row against a declared ` +
@@ -408,7 +325,7 @@ describe('a converted manager trigger keeps the width its native select had (iss
   }
 
   it('holds the add-sub-unit control at its column width across its option labels', async () => {
-    // THE SITE THE CONVERSION REGRESSED, and the one `?value=` cannot reach: the add-sub-unit
+    // THE SITE THE CONVERSION REGRESSED, and the one `?value=` cannot reach.
     // control renders only inside an EXPANDED currency unit that still has assignable sub-units,
     // so it is driven here rather than mounted. Its native `<select>` filled the
     // `minmax(0, 1fr)` track of `.manager-currency-subunit-builder`; the `<button>` measured
@@ -467,9 +384,7 @@ describe('a converted manager trigger keeps the width its native select had (iss
   });
 
   it('shows a converted trigger DOES resize with its value once its width rule is removed', async () => {
-    // NON-VACUITY for every clause above. Without it, a width counterpart deleted from a
-    // component would leave the pair comparison passing on a control that happens to render two
-    // labels of the same length, and the suite would read as green rather than as unperturbed.
+    // NON-VACUITY for every clause above. Without it.
     const [shortest, longest] = await Promise.all([
       measureTrigger('currency', '[data-world-currency-strategy-select]', 'macro'),
       measureTrigger('currency', '[data-world-currency-strategy-select]', 'actorProperty'),
@@ -571,11 +486,7 @@ describe('a converted manager panel is wide enough for the list it opens (issue 
   }
 
   it('shows the non-truncation clause CAN see a panel that is too narrow', async () => {
-    // THE NEGATIVE CONTROL, and it perturbs the PANEL rather than the assertion: the same page,
-    // the same rows, an inline width the resolved band cannot out-rank. Without it the clause
-    // above is indistinguishable from one whose query matched nothing — an empty offender list
-    // reads identically either way, and `scrollWidth` equals `clientWidth` on an element that
-    // was never laid out.
+    // THE NEGATIVE CONTROL, and it perturbs the PANEL rather than the assertion.
     const page = await openFixture('currency', 'actorInventory');
     try {
       await pressPointerOn(page, '[data-world-currency-provider-select]');

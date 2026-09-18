@@ -1,136 +1,5 @@
 /*
  * THE RE-ROOTED CONTROLS, RENDERED IN THREE HOSTS (issues 1502, 1508 and 1509).
- *
- * ── WHAT ISSUE 1509 PHASE 3 ADDED ─────────────────────────────────────────────
- * `RadioCardGroup`, and it is the first family here whose ROOT ELEMENT BELONGS TO ANOTHER
- * PRIMITIVE. The component renders `<Field as="fieldset">` unconditionally, so its fieldset
- * carries `fabricate-field` and `fabricate-option-cards` together and the two families are
- * co-rooted on ONE element rather than nested.
- *
- * That is why this family declares NO FONT FLOOR, and the refusal is measured rather than
- * asserted: `Field`'s own `.fabricate-field :is(input, select, textarea)` at (0,1,1) already
- * reaches every radio inside this group in every host, so a floor here would restate the same
- * property at the same rank rather than establish one. The negative control below DELETES
- * `Field`'s member from the floor group and shows the bare host's radio losing its type, which
- * is what says the resolution really comes from there.
- *
- * Its focus PAIR is neither new nor refused: the family already declared one, and this change
- * re-rooted it IN PLACE after SPLITTING the six selector lists it shared with the Tool
- * Requirements bonus row. That split is what makes the strip half a single-compound rule and
- * therefore a recognisable `PRIMITIVE_FOCUS_STRIPS` member at all.
- *
- * EVERY PROBE UNDER THIS CARD OPTS OUT OF THE BOX COMPARISON, and they all opt out for ONE
- * cause rather than seven: the icon tile declares a 40x40 size over a 1px border, so its border
- * box is 42x42 wherever `box-sizing` falls to `content-box` and 40x40 where the host supplies
- * `border-box` — and it is the tallest thing in the row, so the row, the grid and the fieldset
- * inherit the 2px from it. That is this core-less harness rather than Foundry, where core's
- * `@layer reset` gives every host `border-box`, and the tile's DECLARED 40x40 is compared in all
- * three hosts instead. The two RADIO probes keep their box comparison, because the radio
- * declares `box-sizing: border-box` itself and lays out 16x16 everywhere.
- *
- * ── WHAT ISSUE 1509 PHASES 1 AND 2 ADDED ───────────────────────────────────────
- * `EditorTabs`, the manager's editor tab strip, and it is the first family here whose root is not
- * a control and whose control is a `<button>` rather than an `<input>`. Its root is a
- * `<div role="tablist">` and the control it owns is the `<button role="tab">` inside it, so its
- * font floor takes the (0,1,1) shape — `.fabricate-tabs button` — and joins the same group as
- * `Field`'s, `ManagerSearchField`'s and `ChanceSlider`'s rather than sitting at its own root the
- * way the two button FAMILIES' floors do.
- *
- * TWO probes rather than one, because the strip's ACTIVE UNDERLINE is what it is recognisable by:
- * the resting tab's bottom border is transparent and the selected tab's is the accent, and a
- * single probe would compare one of those and call the strip proved.
- *
- * Its focus PAIR is new on both halves, which nothing before it here was. The strip carried no
- * focus chrome of its own at all — inside a Fabricate window the module pair reached its buttons,
- * and outside one there was no strip — so both halves are added, at the module pair's own (0,2,1)
- * and with its declarations verbatim.
- *
- * ── WHAT ISSUE 1508 ADDED ───────────────────────────────────────────────────────────────────
- * Two more families, and they differ from the first three in the one way that matters to this
- * file: their root is NOT the control. `ManagerButton`, `IconButton` and `Pagination` are rooted
- * on the thing being measured (or, for the pager, on a `<section>` whose buttons carry their own
- * primitive's root); `Field` is a `<label>`/`<div>`/`<fieldset>` whose CONTROL is the caller's
- * `<input>`, `<select>` or `<textarea>`, and `ManagerSearchField` is a `<label>` around its own
- * `<input type="search">`. So each declares its floor at the family root PLUS the bare element it
- * owns, (0,1,1), and the measured probe is the CONTROL rather than the root.
- *
- * That rank ties the manager's own bare-element baseline instead of losing to it, which makes
- * POSITION load-bearing in a way it never was for the (0,1,0) button floor — and the negative
- * controls below are what hold that down: inside `.fabricate-manager`, a textarea's `line-height`
- * and a select's `line-height` under `@supports (appearance: base-select)` must still come from
- * the area's own later rules, not from the floor.
- *
- * ── WHAT THIS FILE IS FOR ───────────────────────────────────────────────────────────────────
- * Issue 1502 moved `ManagerButton`, `IconButton` and `Pagination` off `.fabricate-manager` and
- * onto a namespace class each primitive emits on its own root element. Every other gate in this
- * repository asks a SPELLING question about that move — does the selector name the root, does the
- * component emit it, does a fixture copy it. This is the only one that asks the question the move
- * was made to settle: does the control render the SAME outside the manager as inside it.
- *
- * That question has exactly one honest form. Put one control in three hosts that differ only in
- * the class on an ancestor — a bare `<div>` carrying neither app class, `.fabricate fabricate-app`
- * and `.fabricate-manager` — and compare its COMPUTED geometry and type across the three. If any
- * of them disagree, some rule still depends on an application root, and the control the player app
- * renders is not the control the manager renders.
- *
- * ── WHY THE BARE HOST IS THE ONE THAT MATTERS ───────────────────────────────────────────────
- * `.fabricate` declares the module focus pair for every application, and `.fabricate-app` its own
- * select chrome, so comparing the two APPS against each other can pass while both are being rescued
- * by a rule neither of them owns. The bare `<div>` is rescued by nothing: it is the state a
- * re-rooted control reaches when it is rendered somewhere no `.fabricate-*` area class exists,
- * which is precisely what "rooted at the primitive" claims to make safe.
- *
- * ── WHAT THE HARNESS LOADS, AND WHAT IT DELIBERATELY DOES NOT ───────────────────────────────
- * `styles/fabricate.css` UNLAYERED, and nothing else. No Foundry core sheet, no scoped component
- * CSS, no font declaration of the harness's own.
- *
- * Loading core's sheet here would make this file unable to fail. Core declares
- * `@layer reset { input, button, textarea, select { font: inherit } }`, which applies in ALL THREE
- * hosts equally — so a `<button>` in the bare host would inherit its font from core whether or not
- * the primitive declared anything, and the `font-family` / `font-size` / `line-height` comparisons
- * would agree for a reason that has nothing to do with this change. The one declaration this file
- * exists to prove — `font: inherit` on the family's own baseline rule, replacing the manager's
- * `.fabricate-manager button, … { font: inherit }` at `fabricate.css:1088-1093` — would be
- * unobservable. Without core's sheet a bare `<button>` falls to the UA default button font, which
- * is NOT the inherited one, so deleting the primitive's declaration reds here. That is the whole
- * design of the fixture and it is why it diverges from `world-vocabulary-control-row-cascade.js`,
- * which loads core precisely BECAUSE its defect is a contest with a core rule.
- *
- * The three hosts sit inside one `<body>` that declares `font-family` and `font-size` once, so
- * `font: inherit` resolves from the same ancestor in all three and an equality between them is a
- * statement about the sheet rather than about the fixture.
- *
- * ── WHY A REAL BROWSER, AND WHY SOME ASSERTIONS ARE CSSOM RATHER THAN COMPUTED ──────────────
- * happy-dom computes no cascade at all, so a mounted suite cannot answer any of this. Chromium
- * can, and it resolves `var()`, so the six compared properties are read as COMPUTED values.
- *
- * Two things are read through the CSSOM instead, because a computed value cannot prove them:
- *
- *  1. WHERE THE BASELINE IS ROOTED, AND IN WHAT ORDER. `font: inherit` is the family's
- *     BARE-ELEMENT baseline, so it has to be a FLOOR: rooted at the family root ALONE, at
- *     (0,1,0), high enough to beat the UA button font in a host that declares nothing and
- *     deliberately too low to beat a caller's own per-site rule at (0,2,0). Written on the
- *     family's own (0,2,0) shared base block it tied every such rule and won on source order
- *     against each one declared earlier in the sheet, which is how it deleted
- *     `.manager-recipe-lock`'s and `.manager-recipe-edit`'s 0.68rem and made both glyphs 28.7%
- *     larger. `font` is a shorthand, so it resets `line-height` along with the rest — to the
- *     inherited value in the `inherit` form — and the shared base block declares `line-height: 1`;
- *     being MORE SPECIFIC and later, that block is what resolves. A computed value can show the consequence only in
- *     an engine that expands the shorthand and only for the properties the fixture happens to
- *     measure; reading the two rules' rooting and order shows the CAUSE, in any engine. The
- *     caller-override half is measured as well, on the two classes the regression moved.
- *  2. THE RINGS. Each primitive now declares its own `:focus-visible` outline, and a ring is only
- *     observable on a focused element in a browser that has decided `:focus-visible` applies. The
- *     rule's declared text is the thing under contract here — that it exists and that its
- *     declarations are the two the module ring uses — plus the standing rule that none of these
- *     families may reach a bare `<select>` on `:focus`. That last half outlived the rule it was
- *     written to protect: `.fabricate-app select:focus-visible` was deleted with the player app's
- *     last native select at issue 1511, so there is no longer an inset ring here to displace, and
- *     what the clause holds now is the boundary itself — a family that started ringing selects
- *     would be writing element chrome the module ring already owns, and would tie the manager's
- *     surviving `<select>`s at equal rank while issue 1510's sweep and the root's own convergence
- *     (issue 1357) are still in flight.
- *
  * ── THE MARKUP IS THE PRIMITIVE'S OWN CLASS LIST, READ OUT OF THE PRIMITIVE ─────────────────
  * The controls are rendered as markup rather than by compiling and mounting three Svelte
  * components into a browser page, on `manager-layout.test.js`'s precedent (`:8790`) and for its
@@ -156,11 +25,6 @@ const read = (path) => readFileSync(resolve(repoRoot, path), 'utf8');
 
 /**
  * The unconditional class literals of a primitive's `const classes = $derived([…])` array.
- *
- * Reading the array rather than restating its tokens is the same decision `manager-layout.js`
- * makes about the same two components, and for the same reason: a probe built from a restated
- * string keeps measuring the old control after the component stops emitting it, and reports green
- * while doing so.
  *
  * @param {string} source A Svelte component's source text.
  * @param {string} label The component, for the failure message.
@@ -189,30 +53,19 @@ const ICON_BUTTON_CLASSES = composedClasses(
  * `Pagination` writes its classes inline on its root `<section>` rather than composing them,
  * so its contract is read from the markup instead — by the same rule that nothing is restated.
  */
-/**
- * `Field` composes exactly two unconditional literals — its root and its hook class — so the whole
- * array is what a default `<Field>` emits.
- */
+/** `Field` composes exactly two unconditional literals — its root and its hook class. */
 const FIELD_CLASSES = composedClasses(
   read('src/ui/svelte/components/Field.svelte'),
   'Field'
 ).join(' ');
 
-/**
- * `ManagerSearchField`'s `is-compact` literal belongs to a conditional expression, just like
- * `IconButton`'s `is-size-24`. Neither is an unconditional array member, so the reader excludes
- * both rather than applying opt-in geometry to a default-control fixture.
- */
+/** `ManagerSearchField`'s `is-compact` literal belongs to a conditional expression. */
 const SEARCH_CLASSES = composedClasses(
   read('src/ui/svelte/components/ManagerSearchField.svelte'),
   'ManagerSearchField'
 ).join(' ');
 
-/**
- * `ManagerToolbar` and `InspectorCard` each compose exactly two unconditional literals — their
- * root and their hook class — so the whole array is what a default render emits. Neither owns a
- * control of its own, which is why neither appears in the floor or the ring populations below.
- */
+/** `ManagerToolbar` and `InspectorCard` each compose exactly two unconditional literals. */
 const TOOLBAR_CLASSES = composedClasses(
   read('src/ui/svelte/components/ManagerToolbar.svelte'),
   'ManagerToolbar'
@@ -222,24 +75,13 @@ const CARD_CLASSES = composedClasses(
   'InspectorCard'
 ).join(' ');
 
-/**
- * `StatusToggle`'s array holds MORE than its unconditional literals — the host's own class, the
- * caller's extra and the state modifier all follow — but the reader above stops at the array's
- * first `]`, which in this component is `HOST_CLASSES[host]`'s own. So it sees exactly the two
- * literals a default `button`-host render emits first, which is what the fixture writes.
- *
- * That truncation is not a limitation being worked around here: it is the CONSTRAINT the
- * area-scope gate depends on, and asserting `[0]` below says so out loud.
- */
+/** `StatusToggle`'s array holds MORE than its unconditional literals — the host's own class. */
 const TOGGLE_CLASSES = composedClasses(
   read('src/ui/svelte/components/StatusToggle.svelte'),
   'StatusToggle'
 ).join(' ');
 
-/**
- * `ChanceSlider` composes nothing: it writes every class it emits as a literal, its root inline on
- * its root `<span>`, so its contract is read from the markup exactly as `Pagination`'s is.
- */
+/** `ChanceSlider` composes nothing: it writes every class it emits as a literal. */
 const SLIDER_CLASSES = (() => {
   const source = read('src/ui/svelte/components/ChanceSlider.svelte');
   const match = source.match(/class="(fabricate-slider[^"]*)"/);
@@ -250,12 +92,6 @@ const SLIDER_CLASSES = (() => {
 /**
  * `EditorTabs` writes its root as a LITERAL at the head of an interpolated template and its
  * container class as a frozen PROP DEFAULT, so its contract is read out of both (issue 1509).
- *
- * That split is the whole shape of this family and is why the two halves are read separately
- * rather than as one string: the root is the primitive's and no caller can drop it, while the
- * container class is a DEFAULT nine wrappers override with a vocabulary of their own. A reader
- * that took the rendered pair as one literal would keep measuring the default after a caller
- * became the only site that renders.
  */
 const TABS_ROOT = (() => {
   const source = read('src/ui/svelte/components/EditorTabs.svelte');
@@ -280,30 +116,13 @@ const TABS_CLASSES = `${TABS_ROOT} ${TABS_CONTAINER_CLASS}`;
 /**
  * `EditorValidationSurface` composes FOUR unconditional literals and the root is the first
  * (issue 1509), which is what `composedClassRegion` in the area-scope gate reads.
- *
- * The whole array is what a caller passing no `class` of its own emits, so it is the literal the
- * fixture below writes. The three `manager-*` names travel with it deliberately:
- * `manager-recipe-tab` is the RECIPE EDITOR's tab vocabulary and stays application-rooted, and
- * its presence on the fixture root is what makes the residue this file records MEASURABLE rather
- * than argued.
  */
 const VALIDATION_CLASSES = composedClasses(
   read('src/ui/svelte/components/EditorValidationSurface.svelte'),
   'EditorValidationSurface'
 ).join(' ');
 
-/**
- * The class list `RadioCardGroup` hands `Field`, read out of the component's own template.
- *
- * The template's LEADING LITERAL is the family root, and the position is a constraint rather than
- * a style note: `searchable-popover-area-scope.test.js` reads this component's family out of its
- * markup, and `Field` prepends its own two classes to whatever arrives — so what the fieldset
- * renders is `Field`'s pair, then this family's root, then this family's own classes. That is the
- * one place in this file where TWO namespace roots land on ONE element.
- *
- * `is-config-cards` is appended rather than read, because it arrives through an interpolation the
- * literal reader cannot see; the pinning test below asserts the whole assembled string.
- */
+/** The class list `RadioCardGroup` hands `Field`, read out of the component's own template. */
 const OPTION_CARDS_OWN_CLASSES = (() => {
   const source = read('src/ui/svelte/components/RadioCardGroup.svelte');
   const match = source.match(/class=\{`([^`$]*)\$\{/u);
@@ -316,14 +135,7 @@ const OPTION_CARDS_OWN_CLASSES = (() => {
 
 const OPTION_CARDS_CLASSES = `${FIELD_CLASSES} ${OPTION_CARDS_OWN_CLASSES} is-config-cards`;
 
-/**
- * The class list `ToggleCard` writes on its own root `<div>`, read out of its template.
- *
- * Its template interpolates the `variant` and the on/off state, so what is READ is the LEADING
- * LITERAL RUN — the namespace root and the family's own card class — and the two state tokens are
- * appended by the fixture. That split is the same one `RadioCardGroup`'s read makes below, and it
- * is what `searchable-popover-area-scope.test.js` reads the family from.
- */
+/** The class list `ToggleCard` writes on its own root `<div>`, read out of its template. */
 const TOGGLE_CARD_CLASSES = (() => {
   const source = read('src/ui/svelte/components/ToggleCard.svelte');
   const match = source.match(/class=\{`([^`$]*)\$\{/u);
@@ -343,14 +155,7 @@ const LINK_FIELD_CLASSES = (() => {
   return match[1];
 })();
 
-/**
- * The class list `ModifierPillSelect` hands `Field`, read out of its own markup (issue 1515).
- *
- * A plain literal attribute like `ChanceSlider`'s and `ItemDropZone`'s, so it is read the same
- * way — but the element it lands on is `Field`'s, not this component's, so what the fieldset
- * RENDERS is `Field`'s pair followed by this pair. That is `RadioCardGroup`'s shape exactly, and
- * it is the second and last place in this file where TWO namespace roots land on ONE element.
- */
+/** The class list `ModifierPillSelect` hands `Field`, read out of its own markup (issue 1515). */
 const PILL_SELECT_OWN_CLASSES = (() => {
   const source = read('src/ui/svelte/components/ModifierPillSelect.svelte');
   const match = source.match(/class="(fabricate-pill-select[^"]*)"/u);
@@ -438,7 +243,7 @@ test('the fifteen class strings under measurement are the ones the primitives em
       'its frozen map rather than restated here'
   );
 
-  // AND THE ROOT IS THE ARRAY'S FIRST LITERAL, for both. This is a CONSTRAINT rather than a
+  // AND THE ROOT IS THE ARRAY'S FIRST LITERAL.
   // style note: `searchable-popover-area-scope.test.js` reads the composed region by taking the
   // first `]` after the opener, so a root moved off the head of the array is a root that gate
   // reports as unemitted while every re-rooted rule in the sheet keeps matching.
@@ -482,29 +287,7 @@ const HOSTS = Object.freeze([
   Object.freeze({ id: 'manager', className: 'fabricate fabricate-manager' }),
 ]);
 
-/**
- * The controls, and the element inside each host that is measured.
- *
- * THE CLASS ATTRIBUTES ARE LITERALS, and the reads above are what stop them drifting. Building
- * them by interpolation was the first shape of this file and it was wrong for a reason worth
- * recording: `searchable-popover-area-scope.test.js` is a TEXT SCANNER over `tests/`, and a
- * fixture that spells its classes as `class="${…}"` is invisible to it. This file would then have
- * been a new blind spot in the census — and a carrier no scanner could see is precisely the defect
- * that cost issue 1502 a whole extra phase, when twelve `triggerClass="…"` sites went unrepaired
- * because the census probe only matched `class="manager-button`.
- *
- * So the markup says what it renders, in the open, and the pinning test above asserts every
- * literal against the value read out of the component. A literal that drifts from the primitive
- * reds there rather than quietly measuring the wrong control here.
- *
- * EACH FRAGMENT IS ONE UNBROKEN TEMPLATE LITERAL, and that is a constraint rather than a style.
- * The same scanner walks `<tag …>` with an attribute run that alternates `"[^"]*"` and `'[^']*'`,
- * so an OPEN TAG split across a `'…' + \`…\`` join puts the join's own apostrophe inside the tag
- * and lets the alternation run past the `>` that should have ended it. Measured on the first draft
- * of this file: splitting the pager arrow's `<button …>` across two fragments corrupted the tag
- * stack and made the census report this file's `<nav>` and page label as rootless — a false
- * offender produced entirely by where the source happened to wrap. Long lines here, one tag each.
- */
+/** The controls, and the element inside each host that is measured. */
 const CONTROLS = Object.freeze([
   Object.freeze({
     id: 'manager-button',
@@ -541,12 +324,7 @@ const CONTROLS = Object.freeze([
     markup: (host) =>
       `<label class="fabricate-search manager-search" data-probe="${host}-search-root"><i class="fas fa-search"></i><input type="search" data-probe="${host}-search"></label>`,
   }),
-  // THE PROBE IS THE ROOT FOR BOTH OF THESE, and that is the point rather than a shortcut. The
-  // bar and the card own NO control: each renders its caller's children, so the whole of what
-  // either family declares is on the `<section>` itself. The bar carries one `<select>` all the
-  // same, because `.fabricate-filter-bar.manager-toolbar select.is-size-38` is the one family
-  // rule that REACHES a caller's control, and its own clause below measures what does and does
-  // not travel with it.
+  // THE PROBE IS THE ROOT FOR BOTH OF THESE.
   Object.freeze({
     id: 'toolbar',
     classes: TOOLBAR_CLASSES,
@@ -559,21 +337,11 @@ const CONTROLS = Object.freeze([
     markup: (host) =>
       `<section class="fabricate-card manager-inspector-card" data-probe="${host}-card"><h3>Matching evidence</h3><p>Body</p></section>`,
   }),
-  // THE PROBE IS THE ROOT AGAIN FOR THE TOGGLE, and here that is not a shortcut either: the
-  // switch's root IS its control, a `<button>`, which is why its font floor is written at the
-  // family root alone. Its track and knob are measured as separate probes below, because the
-  // 34x20 / 14x14 geometry the switch is recognisable by lives on those two children and a
-  // comparison on the button alone would not see it move.
+  // THE PROBE IS THE ROOT AGAIN FOR THE TOGGLE, and here that is not a shortcut either.
   Object.freeze({
     id: 'toggle',
     classes: TOGGLE_CLASSES,
-    // OPTED OUT OF THE BOX COMPARISON, for the field's reason and no other. The switch's own box
-    // is `width: auto`, solved from its content, and its content is the 34x20 TRACK — which
-    // declares a 1px border over a 34x20 size and therefore lays out at 36x22 wherever
-    // `box-sizing` falls to `content-box`. That is this core-less harness outside
-    // `.fabricate-manager`, and it is nowhere in Foundry, where core's `@layer reset` declares the
-    // universal rule for every host. Both halves are asserted by the box-sizing clause below, so
-    // the opt-out cannot outlive its reason.
+    // OPTED OUT OF THE BOX COMPARISON.
     comparesBox: false,
     markup: (host) =>
       `<button type="button" class="fabricate-toggle manager-status-toggle" data-probe="${host}-toggle" data-keyboard-focus="true"><span class="manager-status-toggle-track" data-probe="${host}-toggle-track"><span class="manager-status-toggle-knob" data-probe="${host}-toggle-knob"></span></span><span class="manager-status-toggle-label" data-probe="${host}-toggle-label">On</span></button>`,
@@ -596,12 +364,7 @@ const CONTROLS = Object.freeze([
   Object.freeze({
     id: 'tabs',
     classes: TABS_CLASSES,
-    // OPTED OUT OF THE BOX COMPARISON, for its CHILDREN's reason rather than its own. The strip
-    // declares no height at all — it is solved from the tallest button — and each button declares
-    // a 38px `min-height` under a 2px bottom border, so a button lays out 2px taller wherever
-    // `box-sizing` falls to `content-box` and the strip grows with it. That is the bordered
-    // rails' case exactly, it is a property of this core-less harness rather than of Foundry, and
-    // the box-sizing clause below asserts both halves so the opt-out cannot outlive its reason.
+    // OPTED OUT OF THE BOX COMPARISON.
     comparesBox: false,
     markup: (host) =>
       `<div class="fabricate-tabs manager-editor-tabs" role="tablist" data-probe="${host}-tabs"><button type="button" role="tab" class="manager-editor-tab-button is-active" data-probe="${host}-tabs-active" aria-selected="true" data-keyboard-focus="true"><span>Overview</span></button><button type="button" role="tab" class="manager-editor-tab-button" data-probe="${host}-tabs-button" aria-selected="false" data-keyboard-focus="true"><span>Results</span></button></div>`,
@@ -612,43 +375,19 @@ const CONTROLS = Object.freeze([
   // with its medallion, the count rail, and the grouped row stack. Eighteen probes, because
   // every one of them is painted by a rule this change re-rooted and none of them may depend on
   // the host.
-  //
-  // THE ROOT ITSELF IS THE RESIDUE, and the fixture states it rather than hiding it. The section
-  // carries `manager-recipe-tab` beside the namespace root, and
-  // `.fabricate-manager .manager-recipe-tab` is (0,2,0) declared LATER in the sheet than the
-  // surface's own (0,2,0) root rule — so inside the manager the root's `gap` is `--fab-space-3`
-  // and its `min-width` is 0, and outside it the surface's own `--fab-space-4` stands with no
-  // `min-width` at all. That is the one thing about this family that is NOT host-independent, it
-  // is owned by issue 1507, and `VALIDATION_COMPARED` below is scoped to the two declarations
-  // both rules agree on so the exclusion is a named set rather than a silent gap.
   Object.freeze({
     id: 'validation',
     classes: VALIDATION_CLASSES,
-    // OPTED OUT OF THE BOX COMPARISON for the residue above: two different `gap`s in two hosts
-    // put the row stack at two different offsets and give the section two different heights.
-    // Every element INSIDE it is compared as normal, which is where this family's claim lives.
+    // OPTED OUT OF THE BOX COMPARISON for the residue above.
     comparesBox: false,
     markup: (host) =>
       `<section class="fabricate-validation manager-recipe-tab manager-recipe-validation manager-editor-validation-surface" data-probe="${host}-validation"><section class="manager-recipe-validation-summary-row" data-probe="${host}-validation-summary-row"><div class="manager-recipe-rail-summary is-block" data-probe="${host}-validation-summary"><span class="manager-recipe-rail-summary-medallion" data-probe="${host}-validation-medallion"><i class="fas fa-circle-xmark"></i></span><span class="manager-recipe-rail-summary-copy" data-probe="${host}-validation-copy"><span class="manager-recipe-rail-summary-title" data-probe="${host}-validation-title">Cannot be enabled</span><span class="manager-recipe-rail-summary-sub manager-muted" data-probe="${host}-validation-sub">Clear every blocking issue first.</span></span></div><ul class="manager-recipe-rail-counts" data-probe="${host}-validation-counts"><li class="manager-recipe-rail-count is-passing" data-probe="${host}-validation-count"><i class="fas fa-circle-check"></i><span class="manager-recipe-rail-count-label" data-probe="${host}-validation-count-label">Passing</span><span class="manager-recipe-rail-count-value" data-probe="${host}-validation-count-value">7</span></li></ul></section><div class="manager-recipe-val-group" data-probe="${host}-validation-group"><p class="manager-recipe-val-group-label" data-probe="${host}-validation-group-label">Requirements</p><ul class="manager-recipe-val-rows" data-probe="${host}-validation-rows"><li class="manager-recipe-val-row is-block" data-probe="${host}-validation-row"><i class="manager-recipe-val-status fas fa-circle-xmark" data-probe="${host}-validation-status"></i><div class="manager-recipe-val-copy" data-probe="${host}-validation-row-copy"><span class="manager-recipe-val-title" data-probe="${host}-validation-row-title">A game-world Item is linked</span></div></li></ul></div></section>`,
   }),
-  // AND THE PROBE IS NOT THE ROOT FOR THE OPTION CARDS EITHER (issue 1509 phase 3), for a reason
-  // no other entry here has: the root element is `Field`'s `<fieldset>`, so it carries TWO
-  // namespace roots and what this family declares about it is only part of what paints it. The
-  // control the family owns is its own `<input type="radio">`, and it is probed in BOTH states,
-  // because the checked ring is an inset `box-shadow` written by a rule of its own and a single
-  // resting probe would compare the hollow ring and call the family proved.
-  //
-  // ELEVEN PROBES, and the icon tile is the one this fixture exists to draw: the two-column
-  // `is-config-cards` face is the only presentation that renders it, and the 40x40 plate over a
-  // hairline is what the card is recognisable by.
+  // AND THE PROBE IS NOT THE ROOT FOR THE OPTION CARDS EITHER (issue 1509 phase 3).
   Object.freeze({
     id: 'option-cards',
     classes: OPTION_CARDS_CLASSES,
-    // OPTED OUT OF THE BOX COMPARISON, for the icon tile's reason stated in the header: the tile
-    // declares 40x40 over a 1px border, so it is 42 high wherever `box-sizing` falls to
-    // `content-box`, and it is the tallest thing in the row — so the row, the grid and this
-    // fieldset are all 2px taller in the two hosts this core-less harness leaves without a
-    // universal box-sizing rule. The tile's DECLARED size is compared instead, in all three hosts.
+    // OPTED OUT OF THE BOX COMPARISON, for the icon tile's reason stated in the header.
     comparesBox: false,
     markup: (host) =>
       `<fieldset class="fabricate-field manager-field fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards" data-probe="${host}-option-cards"><legend class="manager-resolution-mode-legend" data-probe="${host}-option-cards-legend">Resolution</legend><div class="manager-resolution-mode-options" data-probe="${host}-option-cards-options"><label class="manager-resolution-option is-active" data-probe="${host}-option-cards-row-active"><input type="radio" name="${host}-option-cards" checked data-probe="${host}-option-cards-radio-checked"><span class="manager-resolution-option-icon" data-probe="${host}-option-cards-icon"><i class="fas fa-wand-magic-sparkles"></i></span><span class="manager-resolution-option-body" data-probe="${host}-option-cards-body"><span class="manager-resolution-option-name" data-probe="${host}-option-cards-name">Simple</span><span class="manager-resolution-option-desc" data-probe="${host}-option-cards-desc">One ingredient set and one result group.</span></span></label><label class="manager-resolution-option" data-probe="${host}-option-cards-row"><input type="radio" name="${host}-option-cards" data-probe="${host}-option-cards-radio"><span class="manager-resolution-option-icon"><i class="fas fa-layer-group"></i></span><span class="manager-resolution-option-body"><span class="manager-resolution-option-name">Routed by ingredients</span></span></label></div></fieldset>`,
@@ -658,26 +397,10 @@ const CONTROLS = Object.freeze([
   // it is rendered here exactly as the card renders it — with its own namespace root on it — so
   // the fixture is the card the product draws rather than a card-shaped approximation. It carries
   // no probe of its own, because the `toggle` entry above already measures that primitive.
-  //
-  // THREE CARDS, because the family's ten rules are three variants and their shared base, and one
-  // card would leave five of them unrendered. `is-enabled.is-on` carries the copy probes and the
-  // success-toned glyph, `is-locked.is-on` the accent tone and `is-info.is-on` the info tone and
-  // ITS glyph — the one rule in the family that tones a child from a variant on the parent.
-  //
-  // THE SUB-LINE IS THE RESIDUE, and the fixture states it rather than hiding it: it carries
-  // `manager-muted` beside the family class exactly as the component writes it, and
-  // `.fabricate-manager .manager-muted` is a (0,2,0) rule declared LATER in the sheet that gives
-  // it a colour, a `font-size` and a margin this family does not restate. So inside the manager
-  // that line is 0.78rem muted and outside it takes its type from its ancestor, and what the
-  // FAMILY promises about it — `min-width: 0` and the 1.35 leading — travels and is compared.
-  // `manager-muted` is the manager's vocabulary, not this primitive's; issue 1507 owns it.
   Object.freeze({
     id: 'toggle-card',
     classes: `${TOGGLE_CARD_CLASSES} is-enabled is-on`,
-    // OPTED OUT OF THE BOX COMPARISON, for the sub-line's reason above: a 0.78rem line inside the
-    // manager and an inherited-size line outside it give the copy column two heights, and the
-    // card is a `align-items: center` row solved from its tallest child. Every property the
-    // family declares on the card itself is compared in all three hosts.
+    // OPTED OUT OF THE BOX COMPARISON, for the sub-line's reason above.
     comparesBox: false,
     markup: (host) =>
       `<div class="fabricate-toggle-card manager-recipe-status-card is-enabled is-on" data-probe="${host}-toggle-card"><span class="manager-recipe-status-icon" aria-hidden="true" data-probe="${host}-toggle-card-icon"><i class="fas fa-circle-check"></i></span><div class="manager-recipe-status-copy" data-probe="${host}-toggle-card-copy"><p class="manager-recipe-status-title" data-probe="${host}-toggle-card-title">Enabled</p><p class="manager-recipe-status-sub manager-muted" data-probe="${host}-toggle-card-sub">Craftable by players</p></div><button type="button" class="fabricate-toggle manager-status-toggle is-on" aria-pressed="true" data-keyboard-focus="true"><span class="manager-status-toggle-track" aria-hidden="true"><span class="manager-status-toggle-knob"></span></span></button></div>`,
@@ -696,32 +419,7 @@ const CONTROLS = Object.freeze([
     markup: (host) =>
       `<div class="fabricate-toggle-card manager-recipe-status-card is-info is-on" data-probe="${host}-toggle-card-info"><span class="manager-recipe-status-icon" aria-hidden="true" data-probe="${host}-toggle-card-info-icon"><i class="fas fa-circle-info"></i></span><div class="manager-recipe-status-copy"><p class="manager-recipe-status-title">Policy</p><p class="manager-recipe-status-sub manager-muted">Set by the world</p></div></div>`,
   }),
-  // AND THE PROBE IS NOT THE ROOT FOR THE LINK FIELD EITHER (issue 1509 phase 4), and this family
-  // owns no control either: its two actions are `IconButton`s, composed and rendered here with
-  // that primitive's own root on them.
-  //
-  // TWO FACES, because `compact` is not a density knob but a different claim about what the zone
-  // is FOR, and the two share only the root class. The default face is the three-column linked
-  // card — art, copy, actions — and the compact one is the centred glyph-over-title-over-note
-  // prompt. Between them they render thirteen of the fifteen rules this change re-roots; the two
-  // that are missing are `.is-drop-active` and `.is-disabled`, single-declaration state tones
-  // that no static fixture reaches, and they are covered by the CSSOM clause below instead.
-  //
-  // ONE EXCLUSION, NAMED RATHER THAN LEFT TO BE DISCOVERED, and it belongs to ONE CALLER rather
-  // than to the family. `styles/fabricate.css` declares `.fabricate-manager [data-tool-create-card]
-  // { flex: 0 0 auto; width: 100% }`, a STYLING hook the Tools catalogue's create prompt passes
-  // through this primitive's `hookAttrs` bag. That rule is application-rooted and its selector
-  // names no class of this family at all, so it is outside every census this change made and it
-  // does not travel: the create prompt keeps its `flex` and its full width only inside the
-  // manager. `fabricate-link-field` is therefore host-independent for eight of its nine callers
-  // and host-DEPENDENT for the ninth, the residue is issue 1507's, and no fixture here carries
-  // that attribute — a probe for it would be measuring the exclusion rather than the family.
-  //
-  // THE ADDRESS LINE IS PROBED FOR THE OPPOSITE REASON TO EVERYTHING ELSE HERE. Its type comes
-  // from the component's OWN scoped block, which this harness deliberately does not load, so the
-  // global sheet gives it nothing and all three hosts compute the same UA default. That agreement
-  // is the assertion: the moment anybody writes `.fabricate-manager .manager-item-drop-zone-uuid`
-  // the three stop agreeing and this probe reds, which is exactly the regression this file is for.
+  // AND THE PROBE IS NOT THE ROOT FOR THE LINK FIELD EITHER (issue 1509 phase 4).
   Object.freeze({
     id: 'link-field',
     classes: `${LINK_FIELD_CLASSES} is-linked`,
@@ -738,28 +436,10 @@ const CONTROLS = Object.freeze([
   // `<Field as="div">` it renders, so that element carries `fabricate-field` and
   // `fabricate-pill-select` together — the second and last co-rooted family here — and the
   // controls this family owns are the add TRIGGER and the removable pill inside the row.
-  //
-  // TWO FACES, because the pill row is an `{#each}…{:else}`: a row of pills, or one quiet
-  // placeholder line. They share the root and the row and nothing else, and the placeholder is
-  // the only element that reaches the `manager-availability-any` rule, so a single fixture would
-  // leave one of the family's thirteen selectors unrendered.
-  //
-  // THE PLACEHOLDER IS THE RESIDUE, and the fixture states it rather than hiding it: it carries
-  // `manager-muted` beside the family class exactly as the component writes it, and
-  // `.fabricate-manager .manager-muted` is a (0,2,0) rule that gives it a colour, a `font-size`
-  // and a margin this family does not restate. So inside the manager that line is 0.78rem and
-  // outside it takes its type from its ancestor, and what the FAMILY promises about it — the
-  // 28px floor and the inline-flex centring — travels and is compared. `manager-muted` is the
-  // manager's vocabulary, not this primitive's; issue 1507 owns it.
   Object.freeze({
     id: 'pill-select',
     classes: PILL_SELECT_CLASSES,
     // OPTED OUT OF THE BOX COMPARISON, for the bordered rails' cause rather than one of its own:
-    // the trigger declares a 34px `min-height` under a 1px border and the pill a 28px one under
-    // another, so each is 2px taller wherever `box-sizing` falls to `content-box` and this
-    // column is solved from them. That is this core-less harness rather than Foundry, where
-    // core's `@layer reset` gives every host `border-box`, and the DECLARED values on both are
-    // compared in all three hosts instead.
     comparesBox: false,
     markup: (host) =>
       `<div class="fabricate-field manager-field fabricate-pill-select manager-availability-multi" role="group" aria-label="Modifiers" data-probe="${host}-pill-select"><button type="button" class="manager-availability-menu-button" data-keyboard-focus="true" data-probe="${host}-pill-select-menu"><span>Add modifier</span><i class="fas fa-chevron-down" aria-hidden="true"></i></button><div class="manager-availability-pill-row" data-probe="${host}-pill-select-row"><span class="manager-availability-pill is-modifier" data-probe="${host}-pill-select-pill"><i class="fas fa-dice-d20" aria-hidden="true" data-probe="${host}-pill-select-glyph"></i><span data-probe="${host}-pill-select-label">Medicine</span><button type="button" class="manager-availability-remove" data-keyboard-focus="true" aria-label="Remove Medicine" data-probe="${host}-pill-select-remove"><i class="fas fa-xmark" aria-hidden="true"></i></button></span></div></div>`,
@@ -773,13 +453,7 @@ const CONTROLS = Object.freeze([
   }),
 ]);
 
-/**
- * Probes measured across the three hosts that are not themselves `CONTROLS` entries.
- *
- * `toolbar-select` is a caller's control INSIDE the bar rather than a control of the bar's, so it
- * has no class string of its own to pin and no entry above; the bar's markup renders it and the
- * rung clause below is what asks about it.
- */
+/** Probes measured across the three hosts that are not themselves `CONTROLS` entries. */
 const EXTRA_PROBES = Object.freeze([
   'toolbar-select',
   'toggle-track',
@@ -849,57 +523,22 @@ const EXTRA_PROBES = Object.freeze([
   'pill-select-any',
 ]);
 
-/**
- * The extra probes that are the issue-1508 families' OWN elements, and are therefore held to the
- * same three-host equality the `CONTROLS` entries are.
- *
- * `toolbar-select` is deliberately absent: it is a CALLER's control inside the bar, only two of
- * whose properties travel, and its own clause below measures both halves of that residue. These
- * ten are different — every one of them is an element `StatusToggle` or `ChanceSlider` writes
- * itself, painted by a rule this change re-rooted, so nothing about them may depend on the host.
- */
+/** The extra probes that are the issue-1508 families' OWN elements. */
 const FAMILY_EXTRA_PROBES = Object.freeze(
   EXTRA_PROBES.filter((probe) => probe !== 'toolbar-select')
 );
 
-/**
- * The two family RAILS whose rendered border box follows the host's `box-sizing`.
- *
- * Both declare a 1px border over a size they also declare — the switch's 34x20 rail and the
- * slider's 6px-high rail — so in this core-less harness they lay out 2px larger in each dimension
- * wherever `box-sizing` falls to `content-box`, which is every host but the manager. That
- * difference does not exist in Foundry, where core's `@layer reset` declares the universal rule
- * for every host; it is a property of the fixture. Both halves are asserted by the box-sizing
- * clause below so neither opt-out can outlive its reason.
- */
+/** The two family RAILS whose rendered border box follows the host's `box-sizing`. */
 const BORDERED_TRACK_PROBES = Object.freeze(['toggle-track', 'slider-track']);
 
-/**
- * Those two rails, plus the fill INSIDE one of them, which inherits the same dependence.
- *
- * `.fabricate-slider .manager-drop-rate-fill` is `width: var(--fab-drop-rate-value)` and
- * `height: 100%` — both percentages, both resolved against its rail's CONTENT box, which is the
- * box the keyword decides. So the fill's size differs by host for exactly the rail's reason and
- * not for one of its own, and comparing it as a VALUE would report the harness rather than the
- * sheet. What the family actually promises about it is a RELATIONSHIP — the fill fills its rail —
- * and that is asserted directly by the box-sizing clause below, in every host.
- */
+/** Those two rails, plus the fill INSIDE one of them, which inherits the same dependence. */
 const HOST_BOX_DEPENDENT_PROBES = Object.freeze([
   ...BORDERED_TRACK_PROBES,
   'slider-fill',
-  // THE TWO TAB BUTTONS, for the bordered rails' reason (issue 1509): each declares a 38px
-  // `min-height` under a 2px bottom border, so its border box is 40 high wherever `box-sizing`
-  // falls to `content-box` and 38 where the host supplies `border-box`. The DECLARED 38 is
-  // compared instead, in all three hosts, which is the claim that matters.
+  // THE TWO TAB BUTTONS, for the bordered rails' reason (issue 1509).
   'tabs-active',
   'tabs-button',
   // AND SEVEN OF THE OPTION CARD'S PROBES (issue 1509 phase 3), for ONE cause rather than seven.
-  // `.fabricate-option-cards… .manager-resolution-option-icon` declares a 40x40 tile over a 1px
-  // border, so its border box is 42x42 wherever `box-sizing` falls to `content-box` and 40x40
-  // where the host supplies `border-box`. The tile is the tallest thing in an option row, so the
-  // row's box follows it, the grid's follows the row's and the fieldset's follows the grid's; the
-  // body, the name and the desc follow the row's CONTENT width for the same reason. Their
-  // DECLARED values are compared instead, in all three hosts, and the tile's 40x40 is among them.
   // The two RADIO probes are deliberately NOT here: the radio declares `box-sizing: border-box`
   // in its own rule, so it lays out 16x16 in every host and its box is compared.
   'option-cards-options',
@@ -909,20 +548,11 @@ const HOST_BOX_DEPENDENT_PROBES = Object.freeze([
   'option-cards-body',
   'option-cards-name',
   'option-cards-desc',
-  // AND THE STATUS CARD'S COPY COLUMN AND ITS TWO LINES (issue 1509 phase 4), for the card's own
-  // `box-sizing` dependence rather than for a cause of theirs. The card declares no `box-sizing`,
-  // so inside the manager it takes `border-box` from `.fabricate-manager *` and its 1px border and
-  // 12px padding come out of its width; elsewhere in this core-less harness they are added to it,
-  // and the flexible copy column is 2px narrower. Every DECLARED value on all three is compared in
-  // all three hosts, and the card's own box-sizing exclusion is asserted with its reason below.
+  // AND THE STATUS CARD'S COPY COLUMN AND ITS TWO LINES (issue 1509 phase 4).
   'toggle-card-copy',
   'toggle-card-title',
   'toggle-card-sub',
-  // AND THREE OF THE PILL SELECT'S (issue 1515), for the bordered rails' cause rather than three
-  // of their own. The add trigger declares a 34px `min-height` under a 1px border and the pill a
-  // 28px one under another, so each is 2px taller wherever `box-sizing` falls to `content-box`
-  // and the pill ROW is solved from the pill. Their DECLARED values are compared instead, in all
-  // three hosts, which is where the family's claim lives.
+  // AND THREE OF THE PILL SELECT'S (issue 1515).
   'pill-select-menu',
   'pill-select-pill',
   'pill-select-row',
@@ -931,28 +561,11 @@ const HOST_BOX_DEPENDENT_PROBES = Object.freeze([
 /**
  * The two validation-surface probes whose laid-out BOX follows a MANAGER class rather than a
  * family one (issue 1509).
- *
- * The summary card's sub-line carries `manager-muted` beside the family class, and
- * `.fabricate-manager .manager-muted` declares `line-height: 1.35` and a top margin that this
- * family does not and must not restate. So the sub's LINE BOX is 12 high in a bare host and 16
- * in the manager, and the copy column that stacks it under the title is 35 against 41. What the
- * family promises about that line — its 0.72rem, at (0,3,0) over the muted class's 0.78rem — DOES
- * travel and is compared on the `validation-sub` probe.
- *
- * The sub-line is a FLEX ITEM of that column, so it is blockified and its own border box follows
- * the same leading; both are opted out together rather than one of them being reported as a
- * different kind of difference. Both halves of the reason are asserted by the clause below so the
- * opt-out cannot outlive it. `manager-muted` is the manager's vocabulary, not
- * this primitive's; retiring it from this surface is issue 1507's.
  */
 const HOST_LEADING_PROBES = Object.freeze([
   'validation-copy',
   'validation-sub',
   // AND THE PILL SELECT'S PLACEHOLDER LINE (issue 1515), for the identical reason a third time:
-  // it carries `manager-muted` beside the family class exactly as the component writes it, so
-  // inside the manager it is 0.78rem and outside it takes its size from its ancestor — which
-  // makes the line's own inline box a different WIDTH in the two. What the family declares about
-  // it, the 28px floor and the inline-flex centring, is compared in all three hosts.
   'pill-select-any',
   // AND THE ROW THAT HOLDS IT, whose own box follows the line's. `.fabricate-manager
   // .manager-muted` declares a `--fab-space-2xs` TOP MARGIN as well as the size, and the row is
@@ -961,24 +574,10 @@ const HOST_LEADING_PROBES = Object.freeze([
   // row's own declarations are compared in all three hosts; only its solved box is excluded.
   'pill-select-empty-row',
   // AND THE STATUS CARD'S TWO, for the identical reason one family later (issue 1509 phase 4):
-  // its sub-line also carries `manager-muted`, so inside the manager that line is 0.78rem with a
-  // margin the family does not restate and outside it takes its size from its ancestor. The
-  // sub-line's own border box follows that leading and the copy column that stacks it under the
-  // title follows the sub-line's, so the two are opted out together rather than one of them being
-  // reported as a different kind of difference. What the FAMILY declares about both is compared.
   'toggle-card-sub',
 ]);
 
-/**
- * The one probe that is a Font Awesome GLYPH and nothing else (issue 1509).
- *
- * `.manager-recipe-val-status` is an empty `<i>` whose whole rendered content is a ligature from
- * a webfont this core-less harness does not load, so it lays out at 0x0 in every host and a box
- * comparison over it would be three zeroes agreeing. It is probed anyway because what the family
- * declares about it DOES travel and is worth asserting: `flex: 0 0 auto`, and the per-status tone
- * the row's own `is-block` gives it, which is the only place in this fixture where a row status
- * reaches a colour.
- */
+/** The one probe that is a Font Awesome GLYPH and nothing else (issue 1509). */
 const GLYPH_ONLY_PROBES = Object.freeze([
   'validation-status',
   // AND THE PILL'S LEADING GLYPH (issue 1515). It is an empty `<i>` whose whole rendered content
@@ -994,38 +593,14 @@ const GLYPH_ONLY_PROBES = Object.freeze([
   'link-field-compact-icon',
 ]);
 
-/**
- * The family's shared base rule, as the browser serialises its prelude.
- *
- * This is the lowest-specificity (0,2,0) rule of BOTH button families — the one that declares the
- * control contract and the `line-height: 1` the baseline above it must not reset. It is named
- * once here because four assertions below ask about the same rule.
- */
+/** The family's shared base rule, as the browser serialises its prelude. */
 const BASE_RULE_SELECTOR =
   '.fabricate-button.manager-button, .fabricate-icon-button.manager-icon-button';
 
-/**
- * The family's bare-element type baseline, as the browser serialises its prelude.
- *
- * Rooted at the two family roots ALONE — (0,1,0) — which is the whole of the FLOOR property: it
- * beats the UA button font in a host that declares nothing, and loses to every caller's per-site
- * rule at (0,2,0) or above.
- */
+/** The family's bare-element type baseline, as the browser serialises its prelude. */
 const FLOOR_RULE_SELECTOR = '.fabricate-button, .fabricate-icon-button';
 
-/**
- * The issue-1508 families' font floor, as the browser serialises its prelude.
- *
- * ONE rule with one member per family whose root is NOT its control, declared as a group
- * immediately below the area's own bare-element baseline. All FOUR members are (0,1,1) and every
- * one of them TIES that baseline, which is what makes the group's position load-bearing and is
- * asserted as a CSSOM index below.
- *
- * `StatusToggle` has a font floor too and is deliberately not on this list: its root IS its
- * control, so its floor is `.fabricate-toggle` alone at (0,1,0), which LOSES to the area baseline
- * rather than tying it. Its position is therefore free and it sits in the family's own block, as
- * the two button families' floor does. `TOGGLE_FONT_FLOOR_SELECTOR` below is what asserts that.
- */
+/** The issue-1508 families' font floor, as the browser serialises its prelude. */
 const FAMILY_FONT_FLOOR_MEMBERS = Object.freeze([
   '.fabricate-field :is(input, select, textarea)',
   '.fabricate-search input',
@@ -1042,15 +617,7 @@ const FAMILY_FONT_FLOOR_SELECTOR = FAMILY_FONT_FLOOR_MEMBERS.join(', ');
 /** `StatusToggle`'s floor, at the family root ALONE — the (0,1,0) shape, not the (0,1,1) one. */
 const TOGGLE_FONT_FLOOR_SELECTOR = '.fabricate-toggle';
 
-/**
- * `Field`'s element-typed chrome rule, as the browser serialises its prelude.
- *
- * It restates the area baseline's OWN element predicate leg for leg — six `input` legs at (0,2,1)
- * and `textarea` at (0,1,1) — rather than widening the (0,1,1) floor above, because `appearance`
- * and `min-height` written over `:is(input, select, textarea)` reach radios, ranges, steppers and
- * selects that the area deliberately excludes and that neither a higher-specificity `height` nor
- * a higher-specificity `appearance` can undo.
- */
+/** `Field`'s element-typed chrome rule, as the browser serialises its prelude. */
 const FIELD_CHROME_MEMBERS = Object.freeze([
   '.fabricate-field input[type="text"]',
   '.fabricate-field input[type="url"]',
@@ -1064,11 +631,6 @@ const FIELD_CHROME_SELECTOR = FIELD_CHROME_MEMBERS.join(', ');
 
 /**
  * A rule's specificity as (ids, classes, elements), counted off the browser-serialised prelude.
- *
- * Only the shapes this family actually writes are counted — class tokens, id tokens and element
- * names — which is enough to separate (0,1,0) from (0,2,0) and is checked below against the two
- * preludes it is asked about rather than trusted in the abstract. Every comma-separated compound
- * must agree, because a selector list is only as specific as the compound that matched.
  *
  * @param {string} selectorText A browser-serialised selector list.
  * @returns {string} `a,b,c` when every compound agrees, or a list of the disagreeing compounds.
@@ -1094,45 +656,10 @@ const COMPARED = Object.freeze([
   'font-size',
 ]);
 
-/**
- * `box-sizing` is compared on the two BUTTON families and not on the pager, and the exclusion is
- * a measured fact rather than a convenience.
- *
- * The button families declare `box-sizing: border-box` on their own shared base rule at
- * `fabricate.css:10553-10554`, so the comparison is live for them and reds if that declaration
- * goes. `Pagination`'s root `<section>` declares none. It is a DEPENDENCE on host chrome rather
- * than a value the family owns: in the manager it picks `border-box` up from
- * `.fabricate-manager * { box-sizing: border-box }` (`:1081-1082`), a UNIVERSAL rule that is the
- * manager area's own chrome and belongs to no primitive family, and everywhere else it takes
- * whatever the host declares.
- *
- * The `content-box` this harness measures outside the manager is a PROPERTY OF THIS HARNESS, not
- * of the product. This file loads `styles/fabricate.css` and nothing else, deliberately (see the
- * header), and Foundry core's own `@layer reset` declares `*, *::before, *::after { box-sizing:
- * border-box }` — so in Foundry every host computes `border-box` and the keyword does not differ
- * by host at all. What is asserted below is therefore the dependence itself, in the one
- * environment that can expose it, plus the guard that keeps it inert.
- *
- * That difference is RENDERED-INERT, and the test below proves it rather than assuming it: no rule
- * anywhere declares an explicit `width` or `height` on that section outside the manager, and for a
- * block box with `width: auto` the used width is solved so that margin + border + padding +
- * content fills the containing block WHATEVER the box-sizing keyword says. Measured on this tree,
- * all three hosts lay the section out at an identical 1264 x 31 border box. So the honest
- * assertion for this control is the rendered BOX, which is asserted for all three controls, plus a
- * guard that the condition making the keyword inert still holds.
- */
+/** `box-sizing` is compared on the two BUTTON families and not on the pager. */
 const COMPARED_PAGINATION = Object.freeze(COMPARED.filter((property) => property !== 'box-sizing'));
 
-/**
- * What acceptance 2 compares on `Field`'s control, measured on an `<input type="text">`.
- *
- * `appearance` and `-webkit-appearance` are here because they are two of the three declarations
- * Field's element-typed chrome rule restates from the area baseline; `min-height` and `height`
- * because they are the pair that decides the box; `border-*` and `background-color` because the
- * family's own control chrome paints them. `line-height` is compared on the INPUT and
- * deliberately not on a `<textarea>` or a `<select>` — see the negative controls below, where the
- * area's own later same-rank rules are asserted to keep winning for exactly those two elements.
- */
+/** What acceptance 2 compares on `Field`'s control, measured on an `<input type="text">`. */
 const FIELD_COMPARED = Object.freeze([
   'appearance',
   '-webkit-appearance',
@@ -1148,13 +675,7 @@ const FIELD_COMPARED = Object.freeze([
   'line-height',
 ]);
 
-/**
- * And on `ManagerSearchField`'s own `<input type="search">`.
- *
- * No `appearance` or `min-height`: the area's element-typed baseline matches no `type="search"`,
- * so this family restates none of it. Its pill declares its own 34 height and 6 radius, and the
- * 34px side padding is what leaves room for the leading glyph.
- */
+/** And on `ManagerSearchField`'s own `<input type="search">`. */
 const SEARCH_COMPARED = Object.freeze([
   'height',
   'border-radius',
@@ -1169,19 +690,7 @@ const SEARCH_COMPARED = Object.freeze([
   'line-height',
 ]);
 
-/**
- * What acceptance 2 compares on the filter bar's own `<section>`.
- *
- * Every one of these is a declaration the bar's three re-rooted rules make: the `--fab-space-3`
- * padding and the hairline bottom rule from its box, the overlay fill and the flex row from the
- * always-taken `:not(:has(.manager-toolbar-primary))` branch. `border-TOP-color` is deliberately
- * absent and `border-BOTTOM-*` present: the bar declares a bottom border only, so the top edge
- * resolves to `currentColor` and differs by host for a reason that belongs to the area's own
- * `color`, not to this family. `box-sizing` is excluded for the pager's reason and is asserted
- * separately below; `font-*` and `line-height` are compared because they must be INHERITED — the
- * bar owns no control and declares no floor, so a family rule that started typing this section
- * would show up here.
- */
+/** What acceptance 2 compares on the filter bar's own `<section>`. */
 const TOOLBAR_COMPARED = Object.freeze([
   'padding-top',
   'padding-right',
@@ -1201,10 +710,7 @@ const TOOLBAR_COMPARED = Object.freeze([
   'line-height',
 ]);
 
-/**
- * And on the card's own `<section>` — the padding, the hairline border on ALL four edges, the 8px
- * corner, the surface fill and the stacked column its two re-rooted rules declare between them.
- */
+/** And on the card's own `<section>` — the padding, the hairline border on ALL four edges. */
 const CARD_COMPARED = Object.freeze([
   'padding-top',
   'padding-right',
@@ -1224,26 +730,10 @@ const CARD_COMPARED = Object.freeze([
   'line-height',
 ]);
 
-/**
- * The two properties the bar's one control-reaching rule declares, and the only two of that
- * select's that may be compared across hosts.
- *
- * `.fabricate-filter-bar.manager-toolbar select.is-size-38` states 38px and the 34-38px band's 9px
- * corner and NOTHING else, because the bar owns no control and therefore declares no font floor
- * for one. So the rung travels and the select's type does not — measured below as a pair, because
- * the residue is as much a fact of this change as the rung is.
- */
+/** The two properties the bar's one control-reaching rule declares. */
 const TOOLBAR_SELECT_COMPARED = Object.freeze(['height', 'border-radius']);
 
-/**
- * What acceptance 2 compares on the switch itself — its root `<button>`, which IS the control.
- *
- * Every one is a declaration the family's own base rule makes: `width: auto` and the 78px cap that
- * keep the switch from filling a status column, the 24px height, the 999px corner and the
- * `border: 0` that makes it a bare flex row rather than a tinted pill. `font-*` and `line-height`
- * are compared because the family declares its own (0,1,0) floor for them, which is what a bare
- * host has instead of the area's bare-element baseline.
- */
+/** What acceptance 2 compares on the switch itself — its root `<button>`, which IS the control. */
 const TOGGLE_COMPARED = Object.freeze([
   'max-width',
   'height',
@@ -1258,14 +748,7 @@ const TOGGLE_COMPARED = Object.freeze([
   'line-height',
 ]);
 
-/**
- * The 34x20 rail and the 14x14 knob, which is the geometry the switch is recognisable by.
- *
- * The rail's `width`/`height` are compared as the family's own DECLARED 34 and 20 rather than as a
- * rendered box: it declares a 1px border, so its border box is 36x22 wherever `box-sizing` falls
- * to `content-box` and 34x20 where the host supplies `border-box`. The knob declares no border and
- * lays out identically in every host, so it keeps the box comparison.
- */
+/** The 34x20 rail and the 14x14 knob, which is the geometry the switch is recognisable by. */
 const TOGGLE_TRACK_COMPARED = Object.freeze([
   'width',
   'height',
@@ -1296,14 +779,7 @@ const TOGGLE_LABEL_COMPARED = Object.freeze([
   'text-overflow',
 ]);
 
-/**
- * What acceptance 2 compares on the slider's two INPUTS, which are the controls it owns.
- *
- * The `font-*` triple is the point of the family's floor and is compared on both halves. The
- * number input adds the box its own rule paints — the 28px height, the 6px corner, the border and
- * the fill — and the range input adds the 28px track height and the `appearance: none` that
- * removes the platform slider so the family's own rail can show through.
- */
+/** What acceptance 2 compares on the slider's two INPUTS, which are the controls it owns. */
 const SLIDER_NUMBER_COMPARED = Object.freeze([
   'height',
   'box-sizing',
@@ -1348,15 +824,7 @@ const SLIDER_ROOT_COMPARED = Object.freeze([
   'gap',
 ]);
 
-/**
- * What acceptance 2 compares on the tab strip's own `<div role="tablist">`.
- *
- * Every one is a declaration the strip's own re-rooted rule makes: the stretched flex row, the
- * wrap, the `--fab-space-1` gap, the `min-width: 0` that lets a long tab list shrink, and the
- * hairline the strip draws under itself. `box-sizing` is excluded for the pager's reason and is
- * asserted separately below; `font-*` are compared because they must be INHERITED — the strip's
- * own rule types nothing, so a family rule that started typing this container would show up here.
- */
+/** What acceptance 2 compares on the tab strip's own `<div role="tablist">`. */
 const TABS_COMPARED = Object.freeze([
   'display',
   'align-items',
@@ -1370,18 +838,7 @@ const TABS_COMPARED = Object.freeze([
   'font-size',
 ]);
 
-/**
- * And on each of the two `<button role="tab">`s, which are the controls the strip owns.
- *
- * `appearance` is here because the button rule declares `none` itself rather than borrowing the
- * area's; `min-height` and the two paddings are the box; `border-bottom-*` is the ACTIVE
- * UNDERLINE, which is transparent on the resting tab and the accent on the selected one and is
- * what makes the two probes different measurements rather than a duplicate. `font-family`,
- * `font-size`, `font-weight` and `line-height` are the type: the size and the weight come from
- * the button's own (0,2,0) rule and the family name and the line-height come from the strip's
- * (0,1,1) font floor, which is what a bare host has instead of the manager's bare-element
- * baseline.
- */
+/** And on each of the two `<button role="tab">`s, which are the controls the strip owns. */
 const TABS_BUTTON_COMPARED = Object.freeze([
   'appearance',
   '-webkit-appearance',
@@ -1403,23 +860,7 @@ const TABS_BUTTON_COMPARED = Object.freeze([
   'line-height',
 ]);
 
-/**
- * What acceptance 2 compares on the validation surface's own root `<section>`, and why it is TWO
- * properties rather than the three its rule declares (issue 1509).
- *
- * `.fabricate-validation.manager-recipe-validation` declares `display`, `flex-direction` and
- * `gap`; the RECIPE EDITOR's `.fabricate-manager .manager-recipe-tab` declares the first two
- * identically, a DIFFERENT `gap` and a `min-width: 0`, at the same (0,2,0) and later in the
- * sheet. That class is on this root because six other recipe tabs write it too, so this change
- * deliberately left it and its two head-block rules application-rooted rather than un-styling six
- * tabs — and the consequence is that the surface's own outer gap is the manager's inside the
- * manager and the surface's outside it.
- *
- * So `gap` and `min-width` are EXCLUDED BY NAME and recorded as the residue issue 1507 owns, and
- * what stays compared is the pair both rules agree on: the surface is a vertical stack wherever
- * it is mounted. Everything the family actually paints — the card, the medallion, the rail and
- * the row stack — is compared in full on the probes below.
- */
+/** What acceptance 2 compares on the validation surface's own root `<section>`. */
 const VALIDATION_COMPARED = Object.freeze(['display', 'flex-direction']);
 
 /** The two-column header row: a flex row that wraps, at the surface's own gap. */
@@ -1430,13 +871,7 @@ const VALIDATION_SUMMARY_ROW_COMPARED = Object.freeze([
   'gap',
 ]);
 
-/**
- * The summary CARD, which is the thing a GM reads first.
- *
- * Its border colour is the status face's — `is-block` here, so `--fab-danger-border` — and is
- * compared because a status face that stopped travelling would leave every non-manager host
- * drawing a neutral card for a blocking verdict.
- */
+/** The summary CARD, which is the thing a GM reads first. */
 const VALIDATION_SUMMARY_COMPARED = Object.freeze([
   'display',
   'align-items',
@@ -1467,14 +902,7 @@ const VALIDATION_MEDALLION_COMPARED = Object.freeze([
 /** The card's copy column, and the two lines in it. */
 const VALIDATION_COPY_COMPARED = Object.freeze(['display', 'flex-direction', 'gap', 'min-width']);
 const VALIDATION_TITLE_COMPARED = Object.freeze(['font-family', 'font-size', 'font-weight']);
-/**
- * The sub-line, and ONLY its size.
- *
- * It also carries `manager-muted`, whose colour is the manager's and not this family's, so
- * comparing `color` here would report the residue of a class this change does not own. The
- * 0.72rem is the whole of what the surface promises about this line, and it is the number
- * `recipe-studio-font-size.test.js` pins in Chromium.
- */
+/** The sub-line, and ONLY its size. */
 const VALIDATION_SUB_COMPARED = Object.freeze(['font-size']);
 
 /** The count RAIL and one count row, including the tone the row's own status gives its glyph. */
@@ -1539,9 +967,7 @@ const VALIDATION_ROW_COMPARED = Object.freeze([
   'gap',
   'padding-top',
   'padding-left',
-  // THE FIRST ROW'S border is reset to 0 by `:first-child`, which is the rule that keeps the
-  // stack's own rounded border from doubling on the top row. Comparing it is what proves that
-  // reset travels too.
+  // THE FIRST ROW'S border is reset to 0 by `:first-child`.
   'border-top-width',
 ]);
 const VALIDATION_STATUS_COMPARED = Object.freeze([
@@ -1559,25 +985,8 @@ const VALIDATION_ROW_COPY_COMPARED = Object.freeze([
 ]);
 const VALIDATION_ROW_TITLE_COMPARED = Object.freeze(['font-weight']);
 
-/**
- * The compared set per control, for the entries that do not take the button families' default.
- *
- * Declared here rather than on the `CONTROLS` entries themselves because those entries are built
- * above these constants and a forward reference would be a temporal-dead-zone error at import.
- */
-/**
- * What this acceptance compares on the radio-card group, probe by probe (issue 1509 phase 3).
- *
- * `box-sizing` is absent from every one of these lists but the radio's, and the exclusion is the
- * pager's own: nothing under this card declares a keyword except the radio, so the rest take
- * `border-box` from `.fabricate-manager *` inside the manager and whatever this core-less harness
- * leaves elsewhere. The radio DOES declare one, so it is compared there and reds if it goes.
- *
- * `color` is absent from the two radio lists for a different reason and a measured one: a radio
- * inherits `color` from the `.fabricate` module root, which the bare host does not carry, so it
- * is black there and `--fab-text` in both apps. That is the module's vocabulary rather than this
- * family's, and the family declares no `color` on its radios at all.
- */
+/** The compared set per control, for the entries that do not take the button families' default. */
+/** What this acceptance compares on the radio-card group, probe by probe (issue 1509 phase 3). */
 const OPTION_CARDS_ROOT_COMPARED = Object.freeze([
   'display',
   'flex-direction',
@@ -1659,13 +1068,7 @@ const OPTION_CARDS_DESC_COMPARED = Object.freeze([
   'line-height',
 ]);
 
-/**
- * The control the family OWNS, in both states.
- *
- * `font-family` is here and it is the point: this family declares NO floor of its own, so the
- * only thing typing this radio in a bare host is `Field`'s (0,1,1) floor reaching it through the
- * root they SHARE. The clause that deletes that floor and watches this value move is below.
- */
+/** The control the family OWNS, in both states. */
 const OPTION_CARDS_RADIO_COMPARED = Object.freeze([
   'appearance',
   '-webkit-appearance',
@@ -1686,26 +1089,9 @@ const OPTION_CARDS_RADIO_COMPARED = Object.freeze([
 ]);
 
 
-/**
- * ── THE TWO FAMILIES THAT OWN NO CONTROL AT ALL (issue 1509 phase 4) ────────────────────
- *
- * `ToggleCard` and `ItemDropZone` are the first two entries here whose root is neither a control
- * nor the parent of one they wrote: the card's switch is `StatusToggle`'s and the link field's two
- * actions are `IconButton`'s, both COMPOSED. So neither declares a font floor and neither declares
- * a focus pair, and both refusals are asserted below over the sheet rather than left implicit.
- *
- * What is compared here is therefore the four things each family DRAWS.
- */
+/** ── THE TWO FAMILIES THAT OWN NO CONTROL AT ALL (issue 1509 phase 4) ──────────────────── */
 
-/**
- * The status card's own box: a centred row of glyph, copy and switch on a toned surface.
- *
- * `box-sizing` is EXCLUDED, and it is the pager's exclusion rather than a new one: this card
- * declares none, so inside the manager it takes `border-box` from `.fabricate-manager *` and
- * elsewhere it takes whatever the host gives. The dependence is inert while no rule gives the card
- * an explicit `width` or `height` — none does — and in Foundry core's own `@layer reset` supplies
- * the keyword to every host anyway. The card's DECLARED box is compared in full instead.
- */
+/** The status card's own box: a centred row of glyph, copy and switch on a toned surface. */
 const TOGGLE_CARD_COMPARED = Object.freeze([
   'display',
   'align-items',
@@ -1758,22 +1144,7 @@ const TOGGLE_CARD_COPY_COMPARED = Object.freeze([
 /** The title line. */
 const TOGGLE_CARD_TITLE_COMPARED = Object.freeze(['margin-top', 'margin-bottom', 'font-weight']);
 
-/**
- * The sub-line, scoped to what this family owns.
- *
- * The element carries `manager-muted` beside the family class, exactly as the component writes it,
- * and `.fabricate-manager .manager-muted` is a (0,2,0) rule declared LATER in the sheet that gives
- * it a `margin`, a `color` and a `font-size: 0.78rem`. Those three are the MANAGER's vocabulary
- * rather than this primitive's, they are EXCLUDED BY NAME, and issue 1507 owns retiring the class.
- * `line-height` is excluded for a SECOND-ORDER form of the same fact, and the distinction matters:
- * the family declares `line-height: 1.35` and that RATIO is identical in every host, but a
- * unitless line-height computes against the element's own `font-size` — which is 0.78rem inside
- * the manager and the inherited size outside it — so the computed pixel value differs while the
- * declaration does not. Comparing it would report `manager-muted`'s font size a second time.
- *
- * What is left is `min-width: 0`, the one thing this family says about this line that survives the
- * residue. The card's own rules are compared in full on the three card probes above.
- */
+/** The sub-line, scoped to what this family owns. */
 const TOGGLE_CARD_SUB_COMPARED = Object.freeze(['min-width']);
 
 /** The link field's default face: the three-column linked card on a dashed edge. */
@@ -1863,36 +1234,13 @@ const LINK_FIELD_HINT_COMPARED = Object.freeze([
 /** The compact face's note. */
 const LINK_FIELD_COMPACT_HINT_COMPARED = Object.freeze(['font-size', 'line-height', 'color']);
 
-/**
- * The ADDRESS LINE, probed for the opposite reason to every other entry in this table.
- *
- * Its type comes from the component's OWN scoped `<style>` block, which this harness deliberately
- * does not load, so the global sheet gives it nothing and all three hosts compute the same UA
- * default. That agreement IS the assertion here: the moment anybody writes
- * `.fabricate-manager .manager-item-drop-zone-uuid` into the sheet, the three stop agreeing and
- * this probe reds — which is the regression this whole file exists to report.
- *
- * `color` is excluded and the exclusion is the harness's rather than the family's: nothing styles
- * this element, so its colour is INHERITED, and the two app hosts declare a text colour on their
- * own root while the bare `<div>` declares none. That difference is host chrome — the same chrome
- * `.fabricate-app` and `.fabricate-manager` give every uncoloured descendant — and reporting it
- * here would be reporting the fixture. Everything a rule could set on this element is compared.
- */
+/** The ADDRESS LINE, probed for the opposite reason to every other entry in this table. */
 const LINK_FIELD_UUID_COMPARED = Object.freeze(['display', 'font-family', 'font-size']);
 
 /** The action cluster, which is a gap and nothing else — the buttons are `IconButton`'s. */
 const LINK_FIELD_ACTIONS_COMPARED = Object.freeze(['display', 'gap']);
 
-/**
- * What acceptance 2 compares on the pill select (issue 1515).
- *
- * The ROOT carries `Field`'s stacked column and this family's own `min-width: 0`, and the type it
- * declares, so all four travel together. Everything else is one probe per element the family
- * paints: the add TRIGGER's box and type, the row's wrapping flex, the PILL's band and the tinted
- * fill and edge its `is-modifier` facet resolves through `--fab-chip-color`, the leading glyph's
- * tone, the label's truncation contract, the remove button's 20x20 circle, and the placeholder
- * line's 28px floor.
- */
+/** What acceptance 2 compares on the pill select (issue 1515). */
 const PILL_SELECT_ROOT_COMPARED = Object.freeze([
   'display',
   'flex-direction',
@@ -2063,8 +1411,7 @@ const ALL_COMPARED = Object.freeze([
 ]);
 
 /**
- * One page holding all three hosts, with the sheet supplied as a STRING so a negative control can
- * perturb it without touching the file on disk.
+ * One page holding all three hosts.
  *
  * @param {string} css The module sheet text to load, unlayered.
  * @returns {string} A complete document.
@@ -2079,17 +1426,12 @@ function document_(css) {
       // entirely by the fixture's own nesting and not by any rule in the family. Measured before
       // the slot was added: `pagination` read `auto` in the manager host and `0px` in the other
       // two, which is a false positive of exactly the kind this file exists to report as real.
-      // With the slot, every measured control's containing block is a plain block `<div>` in all
-      // three hosts and the ONLY difference between them is the class name being tested.
       `<div>${CONTROLS.map((control) => control.markup(host.id)).join('')}</div>` +
       '</div>'
   ).join('');
   return (
     '<!doctype html><html><head><meta charset="utf-8">' +
-    // THE HARNESS DECLARES THE TYPOGRAPHIC CONTEXT EXACTLY ONCE, on a common ancestor of all
-    // three hosts, and declares no font anywhere below it. That is what makes `font: inherit`
-    // resolve to the same thing in every host and an equality between them a fact about the
-    // sheet. It deliberately does NOT restate anything the sheet declares.
+    // THE HARNESS DECLARES THE TYPOGRAPHIC CONTEXT EXACTLY ONCE.
     '<style>html, body { margin: 0; padding: 0; }' +
     'body { font-family: "Signika", sans-serif; font-size: 16px; }</style>' +
     `<style id="module-sheet">${css}</style>` +
@@ -2155,24 +1497,12 @@ async function measure(css) {
   }
 }
 
-/**
- * Every probe held to the three-host equality, and whether its laid-out BOX is compared too.
- *
- * The `CONTROLS` entries and the families' own extra probes are one population for this clause:
- * the question asked of `.fabricate-toggle .manager-status-toggle-track` is exactly the question
- * asked of `.fabricate-card.manager-inspector-card`, and splitting them into two loops would be
- * two copies of it. `toolbar-select` is the one probe outside this list, because it is a CALLER's
- * control and only part of it travels; its own clause below measures both halves of that.
- */
+/** Every probe held to the three-host equality, and whether its laid-out BOX is compared too. */
 const MEASURED_PROBES = Object.freeze([
   ...CONTROLS.map((control) =>
     Object.freeze({ id: control.id, comparesBox: control.comparesBox !== false })
   ),
-  // TWO PROBES OPT OUT, and both for the switch's own reason above: each declares a 1px border
-  // over a declared size, so its BORDER box follows the host's `box-sizing` while the size it
-  // declares does not. `toggle-track` is 34x20 + 1 and `slider-track` is 6 high + 1. Everything
-  // else here either declares its own `box-sizing` (the slider's number input does, in its own
-  // rule) or declares no border over a declared size, and lays out identically in all three hosts.
+  // TWO PROBES OPT OUT, and both for the switch's own reason above.
   ...FAMILY_EXTRA_PROBES.map((id) =>
     Object.freeze({
       id,
@@ -2210,20 +1540,7 @@ test('each re-rooted control computes the same geometry and type in all three ho
       );
     }
 
-    // AND THE LAID-OUT BOX AGREES, which is the promise the issue actually makes: no frame
-    // moves, in either app. A computed-property comparison can agree while two hosts lay the
-    // control out differently; this cannot.
-    //
-    // OPTED OUT FOR `field` ONLY, for the pager's own reason and no other. Field's control is an
-    // `<input type="text">`, which declares no `box-sizing` and which Chromium's UA sheet does not
-    // give one either: inside `.fabricate-manager` the area's universal `* { box-sizing:
-    // border-box }` supplies it, and elsewhere in THIS core-less harness it falls to
-    // `content-box` — so a 36px-high input with a 1px border lays out at 36 in the manager and 38
-    // outside it. That difference does not exist in Foundry, where core's `@layer reset` declares
-    // the universal rule for every host; it is a property of the fixture rather than of the
-    // sheet. `search` is NOT opted out and must not be: its control is an `<input type="search">`,
-    // which the UA sheet gives `border-box` in every host, so its box is comparable and is
-    // compared. The clause below asserts both halves, so neither can outlive its reason.
+    // AND THE LAID-OUT BOX AGREES, which is the promise the issue actually makes.
     if (!comparesBox) continue;
     const boxes = HOSTS.map((host) => measured[control][host.id]['rendered-size']);
     assert.ok(
@@ -2240,15 +1557,7 @@ test('each re-rooted control computes the same geometry and type in all three ho
 });
 
 test('the pager’s box-sizing keyword differs by host, and nothing in the sheet lets that render', async () => {
-  // THE ONE MEASURED RESIDUAL, recorded rather than reconciled away: the pager root DEPENDS on
-  // host chrome for its `box-sizing` rather than declaring one, taking `border-box` from the
-  // manager area's universal rule and whatever the host supplies elsewhere. The `content-box`
-  // below is a property of THIS HARNESS, which loads the module sheet alone; in Foundry core's
-  // `@layer reset` universal rule gives every host `border-box`, so the keyword does not differ
-  // by host there. The dependence is inert while no rule gives that section an explicit `width`
-  // or `height` — the moment one does, the two keywords produce two different boxes and the
-  // `rendered-size` equality above becomes the thing that reds. This states both halves so the
-  // exclusion from `COMPARED_PAGINATION` cannot quietly outlive its reason.
+  // THE ONE MEASURED RESIDUAL, recorded rather than reconciled away.
   const measured = await measure(sheet);
   const declaresNone =
     'the pager root declares no `box-sizing` of its own and takes it from host chrome; in this ' +
@@ -2272,8 +1581,7 @@ test('the pager’s box-sizing keyword differs by host, and nothing in the sheet
         for (const rule of rules) {
           if (rule.cssRules) walk(rule.cssRules);
           if (!rule.selectorText) continue;
-          // A sheet this size holds selectors this engine can parse but `matches` rejects, and
-          // one of them must not take the walk down with it.
+          // A sheet this size holds selectors this engine can parse but `matches` rejects.
           const matches = (() => {
             try {
               return node.matches(rule.selectorText);
@@ -2309,14 +1617,9 @@ test('the values the comparison holds over are the ones the family declares, not
   const measured = await measure(sheet);
   const bare = (control) => measured[control].bare;
 
-  // The four properties acceptance 2 says DO resolve, pinned at the values the shared base rule
-  // and the button's own block declare. Without these the equality above would still pass on a
-  // tree where the whole family stopped matching in every host at once.
+  // The four properties acceptance 2 says DO resolve.
   assert.equal(bare('manager-button')['box-sizing'], 'border-box');
-  // 9px, not the shared base block's 6: the probe carries `fab-manager-button`, and issue 1371's
-  // maintainer ruling M12a gave the converted control the radius ladder's 34-38px rung on
-  // `.fabricate-button.manager-button.fab-manager-button`. `icon-button` below still reads the
-  // base block's 6, which is what keeps this pair a discriminator rather than one value twice.
+  // 9px, not the shared base block's 6: the probe carries `fab-manager-button`.
   assert.equal(bare('manager-button')['border-radius'], '9px');
   assert.equal(bare('manager-button')['min-height'], '34px');
   assert.equal(bare('icon-button')['box-sizing'], 'border-box');
@@ -2345,12 +1648,6 @@ test('the values the comparison holds over are the ones the family declares, not
   // not carries the UA's default button font, which in Chromium is Arial. This is the single
   // computed observation that proves the family no longer depends on
   // `.fabricate-manager button, … { font: inherit }` (`fabricate.css:1088-1093`) to get there.
-  //
-  // `font-size` is deliberately NOT read this way. `font: inherit` sets it to the inherited
-  // value, but the family then declares its own type scale further down the sheet — measured
-  // 11.52px (0.72rem) on the manager button — so a "did it inherit 16px" assertion would fail
-  // against a value the design states on purpose. What matters about `font-size` is that all
-  // three hosts agree on it, which the equality above already requires.
   for (const control of ['manager-button', 'icon-button']) {
     assert.match(
       bare(control)['font-family'],
@@ -2400,9 +1697,7 @@ test('the `font: inherit` rule is above the `line-height: 1` rule, and the latte
     const rules = await readRules(tab);
     assert.ok(rules.length > 2000, `only ${rules.length} rules parsed; the sheet did not load`);
 
-    // Both rules by their exact preludes, not by "a rule in the family that declares one" —
-    // `.manager-checks-card-head-link` also declares both properties, and matching loosely
-    // catches it too, which would make these assertions depend on which one sorted first.
+    // Both rules by their exact preludes.
     const floorIndex = rules.findIndex((rule) => rule.selectorText === FLOOR_RULE_SELECTOR);
     const floors = rules.filter((rule) => rule.selectorText === FLOOR_RULE_SELECTOR);
     assert.equal(
@@ -2420,16 +1715,7 @@ test('the `font: inherit` rule is above the `line-height: 1` rule, and the latte
         "family's shared control contract and the rule that declares `line-height: 1`."
     );
 
-    // THE DECLARED VALUE IS `inherit`, on the FLOOR rule. The computed comparison can only ever
-    // show that the three hosts agree; this shows WHAT they agree on, which is the declaration
-    // acceptance 2 asks to be proved by reach rather than by a resolved value.
-    //
-    // EITHER SERIALISATION IS ACCEPTED, and the alternation is a measured fact rather than
-    // caution. Chromium round-trips `font: inherit` as the SHORTHAND on this rule, because every
-    // longhand the shorthand covers holds the same CSS-wide keyword and nothing else in the block
-    // disturbs that; on the shared base block, where it stood beside a dozen other declarations,
-    // the same engine serialised it into `font-family: inherit` and its siblings. Pinning one
-    // spelling would make this assertion a statement about the engine.
+    // THE DECLARED VALUE IS `inherit`.
     assert.match(
       floors[0].cssText,
       /font(?:-family)?:\s*inherit/,
@@ -2489,23 +1775,7 @@ test('the `font: inherit` rule is above the `line-height: 1` rule, and the latte
   }
 });
 
-/*
- * WHAT THE FLOOR IS FOR, MEASURED ON THE TWO CONTROLS THAT PROVED IT MATTERS.
- *
- * The specificity assertion above states the rooting; this states its CONSEQUENCE, on real
- * classes, in the host that renders them. `.fabricate-manager .manager-recipe-lock` and
- * `.manager-recipe-edit` size the recipe row's lock and pencil at 0.68rem — the deliberate
- * compact scale of that row, beside `manager-recipe-io` at 0.68rem and
- * `manager-recipe-table-head` at 0.72rem. They are app-rooted rules naming a class the CALLER
- * passes through to `IconButton`, so no family gate in this repository can see them: the family
- * detector keys on the literal `manager-icon-button` token, and these carry neither family class
- * in their prelude.
- *
- * That is what made them the ones a baseline written at the family's own (0,2,0) deleted. It tied
- * them and won on source order, and both glyphs rendered 28.7% larger — the only pixel change in
- * the whole conversion, and one no gate in the tree could see. The floor rooting is what puts
- * them back, so this measures the outcome rather than the rule.
- */
+/* WHAT THE FLOOR IS FOR, MEASURED ON THE TWO CONTROLS THAT PROVED IT MATTERS. */
 const CALLER_SIZED = Object.freeze([
   Object.freeze({
     id: 'recipe-lock',
@@ -2562,9 +1832,7 @@ async function measureCallerSized(css) {
 }
 
 test('a caller`s per-site font rule still beats the family`s baseline', async () => {
-  // NON-VACUITY, BOTH WAYS. The rules must still declare the compact scale, and the components
-  // must still pass those classes through — a probe measuring a class the product stopped
-  // rendering, or a rule that stopped declaring a size, would pass while proving nothing.
+  // NON-VACUITY, BOTH WAYS. The rules must still declare the compact scale.
   const recipesBrowserSource = read('src/ui/svelte/apps/manager/RecipesBrowserView.svelte');
   const declaredSize = CALLER_FONT_SIZE.replaceAll('.', String.raw`\.`);
   for (const { id, passThrough } of CALLER_SIZED) {
@@ -2585,10 +1853,7 @@ test('a caller`s per-site font rule still beats the family`s baseline', async ()
   }
 
   const measured = await measureCallerSized(sheet);
-  // 0.68rem against the ROOT font size, which the harness leaves at the browser default while
-  // declaring 14px on the body — so a control that took the baseline instead reads the body's
-  // 14px and a control that took the caller's rule reads 10.88px. The two differ, which is the
-  // whole point, and the expected value is computed rather than hard-coded.
+  // 0.68rem against the ROOT font size.
   const expected = `${Number.parseFloat(CALLER_FONT_SIZE) * 16}px`;
   for (const { id } of CALLER_SIZED) {
     const probe = measured[`caller-${id}`];
@@ -2607,9 +1872,7 @@ test('a caller`s per-site font rule still beats the family`s baseline', async ()
     );
   }
 
-  // AND THE FLOOR STILL REACHES A HOST THAT DECLARES NOTHING, which is the half a narrower fix
-  // would have kept while giving up. Without the baseline this button falls to the UA button
-  // font, which in Chromium is 13.3333px Arial rather than the ambient 14px Signika.
+  // AND THE FLOOR STILL REACHES A HOST THAT DECLARES NOTHING.
   assert.equal(measured['caller-bare-icon'].fontSize, '14px');
   assert.match(
     measured['caller-bare-icon'].fontFamily,
@@ -2619,14 +1882,7 @@ test('a caller`s per-site font rule still beats the family`s baseline', async ()
   );
 });
 
-/*
- * THE SECOND NEGATIVE CONTROL, ON THE FLOOR ITSELF.
- *
- * The measurement above is only evidence once it has been shown to break, and the way it breaks
- * is the exact spelling this fix retired: the baseline written on the family's own (0,2,0) shared
- * base block. This re-roots it there in the sheet TEXT, asserts the substitution applied, and
- * requires the two caller-sized controls to leave 0.68rem.
- */
+/* THE SECOND NEGATIVE CONTROL, ON THE FLOOR ITSELF. */
 const FLOOR_RULE_PRELUDE = '.fabricate-button,\n.fabricate-icon-button {\n  font: inherit;\n}';
 const RE_FAMILY_ROOTED_FLOOR =
   '.fabricate-button.manager-button,\n.fabricate-icon-button.manager-icon-button {\n  font: inherit;\n}';
@@ -2669,24 +1925,6 @@ test('each re-rooted family declares its own focus ring, and none of them reache
     // `getComputedStyle` returns `''` for `outline` in a non-focused element and cannot be asked
     // "which rule said so" at all, so the ring is read as a DECLARED rule — the same route
     // `import-folder-mapping-modal-focus.test.js` takes for the same reason.
-    //
-    // THE CHROME A FAMILY DECLARES IS A PAIR, and only the pair is host-independent. Foundry core
-    // paints every focused button with an orange outline and a 4px glow (`a.button:focus,
-    // button:focus` in core's `elements` layer), and the MODULE reset strips it only inside
-    // `.fabricate`, the root every Fabricate application emits (issue 1501). A control rooted at a
-    // class the primitive emits renders in hosts carrying no Fabricate root at all, where the
-    // repaint half alone would lay the accent ring OVER core's glow instead of replacing it. So
-    // each family declares the strip at `:focus` as well as the repaint at `:focus-visible` — the
-    // same pairing CONTRIBUTING.md states for the module — and the strip must be declared FIRST,
-    // because the two halves tie on specificity and a `:focus-visible` element matches both.
-    //
-    // THE TWO ISSUE-1508 PAIRS ARE WRITTEN IN TWO DIFFERENT SHAPES ON PURPOSE, and both are
-    // asserted here by their exact serialised prelude so neither can be "unified" into the other.
-    // `Field`'s STRIP is ONE `:is(input, textarea):focus` member, because
-    // `design-system-debt-ratchets.test.js`'s strip register is an exact list of SINGLE compounds;
-    // its REPAINT is TWO comma-separated legs, because that file's `RING_ROOTS` recogniser reads
-    // `<root> <element>:focus-visible` per member and would not see an `:is()` at all. Each form
-    // is what keeps its half inside the population that governs it.
     for (const [strip, repaint] of [
       ['.fabricate-button:focus', '.fabricate-button:focus-visible'],
       ['.fabricate-icon-button:focus', '.fabricate-icon-button:focus-visible'],
@@ -2697,22 +1935,9 @@ test('each re-rooted family declares its own focus ring, and none of them reache
       ],
       ['.fabricate-search input:focus', '.fabricate-search input:focus-visible'],
       ['.fabricate-slider input:focus', '.fabricate-slider input:focus-visible'],
-      // THE TAB STRIP'S PAIR (issue 1509), and it is the first this file has seen that is NEW on
-      // BOTH halves rather than a re-rooted one. The strip had no focus chrome of its own at all:
-      // inside a Fabricate window the module pair reached its buttons and nothing more was
-      // needed, and outside one there was no strip. Rooted at the class it emits, the strip
-      // renders where no `.fabricate` root exists, so it declares both halves — at the module
-      // pair's own (0,2,1) and with the module pair's declarations verbatim, which is what keeps
-      // the two identical wherever both reach. `.fabricate-pagination button:focus` is the shape.
+      // THE TAB STRIP'S PAIR (issue 1509).
       ['.fabricate-tabs button:focus', '.fabricate-tabs button:focus-visible'],
-      // THE TOGGLE'S TWO PAIRS. The first is the one this change CONVERTED rather than added: it
-      // existed at (0,3,0) before the re-root and was re-rooted in place, declarations and rank
-      // unchanged. The second is the checkbox host's, and its two halves sit on two DIFFERENT
-      // elements by construction: the host is a `<label>`, which never matches `:focus`, so the
-      // strip is written on the transparent `<input>` the label wraps while the repaint stays a
-      // `:has()` ring on the label. `design-system/spec.md` records that case; the ordering
-      // assertion below still holds, and the strip's own reach is measured by the negative
-      // controls rather than argued.
+      // THE TOGGLE'S TWO PAIRS. The first is the one this change CONVERTED rather than added.
       [
         '.fabricate-toggle.manager-status-toggle:focus',
         '.fabricate-toggle.manager-status-toggle:focus-visible',
@@ -2762,21 +1987,6 @@ test('each re-rooted family declares its own focus ring, and none of them reache
     }
 
     // NO RE-ROOTED FAMILY REACHES A FOCUSED `select`, and this is now the whole of that claim.
-    //
-    // It used to be half of a pair. `.fabricate-pagination :is(button, select)` would have tied
-    // `.fabricate-app select:focus-visible` and won on source order, deleting its `outline: none`
-    // + inset `box-shadow` and reinstating the clipped-outline defect that rule existed to
-    // prevent — so the clause above this one read that rule back out of the sheet and pinned its
-    // two declarations. Issue 1511 converted the player app's last native select and DELETED the
-    // rule, so that half was retired with its subject rather than left asserting the presence of
-    // something the same change removed.
-    //
-    // What survives is the reach half, and it is not vacuous without its partner: the elements
-    // are still there. The manager renders 78 native selects, a `<select>` in a `Field` is a
-    // stated residue of issue 1510's sweep and of the root's own convergence (issue 1357), and a
-    // family rooted at a class it emits travels into both areas. A leg added here would be family
-    // chrome over an element the module ring already reaches at the same rank, decided by source
-    // order — which is exactly what the eight-root list below exists to refuse.
     const roots = [
       'fabricate-button',
       'fabricate-icon-button',
@@ -2807,15 +2017,7 @@ test('each re-rooted family declares its own focus ring, and none of them reache
   }
 });
 
-/*
- * ── THE ISSUE-1508 FAMILIES: WHAT THEY DECLARE, AND WHAT THEY MUST NOT REACH ────────────────
- *
- * The two blocks below are the two halves of one claim. The first pins the values `Field`'s and
- * `ManagerSearchField`'s own controls resolve to in a host that declares nothing, so the
- * three-host equality above cannot pass on a tree where both families stopped matching in every
- * host at once. The second is the NEGATIVE half, and it is the one this change actually turns on:
- * the chrome these families declare must reach the control each of them OWNS and nothing else.
- */
+/* ── THE ISSUE-1508 FAMILIES: WHAT THEY DECLARE. */
 
 /** The two new families' own controls, in a bare host, at the values their own rules declare. */
 test('the issue-1508 families declare their own control chrome rather than inheriting it', async () => {
@@ -2854,9 +2056,7 @@ test('the issue-1508 families declare their own control chrome rather than inher
       'inherit` floor is not reaching it'
   );
 
-  // SEARCH. No `min-height` and no `appearance`: the area's element-typed baseline matches no
-  // `type="search"`, so this family restates none of it and the pill's own rule is the whole of
-  // its chrome — 34 high, a 6px corner, and 34px of side padding for the leading glyph.
+  // SEARCH. No `min-height` and no `appearance`.
   assert.equal(search.height, '34px');
   assert.equal(search['border-radius'], '6px');
   assert.equal(search['padding-left'], '34px');
@@ -2870,8 +2070,7 @@ test('the toggle and the slider declare their own control chrome rather than inh
   const measured = await measure(sheet);
   const bare = (probe) => measured[probe].bare;
 
-  // NON-VACUITY FIRST, the clause above's own guard: an engine returning `''` would satisfy every
-  // equality below.
+  // NON-VACUITY FIRST, the clause above's own guard.
   for (const probe of ['toggle', 'toggle-track', 'toggle-knob', 'slider-number', 'slider-range']) {
     for (const property of COMPARED_BY_CONTROL[probe]) {
       assert.ok(
@@ -2881,9 +2080,7 @@ test('the toggle and the slider declare their own control chrome rather than inh
     }
   }
 
-  // THE SWITCH. `max-width: 78px`, `height: 24px`, the 999px corner and `border: 0` are the whole
-  // of what makes it a bare flex row rather than a tinted pill, and all four now come from the
-  // family's own re-rooted base rule rather than from the manager.
+  // THE SWITCH. `max-width: 78px`, `height: 24px`.
   const toggle = bare('toggle');
   assert.equal(toggle['max-width'], '78px');
   assert.equal(toggle.height, '24px');
@@ -2897,10 +2094,7 @@ test('the toggle and the slider declare their own control chrome rather than inh
       'floor is not reaching it'
   );
 
-  // AND `width: auto` IS READ AS A DECLARATION, never as a resolved value. The switch's used width
-  // is solved from its content, so a resolved reading would be a fact about the fixture's label
-  // rather than about the sheet — and it is the `auto` keyword that keeps the switch from filling
-  // a status column, which is what the family's own rule promises.
+  // AND `width: auto` IS READ AS A DECLARATION.
   const tab = await browser.newPage();
   try {
     await tab.setContent(document_(sheet));
@@ -2912,10 +2106,7 @@ test('the toggle and the slider declare their own control chrome rather than inh
     assert.match(base[0].cssText, /width:\s*auto/, 'the switch sizes to its content, not its cell');
     assert.match(base[0].cssText, /max-width:\s*78px/);
 
-    // THE TOGGLE'S FLOOR IS AT THE FAMILY ROOT ALONE, and is NOT in the (0,1,1) group. That is the
-    // whole reason its position is free: at (0,1,0) it LOSES to the area's bare-element baseline
-    // rather than tying it, so it cannot re-type a manager textarea or select whatever comes
-    // after it. A later editor folding it into the group above would change that, and reds here.
+    // THE TOGGLE'S FLOOR IS AT THE FAMILY ROOT ALONE.
     const floor = rules.filter((rule) => rule.selectorText === TOGGLE_FONT_FLOOR_SELECTOR);
     assert.equal(floor.length, 1, 'the switch`s font floor must be declared exactly once');
     assert.deepEqual(
@@ -2929,9 +2120,7 @@ test('the toggle and the slider declare their own control chrome rather than inh
       /font(?:-family)?:\s*inherit/,
       `the switch's floor must declare \`font: inherit\`; declared: ${floor[0].cssText}`
     );
-    // AND NOTHING ELSE, read as the `font` SHORTHAND'S OWN LONGHANDS, which is how the CSSOM
-    // reports it — the same reading the (0,1,1) group's clause below uses, so a declaration of
-    // any other kind reds here by name.
+    // AND NOTHING ELSE, read as the `font` SHORTHAND'S OWN LONGHANDS.
     assert.deepEqual(
       floor[0].properties.filter(
         (property) => !property.startsWith('font') && property !== 'line-height'
@@ -2949,10 +2138,7 @@ test('the toggle and the slider declare their own control chrome rather than inh
     await tab.close();
   }
 
-  // THE SLIDER'S TWO CONTROLS. The number half declares its own 28px box, 6px corner, border and
-  // fill; the range half declares `appearance: none` so the platform slider is replaced by the
-  // family's own rail, and its own 28px height. BOTH inherit the ambient font, which is what the
-  // family's `.fabricate-slider input` floor is for and what a bare host would otherwise lose.
+  // THE SLIDER'S TWO CONTROLS. The number half declares its own 28px box, 6px corner.
   const number = bare('slider-number');
   assert.equal(number.height, '28px');
   assert.equal(number['border-radius'], '6px');
@@ -2971,8 +2157,7 @@ test('the toggle and the slider declare their own control chrome rather than inh
       'so it must reach the range half as well as the number half'
   );
 
-  // AND THE RAIL AND KNOB GEOMETRY the two families are recognisable by, declared rather than
-  // inherited: 34x20 and 14x14 for the switch, 6px high for the slider's rail.
+  // AND THE RAIL AND KNOB GEOMETRY the two families are recognisable by.
   assert.equal(bare('toggle-track').width, '34px');
   assert.equal(bare('toggle-track').height, '20px');
   assert.equal(bare('toggle-knob').width, '14px');
@@ -2981,12 +2166,7 @@ test('the toggle and the slider declare their own control chrome rather than inh
 });
 
 test('the issue-1508 controls depend on host chrome for box-sizing, and nothing lets that render', async () => {
-  // THE OPT-OUT FROM THE BOX COMPARISON, STATED AS ITS OWN MEASUREMENT, exactly as the pager's
-  // is. Neither `<input>` declares a `box-sizing`: in the manager the area's universal rule
-  // supplies `border-box`, and in this core-less harness they fall to `content-box` elsewhere. In
-  // Foundry that difference does not exist, because core's `@layer reset` declares the universal
-  // rule for every host. If either family ever declares its own keyword, this reds and the
-  // `comparesBox: false` opt-out above should go with it.
+  // THE OPT-OUT FROM THE BOX COMPARISON, STATED AS ITS OWN MEASUREMENT.
   const measured = await measure(sheet);
   assert.equal(
     measured.field.bare['box-sizing'],
@@ -3010,11 +2190,6 @@ test('the issue-1508 controls depend on host chrome for box-sizing, and nothing 
 
   // THE BAR AND THE CARD TAKE THE SAME DEPENDENCE and are NOT opted out of the box comparison,
   // which is the pager's case rather than the field's: both are block `<section>`s with `width:
-  // auto` and no declared height, so the used width is solved to fill the containing block and
-  // the used height is solved from the content WHATEVER the keyword says. Measured on this tree,
-  // all three hosts lay each of them out at an identical border box, which is why `comparesBox`
-  // is left at its default for both and the equality above is the assertion with teeth. The
-  // keyword itself is stated here so the difference cannot be mistaken for one this change made.
   for (const control of ['toolbar', 'card']) {
     assert.equal(
       measured[control].bare['box-sizing'],
@@ -3029,11 +2204,7 @@ test('the issue-1508 controls depend on host chrome for box-sizing, and nothing 
     );
   }
 
-  // THE TWO BORDERED RAILS, which are the field's case rather than the pager's: each declares a
-  // 1px border over a size it also declares, so the two keywords really do produce two different
-  // border boxes and the rendered-box equality is what has to be opted out of. Their DECLARED
-  // sizes are compared instead, and are equal in all three hosts, which is the claim that matters:
-  // the rail is 34x20 and 6 high because the family says so, not because a host does.
+  // THE TWO BORDERED RAILS, which are the field's case rather than the pager's.
   for (const probe of BORDERED_TRACK_PROBES) {
     assert.equal(
       measured[probe].bare['box-sizing'],
@@ -3054,7 +2225,7 @@ test('the issue-1508 controls depend on host chrome for box-sizing, and nothing 
     );
   }
 
-  // AND THE SLIDER'S NUMBER INPUT DOES DECLARE ONE, in its own rule, which is why it is NOT opted
+  // AND THE SLIDER'S NUMBER INPUT DOES DECLARE ONE, in its own rule.
   // out and its box is compared in every host.
   for (const host of HOSTS) {
     assert.equal(
@@ -3089,7 +2260,6 @@ test('the issue-1508 controls depend on host chrome for box-sizing, and nothing 
 
 /*
  * ── THE TWO FAMILIES THAT OWN NO CONTROL (issue 1508, phase 2) ──────────────────────────────
- *
  * `ManagerToolbar` and `InspectorCard` are the first re-rooted families whose root is not a
  * control and does not CONTAIN one of their own: the bar renders `{@render children?.()}` and the
  * card renders its caller's children. So they declare no font floor and no focus pair, and the
@@ -3101,8 +2271,7 @@ test('the filter bar and the card declare their own box rather than inheriting i
   const toolbar = measured.toolbar.bare;
   const card = measured.card.bare;
 
-  // NON-VACUITY FIRST, as everywhere else in this file: an engine returning `''` would satisfy
-  // every equality below and the three-host comparison above along with it.
+  // NON-VACUITY FIRST, as everywhere else in this file.
   for (const [label, style, properties] of [
     ['toolbar', toolbar, TOOLBAR_COMPARED],
     ['card', card, CARD_COMPARED],
@@ -3115,9 +2284,7 @@ test('the filter bar and the card declare their own box rather than inheriting i
     }
   }
 
-  // THE BAR. `--fab-space-3` padding, the hairline bottom rule, the `--fab-overlay-light-03` fill
-  // and the wrapping flex row — the four things eleven hand-rolled bars used to get from
-  // `.fabricate-manager .manager-toolbar`, now declared by the family itself.
+  // THE BAR. `--fab-space-3` padding, the hairline bottom rule.
   assert.equal(toolbar['padding-top'], '12px');
   assert.equal(toolbar['padding-left'], '12px');
   assert.equal(toolbar['border-bottom-width'], '1px');
@@ -3144,8 +2311,7 @@ test('the filter bar and the card declare their own box rather than inheriting i
       'or a bar outside the manager renders the grid form no screen in the product uses'
   );
 
-  // THE CARD. Padding, a hairline border on all four edges, the 8px corner, the surface fill and
-  // the stacked column.
+  // THE CARD. Padding, a hairline border on all four edges, the 8px corner.
   assert.equal(card['padding-top'], '12px');
   assert.equal(card['border-top-width'], '1px');
   assert.equal(card['border-top-style'], 'solid');
@@ -3159,9 +2325,7 @@ test('the filter bar and the card declare their own box rather than inheriting i
     'the card declares its own surface fill; a transparent one means the rule stopped matching'
   );
 
-  // AND NEITHER IS TYPED BY ITS FAMILY. Both inherit the harness's ambient font, which is what a
-  // section that declares no floor does. A family rule that started declaring type here would
-  // show up as a font-family that is not the body's.
+  // AND NEITHER IS TYPED BY ITS FAMILY. Both inherit the harness's ambient font.
   for (const [label, style] of [['toolbar', toolbar], ['card', card]]) {
     assert.match(
       style['font-family'],
@@ -3173,12 +2337,6 @@ test('the filter bar and the card declare their own box rather than inheriting i
 
 test('the bar`s 38px select rung travels with the family, and the select`s type does not', async () => {
   // THE ONE FAMILY RULE THAT REACHES A CALLER'S CONTROL, and both halves of what that means.
-  //
-  // `.fabricate-filter-bar.manager-toolbar select.is-size-38` states 38px and the 34-38px band's
-  // 9px corner, so those two travel to a bare host with the family. Everything else about that
-  // select does NOT, because the bar declares no font floor for a control it does not own — a
-  // stated residue owned by issues 1510/1511, not a defect of this change. Asserting the rung
-  // without the residue would read as a claim that the whole control travels.
   const measured = await measure(sheet);
   for (const property of TOOLBAR_SELECT_COMPARED) {
     const values = HOSTS.map((host) => measured['toolbar-select'][host.id][property]);
@@ -3261,18 +2419,6 @@ test('neither the filter bar nor the card declares a font floor or a focus pair'
     }
 
     // AND THE FAMILY RULES THE THREE-HOST COMPARISON DOES NOT COVER, EXCLUDED BY COUNT.
-    // `.fabricate-filter-bar.manager-toolbar:not(:has(.manager-toolbar-primary))` is declared a
-    // second time inside `@container fabricate-manager (max-width: 680px)`, and so are the
-    // search family's `.is-compact { width: 100% }` and `{ flex-basis: 100% }`. That container
-    // NAME is established by `.fabricate-manager` itself (`container-name: fabricate-manager`,
-    // `styles/fabricate.css:1066`), so none of them can travel to a bare host WHATEVER it is
-    // rooted at. They re-root for family consistency and move nothing; the inability to travel
-    // is a residue of the responsive layer rather than a defect of this change, and they are
-    // named here so that the equality above is not read as covering them.
-    //
-    // COUNTED PER ROOT rather than asserted as one exclusion, because the two families reached
-    // this state independently: an unrecorded THIRD rule under either root is a residue nobody
-    // has decided about, which is exactly what this clause exists to make loud.
     for (const [root, expected] of [
       ['.fabricate-filter-bar', 1],
       ['.fabricate-search', 2],
@@ -3309,28 +2455,7 @@ test('neither the filter bar nor the card declares a font floor or a focus pair'
   }
 });
 
-/**
- * The elements a widened floor would have reached, rendered inside a `.fabricate-field` in the
- * manager host — which is the host where a move would be a regression rather than the point.
- *
- * Every one is a REAL shape from the tree, not an invented one: the resolution and tool-bonus
- * radios live in a `<Field as="fieldset">` (`RadioCardGroup`), the range and the stepper in a
- * `<Field as="label">`, and the `<select>` and `<textarea>` in ordinary fields everywhere.
- *
- * THE SLIDER WRAPPER CARRIES `fabricate-slider` ALREADY, and that is deliberate rather than
- * premature: `.manager-drop-rate-control`'s own rules re-root onto that class in this change's
- * third phase, and a fixture element carrying a family class with no root above it is exactly the
- * offender `searchable-popover-area-scope.test.js`'s ancestry clause reports. Writing the wrapper
- * now means this file does not become that phase's repair work.
- *
- * AND THE FIELDSET CARRIES `fabricate-option-cards` AS OF ISSUE 1509 PHASE 3, for a reason that
- * is not bookkeeping: the resolution radio's own (0,3,1) chrome rule re-rooted onto that class in
- * that phase, so without it this control's radio would stop matching the rule it has always been
- * measured under and every value below would move for a reason that has nothing to do with a
- * floor. The root restores the match exactly, at the same rank, which is what keeps this a
- * NEGATIVE control rather than a changed subject. It is also what the ancestry clause asks for,
- * and the two repairs are the same edit.
- */
+/** The elements a widened floor would have reached. */
 const NEGATIVE_CONTROLS =
   '<fieldset class="fabricate-field manager-field fabricate-option-cards" data-probe="neg-root">' +
   '<label class="manager-resolution-option"><input type="radio" data-probe="neg-radio"></label>' +
@@ -3342,12 +2467,6 @@ const NEGATIVE_CONTROLS =
   '</fieldset>' +
   // OUTSIDE THE FIELDSET, because a switch is not a field's control and nesting it inside one
   // would make the comparison below answer a question about `Field` rather than about the toggle.
-  // It is here so the toggle's own (0,1,0) floor has something to be measured on: inside the
-  // manager the area's bare-element baseline OUT-RANKS that floor at (0,1,1) and declares the
-  // identical value, so the floor is a no-op — and this is what says so with a measurement rather
-  // than with an argument. The checkbox host is rendered too, because its `:focus` strip is the
-  // one rule in this change whose interval walk is not empty and the input it lands on is
-  // `opacity: 0`, which is the fact that makes the move zero pixels.
   '<button type="button" class="fabricate-toggle manager-status-toggle" data-probe="neg-toggle"><span class="manager-status-toggle-track"><span class="manager-status-toggle-knob"></span></span></button>' +
   '<label class="fabricate-toggle manager-tool-setting-toggle" data-probe="neg-toggle-host"><input type="checkbox" class="manager-tool-setting-toggle-input" data-probe="neg-toggle-input"><span class="manager-status-toggle-track"><span class="manager-status-toggle-knob"></span></span></label>' +
   // AND A TAB STRIP (issue 1509), for the toggle's reason and the floor group's. Its
@@ -3387,8 +2506,7 @@ async function measureNegativeControls(css) {
           'line-height': style['line-height'],
           'font-size': style['font-size'],
           'font-family': style['font-family'],
-          // READ FOR THE TOGGLE'S CHECKBOX INPUT, whose `opacity: 0` is what makes the one
-          // non-empty interval this change has cost zero pixels.
+          // READ FOR THE TOGGLE'S CHECKBOX INPUT.
           opacity: style.opacity,
           box: `${Math.round(box.width)}x${Math.round(box.height)}`,
         };
@@ -3400,18 +2518,7 @@ async function measureNegativeControls(css) {
   }
 }
 
-/**
- * The blocks issues 1508 and 1509 ADD that can move a resting measurement, spelled exactly as the
- * sheet spells them, so a "base" sheet can be built by removing them.
- *
- * Issue 1509 adds no block of its own: its `.fabricate-tabs button` floor is a fifth MEMBER of the
- * group below, so removing that group already removes it and the tab button in the fixture is
- * measured against a sheet that has none.
- *
- * The focus PAIRS are not on this list and do not need to be: they declare `:focus` and
- * `:focus-visible` chrome only, which no resting measurement reads, and their own neutrality is
- * asserted by the ring clause below and by the select-reach check inside it.
- */
+/** The blocks issues 1508 and 1509 ADD that can move a resting measurement. */
 const ADDED_BLOCKS = Object.freeze([
   '.fabricate-field :is(input, select, textarea),\n.fabricate-search input,\n' +
     '.fabricate-slider input,\n.fabricate-tabs button {\n  font: inherit;\n}',
@@ -3424,14 +2531,7 @@ const ADDED_BLOCKS = Object.freeze([
 ]);
 
 test('the validation surface`s sub-line takes its LEADING from a manager class, not this family', async () => {
-  // THE OPT-OUT FROM THE BOX COMPARISON, STATED AS ITS OWN MEASUREMENT, exactly as the two
-  // bordered rails' is. `manager-recipe-rail-summary-sub` is written beside `manager-muted`, and
-  // `.fabricate-manager .manager-muted` declares a `line-height` and a top margin the family does
-  // not — so the line box, and the column that stacks it under the title, differ by host while
-  // everything the family itself declares does not.
-  //
-  // BOTH HALVES, so the exclusion cannot be read as a gap nobody measured: the SIZE the family
-  // declares travels, and the LEADING the manager declares does not.
+  // THE OPT-OUT FROM THE BOX COMPARISON, STATED AS ITS OWN MEASUREMENT.
   const measured = await measure(sheet);
 
   assert.equal(
@@ -3471,15 +2571,7 @@ test('the validation surface`s sub-line takes its LEADING from a manager class, 
   );
 });
 
-/*
- * ── THE FAMILY THAT OWNS NO CONTROL AT ALL (issue 1509) ───────────────────────────────
- *
- * `EditorValidationSurface` goes further than the bar and the card above: its root is a
- * `<section>`, everything under it is sections, lists and spans, and the only two INTERACTIVE
- * things it renders — the row's View action and its status pill — are a composed `ManagerButton`
- * and a composed `Chip`, which carry their own families' chrome. So it declares neither a font
- * floor nor a focus pair, and the clause below is the negative control for that decision.
- */
+/* ── THE FAMILY THAT OWNS NO CONTROL AT ALL (issue 1509) ─────────────────────────────── */
 
 test('the validation surface declares no font floor and no focus pair', async () => {
   const tab = await browser.newPage();
@@ -3509,10 +2601,7 @@ test('the validation surface declares no font floor and no focus pair', async ()
         'merely absent.'
     );
 
-    // AND NO FLOOR. A floor is a rule that types a BARE ELEMENT under the family root, which is
-    // what reaches a control the family does not write. This family has three bare-element rules
-    // — the three `> i` count glyphs — and every one of them declares `color` alone, so the
-    // predicate has a real domain and is not vacuously true of an empty set.
+    // AND NO FLOOR. A floor is a rule that types a BARE ELEMENT under the family root.
     const bareElement = family.filter((rule) =>
       rule.selectorText
         .split(/\s*(?:>|\+|~|\s)\s*/u)
@@ -3543,19 +2632,7 @@ test('the validation surface declares no font floor and no focus pair', async ()
   }
 });
 
-/*
- * ── THE FAMILY WHOSE ROOT ELEMENT IS ANOTHER FAMILY'S (issue 1509 phase 3) ────────────
- *
- * `RadioCardGroup` owns a control — its `<input type="radio">` — and still declares no font floor,
- * which no other entry in this file does. The reason is CO-ROOTING rather than composition: the
- * component renders `<Field as="fieldset">`, so `fabricate-field` and `fabricate-option-cards` are
- * on the SAME element and `Field`'s (0,1,1) floor already reaches every input inside the group in
- * every host. A floor of this family's own would restate the same property at the same rank.
- *
- * The two clauses below are the two halves of that: the refusal is asserted over the sheet, and
- * the thing it rests on is proved by DELETING `Field`'s member of the floor group and watching the
- * bare host's radio lose its type.
- */
+/* ── THE FAMILY WHOSE ROOT ELEMENT IS ANOTHER FAMILY'S (issue 1509 phase 3) ──────────── */
 
 test('the option-card family declares no font floor of its own', async () => {
   const tab = await browser.newPage();
@@ -3572,9 +2649,7 @@ test('the option-card family declares no font floor of its own', async () => {
         'holds over nothing. The family has been renamed or the re-root has been undone.'
     );
 
-    // THE DOMAIN IS REAL. This family DOES name bare elements under its root — the six radio rules
-    // the split produced, plus the note glyph — so a predicate that found none would be reporting
-    // a broken reader rather than a clean sheet, and the count says which it is.
+    // THE DOMAIN IS REAL. This family DOES name bare elements under its root.
     const bareElement = family.filter((rule) =>
       rule.selectorText
         .split(/\s*(?:>|\+|~|\s)\s*/u)
@@ -3600,10 +2675,7 @@ test('the option-card family declares no font floor of its own', async () => {
         'establishing one, and whichever of the two came later would win on source order alone.'
     );
 
-    // AND IT IS NOT A MEMBER OF THE SHARED FLOOR GROUP EITHER, which is the other shape a floor
-    // could take here — `EditorTabs` joined that group rather than writing a block of its own.
-    // The group is found by its PRELUDE rather than by its declaration, because Chromium expands
-    // the `font` shorthand in `cssText` and a text search for it finds nothing.
+    // AND IT IS NOT A MEMBER OF THE SHARED FLOOR GROUP EITHER.
     const floorGroup = rules.filter((rule) => rule.selectorText === FAMILY_FONT_FLOOR_SELECTOR);
     assert.equal(
       floorGroup.length,
@@ -3625,9 +2697,6 @@ test('the option-card family declares no font floor of its own', async () => {
 
 test('the option-card radio takes its type from the field floor it shares a root with', async () => {
   // THE NEGATIVE CONTROL FOR THE REFUSAL ABOVE, and it is a perturbation rather than an argument:
-  // "this family needs no floor because another one already reaches its control" is a claim about
-  // the cascade, and the only honest way to state it is to remove the other one and show the
-  // control lose its type in the host that has nothing else.
   const FIELD_FLOOR_MEMBER = '.fabricate-field :is(input, select, textarea),\n';
   assert.equal(
     sheet.split(FIELD_FLOOR_MEMBER).length - 1,
@@ -3658,10 +2727,7 @@ test('the option-card radio takes its type from the field floor it shares a root
       'what, and say so here — do not add a floor to this family until it is the answer.'
   );
 
-  // AND NOTHING ELSE MOVED IN THE MANAGER, which is the other half of "the floor is not this
-  // family's": inside `.fabricate-manager` the area's own bare-element baseline types the radio,
-  // so removing `Field`s member changes nothing there and the difference above is exactly the
-  // bare host's.
+  // AND NOTHING ELSE MOVED IN THE MANAGER.
   assert.equal(
     atBase['option-cards-radio'].manager['font-family'],
     shipped['option-cards-radio'].manager['font-family'],
@@ -3672,24 +2738,6 @@ test('the option-card radio takes its type from the field floor it shares a root
 
 /*
  * ── THE TWO FAMILIES THAT OWN NO CONTROL AT ALL (issue 1509 phase 4) ─────────────────
- *
- * `ToggleCard`'s switch is `StatusToggle`'s and `ItemDropZone`'s two actions are `IconButton`'s.
- * Both are COMPOSED, so both families declare no font floor and no focus pair — and the refusals
- * are asserted over the sheet, with the rank each would have taken published beside the rule it
- * would have met, because "there was nothing to floor" and "a floor here would have been wrong"
- * are two different claims and only the second is true.
- *
- * WHAT A FLOOR IS, STATED PRECISELY, and the two families do NOT stand in the same place against
- * it. A floor is `<root> <bare element>` and nothing else — two compounds, the first the namespace
- * root alone, the second carrying no class, attribute or id — which is the (0,1,1) shape every
- * shipped member of the `fabricate.css` floor group takes.
- *
- * THE LINK FIELD DOES TYPE BARE ELEMENTS: five of its fourteen rules end in one (`strong`, `small`
- * and `img`, counting the grouped `strong, small` prelude once), and not one of them is a floor.
- * `.fabricate-link-field .manager-item-drop-zone-copy small` is the closest of them and is still
- * not that: it is (0,2,1), it types a `<small>` inside a class the component itself writes, and it
- * reaches no control anybody else could put there. Its zero is a real discrimination.
- *
  * THE STATUS CARD TYPES NONE AT ALL: all ten of its rules name a class in every compound, so the
  * floor predicate is quantifying over an empty domain and its zero would hold whatever the
  * predicate said. What carries that clause is therefore not the zero but the two guards around it
@@ -3737,11 +2785,6 @@ function floorShaped(family, root) {
 /**
  * The rules in `family` whose selector ENDS in a bare element, floor-shaped or not.
  *
- * This is the domain `floorShaped` discriminates within, and the two clauses below report it
- * because a zero from `floorShaped` means two different things depending on it: over a non-empty
- * domain it is a discrimination, and over an empty one it is a tautology (issue 1509 review r1).
- * A grouped prelude counts ONCE — `.a .b strong, .a .b small` is one rule and one entry.
- *
  * @param {Array<{selectorText: string}>} family
  * @returns {Array<{selectorText: string}>}
  */
@@ -3759,8 +2802,6 @@ test('the status card family declares no font floor and no focus pair', async ()
     const family = familyRootedAt(rules, 'fabricate-toggle-card', 9);
 
     // THE FLOOR PREDICATE FIRES, proved on the shipped group before it is used to report a zero.
-    // `.fabricate-tabs button` is a real member of `fabricate.css`'s floor group and is exactly
-    // the shape this predicate exists to recognise.
     assert.ok(
       floorShaped(
         [{ selectorText: '.fabricate-tabs button' }, { selectorText: '.fabricate-tabs .x button' }],
@@ -3779,13 +2820,7 @@ test('the status card family declares no font floor and no focus pair', async ()
         'CALLER put inside the card as well.'
     );
 
-    // AND THE ZERO ABOVE IS A TAUTOLOGY HERE, SAID OUT LOUD (issue 1509 review r1). Every one of
-    // this family's rules names a class in every compound, so `floorShaped` is quantifying over an
-    // empty domain and would report a zero whatever it tested. What actually carries this refusal
-    // is the size floor in `familyRootedAt`, the predicate's proof that it fires on the shipped
-    // `.fabricate-tabs button`, and the rank published below. This assertion pins the emptiness
-    // itself, so the day the card starts typing a bare element the contrast drawn in the docblock
-    // — link field five, status card none — reds instead of quietly becoming false.
+    // AND THE ZERO ABOVE IS A TAUTOLOGY HERE.
     assert.deepEqual(
       endingInBareElement(family).map((rule) => rule.selectorText),
       [],
@@ -3852,11 +2887,7 @@ test('the link field family declares no font floor and no focus pair', async () 
         'floors at its own root.'
     );
 
-    // THE DOMAIN THE ZERO ABOVE WAS MEASURED OVER IS NOT EMPTY, which is what makes it a
-    // discrimination rather than a tautology, and is the half the status card cannot claim. Five
-    // of this family's rules end in a bare element — `img` under the icon, and `strong`/`small`
-    // under the copy in both faces, the grouped `strong, small` prelude counting once — and not
-    // one of them is floor-shaped.
+    // THE DOMAIN THE ZERO ABOVE WAS MEASURED OVER IS NOT EMPTY.
     assert.equal(
       endingInBareElement(family).length,
       5,
@@ -3921,10 +2952,7 @@ test('the link field family declares no font floor and no focus pair', async () 
 });
 
 test('the chrome these families declare reaches the control they own and nothing else', async () => {
-  // THE CONTROL IS A COMPARISON AGAINST BASE, not a list of remembered numbers, because that is
-  // the claim: the floor and the chrome rule move NOTHING inside the manager. The base sheet is
-  // this sheet with both added blocks removed, and the removal is proved to have applied before
-  // the run means anything.
+  // THE CONTROL IS A COMPARISON AGAINST BASE, not a list of remembered numbers.
   let base = sheet;
   for (const block of ADDED_BLOCKS) {
     assert.equal(
@@ -3971,10 +2999,7 @@ test('the chrome these families declare reaches the control they own and nothing
   assert.notEqual(shipped['neg-checkbox'].height, '34px', 'a checkbox is never floored to 34');
   assert.equal(shipped['neg-textarea']['min-height'], '92px', 'the field textarea keeps its 92');
 
-  // THE TWO AREA RULES THE FLOOR TIES, measured rather than argued. Both restate a `font`
-  // longhand at the floor's own (0,1,1) and both are declared LATER in the sheet, so both must
-  // still win inside the manager — which is the whole reason the floor group sits immediately
-  // below the area baseline instead of in either family's own block.
+  // THE TWO AREA RULES THE FLOOR TIES.
   assert.equal(
     shipped['neg-textarea']['line-height'],
     `${Number.parseFloat(shipped['neg-textarea']['font-size']) * 1.4}px`,
@@ -3996,10 +3021,6 @@ test('the chrome these families declare reaches the control they own and nothing
 test('the font floor is declared between the area baseline and the two rules that restate a font longhand', async () => {
   // N1's INTERVAL, STATED AS AN ASSERTION. The floor ties `.fabricate-manager button, … textarea`
   // at (0,1,1) and beats it on source order with that rule's own declaration, which is a no-op.
-  // It ALSO ties every LATER same-rank rule in the area, and two of those restate a `font`
-  // longhand for controls the floor reaches. So the floor has exactly one safe position: after
-  // the baseline and before both of them. A later editor moving it into a family block reds here
-  // rather than silently re-typing every manager textarea and select.
   const tab = await browser.newPage();
   try {
     await tab.setContent(document_(sheet));
@@ -4043,9 +3064,7 @@ test('the font floor is declared between the area baseline and the two rules tha
         `rank; floor=${floorIndex}, textarea=${textareaIndex}, @supports select=${supportsSelectIndex}`
     );
 
-    // AND ITS REACH IS READ AS THE DECLARATION, never as a resolved value: `font: inherit`
-    // computes to whatever the ancestor says, so a resolved reading cannot tell a floor that
-    // reached from an ancestor chain that happened to agree.
+    // AND ITS REACH IS READ AS THE DECLARATION, never as a resolved value.
     const floor = rules[floorIndex];
     assert.match(
       floor.cssText,
@@ -4081,10 +3100,7 @@ test('the font floor is declared between the area baseline and the two rules tha
     for (const member of FIELD_CHROME_MEMBERS) {
       assert.deepEqual(
         specificityOf(member),
-        // Six `input` legs carry an attribute — five `[type=…]` and one `:not([type])`, whose
-        // `:not()` argument counts in the class column just the same — so each is (0,2,1); the
-        // `textarea` leg names no attribute and is (0,1,1). Both are the rank of the donor leg
-        // they restate in `.fabricate-manager input[type="text"], … .fabricate-manager textarea`.
+        // Six `input` legs carry an attribute — five `[type=…]` and one `:not([type])`.
         member.includes('[') ? [0, 2, 1] : [0, 1, 1],
         `\`${member}\` must carry the same rank as its donor leg in the area baseline`
       );
@@ -4099,10 +3115,7 @@ test('the family base rule declares its background rather than inheriting one', 
   try {
     await tab.setContent(document_(sheet));
     const rules = await readRules(tab);
-    // `background: var(--fab-overlay-light-06)` resolves through a custom property, and a host
-    // that failed to define it computes the same `rgba(0, 0, 0, 0)` a control with NO background
-    // computes — so a computed comparison would agree for the wrong reason. The declared value is
-    // read instead, which is what acceptance 2 asks for.
+    // `background: var(--fab-overlay-light-06)` resolves through a custom property.
     const base = rules.filter((rule) => rule.selectorText === BASE_RULE_SELECTOR);
     assert.equal(
       base.length,
@@ -4119,18 +3132,7 @@ test('the family base rule declares its background rather than inheriting one', 
   }
 });
 
-/*
- * THE NEGATIVE CONTROL, PERMANENT AND IN-FILE.
- *
- * A three-host equality is only evidence once it has been shown to break. This re-prefixes the
- * family's shared base rule with `.fabricate-manager` — the exact spelling this issue retired —
- * in the sheet TEXT, asserts the substitution actually applied before loading it, and then
- * requires the bare host to diverge from the manager host. A substitution that silently matched
- * nothing would leave this passing while perturbing nothing, which is the failure mode that makes
- * a negative control worthless, so the count is asserted first.
- *
- * It mutates a string, never the file: the sheet on disk is read once at module load.
- */
+/* THE NEGATIVE CONTROL, PERMANENT AND IN-FILE. */
 const BASE_RULE_PRELUDE =
   '.fabricate-button.manager-button,\n.fabricate-icon-button.manager-icon-button {';
 const RE_APP_ROOTED_PRELUDE =

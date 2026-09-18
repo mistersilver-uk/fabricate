@@ -1,9 +1,4 @@
-/**
- * Fixtures and rendered-geometry readers for `manager-layout-primitives.js` (issue 1670).
- *
- * App shell, rail, titlebar, empty state, callout, card and chip layout: the markup, the component sources and the
- * page readers that surface's tests measure through. Nothing here asserts.
- */
+/** Fixtures and rendered-geometry readers for `manager-layout-primitives.js` (issue 1670). */
 
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -21,7 +16,6 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const emptyStatePath = resolve(__dirname, '../../src/ui/svelte/apps/manager/EmptyState.svelte');
 export const calloutPath = resolve(__dirname, '../../src/ui/svelte/apps/manager/Callout.svelte');
 // The shared side-panel explainer card and icon fact row (issue 881) follow the same rule:
-// their appearance is in their own scoped block, so it is read out of the component.
 const explainerCardPath = resolve(
   __dirname,
   '../../src/ui/svelte/apps/manager/ExplainerCard.svelte'
@@ -50,19 +44,6 @@ export function stackedBodyRule() {
 }
 
 // The rail nav was unreachable in a SHORT window.
-//
-// Every rule that ever gave the rail a scroller lived in an `inline-size` container query — the
-// 1120px stacked block above and the per-view 831px ones — so a window that stayed WIDE and only
-// lost height never reached one. The rail's height is definite (the shell's `1fr` row) and it
-// carries `overflow: hidden` from the grouped region rule, so the bottom of the section list was
-// clipped: Tools, Checks, Gathering and the placeholders sat in the DOM and could not be reached
-// with a pointer. `assertManagerLayoutStable` cannot see this either — a CLIPPED rail does not
-// overflow, the same blind spot the issue-643 note above records.
-//
-// The fixture is the real shell shape on purpose: two `auto` header rows ABOVE the body, so
-// `.manager-body` lands in the `1fr` row and the rail inherits a window-bound height. Rendering
-// the body alone would put it in an implicit `auto` row, size it to its content, and the bug
-// would be unreproducible.
 function shortWindowRailMarkup(navItems) {
   const items = Array.from({ length: navItems }, (item, index) => {
     const last = index === navItems - 1 ? ' data-last-nav' : '';
@@ -107,9 +88,7 @@ export async function readShortWindowRailGeometry({ width = 1280, height = 560, 
       const scopeTopBefore = scope.getBoundingClientRect().top;
       const navScrollable = nav.scrollHeight - nav.clientHeight;
 
-      // Reaching the bottom entry is the whole question, so drive the scroller rather than
-      // measuring its resting position: a clipped box reports a bottom entry that is simply
-      // off the end of the rail and stays there.
+      // Reaching the bottom entry is the whole question.
       nav.scrollTop = nav.scrollHeight;
 
       const navRect = nav.getBoundingClientRect();
@@ -133,53 +112,11 @@ export async function readShortWindowRailGeometry({ width = 1280, height = 560, 
   }
 }
 
-// ── A SWITCHED-OFF manager button looks switched off, in every role AND every container ───
-//
-// The reported state of the sheet was that it did not. `.manager-button:disabled` is (0,3,0);
-// `.manager-button.is-primary`, `.is-danger` and `.is-warning-action` are (0,3,0) too and
-// stand LATER in the file, and the primitive's `is-ghost` and `is-dashed` companions are
-// (0,4,0) and beat it outright. Every one of those declares border-color, colour and
-// background with no `:disabled` requirement, so a disabled button kept its enabled paint in
-// every role. `opacity: 0.62` and `cursor: default` still applied — which is why it read as a
-// dimmed LIVE control rather than a dead one, and why three rounds of plan review walked past
-// it. It was already shipping on the screen this conversion designates as the authority:
-// `ToolEditView` renders `role="ghost"` with `disabled={saving}`, so the Back button looked
-// available for the whole of a tool save.
-//
-// The repair qualifies every resting-paint rule with `:not(:disabled)` rather than chaining
-// the disabled rule above them, because that selector also serves `.manager-icon-button` and
-// every hand-written button the sweep does not convert; chaining it would have taken the
-// disabled paint from exactly the controls with no other. So this measures the INVARIANT the
-// repair states — the disabled paint is role-independent — rather than re-deriving the
-// arithmetic that made it false.
-//
-// ── WHY IT PROBES EVERY CONTAINER, AND WHY THE CONTAINER LIST IS DERIVED ─────────────────
-// The first version of this gate mounted its six probes inside `.manager-edit-card` and
-// nothing else, so it measured the invariant against the ROLE rules alone. It was green while
-// `.fabricate-manager .manager-tool-edit-actions .manager-button.is-ghost` — (0,4,0),
-// unqualified, three colour declarations — still beat the disabled rule outright in the one
-// container the Tool Studio's Back button actually sits in. The defect this whole section is
-// named for was live, in the exact control the issue cites, underneath a passing test.
-//
-// A hand-written container list would have repeated that failure one container later, so the
-// list is DERIVED from the sheet: every rule whose key compound is a `.manager-button` and
-// which names an ancestor between `.fabricate-manager` and that compound contributes its
-// ancestor chain, materialized as real elements. Add an ancestor-context rule to the sheet
-// and the probe follows it there on the next run, with no edit here. `ANCESTOR_CONTEXT_FLOOR`
-// and the named-context assertion below are what stop a parse break from emptying the list
-// and reporting green over nothing.
-//
-// Ancestors are materialized as nested elements, so a `>` combinator is honoured and a `+`
-// or `~` one is not: a sibling context is collected as UNMATERIALIZABLE and reds the gate
-// rather than being silently dropped. The sheet has none today.
+// ── A SWITCHED-OFF manager button looks switched off.
 export const DISABLED_ROLE_PROBES = ['neutral', 'primary', 'ghost', 'danger', 'dashed', 'warning'];
 
 /**
  * Every rule prelude in a stylesheet, with comments blanked and at-rule preludes dropped.
- *
- * Rules nested inside an `@media`/`@container` block are included: a container is a container
- * whatever guards it, and a probe that skipped them would be blind to exactly the responsive
- * overrides this sheet uses to re-type a header cluster at narrow widths.
  *
  * @param {string} sheet stylesheet text
  * @returns {Array<string>} one prelude per rule
@@ -206,10 +143,6 @@ const ATTRIBUTE_TOKEN = /\[([\w-]+)="([^"]*)"]/g;
 /**
  * A compound selector as a renderable element, or `null` when it cannot be one.
  *
- * Classes and quoted attribute selectors are materialized; anything else left in the compound
- * — a pseudo-class, a type selector, a universal — means the caller must not pretend it can
- * render this context, so it says so instead of rendering an approximation.
- *
  * @param {string} compound one compound selector, e.g. `.fabricate-manager[data-x="y"]`
  * @returns {{classes: Array<string>, attributes: string}|null} the element, or null
  */
@@ -232,8 +165,7 @@ function elementForCompound(compound) {
 function ancestorContextIn(selector) {
   const one = selector.trim().replaceAll(/\s+/g, ' ');
   if (!one.includes('.manager-button')) return null;
-  // A comma inside `:is(…)`/`:not(…)` would have been split by the caller, leaving a fragment
-  // with unbalanced parentheses. Such a fragment is not a selector and is not reasoned about.
+  // A comma inside `:is(…)`/`:not(…)` would have been split by the caller.
   if ((one.match(/\(/g) || []).length !== (one.match(/\)/g) || []).length) return null;
   const compounds = one.split(/\s*>\s*|\s+/).filter(Boolean);
   if (!compounds.at(-1).includes('.manager-button')) return null;
@@ -263,10 +195,7 @@ const BASE_DISABLED_CONTEXT = {
 // would make this whole gate vacuous while reporting green.
 export const ANCESTOR_CONTEXT_FLOOR = 10;
 
-// Named because each is a container the issue's own findings turn on: the Tool Studio's Back
-// button cluster, the 27-site editor header, the knowledge rows, the drop inspector's stack
-// and the Checks Studio preset row, whose `background` was the SECOND rule found beating the
-// disabled invariant from a container.
+// Named because each is a container the issue's own findings turn on.
 export const REQUIRED_DISABLED_CONTEXTS = [
   '.manager-tool-edit-actions',
   '.manager-header-actions',

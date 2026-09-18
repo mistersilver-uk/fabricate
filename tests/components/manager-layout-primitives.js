@@ -1,8 +1,5 @@
 /**
  * App shell, rail, titlebar, empty state, callout, card and chip layout, measured in a real browser (issue 1670).
- *
- * A surface module of `manager-layout.test.js`. It registers its tests on import and owns no
- * browser: `tests/helpers/layout-harness.js` holds the one Chromium every surface shares.
  */
 
 import test from 'node:test';
@@ -55,9 +52,7 @@ test('manager root defines a scoped responsive app container', () => {
   );
   assert.ok(block.includes('isolation: isolate;'), 'manager should isolate its shell');
   assert.ok(block.includes('height: 100%;'), 'manager should fill the ApplicationV2 body');
-  // `clip`, deliberately, and NOT `hidden` — see the dedicated issue-1286 test below. Both
-  // hide the overflow; only `clip` refuses to be a scroll container, and `hidden` left focus
-  // able to scroll the entire app out of its own frame.
+  // `clip`, deliberately, and NOT `hidden`.
   assert.ok(block.includes('overflow: clip;'), 'manager shell should own overflow');
 });
 
@@ -100,11 +95,6 @@ test('Fabricate app shells suppress host click focus outlines while preserving k
   // keeps the host's, which is what the twelve anchor manager buttons did. Both were live and
   // both were invisible to the two blocks read above, because each of those only asks whether
   // its own block declares an outline.
-  //
-  // The root token is OPTIONALLY hyphenated, and that is load-bearing rather than tidy: the
-  // collapsed pair is rooted at the bare `.fabricate`, so the `\.fabricate-\w+` this matched
-  // before finds nothing in it and the comparison below degrades to `deepEqual([], [])` — a
-  // green test that has stopped checking the pairing it exists to check.
   const elementsIn = (prelude) => [
     ...new Set(
       [...prelude.matchAll(/\.fabricate(?:-\w+)?\s+([a-z]+|\[tabindex])(?=:)/g)].map(
@@ -116,8 +106,7 @@ test('Fabricate app shells suppress host click focus outlines while preserving k
     ['module root', moduleFocusBlock, moduleFocusVisibleBlock],
   ]) {
     const suppressed = elementsIn(suppressing).sort(compareStrings);
-    // NON-EMPTY, asserted rather than assumed, for the reason the note above gives: an empty
-    // pair of lists satisfies the `deepEqual` below without comparing anything.
+    // NON-EMPTY, asserted rather than assumed, for the reason the note above gives.
     assert.deepEqual(
       suppressed,
       ['[tabindex]', 'a', 'button', 'input', 'select', 'textarea'],
@@ -219,12 +208,7 @@ test('the rail crafting-system card selects a system and links back to the libra
     scopeBlock.includes('overflow: hidden;'),
     'scope card should prevent long names from affecting nav layout'
   );
-  // NO BOX (issue 1373). The reference's rail is a flat run — its section label, then nav rows
-  // — and draws nothing around the scope controls at the top; ours opened with a bordered,
-  // filled card, so the rail began with a panel where the design begins with a list. The
-  // CONTROLS are unchanged and still asserted below: the reference is a static mock with one
-  // crafting system and no switcher, and this rail carries the live system select, the route
-  // back to the library and the collapse toggle, which have no other home.
+  // NO BOX (issue 1373). The reference's rail is a flat run — its section label.
   assert.equal(
     scopeBlock.includes('border: 1px solid var(--fab-border-strong);'),
     false,
@@ -236,8 +220,7 @@ test('the rail crafting-system card selects a system and links back to the libra
     'and no card fill either — half of the treatment reads as neither'
   );
 
-  // The system's name is set in the display face wherever it is named — here it is the
-  // select's own value, so the serif moves onto the control.
+  // The system's name is set in the display face wherever it is named.
   assert.ok(
     selectBlock.includes('font-family: var(--fab-font-serif);'),
     'the selected system name keeps the display face'
@@ -399,9 +382,7 @@ test('manager inspector count labels wrap without truncation', () => {
 });
 
 test('manager empty states use refined heading and setup-panel styling', () => {
-  // Read from the PRIMITIVE, not the global sheet (issue 785): `EmptyState.svelte` owns the
-  // appearance in its scoped block so a change to it maps to the views that render it
-  // rather than to the broad `theme-or-global-ui` screenshot recipe.
+  // Read from the PRIMITIVE, not the global sheet (issue 785).
   const emptyPanelBlock = blockIn(emptyStateStyles, '.manager-empty');
   const emptyIconBlock = blockIn(emptyStateStyles, '.manager-empty > div > i');
   const emptyHeadingBlock = blockIn(emptyStateStyles, '.manager-empty h3');
@@ -412,10 +393,7 @@ test('manager empty states use refined heading and setup-panel styling', () => {
   const setupListBlock = blockFor('.fabricate-manager .manager-setup-list');
   const setupLinksBlock = blockFor('.fabricate-manager .manager-setup-links');
 
-  // Matched to the reference prototype: a 46px rounded tile holding an 18px SUBTLE glyph,
-  // a 13px/600 serif title in the secondary tone, and an 11px body capped at 280px. The
-  // icon is deliberately quieter than the title — it used to render at 1.55rem in the full
-  // text colour and was the loudest thing in an otherwise quiet panel.
+  // Matched to the reference prototype.
   assert.ok(
     emptyPanelBlock.includes('border: 1.5px dashed var(--fab-border);') &&
       emptyPanelBlock.includes('border-radius: 12px;'),
@@ -428,14 +406,6 @@ test('manager empty states use refined heading and setup-panel styling', () => {
   // value silently falls back to inheritance. Nothing fails; it just looks wrong, and the
   // trigger is the reuse the primitive exists to enable. Theme-root tokens (`:root` + all
   // seven theme blocks) resolve everywhere.
-  //
-  // The failure mode is NARROWED by issue 1399, not removed: the manager's twelve colour
-  // aliases are inlined onto their foundation tokens, but five layout properties are still
-  // declared inside `.fabricate-manager`, so a primitive that reads one still renders
-  // unstyled in the player app. `tests/token-generation-gate.test.js` DOES catch that now —
-  // its scoped-style test scans every `<style>` under `src/` for the prefix, a strict
-  // superset of these five primitives — and this guard stays because it is the narrower,
-  // louder one: it names the primitive that broke and the token it reached for.
   for (const [name, styles] of Object.entries({
     EmptyState: emptyStateStyles,
     Callout: calloutStyles,
@@ -531,17 +501,6 @@ test('manager empty states use refined heading and setup-panel styling', () => {
 
 // Issue 785: the two Knowledge tabs rendered the same standing statement at two sizes —
 // a compact 0.66rem info banner on one tab and a taller 0.7rem warning band on the other.
-// `Callout` is ONE shape for every tone; a tone that also changed the geometry or the type
-// would put the drift straight back.
-//
-// THE ONE SHAPE IS NOW THE SPECIMEN'S, AND THE DEFAULT TONE IS NEUTRAL (issue 1505). This
-// test used to pin r8 / 0.7rem / 500 / 1.45 over an info-tinted default with a `--fab-info`
-// glyph — the taller treatment, defended as "the one already approved visually". The design
-// system's own specimen draws the control quietly (r11 / 11.5px / 1.6 / `--fab-text-muted`
-// on the surface fill and the ordinary border) and reserves the info tint for "a note about
-// live state", and the Checks studio was already overriding the component back to exactly
-// that. So the numbers below move with the convergence; what does NOT move is the property
-// this test exists for — a tone still changes colour and nothing else.
 test('the shared callout keeps one shape and lets tone change only its colours', () => {
   const calloutBlock = blockIn(calloutStyles, '.manager-callout');
   const calloutIconBlock = blockIn(calloutStyles, '.manager-callout > i');
@@ -588,22 +547,14 @@ test('the shared callout keeps one shape and lets tone change only its colours',
   );
 });
 
-// Issue 1505: the widened `Callout` takes an `actions` snippet, and the Tool Studio's identity
-// notice is its first caller — its `World Tool` button MOVED from a sibling of the strip into
-// the strip's own body. `Notice` does the same with its action and dismiss controls. A control
-// that has been repositioned INSIDE another component's flex row is exactly the case a mounted
-// test cannot see: happy-dom computes no cascade, so a body that grew over the button, or a
-// glyph column that overlapped it, would still report a button in the DOM and a handler bound
-// to it. So the press is measured where a user makes it — at the control's own centre, in a
-// real browser, against the components' real scoped CSS injected in the real order.
+// Issue 1505: the widened `Callout` takes an `actions` snippet.
 test('the controls nested inside a callout and a notice own their own pointer targets', async () => {
   const calloutScoped = scopedComponentCss(calloutPath);
   const noticeScoped = scopedComponentCss(
     resolve(__dirname, '../../src/ui/svelte/components/Notice.svelte')
   );
 
-  // The rendered shapes, element for element: a `<div role="note">` once a title or an action is
-  // present, the body between the glyph and the controls, and the controls last.
+  // The rendered shapes, element for element.
   let fixture = `
     <div class="fabricate">
       <main class="fabricate-manager">
@@ -663,8 +614,7 @@ test('the controls nested inside a callout and a notice own their own pointer ta
   });
   const page = await context.newPage();
   try {
-    // The scoped blocks come AFTER the global sheet, which is the order `css: 'injected'`
-    // produces at runtime — see `tests/helpers/scoped-component-css.js`.
+    // The scoped blocks come AFTER the global sheet.
     await page.setContent(`
       <!doctype html>
       <html lang="en">
@@ -734,12 +684,7 @@ test('the shared explainer card reuses the card shell and owns only the explaine
   const rowBlock = blockIn(explainerCardStyles, '.manager-explainer-card-list > li');
   const rowGlyphBlock = blockIn(explainerCardStyles, '.manager-explainer-card-list > li > i');
 
-  // The card shell and the heading come from the manager's ONE contract for each, applied
-  // as classes on the primitive's own elements — not re-declared in this scoped block.
-  // RETARGETED at the primitive (issue 1427). The shell is `<InspectorCard>` now, so the class
-  // it once wrote by hand is emitted by that component and the caller passes only its own
-  // modifier. The assertion is the same one — this card does not re-declare the shell — stated
-  // against the markup that carries it today.
+  // The card shell and the heading come from the manager's ONE contract for each.
   assert.ok(
     explainerCardSource.includes('<InspectorCard class="manager-explainer-card"'),
     'the explainer wears the shared side-panel card shell'
@@ -771,7 +716,7 @@ test('the shared explainer card reuses the card shell and owns only the explaine
     'the row glyph is the accent, as in the Tool Studio reference'
   );
 
-  // Issue 883: the primitive takes a LIST of links, because the Checks rail offers two ways
+  // Issue 883: the primitive takes a LIST of links.
   // out of its card and a one-link primitive is exactly the incompatibility that kept a
   // hand-rolled card alive beside it. The single `docsHref`/`docsLabel` pair is gone rather
   // than kept alongside — two ways to express one link is the drift this pass removes.
@@ -783,9 +728,7 @@ test('the shared explainer card reuses the card shell and owns only the explaine
       `${dead} was replaced by the link list and must not survive as a second way in`
     );
   }
-  // The link ROW is the manager's existing `.manager-setup-links` contract, reused rather
-  // than re-derived: a scoped copy of its flex/wrap/gap would be a second declaration of
-  // the same values.
+  // The link ROW is the manager's existing `.manager-setup-links` contract.
   assert.ok(
     explainerCardSource.includes('<div class="manager-setup-links">'),
     'the explainer links reuse the shared card-link row'
@@ -796,8 +739,7 @@ test('the shared explainer card reuses the card shell and owns only the explaine
     'the explainer must not re-derive the card-link row it now reuses'
   );
 
-  // Every re-derivation is gone from the global sheet, not merely unused: a surviving
-  // rule is what the next copy gets written against.
+  // Every re-derivation is gone from the global sheet, not merely unused.
   for (const dead of [
     'manager-tool-how-it-works',
     'manager-tool-docs-link',
@@ -808,8 +750,7 @@ test('the shared explainer card reuses the card shell and owns only the explaine
   }
 });
 
-// The second half of the same change: the Tool Studio built one fact row twice, from the
-// SAME `projectToolBehaviorFacts` projection, at two geometries.
+// The second half of the same change: the Tool Studio built one fact row twice.
 test('the shared icon fact row is one well, used by every behavior-fact surface', () => {
   const rowBlock = blockIn(iconFactRowStyles, '.manager-icon-fact-row');
   const glyphBlock = blockIn(iconFactRowStyles, '.manager-icon-fact-row > i');
@@ -874,14 +815,9 @@ test('every explainer and fact-row site renders through the primitive, not by ha
     );
   }
 
-  // And the converted sites really do import it — an assertion that only deleted the old
-  // class names would pass on a screen that had simply dropped the card.
+  // And the converted sites really do import it.
   for (const [componentPath, imports] of [
-    // The Tool preview renders through the shared scoped-entity shell since issue 1362, so
-    // the chain is asserted rather than the leaf: the site must still render A preview shell,
-    // and that shell must still render both primitives. Asserting only the site's own imports
-    // would have gone red on a faithful conversion; asserting only the shell's would pass on a
-    // site that had dropped the card entirely, which is what this test exists to catch.
+    // The Tool preview renders through the shared scoped-entity shell since issue 1362.
     ['tools/ToolBehaviorPreview.svelte', ['ScopedEntityPreview']],
     ['scoped/ScopedEntityPreview.svelte', ['ExplainerCard', 'IconFactRow']],
     ['tools/ToolBrowserInspector.svelte', ['IconFactRow']],
@@ -1050,8 +986,7 @@ test('collapsed manager rail reclaims content width and keeps section nav as an 
     collapsedRailBlock.includes('padding:'),
     'collapsed rail should tighten its padding for the icon strip'
   );
-  // The hide rule lists each trailing marker by name as of issue 1515: the planned-view word
-  // and the premium chip used to inherit it by wearing `.manager-nav-count`.
+  // The hide rule lists each trailing marker by name as of issue 1515.
   assert.ok(
     css.includes(
       '.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-label,\n' +
@@ -1072,17 +1007,6 @@ test('collapsed manager rail reclaims content width and keeps section nav as an 
 });
 
 // Issue 643 — the bug that made the recipe library render ZERO visible rows at 900px.
-//
-// Stacked, `.manager-body`'s three children land in implicit `auto` rows inside a box of
-// DEFINITE height, and each of them carries `min-height: 0` + `overflow: hidden` — so each
-// contributes a min-content size of ZERO and the track-sizing algorithm SHARES the body's
-// height between them rather than sizing each to its content. Measured at 900x700: rail
-// 225px (its whole nav clipped away), main 200px, inspector 179px, `.manager-table-scroll`
-// squeezed to 24px, and every recipe row still in the DOM at its full 76px — which is
-// precisely why `assertManagerLayoutStable` (a DOM row count plus an overflow measurement)
-// passed on a library that showed nothing at all.
-//
-// `max-content` tracks cannot be squeezed. This is a correctness rule, not tidiness.
 test('the stacked manager body sizes its regions to content instead of sharing its height', () => {
   const bodyRule = stackedBodyRule();
   assert.ok(bodyRule, 'the 1120px query must still carry a stacked-body rule');
@@ -1132,9 +1056,7 @@ test('a short window scrolls the rail nav instead of clipping its bottom entries
     'the scrolling nav must stay inside the rail rather than run past it'
   );
 
-  // The user-facing claim, stated against the rail rather than the nav: with the scroller
-  // removed this fixture puts the last entry ~340px BELOW the rail, clipped and unclickable,
-  // while every nav-relative measurement still looks healthy.
+  // The user-facing claim, stated against the rail rather than the nav.
   assert.ok(
     report.lastItemBottom <= report.railBottom + 1,
     'the last nav entry must be on screen inside the rail, not clipped below it'
@@ -1154,7 +1076,6 @@ test('a short window scrolls the rail nav instead of clipping its bottom entries
   );
 
   // The nav absorbs the rail's slack, so the rail itself must not also become a scroller here:
-  // two nested scrollbars in one 220px column is a worse bug than the one being fixed.
   assert.ok(
     report.railScrollable <= 1,
     'the rail itself must not scroll while the nav has room to absorb the overflow'
@@ -1180,8 +1101,7 @@ test('the rail nav declares the scroller and the stacked breakpoint hands it bac
     'the blocks above the nav must opt out of shrinking, or they absorb the nav scroller'
   );
 
-  // Stacked, the rail is already a bounded 232px strip that scrolls itself, so the nav must
-  // hand the scrolling back rather than scroll inside whatever the pinned blocks leave of it.
+  // Stacked, the rail is already a bounded 232px strip that scrolls itself.
   const query = css.slice(css.indexOf('@container fabricate-manager (max-width: 1120px)'));
   const navStart = query.indexOf('.fabricate-manager .manager-nav {');
   assert.ok(navStart > -1, 'the 1120px query must reset the nav scroller');
@@ -1192,13 +1112,7 @@ test('the rail nav declares the scroller and the stacked breakpoint hands it bac
   );
 });
 
-// Issue 643: the Studio rail adds a section label, a crafting-system card and count
-// numerals. Each has to opt out of the 56px collapsed strip explicitly, or it blows the
-// icon column out.
-//
-// A rail count is a BARE NUMERAL, not a badge. It used to borrow `.manager-chip` and then
-// spend five declarations undoing it (the 999px border, the fill, the 24px min-height), so
-// every nav row still wore a button-shaped badge. Its own rule owes the chip nothing.
+// Issue 643: the Studio rail adds a section label.
 test('collapsed manager rail hides scope content but keeps its expand control and nav icons', () => {
   const collapsedRailTitleBlock = blockFor(
     '.fabricate-manager .manager-body.is-rail-collapsed .manager-rail-title'
@@ -1282,8 +1196,7 @@ test('collapsed manager rail hides scope content but keeps its expand control an
     css.includes(collapsedHideSelectors.join(',\n') + ' {\n  display: none;\n}'),
     'collapsed rail must hide the nav label and every trailing marker that reports on the row'
   );
-  // Comments stripped: the rule this replaced NAMES the old compound in its own prose, and a
-  // negative control that a comment can satisfy tests nothing.
+  // Comments stripped: the rule this replaced NAMES the old compound in its own prose.
   assert.equal(
     withoutComments(css).includes('.manager-nav-count.manager-nav-premium'),
     false,
@@ -1313,11 +1226,6 @@ test('the manager titlebar caps the premium badge and keeps the status line on o
   );
   // The badge carries the localized PREMIUM mark (issue 1185; it used to carry the selected
   // system's name, which the rail's crafting-system card already shows).
-  //
-  // Its gold pair is stated ONCE, in a rule it SHARES with the rail's Downtime PREMIUM chip.
-  // Two marks that must stay the same colour must not name that colour twice: a second copy
-  // is a second thing to keep in step across all seven palettes. So the pair is asserted on
-  // the shared rule, and the badge's own block is asserted NOT to restate it.
   const goldChipBlock =
     /\.fabricate-manager \.manager-titlebar-badge,\s*\.fabricate-manager \.manager-nav-premium \{[\s\S]*?\}/.exec(
       withoutComments(css)
@@ -1342,8 +1250,7 @@ test('the manager titlebar caps the premium badge and keeps the status line on o
     badgeBlock.includes('text-overflow: ellipsis;') && badgeBlock.includes('white-space: nowrap;'),
     'the premium badge should ellipsis rather than push the status line off the strip'
   );
-  // Both sources are now the literal localized string `PREMIUM`, so neither mark uppercases
-  // in CSS — shouting an already-uppercase word is how a translation gets shouted twice.
+  // Both sources are now the literal localized string `PREMIUM`.
   assert.ok(
     !badgeBlock.includes('text-transform:'),
     'the premium badge should leave casing to the translation'
@@ -1368,9 +1275,6 @@ test('every view-specific manager-body grid override narrows the rail column whe
   // distinct fixed rail column). Each must ship a matching `.is-rail-collapsed` override that
   // narrows column one to 56px, otherwise the later view rule wins on equal specificity and the
   // collapse no-ops (issue #331 regression: a wide, mostly-empty icon strip).
-  //
-  // Read each selector in grouped rules, including task-mode attributes and wrapped lines.
-  // Only top-level rules own a rail; narrow container-query stacks do not.
   const rules = topLevelRules(css).flatMap(({ prelude, declarations }) =>
     splitTopLevel(prelude, ',').map((selector) => ({
       selector: selector.replace(/\s+/g, ' '),
@@ -1400,8 +1304,6 @@ test('every view-specific manager-body grid override narrows the rail column whe
 // 24px/`0.75rem`/700, and the Tool Studio and Knowledge surfaces opted OUT of it through a
 // three-selector join restating a compact 20px/`0.62rem`/1 scale — so chips out-sized the
 // Tool Studio's everywhere else, and fixing a screen meant lengthening that join.
-//
-// `Chip.svelte` is the one implementation and the compact scale is simply what a chip is.
 test('the shared chip owns ONE scale, and no surface can opt into a second', () => {
   const chipBlock = blockIn(chipStyles, '.manager-chip');
 
@@ -1432,8 +1334,7 @@ test('the shared chip owns ONE scale, and no surface can opt into a second', () 
     'a truncated chip is single-line, so it keeps the pill'
   );
 
-  // The opt-in join is gone from the global sheet, not merely unused: a surviving rule is
-  // what the next screen gets added to.
+  // The opt-in join is gone from the global sheet, not merely unused.
   assert.equal(
     css.includes('.manager-tools-library-chips .manager-chip'),
     false,
@@ -1456,25 +1357,10 @@ test('the shared chip owns ONE scale, and no surface can opt into a second', () 
     );
   }
 
-  // THE TAB BADGE IS WRITTEN AT THREE CLASSES, and issue 1509 corrects WHY while changing
-  // neither assertion's subject, the rule's declarations, nor any rendered value.
-  //
+  // THE TAB BADGE IS WRITTEN AT THREE CLASSES.
   // Issue 883's reason was that three classes out-rank `Chip.svelte`'s own scoped
   // `.manager-chip.svelte-<hash>` block, so the badge renders at its own deliberately smaller
   // 18px/0.56rem rather than at the chip's scale. That is not how the contest resolves.
-  // Foundry loads `styles/fabricate.css` into `layer(modules)` and `svelte.config.js` injects a
-  // scoped block UNLAYERED, and an unlayered declaration beats a layered one at ANY specificity
-  // — so the chip's block wins every property it declares whatever this selector's class count
-  // is, and only the properties `Chip` does NOT declare (the margin, the min-width, the mono
-  // face and the tabular figures) actually land from here. The badge does not render at
-  // 18px/0.56rem in the product today; that defect, and the fact that
-  // `tests/helpers/scoped-component-css.js` models injection order and specificity but no
-  // layers at all and therefore cannot see it, are both filed to issue 1507.
-  //
-  // So the three-class form is preserved for a smaller and true reason: CHANGING THE CLASS
-  // COUNT IS A CHANGE, and issue 1509 re-roots this family at `fabricate-tabs` with the rank,
-  // the layer, the position and the declarations all unchanged. The first assertion below is
-  // the one the re-root moves, and it moves by exactly one compound.
   assert.ok(
     css.includes('.fabricate-tabs .manager-chip.manager-editor-tab-badge {'),
     'the tab badge rule must stay at three classes, rooted at the class `EditorTabs` emits ' +
@@ -1488,16 +1374,7 @@ test('the shared chip owns ONE scale, and no surface can opt into a second', () 
   );
 });
 
-// A staged conversion needs a ratchet, or it stalls half-done and the primitive becomes a
-// fourth variant. This pinned the EXACT set of files still rendering a chip by hand: a new
-// hand-rolled site failed because the file was not on the list, and a converted one failed
-// because a listed file no longer matched. Both directions are what made it a ratchet
-// rather than a fading reminder — the list could only shrink, and it had to reach empty.
-//
-// It IS empty: every manager chip renders through `Chip.svelte`, and the global base rule
-// and its eight tone rules are gone from the sheet, so a hand-rolled `manager-chip` would
-// now render unstyled as well as failing here. The test STAYS at empty — that is what it
-// is for. It is the assertion that stops the next screen from starting the drift again.
+// A staged conversion needs a ratchet.
 test('every remaining hand-rolled chip site is declared, so the migration can only shrink', () => {
   const UNCONVERTED = [];
 
@@ -1513,11 +1390,7 @@ test('every remaining hand-rolled chip site is declared, so the migration can on
     }))
     // `Chip.svelte` IS the contract markup and is the one place it may be written.
     .filter(({ name }) => name !== 'Chip.svelte')
-    // Matched anywhere in the file, not just in a `class=` attribute: one site passes the
-    // chip classes to another component as a STRING prop (`RecipeIngredientGroupCard`'s
-    // `triggerClass`), and an attribute-shaped check silently missed it. `manager-chip-row`
-    // and `manager-chip-field` are CONTAINERS, not chips, so the token must not match those
-    // or the ratchet could never reach empty.
+    // Matched anywhere in the file, not just in a `class=` attribute.
     .filter(({ path }) => /\bmanager-chip\b(?!-)/.test(readFileSync(path, 'utf8')))
     .map(({ name }) => name)
     .sort(compareStrings);
@@ -1573,7 +1446,6 @@ test('the manager workspace restacks at the declared 1024 floor, not only below 
   );
 
   // 1024x640 — the DECLARED FLOOR, and the width `manager-checks-stacked-floor` photographs.
-  // It sits inside the 1120→961 band, which is exactly where the dead rule left a side rail.
   const floor = await readWorkspaceGrid(1024, 'checks-crafting');
   assert.equal(floor.bodyColumns, 1, 'the body is stacked at the floor');
   assert.equal(floor.workspaceColumns, 1, 'and so is the workspace — no 300px side column');
@@ -1588,8 +1460,7 @@ test('the manager workspace restacks at the declared 1024 floor, not only below 
 });
 
 test('the environment, tags and system studios restack at the same floor', async () => {
-  // The dead rule was never Checks-specific: `.manager-environment-workspace` is the shared
-  // editor shell, so every studio built on it carried the same 1120→961 side rail.
+  // The dead rule was never Checks-specific.
   for (const view of ['environment-edit', 'system-edit', 'crafting-settings']) {
     const floor = await readWorkspaceGrid(1024, view);
     assert.equal(floor.workspaceColumns, 1, `${view} stacks its workspace at the floor`);
@@ -1713,9 +1584,7 @@ test('a disabled manager button paints from the disabled rule in every role and 
       }
       if (DISABLED_ROLE_PROBES.some((role) => !on[role] || !off[role])) continue;
 
-      // NON-VACUITY, and the one that would have caught the defect on its own: the sheet must
-      // actually reach these probes. If it did not, every role would report the UA default and
-      // the equality below would hold over nothing.
+      // NON-VACUITY, and the one that would have caught the defect on its own.
       record(
         on.ghost.borderColor === measured.tokens.ghostBorder,
         `${entry.id}: the enabled ghost must take the primitive's resting border ` +
@@ -1748,7 +1617,6 @@ test('a disabled manager button paints from the disabled rule in every role and 
 
       // The dashed role is why the reconciliation splits paint from geometry rather than
       // qualifying one rule: switching a control off must take its colours, never its shape.
-      // A `border` shorthand under `:not(:disabled)` would have taken the dashed edge with it.
       record(
         off.dashed.borderStyle === 'dashed',
         `${entry.id}: a disabled dashed button must keep its dashed edge, got ${off.dashed.borderStyle}`
@@ -1771,21 +1639,6 @@ test('a disabled manager button paints from the disabled rule in every role and 
 });
 
 // ── The `warning` role paints, and the spelling it replaces never did (issue 1118) ────────
-//
-// This is the defect that put a sixth role in the primitive's vocabulary, measured from both
-// sides. `environment/CompositionList.svelte` renders ONE verb — the same `onForceInclude`,
-// the same `data-action="force-include"`, the same localization key — from two places, and one
-// of them wrote `class="manager-button is-warning"`. The sheet declares
-// `.manager-button.is-warning-action` and declares `.manager-button.is-warning` NOWHERE, so
-// that Force add shipped with no warning treatment at all while the amber treatment shipped
-// with no call site: a defect and a dead rule, from one typo, on a pair of buttons that are the
-// same verb.
-//
-// The role is what makes the typo unrepeatable — `role="warning"` names a vocabulary entry and
-// the primitive owns which class it emits — so the assertion is on the emitted class rather
-// than on a class string anyone has to remember. The MISSPELT probe is kept beside it as the
-// negative control, and it is not decoration: it is the only thing that distinguishes "the
-// warning role paints" from "these two probes both landed on the base control and agree".
 test('the warning role paints amber, and the is-warning spelling it replaces paints nothing', async () => {
   const context = await openLayoutContext({
     viewport: { width: 1280, height: 720 },
@@ -1850,8 +1703,7 @@ test('the warning role paints amber, and the is-warning spelling it replaces pai
       },
       'a warning manager button computes the three amber tokens the sheet names for it'
     );
-    // The defect itself, still measurable: `is-warning` selects nothing, so a button wearing
-    // it is indistinguishable from a bare neutral one.
+    // The defect itself, still measurable: `is-warning` selects nothing.
     assert.deepEqual(
       measured.misspelt,
       measured.neutral,
@@ -1868,8 +1720,6 @@ test('the warning role paints amber, and the is-warning spelling it replaces pai
     // lived in the manual-mode Available-to-add list, which is now plain add/remove, and it was
     // deleted along with `.manager-icon-button.is-warning-action`. Asserting the two paint alike
     // would compare the live control against a class nothing writes — green, and about nothing.
-    // What still matters is the half that survived, already asserted above: the role paints amber
-    // and the `is-warning` spelling it replaces paints nothing.
   } finally {
     await context.close();
   }
@@ -1892,11 +1742,7 @@ test('the manager root clips rather than hides, so focus cannot scroll the app a
   assert.doesNotMatch(
     body,
     /overflow:\s*hidden;/,
-    // `hidden` looks equivalent — no scrollbar either way — and is not. It leaves the box
-    // scrollable PROGRAMMATICALLY, and focus scrolls it: clicking a control low in a tall panel
-    // scrolled this root by ~738px, carrying the rail and body up out of the frame and leaving
-    // the bottom third of the window an unrecoverable void, because with no scrollbar there was
-    // no way back. The complications editor merely made the root tall enough to reach it.
+    // `hidden` looks equivalent — no scrollbar either way.
     'the manager root must not use `overflow: hidden`: it still creates a scroll container that ' +
       'focus can drive, which is the issue-1286 blank-window defect'
   );

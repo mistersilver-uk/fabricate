@@ -1,8 +1,5 @@
 /**
  * Recipe browser, tag requirement and requirement-picker layout, measured in a real browser (issue 1670).
- *
- * A surface module of `manager-layout.test.js`. It registers its tests on import and owns no
- * browser: `tests/helpers/layout-harness.js` holds the one Chromium every surface shares.
  */
 
 import test from 'node:test';
@@ -31,16 +28,7 @@ import {
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-// The recipe library is a list of CARD rows (issue 643), not a column grid. The old
-// assertions pinned a recipe-grid column template, the `has-no-category` grid variant and
-// the medium-query column stacking — none of which a card row has. What replaces them
-// is the pair that actually prevents horizontal overflow: the identity cell is the ONLY
-// shrinkable flex child, and the control cluster never shrinks.
-//
-// The absence assertion on that retired column template is GONE (issue 1399). Its needle
-// was a legacy generation name the sheet had already stopped declaring, so it could only
-// ever pass; `tests/token-generation-gate.test.js` bans the whole name shape from a
-// population that is not empty, which is the same guarantee from a gate that can fail.
+// The recipe library is a list of CARD rows (issue 643).
 test('manager recipes browser defines a non-overflowing card row', () => {
   const tableBlock = blockFor('.fabricate-manager .manager-recipes-table');
   const rowBlock = blockFor('.fabricate-manager .manager-recipe-row');
@@ -63,8 +51,7 @@ test('manager recipes browser defines a non-overflowing card row', () => {
     clusterBlock.includes('grid-template-columns: var(--fab-recipe-cluster-cols);'),
     'the row cluster consumes the same shared column template'
   );
-  // The header hides at the stacked breakpoint, where a column header over a stack of
-  // cards means nothing — it rides the same rule as the other browsers' table heads.
+  // The header hides at the stacked breakpoint.
   assert.ok(
     css.includes(
       '.fabricate-manager .manager-table-head,\n  .fabricate-manager .manager-recipe-table-head {\n    display: none;'
@@ -86,11 +73,7 @@ test('manager recipes browser defines a non-overflowing card row', () => {
     'the rows render as a real, unstyled list'
   );
 
-  // The recipe row LEFT the shared 76px row-card geometry group: it is a denser card at
-  // 11px/12px and radius 9 (~62px tall), so a page of recipes shows more of the library
-  // and less of the gaps between it. The COMPONENT row followed it (issue 676, ruling 1:
-  // where the Component Studio and the Recipe Studio disagree, the Recipe Studio wins).
-  // The other three browser rows keep the 76px group — this change never visited them.
+  // The recipe row LEFT the shared 76px row-card geometry group.
   assert.ok(
     css.includes(
       '.fabricate-manager .manager-environment-row,\n.fabricate-manager .manager-gathering-task-row,\n.fabricate-manager .manager-essence-row {\n  width: 100%;\n  min-height: 76px;'
@@ -109,17 +92,14 @@ test('manager recipes browser defines a non-overflowing card row', () => {
     rowBlock.includes('padding: 11px 12px;'),
     'the recipe row uses the library card padding'
   );
-  // The recipe row's own radius (9px) was retired by issue 883: the edge, corner and fill
-  // are the ONE browser-row treatment now, so the row block must declare none of them.
-  // Asserting their ABSENCE is what stops the copy being written back in.
+  // The recipe row's own radius (9px) was retired by issue 883: the edge.
   assert.equal(
     /border-radius:|border: 1px|background:/.test(rowBlock),
     false,
     'the recipe row must not restate the shared browser-row edge, corner or fill'
   );
 
-  // A disabled row reads at .55, not .62 — far enough back that a page of rows separates
-  // at a glance into what is live and what is not.
+  // A disabled row reads at .55, not .62.
   assert.ok(
     blockFor('.fabricate-manager .manager-recipe-row.is-off').includes('opacity: 0.55;'),
     'a disabled row recedes'
@@ -128,10 +108,6 @@ test('manager recipes browser defines a non-overflowing card row', () => {
   // Selection is the accent BORDER. A ring plus an inset left bar is the same statement
   // made twice, and the bar bit into the row's medallion. The COMPONENT row joined the
   // opt-out in issue 676: it now leads with the same Medallion, so it had the same defect.
-  // The ESSENCE row joined in issue 1036 on the same precondition — its redesign gave it
-  // the 40px Medallion lead — and it is also the only one of the three that renders as a
-  // GRID CARD, where an inset left bar is not even the right axis. The environment and
-  // gathering-task rows are deliberately NOT here: they still lead differently.
   assert.ok(
     blockFor(
       '.fabricate-manager .manager-recipe-row.is-selected,\n.fabricate-manager .manager-component-row.is-selected,\n.fabricate-manager .manager-essence-row.is-selected'
@@ -153,15 +129,7 @@ test('manager recipes browser defines a non-overflowing card row', () => {
   }
 });
 
-// The collapse ladder (issue 643 §8). Drop order is fixed and monotonic, and the
-// lock / enable / edit controls are never in it.
-//
-// The ladder measures the ROW's own container, not the manager. `.manager-body` is
-// `220px + 1fr + 300px` above 1120px and only collapses to one column at or below it,
-// so a manager-keyed ladder fired NONE of its steps in the 1121-1280px band — exactly
-// where the row is at its narrowest (~570-760px) — and every step once the layout
-// stacked, where the row has the whole window. Keying it to `.manager-recipes-table`
-// makes each step fire when the row is actually short of room.
+// The collapse ladder (issue 643 §8). Drop order is fixed and monotonic.
 test('manager recipe row collapses in the specified order and never drops its controls', () => {
   const tableBlock = blockFor('.fabricate-manager .manager-recipes-table');
   assert.ok(
@@ -174,10 +142,6 @@ test('manager recipe row collapses in the specified order and never drops its co
   // is no longer rendered in the row at all — the track colour is the state, the aria-label
   // names it, and the Disabled pill says it in words — so the rung is gone rather than left
   // as a rule matching nothing.
-  // Each rung moved out by 34px for issue 1010 — the 22px bulk selection track plus one
-  // more 12px grid gap — so every band gives the identity cell exactly the room it did
-  // before. Holding the thresholds fixed would have spent the identity's own budget on the
-  // checkbox; the arithmetic is stated beside the ladder in the sheet.
   const LADDER = [
     [714, '.fabricate-manager .manager-recipe-row .manager-recipe-description'],
     [634, '.fabricate-manager .manager-recipe-row .manager-recipe-io'],
@@ -208,8 +172,7 @@ test('manager recipe row collapses in the specified order and never drops its co
     );
   }
 
-  // The three status pills are all `white-space: nowrap`, and the identity cell set no
-  // overflow: they could spill out of it. The name gives way first; the row clips.
+  // The three status pills are all `white-space: nowrap`.
   const nameRowBlock = blockFor('.fabricate-manager .manager-recipe-name-row');
   const nameBlock = blockFor('.fabricate-manager .manager-recipe-name-row .manager-system-name');
   assert.ok(
@@ -225,10 +188,6 @@ test('manager recipe row collapses in the specified order and never drops its co
 // Issue 1010 — the bulk selection column. It is APPENDED to the cluster template rather
 // than prepended, and that is what makes the column header's four explicit `grid-column`
 // placements survive: a prepend would have shifted every one of them by a track.
-//
-// The ladder rewrites the template at each rung, so "appended" has to hold in ALL THREE
-// declarations — the base and the two rungs — or the checkbox lands under the edit pencil
-// at the very widths where the row is tightest.
 test('the recipe cluster appends a bulk selection column that the ladder never drops', () => {
   const declarations = [...css.matchAll(/--fab-recipe-cluster-cols:\s*([^;]+);/g)].map(
     ([, value]) => value.replace(/\s+/g, ' ').trim()
@@ -248,8 +207,7 @@ test('the recipe cluster appends a bulk selection column that the ladder never d
       'select',
       `the select track must be LAST in "${declaration}" — the header placements assume an append`
     );
-    // Never dropped: a truncated readout is a compromise, a selection the GM cannot reach
-    // is a control that has silently stopped working.
+    // Never dropped: a truncated readout is a compromise.
     assert.equal(
       tracks.filter((track) => track === 'select').length,
       1,
@@ -266,36 +224,6 @@ test('the recipe cluster appends a bulk selection column that the ladder never d
 });
 
 // ── EVERY DECLARATION ON THE TAG CHIP'S RULE ACTUALLY WINS (issue 1373) ────────────────────
-//
-// Regression it started as: chips WERE `<li>`s in a `<ul>` on a second line, and a host
-// (Foundry) global list rule giving non-last items a margin-bottom inflated only the first
-// chip's box — 34px against the last chip's 30px. Maintainer round 5 moved the chips onto the
-// ROW itself (`proto:2254`), so they are `<span>`s and that particular host rule can no longer
-// reach them. The hostile `li` rule stays in the fixture as the negative half: it must reach
-// nothing.
-//
-// == WHY THE OLD FIXTURE COULD NOT FAIL, AND WHAT REPAIRED IT ==============================
-// It injected `styles/fabricate.css` UNLAYERED and stamped no scoping hash on its chips, which
-// is a cascade production has never had. `module.json` registers the sheet with no explicit
-// `layer`, so Foundry imports it at `layer(modules)`; `Chip.svelte` ships `css: 'injected'`,
-// which lands its block in `document.head` unlayered — and an unlayered author declaration
-// beats every layered one at ANY specificity. Unlayered, the sheet's three-class rule won
-// everything it declared and the fixture measured a chip nobody renders; layered, four of that
-// rule's eight declarations were being discarded in the product with nothing able to say so.
-//
-// Both halves are needed and both are here now: `@layer modules { … }` around the sheet
-// reproduces Foundry's import, `chipCss` after it reproduces the injection order, and
-// `withChipHash` stamps the real `svelte-<hash>` so the specificity matches too. Svelte 5 puts
-// that hash on the LEADING compound as a real class, which is what makes the primitive's block
-// (0,2,0) rather than (0,1,0).
-//
-// == WHAT IT ASSERTS, AND WHY THAT CANNOT GO VACUOUS =======================================
-// Not a hand-listed set of values: it reads the sheet rule's OWN declarations and requires each
-// one to win in the composed cascade. A value is compared against a probe carrying that exact
-// declaration inline, so `var(--fab-space-chip)` and `4.5rem` resolve the same way for both
-// sides and no token is frozen into this file. Add a fifth declaration the primitive already
-// owns and this goes red naming the property; delete the rule and the loop reads zero
-// declarations, so an explicit floor refuses that too.
 test('every declaration on the recipe tag chip rule wins the real cascade', async () => {
   const selector = '.fabricate-manager .manager-chip.manager-recipe-tag-chip {';
   const ruleStart = css.indexOf(selector);
@@ -358,8 +286,7 @@ test('every declaration on the recipe tag chip rule wins the real cascade', asyn
     const report = await page.evaluate((wanted) => {
       const chips = Array.from(document.querySelectorAll('.manager-recipe-tag-chip'));
       const chip = chips[0];
-      // The probe is a CLONE of the chip carrying one declaration inline, so both sides resolve
-      // the same tokens in the same place and the comparison is of used values, not of strings.
+      // The probe is a CLONE of the chip carrying one declaration inline.
       const declared = wanted.map(({ property, value }) => {
         const probe = chip.cloneNode(true);
         probe.style.setProperty(property, value);
@@ -420,38 +347,6 @@ test('the tag requirement row keeps its arm whole, and an EMPTY one is a row lik
   // defect: `.manager-recipe-option-tags-detail` carried `flex: 1 1 100%`, so the tag arm
   // ALWAYS wrapped to a second full-width line whatever the row's width was, taking the match
   // toggle, an `Add tag` dropdown and a bordered `No tags set` box with it.
-  //
-  // `proto:2252`-`2268` draws `[Tag v] Any of [chips] [+ Tag] ... [Any of|All of] [- 1 +] [x]`.
-  // The claim is geometric and this is where it can be made: nothing else in the corpus
-  // computes a real cascade, and the mounted suites cannot see a wrap at all.
-  //
-  // == WHAT THIS GUARD COULD NOT SEE, TWICE (round 7) ======================================
-  // Round 6 widened it to two widths after finding the fixture was missing the `or...` chip,
-  // the divider and the real `Stepper` - most of a hundred pixels. It was still green through
-  // the defect the maintainer reported next, and the reason is not the width list:
-  //
-  //   1. It only ever rendered a POPULATED arm. Two chips make the arm the widest flexible
-  //      item in the row, so it is never the item the row squeezes, and "the arm is one line"
-  //      was TRUE throughout. The row a GM meets the instant they press `Add tag` - the policy
-  //      word and `+ Tag`, nothing between them - was never measured.
-  //   2. It asserted nothing about the ROW at all. The maintainer's report is that an empty tag
-  //      row stands at 96px where every sibling requirement row stands at 46, and an arm can be
-  //      perfectly whole inside a row that has grown a second line underneath it.
-  //   3. It rendered no sibling row, so it had nothing to be wrong AGAINST. A pinned constant
-  //      would not have helped: the number it encodes is every control height in the row at once.
-  //
-  // So the fixture now renders a COMPONENT row beside the two tag rows and the empty tag row is
-  // asserted against ITS height, and the `+ Tag` pill is wrapped in the `div.fabricate-picker`
-  // namespace root `SearchablePopover` actually renders it inside
-  // (`SearchablePopover.svelte:1209`) rather than dropped bare into the arm - a flex item the
-  // shipped tree has and the old fixture did not.
-  //
-  // WHAT IS ASSERTED IS NOT "one line" AT BOTH WIDTHS. At the narrow width `Any of` + two chips
-  // + `+ Tag` + the segments + the stepper + `or...` + `x` do not fit on one line and no CSS
-  // can make them; the design's own frame is the wide one. What must hold is that the tag ARM
-  // stays whole - one line, with its policy word, its chips and its `+ Tag` together - so the
-  // row degrades by moving a WHOLE control down rather than by shredding the arm; and that an
-  // EMPTY tag row, which asks for less room than a named component row does, is no taller.
   const stepperScoped = scopedComponentCss(
     resolve(__dirname, '../../src/ui/svelte/components/Stepper.svelte')
   );
@@ -470,8 +365,7 @@ test('the tag requirement row keeps its arm whole, and an EMPTY one is a row lik
       ['manager-segment-label', segmentedScoped.hashClass],
     ].reduce((html, [className, hash]) => withScopeHash(html, className, hash), markup);
 
-  // The trailing cluster is identical on every requirement row whatever its kind, so it is
-  // written once: a second copy would be the very thing the two rows are supposed to share.
+  // The trailing cluster is identical on every requirement row whatever its kind.
   const controls = `
       <div class="manager-recipe-option-controls">
         <div class="fab-stepper">
@@ -488,8 +382,7 @@ test('the tag requirement row keeps its arm whole, and an EMPTY one is a row lik
         <span class="manager-chip is-tag manager-recipe-tag-chip" data-recipe-tag="abrasive"><span>abrasive</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></span>
         <span class="manager-chip is-tag manager-recipe-tag-chip" data-recipe-tag="hide"><span>hide</span><button type="button" class="manager-recipe-tag-remove"><i class="fas fa-times"></i></button></span>`;
 
-  // The row exactly as `RecipeIngredientOption` renders a tag requirement: the plate, the kind
-  // select, the tag arm, the Any of / All of segments and the trailing control cluster.
+  // The row exactly as `RecipeIngredientOption` renders a tag requirement: the plate.
   const tagRow = (caseName, chips) =>
     stamp(`
     <div class="manager-recipe-ingredient-option-row is-tag" data-recipe-option data-case="${caseName}">
@@ -521,20 +414,7 @@ test('the tag requirement row keeps its arm whole, and an EMPTY one is a row lik
       </span>${controls}
     </div>`);
 
-  // `manager-recipe-edit-ingredients-cost` photographs the first; `world-tool-entry-on-break-repair`
-  // and `manager-tool-stress-repair` photograph the second, and it is the one that broke.
-  //
-  // The third and fourth are neither, and they do NOT claim row parity. Below about 560px the
-  // row's five controls do not fit on one line and no CSS makes them; what those two are here
-  // to hold is the OTHER half of the report — that however hard the row is squeezed, the arm's
-  // answer is a WHOLE control moving down and never the policy word parting from `+ Tag`.
-  //
-  // THE FOURTH RAISES THE ROOT FONT rather than narrowing the column, because that is the axis
-  // the two halves of this row disagree on: the sheet sizes the policy word and the `+ Tag`
-  // pill in `rem`, so Foundry's interface font-size setting widens them, while
-  // `.manager-recipe-option-kind` states a 132px WIDTH and does not move. A guard that only
-  // ever renders at 16px cannot see a row that only fails on a GM's own font setting, and the
-  // reported stack was never reproduced at 16px at any width.
+  // `manager-recipe-edit-ingredients-cost` photographs the first.
   for (const surface of [
     { label: 'the recipe tab', width: 1006, rootFontSize: 16, rowParity: true },
     { label: 'a Tool inspector', width: 622, rootFontSize: 16, rowParity: true },
@@ -603,9 +483,7 @@ test('the tag requirement row keeps its arm whole, and an EMPTY one is a row lik
         ['a populated', report.populated],
         ['an empty', report.empty],
       ]) {
-        // THE ARM IS ONE LINE. Measured as "the arm is no taller than its tallest member", which
-        // is the same claim as "no member wrapped" and survives a rung change on the spacing
-        // ladder in a way a pinned pixel height would not.
+        // THE ARM IS ONE LINE. Measured as "the arm is no taller than its tallest member".
         const tallest = Math.max(...measured.armMembers.map((member) => member.height));
         assert.ok(
           measured.arm.height <= tallest + 1,
@@ -627,11 +505,7 @@ test('the tag requirement row keeps its arm whole, and an EMPTY one is a row lik
         );
       }
 
-      // AN EMPTY TAG ROW IS A ROW LIKE ANY OTHER, at every width the row's controls fit on one
-      // line at all. It asks for LESS room than the named component row beside it - a policy
-      // word and a dashed pill against an image, a name and a clear button - so there is no
-      // such width at which it may stand taller. Against the SIBLING rather than a constant,
-      // for the reason the third failure above gives.
+      // AN EMPTY TAG ROW IS A ROW LIKE ANY OTHER.
       if (!surface.rowParity) continue;
       assert.equal(
         Math.round(report.empty.row.height),
@@ -653,26 +527,9 @@ test('a suggestion reads from the left edge the typed query does, under the host
   // centring anywhere in it, and there cannot be: the panel sits directly beneath the field it
   // completes, so a suggestion that does not start where the query starts is not continuing the
   // GM's own typing (issue 1373, maintainer round 7).
-  //
   // IT SHIPPED CENTRED, and the sheet looked right. `.manager-recipe-option-suggestion` is a
   // `<button>` declaring `display: flex` and `text-align: left` - and `text-align` positions
   // the CONTENT of a text container, not the ITEMS of a flex one, so it landed on nothing.
-  // What placed them was Foundry's own `a.button, button { justify-content: center }`, which
-  // our rule left standing because it named no `justify-content` of its own to displace it.
-  //
-  // So the host rule is in the fixture, exactly as the hostile `li` margin is in the tag-chip
-  // guard above. Without it this file loads `styles/fabricate.css` alone, the initial
-  // `justify-content: normal` applies, the label sits at the left, and the guard passes over
-  // the defect it exists for.
-  //
-  // AND IT IS IN ITS REAL LAYER, which is the half a specificity comparison cannot answer.
-  // `foundry2.css` declares the cascade layers `reset, variables, elements, blocks,
-  // applications, compatibility, layouts, system, modules, exceptions` and puts that button
-  // rule in `elements.forms`; `module.json` registers `styles/fabricate.css` with no explicit
-  // layer, so Foundry imports it at `modules`. The winner is decided by LAYER ORDER before
-  // specificity is consulted at all - `modules` sorts after `elements`, so one declaration is
-  // enough and no extra class is needed to buy it. Rendering both sheets flat would prove a
-  // different cascade from the one that ships, in either direction.
   const context = await openLayoutContext({
     viewport: { width: 640, height: 400 },
     deviceScaleFactor: 1,
@@ -744,8 +601,7 @@ test('a suggestion reads from the left edge the typed query does, under the host
         // starts where the row starts; anything else is slack the row put in front of it.
         glyphIndent:
           left(glyph) - (left(suggestion) + Number.parseFloat(style.paddingLeft) + Number.parseFloat(style.borderLeftWidth)),
-        // …and where the LABEL lands against the query it is completing, which is the thing the
-        // maintainer actually saw: `ingot` at the field's left edge, `Iron Ingot` mid-panel.
+        // …and where the LABEL lands against the query it is completing.
         labelIndent: left(label) - left(field),
         suggestionWidth: suggestion.getBoundingClientRect().width,
         fieldTextAlign: getComputedStyle(field).textAlign,
@@ -782,8 +638,6 @@ test('a suggestion reads from the left edge the typed query does, under the host
         `(+${report.labelIndent.toFixed(1)}px against the field's own text)`
     );
     // The field itself, measured in the same document rather than read off the sheet:
-    // `proto:2276` and premium's `RewardRow` `.search input` both give it `flex: 1; min-width: 0`
-    // and no alignment of its own, and this is where a disagreement would show.
     assert.equal(report.fieldTextAlign, 'start', 'the search field itself reads from the left');
     assert.equal(report.fieldFlexGrow, '1', 'the search field absorbs the row slack');
     assert.equal(report.fieldFlexBasis, '0%', 'the search field takes a zero flex base');
@@ -799,29 +653,6 @@ test('the picker popover is the design’s panel, field and rows, not a heavy sh
   // gapped list carrying its own scroll; and 30px rows at `0 8px` with a 7px corner. Ours drew
   // a 240px sheet on `--fab-bg-3` — the LIGHTEST rung, over a pane painted darker than it — with
   // a 6px corner, an 8px-inset divider-ruled field, an 8px-inset list and 40px rows.
-  //
-  // ── THE ONE SUBSTITUTION, AND WHY IT IS A JUDGEMENT ──────────────────────────────────────
-  // The design's ramp is shifted a rung against ours: its `--bg1` is our `--fab-bg-0` and its
-  // `--bg2` our `--fab-bg-1`, so the `--bg0` it paints this panel with sits BELOW our darkest
-  // token and has no equivalent. Inventing an eighth rung across seven themes to transcribe one
-  // popover would be a token-generation change; the relationship the design is expressing is
-  // that the panel is DARKER than the block it floats over, separated by `--border-strong` and
-  // a deep shadow. `--fab-bg-0` is the darkest rung we publish and preserves that relationship,
-  // so it is what the panel takes. Every theme's ramp runs the same direction — all seven are
-  // dark and `--fab-bg-0` is the darkest in each — so no theme inverts the reading.
-  //
-  // The 7px and 5px insets are not transcribed either: `spacing-scale-ratchet.test.js` bans a
-  // new raw literal in `padding`/`margin`/`gap`, so each takes its nearest published step —
-  // 7 to `--fab-space-chip` (6) and 5 to `--fab-space-1` (4) — exactly as `EmptyState`'s
-  // `is-filtered` variant took the design's 26 to 24.
-  //
-  // ── MEASURED, NOT READ ───────────────────────────────────────────────────────────────────
-  // `styles/fabricate.css` is layered at `modules` and `SearchablePopover`'s own block is
-  // UNLAYERED, so a scoped declaration beats a sheet declaration at any specificity. That makes
-  // "the sheet says 10px" and "the panel is 10px" different questions, and only the second one
-  // is the product. The component's compiled CSS (`css: 'external'`) is appended after the
-  // layered sheet and its hash stamped onto the fixture, so a compact-mode rule that grew past
-  // its `.is-compact-option-rows` qualifier would be caught here rather than shipping.
   const popoverScoped = scopedComponentCss(
     resolve(__dirname, '../../src/ui/svelte/components/SearchablePopover.svelte')
   );
@@ -973,10 +804,6 @@ test('the any-of / all-of toggle is edged and lit in the tag hue, not the warm o
   // value the row's own border, the tag chips and the `+ Tag` pill already carry here, which is
   // `--fab-purple` - so a warm track puts the one control that is ABOUT tags in a different
   // family from everything beside it (issue 1373, maintainer round 7).
-  //
-  // MEASURED THROUGH PROBES IN THE SAME DOCUMENT, for the reason the kind-tint guard gives: a
-  // rule that reaches the element but loses the cascade reads as correct in the source. Both
-  // tokens are resolved here and the assertion is a computed-value comparison.
   const segmentedScoped = scopedComponentCss(
     resolve(__dirname, '../../src/ui/svelte/apps/manager/SegmentedControl.svelte')
   );
@@ -1028,8 +855,7 @@ test('the any-of / all-of toggle is edged and lit in the tag hue, not the warm o
       const track = document.querySelector('[data-tag-match]');
       const lit = document.querySelector('[data-segment="any"]');
       const unlit = document.querySelector('[data-segment="all"]');
-      // The ring is `:has(:focus-visible)`, so the radio has to be really focused by the
-      // keyboard for the rule to match; a click leaves `:focus` without `:focus-visible`.
+      // The ring is `:has(:focus-visible)`.
       unlit.querySelector('input[type="radio"]').focus();
       return {
         trackEdge: getComputedStyle(track).borderTopColor,
@@ -1090,23 +916,10 @@ test('the any-of / all-of toggle is edged and lit in the tag hue, not the warm o
 
 test('every requirement kind marks itself in its OWN tint, on the plate and on the chosen chip', async () => {
   // `proto:4624`-`4627` is the design's `KINDMETA`, and a tint is half of every entry in it:
-  // `comp` is `--success`, `tag` is `--tag`, `cur` is `--accent`, and `ess` is `--water` — an
-  // essence/water hue the design's own `:root` never declares, so its own frames render that
-  // one glyph uncoloured. `--fab-info` is the token that hue names here, and the other three
-  // map exactly: the design's `--success`, `--accent` and `--info` are byte-for-byte our
-  // `--fab-success`, `--fab-accent` and `--fab-info`, and `--fab-purple` is this repo's tag
-  // family (`Chip`'s `is-tag`, the tag row's own edge, the `+ Tag` pill).
-  //
   // `proto:4645` resolves the entry PER ROW, and premium's `RewardRow` puts the same
   // `presentation.tint` on the plate (`:62`) AND on the chosen chip's glyph (`:80`) and on
   // each suggestion's (`:129`). The plate shipped tinted; the chip and the suggestions did
   // not, so a NAMED row's mark was one inherited ink whatever kind the row was.
-  //
-  // MEASURED, NOT MATCHED. A rule that reaches the element but loses the cascade — an `<i>`
-  // whose colour an ancestor pill sets, a `layer(modules)` sheet rule against a component's
-  // own unlayered block — reads as correct in the source and renders as one colour. So this
-  // resolves each token through a probe element in the same document and compares computed
-  // values rather than asserting a selector exists.
   const context = await openLayoutContext({
     viewport: { width: 900, height: 420 },
     deviceScaleFactor: 1,
@@ -1173,8 +986,7 @@ test('every requirement kind marks itself in its OWN tint, on the plate and on t
         `the chosen chip's ${kind.kind} glyph takes the same tint the plate does (RewardRow.svelte:80)`
       );
     }
-    // …and the four are four, not one token wearing four class names: a sheet that resolved
-    // every kind to the same colour would satisfy every assertion above.
+    // …and the four are four, not one token wearing four class names.
     assert.equal(
       new Set(report.map((kind) => kind.plate)).size,
       4,
@@ -1186,12 +998,7 @@ test('every requirement kind marks itself in its OWN tint, on the plate and on t
 });
 
 test('the Books & Scrolls route names one grid track per section and grows the table', () => {
-  // THE PAGER IS A FOURTH CHILD AND THE SHEET NAMES THREE TRACKS, which the old hand-listed
-  // matcher hid by not counting `<Pagination>` at all. It is recorded rather than repaired: an
-  // unnamed trailing child falls into an IMPLICIT row, which grid sizes `auto` — the same value
-  // the sheet would name — so the route renders correctly today and naming the track is a change
-  // to a route this issue does not touch. What matters is that the shortfall is now written down
-  // and a FIFTH child would fail here instead of passing.
+  // THE PAGER IS A FOURTH CHILD AND THE SHEET NAMES THREE TRACKS.
   assertOneTrackPerGridChild({
     viewFile: 'BooksScrollsView.svelte',
     route: 'books-scrolls',
@@ -1218,17 +1025,13 @@ test('the Tags & Categories route names one grid track per section and grows the
   });
 });
 
-// The SAME defect family, a third time, on the Component Rules route (issue 1371). Issue 1371
-// added a fifth top-level child to a four-track template: the attribution banner went in FIRST,
-// every child shifted one track down, and the toolbar landed in the zero-min growing track.
+// The SAME defect family, a third time.
 test('the Component Rules route names one grid track per child and grows the list', () => {
   assertOneTrackPerGridChild({
     viewFile: 'ComponentsBrowserView.svelte',
     route: 'components',
     expectedChildren: 4,
-    // THE LIST IS THE THIRD OF FOUR, not the last: the pager is a real child below it, and this
-    // is the one route whose sheet names a track for it. So the growing track is asserted by
-    // POSITION rather than by "last".
+    // THE LIST IS THE THIRD OF FOUR, not the last: the pager is a real child below it.
     growingTrackIndex: 2,
     growingLabel: 'the scrolling list',
     autoLabel: 'head/toolbar/pager',
@@ -1251,36 +1054,6 @@ test('the Component Rules route names one grid track per child and grows the lis
 // sentence used to stack under the name, making it the one card in an `align-items: start`
 // grid whose content exceeded the 34px icon tile — so it stood visibly taller than every
 // sibling. Source-reading cannot see that; only layout can, so this measures both cards.
-//
-// The fixture's tab strip and workspace are a `<div role="tablist">` / `<div role="tabpanel">`
-// because that is what the view now ships (issue 924 — the `<nav>`/`<section>` forms carried
-// implicit landmark roles for the ARIA roles to override). Every governing selector below is
-// class-based, so nothing here depends on the element; the fixture is updated so it keeps
-// MIRRORING shipped markup rather than quietly describing a shape that no longer exists.
-//
-// Issue 1429 moved the strip onto `EditorTabs` and corrected its mark from the neutral chip to
-// the Rail Marker Family's RECORD COUNT, so the fixture's tab now carries
-// `<span class="manager-editor-tab-count">` rather than a `.manager-chip`. This is a hand-written
-// COPY of shipped markup, which is exactly the kind that keeps passing after the product stops
-// emitting it — the `<div role="tablist">` host and both container classes are unchanged, so the
-// copy is faithful again rather than merely still green.
-//
-// Issue 1470 added the picker root element the component actually renders around its trigger.
-// That element was missing here from the start, which cost nothing while every trigger rule hung
-// off `.fabricate-manager` and costs the whole block once they hang off the picker's own
-// namespace root: without it this row measures an unstyled button and still reports on the
-// vocabulary row's height by name.
-//
-// Issue 1503 added the two SHARED picker classes beside them. The picker renders through
-// `SearchablePopover` now, so the root element the product writes carries the primitive's own
-// pair as well as the caller's, which arrives through `pickerClass`. No area-scope clause reds
-// on the shorter form — the shared `mirrored` pair keys on `manager-travel-picker`, which this
-// copy did not carry — so nothing forced this edit; it is here because the copy would otherwise
-// mirror a root the product no longer emits, which is exactly the failure mode a hand-written
-// mirror has. It pulls `.fabricate-picker.manager-travel-picker`'s `position: relative;
-// min-width: 0` onto the fixture, and the measurement was RE-RUN rather than assumed: the row
-// height is unchanged, because what is measured is the trigger inside the wrapper and the
-// wrapper is a containing block for nothing in this copy.
 test('the reserved vocabulary row renders exactly as tall as a custom row', async () => {
   const context = await openLayoutContext({ viewport: { width: 760, height: 600 } });
   const page = await context.newPage();
@@ -1317,20 +1090,13 @@ test('the reserved vocabulary row renders exactly as tall as a custom row', asyn
         ),
         lockedChipBackground: getComputedStyle(locked.querySelector('.manager-chip'))
           .backgroundColor,
-        // A chip that exists to BE the default, named by its own hook. It used to be read off
-        // `.manager-editor-tab-button .manager-chip` — the tab badge — which made an assertion
-        // about the LOCKED ROW's fill depend on the vehicle the tab strip happened to draw.
-        // Issue 1429 corrected that badge to the bare-numeral record count, and this clause fell
-        // over with `getComputedStyle` on null rather than saying what it had lost. The
-        // comparison only ever needed a default chip on the same page.
+        // A chip that exists to BE the default.
         defaultChipBackground: getComputedStyle(
           document.querySelector('[data-default-chip-reference]')
         ).backgroundColor,
       };
     });
-    // The IconPicker's own `.essence-icon-picker-trigger` block is a full-width, 36px-min
-    // three-column combo declared LATER in the sheet, so the row tile only stays a 34px
-    // square while the vocabulary override outranks it on specificity, not source order.
+    // The IconPicker's own `.essence-icon-picker-trigger` block is a full-width.
     assert.deepEqual(
       { width: geometry.triggerWidth, height: geometry.triggerHeight },
       { width: 34, height: 34 },
@@ -1342,13 +1108,7 @@ test('the reserved vocabulary row renders exactly as tall as a custom row', asyn
       `the reserved row must match its siblings exactly (locked ${geometry.lockedHeight}px vs custom ${geometry.customHeight}px)`
     );
 
-    // Two facts about the chip that ONLY a real browser can establish, and that the whole
-    // of issue 883 rests on.
-    //
-    // First, the row's chip renders at the primitive's compact 20px. The global sheet has
-    // no chip rule left at all, so this measures `Chip.svelte`'s own scoped block reaching
-    // a real page — if the injection or the scoping hash ever stopped matching, the chip
-    // would collapse to bare text and this drops well below 20.
+    // Two facts about the chip that ONLY a real browser can establish.
     assert.ok(
       geometry.lockedChipHeight >= 20,
       `the locked chip renders at the primitive's compact scale, got ${geometry.lockedChipHeight}px`
@@ -1379,23 +1139,6 @@ test('the reserved vocabulary row renders exactly as tall as a custom row', asyn
 test('the "or…" menu is a 150px panel of four tinted, one-word entries under its own header', async () => {
   // WHY IT IS MEASURED AND NOT READ. Three of this panel's claims are cascade questions that a
   // sheet cannot answer on its own:
-  //
-  //   1. the ENTRY is a `<button>`, so Foundry's `a.button, button { justify-content: center }`
-  //      in `@layer elements.forms` reaches it — the same host rule that centred the suggestion
-  //      row one round ago. `styles/fabricate.css` imports at `layer(modules)`, which sorts
-  //      after `elements`, so one declaration displaces it; whether one is WRITTEN is the
-  //      question, and only a rendered cascade answers it.
-  //   2. the panel's frame is stated twice — `.fabricate-picker-popover.manager-travel-popover`
-  //      gives every picker an 8px corner on `--fab-bg-3`, and this menu's own rule has to
-  //      out-specify it inside the same layer.
-  //   3. the entry TINT is not written for this panel at all. The glyph carries the ROW's own
-  //      `.manager-recipe-option-mark.is-<kind>` class, so the menu is inked by the same four
-  //      rules the plate and the chosen chip are and cannot drift from them. That claim holds
-  //      only if those rules still reach a glyph inside a PORTALED panel, which is a different
-  //      DOM position from the row's.
-  //
-  // So the fixture renders the four reference marks a ROW draws beside the panel and compares
-  // colour for colour, rather than pinning four token names a rename would walk away from.
   const popoverScoped = scopedComponentCss(
     resolve(__dirname, '../../src/ui/svelte/components/SearchablePopover.svelte')
   );
@@ -1409,12 +1152,7 @@ test('the "or…" menu is a 150px panel of four tinted, one-word entries under i
       'manager-travel-option-name',
     ].reduce((html, className) => withScopeHash(html, className, popoverScoped.hashClass), markup);
 
-  // The panel exactly as `SearchablePopover` portals it: the primitive's own two classes, the
-  // caller's `popoverClass`, the header the `popoverTitle` prop renders, and one option button
-  // per kind carrying the row's tinted-mark glyph. `width: 150px` is written inline because
-  // that is where it comes from in the product — the primitive computes its width from
-  // `minWidth`/`maxWidth` and writes it onto the node, so no rule in the sheet states it and
-  // the source assertion at the foot of this test is what pins the number.
+  // The panel exactly as `SearchablePopover` portals it: the primitive's own two classes.
   const panel = stamp(
     '<div class="fabricate-picker-popover manager-travel-popover manager-recipe-or-popover" ' +
       'role="dialog" aria-label="Accept instead" style="width: 150px;">' +
@@ -1484,8 +1222,7 @@ test('the "or…" menu is a 150px panel of four tinted, one-word entries under i
           justifyContent: style.justifyContent,
           fontSize: style.fontSize,
           fontWeight: style.fontWeight,
-          // The offset of the glyph from the entry's own padding edge: zero means the row
-          // reads from its left edge, as `proto:4683` draws it.
+          // The offset of the glyph from the entry's own padding edge.
           glyphIndent: Number(
             (
               glyph.getBoundingClientRect().left -
@@ -1560,9 +1297,7 @@ test('the "or…" menu is a 150px panel of four tinted, one-word entries under i
     await context.close();
   }
 
-  // THE WIDTH'S OWN SOURCE. The primitive writes the computed width onto the node, so the
-  // measurement above proves the geometry a 150px panel produces and this proves 150 is the
-  // number the caller asks for.
+  // THE WIDTH'S OWN SOURCE. The primitive writes the computed width onto the node.
   assert.match(
     orMenuGroupCardSource,
     /minWidth=\{150\}/,
@@ -1575,21 +1310,6 @@ test('the "or…" menu is a 150px panel of four tinted, one-word entries under i
 
 test("the requirement row's two dashed affordances paint at all, and at the design's two scales", async () => {
   // MEASURED, BECAUSE THE SHEET SAID OTHERWISE AND WAS NOT PAINTING (issue 1373, round 8).
-  //
-  // `or…` and `+ Tag` are the two affordances a requirement row carries, and `styles/fabricate.css`
-  // stated a dashed edge, a tint and a transparent fill for each — bound to the shared chip class,
-  // because both rendered through `Chip`. Every one of those properties is ALSO declared in
-  // `Chip.svelte`'s own scoped block, which `svelte.config.js` injects UNLAYERED while
-  // `module.json` imports the sheet at `layer(modules)`. An unlayered declaration beats a layered
-  // one at any specificity, so both rules matched, both were discarded, and the two shipped as
-  // the default filled neutral chip: 20px tall, a SOLID `--fab-border` edge, `--fab-text` ink, a
-  // 10px corner and a fill. Two rounds of this issue believed otherwise, and no gate could
-  // disagree — stylelint does not read `.svelte`, Svelte's unused-selector pass never sees the
-  // sheet, and a fixture that loads both flat reports the sheet winning.
-  //
-  // So this test is written in the LAYER ORDER THAT SHIPS, and it measures the CHIP as a control:
-  // the same fixture renders a plain `Chip` beside the two, so "these two are not chips" is a
-  // measured difference against the real primitive rather than an assertion about a token name.
   const chipScopedForTriggers = scopedComponentCss(
     resolve(__dirname, '../../src/ui/svelte/components/Chip.svelte')
   );
@@ -1662,8 +1382,7 @@ test("the requirement row's two dashed affordances paint at all, and at the desi
       };
     });
 
-    // THE CONTROL IN BOTH SENSES. This is what the two affordances were rendering as, so every
-    // claim below is a measured difference from it rather than a value read off the sheet.
+    // THE CONTROL IN BOTH SENSES. This is what the two affordances were rendering as.
     assert.equal(
       report.chip.borderStyle,
       'solid',
@@ -1688,8 +1407,7 @@ test("the requirement row's two dashed affordances paint at all, and at the desi
       'and it displaces the host `button { justify-content: center }` rather than inheriting it'
     );
 
-    // `proto:2256`: a ~20px stadium in the TAG tint at 10px/600, which is a different scale from
-    // `or…` on purpose — one is a control among controls, the other a chip among chips.
+    // `proto:2256`: a ~20px stadium in the TAG tint at 10px/600.
     assert.equal(report.tag.borderStyle, 'dashed', 'the `+ Tag` pill is an affordance too');
     assert.equal(report.tag.borderRadius, '999px', '`proto:2256`: a stadium');
     assert.equal(report.tag.fontSize, '10px', '`proto:2256`: 10px');

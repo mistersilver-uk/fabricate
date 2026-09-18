@@ -1,12 +1,4 @@
-/**
- * The Downtime route: the Core preview, the companion contract and the experimental gate.
- *
- * A route module of `manager-mounted.test.js` (issue 1690). It registers its cases INSIDE
- * that file's one `describe` rather than at module scope, so the split keeps the suite
- * name, the compiled manager tree and the one process the 26,709-line file had.
- * `manager-mounted-shared.js` owns the compile and the between-test yield; the mount state
- * below is this module's own, so its locators read its own `target`.
- */
+/** The Downtime route: the Core preview, the companion contract and the experimental gate. */
 
 import { afterEach, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -40,8 +32,7 @@ let target;
 // under a GM who is already standing somewhere (issue 1257).
 let mountedStore = null;
 
-// The locators read `target` through a getter rather than a captured element, because the
-// module remounts per case and half these cases assign `target` themselves.
+// The locators read `target` through a getter rather than a captured element.
 const queries = createManagerQueries(() => target);
 const {
   activeCompanionPanel,
@@ -108,14 +99,7 @@ export function registerDowntimeCases() {
     await settleRouteExit();
 
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'world-downtime');
-    // world-downtime is a two-column route: the `{#if}` that renders the inspector
-    // excludes it, and `styles/fabricate.css` releases its column to match. Those are
-    // one decision expressed twice, so drop the guard and this (empty) aside wraps to
-    // an implicit grid row under the preview — which `expectNoHorizontalOverflow` in
-    // the View Lab cases cannot see, because a stray ROW costs no horizontal width.
-    // assert.ok(!el) rather than assert.equal(el, null): on failure, assert.equal
-    // tries to build an inline diff of a happy-dom element — a circular, whole-subtree
-    // graph — and dies with an unmessaged heap OOM. Same detection, readable failure.
+    // world-downtime is a two-column route.
     assert.ok(
       !target.querySelector('.manager-inspector'),
       'world-downtime renders no inspector aside — the guard and the released CSS column stay in step'
@@ -207,10 +191,7 @@ export function registerDowntimeCases() {
     globalThis.game.i18n.localize = originalLocalize;
   });
 
-  // The maintainer's own report was "all of the sub-tabs are missing": the design nests the
-  // same four previews under the rail's Downtime entry, each carrying a premium padlock, and
-  // Core rendered only the strip inside the panel. These assertions pin the rail treatment,
-  // and that BOTH triggers — a rail child and a studio-card button — drive one navigation.
+  // The maintainer's own report was "all of the sub-tabs are missing".
   it('nests four locked Downtime previews in the rail and drives one navigation from either trigger', async () => {
     useShippedLocalization();
     const calls = [];
@@ -467,8 +448,7 @@ export function registerDowntimeCases() {
       'See active, paused, pending and attention-needed work for every character at a glance.'
     );
 
-    // The tint travels with the SLOT, not the glyph: `fa-house-chimney` is ember on
-    // Tracking and vitality on Activities, so a per-glyph rule would flatten one of them.
+    // The tint travels with the SLOT, not the glyph.
     assert.deepEqual(
       Array.from(panel('tracking').querySelectorAll('[data-downtime-board-row]')).map(
         (row) => row.dataset.downtimeBoardRow
@@ -525,10 +505,7 @@ export function registerDowntimeCases() {
       target.querySelector('[data-downtime-extension-panel]').textContent,
       /Mounted tracking/
     );
-    // `[data-world-downtime-lock]` on the RAIL, not `.downtime-tab-lock` on the strip: with no
-    // strip in provider mode the strip padlock cannot exist, so asserting its absence could
-    // not fail (issue 1213). The rail padlock is rendered in both modes' markup and gated on
-    // `downtimeCoreFallback`, so its absence is a real claim about this mode.
+    // `[data-world-downtime-lock]` on the RAIL, not `.downtime-tab-lock` on the strip.
     assert.ok(
       !target.querySelector('[data-world-downtime-lock]'),
       'an installed companion never inherits the Core fallback lock treatment'
@@ -563,10 +540,6 @@ export function registerDowntimeCases() {
 
   // The OTHER direction, and the one issue 1213 breaks (the test above covers deregister,
   // which still resolves because the `{#if coreFallback}` branch still renders the strip).
-  // Registering a provider removes the strip, so `#world-downtime-tab-<id>` — the id the
-  // recovery used to ask for unconditionally — resolves to nothing, optional chaining
-  // swallows it, and focus silently drops to `<body>`. The rail sub-item is not a descendant
-  // of the host's own `shell`, so no id scheme on the rail could have fixed it either.
   it('recovers focus onto the companion panel when a provider registers under a focused Core tab', async () => {
     const registry = createManagerExtensionsRegistry();
     mountDowntimeManager([], {}, {}, { managerExtensions: registry });
@@ -592,10 +565,7 @@ export function registerDowntimeCases() {
     );
   });
 
-  // Issue 1213, decision 3. Removing the strip strands a GM at a 56px rail: `.manager-nav-submenu`
-  // is `display: none` there, so with no strip the number of reachable tab switchers is zero —
-  // and `display: none` takes them out of the accessibility tree too, so it is a keyboard and
-  // screen-reader dead end rather than a pointer inconvenience.
+  // Issue 1213, decision 3. Removing the strip strands a GM at a 56px rail.
   it('locks the rail open in provider mode only, and never writes the stored collapse preference', async () => {
     useShippedLocalization();
     const registry = createManagerExtensionsRegistry();
@@ -626,8 +596,7 @@ export function registerDowntimeCases() {
     assertRailLockedOpen(railWrites);
     await assertRailLockSurvivesPresses(railWrites);
 
-    // MODE-scoped, half two: Core's fallback keeps its strip, so it is never stranded and
-    // keeps its collapsible rail — on this very route.
+    // MODE-scoped, half two: Core's fallback keeps its strip.
     unregister();
     await settleDowntimeProvider();
     assert.ok(railBodyCollapsed(), 'losing the companion returns the route to the stored collapse');
@@ -712,18 +681,13 @@ export function registerDowntimeCases() {
         ['manager-downtime-nav-crew', { block: 'nearest' }],
         'and switching screen follows the switcher'
       );
-      // There was an assertion here that a further settle does not re-scroll, claiming to gate
-      // the `revealedDowntimeNavId` guard in the effect. It could not fail: deleting that guard
-      // left this suite at 374/374. Removed rather than left standing, on the same principle
-      // that removed a surviving grid-track assertion in the layout suite — an assertion that
-      // cannot fail reads as coverage and is not. The guard is defensive; see its comment.
+      // There was an assertion here that a further settle does not re-scroll.
     } finally {
       globalThis.Element.prototype.scrollIntoView = original;
     }
   });
 
-  // Core's preview owns the top of its own panel, so it needs no reveal — and doing it anyway
-  // would move the rail on a route where nothing was ever out of reach.
+  // Core's preview owns the top of its own panel, so it needs no reveal.
   it('does not scroll the rail on the Core preview route', async () => {
     const scrolled = [];
     const original = globalThis.Element.prototype.scrollIntoView;
@@ -804,9 +768,7 @@ export function registerDowntimeCases() {
     assert.equal(downtimeTitle(), 'Unlock Downtime Studio with Fabricate Premium');
   });
 
-  // The badge is a claim about the MODULE, not about Core's Downtime route. A companion that
-  // claims a surface Core has never heard of is still installed and still working, so it must
-  // light the same badge — while Core, which still owns Downtime, keeps selling it there.
+  // The badge is a claim about the MODULE.
   it('lights the title-bar premium badge for a surface Core does not host', async () => {
     useShippedLocalization();
     const registry = createManagerExtensionsRegistry();
@@ -832,10 +794,7 @@ export function registerDowntimeCases() {
     );
   });
 
-  // Issue 1198, maintainer decision A2. The badge reports the MODULE, so it must not be keyed
-  // on one REGISTRY either: a companion whose only surface is a PLAYER-window one is just as
-  // installed and just as working. This is the case that would silently pass if `T7` widened
-  // nothing, because the manager registry alone already lights the badge in every other case.
+  // Issue 1198, maintainer decision A2. The badge reports the MODULE.
   it('lights the title-bar premium badge for a companion registered ONLY in the player registry', async () => {
     useShippedLocalization();
     const playerExtensions = createPlayerExtensionsRegistry({ emitHook: () => {} });
@@ -930,8 +889,7 @@ export function registerDowntimeCases() {
       await settleDowntimeProvider();
       assert.match(target.textContent, /Recovered tracking/);
       assert.match(target.textContent, /Recovered activities/);
-      // Again the RAIL padlock: the strip one is unrenderable in provider mode, so its absence
-      // would prove nothing about whether a `coreFallback` field on a provider was honoured.
+      // Again the RAIL padlock: the strip one is unrenderable in provider mode.
       assert.ok(
         !target.querySelector('[data-world-downtime-lock]'),
         'a companion cannot opt into Core-only fallback behavior with coreFallback'
@@ -1035,10 +993,7 @@ export function registerDowntimeCases() {
       '-1',
       'programmatically focusable for provider-swap recovery, but not a tab stop that scrolls nothing'
     );
-    // WHERE EACH REQUIRED TAB FIELD LANDS, and the two are deliberately DIFFERENT elements
-    // (issue 1213). With no strip the rail sub-item is the only control naming the screen, so
-    // it consumes `accessibleName` and `tooltip` — otherwise Core would validate both, throw
-    // if a provider omitted either, and then discard them.
+    // WHERE EACH REQUIRED TAB FIELD LANDS.
     const railItem = target.querySelector('#manager-downtime-nav-ledger');
     assert.equal(
       railItem.getAttribute('aria-label'),
@@ -1050,7 +1005,7 @@ export function registerDowntimeCases() {
       'Guild ledger tools',
       'and tooltip is that sub-item native tooltip'
     );
-    // The REGION is named by the screen, not by the action that opens it. Pointing this at the
+    // The REGION is named by the screen.
     // button would make the landmark inherit the button's whole accessible name and announce
     // "Open Guild ledger, region"; it points at the label span, which holds "Guild ledger".
     const labelSpan = railItem.querySelector('.manager-nav-label');
@@ -1171,10 +1126,7 @@ export function registerDowntimeCases() {
     );
   });
 
-  // The chrome fixture every runtime-channel case below drills into, named once. It is one
-  // object rather than a per-test literal because it is the shape the seam promises — a
-  // companion editor's identity, its staged-changes chip and Core's own Back/Delete/Save trio
-  // — and three near-identical copies of it is exactly what the duplication gate counts.
+  // The chrome fixture every runtime-channel case below drills into.
   const COMPANION_EDITOR_CHROME = Object.freeze({
     title: 'Marn the Quartermaster',
     subtitle: 'Crew member · two projects in flight',
@@ -1195,9 +1147,7 @@ export function registerDowntimeCases() {
     ]),
   });
 
-  // The provider every runtime-channel case registers: two tabs, both fully dressed at
-  // registration, recording each mount context so a case can drive the channel and — more
-  // importantly — count the mounts.
+  // The provider every runtime-channel case registers: two tabs.
   function chromeChannelProvider(mounts) {
     return downtimeProvider({
       prefix: 'Guild',
@@ -1325,8 +1275,7 @@ export function registerDowntimeCases() {
     await settleDowntimeProvider();
     assert.equal(managerTitle(), 'crew title');
 
-    // A malformed update is refused at the seam, with a message, changing nothing — and the
-    // Manager stays entirely on its feet, which a thrown error escaping into Core would not.
+    // A malformed update is refused at the seam, with a message, changing nothing.
     assert.throws(
       () => mounts[1].setRouteChrome({ title: 'Crew', subtitel: 'oops' }),
       /does not accept "subtitel"/
@@ -1349,9 +1298,7 @@ export function registerDowntimeCases() {
     await settleDowntimeProvider();
     worldNavItem('parties').click();
     await settleRouteExit();
-    // Asserted as the REFUSAL rather than as a header reading, because a route the GM has left
-    // renders no Downtime header to read: with the mount left open, this context would still be
-    // accepted and would repaint the route the moment the GM came back to it.
+    // Asserted as the REFUSAL rather than as a header reading.
     assert.equal(
       mounts[1].setRouteChrome({ title: 'Still here' }),
       false,
@@ -1398,7 +1345,6 @@ export function registerDowntimeCases() {
     assert.equal(mounts.length, 1, 'and it is a re-activation, not a remount');
 
     // AND IT IS NOT A ONE-SHOT, which is the property a crumb wired to a navigation would lose:
-    // Core's own route has not changed, so nothing about the second press is different.
     crumb.click();
     await settleRouteExit();
     assert.deepEqual(events, ['pop', 'pop']);
@@ -1415,8 +1361,6 @@ export function registerDowntimeCases() {
   it('roots a World route at World, and never under Crafting Systems', async () => {
     // TWO ROOTS, NOT ONE (issue 1322). `Crafting Systems` used to lead every trail in the
     // Manager, so a GM configuring their world read `Crafting Systems > World > Downtime > ...`
-    // — which says World is a page inside a crafting system. It is not: World routes are
-    // `every system`, and several of them are reachable before any system has opted in.
     const registry = createManagerExtensionsRegistry();
     const mounts = [];
     registry.publicApi.registerWorldNavProvider(chromeChannelProvider(mounts));
@@ -1442,8 +1386,7 @@ export function registerDowntimeCases() {
     world.click();
     await settleRouteExit();
     assert.deepEqual(crumbs(), ['World'], 'the World crumb did not reach the World route');
-    // ON THE WORLD ROUTE IT IS THE LEAF and stops being a control, which is that same rule read
-    // the other way: the last crumb in a trail names the screen you are on.
+    // ON THE WORLD ROUTE IT IS THE LEAF and stops being a control.
     assert.equal(target.querySelector('[data-breadcrumb-world]').tagName.toLowerCase(), 'span');
   });
 
@@ -1458,8 +1401,7 @@ export function registerDowntimeCases() {
     assert.equal(mounts.length, 1);
     const stop = mounts[0].onRouteReselect(() => events.push('pop'));
 
-    // The click that used to do nothing at all. It is DISTINGUISHABLE from a first mount: the
-    // mount count does not move, so a companion pops one level rather than re-initialising.
+    // The click that used to do nothing at all. It is DISTINGUISHABLE from a first mount.
     target.querySelector('#manager-downtime-nav-ledger').click();
     await settleRouteExit();
     assert.deepEqual(events, ['pop'], 'the rail click reaches the companion');
@@ -1519,10 +1461,7 @@ export function registerDowntimeCases() {
     );
   });
 
-  // The mounted-companion fixture every navigation-guard case opens with: a two-tab provider
-  // holding the route, with its first mount's context in hand. Named once because six cases
-  // start from it, and six copies of the same five lines is exactly the near-identical block
-  // the duplication gate counts against `tests/**`.
+  // The mounted-companion fixture every navigation-guard case opens with.
   async function mountGuardedCompanion() {
     const registry = createManagerExtensionsRegistry();
     const mounts = [];
@@ -1624,15 +1563,7 @@ export function registerDowntimeCases() {
     assert.equal(mounts.length, 1);
   });
 
-  /**
-   * THE COMPATIBILITY GUARANTEE at the Manager level.
-   *
-   * A companion that never calls `onBeforeNavigate` — which is every companion shipped before
-   * this seam, and every future one that has nothing to guard — must navigate exactly as it
-   * did: no prompt, no veto, no changed mount lifecycle. The channel's own suite pins the half
-   * that cannot be seen from here, that Core is handed `undefined` rather than `true` and so
-   * takes its original branch with no added `await`.
-   */
+  /** THE COMPATIBILITY GUARANTEE at the Manager level. */
   it('asks nothing at all of a companion that registered no guard', async () => {
     const mounts = await mountGuardedCompanion();
 
@@ -1666,8 +1597,7 @@ export function registerDowntimeCases() {
     await settleRouteExit();
     assert.deepEqual(asked, [], 're-entering the route the GM is already on is not a navigation');
 
-    // Neither is re-activating the sub-item already on screen: that is `onRouteReselect`, and
-    // whether the companion's unsaved work should block its own pop is its question, inside it.
+    // Neither is re-activating the sub-item already on screen: that is `onRouteReselect`.
     target.querySelector('#manager-downtime-nav-ledger').click();
     await settleRouteExit();
     assert.deepEqual(asked, [], 'and neither is a re-activation of the tab already showing');
@@ -1706,14 +1636,7 @@ export function registerDowntimeCases() {
     assert.equal(managerRoute(), 'world');
   });
 
-  /**
-   * A COMPANION DEFECT MUST NEVER TRAP THE GM.
-   *
-   * A guard that throws is reported and the navigation proceeds. The opposite ruling would let
-   * one broken companion leave the GM on a route they cannot leave, in a window they cannot
-   * close, recoverable only by reloading Foundry — and it would do so silently, because a
-   * throwing guard is precisely the module least likely to be watching its own console.
-   */
+  /** A COMPANION DEFECT MUST NEVER TRAP THE GM. */
   it('contains a throwing navigation guard and lets the GM leave', async () => {
     const mounts = await mountGuardedCompanion();
     mounts[0].onBeforeNavigate(() => {
@@ -1734,15 +1657,7 @@ export function registerDowntimeCases() {
     assert.equal(managerRoute(), 'world', 'the GM is not stranded by a companion’s bug');
   });
 
-  /**
-   * ISSUE 1332 — a companion sending the GM to another of its OWN tabs.
-   *
-   * These cases sit beside the navigation-guard block above because they are the same
-   * navigation seen from the other end: the guard is a companion refusing a move, and this is a
-   * companion asking for one. The rail sub-item they are asserted against is the same control
-   * the guard cases click, on purpose — the whole claim is that a programmatic request and a
-   * GM's click are ONE navigation rather than two that agree today.
-   */
+  /** ISSUE 1332 — a companion sending the GM to another of its OWN tabs. */
   const downtimeSubitem = (tabId) => target.querySelector(`#manager-downtime-nav-${tabId}`);
 
   it('takes the GM to another of the companion’s own tabs, on the companion’s own request', async () => {
@@ -1765,8 +1680,7 @@ export function registerDowntimeCases() {
     assert.equal(mounts.length, 2, 'the destination mounts exactly as a rail click mounts it');
     assert.equal(mounts[1].tabId, 'crew', 'and is told which of its own tabs it is showing');
     assert.equal(managerRoute(), 'world-downtime');
-    // The RAIL follows, which is what makes this a navigation rather than a panel swap: the
-    // sub-item the GM did not press is now the current one.
+    // The RAIL follows, which is what makes this a navigation rather than a panel swap.
     assert.equal(downtimeSubitem('crew').getAttribute('aria-current'), 'true');
     assert.equal(downtimeSubitem('ledger').getAttribute('aria-current'), null);
     assert.ok(downtimeSubitem('crew').classList.contains('is-active'));
@@ -1808,9 +1722,7 @@ export function registerDowntimeCases() {
     );
 
     const moved = mounts[0].navigateToTab('crew');
-    // A BOOLEAN HERE WOULD BE A LIE. The veto is a dialog the GM has not answered, so the only
-    // honest synchronous answer is "not yet" — a `true` would have the companion tearing down
-    // the screen its own prompt is still asking about.
+    // A BOOLEAN HERE WOULD BE A LIE. The veto is a dialog the GM has not answered.
     assert.equal(typeof moved?.then, 'function');
     await settleRouteExit();
     assert.equal(
@@ -1845,23 +1757,12 @@ export function registerDowntimeCases() {
       1,
       'THE POINT: no remount, so the drill-down the companion is popping out of still exists'
     );
-    // The veto above is a POSITIVE CONTROL for the routing claim, not decoration: a guard that
-    // refuses everything did not stop this, which is only possible if the request never went
-    // through the route-exit confirmation at all — exactly as the rail click does not.
+    // The veto above is a POSITIVE CONTROL for the routing claim, not decoration.
     assert.deepEqual(asked, [], 'and no guard is asked about a navigation that goes nowhere');
     assert.equal(activeCompanionPanel().dataset.downtimeExtensionPanel, 'ledger');
   });
 
-  /**
-   * THE GUARD CALLING BACK INTO THE SEAM IT IS ANSWERING (issue 1332 review).
-   *
-   * "Veto this move, and send the GM to Settings instead" is the shape a companion author will
-   * reach for, and it is the shape the pending-answer rule above cannot cover: that rule shares
-   * an answer between two navigations CORE raised, and this is the companion asking a DIFFERENT
-   * question from inside the answer to the first one. Both cases below drive it through the rail
-   * click a GM actually makes, because the outer navigation has to be a real one for the inner
-   * request to be nested inside anything.
-   */
+  /** THE GUARD CALLING BACK INTO THE SEAM IT IS ANSWERING (issue 1332 review). */
   async function mountThreeTabCompanion() {
     const registry = createManagerExtensionsRegistry();
     const mounts = [];
@@ -1891,9 +1792,7 @@ export function registerDowntimeCases() {
       return false;
     });
 
-    // Before the refusal existed this recursed without bound: the redirect asked the same guard,
-    // which redirected again. The test would not have failed an assertion — it would have blown
-    // the stack, which is the sort of defect a companion meets as a frozen Manager.
+    // Before the refusal existed this recursed without bound.
     downtimeSubitem('crew').click();
     await settleRouteExit();
 
@@ -1909,10 +1808,7 @@ export function registerDowntimeCases() {
     let redirect;
     mounts[0].onBeforeNavigate(() => {
       calls += 1;
-      // The CONDITIONAL redirect, which is worse than the unbounded one: it terminates, so it
-      // ships. Nested, the second call would allow the inner navigation and commit `writs`
-      // before this first call had returned its veto — leaving the GM moved by a decision that
-      // then came back `false`, and moved somewhere neither they nor the guard asked for.
+      // The CONDITIONAL redirect, which is worse than the unbounded one: it terminates.
       if (calls > 1) return true;
       redirect = mounts[0].navigateToTab('writs');
       return false;
@@ -1960,8 +1856,7 @@ export function registerDowntimeCases() {
     await settleRouteExit();
     assert.equal(mounts.length, 2, 'the GM went somewhere, and the first mount ended');
 
-    // The retired context, exactly as a companion would still be holding it: a pending promise
-    // that resolved late, a data listener nobody unsubscribed.
+    // The retired context, exactly as a companion would still be holding it.
     assert.equal(mounts[0].navigateToTab('ledger'), false);
     await settleRouteExit();
     assert.equal(
@@ -1982,10 +1877,7 @@ export function registerDowntimeCases() {
   it('reaches the tabs this provider registered, and nothing else', async () => {
     const mounts = await mountGuardedCompanion();
 
-    // `tracking` and `settings` are CORE'S OWN preview tab ids — real Downtime tabs, and not
-    // ones this provider declared. They are the case that separates "resolved from the
-    // registered provider" from "resolved from whatever Core would render", which a made-up id
-    // could not tell apart.
+    // `tracking` and `settings` are CORE'S OWN preview tab ids — real Downtime tabs.
     assert.equal(mounts[0].navigateToTab('tracking'), false);
     assert.equal(mounts[0].navigateToTab('settings'), false);
     assert.equal(mounts[0].navigateToTab('ledger-2'), false, 'and an id that exists nowhere');
@@ -1994,8 +1886,7 @@ export function registerDowntimeCases() {
     assert.equal(managerRoute(), 'world-downtime', 'no Core route is reachable through the seam');
     assert.equal(mounts.length, 1, 'and nothing remounted on the way to refusing');
 
-    // MALFORMED INPUT IS THE OTHER RULING, and it throws rather than answering: an empty or
-    // non-string id can never be a runtime question the way a conditional tab can.
+    // MALFORMED INPUT IS THE OTHER RULING, and it throws rather than answering.
     for (const malformed of [undefined, null, '', '   ', 7, ['crew']]) {
       assert.throws(
         () => mounts[0].navigateToTab(malformed),
@@ -2124,11 +2015,7 @@ export function registerDowntimeCases() {
       assert.deepEqual(Object.keys(context).sort(compareStrings), [
         'craftingSystemId',
         'isGM',
-        // The runtime route-chrome channel is FUNCTIONS on the frozen context, never mutable
-        // fields: the context stays frozen and its identity — which is what the host keys a
-        // remount on — never moves when a companion restates its chrome.
-        // Issue 1332 — the fourth runtime channel, and the only one that MOVES the GM rather
-        // than restating what is on screen around them.
+        // The runtime route-chrome channel is FUNCTIONS on the frozen context.
         'navigateToTab',
         'onBeforeNavigate',
         'onRouteReselect',
@@ -2233,14 +2120,6 @@ export function registerDowntimeCases() {
   });
 
   // -- Downtime rail tab badges (issue 1302) --------------------------------------------
-  //
-  // A companion tab may carry `{ count, accessibleName }`, and `setWorldNavTabBadge` restates
-  // one at runtime with no mount and no remount. Every fixture here attaches badges through
-  // `downtimeProvider`'s `tab(id)` decorator or through a case-local provider, and NEVER by
-  // adding one to the factory's default tab literal: that literal is the fixture the shipped
-  // installed-chip case registers on the `systems` route with the group closed, which is
-  // precisely the state a nonzero rollup changes, and a default badge would suppress the very
-  // chip that case asserts.
 
   const downtimeBadge = (tabId) => target.querySelector(`[data-world-downtime-badge="${tabId}"]`);
   const downtimeRollup = () => target.querySelector('[data-world-downtime-badge-total]');
@@ -2248,8 +2127,7 @@ export function registerDowntimeCases() {
   const downtimePremiumState = () =>
     target.querySelector('[data-world-nav-premium]')?.dataset.worldNavPremiumState;
 
-  // AC-14's fixture: three rendered tabs, registered badges of 3 on `ledger` and 2 on `crew`,
-  // and `writs` carrying none — so the total is 5 and an un-badged tab has to contribute 0.
+  // AC-14's fixture: three rendered tabs.
   function badgedDowntimeProvider(mounts = [], badges = { ledger: 3, crew: 2 }) {
     return downtimeProvider({
       prefix: 'Guild',
@@ -2362,10 +2240,7 @@ export function registerDowntimeCases() {
 
   it('AC-12 — a badge is a DESCRIPTION with a verbatim name, never part of the sub-item’s name', async () => {
     useShippedLocalization();
-    // The fixture's `accessibleName` is a LIVE lang key, and the rendered value must be that
-    // key. A fixture string that is not a real key passes against the mutation
-    // `aria-label={text(badge.accessibleName, badge.accessibleName)}`, because `text` returns
-    // its fallback for anything that does not resolve — so only a resolvable key discriminates.
+    // The fixture's `accessibleName` is a LIVE lang key.
     const VERBATIM_KEY = 'FABRICATE.Admin.Manager.World.Downtime.Nav';
     const registry = createManagerExtensionsRegistry();
     registry.publicApi.registerWorldNavProvider(
@@ -2526,8 +2401,7 @@ export function registerDowntimeCases() {
         'the parent’s single trailing track carries EITHER the chip or the rollup, never both'
       );
 
-      // The parent's `aria-label` replaces its subtree, so a `role="img"` rollup inside it
-      // would be silent — the same gap that already silences the PREMIUM chip.
+      // The parent's `aria-label` replaces its subtree.
       const visibleLabel = parent.querySelector('.manager-nav-label').textContent.trim();
       assert.equal(parent.getAttribute('aria-label'), 'Downtime, 5 updates');
       assert.ok(
@@ -2573,9 +2447,7 @@ export function registerDowntimeCases() {
           '`!railGroupExpanded.worldDowntime`: on a collapsed rail the submenu is hidden and ' +
           'the rollup is the group’s only surviving signal'
       );
-      // Deliberately nothing about the sub-item badges: happy-dom applies no stylesheet, so
-      // `.manager-nav-submenu`'s `display: none` is invisible to it and those nodes are still
-      // in the DOM. That claim belongs in the real-browser layout suite, not here.
+      // Deliberately nothing about the sub-item badges: happy-dom applies no stylesheet.
     });
 
     it('cell 4 — a provider with no badges renders no rollup and keeps its chip', async () => {
@@ -2628,10 +2500,7 @@ export function registerDowntimeCases() {
     });
 
     it('cell 6 — core-fallback renders no rollup and keeps the gold preview chip', async () => {
-      // The CHEAP SECONDARY to AC-15, not the decisive form: Core's preview tabs are a frozen
-      // literal declaring no badge, so this state is unreachable by a registered badge and a
-      // client-mount assertion about it would pass against the guard deleted outright. The
-      // source contract in `manager-contract.test.js` is what actually pins the branch.
+      // The CHEAP SECONDARY to AC-15, not the decisive form.
       mountDowntimeManager([], {}, {}, { managerExtensions: createManagerExtensionsRegistry() });
       await settleDowntimeProvider();
 
@@ -2643,11 +2512,6 @@ export function registerDowntimeCases() {
   // AC-15, the reachable half. The source contract in `manager-contract.test.js` pins that
   // both render sites are inside `downtimeCoreFallback === false`; this is the state that
   // proves the guard is doing work rather than guarding an impossibility.
-  //
-  // A provider whose mount threw KEEPS its registration, so the registry still holds
-  // `downtime` while Core renders its own preview rows — and `downtimeProvider()`'s default
-  // ids are Core's own four, identical in content and order to `CORE_DOWNTIME_PREVIEW_TAB_IDS`.
-  // So a runtime badge really can be stored against an id Core is at that moment rendering.
   it('AC-15 — a runtime badge stored while a mount is faulted never reaches Core’s preview row', async () => {
     useShippedLocalization();
     const registry = createManagerExtensionsRegistry();
@@ -2740,14 +2604,8 @@ export function registerDowntimeCases() {
   });
 
   // -- The World > Downtime experimental gate (issue 1257) ------------------------------
-  //
-  // The route hosts the unreleased premium Downtime Studio, so until that ships it is visible
-  // and reachable only behind `fabricate.experimentalFeatures`. These cases own the gate
-  // itself; every other Downtime case in this file opens it through `mountDowntimeManager`.
 
-  // Everything the rail renders for Downtime, as one list, so the hidden and shown cases are
-  // literally the same claim with opposite polarity rather than two hand-kept lists that could
-  // drift into asserting different subsets.
+  // Everything the rail renders for Downtime, as one list.
   const DOWNTIME_RAIL_PARTS = [
     ['[data-world-downtime-section]', 'the group'],
     ['#manager-world-nav-downtime', 'the parent row'],
@@ -2759,9 +2617,7 @@ export function registerDowntimeCases() {
     for (const [selector, label] of DOWNTIME_RAIL_PARTS) {
       assert.ok(!target.querySelector(selector), `${label} must not render behind a shut gate`);
     }
-    // The submenu, its padlocks and the premium callout are children of the group, so they go
-    // with it; asserted anyway, because "it is a child today" is the sort of fact a later
-    // refactor moves without noticing.
+    // The submenu, its padlocks and the premium callout are children of the group.
     assert.ok(!target.querySelector('[data-world-downtime-submenu]'), 'no submenu');
     assert.ok(!target.querySelector('[data-world-downtime-lock]'), 'no padlocks');
     assert.ok(!target.querySelector('[data-world-downtime-callout]'), 'no premium callout');
@@ -2813,10 +2669,6 @@ export function registerDowntimeCases() {
   /**
    * Turn the world setting off underneath the mounted Manager.
    *
-   * The real `adminStore` republishes `viewState` when a setting moves, so this is the shape
-   * production has — NOT a remount, which could not reproduce a flag flipping under a GM who
-   * is already standing somewhere.
-   *
    * @param {boolean} enabled The new value of `fabricate.experimentalFeatures`.
    */
   async function setExperimentalFeatures(enabled) {
@@ -2854,20 +2706,7 @@ export function registerDowntimeCases() {
     return { mounts, cleanups, unregister };
   }
 
-  /**
-   * THE SETTING MOVING UNDER A STANDING GM MUST NOT TOUCH THE PANEL (issue 1257).
-   *
-   * The gate is read by the rail group and the two route entries, and DELIBERATELY not by
-   * `normalizedActiveView`. That omission is the whole of this behaviour: `currentView` is a
-   * `$derived`, so a gate read in the normalizer would resolve the route away in the same flush
-   * the setting moved in, unmount the extension host, and run a mounted companion's cleanup —
-   * destroying unsaved work without ever consulting the `onBeforeNavigate` guard that every
-   * other exit from this route honours. A GM's in-progress edit is not ours to discard because a
-   * setting changed, so the panel stays put and the GM leaves it by an ordinary guarded exit.
-   *
-   * This case is a REGRESSION FENCE around that omission. Reintroducing the gate read in the
-   * normalizer — which looks like tightening the gate — turns it red.
-   */
+  /** THE SETTING MOVING UNDER A STANDING GM MUST NOT TOUCH THE PANEL (issue 1257). */
   it('leaves an open companion panel alone when the setting moves under it', async () => {
     const { mounts, cleanups } = await standOnCompanionDowntime();
     const asked = [];
@@ -2898,8 +2737,7 @@ export function registerDowntimeCases() {
     assert.deepEqual(asked, [], 'and nothing prompted either — this is not a navigation at all');
     assertDowntimeRailAbsent();
 
-    // THE WAY OUT IS UNCHANGED. The rail entry is gone, so the GM leaves by any other control,
-    // and that is the ordinary guarded exit it always was — guard consulted, refusal honoured.
+    // THE WAY OUT IS UNCHANGED. The rail entry is gone.
     worldNavItem('parties').click();
     await settleRouteExit();
     assert.deepEqual(asked, ['route'], 'the next navigation still consults the same live guard');
@@ -2927,8 +2765,7 @@ export function registerDowntimeCases() {
     );
     assertDowntimeRailAbsent();
 
-    // AND CANNOT RETURN. The rail entry is gone and both entries refuse, which is what makes the
-    // route unreachable without the normalizer having to police a token nothing can produce.
+    // AND CANNOT RETURN. The rail entry is gone and both entries refuse.
     assert.ok(!target.querySelector('[data-world-downtime-item]'), 'no sub-item survives to click');
     assert.equal(managerRoute(), 'world');
   });
@@ -2949,8 +2786,7 @@ export function registerDowntimeCases() {
     console.warn = (...args) => warnings.push(args);
     let unregister;
     try {
-      // A companion registers at `ready` and cannot know this GM's setting, so registration
-      // must behave exactly as it does with the gate open.
+      // A companion registers at `ready` and cannot know this GM's setting.
       assert.doesNotThrow(() => {
         unregister = registry.publicApi.registerWorldNavProvider(
           downtimeProvider({
@@ -2983,10 +2819,6 @@ export function registerDowntimeCases() {
     const { mounts, cleanups } = await standOnCompanionDowntime();
 
     // The gate does not evict a standing GM, which is what makes this state reachable at all:
-    // a LIVE mount asking for a route Core will no longer open. Neither of the seam's other
-    // refusals can answer it — the context is live, the provider is still registered, and
-    // `crew` is still one of its own tabs — so the availability refusal is the only thing
-    // between a companion and a `true` reporting a move that never happened.
     await setExperimentalFeatures(false);
     assert.equal(managerRoute(), 'world-downtime', 'the GM is left exactly where they were');
     assert.equal(mounts.length, 1);
@@ -3003,17 +2835,14 @@ export function registerDowntimeCases() {
     const { mounts, cleanups } = await standOnCompanionDowntime();
     const retained = mounts[0];
 
-    // Close the gate, then leave the panel the ordinary way — the gate does not evict a standing
-    // GM, so reaching the state this case is about takes both steps.
+    // Close the gate, then leave the panel the ordinary way.
     await setExperimentalFeatures(false);
     worldNavItem('parties').click();
     await settleRouteExit();
     assert.equal(managerRoute(), 'world');
     assert.deepEqual(cleanups, ['ledger'], 'the mount ended on the way out');
 
-    // A companion may hold its context past the mount that minted it — a pending promise, a
-    // stray data listener — and `requestRemount()` is the one context method whose whole job is
-    // to bring a surface back. It must not bring back a surface the gate has removed.
+    // A companion may hold its context past the mount that minted it — a pending promise.
     assert.doesNotThrow(() => retained.requestRemount());
     await settleRouteExit();
 

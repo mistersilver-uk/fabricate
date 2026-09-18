@@ -1,12 +1,4 @@
-/**
- * The environment routes: the browser, the v2 editor and its validation surfaces.
- *
- * A route module of `manager-mounted.test.js` (issue 1690). It registers its cases INSIDE
- * that file's one `describe` rather than at module scope, so the split keeps the suite
- * name, the compiled manager tree and the one process the 26,709-line file had.
- * `manager-mounted-shared.js` owns the compile and the between-test yield; the mount state
- * below is this module's own, so its locators read its own `target`.
- */
+/** The environment routes: the browser, the v2 editor and its validation surfaces. */
 
 import { afterEach, before, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -28,8 +20,7 @@ let EnvironmentEditViewComponent;
 let mounted;
 let target;
 
-// The locators read `target` through a getter rather than a captured element, because the
-// module remounts per case and half these cases assign `target` themselves.
+// The locators read `target` through a getter rather than a captured element.
 const queries = createManagerQueries(() => target);
 const {
   assertHeaderBackIsGhost,
@@ -85,14 +76,12 @@ export function registerEnvironmentsCases() {
     const gatheringParent = target.querySelector('#manager-nav-gathering');
     assert.equal(gatheringParent.getAttribute('aria-expanded'), 'true');
     assert.equal(gatheringParent.classList.contains('is-active'), false);
-    // The Crafting group also renders (unconditional as of issue 745), so target the
-    // Gathering group specifically rather than the first `.manager-nav-group`.
+    // The Crafting group also renders (unconditional as of issue 745).
     assert.equal(
       gatheringParent.closest('.manager-nav-group').classList.contains('is-expanded'),
       true
     );
-    // The parent count is the sum of records (environments + tasks + events), not
-    // the subitem count. Travel is not among them: it is a WORLD entry (issue 1282).
+    // The parent count is the sum of records (environments + tasks + events).
     assert.equal(gatheringParent.querySelector('.manager-nav-count').textContent.trim(), '5');
     assert.equal(gatheringToggle().getAttribute('aria-label'), 'Collapse gathering menu');
     const gatheringItems = Array.from(target.querySelectorAll('.manager-nav-subitem'));
@@ -598,9 +587,7 @@ export function registerEnvironmentsCases() {
     const inspectorRateInput = inspectorRateEditor.querySelector(
       '.manager-drop-rate-percent input'
     );
-    // Issue 883: the inspector renders the shared `ChanceSlider`, exactly as the drop ROWS
-    // do, so its field is a real number input with the control's own min/max rather than a
-    // text input policed by a local digit regex.
+    // Issue 883: the inspector renders the shared `ChanceSlider`.
     assert.equal(inspectorRateInput.getAttribute('type'), 'number');
     assert.equal(inspectorRateInput.getAttribute('min'), '0');
     assert.equal(inspectorRateInput.getAttribute('max'), '100');
@@ -619,8 +606,7 @@ export function registerEnvironmentsCases() {
     await tick();
     flushSync();
     assert.equal(inspectorRateInput.value, '9');
-    // Out of range clamps rather than being held un-committed until blur — the behaviour
-    // the drop rows have shipped with all along.
+    // Out of range clamps rather than being held un-committed until blur.
     inspectorRateInput.value = '150';
     inspectorRateInput.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
@@ -771,18 +757,7 @@ export function registerEnvironmentsCases() {
     assert.ok(weatherPill.textContent.includes('Clear Sky'));
     assert.ok(weatherPill.querySelector('i.fas.fa-sun'));
 
-    // The three availability add menus are `SearchablePopover`s (issue 1458), and the primitive
-    // PORTALS its open panel to the `.fabricate-manager` host — so an option is no longer a
-    // descendant of the field that anchors it. Every option lookup below therefore goes through
-    // the DOCUMENT, which the per-menu `data-gathering-task-availability-option="<kind>"` hook
-    // keeps unambiguous across the three menus.
-    //
-    // Scoping them to the field instead is not merely stale, it is VACUOUS in the direction that
-    // reports clean: `assert.equal(field.querySelector('[…option…]'), null)` passes because the
-    // panel is somewhere else entirely, not because the option is absent. The one clause that
-    // could not pass that way — the deep-equal on the remaining option LABELS — is what caught
-    // this conversion, and it is why each menu below is read by its labels rather than only by
-    // the absence of the option already chosen.
+    // The three availability add menus are `SearchablePopover`s (issue 1458).
     const availabilityOptions = (kind) =>
       Array.from(document.querySelectorAll(`[data-gathering-task-availability-option="${kind}"]`));
     const availabilityOption = (kind, conditionId) =>
@@ -1060,12 +1035,6 @@ export function registerEnvironmentsCases() {
     // verb of its own little form — the same shape `InlineVocabularyAdd` already paints
     // `manager-button is-primary` — and all three shipped role-less, so they read as the
     // neutral secondary beside the field they complete.
-    //
-    // Addressed by its OWN hook rather than by position. The two condition adds shared one
-    // i18n key and none of the three carried a `data-*` handle, so "the third control in the
-    // row" was the only way to name one, and that is a statement about DOM order rather than
-    // about the control: moving the role onto a neighbouring add would satisfy a positional
-    // assertion and fail this one.
     for (const hook of [
       '[data-gathering-condition-add="timeOfDay"]',
       '[data-gathering-condition-add="weather"]',
@@ -1400,22 +1369,12 @@ export function registerEnvironmentsCases() {
     assert.ok(forestRow.querySelector('.manager-status-toggle'));
     assert.ok(forestRow.querySelector('.manager-environment-action-grid'));
     assert.ok(forestRow.querySelector('[aria-label="Edit Moonlit Forest"]'));
-    // Edit stays the row's own `<IconButton>`; Duplicate and Delete are commands in the shared
-    // overflow menu since issue 1515, so they are read from the portaled panel rather than as two
-    // more buttons in the row. They name the COMMAND, not the row: `ActionMenu`'s `label` is the
-    // `menuitem`'s accessible name as well as its visible text, and the shipped callers that
-    // predate this conversion spell it generically. The row is named by the trigger the menu was
-    // opened from — which this helper addresses by, so the binding is still asserted here, and
-    // the clause below pins that the trigger really does carry the record's name.
+    // Edit stays the row's own `<IconButton>`.
     assert.deepEqual(await rowMenuCommands('[data-environment-id="env-forest"]'), [
       'Duplicate environment',
       'Delete environment',
     ]);
-    // AND THE TRIGGER NAMES THE RECORD (issue 1515, review round 1). The items are generic, so
-    // the ONLY thing telling a screen-reader user which row they are on is the trigger's own
-    // accessible name — and every row announced the identical "Environment actions", which the
-    // route header's action group also announces. Read as a SET of two, because a per-row check
-    // against one expected string passes just as well when every row says the same thing.
+    // AND THE TRIGGER NAMES THE RECORD (issue 1515, review round 1). The items are generic.
     assert.deepEqual(
       [...target.querySelectorAll('.manager-environment-row')].map((row) =>
         row.querySelector('[aria-haspopup="menu"]').getAttribute('aria-label')
@@ -1423,8 +1382,7 @@ export function registerEnvironmentsCases() {
       ['Environment actions for Moonlit Forest', 'Environment actions for Quiet Cavern'],
       'each row menu trigger is named for the record it acts on'
     );
-    // The hover tooltip stays generic: it appears beside the row the pointer is already on, so a
-    // name there restates what the GM can see.
+    // The hover tooltip stays generic: it appears beside the row the pointer is already on.
     assert.deepEqual(
       [...target.querySelectorAll('.manager-environment-row')].map((row) =>
         row.querySelector('[aria-haspopup="menu"]').getAttribute('title')
@@ -1533,13 +1491,6 @@ export function registerEnvironmentsCases() {
     // one rule and are now two, deliberately. The chrome ruling this case was written for is
     // about the TITLE and SUBTITLE: an environment's name and description are not injected
     // there, and the pills render under a fixed heading. That still holds.
-    //
-    // A breadcrumb is a different instrument. It is the only thing on the screen that says WHICH
-    // environment is open — the title says what kind of screen it is, which a GM can already see
-    // — so a trail ending `Edit environment` withholds the one fact only it can carry, and four
-    // environments opened in turn produce four identical trails. The recipe, component and tool
-    // editors have always named their subject; this is the same rule reaching the three editors
-    // that did not.
     assert.equal(target.querySelector('.manager-title').textContent.trim(), 'Edit environment');
     const envEditCrumbs = Array.from(target.querySelectorAll('.manager-breadcrumbs span'));
     assert.equal(
@@ -1547,8 +1498,7 @@ export function registerEnvironmentsCases() {
       'New Gathering Environment',
       'final breadcrumb crumb should name the environment, not the kind of screen'
     );
-    // AND THE TRAIL ABOVE IT IS THE PATH THAT WAS WALKED, group and sub-tab included, rather
-    // than a jump from the system straight to the editor.
+    // AND THE TRAIL ABOVE IT IS THE PATH THAT WAS WALKED, group and sub-tab included.
     assert.deepEqual(
       Array.from(target.querySelectorAll('.manager-breadcrumbs > *'))
         .filter((node) => node.tagName.toLowerCase() !== 'i')
@@ -2277,11 +2227,7 @@ export function registerEnvironmentsCases() {
                 img: 'icons/svg/hazard.svg',
                 dropRate: 10,
               },
-              // `includedNotMatching` (issue #1315): a picked record that does not match its
-              // environment. It COMPOSES — manual mode has no match filter — so it renders as an
-              // Included row here, which is what makes it reachable from the validation deep link
-              // this test follows. It is also the only record-scoped EVENT issue the readiness
-              // evaluator raises, so the "View event" link exists because of this state.
+              // `includedNotMatching` (issue #1315).
               compositionState: 'includedNotMatching',
               runtimeState: 'unavailable',
               evidence: {},
@@ -2296,15 +2242,7 @@ export function registerEnvironmentsCases() {
     await tick();
     flushSync();
 
-    // THE TAB IS THE SHARED SURFACE AS OF ISSUE 1517, and this block is the deep link's
-    // coverage RE-EXPRESSED through the surface's hooks rather than replaced. Every assertion
-    // below the fixture is the one that was here before; these four are what the conversion
-    // added, and each is a claim the old markup could not make.
-    //
-    // The site's own root hook is what makes the rest of them addressable: `data-environment-tab`
-    // travels through `hookAttrs.root`, so the View Lab case that opens this tab, the tab-panel
-    // selectors below and this line all still resolve. `data-editor-validation-surface` is the
-    // primitive's own, emitted ALONGSIDE it rather than instead of it.
+    // THE TAB IS THE SHARED SURFACE AS OF ISSUE 1517.
     const surface = target.querySelector('[data-environment-tab="validation"]');
     assert.ok(
       surface.hasAttribute('data-editor-validation-surface'),
@@ -2330,11 +2268,7 @@ export function registerEnvironmentsCases() {
       'the counts rail reports six satisfied checks and the three issues, none of them blocking'
     );
 
-    // `info` COLLAPSES TO `warn` IN THIS TAB'S ROW BUILDER, and both halves are asserted. The
-    // ROW takes the amber word because the surface has only three; the row's own hook keeps the
-    // DOMAIN severity `environmentReadiness.js` emitted, which is unedited. Fed `info` verbatim
-    // the row would fall through to `statusIcons.pass` — a green tick beside a note saying the
-    // record composes anyway — and its pill would render the literal string `undefined`.
+    // `info` COLLAPSES TO `warn` IN THIS TAB'S ROW BUILDER.
     const staleRow = surface.querySelector('[data-issue="staleIncluded"]');
     assert.ok(Boolean(staleRow), 'the not-matching included event still raises its note');
     assert.ok(
@@ -2350,12 +2284,6 @@ export function registerEnvironmentsCases() {
     // bespoke `manager-environment-issue-action` class it used to be found by styled nothing
     // in any theme — it was a test selector wearing a style class's clothes — and matching on
     // `textContent` could not tell the two deep links apart except by the words on them.
-    //
-    // Audit row 44's forgotten role, asserted on BOTH deep links by name. Same reasoning as
-    // the system overview's: a "go and look at that" link repeated down an issue list, beside
-    // a severity chip that is meant to be the loud thing. Addressing each by its record kind
-    // is what makes the mutation proof real — moving `role="ghost"` onto a neighbouring
-    // control reds this, where "the validation tab contains a ghost" would not.
     for (const kind of ['event', 'task']) {
       const action = target.querySelector(`[data-environment-issue-action="${kind}"]`);
       assert.ok(Boolean(action), `the validation tab renders a View ${kind} deep link`);
@@ -2367,11 +2295,7 @@ export function registerEnvironmentsCases() {
         action.classList.contains('is-ghost'),
         `the View ${kind} link takes the ghost role, got ${action.className}`
       );
-      // TWO VERBS DOWN ONE LIST, which is what `row.viewLabel` exists for: the surface's own
-      // `viewLabel` is a single scalar, so a conversion that ignored the per-row override would
-      // announce both deep links as one word. The harness localizer is the identity, so the
-      // rendered text IS the key each row carried — which is the sharpest available form of this
-      // assertion, because a collapsed label would show one key on both.
+      // TWO VERBS DOWN ONE LIST, which is what `row.viewLabel` exists for.
       assert.ok(
         action.textContent.includes(kind === 'event' ? 'ViewEvent' : 'ViewTask'),
         `the View ${kind} link keeps its own verb, got ${action.textContent.trim()}`
@@ -2541,17 +2465,7 @@ export function registerEnvironmentsCases() {
     assert.deepEqual(
       validationBadges.map((node) => node.textContent.trim()),
       ['2', '4'],
-      // TWO blocking, not three (issue #1315): `noAvailableTasks` and `activeNoComposition`. The
-      // third used to be `staleIncluded` on the not-matching event, and that is now an `info`
-      // note — the record composes deliberately, so refusing to enable the environment over it
-      // told the GM to undo what manual mode invites.
-      //
-      // AND FOUR WARNINGS, WHERE THIS READ 2 BEFORE ISSUE 1517's REVIEW ROUND. The badge counted
-      // `severity === 'warning'` — two issues — while the Validation tab it badges counted
-      // `!== 'critical'`, and drew a row per readiness CHECK besides. The four are those two
-      // warnings, the `info` note the tab has always shown in its Warnings tile, and the one
-      // unsatisfied readiness check (`hasAvailableTask`) that nothing badged at all. Both numbers
-      // now come from `countReadiness`, so the badge cannot report a state the tab contradicts.
+      // TWO blocking, not three (issue #1315).
       'validation badges should show counts only'
     );
     assert.equal(
@@ -2581,13 +2495,6 @@ export function registerEnvironmentsCases() {
   });
 
   // ── THE RAIL, THE VERDICT AND THE ROWS ARE ONE READING (issue 1517, review r1) ─────────────
-  //
-  // Three screens report an environment's validation state — the Validation tab's counts rail and
-  // verdict, the editor tab strip's badge, and the summary inspector's chips — and they counted
-  // three different populations under two definitions of "warning". The three cases below are the
-  // states where that showed, and no fixture in this file reached any of them: the deep-link
-  // fixture above satisfies every check and raises three issues, so its 6/3/0 rail was the same
-  // number either way.
   const environmentDraftWith = (overrides) => ({
     id: 'env-forest',
     craftingSystemId: 'alchemy',
@@ -2634,9 +2541,7 @@ export function registerEnvironmentsCases() {
   const verdict = () => target.querySelector('[data-editor-validation-summary]');
 
   it('counts an unsatisfied check that raises NO issue, and does not call it all clear', async () => {
-    // THE REPRO. Only `hasAvailableTask` pairs with an issue, so a missing description and a
-    // missing danger level are amber ROWS that raised nothing — and the rail counted issues. The
-    // GM saw two amber rows under "Warnings: 0" and a green "All clear" verdict above them.
+    // THE REPRO. Only `hasAvailableTask` pairs with an issue.
     mountEnvironmentEditor(
       environmentDraftWith({ description: '', dangerLevel: '' }),
       {
@@ -2672,9 +2577,7 @@ export function registerEnvironmentsCases() {
   });
 
   it('badges an INFO-only environment with the same warnings count the rail shows', async () => {
-    // `info` collapses to the Warnings tile inside the tab — there is no Info tile and the count
-    // vocabulary is closed — but the badge counted `severity === 'warning'`, so this environment
-    // showed NO badge at all over a rail reading "Warnings: 1".
+    // `info` collapses to the Warnings tile inside the tab.
     mountEnvironmentEditor(environmentDraftWith({}), {
       compositionMode: 'manual',
       counts: { availableTasks: 1, availableEvents: 1, includedNotMatchingEvents: 1 },
@@ -2704,17 +2607,6 @@ export function registerEnvironmentsCases() {
   });
 
   // ── THE ROW ACTION RE-HOMES THE KEYBOARD AND SAYS WHERE (issue 1517, docs round) ───────────
-  //
-  // This editor wired half of the row action: it selected the record and switched the tab, and
-  // stopped. Activating a row therefore unmounted the very View button that was pressed and
-  // dropped focus onto `<body>` — where `KeyboardManager#hasFocus` is false, so Space pauses the
-  // game, the arrows pan the canvas behind the window and Tab walks out of the application. It is
-  // now the SIXTH host of the shared action.
-  //
-  // ITS ROWS ADDRESS A RECORD, NOT A CONTROL, which is what makes this host's shape different
-  // from the other five and worth its own mounted proof: there is no `data-validation-target`
-  // anywhere on the destination to resolve, so the resolver answers `null` on every activation and
-  // the PANEL fallback is the whole of the focus move here rather than a route-only special case.
   it('lands the keyboard in the destination panel and announces the record it selected', async () => {
     mountEnvironmentEditor(environmentDraftWith({}), {
       compositionMode: 'manual',
@@ -2737,10 +2629,7 @@ export function registerEnvironmentsCases() {
     assert.equal(region.textContent.trim(), '', 'and it is empty until an action has an outcome');
 
     target.querySelector('[data-environment-issue-action="event"]').click();
-    // A MACROTASK, not a microtask. The focus move is two `queueMicrotask` hops deep — one in
-    // `announceAfterFocusMove`, so Svelte has flushed the route it just wrote, and one inside
-    // `focusValidationTarget`, for the same reason — so an assertion made after `await tick()`
-    // alone reads the pre-hop `document.activeElement` and fails for the wrong reason.
+    // A MACROTASK, not a microtask. The focus move is two `queueMicrotask` hops deep.
     await new Promise((resolve) => setTimeout(resolve, 0));
     flushSync();
 
@@ -2750,9 +2639,7 @@ export function registerEnvironmentsCases() {
       'the route ran first, so the panel the keyboard is about to land in is the Events one'
     );
     const panel = target.querySelector('.manager-environment-tab-panel');
-    // `assert.ok(a === b)` rather than `assert.strictEqual`: on failure `node:assert` serialises a
-    // mounted happy-dom element to build its diff and walks its circular tree until the heap dies,
-    // which surfaces a two-millisecond assertion failure as an unattributable OOM.
+    // `assert.ok(a === b)` rather than `assert.strictEqual`.
     assert.ok(
       document.activeElement === panel,
       'the destination PANEL took the keyboard. Without it focus rests on `<body>`, where every ' +

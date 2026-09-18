@@ -1,11 +1,6 @@
 /**
  * The ONE compiled manager tree the thirteen `manager-mounted.test.js` route modules mount
  * against, plus the helpers more than one of them needs (issue 1690).
- *
- * `node --test` runs a process per `*.test.js`, so the route modules are plain `.js` imported by
- * that single entry: one process, one compile of the manager root. The compile is memoised here
- * rather than repeated in each module's `before`, and `disposeManagerSuite` runs once, from the
- * entry, after every module's cases have.
  */
 import assert from 'node:assert/strict';
 import { existsSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs';
@@ -110,9 +105,7 @@ export async function settleBetweenTests() {
   await new Promise((settled) => setImmediate(settled));
 }
 
-// The selectors are READ FROM THE REGISTRY rather than restated, because a restated copy
-// is the drift this pins against: it would keep passing after the case it mirrors changed.
-// The mounted root renders `.fabricate-manager`, so each case's selector runs verbatim.
+// The selectors are READ FROM THE REGISTRY rather than restated.
 export const labCaseSelector = (id) => {
   const viewCase = VIEW_LAB_CASES.find((entry) => entry.id === id);
   assert.ok(Boolean(viewCase), `no View Lab case "${id}" — was it renamed?`);

@@ -6,9 +6,7 @@ import {
   withFabricateLifecycleReplay,
 } from '../helpers/extension-composition-harness.js';
 
-// Deliberately NOT Core's four tab ids, and deliberately not four of them: the public seam
-// a companion reaches through `game.fabricate.api` must accept the tab set the companion
-// declares, and a fixture that mirrors Core's list cannot tell the two apart.
+// Deliberately NOT Core's four tab ids, and deliberately not four of them.
 function provider(id = 'downtime') {
   return {
     apiVersion: 1,
@@ -32,15 +30,13 @@ test('the production init/ready replay preserves a provider registered through g
   await withFabricateLifecycleReplay(async ({ world, init, ready }) => {
     let unregister = null;
     try {
-      // Prove the public seam as a companion sees it: init binds `game.fabricate.api`, then a
-      // companion registers before ready rebinds the live global.
+      // Prove the public seam as a companion sees it: init binds `game.fabricate.api`.
       globalThis.game.fabricate = undefined;
       await init();
       const initApi = globalThis.game.fabricate.api.managerExtensions;
       unregister = initApi.registerWorldNavProvider(provider());
 
-      // Model the late-evaluated-entry recovery that `ready` owns: the init-bound facade has
-      // disappeared, but the page-session registry still contains the companion provider.
+      // Model the late-evaluated-entry recovery that `ready` owns.
       globalThis.game.fabricate = { stale: true };
       await ready();
       const readyApi = globalThis.game.fabricate.api.managerExtensions;
@@ -60,8 +56,7 @@ test('the production init/ready replay preserves a provider registered through g
         /already registered/,
         'the provider registered between the actual lifecycle callbacks must survive ready'
       );
-      // A second surface is a second slot, not a conflict: the registry is keyed by surface
-      // id, so a companion claiming a Manager surface Core has never heard of is accepted.
+      // A second surface is a second slot, not a conflict.
       const unregisterOtherSurface = readyApi.registerWorldNavProvider(provider('crew-quarters'));
       unregisterOtherSurface();
 
@@ -94,16 +89,10 @@ test('the production manager closes a mounted companion before ApplicationV2 rem
 /**
  * Close one production manager with a companion navigation guard installed.
  *
- * A helper rather than three inlined `captureCloseOrdering` calls: the three cases below
- * differ only in what the guard answers and what `close` is passed, and three copies of the
- * same eight-line block is the near-identical duplication the SonarCloud gate counts against
- * `tests/**` exactly as it does against `src/`.
- *
  * @param {object} options Scenario inputs.
  * @param {Function} [options.guard] The value the app's registered companion guard returns.
  * @param {object} [options.closeOptions] Options passed to `close()`.
  * @returns {Promise<{lifecycle: Array, asked: string[]}>} What happened, and whether the
- *   companion was consulted at all.
  */
 async function closeWithCompanionGuard({ guard, closeOptions }) {
   const asked = [];
@@ -151,15 +140,7 @@ test('a companion that allows the close changes nothing about it', async () => {
   ]);
 });
 
-/**
- * THE FORCE EXEMPTION, and why it is not negotiable.
- *
- * Foundry's own lifecycle teardown and the repository's smoke harness both close with
- * `force`, in contexts where no confirmation dialog can be serviced. A guard that ran there
- * would be asking a question nothing can answer — the smoke harness would hang on it, and a
- * Foundry teardown would leave a window that refuses to die. So a forced close skips the
- * companion exactly as it already skips Core's own three dirty-draft guards.
- */
+/** THE FORCE EXEMPTION, and why it is not negotiable. */
 test('a forced close never consults the companion, however dirty it is', async () => {
   const { lifecycle, asked } = await closeWithCompanionGuard({
     guard: () => false,

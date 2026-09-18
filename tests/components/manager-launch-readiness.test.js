@@ -1,27 +1,6 @@
 /**
  * Regression — the Crafting System Manager must not stall on "still loading" after
  * a missed `init` hook, and its deferred-open gate must be replay-safe.
- *
- * Real-world failure (Vite dev, esp. with DevTools open): the source module evaluated
- * AFTER Foundry's `init` event, so the `init` hook callback — the ONLY place that set
- * `game.fabricate` — never ran. The `ready` hook still ran, logged "Fabricate | Ready"
- * and fired the one-shot `fabricate.ready` Hook. By the time the GM clicked the
- * manager button, `game.fabricate` was undefined AND the readiness Hook was spent, so
- * `show()` warned, latched `_pendingReadyOpen`, and every later click repeated the
- * warning forever.
- *
- * Two fixes, pinned here:
- *  1. `main.js` binds the global from BOTH `init` and `ready` (idempotent helper), so
- *     a missed `init` can no longer leave `game.fabricate` undefined.
- *  2. `show()` prefers the replay-safe `whenReady()` promise (resolves even if startup
- *     already finished) and clears the latch + re-checks readiness before opening, so
- *     a spent/early/stale signal can never permanently latch the gate.
- *
- * The real classes extend `SvelteApplicationMixin(ApplicationV2)` / import `.svelte`
- * roots, so they cannot be `new`'d under `node:test`. As with the sibling
- * `interactable-browser-app-show` suite, this pins the contract two ways: a faithful
- * re-implementation harness driven by a fake, plus source-drift guards on the shipped
- * code.
  */
 
 import test from 'node:test';
@@ -37,12 +16,7 @@ const appSource = readFileSync(
 );
 const mainSource = readFileSync(resolve(__dirname, '../../src/main.js'), 'utf8');
 
-/**
- * A faithful harness mirroring the static `show()` deferred-open decision: a fake
- * `game.fabricate` whose readiness flag and `whenReady()` promise can be flipped
- * independently (so we can model the "promise resolved but not yet ready" stale
- * signal), and a fake app that counts constructs/renders.
- */
+/** A faithful harness mirroring the static `show()` deferred-open decision. */
 function makeHarness({ readyAtStart = false } = {}) {
   let constructs = 0;
   let resolveReady;
@@ -132,8 +106,7 @@ test('deferred open fires once Fabricate finishes startup (whenReady resolves)',
 });
 
 test('a launch when startup already finished opens immediately (replay-safe)', () => {
-  // The spent-Hook scenario: by click time, readiness is already true. The old
-  // one-shot Hook would never fire again; the direct readiness check opens now.
+  // The spent-Hook scenario: by click time.
   const h = makeHarness({ readyAtStart: true });
 
   const app = h.FakeApp.show();
