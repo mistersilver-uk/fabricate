@@ -4,6 +4,8 @@
 // gathering-task interactable carries NO per-interactable node pool (the environment's
 // `nodeRuntime[taskId]` owns depletion and respawn), so no node count or ETA is formatted here.
 
+import { numberOrNull } from '../utils/scalars.js';
+
 const VISUAL_STATUS = Object.freeze({
   ok: { severity: 'ok', icon: 'fa-link', key: 'FABRICATE.Canvas.Interactable.Config.VisualOk', fallback: 'Marker linked.' },
   missing: { severity: 'missing', icon: 'fa-link-slash', key: 'FABRICATE.Canvas.Interactable.Config.VisualMissing', fallback: 'Linked marker is missing.' },
@@ -66,10 +68,4 @@ export function describeActivationGate(state, { now } = {}) {
     return { status: 'cooldown', key: 'FABRICATE.Canvas.Interactable.Config.GateCooldown', fallback: 'On cooldown' };
   }
   return { status: 'active', key: 'FABRICATE.Canvas.Interactable.Config.GateActive', fallback: 'Active' };
-}
-
-function numberOrNull(value) {
-  if (value === null || value === undefined || value === '') return null;
-  const number = Number(value);
-  return Number.isFinite(number) ? number : null;
 }

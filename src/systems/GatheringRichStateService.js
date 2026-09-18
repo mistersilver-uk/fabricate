@@ -1,6 +1,11 @@
 import { authoredCheckModifierIds } from '../utils/checkModifierPicks.js';
 import { authoredFailureOutcome } from '../utils/gatheringFailureOutcome.js';
-import { normalizeConditionId, normalizeTag, normalizeTagList } from '../utils/scalars.js';
+import {
+  laxNumberOrNull as numberOrNull,
+  normalizeConditionId,
+  normalizeTag,
+  normalizeTagList,
+} from '../utils/scalars.js';
 
 import { chatModeOption } from './bulkChatVisibility.js';
 import { resolveModifierLibrary } from './characterLibraries.js';
@@ -2977,11 +2982,6 @@ function clampDropRate(value) {
 function stringOrFallback(value, fallback) {
   const normalized = String(value ?? '').trim();
   return normalized || fallback;
-}
-
-function numberOrNull(value) {
-  const number = Number(value);
-  return Number.isFinite(number) ? number : null;
 }
 
 function plainObjectOrNull(value) {

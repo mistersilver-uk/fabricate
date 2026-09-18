@@ -3,12 +3,7 @@
  * loosely-typed values out of Foundry flag data — so it lives here once rather than per module.
  */
 
-/** A finite number, or null. Empty, nullish and non-finite inputs collapse together. */
-export function numberOrNull(value) {
-  if (value == null || value === '') return null;
-  const number = Number(value);
-  return Number.isFinite(number) ? number : null;
-}
+export { numberOrNull } from '../../utils/scalars.js';
 
 /**
  * A plain array from a V13 embedded collection (`.contents`, `.values()`) or an already-plain

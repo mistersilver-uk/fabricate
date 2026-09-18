@@ -7,7 +7,7 @@
  * duplication gate forbids a second copy in the builder).
  */
 
-import { cloneJson } from '../utils/scalars.js';
+import { cloneJson, stringOrEmpty, stringOrNull } from '../utils/scalars.js';
 
 /**
  * Sentinel `taskId` prefix persisted on an opaque-blind WAITING run in place of
@@ -86,18 +86,6 @@ export function idOf(document) {
 }
 
 /**
- * Trim a value to a non-empty string, or null when empty / nullish.
- *
- * @param {*} value
- * @returns {string|null}
- */
-export function stringOrNull(value) {
-  if (value === null || value === undefined) return null;
-  const normalized = String(value).trim();
-  return normalized || null;
-}
-
-/**
  * Iterate a Foundry collection / array / EmbeddedCollection (scenes, regions,
  * behaviours) tolerantly, mirroring the scan in `interactableMarkerDepletion`.
  * Returns an empty array for nullish input so callers can `for...of` safely.
@@ -111,29 +99,6 @@ export function iterateCollection(collection) {
   if (Array.isArray(collection?.contents)) return collection.contents;
   if (typeof collection?.values === 'function') return collection.values();
   return [];
-}
-
-/**
- * Trim a value to a string, or `''` when nullish. Mirrors `stringOrNull` but
- * never returns null, for fields the listing models render directly.
- *
- * @param {*} value
- * @returns {string}
- */
-export function stringOrEmpty(value) {
-  if (value === null || value === undefined) return '';
-  return String(value).trim();
-}
-
-/**
- * Coerce a value to a finite number, or null when not finite.
- *
- * @param {*} value
- * @returns {number|null}
- */
-export function numberOrNull(value) {
-  const number = Number(value);
-  return Number.isFinite(number) ? number : null;
 }
 
 /**
@@ -345,4 +310,9 @@ export function stripRuntimeSnapshotFromRun(run) {
   return publicRun;
 }
 
-export { cloneJson } from '../utils/scalars.js';
+export {
+  cloneJson,
+  laxNumberOrNull as numberOrNull,
+  stringOrEmpty,
+  stringOrNull,
+} from '../utils/scalars.js';
