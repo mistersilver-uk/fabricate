@@ -29,7 +29,7 @@ globalThis.foundry = {
 };
 
 const { createGatheringResultCreator } = await import('../src/gatheringResultCreation.js');
-const { seededRollClass } = await import('./helpers/seededRoll.js');
+const { seededRollClass, withRoll } = await import('./helpers/seededRoll.js');
 const { itemReceipt } = await import('../src/systems/runHistoryEvidence.js');
 
 const SYSTEM_ID = 'sys-780';
@@ -351,15 +351,13 @@ test('1645: a gathering attempt rolls each amount once across plan() and create(
   const system = { id: SYSTEM_ID, components: COMPONENTS };
   globalThis.fromUuidSync = () => null;
   const { Roll, calls } = seededRollClass({ totals: { '1d4+2': 5, '1d6': 2 } });
-  const previous = globalThis.Roll;
-  globalThis.Roll = Roll;
-  try {
+  await withRoll(Roll, async () => {
     const actor = capturingActor();
     const resultGroups = [
       {
         results: [
-          { componentId: SOURCELESS_COMPONENT.id, quantity: 1, quantityFormula: '1d4+2' },
-          { componentId: SOURCELESS_COMPONENT.id, quantity: 9, quantityFormula: '1d6' },
+          { id: 'ore-row', componentId: SOURCELESS_COMPONENT.id, quantity: 1, quantityFormula: '1d4+2' },
+          { id: 'clay-row', componentId: SOURCELESS_COMPONENT.id, quantity: 9, quantityFormula: '1d6' },
         ],
       },
     ];
@@ -375,19 +373,39 @@ test('1645: a gathering attempt rolls each amount once across plan() and create(
     assert.deepEqual(planned.map((ref) => ref.quantity), [5, 2], 'the plan states the roll');
     assert.deepEqual(planned[0].rolled, { formula: '1d4+2', total: 5 });
     assert.deepEqual(created.map((receipt) => receipt.quantity), [5, 2], 'and the award matches');
-  } finally {
-    if (previous === undefined) delete globalThis.Roll;
-    else globalThis.Roll = previous;
-  }
+    assert.deepEqual(created[0].rolled, { formula: '1d4+2', total: 5 }, 'the receipt carries it too');
+  });
+});
+
+test('1645: a structurally equal clone of the planned row consumes the plan, never a second roll', async () => {
+  const system = { id: SYSTEM_ID, components: COMPONENTS };
+  globalThis.fromUuidSync = () => null;
+  const { Roll, calls } = seededRollClass({ totals: { '1d4+2': 5 } });
+  await withRoll(Roll, async () => {
+    const row = () => ({
+      id: 'ore-row',
+      resultRowId: 'group:ore-row:0',
+      componentId: SOURCELESS_COMPONENT.id,
+      quantity: 1,
+      quantityFormula: '1d4+2',
+    });
+    const creator = createGatheringResultCreator(managerWith(system));
+    // The run persists and reloads between plan and award, so the awarded row is an equal COPY of
+    // the planned one; keyed on identity alone, the amount would be rolled a second time.
+    const planned = await creator.plan({ actor: capturingActor(), system, resultGroups: [{ results: [row()] }] });
+    const created = await creator.create({ actor: capturingActor(), system, resultGroups: [{ results: [row()] }] });
+
+    assert.equal(calls.length, 1, 'ONE roll for one authored row');
+    assert.equal(planned[0].quantity, 5);
+    assert.equal(created[0].quantity, 5, 'the awarded stack is the planned integer');
+  });
 });
 
 test('1645: a gathered amount that rolls to zero creates no item', async () => {
   const system = { id: SYSTEM_ID, components: COMPONENTS };
   globalThis.fromUuidSync = () => null;
   const { Roll } = seededRollClass({ totals: { '1d4-8': -3 } });
-  const previous = globalThis.Roll;
-  globalThis.Roll = Roll;
-  try {
+  await withRoll(Roll, async () => {
     const actor = capturingActor();
     const created = await createGatheringResultCreator(managerWith(system)).create({
       actor,
@@ -398,19 +416,14 @@ test('1645: a gathered amount that rolls to zero creates no item', async () => {
     });
     assert.equal(actor.captured.length, 0, 'nothing is created for an empty award');
     assert.equal(created.length, 0, 'and no receipt claims one was');
-  } finally {
-    if (previous === undefined) delete globalThis.Roll;
-    else globalThis.Roll = previous;
-  }
+  });
 });
 
 test('1645: a planned roll survives the run-item normalizer that rebuilds every entry', async () => {
   const system = { id: SYSTEM_ID, components: COMPONENTS };
   globalThis.fromUuidSync = () => null;
   const { Roll } = seededRollClass({ totals: { '1d4+2': 5 } });
-  const previous = globalThis.Roll;
-  globalThis.Roll = Roll;
-  try {
+  await withRoll(Roll, async () => {
     const [planned] = await createGatheringResultCreator(managerWith(system)).plan({
       actor: capturingActor(),
       system,
@@ -425,8 +438,5 @@ test('1645: a planned roll survives the run-item normalizer that rebuilds every 
     // `normalizeRunItems` rebuilds each entry through `itemReceipt`, which carries only the keys it
     // names — so the journal sees the roll only because the receipt shape carries it (issue 1645).
     assert.deepEqual(itemReceipt(planned).rolled, { formula: '1d4+2', total: 5 });
-  } finally {
-    if (previous === undefined) delete globalThis.Roll;
-    else globalThis.Roll = previous;
-  }
+  });
 });

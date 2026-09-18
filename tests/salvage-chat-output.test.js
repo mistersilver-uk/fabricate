@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { SalvageRunManager } from '../src/systems/SalvageRunManager.js';
-import { attachAwardReceipts } from '../src/systems/runHistoryEvidence.js';
+import { attachAwardReceipts, attachRolledAwards } from '../src/systems/runHistoryEvidence.js';
 import { authoredComplications } from '../src/utils/componentComplications.js';
 
 let chatCreated = [];
@@ -88,6 +88,57 @@ test('_postSalvageChatMessage: success posts a salvage card with source, recover
   assert.ok(content.includes('Prospector Hammer'), 'broken tool by authored name');
   const hammerCount = content.split('Prospector Hammer').length - 1;
   assert.equal(hammerCount, 1, 'the tool is listed once (spared record skipped, no dup)');
+});
+
+test('1645: a rolled recovery states its roll and rides the evaluated Roll on the message', async () => {
+  setupGame();
+  resetChat();
+  const roll = { total: 2, formula: '1d4-2' };
+  const results = attachRolledAwards(
+    attachAwardReceipts(
+      [{ name: 'Iron Shard' }],
+      [{ name: 'Iron Shard', img: 'icons/shard.png', quantity: 2, rolled: { formula: '1d4-2', total: 2 } }]
+    ),
+    [
+      { resultId: 'r1', componentId: 'shard', formula: '1d4-2', total: 2, quantity: 2,
+        rolled: { formula: '1d4-2', total: 2 }, roll, name: 'Iron Shard', img: 'icons/shard.png' },
+      { resultId: 'r2', componentId: 'dust', formula: '1d4-8', total: -4, quantity: 0,
+        rolled: { formula: '1d4-8', total: -4 }, roll: { total: -4, formula: '1d4-8' },
+        name: 'Iron Dust', img: '' },
+    ]
+  );
+
+  await new CraftingEngine({})._postSalvageChatMessage({
+    success: true,
+    actor: { name: 'Akra' },
+    system: systemWithChat(true),
+    component,
+    consumedQuantity: 1,
+    results,
+    usedTools: [],
+  });
+
+  const { content, rolls } = chatCreated[0];
+  assert.equal(rolls.length, 2, 'every evaluated roll rides along, so the dice sound');
+  assert.ok(content.includes('2× Iron Shard'), 'the recovered stack is the rolled integer');
+  assert.ok(content.includes('FABRICATE.Chat.RolledAmount'), 'stated in the shared card treatment');
+  assert.ok(content.includes('Iron Dust'), 'and an empty recovery is its own row');
+});
+
+test('1645: a fixed salvage recovery carries no rolls key at all', async () => {
+  setupGame();
+  resetChat();
+  await new CraftingEngine({})._postSalvageChatMessage({
+    success: true,
+    actor: { name: 'Akra' },
+    system: systemWithChat(true),
+    component,
+    consumedQuantity: 1,
+    results: attachAwardReceipts([{ name: 'Iron Shard' }], [{ name: 'Iron Shard', quantity: 2 }]),
+    usedTools: [],
+  });
+  assert.ok(!('rolls' in chatCreated[0]), 'no dice were rolled, so the message carries none');
+  assert.ok(!chatCreated[0].content.includes('RolledAmount'), 'and the card states no roll');
 });
 
 test('_postSalvageChatMessage: failure posts the reason and the forfeited source', async () => {

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import { GatheringEngine } from '../src/systems/GatheringEngine.js';
 import { routedRoll, routedSystemCheck, terminalHistoryRunManager } from './helpers/gathering.js';
+import { seededRollClass, withRoll } from './helpers/seededRoll.js';
 
 const viewer = { id: 'user-1', isGM: false };
 const gmViewer = { id: 'gm-1', isGM: true };
@@ -802,6 +803,23 @@ test('startAttempt rejects task misconfiguration after tools but before run writ
   assert.deepEqual(result.blockedReasons[0].data.errors, ['Routed gathering task requires a system-level gathering check roll formula']);
   assert.deepEqual(calls.validate, []);
   assertNoRunMutation(calls);
+});
+
+test('1645: startAttempt rejects a rolled result amount that can never award anything', async () => {
+  const { Roll } = seededRollClass({ maxima: { '1d4+1': 5, '1d4 - 10': -6 } });
+  const rolledTask = quantityFormula => task({
+    resultGroups: [{ id: 'group-a', name: 'Iron', results: [{ id: 'ore', componentId: 'ore', quantity: 1, quantityFormula }] }]
+  });
+  await withRoll(Roll, async () => {
+    const start = quantityFormula => makeEngine({ environments: [environment({ tasks: [rolledTask(quantityFormula)] })] })
+      .startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
+
+    const refused = await start('1d4 - 10');
+    assert.equal(refused.accepted, false);
+    assert.deepEqual(codes(refused), ['TASK_MISCONFIGURED']);
+    assert.deepEqual(refused.blockedReasons[0].data.errors, ['Gathering result quantity formula can never award a positive amount']);
+    assert.equal((await start('1d4+1')).accepted, true, 'a rollable amount starts');
+  });
 });
 
 test('startAttempt rejects timed task misconfiguration before waiting run creation', async () => {

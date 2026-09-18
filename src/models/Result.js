@@ -14,6 +14,18 @@ export function normalizeQuantityFormula(value) {
   return text.length > 0 ? text : null;
 }
 
+/** The rollability floor an amount expression must clear, as validation errors; `Roll` is injected,
+ *  and the gathering data boundary applies the same floor through this one function (issue 1645). */
+export function quantityFormulaErrors(quantityFormula, Roll) {
+  if (!quantityFormula || typeof Roll !== 'function') return [];
+  const maximum = maximisedTotal(quantityFormula, Roll);
+  if (maximum === null) return ['quantity formula cannot be rolled'];
+  if (maximum <= 0 && !hasRollDataPath(quantityFormula)) {
+    return ['quantity formula can never award a positive amount'];
+  }
+  return [];
+}
+
 /** An item a recipe produces; a recipe can produce several. */
 export class Result {
   constructor(data = {}) {
@@ -46,14 +58,9 @@ export class Result {
       errors.push('Result quantity must be a positive number');
     }
 
-    if (this.quantityFormula && typeof Roll === 'function') {
-      const maximum = maximisedTotal(this.quantityFormula, Roll);
-      if (maximum === null) {
-        errors.push('Result quantity formula cannot be rolled');
-      } else if (maximum <= 0 && !hasRollDataPath(this.quantityFormula)) {
-        errors.push('Result quantity formula can never award a positive amount');
-      }
-    }
+    errors.push(
+      ...quantityFormulaErrors(this.quantityFormula, Roll).map((error) => `Result ${error}`)
+    );
 
     if (this.propertyMacroUuid !== null && typeof this.propertyMacroUuid !== 'string') {
       errors.push('Property macro UUID must be a string or null');

@@ -133,10 +133,22 @@ export function gatheringRunItemRef(actor, item, quantity = null, componentId = 
 }
 
 export function createGatheringResultCreator(craftingSystemManager) {
-  // `plan()` rolls each amount ONCE per attempt and parks the outcome against the live result row
-  // `create()` is handed, so the journalled plan and the awarded stack are the same number rather
-  // than two independent rolls (issue 1645). A plan-less award resolves in `create()` instead.
-  const planned = new WeakMap();
+  // `plan()` rolls each amount ONCE per attempt and parks the outcome for the row `create()` is
+  // handed, so the journalled plan and the awarded stack are one roll rather than two (issue 1645).
+  // Keyed on the row's own id, because `create()` may be handed a structurally equal CLONE of the
+  // planned task — identity alone would silently re-roll. A plan-less award resolves in `create()`.
+  const plannedById = new Map();
+  const plannedByRow = new WeakMap();
+  const plannedKey = (result) => stringOrNull(result?.resultRowId) ?? stringOrNull(result?.id);
+  const parkPlan = (result, plan) => {
+    const key = plannedKey(result);
+    if (key) plannedById.set(key, plan);
+    else plannedByRow.set(result, plan);
+  };
+  const readPlan = (result) => {
+    const key = plannedKey(result);
+    return key ? plannedById.get(key) : plannedByRow.get(result);
+  };
   const resolveAmount = (result, actor) =>
     resolveRolledAmount(result, actor, { Roll: diceEngine() });
   return {
@@ -156,7 +168,7 @@ export function createGatheringResultCreator(craftingSystemManager) {
       const refs = [];
       for (const award of awards) {
         const { amount, rolled } = await resolveAmount(award.result, actor);
-        planned.set(award.result, { amount, rolled });
+        parkPlan(award.result, { amount, rolled });
         refs.push({
           ...gatheringRunItemRef(actor, award.source, amount ?? 1, award.componentId),
           resultRowId: award.result.resultRowId ?? null, sourceItemUuid: award.source.uuid ?? null,
@@ -182,12 +194,12 @@ export function createGatheringResultCreator(craftingSystemManager) {
       try {
       for (const award of awards) {
         const { result, source, componentId } = award;
-        const { amount } = planned.get(result) ?? (await resolveAmount(result, actor));
+        const { amount, rolled } = readPlan(result) ?? (await resolveAmount(result, actor));
         const quantity = receiptQuantity(amount ?? 1);
         if (quantity === null) throw unconfirmedHistoryError('Invalid gathering award quantity');
         if (quantity === 0) continue;
         const identity = { actorUuid: actor.uuid, componentId, resultRowId: result.resultRowId ?? null,
-          sourceItemUuid: source.uuid ?? null };
+          sourceItemUuid: source.uuid ?? null, ...(rolled && { rolled }) };
 
         const itemData = source.toObject?.() ?? {
           name: source.name ?? 'Gathered Item',

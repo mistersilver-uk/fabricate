@@ -6973,6 +6973,7 @@ export class CraftingEngine {
     if (suppressed || !system || system.features?.chatOutput !== true) return;
 
     const localize = (key) => game.i18n?.localize?.(key) ?? key;
+    const { rolls, emptyAwards } = rolledAwardChatParts(results);
     const consumed =
       Number(consumedQuantity) > 0
         ? [
@@ -6989,7 +6990,7 @@ export class CraftingEngine {
         status: success ? 'succeeded' : 'failed',
         actorName: actor?.name || '',
         componentName: component?.name || '',
-        results: awardReceipts(results),
+        results: [...awardReceipts(results), ...emptyAwards],
         consumed,
         tools: this._resolveBrokenToolChatEntries(usedTools, system),
         rollValue: Number.isFinite(rollValue) ? rollValue : null,
@@ -7004,6 +7005,7 @@ export class CraftingEngine {
       await ChatMessage.create({
         speaker: ChatMessage.getSpeaker({ actor }),
         content,
+        ...(rolls.length > 0 && { rolls }),
       });
     } catch (error) {
       console.error('Fabricate | Failed to post salvage chat message:', error);
@@ -7858,6 +7860,7 @@ export class CraftingEngine {
     // The awarding component id travels alongside each created item without reshaping
     // `resultItems`, which both callers return as `results`.
     const createdRecords = [];
+    const rolledAwards = [];
     const receiptCollector = createItemReceiptCollector();
     try {
       for (const group of resultGroups) {
@@ -7869,7 +7872,7 @@ export class CraftingEngine {
             tools,
             salvageRecipeView,
             checkResult,
-            { receiptCollector }
+            { receiptCollector, rolledAwards }
           );
           // Return each physical Item once while preserving all receipt rows.
           if (created && !resultItems.includes(created)) {
@@ -7881,7 +7884,13 @@ export class CraftingEngine {
       throw receiptCollector.failure(error);
     }
     createdRecords.push(...receiptCollector.snapshot());
-    return { resultItems: attachAwardReceipts(resultItems, createdRecords), createdRecords };
+    return {
+      resultItems: attachRolledAwards(
+        attachAwardReceipts(resultItems, createdRecords),
+        rolledAwards
+      ),
+      createdRecords,
+    };
   }
 
   /** The salvage failure consumption policy, defaulting to `consumeComponentOnFail: true` and

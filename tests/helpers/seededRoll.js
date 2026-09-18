@@ -1,6 +1,8 @@
 // A `Roll` double recording every construction, so a suite can prove an amount resolved ONCE per
-// result. `totals` seeds `evaluate`, `maxima` the `evaluateSync({ maximize: true })` reading the
-// rollability proof takes; a formula named in `unparsable` throws like Foundry's grammar does.
+// result: `totals` seeds `evaluate`, `maxima` the `evaluateSync({ maximize: true })` rollability
+// reading, and a formula named in `unparsable` throws like Foundry's grammar does. `withRoll`
+// installs an engine as the ambient `globalThis.Roll` and restores what was there, deletion
+// included, for the suites proving the production `diceEngine()` read.
 export function seededRollClass({ totals = {}, maxima = {}, unparsable = [] } = {}) {
   const calls = [];
   const seeded = (map, formula) => (Object.hasOwn(map, formula) ? map[formula] : Number.NaN);
@@ -26,4 +28,15 @@ export function seededRollClass({ totals = {}, maxima = {}, unparsable = [] } = 
     }
   }
   return { Roll: SeededRoll, calls };
+}
+
+export function withRoll(Roll, fn) {
+  const previous = globalThis.Roll;
+  globalThis.Roll = Roll;
+  return Promise.resolve()
+    .then(fn)
+    .finally(() => {
+      if (previous === undefined) delete globalThis.Roll;
+      else globalThis.Roll = previous;
+    });
 }
