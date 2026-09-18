@@ -17,6 +17,7 @@ import { managerComponents, settleBetweenTests } from './manager-mounted-shared.
 
 let Component;
 let EnvironmentEditViewComponent;
+let GatheringModifierEditorComponent;
 let mounted;
 let target;
 
@@ -31,12 +32,63 @@ const {
   runRowMenuCommand,
 } = queries;
 
+/**
+ * A stand-in shell for ONE subject: it answers the panel's readers and, like the real shell,
+ * PERSISTS a picked character modifier before the panel is rendered again (issue 1707).
+ */
+function modifierEditorShell(subject, attached = []) {
+  const picked = [];
+  const refs = [];
+  const keydowns = [];
+  return {
+    picked,
+    keydowns,
+    props: {
+      subject,
+      row: { id: `${subject}-1`, conditionModifiers: {}, characterModifiers: refs },
+      idPrefix: `${subject}-${subject}-1`,
+      suggestions: [{ id: 'mod-training', label: 'Herbalism Training', icon: 'fa-solid fa-leaf' }],
+      characterModifierLibrary: [{ id: 'mod-training', label: 'Herbalism Training' }],
+      gatheringConditionAvailableOptions: () => [{ id: 'forest', label: 'Forest' }],
+      gatheringConditionModifierRows: (_row, kind) =>
+        attached.filter((modifier) => modifier.kind === kind),
+      gatheringConditionLabel: (_kind, conditionId) => `label:${conditionId}`,
+      gatheringModifierValueClass: (modifier) => `is-${modifier.sign}`,
+      gatheringModifierDisplayValue: (modifier) => modifier.display,
+      gatheringModifierKindIcon: () => 'fas fa-mountain-sun',
+      onConditionModifierKeydown: (kind, modifier, event) =>
+        keydowns.push([kind, modifier.id, event.key]),
+      gatheringModifierCardTitle: (kind, scope) => `${kind}/${scope}`,
+      gatheringModifierCardHint: (kind, scope) => `${kind}/${scope} hint`,
+      rowCharacterModifiers: () => refs,
+      characterModifierLabelForRef: (ref) => ref.modifierId,
+      characterModifierLibraryEntry: () => ({ id: 'mod-training', expression: '@skills.nat.total' }),
+      onPickCharacterModifier: (modifierId) => {
+        picked.push(modifierId);
+        refs.push({ id: `ref-${modifierId}`, modifierId, operator: '+' });
+      },
+    },
+  };
+}
+
+/** Mount the shared panel for one subject and return its root element. */
+function mountModifierEditor(props) {
+  target?.remove();
+  target = document.createElement('div');
+  document.body.appendChild(target);
+  if (mounted) unmount(mounted);
+  mounted = mount(GatheringModifierEditorComponent, { target, props });
+  flushSync();
+  return target;
+}
+
 /** Register this route’s cases in `manager-mounted.test.js`’s one describe. */
 export function registerEnvironmentsCases() {
   before(async () => {
     ({
       Component,
       EnvironmentEditViewComponent,
+      GatheringModifierEditorComponent,
     } = await managerComponents());
   });
 
@@ -2815,6 +2867,142 @@ export function registerEnvironmentsCases() {
       dangerPills[1].classList.contains('is-danger'),
       true,
       'extreme should rank above dangerous'
+    );
+  });
+
+  // The DOM half of what `gathering-event-editor.test.js` pinned as root TEXT: the panel is one
+  // component now, so only rendering both subjects can prove their hooks stayed distinct.
+  for (const subject of ['drop', 'event']) {
+    it(`renders the shared modifier panel under its own ${subject} hook prefix`, async () => {
+      const shell = modifierEditorShell(subject);
+      const other = subject === 'drop' ? 'event' : 'drop';
+      const root = mountModifierEditor(shell.props);
+
+      assert.ok(
+        Boolean(root.querySelector(`[data-gathering-${subject}-condition-modifiers="biome"]`)),
+        `the biome condition card must carry the ${subject} prefix`
+      );
+      assert.ok(
+        Boolean(root.querySelector(`[data-gathering-${subject}-condition-modifier-picker="biome"]`)),
+        `the biome picker must carry the ${subject} prefix`
+      );
+      assert.ok(
+        Boolean(root.querySelector(`[data-gathering-${subject}-character-modifiers]`)),
+        `the character-modifier card must carry the ${subject} prefix`
+      );
+      assert.ok(
+        Boolean(root.querySelector(`[data-gathering-${subject}-character-modifier-search]`)),
+        `the character-modifier search must carry the ${subject} prefix`
+      );
+      assert.ok(
+        Boolean(root.querySelector(`[data-gathering-${subject}-character-modifier-suggestions]`)),
+        `the suggestion list must carry the ${subject} prefix`
+      );
+      assert.ok(
+        !root.querySelector(`[data-gathering-${other}-condition-modifiers="biome"]`),
+        `no ${other} hook may appear on the ${subject} panel`
+      );
+      assert.ok(
+        !root.querySelector(`[data-gathering-${other}-character-modifiers]`),
+        `no ${other} hook may appear on the ${subject} panel`
+      );
+
+      // The card copy is fed `subject` as the helpers' existing `scope` argument.
+      assert.ok(
+        root.textContent.includes(`biome/${subject}`),
+        `the card title must be built from the ${subject} scope`
+      );
+
+      const suggestion = root.querySelector(
+        `[data-gathering-${subject}-character-modifier-suggestion="mod-training"]`
+      );
+      assert.ok(Boolean(suggestion), `the suggestion must carry the ${subject} prefix`);
+      assert.ok(
+        !root.querySelector(`[data-gathering-${other}-character-modifier-suggestion="mod-training"]`),
+        `the suggestion must not carry the ${other} prefix`
+      );
+      suggestion.click();
+      await tick();
+      flushSync();
+      assert.deepEqual(shell.picked, ['mod-training'], 'the pick must reach the shell');
+
+      const rendered = mountModifierEditor(shell.props);
+      const ref = rendered.querySelector(
+        `[data-gathering-${subject}-character-modifier-ref="ref-mod-training"]`
+      );
+      assert.ok(Boolean(ref), `the picked reference row must carry the ${subject} prefix`);
+      assert.ok(
+        !rendered.querySelector(`[data-gathering-${other}-character-modifier-ref="ref-mod-training"]`),
+        `the reference row must not carry the ${other} prefix`
+      );
+      assert.ok(
+        Boolean(ref.querySelector('.manager-character-modifier-row-bounds')),
+        'the reference row renders the one shared bounds row'
+      );
+      assert.ok(
+        Boolean(ref.querySelector('.manager-character-modifier-operator-select select')),
+        'the reference row renders its operator select'
+      );
+    });
+  }
+
+  // The coloured box, the signed value input, its `%` adornment and the Arrow stepper moved into
+  // the shared panel, so they are asserted where they render rather than re-pinned as root text.
+  it('renders an attached condition modifier as one coloured, signed, steppable input', async () => {
+    const attached = [{ id: 'cm-1', kind: 'biome', conditionId: 'forest', sign: 'positive', display: '+15' }];
+    const shell = modifierEditorShell('drop', attached);
+    const root = mountModifierEditor(shell.props);
+
+    const article = root.querySelector('[data-gathering-drop-modifier-id="cm-1"]');
+    assert.ok(Boolean(article), 'the attached modifier renders under the drop modifier-id hook');
+    assert.ok(
+      article.classList.contains('manager-condition-modifier-row-reference'),
+      'the row keeps the shared reference class'
+    );
+    assert.ok(
+      article.classList.contains('is-positive'),
+      'the box is coloured by the signed value class the shell computes'
+    );
+    assert.ok(article.textContent.includes('label:forest'), 'the row names its condition');
+
+    const box = article.querySelector('.manager-condition-modifier-value');
+    assert.ok(Boolean(box), 'the value sits in the single signed-input wrapper');
+    const input = box.querySelector('input');
+    assert.equal(input.getAttribute('type'), 'text', 'a text input so a leading + can render');
+    assert.equal(input.getAttribute('inputmode'), 'numeric', 'with a numeric keypad');
+    assert.equal(input.value, '+15', 'and the formatted signed value the shell returned');
+    assert.ok(
+      [...box.querySelectorAll('span')].some((span) => span.textContent === '%'),
+      'the value carries its % adornment'
+    );
+
+    input.dispatchEvent(
+      new globalThis.KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true })
+    );
+    await tick();
+    flushSync();
+    assert.deepEqual(
+      shell.keydowns,
+      [['biome', 'cm-1', 'ArrowUp']],
+      'Arrow stepping reaches the shell with the kind, the modifier and the key'
+    );
+  });
+
+  it('renders the empty condition-modifier body for a drop and nothing for an event', () => {
+    const dropBody = mountModifierEditor(modifierEditorShell('drop').props).querySelector(
+      '[data-gathering-drop-condition-modifiers="biome"] .manager-condition-modifier-row-list'
+    );
+    assert.ok(
+      dropBody.textContent.includes('No modifiers attached.'),
+      'the drop keeps the empty-state body it has always drawn'
+    );
+    const eventBody = mountModifierEditor(modifierEditorShell('event').props).querySelector(
+      '[data-gathering-event-condition-modifiers="biome"] .manager-condition-modifier-row-list'
+    );
+    assert.equal(
+      eventBody.textContent.trim(),
+      '',
+      'the event has never drawn one, and gains none from sharing the panel'
     );
   });
 }

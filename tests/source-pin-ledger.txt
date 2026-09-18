@@ -47,7 +47,7 @@ tests/components/gathering-chance-bar-mounted.test.js	2
 tests/components/gathering-detail-mounted.test.js	30
 tests/components/gathering-environments-mounted.test.js	33
 tests/components/gathering-environments-source.test.js	133
-tests/components/gathering-event-editor.test.js	87
+tests/components/gathering-event-editor.test.js	80
 tests/components/gathering-events-browser.test.js	49
 tests/components/gathering-parties-tab.test.js	2
 tests/components/gathering-realm-toggle.test.js	37

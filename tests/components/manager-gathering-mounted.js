@@ -1839,6 +1839,41 @@ export function registerGatheringCases() {
     );
   });
 
+  // The EVENT half of the shared panel, asserted through the ROOT (issue 1707): only the rendered
+  // hook name can prove the shell still asks for the event subject at THIS call site.
+  it('renders the shared modifier panel at the event subject on the event editor route', async () => {
+    await openDirtyGatheringEventEditor([], {});
+
+    const stack = target.querySelector('[data-gathering-event-inspector-stack]');
+    assert.ok(Boolean(stack), 'the event editor route renders its inspector stack');
+    for (const kind of ['biome', 'timeOfDay', 'weather']) {
+      assert.ok(
+        Boolean(stack.querySelector(`[data-gathering-event-condition-modifiers="${kind}"]`)),
+        `the ${kind} condition-modifier card renders under the event prefix`
+      );
+      assert.ok(
+        Boolean(stack.querySelector(`[data-gathering-event-condition-modifier-picker="${kind}"]`)),
+        `the ${kind} condition picker renders under the event prefix`
+      );
+    }
+    assert.ok(
+      Boolean(stack.querySelector('[data-gathering-event-character-modifiers]')),
+      'the character-modifier card renders under the event prefix'
+    );
+    assert.ok(
+      Boolean(stack.querySelector('[data-gathering-event-character-modifier-search]')),
+      'the character-modifier search renders under the event prefix'
+    );
+    assert.ok(
+      !stack.querySelector('[data-gathering-drop-condition-modifiers="biome"]'),
+      'the event route must not render the drop prefix: the two call sites pass different subjects'
+    );
+    assert.ok(
+      !stack.querySelector('[data-gathering-drop-character-modifiers]'),
+      'the event route must not render the drop prefix'
+    );
+  });
+
   it('surfaces a gathering-event save that rejects, and clears it on the next success', async () => {
     const calls = [];
     const storeOptions = { updateGatheringLibraryEventReject: true };
