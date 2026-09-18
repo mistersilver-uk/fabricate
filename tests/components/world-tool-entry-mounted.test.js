@@ -48,7 +48,7 @@ const harness = createMountedComponentHarness({
     // the SAME `ToolRepairRequirements` the system editor does, so the recipe ingredient tree
     // behind it joins this closure: the add-new essence offer and the currency display/store
     // conversion its rows read.
-    'src/utils/essenceValidation.js',
+    'src/ui/model/essenceValidation.js',
     'src/ui/svelte/util/recipeCurrency.js',
     // And `SearchablePopover`'s own three, which arrive with it.
     'src/ui/svelte/actions/dismissOnOutsideClick.js',

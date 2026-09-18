@@ -29,7 +29,7 @@ const SCOPED_RAW_MODULES = [
   // shipped counter. The harness validates this closure and names the miss, unlike the
   // hand-rolled trees elsewhere.
   'src/systems/worldVocabulary.js',
-  'src/utils/vocabularyUsage.js',
+  'src/ui/model/vocabularyUsage.js',
   'src/utils/componentCategories.js',
   // #1663: the ONE implementation behind both category shims; imports nothing.
   'src/utils/categoryNormalization.js',
@@ -43,12 +43,12 @@ const SCOPED_RAW_MODULES = [
   'src/migration/worldScopeEntityGrouping.js',
   'src/utils/definitionIndex.js',
   'src/utils/sourceReferenceUnion.js',
-  'src/utils/browserPagination.js',
+  'src/ui/model/browserPagination.js',
   'src/utils/bulkSelectionModel.js',
-  'src/utils/scopedEntityListModel.js',
+  'src/ui/model/scopedEntityListModel.js',
   // The frame's lifted view-state (issue 1438). Omitting a declared dependency here
   // THROWS in `before()`, which reports its tests as `# cancelled`, never `# fail`.
-  'src/utils/managerBrowserViewState.js',
+  'src/ui/model/managerBrowserViewState.js',
 ];
 
 const FRAME_MODULES = [

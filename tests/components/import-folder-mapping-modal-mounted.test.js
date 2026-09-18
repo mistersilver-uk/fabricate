@@ -33,7 +33,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/essenceIcons.js',
     'src/ui/svelte/util/foundryIconVocabulary.js',
   'src/ui/svelte/util/foundryIconCatalogue.js',
-    'src/utils/matchFolderVocabulary.js',
+    'src/ui/model/matchFolderVocabulary.js',
   ],
   compiledModules: [
     // THE APP'S ONE SELECT AND ITS WHOLE COMPILED CLOSURE (issue 1510), spread rather than copied.

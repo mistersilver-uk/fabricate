@@ -67,7 +67,7 @@ describe('RealmEnvironmentsEditor mounted behavior', () => {
 
     writeRawModule('src/ui/svelte/util/foundryBridge.js');
     // The editor's lifted picker view-state (issue 1438).
-    writeRawModule('src/utils/managerBrowserViewState.js');
+    writeRawModule('src/ui/model/managerBrowserViewState.js');
     // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     for (const modulePath of SEARCHABLE_POPOVER_RAW_MODULES) writeRawModule(modulePath);
     writeCompiledSvelte('src/ui/svelte/components/Pagination.svelte');

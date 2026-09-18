@@ -16,7 +16,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/componentEditor.js',
-    'src/utils/essenceValidation.js',
+    'src/ui/model/essenceValidation.js',
     'src/utils/scalars.js',
   ],
   // The essence quantity control is the shared `Stepper` (issue 1050). Omitting it here

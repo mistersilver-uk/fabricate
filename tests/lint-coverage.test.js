@@ -27,7 +27,7 @@ import {
 const REPOSITORY_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 /** The size of the gate this replaced, pinned. */
-const LEGACY_GATE_FILE_COUNT = 359;
+const LEGACY_GATE_FILE_COUNT = 341;
 
 /**
  * Each debt group's file count and (file, rule) pair count, pinned EXACTLY rather than capped

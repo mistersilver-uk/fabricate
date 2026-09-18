@@ -5,12 +5,12 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { countByCategory } from '../src/utils/browserGroupCounts.js';
-import { buildRecipeBrowserModel, recipeCategoryOf } from '../src/utils/recipeBrowserModel.js';
+import { countByCategory } from '../src/ui/model/browserGroupCounts.js';
+import { buildRecipeBrowserModel, recipeCategoryOf } from '../src/ui/model/recipeBrowserModel.js';
 import {
   buildComponentBrowserModel,
   componentCategoryOf,
-} from '../src/utils/componentBrowserModel.js';
+} from '../src/ui/model/componentBrowserModel.js';
 
 /** Deliberately > one page (25) in the first bucket, so page 1 cannot hold the category. */
 const ALCHEMY_ROWS = 40;

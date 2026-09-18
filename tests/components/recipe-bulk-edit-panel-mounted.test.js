@@ -8,7 +8,7 @@ import {
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES
 } from '../helpers/svelte-component-harness.js';
-import { createRecipeBulkDraft } from '../../src/utils/recipeBulkEditModel.js';
+import { createRecipeBulkDraft } from '../../src/ui/model/recipeBulkEditModel.js';
 import {
   chooseSelectOption,
   openSelectPanel,
@@ -32,7 +32,7 @@ const panel = createMountedComponentHarness({
     // The pure staging model and its shared selection leaf. Both are STATIC imports of the
     // component under test, and the shared harness's closure validator throws loudly on an
     // omission — the hand-rolled suites are the ones that hang instead.
-    'src/utils/recipeBulkEditModel.js',
+    'src/ui/model/recipeBulkEditModel.js',
     'src/utils/bulkSelectionModel.js'
   ],
   compiledModules: [

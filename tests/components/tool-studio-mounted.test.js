@@ -37,7 +37,7 @@ const harness = createMountedComponentHarness({
     'src/systems/characterPrerequisites.js',
     'src/utils/plainTextDescription.js',
     // The add-new essence offer projection (issue 1036).
-    'src/utils/essenceValidation.js',
+    'src/ui/model/essenceValidation.js',
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/components/stepperLabels.js',

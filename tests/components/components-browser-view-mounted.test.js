@@ -10,7 +10,7 @@ import {
   createComponentScopeHarness,
   createComponentsBrowserViewHarness,
 } from '../helpers/componentScopeMountModules.js';
-import { createComponentBrowserState } from '../../src/utils/componentBrowserModel.js';
+import { createComponentBrowserState } from '../../src/ui/model/componentBrowserModel.js';
 import { buildInterleavedCategoryOrder } from '../helpers/interleavedCategoryLibrary.js';
 import { describeBrowserBulkSelection } from '../helpers/browserBulkSelectionCases.js';
 import { projectWorldScopeEntity as projectComponentScope } from '../../src/ui/svelte/stores/worldScopeProjection.js';

@@ -2,7 +2,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { categoryTotalOf, countByCategory } from '../../src/utils/browserGroupCounts.js';
+import { categoryTotalOf, countByCategory } from '../../src/ui/model/browserGroupCounts.js';
 
 const categoryOf = (row) => row.category;
 

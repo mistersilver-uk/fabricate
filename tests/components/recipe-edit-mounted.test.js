@@ -22,7 +22,7 @@ const RAW_MODULES = [
   'src/ui/svelte/util/listReorderAnnouncement.js',
   // The add-new essence offer projection (issue 1036). The three ingredient components
   // below import it to withhold a DISABLED essence from their add controls.
-  'src/utils/essenceValidation.js',
+  'src/ui/model/essenceValidation.js',
   'src/ui/svelte/util/dropUtils.js',
   'src/ui/svelte/actions/dragDrop.js',
   // recipeImageIcons re-exports DEFAULT_RECIPE_IMAGE from the Recipe model
@@ -102,7 +102,7 @@ const RAW_MODULES = [
   // The Overview tab resolves the recipe's category label for its Category select.
   ...SEARCHABLE_POPOVER_RAW_MODULES,
   // A progressive stage row draws its component's complications read-only (issue 1286).
-  'src/utils/complicationSummary.js',
+  'src/ui/model/complicationSummary.js',
   'src/systems/characterPrerequisites.js',
   'src/utils/scalars.js',
 ];

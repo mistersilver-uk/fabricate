@@ -9,7 +9,7 @@ import { get } from 'svelte/store';
 import { createServices, makeRecipe } from './helpers/adminStoreServices.js';
 // The bulk panel's per-book selection count — a SIXTH reader of this basis, and the only
 // one whose failure mode is a disabled control rather than a wrong list.
-import { countRecipeBookMembership } from '../src/utils/recipeBulkEditModel.js';
+import { countRecipeBookMembership } from '../src/ui/model/recipeBulkEditModel.js';
 
 let idCounter = 0;
 

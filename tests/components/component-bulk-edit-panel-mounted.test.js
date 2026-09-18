@@ -7,7 +7,7 @@ import { resolve } from 'node:path';
 import { describe, it, before, after, afterEach } from 'node:test';
 
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
-import { createComponentBulkDraft } from '../../src/utils/componentBulkEditModel.js';
+import { createComponentBulkDraft } from '../../src/ui/model/componentBulkEditModel.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -24,11 +24,11 @@ const panel = createMountedComponentHarness({
     // #1663: the ONE implementation behind both category shims; imports nothing.
     'src/utils/categoryNormalization.js',
     // The pure selection + staging model, and the inset pager and `n/N` counts beside it.
-    'src/utils/componentBulkEditModel.js',
+    'src/ui/model/componentBulkEditModel.js',
     // Its shared leaf (issue 1010): a STATIC import of that module.
     'src/utils/bulkSelectionModel.js',
     // The add-new essence offer projection (issue 1036).
-    'src/utils/essenceValidation.js',
+    'src/ui/model/essenceValidation.js',
     'src/utils/scalars.js',
   ],
   compiledModules: [

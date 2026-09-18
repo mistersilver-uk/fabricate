@@ -13,8 +13,8 @@ import {
   planComponentCategoryReassignments,
   planTagRemovals,
   planRecipeTagRemovals,
-} from '../src/utils/vocabularyCascade.js';
-import { buildVocabularyUsage, countRecipeTagPlaceholders } from '../src/utils/vocabularyUsage.js';
+} from '../src/ui/model/vocabularyCascade.js';
+import { buildVocabularyUsage, countRecipeTagPlaceholders } from '../src/ui/model/vocabularyUsage.js';
 
 describe('categoryIcons (issue 689)', () => {
   it('normalizes a Font Awesome class string and rejects markup', () => {

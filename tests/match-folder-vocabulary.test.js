@@ -5,7 +5,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { matchFolderNameToVocabulary } from '../src/utils/matchFolderVocabulary.js';
+import { matchFolderNameToVocabulary } from '../src/ui/model/matchFolderVocabulary.js';
 
 const VOCAB = { componentCategories: ['Reagent', 'Metal'], itemTags: ['herb', 'rare'] };
 

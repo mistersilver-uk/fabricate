@@ -47,9 +47,9 @@ describe('requirement 7 correction — the reopened gateways grew seams, not scr
     assert.deepEqual(
       specifiers.filter((specifier) => /component/i.test(specifier)).sort(),
       [
-        '../../../../utils/componentBrowserModel.js',
-        '../../../../utils/componentBulkEditModel.js',
         '../../../../utils/componentCategories.js',
+        '../../../model/componentBrowserModel.js',
+        '../../../model/componentBulkEditModel.js',
         // DRAGGED IN BY ISSUE 1509's FILE MOVE, on exactly the `Chip` precedent recorded below.
         '../../components/ArmedDangerButton.svelte',
         '../../components/ChanceSlider.svelte',

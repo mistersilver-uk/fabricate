@@ -22,7 +22,7 @@ import {
   worldVocabularyEntryId,
 } from '../src/systems/worldVocabulary.js';
 import { buildWorldScopeState } from '../src/ui/svelte/stores/worldScopeProjection.js';
-import { buildVocabularyUsage } from '../src/utils/vocabularyUsage.js';
+import { buildVocabularyUsage } from '../src/ui/model/vocabularyUsage.js';
 
 /** A `Map`-backed settings seam, shared by every store a case builds. */
 function seam() {

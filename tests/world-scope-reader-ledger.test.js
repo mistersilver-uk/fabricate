@@ -60,10 +60,10 @@ const BASE_SCAN = Object.freeze({
  */
 const SCAN_TOTALS = Object.freeze({
   // #1648: eight unique validated-tool/receipt reads in the same two engine files.
-  matches: 170,
-  lines: 154,
-  files: 19,
-  pairs: 125,
+  matches: 168,
+  lines: 152,
+  files: 18,
+  pairs: 123,
   collisionGroups: 17,
   collisionSites: 46,
 });
@@ -197,8 +197,6 @@ const LEDGER = Object.freeze([
   ['src/systems/importReferenceResolver.js', "for (const component of arrayOf(system.components)) {", 1, 'import'],
   ['src/systems/importReferenceResolver.js', "for (const def of arrayOf(system.essenceDefinitions)) {", 1, 'import'],
   ['src/systems/startupPassComposition.js', "new Set((system.components || []).map((component) => component.id)),", 1, 'destructive-basis'],
-  ['src/utils/componentBrowserModel.js', "? groupComponentsByCategory(paged.components, categoryTotals)", 1, 'not-a-system'],
-  ['src/utils/componentBrowserModel.js', "page: paged.components,", 1, 'not-a-system'],
 ]);
 
 /** NAMED LIVE ANCHORS in four distinct files, the other half of the positive control. */
