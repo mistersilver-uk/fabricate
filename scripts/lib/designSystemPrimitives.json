@@ -366,7 +366,7 @@
       "status": "target",
       "evidence": "broad",
       "scope": "shared",
-      "why": "`library.html:799`. 4 callers. The tint swatch panel; its sibling `ManagerColorPicker.svelte` is the single-caller trigger and is recorded in `NOT_A_PRIMITIVE`. `target` rather than `shipped` because the other two halves of the flip are still owed: issue 1776 wrote that entry's Svelte API section, and what remains is the geometry match against the specimen - the entity-tint offering rule and the `allowCustom` default are recorded divergences issue 1523 owns - and a View Lab case that draws this panel, which is a `PRIMITIVES_WITH_NO_FRAME` row today."
+      "why": "`library.html:799`. 5 callers, measured with `componentImporters.js` at issue 1776 against the 4 this row had said. The tint swatch panel; its sibling `ManagerColorPicker.svelte` is the single-caller trigger and is recorded in `NOT_A_PRIMITIVE`. `target` rather than `shipped` because the other two halves of the flip are still owed: issue 1776 wrote that entry's Svelte API section, and what remains is the geometry match against the specimen - the entity-tint offering rule and the `allowCustom` default are recorded divergences issue 1523 owns - and a View Lab case that draws this panel, which is a `PRIMITIVES_WITH_NO_FRAME` row today."
     },
     {
       "path": "src/ui/svelte/components/Medallion.svelte",

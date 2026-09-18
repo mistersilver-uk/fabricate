@@ -75,7 +75,7 @@ function pinManifestRows(observed) {
     scanned: DESIGN_SYSTEM_PRIMITIVES.length,
     floor: 50,
     guidance:
-      'Keyed on the implementation PATH, so a move re-keys the row rather than retiring it: delete ' +
+      'Keyed on the implementation path, so a move re-keys the row rather than retiring it: delete ' +
       'the old key and add the new one, leaving the pinned total alone. A row reaches `shipped` on ' +
       'the same bar as a library name and is deleted here when it does. A promotion into a ' +
       'primitive directory arrives as a new row at `target`, and the promoting change says so.',
