@@ -56,9 +56,10 @@
  * @module src/systems/complicationRuntime
  */
 
+import { esc } from '../ui/presenters/CraftingChatCard.js';
+
 import { compareNumbersByOperatorId } from './characterPrerequisites.js';
 import { evaluateCheckRoll, evaluateSideRoll, resolveCheckFormulaDisplay } from './checkRoll.js';
-import { esc } from './CraftingChatCard.js';
 
 /** The visibility token whose effect roll the ACTING client rolls and posts publicly. */
 const VISIBLE = 'visible';

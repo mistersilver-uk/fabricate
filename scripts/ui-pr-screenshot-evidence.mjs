@@ -575,7 +575,7 @@ export const VIEW_RECIPES = Object.freeze([
     smokeLabels: ['manager-import-report'],
     matches: [
       /^src\/ui\/SvelteCraftingSystemManagerApp\.svelte\.js$/,
-      /^src\/systems\/importReportContent\.js$/,
+      /^src\/ui\/presenters\/importReportContent\.js$/,
       /^src\/ui\/svelte\/apps\/manager\/ImportReportModal\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/ManagerModal\.svelte$/,
     ],
@@ -950,8 +950,8 @@ export const VIEW_RECIPES = Object.freeze([
     label: 'Chat — crafting result card',
     smokeLabels: ['chat-craft-card'],
     matches: [
-      /^src\/systems\/CraftingChatCard\.js$/,
-      /^src\/systems\/SalvageChatCard\.js$/,
+      /^src\/ui\/presenters\/CraftingChatCard\.js$/,
+      /^src\/ui\/presenters\/SalvageChatCard\.js$/,
     ],
   },
   {

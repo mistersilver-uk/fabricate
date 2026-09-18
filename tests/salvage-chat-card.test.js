@@ -5,7 +5,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildSalvageChatContent } from '../src/systems/SalvageChatCard.js';
+import { buildSalvageChatContent } from '../src/ui/presenters/SalvageChatCard.js';
 
 function successModel(overrides = {}) {
   return {

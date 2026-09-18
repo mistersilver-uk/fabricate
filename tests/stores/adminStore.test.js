@@ -7,7 +7,7 @@ import {
   DEFAULT_GATHERING_TASK_IMG,
 } from '../../src/gatheringImageDefaults.js';
 import { CraftingSystemManager } from '../../src/systems/CraftingSystemManager.js';
-import { InventoryListingBuilder } from '../../src/systems/InventoryListingBuilder.js';
+import { InventoryListingBuilder } from '../../src/ui/presenters/InventoryListingBuilder.js';
 import {
   REPORTER_ENRICHER_DESCRIPTION,
   REPORTER_RESOLVED_EXPECTED,

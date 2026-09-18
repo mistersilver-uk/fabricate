@@ -14,7 +14,7 @@ globalThis.foundry = {
   utils: { randomID: () => `id-${Math.random().toString(36).slice(2)}`, getProperty },
 };
 
-const { AlchemyListingBuilder } = await import('../src/systems/AlchemyListingBuilder.js');
+const { AlchemyListingBuilder } = await import('../src/ui/presenters/AlchemyListingBuilder.js');
 const { RecipeVisibilityService } = await import('../src/systems/RecipeVisibilityService.js');
 const { canonicalSignatureKey } = await import('../src/utils/alchemySignatureKey.js');
 

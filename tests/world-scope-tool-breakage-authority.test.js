@@ -15,11 +15,11 @@ import { installFoundryStubs, makeScopeStore } from './helpers/worldScopeCorpus.
 installFoundryStubs();
 const HERE = dirname(fileURLToPath(import.meta.url));
 
-/** The FOUR non-UI readers Phase 7 routes, and the line each re-defaulted on before it. */
+/** The FOUR non-Svelte readers Phase 7 routes, and the line each re-defaulted on before it. */
 const ROUTED_READERS = Object.freeze([
   'src/toolBreakageRuntime.js',
   'src/systems/CraftingEngine.js',
-  'src/systems/InventoryListingBuilder.js',
+  'src/ui/presenters/InventoryListingBuilder.js',
 ]);
 
 function readSource(relative) {
@@ -88,7 +88,7 @@ test('a store that throws degrades to "no world authority" rather than taking a 
   }
 });
 
-test('all FOUR non-UI readers route through the resolver, and NONE re-defaults locally', () => {
+test('all FOUR non-Svelte readers route through the resolver, and NONE re-defaults locally', () => {
   // THE MUTATION THIS PINS: leaving any one of the four un-routed.
   const LOCAL_REDEFAULT =
     /toolBreakage\?\.authority === 'checkDriven'\s*\?\s*'checkDriven'\s*:\s*'toolSpecific'/;
@@ -106,13 +106,13 @@ test('all FOUR non-UI readers route through the resolver, and NONE re-defaults l
   assert.equal(
     routedCallSites,
     4,
-    'FOUR non-UI readers, exactly: the shared breakage evaluator, both crafting-engine decisions, ' +
+    'FOUR non-Svelte readers, exactly: the shared breakage evaluator, both crafting-engine decisions, ' +
       'and the inventory listing builder exhaustion projection'
   );
 });
 
 test('the UI readers are routed at ONE point: the selected-system projection (issue 1374)', () => {
-  // THE STATE THIS REPLACES. Issue 1363 routed the four non-UI readers and deferred the five UI
+  // THE STATE THIS REPLACES. Issue 1363 routed the four non-Svelte readers and deferred the five UI
   // ones, and this test asserted the deferral positively — five local re-defaults, counted.
   const projection = readSource('src/ui/svelte/stores/adminSystemInspectorProjection.js');
   assert.doesNotMatch(

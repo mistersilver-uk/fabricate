@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
-import { CraftingListingBuilder } from '../src/systems/CraftingListingBuilder.js';
+import { CraftingListingBuilder } from '../src/ui/presenters/CraftingListingBuilder.js';
 import { resolveCheckFormulaDisplay } from '../src/systems/checkRoll.js';
 import { Recipe } from '../src/models/Recipe.js';
 import { stubInteractiveRollEnvironment } from './helpers/rollPromptDialogStub.js';

@@ -34,19 +34,18 @@
  * access), so the non-revealed count is zero for a GM.
  */
 
-import { getFabricateFlag } from '../config/flags.js';
-import { resolveAlchemySubmissionComponent } from '../utils/alchemySubmissions.js';
-import { findById, getDefinitionIndex } from '../utils/definitionIndex.js';
-import { routedSuccessTierOptions } from '../utils/routedOutcomeKeywords.js';
+import { getFabricateFlag } from '../../config/flags.js';
+import { readStackQuantity } from '../../systems/itemStackQuantity.js';
+import { buildPassInventorySnapshot } from '../../systems/passInventorySnapshot.js';
+import { resolvedComponentsFor, resolvedEssencesFor } from '../../systems/scopedEntityReads.js';
+import { SignatureValidator } from '../../systems/SignatureValidator.js';
+import { resolveAlchemySubmissionComponent } from '../../utils/alchemySubmissions.js';
+import { findById, getDefinitionIndex } from '../../utils/definitionIndex.js';
+import { routedSuccessTierOptions } from '../../utils/routedOutcomeKeywords.js';
 import {
   untrimmedStringOrEmpty as stringOrEmpty,
   untrimmedStringOrNull as stringOrNull,
-} from '../utils/scalars.js';
-
-import { readStackQuantity } from './itemStackQuantity.js';
-import { buildPassInventorySnapshot } from './passInventorySnapshot.js';
-import { resolvedComponentsFor, resolvedEssencesFor } from './scopedEntityReads.js';
-import { SignatureValidator } from './SignatureValidator.js';
+} from '../../utils/scalars.js';
 
 function actorKey(actor) {
   return actor?.id ?? actor?.uuid ?? null;
@@ -128,7 +127,7 @@ export class AlchemyListingBuilder {
     // ONE snapshot for the whole pass, discarded when this returns (issue 1228). Every
     // `_isRevealed` below routes through it, so an `item`-visibility-mode discipline resolves
     // its held books ONCE instead of re-enumerating every source actor's whole inventory per
-    // recipe — the #1077 defect this builder still carried. It is built from EVERY enabled
+    // recipe — the issue 1077 defect this builder still carried. It is built from EVERY enabled
     // alchemy system's cohort, not just the active one, because the chooser summaries evaluate
     // reveal for all of them and the candidate superset must cover every legacy book link any
     // of those recipes' matchers could see.

@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 import { BulkSalvageService } from '../src/systems/BulkSalvageService.js';
 import { gmComplications } from '../src/systems/complicationRuntime.js';
-import { InventoryListingBuilder } from '../src/systems/InventoryListingBuilder.js';
+import { InventoryListingBuilder } from '../src/ui/presenters/InventoryListingBuilder.js';
 import {
   attachStageComplications,
   checkTriggerIdsOf,

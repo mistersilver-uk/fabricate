@@ -13,8 +13,8 @@ const productRoots = [
 ];
 const allowedExtensions = new Set(['.js', '.svelte', '.css']);
 // The READ corpus is deliberately wider than `productRoots` above (issue 1499). Tokens are read
-// from outside `src/ui` — `src/config/playerCharacterTypesMenu.js` and
-// `src/systems/BulkSalvageChatCard.js` both do — and from `.mjs`, which `allowedExtensions` omits.
+// from outside `src/ui` — `src/config/playerCharacterTypesMenu.js` does — and from `.mjs`, which
+// `allowedExtensions` omits.
 const readCorpusRoots = [resolve(repoRoot, 'src'), resolve(repoRoot, 'styles')];
 const readCorpusExtensions = new Set(['.js', '.mjs', '.svelte', '.css']);
 // `--fab-tag-*` is read as `var(--fab-tag-${token})`, which no static scan can see.

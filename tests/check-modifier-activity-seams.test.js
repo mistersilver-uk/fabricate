@@ -385,7 +385,7 @@ test('the listing builder calls the context builder with an ACTIVITY, not at ari
   // resolves `activity` to `undefined`, `ACTIVITY_CHECK_KEYS.get(undefined)` misses, and the
   // context silently reads NO selection at all — every rule collapses to `addAll` over an empty
   // set, which is a scalar of 0 and an appended term of nothing.
-  const source = readFileSync('src/systems/CraftingListingBuilder.js', 'utf8');
+  const source = readFileSync('src/ui/presenters/CraftingListingBuilder.js', 'utf8');
   assert.match(
     source,
     /buildCheckModifierContext\(\s*system,\s*'crafting',\s*recipe\s*\)/,

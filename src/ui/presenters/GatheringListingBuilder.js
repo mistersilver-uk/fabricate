@@ -13,8 +13,8 @@ import {
   stringOrNull,
   stripRuntimeSnapshotFromRun,
   uniqueReasons,
-} from './gatheringEngineInternals.js';
-import { isGatheringRealmsEnabled } from './gatheringRealms.js';
+} from '../../systems/gatheringEngineInternals.js';
+import { isGatheringRealmsEnabled } from '../../systems/gatheringRealms.js';
 
 const BLIND_TASK_LABEL_KEY = 'FABRICATE.Gathering.BlindTaskLabel';
 const DEFAULT_DROP_IMG = 'icons/svg/item-bag.svg';

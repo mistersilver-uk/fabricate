@@ -29,7 +29,7 @@ globalThis.game = { user: { isGM: true, name: 'GM' }, fabricate: {}, time: { wor
 const { Recipe } = await import('../src/models/Recipe.js');
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
 const { ResolutionModeService } = await import('../src/systems/ResolutionModeService.js');
-const { CraftingListingBuilder } = await import('../src/systems/CraftingListingBuilder.js');
+const { CraftingListingBuilder } = await import('../src/ui/presenters/CraftingListingBuilder.js');
 
 // Fakes
 

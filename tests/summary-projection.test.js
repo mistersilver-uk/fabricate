@@ -27,7 +27,7 @@ globalThis.game = { user: { name: 'Fixture GM' } };
 const { Recipe } = await import('../src/models/Recipe.js');
 const { buildInventorySnapshot } = await import('../src/systems/inventorySnapshot.js');
 const { CRAFTING_BROWSE_STATUS, deriveBrowseStatus } =
-  await import('../src/systems/craftingBrowseStatus.js');
+  await import('../src/ui/presenters/craftingBrowseStatus.js');
 const {
   COMPONENT_SUMMARY_FIELDS,
   RECIPE_SUMMARY_FIELDS,
@@ -36,7 +36,7 @@ const {
   projectRecipeSummary,
   projectSummaryAvailability,
   summaryFieldsFor,
-} = await import('../src/systems/summaryProjection.js');
+} = await import('../src/ui/presenters/summaryProjection.js');
 
 const SYSTEM_ID = 'system-1';
 
@@ -405,7 +405,7 @@ describe('summary purity — zero exact-evaluation calls', () => {
   it('holds no collaborator it could call either function on', () => {
     // The structural half of the invariant.
     const source = readFileSync(
-      fileURLToPath(new URL('../src/systems/summaryProjection.js', import.meta.url)),
+      fileURLToPath(new URL('../src/ui/presenters/summaryProjection.js', import.meta.url)),
       'utf8'
     );
 
@@ -437,12 +437,12 @@ describe('summary purity — zero exact-evaluation calls', () => {
     assert.deepEqual(
       specifiers,
       [
-        '../ui/svelte/util/craftingImageDefaults.js',
-        '../utils/componentCategories.js',
-        '../utils/recipeCategories.js',
+        '../../systems/inventorySnapshot.js',
+        '../../systems/stepRecipeView.js',
+        '../../utils/componentCategories.js',
+        '../../utils/recipeCategories.js',
+        '../svelte/util/craftingImageDefaults.js',
         './craftingBrowseStatus.js',
-        './inventorySnapshot.js',
-        './stepRecipeView.js',
       ],
       'summaryProjection may hold only pure projection leaves — no manager, engine, ' +
         'builder or visibility service. Adding an import or re-export here is a ' +

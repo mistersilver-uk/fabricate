@@ -18,7 +18,7 @@ globalThis.fromUuid = async () => null;
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
 const { CraftingEngine } = await import('../src/systems/CraftingEngine.js');
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
-const { InventoryListingBuilder } = await import('../src/systems/InventoryListingBuilder.js');
+const { InventoryListingBuilder } = await import('../src/ui/presenters/InventoryListingBuilder.js');
 const { createGatheringResultCreator } = await import('../src/gatheringResultCreation.js');
 const { component, componentSet, roleItem } = await import('./helpers/componentIdentityFixtures.js');
 const { toAlchemyRecords } = await import('./helpers/alchemySubmissionRecords.js');

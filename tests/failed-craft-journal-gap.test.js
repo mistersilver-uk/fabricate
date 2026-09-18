@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { CraftingRunManager } from '../src/systems/CraftingRunManager.js';
 import { ResolutionModeService } from '../src/systems/ResolutionModeService.js';
-import { RunJournalBuilder } from '../src/systems/RunJournalBuilder.js';
+import { RunJournalBuilder } from '../src/ui/presenters/RunJournalBuilder.js';
 
 // Faithful foundry.utils: getProperty / setProperty / expandObject / mergeObject with `-=`
 // deletion, so setFlag + update behave like the Foundry document layer.

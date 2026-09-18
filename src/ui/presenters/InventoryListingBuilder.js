@@ -41,7 +41,7 @@
  * Essence rows and recipe-item book rows are NOT collapsed — they remain per-system.
  */
 
-import { getFabricateFlag } from '../config/flags.js';
+import { getFabricateFlag } from '../../config/flags.js';
 // The ONE `toolBroken` reader, reused rather than re-implemented. That flag is the
 // AUTHORITATIVE presence-gate disqualifier, and a second copy of its tolerant
 // flag-shape handling would drift from the gate this projection has to agree with.
@@ -50,52 +50,51 @@ import {
   isToolBroken,
   matchGatheringTools,
   classifyGatheringToolStates,
-} from '../gatheringToolRuntime.js';
+} from '../../gatheringToolRuntime.js';
 // Dispatch each ingredient option's `match` through the registry so tag matchers
 // (and any future matcher type) expand to the component ids they consume, instead
 // of the builder re-reading `match.componentId` and missing every non-direct type.
-import { getMatchHandler } from '../models/match/matchTypes.js';
-import { DEFAULT_RECIPE_IMAGE } from '../models/Recipe.js';
+import { getMatchHandler } from '../../models/match/matchTypes.js';
+import { DEFAULT_RECIPE_IMAGE } from '../../models/Recipe.js';
 import {
   TOOL_IMAGE_SENTINEL,
   linkedComponentFor,
   resolveToolDescription,
   resolveToolDisplayImage,
   resolveToolDisplayName,
-} from '../models/toolDisplay.js';
-// Single-sourced with the GM UI so the builder and the recipe-item editor share one
-// item-bag literal (the "treat as no image" sentinel).
-import { GENERIC_ITEM_IMAGE } from '../ui/svelte/util/craftingImageDefaults.js';
-import { findMatchingComponent } from '../utils/essenceResolver.js';
-// The player-visible per-stage complication forecast, attached to the stage rows this
-// builder already publishes. Another deliberately import-free leaf (its one import is the
-// pure `complicationPlan.js`), so the audience filter reaches the panel without the
-// complication RUNTIME's import closure following it.
-import { attachStageComplications } from '../utils/progressiveStageComplications.js';
-// The cumulative "reached at >=N" thresholds a progressive salvage's stage list shows.
-// A deliberately import-free leaf.
-import { progressiveStageThresholds } from '../utils/progressiveStageThresholds.js';
-import {
-  untrimmedStringOrEmpty as stringOrEmpty,
-  untrimmedStringOrNull as stringOrNull,
-} from '../utils/scalars.js';
-import { matchRecipeItemDefinition, resolveToolForItem } from '../utils/sourceUuid.js';
-
-import { resolveCharacterPrerequisiteLibrary } from './characterLibraries.js';
-import { evaluatePrerequisites } from './characterPrerequisites.js';
-import { readStackQuantity } from './itemStackQuantity.js';
+} from '../../models/toolDisplay.js';
+import { resolveCharacterPrerequisiteLibrary } from '../../systems/characterLibraries.js';
+import { evaluatePrerequisites } from '../../systems/characterPrerequisites.js';
+import { readStackQuantity } from '../../systems/itemStackQuantity.js';
 // The ONE salvage `(mode, checkUsable)` derivation, shared with `CraftingEngine` so the
 // player's panel and the engine that rolls for it cannot disagree. A pure, Foundry-free
 // leaf, so it adds no transitive edge.
-import { resolveSalvageCheck } from './salvageCheckUsability.js';
+import { resolveSalvageCheck } from '../../systems/salvageCheckUsability.js';
 import {
   resolvedComponentsFor,
   resolvedEssencesFor,
   resolvedToolsFor,
-} from './scopedEntityReads.js';
-import { computeSystemVisibility } from './systemValidation.js';
-import { effectiveToolBreakageAuthority } from './toolBreakageAuthority.js';
-import { ingredientSetToolsAreActive } from './toolCheckBonus.js';
+} from '../../systems/scopedEntityReads.js';
+import { computeSystemVisibility } from '../../systems/systemValidation.js';
+import { effectiveToolBreakageAuthority } from '../../systems/toolBreakageAuthority.js';
+import { ingredientSetToolsAreActive } from '../../systems/toolCheckBonus.js';
+import { findMatchingComponent } from '../../utils/essenceResolver.js';
+// The player-visible per-stage complication forecast, attached to the stage rows this
+// builder already publishes. Another deliberately import-free leaf (its one import is the
+// pure `complicationPlan.js`), so the audience filter reaches the panel without the
+// complication RUNTIME's import closure following it.
+import { attachStageComplications } from '../../utils/progressiveStageComplications.js';
+// The cumulative "reached at >=N" thresholds a progressive salvage's stage list shows.
+// A deliberately import-free leaf.
+import { progressiveStageThresholds } from '../../utils/progressiveStageThresholds.js';
+import {
+  untrimmedStringOrEmpty as stringOrEmpty,
+  untrimmedStringOrNull as stringOrNull,
+} from '../../utils/scalars.js';
+import { matchRecipeItemDefinition, resolveToolForItem } from '../../utils/sourceUuid.js';
+// Single-sourced with the GM UI so the builder and the recipe-item editor share one
+// item-bag literal (the "treat as no image" sentinel).
+import { GENERIC_ITEM_IMAGE } from '../svelte/util/craftingImageDefaults.js';
 
 // A shared empty set for the GM path, where no entity is visibility-hidden — avoids
 // allocating a throwaway Set per system on every listing build.
@@ -2350,7 +2349,7 @@ export class InventoryListingBuilder {
    * Essence-type options are deliberately excluded: an essence match feeds the separate
    * `essenceUsedBy` channel (set-level essence requirements), and expanding it here would
    * list every essence-bearing component as a consumed ingredient of the recipe — a
-   * distinct product question (issue #726 out-of-scope), not this index's contract.
+   * distinct product question (issue 726 out-of-scope), not this index's contract.
    * @private
    */
   _optionConsumedComponentIds(option, systemComponents) {

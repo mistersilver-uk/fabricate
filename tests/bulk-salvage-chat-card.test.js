@@ -11,9 +11,9 @@ import {
   BULK_SALVAGE_CHAT_KEYS,
   buildBulkSalvageChatContent,
   sumChatEntriesByName,
-} from '../src/systems/BulkSalvageChatCard.js';
+} from '../src/ui/presenters/BulkSalvageChatCard.js';
 import { BulkSalvageService } from '../src/systems/BulkSalvageService.js';
-import { SALVAGE_CHAT_KEYS } from '../src/systems/SalvageChatCard.js';
+import { SALVAGE_CHAT_KEYS } from '../src/ui/presenters/SalvageChatCard.js';
 import {
   bulkComponent,
   bulkSystem,

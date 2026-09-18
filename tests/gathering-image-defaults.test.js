@@ -83,7 +83,7 @@ describe('gathering default-image fallback sites use the shared constants', () =
     'src/ui/svelte/apps/gathering/GatheringEventRow.svelte',
     'src/ui/svelte/apps/gathering/GatheringEventDetail.svelte',
     'src/systems/GatheringEngine.js',
-    'src/systems/GatheringChatCard.js'
+    'src/ui/presenters/GatheringChatCard.js'
   ];
 
   for (const relPath of environmentConsumers) {

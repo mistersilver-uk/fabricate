@@ -10,7 +10,7 @@ import {
   REFERENCE_KINDS,
   resolveImportReferences,
 } from '../src/systems/importReferenceResolver.js';
-import { buildImportReportContent } from '../src/systems/importReportContent.js';
+import { buildImportReportContent } from '../src/ui/presenters/importReportContent.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const LANG = JSON.parse(readFileSync(join(ROOT, 'lang', 'en.json'), 'utf8'));

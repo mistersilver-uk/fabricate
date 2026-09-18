@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { InventoryListingBuilder } from '../src/systems/InventoryListingBuilder.js';
+import { InventoryListingBuilder } from '../src/ui/presenters/InventoryListingBuilder.js';
 import { findMatchingComponent } from '../src/utils/essenceResolver.js';
 import { component, componentSet, roleItem } from './helpers/componentIdentityFixtures.js';
 import {

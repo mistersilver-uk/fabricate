@@ -17,7 +17,7 @@ globalThis.fromUuid = async (uuid) => _registry.get(uuid) ?? null;
 
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
 const { RecipeVisibilityService } = await import('../src/systems/RecipeVisibilityService.js');
-const { InventoryListingBuilder } = await import('../src/systems/InventoryListingBuilder.js');
+const { InventoryListingBuilder } = await import('../src/ui/presenters/InventoryListingBuilder.js');
 const { matchRecipeItemDefinition, resolveComponentForItem } = await import('../src/utils/sourceUuid.js');
 const { RECIPE_ITEM_FLAG_STAMP_TARGET } = await import('../src/config/settings.js');
 

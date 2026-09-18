@@ -32,12 +32,12 @@ import {
 
 installFoundryEnv();
 
-const { AlchemyListingBuilder } = await import('../src/systems/AlchemyListingBuilder.js');
-const { RunJournalBuilder } = await import('../src/systems/RunJournalBuilder.js');
+const { AlchemyListingBuilder } = await import('../src/ui/presenters/AlchemyListingBuilder.js');
+const { RunJournalBuilder } = await import('../src/ui/presenters/RunJournalBuilder.js');
 const { RecipeVisibilityService, readVisibilityCounters, resetVisibilityCounters } = await import(
   '../src/systems/RecipeVisibilityService.js'
 );
-const { CraftingListingBuilder } = await import('../src/systems/CraftingListingBuilder.js');
+const { CraftingListingBuilder } = await import('../src/ui/presenters/CraftingListingBuilder.js');
 const { ResolutionModeService } = await import('../src/systems/ResolutionModeService.js');
 const { SignatureValidator, readSignatureCounters, resetSignatureCounters } = await import(
   '../src/systems/SignatureValidator.js'

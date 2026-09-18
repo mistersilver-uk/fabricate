@@ -28,7 +28,7 @@ globalThis.ui = { notifications: { info: () => {}, warn: () => {}, error: () => 
 
 const { CraftingEngine } = await import('../src/systems/CraftingEngine.js');
 const { SignatureValidator } = await import('../src/systems/SignatureValidator.js');
-const { AlchemyListingBuilder } = await import('../src/systems/AlchemyListingBuilder.js');
+const { AlchemyListingBuilder } = await import('../src/ui/presenters/AlchemyListingBuilder.js');
 const { resolveAlchemySubmissions } = await import('../src/utils/alchemySubmissions.js');
 const { getItemSourceReferences } = await import('../src/utils/sourceUuid.js');
 

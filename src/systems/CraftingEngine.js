@@ -16,6 +16,8 @@ import {
   createToolReplacementCreator,
   evaluateCheckBreakage,
 } from '../toolBreakageRuntime.js';
+import { buildCraftingChatContent } from '../ui/presenters/CraftingChatCard.js';
+import { buildSalvageChatContent } from '../ui/presenters/SalvageChatCard.js';
 import { buildInteractiveRollOptions } from '../ui/svelte/apps/crafting/rollPrompt.js';
 import { resolveRecipeImage } from '../ui/svelte/util/craftingImageDefaults.js';
 import { canonicalSignatureKey } from '../utils/alchemySignatureKey.js';
@@ -47,7 +49,6 @@ import {
 import { runFormulaPassFail, runFormulaProgressive, runFormulaRouted } from './checkRoll.js';
 import { fireComplications } from './complicationRuntime.js';
 import { createOrStackComponentItem } from './componentStacking.js';
-import { buildCraftingChatContent } from './CraftingChatCard.js';
 import { CraftingFizzleExecutor } from './CraftingFizzleExecutor.js';
 import {
   CraftingLifecycleExecutionError,
@@ -90,7 +91,6 @@ import {
   assertNativeEffectsUninvoked,
 } from './runHistoryEvidence.js';
 import { getRunLifecycleContract } from './runLifecycleState.js';
-import { buildSalvageChatContent } from './SalvageChatCard.js';
 import { resolveSalvageCheck } from './salvageCheckUsability.js';
 import {
   resolvedComponentsFor,

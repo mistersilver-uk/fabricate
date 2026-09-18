@@ -73,7 +73,7 @@ const DEFAULT_PAGE_SIZE = 12;
 // (`ProgressiveStageList` fires `onReorder` from `ondrop`, never from `ondragover`), so it
 // settles immediately and the drop-path flush below commits it without waiting.
 const ORDER_COMMIT_DEBOUNCE_MS = 400;
-// Mirrors CRAFTING_BROWSE_STATUS.AVAILABLE (systems/CraftingListingBuilder.js). A
+// Mirrors CRAFTING_BROWSE_STATUS.AVAILABLE (ui/presenters/CraftingListingBuilder.js). A
 // local copy keeps the store free of the builder import so its unit-test compiler
 // need not resolve that module graph.
 const RECIPE_STATUS_AVAILABLE = 'available';

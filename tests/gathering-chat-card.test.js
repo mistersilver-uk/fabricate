@@ -5,7 +5,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildGatheringChatContent } from '../src/systems/GatheringChatCard.js';
+import { buildGatheringChatContent } from '../src/ui/presenters/GatheringChatCard.js';
 
 function fullModel(overrides = {}) {
   return {

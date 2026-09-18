@@ -3,7 +3,7 @@
  * 859).
  *
  * A bulk run posts ONE card for N subjects instead of N cards.
- * {@link module:src/systems/CraftingChatCard}'s `buildResultCard` cannot express that
+ * {@link module:src/ui/presenters/CraftingChatCard}'s `buildResultCard` cannot express that
  * — it carries one `subjectName`, one `rollValue` and one `status` — so this module
  * composes its own layout out of that module's exported markup ATOMS (`esc`,
  * `renderSection` — which renders each entry through `renderItem` — `renderRollTotal`,

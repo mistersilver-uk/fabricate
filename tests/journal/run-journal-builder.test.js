@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 
 import { CraftingRunManager } from '../../src/systems/CraftingRunManager.js';
 import { ResolutionModeService } from '../../src/systems/ResolutionModeService.js';
-import { RunJournalBuilder } from '../../src/systems/RunJournalBuilder.js';
+import { RunJournalBuilder } from '../../src/ui/presenters/RunJournalBuilder.js';
 import {
   craftingOutcomeBand,
   routedOutcomeBand,

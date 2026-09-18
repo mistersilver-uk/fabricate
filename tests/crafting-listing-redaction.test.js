@@ -7,8 +7,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { CRAFTING_BROWSE_STATUS } from '../src/systems/craftingBrowseStatus.js';
-import { CraftingListingBuilder } from '../src/systems/CraftingListingBuilder.js';
+import { CRAFTING_BROWSE_STATUS } from '../src/ui/presenters/craftingBrowseStatus.js';
+import { CraftingListingBuilder } from '../src/ui/presenters/CraftingListingBuilder.js';
 import { ResolutionModeService } from '../src/systems/ResolutionModeService.js';
 
 import { countCalls, createOperationCounters } from './helpers/scale/scaleCounters.js';

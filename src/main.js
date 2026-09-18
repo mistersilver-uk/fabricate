@@ -15,7 +15,7 @@ import { CompendiumImporter, scopeStoreDelegate } from './systems/CompendiumImpo
 import { CraftingEngine } from './systems/CraftingEngine.js';
 import { CraftingSystemManager } from './systems/CraftingSystemManager.js';
 import { CraftingRunManager } from './systems/CraftingRunManager.js';
-import { RunJournalBuilder } from './systems/RunJournalBuilder.js';
+import { RunJournalBuilder } from './ui/presenters/RunJournalBuilder.js';
 import { SalvageRunManager } from './systems/SalvageRunManager.js';
 import { runContainersChanged } from './systems/runFlagInvalidation.js';
 import { GatheringEnvironmentStore } from './systems/GatheringEnvironmentStore.js';
@@ -52,13 +52,13 @@ import { RecipeVisibilityService } from './systems/RecipeVisibilityService.js';
 import { runStartupMaintenance } from './systems/startupMaintenance.js';
 import { composeStartupPassList } from './systems/startupPassComposition.js';
 import { ResolutionModeService } from './systems/ResolutionModeService.js';
-import { CraftingListingBuilder } from './systems/CraftingListingBuilder.js';
+import { CraftingListingBuilder } from './ui/presenters/CraftingListingBuilder.js';
 import { activeRunStepState, buildStepRecipeView, resolveStepIngredientSet } from './systems/stepRecipeView.js';
-import { InventoryListingBuilder } from './systems/InventoryListingBuilder.js';
+import { InventoryListingBuilder } from './ui/presenters/InventoryListingBuilder.js';
 import { BulkSalvageService } from './systems/BulkSalvageService.js';
 import { BulkDestroyService } from './systems/BulkDestroyService.js';
 import { applyBulkChatVisibility } from './systems/bulkChatVisibility.js';
-import { AlchemyListingBuilder } from './systems/AlchemyListingBuilder.js';
+import { AlchemyListingBuilder } from './ui/presenters/AlchemyListingBuilder.js';
 import {
   evaluatePreparedCraftingCheck,
   evaluatePreparedRunCheck,

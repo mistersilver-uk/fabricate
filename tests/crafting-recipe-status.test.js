@@ -5,7 +5,7 @@ import {
   craftingRecipeStatus,
   CRAFTING_RECIPE_STATUS_PRESENTATION,
 } from '../src/ui/svelte/util/craftingRecipeStatus.js';
-import { CRAFTING_BROWSE_STATUS } from '../src/systems/CraftingListingBuilder.js';
+import { CRAFTING_BROWSE_STATUS } from '../src/ui/presenters/CraftingListingBuilder.js';
 
 const EXPECTED = {
   [CRAFTING_BROWSE_STATUS.AVAILABLE]: {

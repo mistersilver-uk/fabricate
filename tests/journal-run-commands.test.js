@@ -5,7 +5,7 @@ import { compileFunction } from 'node:vm';
 import { IngredientSet } from '../src/models/IngredientSet.js';
 import { CraftingRunManager } from '../src/systems/CraftingRunManager.js';
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
-import { RunJournalBuilder } from '../src/systems/RunJournalBuilder.js';
+import { RunJournalBuilder } from '../src/ui/presenters/RunJournalBuilder.js';
 import { resolveAlchemySubmissions } from '../src/utils/alchemySubmissions.js';
 import { resolvedComponentsFor } from '../src/systems/scopedEntityReads.js';
 import { createJournalRunAuthority } from '../src/systems/journalRunAuthority.js';

@@ -1,9 +1,5 @@
-import { resolveRecipeImage } from '../ui/svelte/util/craftingImageDefaults.js';
-import { activityPermitsFailureResults } from '../utils/failureResultPolicy.js';
-import { cloneJson } from '../utils/scalars.js';
-
-import { resolveActiveCraftingCheckFormula } from './checkModifierResolver.js';
-import { craftingStepHistoryEvidence } from './CraftingRunManager.js';
+import { resolveActiveCraftingCheckFormula } from '../../systems/checkModifierResolver.js';
+import { craftingStepHistoryEvidence } from '../../systems/CraftingRunManager.js';
 import {
   actorToOption,
   idOf,
@@ -13,15 +9,18 @@ import {
   plainObjectOrNull,
   stringOrEmpty,
   stringOrNull,
-} from './gatheringEngineInternals.js';
-import { gatheringHistoryEvidence } from './gatheringHistoryEvidence.js';
-import { enrichHistoricalConsumption, historicalItemSources } from './historyItemEvidence.js';
-import { readStackQuantity } from './itemStackQuantity.js';
-import { buildPassInventorySnapshot } from './passInventorySnapshot.js';
-import { historyEvidenceFields } from './runHistoryEvidence.js';
-import { craftingOutcomeBand, routedOutcomeBand } from './runJournalOutcomeBands.js';
-import { getRunLifecycleContract } from './runLifecycleState.js';
-import { resolvedComponentsFor, resolvedEssencesFor } from './scopedEntityReads.js';
+} from '../../systems/gatheringEngineInternals.js';
+import { gatheringHistoryEvidence } from '../../systems/gatheringHistoryEvidence.js';
+import {
+  enrichHistoricalConsumption,
+  historicalItemSources,
+} from '../../systems/historyItemEvidence.js';
+import { readStackQuantity } from '../../systems/itemStackQuantity.js';
+import { buildPassInventorySnapshot } from '../../systems/passInventorySnapshot.js';
+import { historyEvidenceFields } from '../../systems/runHistoryEvidence.js';
+import { craftingOutcomeBand, routedOutcomeBand } from '../../systems/runJournalOutcomeBands.js';
+import { getRunLifecycleContract } from '../../systems/runLifecycleState.js';
+import { resolvedComponentsFor, resolvedEssencesFor } from '../../systems/scopedEntityReads.js';
 import {
   STAGE_BLOCKERS,
   classifyStageReadiness,
@@ -33,7 +32,10 @@ import {
   selectedIngredientItems,
   stageSelectionInputsComplete,
   unfundedEssenceGroupIds,
-} from './stageReadiness.js';
+} from '../../systems/stageReadiness.js';
+import { activityPermitsFailureResults } from '../../utils/failureResultPolicy.js';
+import { cloneJson } from '../../utils/scalars.js';
+import { resolveRecipeImage } from '../svelte/util/craftingImageDefaults.js';
 
 const DEFAULT_RUN_IMAGE = 'icons/svg/item-bag.svg';
 const DEFAULT_GATHERING_IMAGE = 'icons/containers/bags/pouch-leather-brown-green.webp';

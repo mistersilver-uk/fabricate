@@ -3,7 +3,7 @@
  *
  * `buildSalvageChatContent` takes an already-resolved, plain data model (no
  * Foundry documents, no globals) and returns the HTML string posted via
- * `ChatMessage.create`. It reuses {@link module:src/systems/CraftingChatCard}'s
+ * `ChatMessage.create`. It reuses {@link module:src/ui/presenters/CraftingChatCard}'s
  * `buildResultCard` renderer verbatim, so a salvage card is the SAME card as a
  * crafting card — same markup, same `fabricate-craft-chat` styles — differing
  * only in its labels: it reads as a salvage analogue of the crafting card, not a
