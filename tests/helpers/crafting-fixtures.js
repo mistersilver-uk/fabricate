@@ -1,7 +1,4 @@
-// Shared fixtures for the player Crafting tab mounted-component tests. Hoisted so
-// the recipe/craftability/store shapes are defined once rather than duplicated
-// across each crafting test file (the SonarCloud new-code duplication gate counts
-// duplicated fixture lines exactly like production code).
+// Shared fixtures for the player Crafting tab mounted-component tests.
 
 import { buildRequirementSlots, resolveOpenSlotId } from '../../src/ui/svelte/util/requirementSlots.js';
 
@@ -26,14 +23,9 @@ export function craftability(overrides = {}) {
   };
 }
 
-// ── Issue 917: essence pool / requirement rail fixtures ─────────────────────
-//
-// The pool is the read-side projection of the resolved essence block: what each
-// requirement needs and was DELIVERED (an essence amount), what each carrier holds
-// and contributes (item units), and the allocation tying the two together. The two
-// units are deliberately distinct — `delivered`/`owned` on a requirement are essence
-// amounts, `allocatedUnits`/`ownedUnits` on a carrier are item units — so a fixture
-// that conflates them would hide exactly the defect these surfaces exist to remove.
+// Issue 917: essence pool / requirement rail fixtures. The pool is the read-side projection of the
+// resolved essence block: what each requirement needs and was DELIVERED (an essence amount), what
+// each carrier holds and contributes (item units), and the allocation tying the two together.
 
 export function essencePool(overrides = {}) {
   return {
@@ -95,9 +87,8 @@ export function essenceCraftability(overrides = {}) {
 }
 
 /**
- * The D-ESS proof fixture: TWO essence requirements funded from one shared pool of
- * DUAL carriers (each unit credits both essences). One requirement is met and one is
- * short, which is the state the `-essence-pool-shared` evidence frame captures.
+ * The D-ESS proof fixture: TWO essence requirements funded from one shared pool of DUAL carriers
+ * (each unit credits both essences).
  */
 export function sharedEssenceCraftability(overrides = {}) {
   const requirements = [
@@ -188,9 +179,7 @@ export function recipe(overrides = {}) {
     blockingReasons: [],
     ingredientSets: [{ id: setId, label: 'Option A', craftability: craftability(), products: [] }],
     defaultSetId: setId,
-    // Multi-step run position (issue 917). Equal ids (both null here) mean the step
-    // being displayed IS the step the engine would execute, so the rail is
-    // interactive — which is the single-step case and today's default.
+    // Multi-step run position (issue 917).
     activeStepIndex: 0,
     activeStepId: null,
     displayedStepId: null,
@@ -203,10 +192,9 @@ export function recipe(overrides = {}) {
   };
 }
 
-// An explicit multi-step (`simple`-mode) recipe model as the CraftingListingBuilder
-// projects it (issue 765): a populated `steps[]` per-step requirement projection, the
-// first step's sets on `ingredientSets`, a terminal PRODUCES `result`, and no check
-// card. Steps carry INPUTS-only craftability; the emphasized product is `result`.
+// An explicit multi-step (`simple`-mode) recipe model as the CraftingListingBuilder projects it
+// (issue 765): a populated `steps[]` per-step requirement projection, the first step's sets on
+// `ingredientSets`, a terminal PRODUCES `result`, and no check card.
 export function multiStepRecipe(overrides = {}) {
   const stepOne = {
     id: 'step-1',
@@ -288,16 +276,7 @@ export function multiStepRecipe(overrides = {}) {
   });
 }
 
-/**
- * A two-step recipe whose FIRST step carries the shared essence block. Step 1 is the
- * step the engine would execute by default (so its rail is interactive); step 2 must
- * render read-only preview whatever the store holds.
- *
- * The two steps are deliberately distinct in EVERY half a step block renders — slot
- * count (two essence requirements vs one), the allocated carrier the consumption plan
- * names, and the tool row — so a block fed another step's projection is visible rather
- * than coincidentally identical. Fresh objects per call: these are mutated by tests.
- */
+/** A two-step recipe whose FIRST step carries the shared essence block. */
 export function steppedEssenceRecipe(overrides = {}) {
   const stepOne = {
     id: 'step-ess-1',
@@ -428,9 +407,7 @@ export function fakeCraftingStore(overrides = {}) {
     availableCategories: overrides.availableCategories ?? [],
     visibleRecipes: recipes,
     pageItems: recipes,
-    // The hydrated rich model and the ROW it was hydrated from (issue 1075). The fake
-    // serves the same object for both, which is what the real store does once hydration
-    // has answered; `selectedSummary` is what the browser list highlights.
+    // The hydrated rich model and the ROW it was hydrated from (issue 1075).
     selectedSummary: selected,
     selectedRecipe: selected,
     selectedSet: selected?.ingredientSets?.[0] ?? null,

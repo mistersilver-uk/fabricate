@@ -1,29 +1,12 @@
 /**
- * The seeded generator behind every scale fixture (issue 1071).
- *
- * There is exactly ONE seeded PRNG in this repository and it already lives in
- * `tests/view-lab/foundry/labRandom.js`. That module's job is to make a screenshot
- * reproducible, so it INSTALLS its generator over `Math.random`, `Date`, `crypto.randomUUID`
- * and `performance.now` and hands back a disposer. A benchmark harness needs the generator
- * and must NOT keep the installation: `performance.now` is replaced there by a fake
- * 16-ms-per-call tick, which would silently turn every wall-clock measurement this harness
- * records into a count of how many times it looked at the clock.
- *
- * So `createSeededRandom` installs, captures the generator, and immediately restores. The
- * returned closure is a live mulberry32 stream that no longer touches any global. Writing a
- * second copy of mulberry32 here would be the obvious alternative and is the wrong one twice
- * over — SonarCloud counts `tests/**` duplication exactly like `src/`, and two PRNGs that
- * drift produce two different "deterministic" corpora.
- *
- * `Math.random()` is never used: SonarCloud reports it as S2245, a MEDIUM vulnerability that
- * fails the quality gate, and a benchmark seeded from entropy is not a benchmark.
+ * The seeded generator behind every scale fixture (issue 1071). There is exactly ONE seeded PRNG in
+ * this repository and it already lives in `tests/view-lab/foundry/labRandom.js`.
  */
 import { installLabRandom } from '../../view-lab/foundry/labRandom.js';
 
 /**
  * A seeded `Math.random`-shaped generator that patches nothing.
  *
- * @param {number} seed
  * @returns {() => number} Uniform in `[0, 1)`, reproducible from `seed` alone.
  */
 export function createSeededRandom(seed) {
@@ -32,14 +15,7 @@ export function createSeededRandom(seed) {
   return random;
 }
 
-/**
- * A seeded integer in `[min, max]` inclusive.
- *
- * @param {() => number} random
- * @param {number} min
- * @param {number} max
- * @returns {number}
- */
+/** A seeded integer in `[min, max]` inclusive. */
 export function intBetween(random, min, max) {
   if (max <= min) return min;
   return min + Math.floor(random() * (max - min + 1));

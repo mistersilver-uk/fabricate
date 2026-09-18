@@ -1,15 +1,4 @@
-/**
- * Shared fixture for the blind-run secrecy suite (issue 901).
- *
- * Builds a WHOLE blind world — real GatheringRunManager (actor flags), real
- * GatheringRichStateService in nodes-economy mode (so `nodeRuntime` writes are
- * observable), real GatheringBlindRunStore over an in-memory settings map, and a
- * GatheringEngine wired to all three — so the tests can assert on what actually
- * lands in each store rather than on a mock's call log.
- *
- * Lives in `helpers/` because several suites need the same world and the
- * duplication gate counts `tests/**`.
- */
+/** Shared fixture for the blind-run secrecy suite (issue 901). */
 import { SETTING_KEYS } from '../../src/config/settings.js';
 import { GatheringBlindRunStore } from '../../src/systems/GatheringBlindRunStore.js';
 import { GatheringEngine } from '../../src/systems/GatheringEngine.js';
@@ -22,22 +11,8 @@ export const BLIND_SYSTEM_ID = 'system-blind';
 export const BLIND_ENVIRONMENT_ID = 'env-blind';
 
 /**
- * Minimal flag-backed actor: the run container lives in `flags.fabricate`.
+ * Minimal flag-backed actor: the run container lives in `flags.fabricate` (issue 1288).
  *
- * The two OWNERSHIP reads are modelled the way Foundry actually defines them, because
- * the difference between them is the whole subject of issue 1288:
- *
- *  - `testUserPermission(user, level)` asks about the PASSED user, and short-circuits any
- *    GM to OWNER (`common/abstract/document.mjs`);
- *  - `isOwner` is `testUserPermission(game.user, 'OWNER')` — the AMBIENT user
- *    (`client/documents/abstract/client-document.mjs`), so it says nothing whatsoever
- *    about the user a relayed request names.
- *
- * A fixture that hard-codes `isOwner: true` cannot tell those apart and would report a
- * GM-side authorization defect as healthy, so this one derives `isOwner` from the
- * installed `globalThis.game.user` exactly as Foundry does.
- *
- * @param {object} [options]
  * @param {string[]} [options.ownerIds] User ids holding Foundry OWNER on this actor.
  */
 export function blindActor({
@@ -118,25 +93,24 @@ function blindEnvironment(id) {
 /**
  * Assemble the blind world.
  *
- * @param {object} [options]
  * @param {object[]} [options.tasks] Library tasks the blind environment composes.
  * @param {string[]} [options.environmentIds] Blind environments to create.
  * @param {boolean} [options.nodesEnabled] System node economy toggle.
- * @param {Function} [options.isActiveGM] Whether this client may write the world
- *   setting. `false` models a PLAYER client, which must relay.
+ * @param {Function} [options.isActiveGM] Whether this client may write the world setting. `false`
+ * models a PLAYER client, which must relay.
  * @param {Function|null} [options.relayStart] Blind-start relay seam.
  * @param {Function|null} [options.isRunActive] Reservation liveness predicate.
  * @param {number[]} [options.rolls] d100 rolls (1 finds every 100%-rate row).
  * @param {object} [options.actor] The fixture actor (override to model ownership).
- * @param {Function} [options.getUserId] Whose id a created run is stamped with. Production
- *   reads the AMBIENT `game.user`, so on a relayed GM-side start this is the GM.
- * @param {Function|null} [options.isActorSelectable] The engine's actor-authorization
- *   seam. Defaults to permissive; pass the production predicate to exercise it.
- * @param {Function|null} [options.getSelectableActors] The engine's selectable-actor
- *   getter. Defaults to the fixture actor unconditionally.
- * @param {Function|null} [options.getRunViewer] How a matured run's viewer is resolved
- *   from the run's own `userId`. Production injects `getGatheringRunViewer`; absent, the
- *   engine's fallback hard-codes `isGM: false` and cannot see a mis-stamped owner.
+ * @param {Function} [options.getUserId] Whose id a created run is stamped with. Production reads
+ * the AMBIENT `game.user`, so on a relayed GM-side start this is the GM.
+ * @param {Function|null} [options.isActorSelectable] The engine's actor-authorization seam.
+ * Defaults to permissive; pass the production predicate to exercise it.
+ * @param {Function|null} [options.getSelectableActors] The engine's selectable-actor getter.
+ * Defaults to the fixture actor unconditionally.
+ * @param {Function|null} [options.getRunViewer] How a matured run's viewer is resolved from the
+ * run's own `userId`. Production injects `getGatheringRunViewer`; absent, the engine's fallback
+ * hard-codes `isGM: false` and cannot see a mis-stamped owner.
  */
 export function makeBlindWorld({
   tasks = [blindLibraryTask()],

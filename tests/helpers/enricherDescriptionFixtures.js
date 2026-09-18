@@ -1,20 +1,8 @@
-/**
- * Shared enricher fixtures for the issue 800 write-time resolution suites.
- *
- * Fabricate RESOLVES descriptions through Foundry's own enricher at write time, so
- * these fixtures come in pairs: the RAW authored text a source item carries, and the
- * ENRICHED HTML Foundry's enricher produces from it. `plainTextDescription` is only
- * ever fed the enriched half — it normalizes, it does not resolve.
- *
- * Hoisted here so the reporter's exact string, the broad mixed fixture, and the fake
- * enricher are defined once and reused across the unit, composition, repair, and
- * read-side suites (`tests/**` counts for the Sonar duplication gate).
- */
+/** Shared enricher fixtures for the issue 800 write-time resolution suites. */
 
-// The reporter's Alchemist's Supplies description (Mythwright world): a list of
-// labelled @UUID content links, plus ONE deliberately label-less reference — the case
-// the rejected approach dropped entirely and write-time resolution renders as the
-// referenced document's real name.
+// The reporter's Alchemist's Supplies description (Mythwright world): a list of labelled @UUID
+// content links, plus ONE deliberately label-less reference — the case the rejected approach
+// dropped entirely and write-time resolution renders as the referenced document's real name.
 export const REPORTER_ENRICHER_DESCRIPTION = [
   '@UUID[Compendium.dnd5e.equipment24.Item.phbagA cid0000000]{Acid}',
   "@UUID[Compendium.dnd5e.equipment24.Item.alchemyfire01]{Alchemist's Fire}",
@@ -59,16 +47,13 @@ export const FIXTURE_DOCUMENT_NAMES = Object.freeze({
 export const UNKNOWN_PLACEHOLDER = 'Unknown';
 
 /**
- * A stand-in for Foundry's enricher, faithful to the behaviours this change depends
- * on and nothing more:
- *
- * - `@UUID[ref]{Label}` and `@UUID[ref]` alike become a `content-link` anchor whose
- *   text is the REFERENCED DOCUMENT'S NAME when the ref resolves — that is the whole
- *   point of resolving rather than flattening to whatever label was typed;
- * - an unresolvable ref becomes `a.content-link.broken` carrying the AUTHORED LABEL
- *   when one was supplied, and the localized placeholder otherwise (core sets
- *   `data.name` from the match before it decides brokenness);
- * - roll expressions are left alone, because we pass `rolls: false`.
+ * A stand-in for Foundry's enricher, faithful to the behaviours this change depends on and nothing
+ * more:. `@UUID[ref]{Label}` and `@UUID[ref]` alike become a `content-link` anchor whose text is
+ * the REFERENCED DOCUMENT'S NAME when the ref resolves — that is the whole point of resolving
+ * rather than flattening to whatever label was typed; - an unresolvable ref becomes
+ * `a.content-link.broken` carrying the AUTHORED LABEL when one was supplied, and the localized
+ * placeholder otherwise (core sets `data.name` from the match before it decides brokenness); - roll
+ * expressions are left alone, because we pass `rolls: false`.
  *
  * @param {Record<string, string>} [names] uuid → document name
  * @returns {(raw: string) => Promise<string>} an `enrichToHtml`-shaped seam
@@ -87,21 +72,10 @@ export function makeFakeEnricher(names = FIXTURE_DOCUMENT_NAMES) {
 }
 
 /**
- * Install a minimal `game.i18n` matching a given Foundry generation's broken-link
- * placeholder key, so the broken-anchor pass is exercised against RUNTIME localization
- * rather than a hardcoded string.
+ * Install a minimal `game.i18n` matching a given Foundry generation's broken-link placeholder key,
+ * so the broken-anchor pass is exercised against RUNTIME localization rather than a hardcoded
+ * string.
  *
- * The key MOVED between generations, and mocking only one shape is exactly how the V13
- * leak reached the smoke harness:
- *
- * - **V13** — `en.json` carries a TOP-LEVEL `"Unknown"`; there is no COMMON namespace at
- *   all, so `localize('COMMON.Unknown')` ECHOES the key back.
- * - **V14** — `COMMON.Unknown` resolves; a bare `Unknown` echoes.
- *
- * `Localization#localize` echoes any missing key in both versions, which is what makes a
- * single-key comparison silently wrong rather than loudly broken.
- *
- * @param {{generation?: 13|14}} [options]
  * @returns {() => void} restore function
  */
 export function withUnknownPlaceholder({ generation = 14 } = {}) {

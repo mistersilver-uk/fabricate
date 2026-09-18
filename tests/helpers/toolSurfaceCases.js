@@ -1,26 +1,6 @@
 /**
- * ONE identity table for "is this owned item a Tool, and which Tool is it", shared by
- * every surface that answers that question (issue 1119).
- *
- * The sibling of `toolDisplayPrecedenceCases.js`, which pins the DISPLAY half
- * (`data-models` requirement 13). This file pins the IDENTITY half (requirement 12), and
- * the two are genuinely different questions — issue 976 fixed display across three
- * surfaces while the identity miss survived untouched in a fourth.
- *
- * Since issue 561 a Tool registered from an Item uuid carries `componentId: null` and
- * holds its identity in its own source references plus the durable
- * `flags.fabricate.roles[systemId].toolId`. `CraftingSystemManager.upsertTool` force-nulls
- * `componentId` for any item source and the Tool Studio offers no other authoring path,
- * so an item-sourced Tool is the ONLY shape a GM can author today. Any surface that
- * resolves a tool through its linked component therefore sees nothing at all.
- *
- * The canonical world below is deliberately shaped so no case passes by accident:
- *
- *   - `PICK`      item-sourced (componentId null), matched by durable `roles[sys].toolId`
- *   - `AXE`       item-sourced, matched by RAW SOURCE REF only (never stamped)
- *   - `WHETSTONE` a component AND a tool — the one document that must never double-count
- *   - `IRON`      a plain component that is NOT a tool — the negative control, so a
- *                 surface that simply returns everything cannot pass
+ * ONE identity table for "is this owned item a Tool, and which Tool is it", shared by every surface
+ * that answers that question (issue 1119).
  */
 
 import { roleItem, tool, toolSet } from './componentIdentityFixtures.js';
@@ -162,10 +142,7 @@ export const EXPECTED_TOOL_IDS = Object.freeze(
   TOOL_SURFACE_CASES.map((entry) => entry.toolId).filter(Boolean)
 );
 
-/**
- * A crafting-system record shaped the way the runtime managers read it.
- * @param {object} [overrides]
- */
+/** A crafting-system record shaped the way the runtime managers read it. */
 export function surfaceSystem(overrides = {}) {
   return {
     id: SYSTEM_ID,

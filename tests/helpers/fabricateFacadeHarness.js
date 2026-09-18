@@ -1,29 +1,8 @@
 /**
- * fabricateFacadeHarness — stands up the `game.fabricate` facade's owner-gated
- * read/submit path with a mock `game`/`user`/`actors`, so tests can drive the
- * viewer -> actor resolution that `src/main.js`'s `Fabricate` facade performs and
- * assert OWNER vs NON-OWNER vs GM behaviour directly (issue 569).
- *
- * WHY A REPRODUCTION (and not the real `Fabricate` class): `src/main.js` imports
- * the global stylesheet and Svelte UI modules at module load, so it cannot be
- * imported under plain `node --test`. This harness therefore composes the SAME
- * real collaborators the facade wires:
- *  - the real ownership predicate `isGatheringActorSelectableByUser`
- *    (`src/config/preferencesCleanup.js`) — the actual security boundary;
- *  - the real `AlchemyListingBuilder` (`src/systems/AlchemyListingBuilder.js`) —
- *    the leak-safe projection that fails closed on a null crafting actor;
- *  - the real `resolveAlchemySubmissions` (`src/utils/alchemySubmissions.js`) —
- *    the submit-path collector;
- * behind a faithful copy of the facade's `_resolveCraftingActor` /
- * `_resolveCraftingSources` resolver. That copy is pinned against the real
- * `src/main.js` source by a source-contract guard in
- * `tests/fabricate-facade-alchemy-owner-gate.test.js`, so weakening the real
- * gate (e.g. dropping the ownership predicate or the GM bypass) fails the suite.
- *
- * The generic pieces (`installFacadeGame`, `makeFacadeActor`, and the shared
- * resolver on the returned facade) are deliberately decoupled from the alchemy
- * methods so the `listCraftingForActor` / gathering facade gates can adopt this
- * harness too.
+ * fabricateFacadeHarness — stands up the `game.fabricate` facade's owner-gated read/submit path
+ * with a mock `game`/`user`/`actors`, so tests can drive the viewer -> actor resolution that
+ * `src/main.js`'s `Fabricate` facade performs and assert OWNER vs NON-OWNER vs GM behaviour
+ * directly (issue 569).
  */
 
 import { randomUUID } from 'node:crypto';
@@ -68,37 +47,17 @@ import { findById, getDefinitionIndex } from '../../src/utils/definitionIndex.js
 import { classMemberSource } from './boundedSource.js';
 
 /**
- * `src/main.js` as text, read once. Every owner-gate suite pins its faithful copy above
- * against this, because the module itself cannot be imported under `node --test`.
- *
- * @type {string}
+ * `src/main.js` as text, read once. Every owner-gate suite pins its faithful copy above against
+ * this, because the module itself cannot be imported under `node --test`.
  */
 export const MAIN_SOURCE = readFileSync(resolve(import.meta.dirname, '../../src/main.js'), 'utf8');
 
 /**
- * THIS FILE as text, so a "faithful copy" claim can be checked rather than trusted.
- *
- * The copies below are hand-maintained against `src/main.js`, and every existing
- * source-contract guard pins the PRODUCTION text only — which catches production
- * weakening and says nothing about the mirror drifting away from it. A divergence that
- * is behaviourally identical on the fixtures at hand (issue 1202 hit exactly this: an
- * indexed lookup in production against a surviving `.find(` scan here) is invisible to
- * every behavioural test in the suite.
- *
- * Slicing this with {@link mainMethodSource} works because the copies are class members
- * at the same two-space indentation `src/main.js` uses, which is what that helper bounds
- * on.
- *
- * @type {string}
+ * THIS FILE as text, so a "faithful copy" claim can be checked rather than trusted (issue 1202).
  */
 export const HARNESS_SOURCE = readFileSync(import.meta.filename, 'utf8');
 
-/**
- * Faithful copy of `src/main.js`'s hoisted `ROLL_ACTOR_CHECK_GATE_KEYS`.
- *
- * Hoisted on both sides so each delegator reads `this._requireGmActor(actorId, KEYS)` on one
- * line rather than restating a four-line object literal in two files.
- */
+/** Faithful copy of `src/main.js`'s hoisted `ROLL_ACTOR_CHECK_GATE_KEYS`. */
 const ROLL_ACTOR_CHECK_GATE_KEYS = Object.freeze({
   gmOnlyKey: CHECK_ROLL_MESSAGE_KEYS[COMPANION_OUTCOMES.gmOnly],
   noActorKey: CHECK_ROLL_MESSAGE_KEYS[COMPANION_OUTCOMES.noActor],
@@ -107,20 +66,6 @@ const ROLL_ACTOR_CHECK_GATE_KEYS = Object.freeze({
 /**
  * Faithful copies of `src/main.js`'s hoisted `AWARD_COMPONENTS_GATE_KEYS` and
  * `CREDIT_CURRENCY_GATE_KEYS` (issue 1301).
- *
- * Two pairs on this side as well, reading from each member's OWN key table — and what that
- * buys is SOURCE FIDELITY over a value that is currently INERT, not a behavioural guard. Both
- * delegators read `gate.outcome` and discard `gate.message`, and their result builders derive
- * `message` from their own tables, so swapping a pair's strings today changes no answer either
- * member gives. `_requireGmActor`'s `message` is read at exactly one site in `src/main.js`,
- * `resetActorKnowledge`, which answers with it directly.
- *
- * The pair is still worth copying faithfully and still worth pinning: the parameter is part of
- * the preamble's published shape, a fifth member could answer with it tomorrow the way
- * `resetActorKnowledge` does today, and a mirror carrying another member's strings is drift in
- * the one artefact this whole change's facade-level evidence rests on. What must not be said —
- * and was said here before — is that the swap makes a refused award report itself in the
- * grant's words. It does not.
  */
 const AWARD_COMPONENTS_GATE_KEYS = Object.freeze({
   gmOnlyKey: COMPONENT_AWARD_MESSAGE_KEYS[COMPANION_OUTCOMES.gmOnly],
@@ -132,32 +77,17 @@ const CREDIT_CURRENCY_GATE_KEYS = Object.freeze({
   noActorKey: CURRENCY_CREDIT_MESSAGE_KEYS[COMPANION_OUTCOMES.noActor],
 });
 
-/**
- * The two pooled members carry NO hoisted refusal-string trio, on either side (issue 1342).
- *
- * The pairs above exist because the SINGULAR preamble's `message` is read — `resetActorKnowledge`
- * answers it verbatim. The SET-valued preamble's is not: both pooled delegators branch on
- * `gate.outcome` alone and answer through their own result builder, which resolves the member's
- * own message table by outcome. A key threaded through the gate could only restate the string
- * the builder is about to derive, so production carries none and this mirror carries none.
- */
+/** The two pooled members carry NO hoisted refusal-string trio, on either side (issue 1342). */
 
 /**
  * The body of ONE `src/main.js` method, BOUNDED at its own closing brace.
  *
- * A thin naming of {@link classMemberSource} for this file's default source, kept because
- * `mainMethodSource(SIGNATURE)` is what the owner-gate suites already read as. The bounding
- * strategy itself — and the reason an unbounded `indexOf`/`slice` pair is a hazard rather
- * than a shortcut — lives in `boundedSource.js`, which is where any other suite reaches for
- * it rather than re-deriving it here.
- *
- * @param {string} signature The method signature exactly as authored, INCLUDING its
- *   opening brace — e.g. `_gateBulkTargets(targets, actorId) {`. Passing a bare name
- *   would match a call site as readily as the declaration.
- * @param {string} [source]
+ * @param {string} signature The method signature exactly as authored, INCLUDING its opening brace —
+ * e.g. `_gateBulkTargets(targets, actorId) {`. Passing a bare name would match a call site as
+ * readily as the declaration.
  * @returns {string} The method's own text, closing brace included.
- * @throws {Error} When the signature is not found, or has no closing brace — either
- *   means the pin is now vacuous, which must fail loudly rather than assert on ''.
+ * @throws {Error} When the signature is not found, or has no closing brace — either means the pin
+ * is now vacuous, which must fail loudly rather than assert on ''.
  */
 export function mainMethodSource(signature, source = MAIN_SOURCE) {
   return classMemberSource(source, signature, 'main.js');
@@ -179,15 +109,6 @@ function installFoundryShim() {
 /**
  * Install the `globalThis.fromUuidSync` the pooled preamble addresses its actors through.
  *
- * ADDRESS-keyed and nothing else, because that is the whole reason the pooled members take a
- * UUID: a synthetic token actor's `id` IS its world prototype's, so a double that resolved by id
- * would agree with the very confusion the address exists to remove. A caller can therefore hand
- * in a token-scoped actor and a world one that share an `id` and see them stay apart.
- *
- * It answers `null` for an address it does not hold, which is what makes the `noActor` and
- * partly-resolved refusals reachable: a resolver that answered something for every string would
- * be a seam that cannot refuse, and the gate above it would be untestable.
- *
  * @param {Array<object>} documents Everything addressable, each carrying its own `uuid`.
  */
 function installUuidResolver(documents) {
@@ -196,10 +117,6 @@ function installUuidResolver(documents) {
     if (typeof document?.uuid !== 'string' || document.uuid === '') continue;
     byUuid.set(document.uuid, document);
     // A document may answer to SEVERAL addresses, and it is the IDENTICAL object at each one.
-    // That is not a convenience for tests: `Token#actor` returns `this.baseActor` for a LINKED
-    // token, so `Actor.x` and `Scene.s.Token.t.Actor.x` are two well-formed, visibly different
-    // addresses for one document. A resolver that answered a copy would make the pooled gate's
-    // distinctness rule untestable in the direction that actually bites.
     for (const alias of Array.isArray(document.uuidAliases) ? document.uuidAliases : []) {
       if (typeof alias === 'string' && alias !== '') byUuid.set(alias, document);
     }
@@ -208,12 +125,10 @@ function installUuidResolver(documents) {
 }
 
 /**
- * Build a builder-compatible mock actor whose ownership is resolved PER user, so
- * one actor can read as owned by user A and not-owned by user B — the exact axis
- * the owner gate turns on.
+ * Build a builder-compatible mock actor whose ownership is resolved PER user, so one actor can read
+ * as owned by user A and not-owned by user B — the exact axis the owner gate turns on.
  *
  * @param {string} id Actor id (the key `game.actors.get` resolves).
- * @param {object} [options]
  * @param {string[]} [options.ownerUserIds] User ids that OWN this actor.
  * @param {object} [options.learned] `{ [recipeId]: {...} }` learned-recipe flag store.
  * @param {object} [options.deadEnds] `{ [systemId]: string[] }` fizzle-key flag store.
@@ -242,8 +157,7 @@ export function makeFacadeActor(
     uuid: `Actor.${id}`,
     // Every real Actor carries this, and `_requireGmActors` reads it: `fromUuidSync` answers
     // whatever the address names, so the pooled preamble refuses an address that resolves to a
-    // document which is not an actor. A double without it would make that gate untestable in
-    // the passing direction — the counterpart to a double that is LOOSER than the real thing.
+    // document which is not an actor.
     documentName: 'Actor',
     name: `Actor ${id}`,
     items,
@@ -258,17 +172,9 @@ export function makeFacadeActor(
 }
 
 /**
- * A {@link makeFacadeActor} that can also DELETE its own embedded Items — what
- * `destroyComponents` ultimately drives (issue 859).
+ * A {@link makeFacadeActor} that can also DELETE its own embedded Items — what `destroyComponents`
+ * ultimately drives (issue 859).
  *
- * `deleteEmbeddedDocuments` RETURNS the removed documents, as core does, because
- * `BulkDestroyService` derives `unitsDeleted` from the return and never from the
- * request. A stand-in that returned nothing would report every row as vetoed.
- *
- * @param {string} id
- * @param {object} [options]
- * @param {string[]} [options.ownerUserIds]
- * @param {Array<{id: string, name?: string, system?: object}>} [options.documents]
  * @returns {object} The actor, with `deletedIds` recording every submitted batch.
  */
 export function makeDeletableFacadeActor(id, { ownerUserIds = [], documents = [] } = {}) {
@@ -296,19 +202,15 @@ export function makeDeletableFacadeActor(id, { ownerUserIds = [], documents = []
 }
 
 /**
- * Install a mock `globalThis.game` (and `foundry` shim) exposing the current
- * `user`, an `actors` collection with `.get(id)`, and a settings-backed
- * crafting-actor / component-source selection. Returns controls to swap the
- * current user (owner -> non-owner) without rebuilding the facade.
+ * Install a mock `globalThis.game` (and `foundry` shim) exposing the current `user`, an `actors`
+ * collection with `.get(id)`, and a settings-backed crafting-actor / component-source selection.
  *
- * @param {object} options
  * @param {object} options.user The current `game.user` (`{ id, isGM }`).
  * @param {Array<object>} [options.actors] Mock actors (each with an `id`).
  * @param {string|null} [options.selectedCraftingActorId] Persisted `LAST_CRAFTING_ACTOR`.
  * @param {string[]} [options.componentSourceActorIds] Persisted `LAST_COMPONENT_SOURCES`.
- * @param {Array<object>} [options.documents] Extra documents `fromUuidSync` can address —
- *   a token-scoped synthetic actor, or a non-Actor document a mistyped address names.
- * @returns {{ game: object, setCurrentUser: (user: object) => void }}
+ * @param {Array<object>} [options.documents] Extra documents `fromUuidSync` can address — a
+ * token-scoped synthetic actor, or a non-Actor document a mistyped address names.
  */
 export function installFacadeGame({
   user,
@@ -346,10 +248,9 @@ export function installFacadeGame({
 }
 
 /**
- * The facade under test: a faithful reproduction of the owner-gated resolution +
- * alchemy read/submit surface of `src/main.js`'s `Fabricate`, wired to the REAL
- * ownership predicate, `AlchemyListingBuilder`, and `resolveAlchemySubmissions`.
- * Reads `globalThis.game` live so a mid-test user swap takes effect.
+ * The facade under test: a faithful reproduction of the owner-gated resolution + alchemy
+ * read/submit surface of `src/main.js`'s `Fabricate`, wired to the REAL ownership predicate,
+ * `AlchemyListingBuilder`, and `resolveAlchemySubmissions`.
  */
 export class FabricateFacadeUnderTest {
   constructor({
@@ -359,33 +260,22 @@ export class FabricateFacadeUnderTest {
     ready = false,
     bulkSalvageService = null,
     bulkDestroyService = null,
-    // The collaborators the companion-contract members reach. Every default here mirrors
-    // what `Fabricate`'s CONSTRUCTOR leaves them as before `initialize()` runs, which is the
-    // state the `handle` tier's "answers `null` before readiness" promise is made about —
-    // `null` for the three assigned in the constructor, and deliberately UNSET for
-    // `currencyConfigStore`, which production never initialises and normalizes with `?? null`
-    // at its accessor instead.
+    // The collaborators the companion-contract members reach.
     recipeManager = null,
     recipeVisibilityService = null,
     currencyConfigStore = undefined,
     actorPropertyCoinSpender = null,
     actorInventoryCoinSpender = null,
-    // The Standalone Check Roll seam bag (issue 1293), INJECTED rather than reproduced. Every
-    // seam in production's own `_companionCheckSeams()` is a Foundry collaborator this harness
-    // has none of, and the two members' criteria turn on counting prompt and runner calls, so
-    // the bag is what a test substitutes. The two DELEGATORS below are faithful copies and are
-    // pinned against the production text; the bag they read is not part of that claim.
+    // The Standalone Check Roll seam bag (issue 1293), INJECTED rather than reproduced.
     companionCheckSeams = null,
-    // The Component Award seam bag (issue 1301), INJECTED for the same reason and NOT part of
-    // the fidelity claim: production's `_componentAwardSeams()` reaches `fromUuid`, the live
-    // crafting-system manager and the real engine, none of which exist here. The DELEGATOR
-    // below is a faithful copy and is pinned; the bag it reads is what a test substitutes.
+    // The Component Award seam bag (issue 1301), INJECTED for the same reason and NOT part of the
+    // fidelity claim: production's `_componentAwardSeams()` reaches `fromUuid`, the live
+    // crafting-system manager and the real engine, none of which exist here.
     componentAwardSeams = null,
-    // The two Pooled Holdings seam bags (issue 1342), INJECTED for the same reason and NOT part
-    // of the fidelity claim: production's `_pooledHoldingsSeams()` and
-    // `_pooledConsumptionSeams()` reach the live crafting-system manager, the real engine and
-    // `game.users`, none of which exist here. Both DELEGATORS below are faithful copies and are
-    // pinned; the bags they read are what a test substitutes.
+    // The two Pooled Holdings seam bags (issue 1342), INJECTED for the same reason and NOT part of
+    // the fidelity claim: production's `_pooledHoldingsSeams()` and `_pooledConsumptionSeams()`
+    // reach the live crafting-system manager, the real engine and `game.users`, none of which exist
+    // here.
     pooledHoldingsSeams = null,
     pooledConsumptionSeams = null,
   } = {}) {
@@ -398,10 +288,8 @@ export class FabricateFacadeUnderTest {
     this.currencyConfigStore = currencyConfigStore;
     this.actorPropertyCoinSpender = actorPropertyCoinSpender;
     this.actorInventoryCoinSpender = actorInventoryCoinSpender;
-    // Injected rather than lazily built: `_getBulkSalvageService` / `_getBulkDestroyService`
-    // exist only to wire Foundry collaborators, which this harness has none of. The gate,
-    // the merge and the refusal row — the parts with behaviour worth pinning — are copied
-    // faithfully below.
+    // Injected rather than lazily built: `_getBulkSalvageService` / `_getBulkDestroyService` exist
+    // only to wire Foundry collaborators, which this harness has none of.
     this._bulkSalvageService = bulkSalvageService;
     this._bulkDestroyService = bulkDestroyService;
     this._companionCheckSeamBag = companionCheckSeams;
@@ -436,15 +324,9 @@ export class FabricateFacadeUnderTest {
     return isGatheringActorSelectableByUser(actor, game.user) ? actor : null;
   }
 
-  // --- Faithful copy of Fabricate#_requireGmActor (issue 1289) ---------------
-  //
-  // The one authorization rule three facade members share, in D9's normative order:
-  // GM -> actor -> (readiness, tested by each MEMBER afterwards, because `_requireReady()`
-  // throws and a `stable` contract member may not). The message keys are parameters so a
-  // failed grant is never reported in the words of a failed reset.
-  //
-  // `tests/companion-facade.test.js` pins this copy against the production text in BOTH
-  // directions, so neither side can lose a gate without the suite going red.
+  // Faithful copy of Fabricate#_requireGmActor (issue 1289). The one authorization rule three
+  // facade members share, in D9's normative order: GM -> actor -> (readiness, tested by each MEMBER
+  // afterwards, because `_requireReady()` throws and a `stable` contract member may not).
   _requireGmActor(actorId, { gmOnlyKey, noActorKey }) {
     const game = this._game;
     if (game.user?.isGM !== true) {
@@ -457,28 +339,8 @@ export class FabricateFacadeUnderTest {
     return { actor, outcome: null, message: null };
   }
 
-  // --- Faithful copy of Fabricate#_requireGmActors (issue 1342) --------------
-  //
-  // The SET-valued extension of the preamble above, for the two pooled members. The GM half is
-  // the same rule in the same words and runs first; everything below it is DELEGATED to the one
-  // place that rule exists, `gatePooledActorUuids` in the contract leaf — which is what keeps
-  // the bound, the shape and the `noActor`/`invalidActorUuids` split out of this copy entirely.
-  //
-  // Addressed by UUID and never by id, because `game.actors.get` cannot tell an unlinked token
-  // actor from its world prototype and this pair feeds a member that DELETES. The
-  // `documentName` test is what stops an address naming an Item being scanned and written to as
-  // if it were an actor, and the `inCompendium` test beside it is what stops a pack TEMPLATE
-  // being deleted from once anything has loaded that pack — `fromUuidSync` answers an index
-  // entry before the load and a real Actor after it, so without that test the member that
-  // deletes would behave differently depending on what else the world had touched.
-  //
-  // It takes NO refusal strings on either side. See the comment where the trios used to be.
-  //
-  // One incidental asymmetry, of the class this file already carries: production reads the bare
-  // `game` global where this copy hoists `this._game` first, exactly as `_requireGmActor` above
-  // does. The resolver expression is VERBATIM on both sides, `globalThis.` and all — production
-  // spells it that way because optional chaining does not rescue an undeclared identifier, and
-  // this suite's own resolver is installed on the same global.
+  // Faithful copy of Fabricate#_requireGmActors (issue 1342). The SET-valued extension of the
+  // preamble above, for the two pooled members.
   _requireGmActors(actorUuids) {
     const game = this._game;
     if (game.user?.isGM !== true) {
@@ -493,14 +355,7 @@ export class FabricateFacadeUnderTest {
     });
   }
 
-  // --- Faithful copies of the four `handle` accessors (issue 1289) -----------
-  //
-  // One line each in production too. They are reproduced rather than stubbed because the
-  // contract's member-resolution assertion reads every member THROUGH its declared host and
-  // path, and because the `null`-before-readiness half of the `handle` promise is a claim
-  // about exactly these four bodies. Note `getCurrencyConfigStore` normalizes with `?? null`
-  // where the other three return a constructor-assigned `null` directly — production differs
-  // the same way, and the promise is true of all four for that reason rather than by luck.
+  // Faithful copies of the four `handle` accessors (issue 1289). One line each in production too.
   getCraftingEngine() {
     return this.craftingEngine;
   }
@@ -517,11 +372,10 @@ export class FabricateFacadeUnderTest {
     return this.actorPropertyCoinSpender;
   }
 
-  // --- Faithful copy of Fabricate#grantRecipeKnowledge (issue 1289) ----------
-  //
-  // The delegator only: the grant itself is the REAL free function, wired to the REAL flag
-  // seams, so what this copy reproduces is exactly the part that lives in `src/main.js` —
-  // the shared preamble, the single readiness guard, and the four injected seams.
+  // Faithful copy of Fabricate#grantRecipeKnowledge (issue 1289). The delegator only: the grant
+  // itself is the REAL free function, wired to the REAL flag seams, so what this copy reproduces is
+  // exactly the part that lives in `src/main.js` — the shared preamble, the single readiness guard,
+  // and the four injected seams.
   async grantRecipeKnowledge({ actorId = null, recipeId = null, grantedBy = null } = {}) {
     const gate = this._requireGmActor(actorId, {
       gmOnlyKey: KNOWLEDGE_GRANT_MESSAGE_KEYS[COMPANION_OUTCOMES.gmOnly],
@@ -560,16 +414,9 @@ export class FabricateFacadeUnderTest {
     );
   }
 
-  // --- Faithful copy of Fabricate#_worldCurrencySeams (issue 1301) -----------
-  //
-  // REPRODUCED rather than injected, unlike the two seam bags above it: every seam here is a
-  // field this harness already carries, so the copy costs nothing and the mirror can be pinned
-  // against production key for key. The mutation that matters is an omission — drop
-  // `actorInventoryCoinSpender` here and every facade-level currency case that does not use
-  // that strategy stays green while the mirror has silently stopped mirroring.
-  //
-  // `isElectedExecutor` is absent on both sides: the check gates on no call site, and
-  // `creditCurrency` spreads this bag and adds its own.
+  // Faithful copy of Fabricate#_worldCurrencySeams (issue 1301). REPRODUCED rather than injected,
+  // unlike the two seam bags above it: every seam here is a field this harness already carries, so
+  // the copy costs nothing and the mirror can be pinned against production key for key.
   _worldCurrencySeams() {
     return {
       getCurrencyConfig: () => this.currencyConfigStore?.get?.() ?? null,
@@ -578,17 +425,10 @@ export class FabricateFacadeUnderTest {
     };
   }
 
-  // --- Faithful copy of Fabricate#creditCurrency (issue 1301) ----------------
-  //
-  // Sited HERE, beside `checkAffordability` and the bag they share, because production sites it
-  // here — the mirror follows production's member order as well as its text, and that order is
-  // what keeps the two new delegators from concatenating into one over-the-bar duplicated run
-  // across the two files.
-  //
-  // One incidental asymmetry, of the class this file already carries: production reads the
-  // election off the bare `game` global and this copy reads it off `this._game`, exactly as
-  // `resolveBulkCheckDecision` above does. The EXPRESSION is otherwise identical, and the
-  // election is added by this member rather than by `_worldCurrencySeams()` on both sides.
+  // Faithful copy of Fabricate#creditCurrency (issue 1301). Sited HERE, beside `checkAffordability`
+  // and the bag they share, because production sites it here — the mirror follows production's
+  // member order as well as its text, and that order is what keeps the two new delegators from
+  // concatenating into one over-the-bar duplicated run across the two files.
   async creditCurrency({ actorId = null, unitId = null, amount = null, callSite = null } = {}) {
     const gate = this._requireGmActor(actorId, CREDIT_CURRENCY_GATE_KEYS);
     if (gate.outcome || this.ready !== true) {
@@ -609,17 +449,11 @@ export class FabricateFacadeUnderTest {
     return this._pooledHoldingsSeamBag;
   }
 
-  // --- Faithful copy of Fabricate#readPooledHoldings (issue 1342) ------------
-  //
-  // The delegator only: the read itself is the REAL leaf, so what this copy reproduces is
-  // exactly the part that lives in `src/main.js` — the SET-valued preamble with this member's
-  // OWN hoisted keys, the single readiness guard, the gate's own `messageData` carried onto the
-  // refusal, and the RESOLVED actor documents passed through as the leaf's FIRST argument.
-  //
-  // Sited HERE, beside `creditCurrency` and the world-currency bag production's own version
-  // spreads, because production sites it here — the mirror follows production's member order as
-  // well as its text, and that order is what keeps the two pooled delegators from concatenating
-  // into one over-the-bar duplicated run across the two files.
+  // Faithful copy of Fabricate#readPooledHoldings (issue 1342). The delegator only: the read itself
+  // is the REAL leaf, so what this copy reproduces is exactly the part that lives in `src/main.js`
+  // — the SET-valued preamble with this member's OWN hoisted keys, the single readiness guard, the
+  // gate's own `messageData` carried onto the refusal, and the RESOLVED actor documents passed
+  // through as the leaf's FIRST argument.
   async readPooledHoldings({ actorUuids = null, costs = null } = {}) {
     const gate = this._requireGmActors(actorUuids);
     if (gate.outcome || this.ready !== true) {
@@ -645,58 +479,8 @@ export class FabricateFacadeUnderTest {
     return this._componentAwardSeamBag;
   }
 
-  // --- Faithful copy of Fabricate#rollActorCheck (issue 1293) ----------------
-  //
-  // The delegator only: the roll itself is the REAL free function. It reuses the shared
-  // preamble VERBATIM and passes `gate.actor` straight into the leaf, so no second actor
-  // resolver exists to disagree with the first.
-  //
-  // DO NOT "TIDY" THIS COPY TOWARDS `src/main.js`'s FORMATTING, and read the numbers before
-  // deciding otherwise (issue 1293, D12).
-  //
-  // The duplicated run against `src/main.js` measures 98 tokens as shipped — under SonarJS's
-  // 100-token minimum, and under the SonarCloud new-code duplication gate that follows from
-  // it. That margin is NOMINAL, not comfortable. It is held by two INDEPENDENT incidental
-  // asymmetries between this copy and production, and removing EITHER one alone crosses the
-  // threshold:
-  //
-  //   as shipped                                                            98
-  //   the trailing comma on `rollDecision = null,` below, normalised       133
-  //   `this._game.user` in `resolveBulkCheckDecision` written `game.user`  152
-  //   both                                                                 187
-  //
-  // (133 is the NORMALISED adjacency figure: 98 plus the 35-token destructuring head that
-  // joins the two runs once the comma stops separating them.)
-  //
-  // The live risk is therefore not someone rewriting this file. It is a Prettier SCOPE
-  // change. `.prettierrc.json` is `printWidth: 100` with `trailingComma: 'es5'`, and
-  // `src/main.js` is currently OUTSIDE the `format`/`format:check` globs in `package.json`.
-  // Bringing it inside them wraps production's ~165-character `rollActorCheck` signature into
-  // the same multi-line destructuring head this copy uses AND adds the trailing comma —
-  // mechanically producing a run of at least 134 tokens. `AGENTS.md` already contemplates
-  // widening those globs and warns that reformatting counts as NEW code, so that PR would
-  // inherit a >100-token duplicated block it did not write. Whoever widens the globs owns
-  // splitting this run, and the cheapest split is the one already used for the gate keys:
-  // hoist the shared shape out of both files rather than paraphrasing either.
-  //
-  // MEASURE AT YOUR OWN MERGE BASE; DO NOT QUOTE THIS COMMENT'S PREDECESSOR, OR ANY OTHER
-  // CHANGE'S PROSE, AS A BASELINE. What stood here was a snapshot — "a whole-repo sweep at a
-  // 100-token floor finds exactly one >=100 run anywhere in the tree" — and it was false when
-  // it was written: `tests/companion-facade.test.js:926` records a 139-token grant-delegator
-  // run, and it landed in the SAME commit. Three consecutive changes then reasoned from it.
-  //
-  // The durable facts are about METHOD, not magnitude. The tree carries many runs at this
-  // floor, and the pairwise `src/main.js` <-> this-file scope carries several delegator runs of
-  // its own, because that is what a hand-maintained mirror IS. So a change that touches these
-  // copies runs the sweep itself, at BOTH scopes, at its own merge base AND at its tip, and is
-  // judged on the DELTA — SonarCloud gates new-code duplication, not a tree with pre-existing
-  // runs. Record the full enumerations in the change's own deviations, never here: a fresh set
-  // of numbers in this comment block would only mint the next false record.
-  //
-  // The mitigation, when a delta does appear, is always the same one: hoist the shared shape
-  // out of BOTH files — as the gate-key constants and the two seam bags already are — and
-  // never paraphrase either copy to break a run, because a paraphrase makes the fidelity claim
-  // this mirror rests on false.
+  // Faithful copy of Fabricate#rollActorCheck (issue 1293). The delegator only: the roll itself is
+  // the REAL free function. The durable facts are about METHOD, not magnitude.
   async rollActorCheck({
     actorId = null,
     callSite = null,
@@ -717,11 +501,10 @@ export class FabricateFacadeUnderTest {
     );
   }
 
-  // --- Faithful copy of Fabricate#resolveBulkCheckDecision (issue 1293) ------
-  //
-  // GM-gated INLINE rather than through `_requireGmActor`, because this member takes no
-  // `actorId`: `_resolveCraftingActor(null)` returns `null`, so the shared preamble would
-  // always answer `noActor` for a member that reads no actor and can never emit one.
+  // Faithful copy of Fabricate#resolveBulkCheckDecision (issue 1293). GM-gated INLINE rather than
+  // through `_requireGmActor`, because this member takes no `actorId`:
+  // `_resolveCraftingActor(null)` returns `null`, so the shared preamble would always answer
+  // `noActor` for a member that reads no actor and can never emit one.
   async resolveBulkCheckDecision({ callSite = null, formulas = null } = {}) {
     const gmOnly = this._game.user?.isGM !== true ? COMPANION_OUTCOMES.gmOnly : null;
     if (gmOnly || this.ready !== true) {
@@ -733,13 +516,11 @@ export class FabricateFacadeUnderTest {
     );
   }
 
-  // --- Faithful copy of Fabricate#awardComponents (issue 1301) ---------------
-  //
-  // The delegator only: the award itself is the REAL free function, so what this copy
-  // reproduces is exactly the part that lives in `src/main.js` — the shared preamble with this
-  // member's OWN hoisted keys, the single readiness guard, and the resolved actor passed
-  // through as the leaf's FIRST argument, which is what makes a caller-supplied `actor` in the
-  // request structurally unable to reach a seam.
+  // Faithful copy of Fabricate#awardComponents (issue 1301). The delegator only: the award itself
+  // is the REAL free function, so what this copy reproduces is exactly the part that lives in
+  // `src/main.js` — the shared preamble with this member's OWN hoisted keys, the single readiness
+  // guard, and the resolved actor passed through as the leaf's FIRST argument, which is what makes
+  // a caller-supplied `actor` in the request structurally unable to reach a seam.
   async awardComponents({ actorId = null, systemId = null, awards = null, callSite = null } = {}) {
     const gate = this._requireGmActor(actorId, AWARD_COMPONENTS_GATE_KEYS);
     if (gate.outcome || this.ready !== true) {
@@ -757,15 +538,9 @@ export class FabricateFacadeUnderTest {
     return this._pooledConsumptionSeamBag;
   }
 
-  // --- Faithful copy of Fabricate#consumePooledHoldings (issue 1342) ---------
-  //
-  // The delegator only: the take itself is the REAL leaf, which owns the call-site gate, the
-  // election, the `costs` validation, the components-first ordering and the rollback.
-  //
-  // Sited HERE, after `awardComponents` and well away from the read above, because production
-  // sites it here for the measured duplicated-run reason recorded on `rollActorCheck` — the two
-  // pooled delegators are near-identical, so adjacency would concatenate them into one run
-  // across this file and `src/main.js` that neither member reaches alone.
+  // Faithful copy of Fabricate#consumePooledHoldings (issue 1342). The delegator only: the take
+  // itself is the REAL leaf, which owns the call-site gate, the election, the `costs` validation,
+  // the components-first ordering and the rollback.
   async consumePooledHoldings({ actorUuids = null, callSite = null, costs = null } = {}) {
     const gate = this._requireGmActors(actorUuids);
     if (gate.outcome || this.ready !== true) {
@@ -794,14 +569,8 @@ export class FabricateFacadeUnderTest {
     return { craftingActor, componentSourceActors };
   }
 
-  // --- Faithful copy of Fabricate#_gateBulkTargets (issue 859) ---------------
-  //
-  // There is deliberately NO `?? this.getSelectedCraftingActorId()` tail here, unlike
-  // `_resolveCraftingSources` above. A bulk run may span actors, so a persisted-selection
-  // fallback would silently RETARGET a row whose own actor did not resolve onto whichever
-  // actor the player last selected — salvaging or destroying the wrong character's items
-  // with no error anywhere. `tests/fabricate-facade-bulk-owner-gate.test.js` pins that
-  // absence against the real source.
+  // Faithful copy of Fabricate#_gateBulkTargets (issue 859). There is deliberately NO `??
+  // this.getSelectedCraftingActorId()` tail here, unlike `_resolveCraftingSources` above.
   _gateBulkTargets(targets, actorId) {
     return (targets || []).filter(Boolean).map((target) => ({
       target,
@@ -824,12 +593,8 @@ export class FabricateFacadeUnderTest {
     return rows;
   }
 
-  // --- Faithful copy of Fabricate#_buildNotPermittedRow ----------------------
-  // The component lookup uses the REAL `definitionIndex` helpers, exactly as production
-  // does (issue 1202). Keeping a raw `.find(` scan here would have been behaviourally
-  // identical for unique ids and so invisible, which is precisely why
-  // `fabricate-facade-bulk-owner-gate.test.js` now pins both texts: a copy that claims
-  // fidelity has to be checkable, not merely asserted in a comment.
+  // Faithful copy of Fabricate#_buildNotPermittedRow ---------------------- The component lookup
+  // uses the REAL `definitionIndex` helpers, exactly as production does (issue 1202).
   _buildNotPermittedRow(target) {
     const system = this.craftingSystemManager?.getSystem?.(target?.systemId) ?? null;
     const component = findById(getDefinitionIndex(resolvedComponentsFor(system)), target?.componentId);
@@ -845,12 +610,8 @@ export class FabricateFacadeUnderTest {
     };
   }
 
-  // --- Faithful copy of Fabricate#salvageComponents --------------------------
-  //
-  // `onProgress` is accepted and FORWARDED, exactly as the real facade does. A mirror
-  // that quietly dropped it would report a frozen `0 of N` here while the real facade
-  // ticked — and, worse, would let a test assert progress behaviour that the copy was
-  // supplying rather than the code under test.
+  // Faithful copy of Fabricate#salvageComponents. `onProgress` is accepted and FORWARDED, exactly
+  // as the real facade does.
   async salvageComponents({
     actorId = null,
     targets = [],
@@ -991,9 +752,6 @@ export class FabricateFacadeUnderTest {
 /**
  * Build managers over a set of `{ system, recipes }` entries, matching the shape
  * `AlchemyListingBuilder` reads (`getSystems`/`getSystem`, `getRecipes`).
- *
- * @param {Array<{ system: object, recipes: object[] }>} entries
- * @returns {{ craftingSystemManager: object, recipeManager: object }}
  */
 export function makeFacadeManagers(entries) {
   const bySystem = new Map(entries.map((entry) => [entry.system.id, entry.recipes]));
@@ -1012,26 +770,20 @@ export function makeFacadeManagers(entries) {
 }
 
 /**
- * Stand up the facade under test with the REAL `AlchemyListingBuilder` wired to
- * the supplied managers, plus a spy crafting engine whose `craftAlchemy` calls
- * are recorded so a test can assert the submit path never reaches the engine for
- * a non-owner (no mutation).
+ * Stand up the facade under test with the REAL `AlchemyListingBuilder` wired to the supplied
+ * managers, plus a spy crafting engine whose `craftAlchemy` calls are recorded so a test can assert
+ * the submit path never reaches the engine for a non-owner (no mutation).
  *
- * @param {object} options
  * @param {object} options.user Current `game.user` (`{ id, isGM }`).
  * @param {Array<object>} options.actors Mock actors (see {@link makeFacadeActor}).
  * @param {Array<{ system: object, recipes: object[] }>} [options.systems] Alchemy fixtures.
- * @param {object} [options.recipeVisibility] Optional reveal collaborator (defaults to learned-map/GM-all).
- * @param {(result: object) => object} [options.craftAlchemyResult] Value the spy engine returns on a resolved brew.
+ * @param {object} [options.recipeVisibility] Optional reveal collaborator (defaults to
+ * learned-map/GM-all).
+ * @param {(result: object) => object} [options.craftAlchemyResult] Value the spy engine returns on
+ * a resolved brew.
  * @param {string|null} [options.selectedCraftingActorId] Persisted selection.
  * @param {string[]} [options.componentSourceActorIds] Persisted component sources.
  * @param {boolean} [options.ready] `Fabricate.ready` flag (defaults true).
- * @returns {{
- *   facade: FabricateFacadeUnderTest,
- *   game: object,
- *   setCurrentUser: (user: object) => void,
- *   craftAlchemyCalls: Array<object>,
- * }}
  */
 export function createFabricateFacadeHarness({
   user,

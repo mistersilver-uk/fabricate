@@ -1,9 +1,4 @@
-// Shared scaffolding for the CraftingSystemManager.deleteSystem cascade/flag-cleanup
-// tests. This file lives under tests/helpers/ so the `npm test` glob does NOT run it
-// as a suite, but it imports fine into the top-level *.test.js files. Keeping the
-// foundry/ui globals, the cache-busting importManager(), and the fake service
-// factories in ONE place avoids duplicating ~80 lines across the two delete tests
-// (and the SonarCloud new-code duplication gate that would flag the copy).
+// Shared scaffolding for the CraftingSystemManager.deleteSystem cascade/flag-cleanup tests.
 
 let idSeq = 0;
 
@@ -57,15 +52,7 @@ export function fakeRecipeManager(recipes = defaultRecipes()) {
   };
 }
 
-/**
- * A `game.settings` stand-in backed by a real `Map`.
- *
- * The harness previously answered every setting with `''`, which meant a preference cleanup
- * could not tell an unset key from a stale one. A real store keeps these suites asserting
- * that a system deletion still prunes.
- *
- * @returns {{store: Map<string, unknown>, accessors: object}}
- */
+/** A `game.settings` stand-in backed by a real `Map`. */
 export function settingsStore() {
   const store = new Map();
   return {
@@ -123,18 +110,12 @@ export function fakeRichStateService(calls) {
 }
 
 /**
- * A recipe-visibility service stand-in whose `cleanupLearnedRecipes` records every
- * call (with a snapshot of the valid recipe-id set) onto the SHARED `calls` array
- * and prunes each `game.actors` entry's `learned` map to the valid ids, mirroring
- * the real service's single bulk pass across all actors.
- *
- * The exactly-once assertion in the flag-cleanup test MUST accumulate through this
- * shared array, NOT an instance counter: the `game.fabricate.getRecipeVisibilityService`
- * seam returns a fresh factory result on every lookup, so an instance-scoped count
- * would reset each call and never catch a per-recipe fan-out regression.
+ * A recipe-visibility service stand-in whose `cleanupLearnedRecipes` records every call (with a
+ * snapshot of the valid recipe-id set) onto the SHARED `calls` array and prunes each `game.actors`
+ * entry's `learned` map to the valid ids, mirroring the real service's single bulk pass across all
+ * actors.
  *
  * @param {Array} calls - shared collector array
- * @param {{throwOnCleanup?: boolean}} [options]
  */
 export function fakeRecipeVisibilityService(calls, options = {}) {
   return {

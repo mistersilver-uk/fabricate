@@ -1,7 +1,5 @@
-// Shared helpers for run-history retention-limit boundary tests
-// (spec 005 §"Run-History Retention"). Used by both the crafting and salvage
-// run-manager suites so the "insert N terminal runs" loop and the
-// cap + most-recent-first assertions live in exactly one place.
+// Shared helpers for run-history retention-limit boundary tests (spec 005 §"Run-History
+// Retention").
 
 export const RETENTION_LIMIT = 50;
 

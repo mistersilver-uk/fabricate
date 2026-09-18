@@ -1,26 +1,7 @@
 /**
- * The Foundry-free world a scale fixture is measured in (issue 1071).
- *
- * No Foundry installation, licence or runtime is involved: the managers and listing builders
- * under measurement read a handful of globals (`game`, `foundry.utils`, `ui.notifications`)
- * and take every collaborator by injection, so the whole crafting read path runs under plain
- * Node. `tests/helpers/foundryEnv.js` supplies those globals and is reused rather than
- * restated — SonarCloud counts `tests/**` duplication exactly like `src/`.
- *
- * ## Why the `src/` imports are DYNAMIC
- *
- * `installFoundryEnv()` must run before the module graph under measurement is evaluated, and a
- * static `import` is hoisted above every statement in the importing module. Loading `src/`
- * through `await import(...)` inside a function is the repo's established order-safe pattern
- * and keeps this helper usable from a `node:test` suite and from `scripts/` alike.
- *
- * ## Two crafting-system managers, on purpose
- *
- * Read-path cases get a light `getSystem`/`getSystems`/`getRecipesForSystem` stub holding the
- * fixture's already-shaped system. Persistence cases get a REAL `CraftingSystemManager`, whose
- * `_normalizeSystem` and `save()` are themselves the thing being measured. Using the real
- * manager everywhere would fold normalisation cost into every read number; using the stub
- * everywhere would leave both `save()` paths — the #1 risk named in #1070 — unmeasured.
+ * The Foundry-free world a scale fixture is measured in (issue 1071). `installFoundryEnv()` must
+ * run before the module graph under measurement is evaluated, and a static `import` is hoisted
+ * above every statement in the importing module.
  */
 import { installFoundryEnv } from '../foundryEnv.js';
 
@@ -89,9 +70,7 @@ export async function loadBenchmarkModules() {
     import('../../../src/utils/browserPagination.js'),
     import('../../../src/ui/svelte/util/recipeGraphBuilder.js'),
     import('../../../src/ui/svelte/stores/adminRecipeRowProjection.js'),
-    // The world-scope entity stores (issue 1359). Loaded here rather than per case because the
-    // module reaches `src/config/settings.js`, which must not be evaluated before
-    // `installFoundryEnv()` has installed `game`.
+    // The world-scope entity stores (issue 1359).
     import('../../../src/systems/worldScopeStores.js'),
     // The shared read seam (issue 1370). The other spelling of the manager's three read
     // unions, and the one every reader holding a system RECORD rather than a manager uses.
@@ -113,8 +92,6 @@ export async function loadBenchmarkModules() {
     SignatureValidator: signatureValidatorModule.SignatureValidator,
     CraftingEngine: craftingEngineModule.CraftingEngine,
     // The bulk destroy service, for the component-library axis's bulk-run case (issue 1202).
-    // Constructed per case rather than in `createBenchWorld`, because only one profile
-    // measures it and its `deleteItems` seam is case-specific.
     BulkDestroyService: bulkDestroyModule.BulkDestroyService,
     Recipe: recipeModule.Recipe,
     IngredientSet: ingredientSetModule.IngredientSet,
@@ -136,9 +113,7 @@ export async function loadBenchmarkModules() {
       reset: signatureValidatorModule.resetSignatureCounters,
     },
     // The VISIBILITY-phase counters (issue 1228): how many held documents the per-recipe
-    // recipe-item matcher was offered across a pass. Module-level and process-global for the
-    // same reason the signature counters are, so a case resets them in `setup` and reads them
-    // in `counts` rather than wrapping an instance.
+    // recipe-item matcher was offered across a pass.
     visibilityCounters: {
       read: visibilityModule.readVisibilityCounters,
       reset: visibilityModule.resetVisibilityCounters,
@@ -150,19 +125,12 @@ export async function loadBenchmarkModules() {
 /**
  * Assemble a measurable world over one fixture and one inventory.
  *
- * `inventory` is a parameter rather than being read off the fixture, because that is exactly
- * what makes the held-inventory axis independent: the same corpus, the same library and the
- * same managers are rebuilt around 100, 500 and 1,000 held stacks with nothing else changed.
- *
- * @param {object} options
  * @param {object} options.modules Result of {@link loadBenchmarkModules}.
  * @param {object} options.fixture Result of `buildScaleFixture`.
  * @param {object} [options.inventory] Defaults to the fixture's own inventory.
  * @param {object[]} [options.recipes] Recipe payloads (or hydrated models) to seed the manager
- *   with. Defaults to the whole corpus; a case bounds it when the path under measurement is a
- *   product of recipes and items and the full corpus would take minutes rather than seconds.
- * @param {{bump: Function, get: Function, snapshot: Function}} options.counters
- * @param {boolean} [options.viewerIsGM]
+ * with. Defaults to the whole corpus; a case bounds it when the path under measurement is a product
+ * of recipes and items and the full corpus would take minutes rather than seconds.
  * @returns {object} The wired world.
  */
 export function createBenchWorld({
@@ -217,10 +185,8 @@ export function createBenchWorld({
     recipeManager,
     craftingSystemManager,
     undefined,
-    // The per-pass inventory snapshot's component resolver (issue 1228), wired exactly as
-    // `main.js` wires it. The visibility service never calls it — it is a SNAPSHOT
-    // collaborator — so this moves no count here; it is present so the benchmark builds the
-    // same complete pass snapshot production builds rather than a half of one.
+    // The per-pass inventory snapshot's component resolver (issue 1228), wired exactly as `main.js`
+    // wires it.
     modules.essenceResolver.findMatchingComponent
   );
   const resolutionModeService = new modules.ResolutionModeService(craftingSystemManager);
@@ -233,21 +199,8 @@ export function createBenchWorld({
     craftingSystemManager,
     localize: (key) => key,
     nowWorldTime: () => 0,
-    // The summary phase's held-quantity tallies (issue 1075) resolve item identity through
-    // the SAME full resolver `main.js` wires and `InventoryListingBuilder` already uses.
-    // Wiring it here is what keeps the benchmark honest: with no resolver the tallies stay
-    // empty, every row reports "missing materials", and the case would report a fast number
-    // for a listing that answered nothing. `availableRecipes` is the counter that would
-    // collapse, and it does not.
-    //
-    // It does NOT keep `componentCandidatesExamined` live on the crafting summary path, and
-    // the committed baselines say so: that counter is absent from every
-    // `craftingListing.buildListing` case while `inventoryListing.buildListing` still records
-    // it over the same actors and the same `components` array. The resolver evidently
-    // answers these items through an indexed/durable-identity route that never reaches the
-    // counted candidate predicate. Not a guard problem — `diffCounts` unions key sets, so an
-    // `undefined -> N` would still go red — but the comment must not claim coverage the
-    // numbers do not show.
+    // The summary phase's held-quantity tallies (issue 1075) resolve item identity through the SAME
+    // full resolver `main.js` wires and `InventoryListingBuilder` already uses.
     resolveComponentForItem: modules.essenceResolver.findMatchingComponent,
   });
   const inventoryListing = new modules.InventoryListingBuilder({
@@ -289,16 +242,7 @@ export function createBenchWorld({
   };
 }
 
-/**
- * Hydrate a fixture's recipe payloads into real `Recipe` instances.
- *
- * Kept out of `createBenchWorld` so it is the SERIALIZATION cases that pay for it, and so a
- * profile's declared construction (`literal` vs `model`) is honoured rather than assumed.
- *
- * @param {object} modules
- * @param {object[]} payloads
- * @returns {object[]}
- */
+/** Hydrate a fixture's recipe payloads into real `Recipe` instances. */
 export function hydrateRecipes(modules, payloads) {
   return payloads.map((payload) => modules.Recipe.fromJSON(payload));
 }
@@ -306,10 +250,6 @@ export function hydrateRecipes(modules, payloads) {
 /**
  * Swap a world's recipe map for hydrated models, so `RecipeManager.save()` serializes real
  * `Recipe#toJSON` output rather than the payloads it was seeded with.
- *
- * @param {object} world
- * @param {object[]} recipes
- * @returns {void}
  */
 export function useHydratedRecipes(world, recipes) {
   world.recipeManager.recipes = new Map(recipes.map((recipe) => [recipe.id, recipe]));

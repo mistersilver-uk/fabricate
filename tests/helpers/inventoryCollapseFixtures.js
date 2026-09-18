@@ -1,10 +1,4 @@
-/**
- * Shared fixtures for the one-card-per-unified-physical-stack collapse (issue 766).
- * Centralised so the multi-system crafting-system definitions, the roles-flagged
- * physical documents, and the projected multi-system card row exist in exactly ONE
- * place — SonarCloud counts `tests/**` duplication like `src/`, and its Automatic
- * Analysis ignores `sonar.cpd.exclusions`, so copy-pasted fixture setup fails the gate.
- */
+/** Shared fixtures for the one-card-per-unified-physical-stack collapse (issue 766). */
 
 import { roleItem } from './componentIdentityFixtures.js';
 
@@ -12,13 +6,8 @@ export const SYS_A = 'system-a';
 export const SYS_B = 'system-b';
 
 /**
- * A salvage-enabled component definition (simple mode, one success group yielding
- * itself) for the collapse fixtures.
- *
- * @param {string} id
- * @param {string} name
- * @param {object} [overrides]
- * @returns {object}
+ * A salvage-enabled component definition (simple mode, one success group yielding itself) for the
+ * collapse fixtures.
  */
 export function salvageComponent(id, name, overrides = {}) {
   return {
@@ -38,13 +27,8 @@ export function salvageComponent(id, name, overrides = {}) {
 }
 
 /**
- * A crafting-system definition with the salvage feature on and simple (no-formula)
- * resolution, holding the given components.
- *
- * @param {string} id
- * @param {object[]} components
- * @param {object} [overrides]
- * @returns {object}
+ * A crafting-system definition with the salvage feature on and simple (no-formula) resolution,
+ * holding the given components.
  */
 export function salvageSystem(id, components, overrides = {}) {
   return {
@@ -61,16 +45,11 @@ export function salvageSystem(id, components, overrides = {}) {
 }
 
 /**
- * One physical owned document flagged into components across up to two systems via the
- * durable `roles` map. Passing only `componentA` yields a single-system document.
+ * One physical owned document flagged into components across up to two systems via the durable
+ * `roles` map. Passing only `componentA` yields a single-system document.
  *
- * @param {object} spec
- * @param {string} spec.uuid
- * @param {number} spec.quantity
  * @param {string} spec.componentA - System A component id.
  * @param {string} [spec.componentB] - System B component id (omit for single-system).
- * @param {string} [spec.name]
- * @returns {object}
  */
 export function rolesDocument({ uuid, quantity, componentA, componentB, name }) {
   const roles = { [SYS_A]: { componentId: componentA } };
@@ -79,15 +58,8 @@ export function rolesDocument({ uuid, quantity, componentA, componentB, name }) 
 }
 
 /**
- * A projected multi-system inventory card row (as `InventoryListingBuilder` emits) for
- * the store/view suites, which construct rows directly rather than through the builder.
- * Two participations (System A / System B) over one physical stack of `total`, each
- * salvageable and scoped to its own `targetActorId`.
- *
- * @param {object} [opts]
- * @param {number} [opts.total]
- * @param {string} [opts.actorId]
- * @returns {object}
+ * A projected multi-system inventory card row (as `InventoryListingBuilder` emits) for the
+ * store/view suites, which construct rows directly rather than through the builder.
  */
 export function multiSystemCardRow({ total = 2, actorId = 'a1' } = {}) {
   const participation = (systemId, componentId, name, essence, ownedQuantity) => ({
@@ -149,15 +121,9 @@ export function multiSystemCardRow({ total = 2, actorId = 'a1' } = {}) {
 }
 
 /**
- * A projected multi-system card whose two participations SHARE one component id (`shared`)
- * across two systems — the pre-existing latent order-key collision the collapse surfaces
- * (component ids are not globally unique). Each participation is progressive and
- * reorderable, so the store's `salvageOrderId`/`selectedParticipation` derivation is
- * exercised end-to-end when a stage is reordered and the commit key observed.
- *
- * @param {object} [opts]
- * @param {string} [opts.actorId]
- * @returns {object}
+ * A projected multi-system card whose two participations SHARE one component id (`shared`) across
+ * two systems — the pre-existing latent order-key collision the collapse surfaces (component ids
+ * are not globally unique).
  */
 export function multiSystemProgressiveCardRow({ actorId = 'a1' } = {}) {
   const stages = () => [

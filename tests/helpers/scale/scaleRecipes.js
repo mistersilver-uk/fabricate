@@ -1,36 +1,14 @@
 /**
- * Synthetic recipe corpora for the scale profiles (issue 1071).
- *
- * Everything here emits PLAIN recipe payloads — the wire shape that comes out of the
- * `recipes` world setting — never `Recipe` instances. That split is deliberate and issue 1071
- * names it as a decision that must be stated rather than left implicit:
- *
- * - Profiles measuring ALGORITHMIC behaviour (filtering, browser models, graph construction,
- *   signature validation) consume these payloads directly. They are roughly an order of
- *   magnitude cheaper to build than hydrated models and exercise no normalisation, which is
- *   the point: the number should be the algorithm's, not the constructor's.
- * - Profiles measuring SERIALIZATION or RECONSTRUCTION (`RecipeManager.save()`,
- *   `CraftingSystemManager.save()`, corpus reload) hydrate these same payloads through
- *   `Recipe.fromJSON` first, so what is timed is the real round trip.
- *
- * Mixing the two silently makes numbers incomparable, so `scaleProfiles.js` records which
- * construction each profile used and the baseline carries it.
- *
- * IDS ARE ALWAYS EXPLICIT. `Recipe` and `IngredientSet` both fall back to
- * `foundry.utils.randomID()` for a missing id, which would make a corpus depend on the global
- * id counter's position — i.e. on what else ran first in the process — rather than on
- * `{profile, seed}` alone. Every id below is derived from its index.
+ * Synthetic recipe corpora for the scale profiles (issue 1071). Everything here emits PLAIN recipe
+ * payloads — the wire shape that comes out of the `recipes` world setting — never `Recipe`
+ * instances.
  */
 import { SCALE_CATEGORIES, SCALE_ESSENCES, SCALE_TAGS } from './scaleComponents.js';
 import { intBetween, pickOne } from './scaleRandom.js';
 
 /**
- * A recipe-item (book) source uuid. The knowledge profile's gate resolves owned book items
- * against these, so the generator and the inventory generator share one format.
- *
- * @param {string} systemId
- * @param {number} index
- * @returns {string}
+ * A recipe-item (book) source uuid. The knowledge profile's gate resolves owned book items against
+ * these, so the generator and the inventory generator share one format.
  */
 export function recipeItemSourceUuid(systemId, index) {
   return `Compendium.fabricate-bench.books.Item.${systemId}-book-${index}`;
@@ -46,19 +24,7 @@ function resultGroup(recipeId, components, random) {
   };
 }
 
-/**
- * A SIMPLE recipe: one ingredient set, one group, one component option, one result.
- *
- * This is the shape that dominates a real library and the one the 10,000-recipe corpus is
- * built from.
- *
- * @param {object} options
- * @param {number} options.index
- * @param {string} options.systemId
- * @param {object[]} options.components
- * @param {() => number} options.random
- * @returns {object}
- */
+/** A SIMPLE recipe: one ingredient set, one group, one component option, one result. */
 export function simpleRecipePayload({ index, systemId, components, random }) {
   const id = `${systemId}-r-${index}`;
   const consumed = components[index % components.length];
@@ -97,23 +63,8 @@ export function simpleRecipePayload({ index, systemId, components, random }) {
 }
 
 /**
- * A RICH recipe: several alternative ingredient sets, multi-option groups mixing component,
- * tag and essence matches, set-level essence requirements, and library tool references.
- *
- * This is the adversarial-but-supported shape. Each extra option multiplies the ingredient
- * solver's branching and each extra set multiplies `evaluateCraftability`'s outer loop, so it
- * is the profile that exercises `IngredientSet.resolveIngredientSelection` for real.
- *
- * @param {object} options
- * @param {number} options.index
- * @param {string} options.systemId
- * @param {object[]} options.components
- * @param {object[]} options.tools
- * @param {() => number} options.random
- * @param {number} [options.setCount]
- * @param {number} [options.groupsPerSet]
- * @param {number} [options.optionsPerGroup]
- * @returns {object}
+ * A RICH recipe: several alternative ingredient sets, multi-option groups mixing component, tag and
+ * essence matches, set-level essence requirements, and library tool references.
  */
 export function richRecipePayload({
   index,
@@ -185,13 +136,7 @@ export function richRecipePayload({
  * A KNOWLEDGE-gated recipe: a simple recipe that additionally carries a recipe-item (book)
  * reference, so the visibility service's book resolution runs for real.
  *
- * @param {object} options
- * @param {number} options.index
- * @param {string} options.systemId
- * @param {object[]} options.components
- * @param {() => number} options.random
  * @param {number} options.bookCount How many distinct books the corpus spreads across.
- * @returns {object}
  */
 export function knowledgeRecipePayload({ index, systemId, components, random, bookCount }) {
   const base = simpleRecipePayload({ index, systemId, components, random });
@@ -203,22 +148,10 @@ export function knowledgeRecipePayload({ index, systemId, components, random, bo
 }
 
 /**
- * An ALCHEMY recipe whose ingredient sets are built to produce a CONTROLLED collision
- * distribution under `SignatureValidator`.
+ * An ALCHEMY recipe whose ingredient sets are built to produce a CONTROLLED collision distribution
+ * under `SignatureValidator`.
  *
- * `collisionRatio` of the corpus draws its group components from a small shared pool, so
- * those recipes' signatures genuinely overlap and the validator's conflict list is non-empty;
- * the rest draw from disjoint index windows and never collide. A corpus with no collisions at
- * all would let a "fixed" validator return early and look free.
- *
- * @param {object} options
- * @param {number} options.index
- * @param {string} options.systemId
- * @param {object[]} options.components
- * @param {() => number} options.random
  * @param {number} options.collidingCount Recipes below this index share the collision pool.
- * @param {number} [options.poolSize]
- * @returns {object}
  */
 export function alchemyRecipePayload({
   index,
@@ -265,22 +198,10 @@ export function alchemyRecipePayload({
 /**
  * A recipe corpus wired into a producer/consumer GRAPH of BOUNDED width and depth.
  *
- * Bounding is not tidiness. `buildRecipeGraph` emits one edge per (producer, consumer) pair
- * per shared component, so an unbounded fan-out is quadratic in recipes and the benchmark
- * becomes the pathology it is meant to measure; and `layoutGraph`'s cycle-detection DFS is
- * recursive and unguarded, so an unbounded CHAIN stack-overflows before layout gets slow.
- * `layerCount` caps the depth and `fanOut` caps the width.
- *
- * @param {object} options
- * @param {number} options.count
- * @param {string} options.systemId
- * @param {object[]} options.components
- * @param {() => number} options.random
  * @param {number} options.layerCount Bounded chain depth.
- * @param {number} options.fanOut How many recipes SHARE one produced component — the width
- *   knob. A hub component with `fanOut` producers and `fanOut` consumers yields `fanOut^2`
- *   edges, so total edge count grows as `count * fanOut` and stays predictable.
- * @returns {object[]}
+ * @param {number} options.fanOut How many recipes SHARE one produced component — the width knob. A
+ * hub component with `fanOut` producers and `fanOut` consumers yields `fanOut^2` edges, so total
+ * edge count grows as `count * fanOut` and stays predictable.
  */
 export function buildGraphCorpus({ count, systemId, components, random, layerCount, fanOut }) {
   const recipes = [];
@@ -296,9 +217,6 @@ export function buildGraphCorpus({ count, systemId, components, random, layerCou
     const positionInLayer = index % perLayer;
     const hub = Math.floor(positionInLayer / fanOut) % hubsPerLayer;
     // Produce this layer's hub output, consume the SAME hub position one layer above.
-    // Strictly layer-decreasing, so the graph is acyclic by construction and the depth is
-    // exactly `layerCount` — which is what keeps `layoutGraph`'s recursive, unguarded
-    // cycle-detection DFS off the stack limit.
     const producedId = hubComponentId(layer, hub);
     const consumedId =
       layer === 0
@@ -339,25 +257,7 @@ export function buildGraphCorpus({ count, systemId, components, random, layerCou
 /**
  * THE DEPTH AXIS: a strictly linear dependency chain of exactly `count` recipes (issue 1082).
  *
- * {@link buildGraphCorpus} varies WIDTH — fan-out at a bounded depth — and cannot produce this
- * shape. Its hub component ids are drawn modulo the shared component library, so asking it for
- * a 20,000-layer chain over a 2,000-component library wraps every 2,000 layers and yields a
- * broad, cyclic graph rather than a deep one. Depth needs its own generator with its own
- * component id space, and it needs one because depth is where the layout used to CRASH: the
- * cycle-detection DFS was recursive and unguarded, and it threw
- * `RangeError: Maximum call stack size exceeded` at a measured depth of 8,193 — inside the
- * 10,000-recipe corpus this programme supports.
- *
- * Recipe `i` consumes chain component `i - 1` and produces chain component `i`, so the graph
- * has exactly `count` nodes, `count - 1` edges, no cycles, and a deepest layer of `count - 1`.
- * Those four figures are all machine-invariant, which is what lets a baseline assert the depth
- * rather than trust the generator.
- *
- * @param {object} options
  * @param {number} options.count Chain depth, in recipes.
- * @param {string} options.systemId
- * @param {() => number} options.random
- * @returns {object[]}
  */
 export function buildGraphChainCorpus({ count, systemId, random }) {
   const recipes = [];
@@ -410,19 +310,7 @@ export function buildGraphChainCorpus({ count, systemId, random }) {
   return recipes;
 }
 
-/**
- * A corpus of `count` recipes of one shape.
- *
- * @param {object} options
- * @param {'simple'|'rich'|'knowledge'|'alchemy'} options.shape
- * @param {number} options.count
- * @param {string} options.systemId
- * @param {object[]} options.components
- * @param {object[]} [options.tools]
- * @param {() => number} options.random
- * @param {object} [options.shapeOptions]
- * @returns {object[]}
- */
+/** A corpus of `count` recipes of one shape. */
 export function buildRecipeCorpus({
   shape,
   count,

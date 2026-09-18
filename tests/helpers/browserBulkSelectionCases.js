@@ -48,21 +48,13 @@ import assert from 'node:assert/strict';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 
 /**
- * These row ids are ASCII kebab-case, so codepoint order and `localeCompare` agree; the
- * comparator is spelled out explicitly anyway (rather than a bare `.sort()`) so a reader
- * cannot mistake the ordering for locale-default and "simplify" it back to the implicit form.
- *
- * @param {string} a
- * @param {string} b
- * @returns {number}
+ * These row ids are ASCII kebab-case, so codepoint order and `localeCompare` agree; the comparator
+ * is spelled out explicitly anyway (rather than a bare `.sort()`) so a reader cannot mistake the
+ * ordering for locale-default and "simplify" it back to the implicit form.
  */
 const compareIds = (a, b) => a.localeCompare(b);
 
-/**
- * Register the seven multi-select cases against one studio.
- *
- * @param {BulkSelectionStudio} studio
- */
+/** Register the seven multi-select cases against one studio. */
 export function describeBrowserBulkSelection(studio) {
   const { harness, prefix, rowClass, rowIdKey, selectionKey, rowsProp } = studio;
 
@@ -114,11 +106,9 @@ export function describeBrowserBulkSelection(studio) {
       assert.equal(selectionCountText(root), '', 'the readout disappears with an empty selection');
     });
 
-    // A studio with no grouping has no way to render FEWER rows than the page holds, so the
-    // case degrades to its flat form rather than being skipped: the page box still has to
-    // act on exactly the rendered rows and no more, and that is what is asserted. Stating it
-    // as one branch of one case rather than as a second `it()` keeps the contract single —
-    // a studio cannot silently answer neither.
+    // A studio with no grouping has no way to render FEWER rows than the page holds, so the case
+    // degrades to its flat form rather than being skipped: the page box still has to act on exactly
+    // the rendered rows and no more, and that is what is asserted.
     it('toggles ONLY the rendered rows from the page box, leaving a collapsed group alone', async () => {
       if (!studio.grouped) {
         const flat = await mountFlat(3);

@@ -1,30 +1,4 @@
-/**
- * Shared currency-REQUIREMENT fixtures (issue 1493).
- *
- * Distinct from `currency-spend-fixtures.js`, which is about the spend/refund ledger. What
- * these build is the evaluation side: a `RecipeManager` whose crafting system has currency
- * enabled, over an injected world ladder, plus the purse-carrying actor a currency
- * requirement is evaluated against.
- *
- * The block below was copied into the three suites that evaluate a real currency
- * requirement — `craftability-evaluation`, `shopping-list-aggregator` and
- * `requirement-rail-mounted` — which is the shape SonarCloud's duplication gate measures. It
- * normalizes literals, so differing system ids and gold amounts do not make two copies
- * distinct, and it scores density PER DIFF, so a small hotfix fails a density a large feature
- * branch passes. `tests/**` counts exactly like `src/**`.
- *
- * `consumption-plan-panel-mounted` is deliberately NOT a consumer: it mounts the panel over a
- * hand-written craftability literal and never builds a manager, so importing this would give
- * it a fixture it has no use for.
- *
- * `RecipeManager` is taken as an explicit PARAMETER rather than imported here. Every suite
- * that uses these fixtures installs the Foundry globals `RecipeManager` loads against and
- * then imports it dynamically; a static import in this module would be hoisted above that
- * setup and load it too early.
- *
- * These live in `tests/helpers/`, which is outside the `npm test` glob — it may hold a
- * fixture module but never a `.test.js`.
- */
+/** Shared currency-REQUIREMENT fixtures (issue 1493). */
 
 /** The default `actorProperty` spend strategy every fixture manager is built with. */
 export const ACTOR_PROPERTY_STRATEGY = 'actorProperty';
@@ -37,22 +11,12 @@ export const SPENDABLE_GOLD_UNITS = Object.freeze([
   Object.freeze({ id: 'gp', label: 'Gold', abbreviation: 'gp', actorPath: 'system.currency.gp' }),
 ]);
 
-/**
- * The same ladder with the actor path CLEARED: present but unusable. This is what
- * `validateCurrencyProfile` rejects, and the state a currency requirement must report as a
- * configuration REASON rather than as an affordability shortfall — telling a player
- * carrying a thousand gold that they cannot pay is the defect, not the fix.
- */
+/** The same ladder with the actor path CLEARED: present but unusable. */
 export const UNSPENDABLE_GOLD_UNITS = Object.freeze([
   Object.freeze({ id: 'gp', label: 'Gold', abbreviation: 'gp' }),
 ]);
 
-/**
- * A minimal crafting system with currency requirements ENABLED and every other feature off.
- *
- * @param {string} systemId
- * @returns {object}
- */
+/** A minimal crafting system with currency requirements ENABLED and every other feature off. */
 export function makeCurrencySystem(systemId) {
   return {
     id: systemId,
@@ -68,16 +32,9 @@ export function makeCurrencySystem(systemId) {
 /**
  * A `RecipeManager` over a currency-enabled system and an injected world ladder.
  *
- * Both scopes go through the CONSTRUCTOR seams rather than the `game.fabricate` global,
- * because these fixtures vary the world half per test while a suite normally shares one
- * global.
- *
- * @param {Function} RecipeManager The class, imported by the caller after its Foundry
- *   globals are installed.
- * @param {object} [options]
- * @param {string} [options.systemId]
+ * @param {Function} RecipeManager The class, imported by the caller after its Foundry globals are
+ * installed.
  * @param {object[]} [options.units] The world's currency ladder.
- * @param {string} [options.spendStrategy]
  * @returns {object} the manager
  */
 export function makeCurrencyRecipeManager(
@@ -93,35 +50,19 @@ export function makeCurrencyRecipeManager(
     getCraftingSystemManager: () => ({ getSystem: (id) => (id === systemId ? system : null) }),
     currencyConfigStore: { get: () => ({ spendStrategy, units: [...units] }) },
   });
-  // Deliberately NOT stamped onto the manager. `RecipeManager` has no `system` field in
-  // production, and a shared fixture that invents one on a production class is how a fake
-  // later reads as real API: the next test to reach for `manager.system` would be reading a
-  // field only this file has ever written. Mutate the system through the closure the
-  // constructor seam already closes over instead.
+  // Deliberately NOT stamped onto the manager.
   return manager;
 }
 
 /**
- * A purse-carrying actor. The pack is empty by default, so only the coin can settle a
- * group offering "these items OR this cost".
- *
- * @param {object} [options]
- * @param {string} [options.id]
- * @param {number} [options.gp]
- * @param {object[]} [options.items]
- * @returns {object}
+ * A purse-carrying actor. The pack is empty by default, so only the coin can settle a group
+ * offering "these items OR this cost".
  */
 export function makePurseActor({ id = 'purse', gp = 0, items = [] } = {}) {
   return { id, items, system: { currency: { gp } } };
 }
 
-/**
- * A currency ingredient OPTION for an authored group.
- *
- * @param {number} amount
- * @param {string} [unit]
- * @returns {object}
- */
+/** A currency ingredient OPTION for an authored group. */
 export function currencyOption(amount, unit = 'gp') {
   return { match: { type: 'currency', unit, amount }, quantity: 1 };
 }

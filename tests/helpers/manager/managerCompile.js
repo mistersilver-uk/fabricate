@@ -1,11 +1,6 @@
 /**
- * The manager root's compiled temp tree, DERIVED from the root's own static import closure
- * (issue 1669). The list was 161 hand-written `writeCompiledSvelte(...)` calls, and a hand list
- * cannot go stale loudly here: a component the tree renders and the list omits does not fail the
- * mounted suite, it HANGS it, and `node --test` reports the blocked tests as `# cancelled`.
- *
- * `tests/helpers/` is outside the `npm test` glob; `tests/helpers-manager.test.js` proves this
- * module from inside it.
+ * The manager root's compiled temp tree, DERIVED from the root's own static import closure (issue
+ * 1669).
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
@@ -21,15 +16,8 @@ export const MANAGER_ROOT = 'src/ui/svelte/apps/manager/CraftingSystemManagerRoo
 /**
  * A RELATIVE specifier in `from '…'`, `import '…'` or `import('…')`. A bare specifier is the
  * package graph and resolves through the temp tree's `node_modules` symlink instead.
- *
- * The specifier may hold no whitespace and comments are blanked before matching, because prose in
- * this tree spells import-shaped sentences: unguarded, one of them resolved to a five-line path.
  */
-/**
- * Order the closure deterministically. `sort()` with no comparator coerces to string and compares
- * UTF-16 units, which is what these paths want, but leaving it implicit reads as an oversight and
- * trips the bug rule that cannot tell a string array from a numeric one.
- */
+/** Order the closure deterministically. */
 function comparePaths(a, b) {
   if (a < b) return -1;
   return a > b ? 1 : 0;
@@ -45,9 +33,6 @@ export const CLOSURE_FLOOR = 50;
 
 /**
  * Every module the mounted root's STATIC graph reaches, split by what the temp tree does with it.
- *
- * The static graph and not the rendered one is what decides, because a compiled `.svelte.js`
- * imports its children unconditionally: an `{#if}` that never runs still needs its child on disk.
  *
  * @param {string} [rootPath] The mounted root, repo-relative.
  * @returns {{ components: string[], modules: string[] }} Sorted repo-relative paths.
@@ -131,12 +116,6 @@ export async function importCompiledComponent(tempRoot, sourcePath) {
 
 /**
  * THE CLOSURE CHECK, kept after the derivation replaced the hand list (issue 1362, issue 1669).
- *
- * It re-walks the root's `.svelte` graph with its OWN narrow matcher against the set the compile
- * actually WROTE, so it is an independent reading rather than a restatement of the derivation:
- * a seed the walk never reaches, a regex that stops matching, or a write that silently fails all
- * surface here. Left undetected each of them hangs the suite — `node --test` reports the blocked
- * tests as `# cancelled`, never `# fail`.
  *
  * @param {Set<string>} compiledSveltePaths Every component `compileManagerTree` wrote.
  * @param {string} [rootPath] The mounted root, repo-relative.

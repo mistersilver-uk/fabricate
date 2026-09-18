@@ -1,45 +1,12 @@
 /**
- * Shared workflow-source primitives for the source-contract tests over `.github/workflows/**`.
- *
- * These walkers and the `if:`-expression tokenizer/evaluator were originally inlined in
- * `tests/ci-workflow-semantics.test.js`. `tests/forward-port-workflow.test.js` needs the same
- * primitives, and `sonar.cpd.exclusions` is inert under SonarCloud Automatic Analysis while
- * `tests/**` duplication counts against the new-code gate — so re-inlining them would fail the
- * quality gate on otherwise correct code. They live here once and both test files import them.
- *
- * This file is deliberately NOT a test file and is NOT collected: `npm test`'s glob is
- * `tests/**\/*.test.js`, which this filename does not match. Before issue #1660 the glob named a
- * fixed set of subdirectories and excluded `tests/helpers/` outright; it is recursive now, so the
- * exclusion rests on the filename alone and `tests/lint-coverage.test.js` asserts that no suite
- * appears under `tests/helpers/`.
- *
- * This is a pragmatic, indentation-driven reader, not a YAML parser. It exists so an assertion can
- * be made against workflow STRUCTURE (a step's `if:`, its `env:` map, its shell body) rather than
- * against a substring of the file, because a substring match passes for code that is wrong in the
- * exact ways these contracts are supposed to catch.
- *
- * ── KNOWN GAP IN `evaluate`: NO FUNCTION CALLS, NO NUMERIC LITERALS ─────────────────────────────
- * The expression grammar covers paths, single-quoted string literals, `!`, `==`, `!=`, `&&`, `||`
- * and parentheses. It does NOT implement the GitHub Actions FUNCTIONS — `always()`, `success()`,
- * `failure()`, `cancelled()`, `contains()`, `startsWith()`, `format()` — and it does NOT accept
- * numeric literals. Both cases THROW rather than mis-evaluating: a call tokenizes as a path
- * followed by unconsumed `(`/`)` tokens and trips the trailing-token assertion, and a number
- * matches no alternation branch and trips `unsupported workflow expression near:`.
- *
- * A consumer that needs to evaluate a job `if:` containing `always()` must substitute it first
- * (`raw.replaceAll('always()', "'x' == 'x'")` models its unconditional truth exactly). Do NOT fall
- * back to substring-matching the gate instead: `&&` -> `||` and `!=` -> `==` both survive every
- * substring check, and those are precisely the mutations these contracts exist to kill.
+ * Shared workflow-source primitives for the source-contract tests over `.github/workflows/**`
+ * (issue 1660).
  */
 
 import assert from 'node:assert/strict';
 
 /**
  * Split a workflow into non-blank, non-comment lines carrying their indentation and source line.
- *
- * Comments are filtered because the structural readers below index sections by indentation, and a
- * comment at a mapping's own indent would otherwise be read as a key. (`runBody` deliberately reads
- * the raw source instead, because a `#` line inside a shell block is body content, not a comment.)
  *
  * @param {string} source The workflow file's contents.
  * @returns {{indent: number, text: string, line: number}[]} One entry per meaningful line.
@@ -107,14 +74,6 @@ export function section(all, name) {
 /**
  * The value of an entry, FOLDING a YAML block scalar when the entry opens one.
  *
- * `promote-to-public.yml` job 4's `if:` is a folded block spanning five lines; the single-line
- * `value()` reader returns only the block indicator for it. `>`/`>-` join with a space (folded),
- * `|`/`|-` join with a newline (literal).
- *
- * KNOWN GAP: an explicit indentation indicator (`|2`, `>-2`) is not recognised, so this returns the
- * literal indicator string rather than the block. Nothing in this repository uses that form; add it
- * here rather than working around it at a call site.
- *
  * @param {{indent: number, text: string}[]} all The entry list containing the entry.
  * @param {number} index The entry's index in that list.
  * @returns {string} The scalar value.
@@ -128,12 +87,8 @@ export function foldedValue(all, index) {
 
 /**
  * The SHELL BODY of a `run:` at a given raw source line, read from the raw source by indentation.
- *
  * Handles `run: |`, `run: |-`, `run: >`-style block openers and the single-line `run: <command>`
- * form. Reading the raw source matters twice over: a `#` line inside the body is content rather than
- * a comment, and the `githubactions:S7630` pre-check must see the body EXACTLY as the shell does, so
- * that a legitimate `${{ ... }}` in the step's `with:`, `env:`, or `if:` is not mistaken for one in
- * a shell line.
+ * form.
  *
  * @param {string} source The workflow file's contents.
  * @param {number} line The zero-based raw line index of the `run:` key.
@@ -238,10 +193,6 @@ function buildSteps(body, source) {
  * Every job of a workflow, indexed by name, with its `if:`, its `with:`/`secrets:`/`permissions:`
  * mappings, and its ordered `steps:`.
  *
- * Jobs are indexed BY INDENTATION (the indent-2 keys of the `jobs:` section), which is what makes
- * the comment filtering in `entries` load-bearing: a workflow carrying an indent-2 comment with a
- * `:` in it would otherwise acquire a spurious job.
- *
  * @param {string} source The workflow file's contents.
  * @returns {Record<string, object>} The jobs.
  */
@@ -283,9 +234,6 @@ export function unwrap(expression) {
 /**
  * Tokenize a GitHub Actions expression.
  *
- * `!=` MUST precede the bare `!` in the alternation, or `a != b` tokenizes as a unary `!` followed
- * by an unmatched `=`.
- *
  * @param {string} expression The bare expression.
  * @returns {{type: string, value: string}[]} The tokens.
  */
@@ -307,10 +255,6 @@ export function tokenize(expression) {
 
 /**
  * Evaluate a GitHub Actions expression against a context object.
- *
- * Supports paths, single-quoted literals, `!`, `==`, `!=`, `&&`, `||` and parentheses ONLY. A
- * function call (`always()`, `success()`, `contains()`, ...) or a numeric literal THROWS — see the
- * file header for why that is deliberate and how to substitute `always()`.
  *
  * @param {string} expression The bare expression.
  * @param {object} context The evaluation context (`inputs`, `steps`, `github`, ...).

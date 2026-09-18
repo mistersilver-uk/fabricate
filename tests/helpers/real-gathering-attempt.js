@@ -1,11 +1,4 @@
-/**
- * The REAL gathering writer chain, as one call (issue 1648, TP14-B).
- *
- * Builds a gathering world out of the production engine, run manager, rich state service
- * and result creator, executes one attempt, serializes the actor flags, reloads a FRESH
- * run manager and exposes the journal projection. Only Foundry documents and the roll /
- * check inputs are doubled — nothing under test is replaced by a fabricated return.
- */
+/** The REAL gathering writer chain, as one call (issue 1648, TP14-B). */
 
 import { GatheringEngine } from '../../src/systems/GatheringEngine.js';
 import { GatheringRichStateService } from '../../src/systems/GatheringRichStateService.js';
@@ -194,8 +187,7 @@ export async function runRealGatheringAttempt({
  * Compose the system/environment/task trio {@link runRealGatheringAttempt} executes.
  *
  * @param {object} [options] Resolution `mode`, authored rows/groups, resolved `components`,
- *   environment `selectionMode` and the system's `failureResultPolicy`.
- * @returns {{system: object, environment: object, task: object, taskId: string}}
+ * environment `selectionMode` and the system's `failureResultPolicy`.
  */
 export function gatheringFixture({
   mode = 'd100',

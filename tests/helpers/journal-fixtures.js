@@ -1,7 +1,4 @@
-// Shared RunModel fixtures for the Journal mounted-component tests. Centralized
-// so the run-card / run-detail / journal-view suites build runs from one factory
-// instead of pasting model literals (keeps new test code under the SonarCloud
-// duplication budget).
+// Shared RunModel fixtures for the Journal mounted-component tests.
 
 /**
  * A crafting RunModel. By default it is a 2-step run gated on world time
@@ -158,18 +155,15 @@ export function makeSucceededRun(overrides = {}) {
 }
 
 /**
- * Historical evidence comes from real execution, serialized actor flags and a fresh manager.
- * Only Item documents, currency settlement and authority are doubled; no evidence is injected.
- * Dynamic imports keep the other mounted fixtures independent of the execution graph.
+ * Historical evidence comes from real execution, serialized actor flags and a fresh manager. Only
+ * Item documents, currency settlement and authority are doubled; no evidence is injected.
  */
 export async function createPersistedCraftingHistory({
   failLast = false, cancelAfter = null, armNext = false, opaque = false,
   resumePrefix = false, stageCount = 2, mode = 'simple', checked = true, awardQuantity = undefined, previewOnly = false, transformBeforeResume = null,
   legacy = false, timed = true, refuseConsumeAt = null, refuseSettlement = false, drive = null,
   // The 99gp plan and the canned 2gp settlement below exist so a history-capture fixture has
-  // currency EVIDENCE to project. A DRIVEN fixture asserts that the engine and the projection
-  // agree, and cannot do that while the engine's settlement is stubbed away, so it settles for
-  // real against the ladder this fixture configures (issue 1648, QE2-5).
+  // currency EVIDENCE to project (issue 1648).
   stubCurrencySettlement = drive === null,
 } = {}) {
   const { CraftingEngine } = await import('../../src/systems/CraftingEngine.js');
@@ -320,9 +314,7 @@ export async function createPersistedCraftingHistory({
         getResultItem: () => null, getComponent: () => null,
         nowWorldTime: () => Number(game.time?.worldTime ?? 0),
         getComponentSourceActors: () => sources,
-        // The three resolution seams `main.js` wires. Without them the projection is currency-
-        // and essence-BLIND rather than currency- and essence-correct, so an agreement assertion
-        // passes in a configuration production never runs (issue 1648, QE2-5).
+        // The three resolution seams `main.js` wires (issue 1648).
         resolveItemEssences: ({ item, recipe: view }) =>
           resolveItemEssences(
             item,

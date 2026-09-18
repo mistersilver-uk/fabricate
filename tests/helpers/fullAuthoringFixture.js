@@ -1,12 +1,7 @@
 /**
- * ONE shared multi-feature authoring fixture + volatile-field normalizer,
- * imported by every import/export test file so the fixture cannot drift and the
- * round-trip/report tests share a single source of truth (Sonar duplication
- * mitigation, Q6). This file is a HELPER, never a `*.test.js`.
- *
- * The fixture deliberately exercises every feature the issue's acceptance
- * checklist requires; `REQUIRED_FIXTURE_FEATURES` (below) is the completeness
- * contract the guard test asserts against so a missing feature fails loudly (Q5).
+ * ONE shared multi-feature authoring fixture + volatile-field normalizer, imported by every
+ * import/export test file so the fixture cannot drift and the round-trip/report tests share a
+ * single source of truth (Sonar duplication mitigation, Q6).
  */
 
 export const FIXTURE_SYSTEM_ID = 'sys-full-authoring';
@@ -16,11 +11,7 @@ export const FIXTURE_TOOL_ID = 'tool-sickle';
 export const FIXTURE_MODIFIER_ID = 'mod-skilled';
 export const FIXTURE_REALM_ID = 'realm-verdant';
 
-/**
- * Build a full authoring fixture.
- *
- * @returns {{ system: object, recipes: object[], environments: object[], gatheringConfig: object, travelConfig: object, characterLibraries: object }}
- */
+/** Build a full authoring fixture. */
 export function buildFullAuthoringFixture() {
   const system = {
     id: FIXTURE_SYSTEM_ID,
@@ -61,9 +52,8 @@ export function buildFullAuthoringFixture() {
         difficulty: 1,
         essences: {},
         aliasItemUuids: [],
-        // An AUTHORED EMPTY salvage check-modifier pick (issue 1095): a real pick of ZERO,
-        // distinct from an absent one, which inherits. It is the one shape a truthiness
-        // test silently loses, and the two resolve to DIFFERENT rolls.
+        // An AUTHORED EMPTY salvage check-modifier pick (issue 1095): a real pick of ZERO, distinct
+        // from an absent one, which inherits.
         salvage: {
           enabled: true,
           resultGroups: [{ id: 'sg-1', name: 'Scrap', results: [] }],
@@ -91,18 +81,12 @@ export function buildFullAuthoringFixture() {
     gatheringRealmSettings: { enabled: true },
     // The modifier library is NOT here: issue 1308 moved it to WORLD scope, so it lives in
     // `characterLibraries` below alongside the character prerequisites.
-    // A NON-DEFAULT selection triple on EACH of the three activity checks. A
-    // default-valued fixture is not an oracle for an allowlist rebuild: `addAll` with an
-    // empty id set and no cap is exactly what a normalizer that emitted NOTHING produces,
-    // so a dropped key would round-trip indistinguishably.
     craftingCheck: {
       enabled: true,
       simple: { rollFormula: '1d20 + @abilities.med.mod', dc: 14 },
-      // Issue 1098. NON-DEFAULT on every activity: the read-time default is `perRecord`,
-      // so a fixture authoring it would be no oracle at all — a normalizer that dropped
-      // the key entirely would round-trip identically. The three checks deliberately
-      // carry DIFFERENT values so a normalizer emitting one activity's policy onto
-      // another (three whitelist rebuilds, one shared derivation) is visible too.
+      // Issue 1098. NON-DEFAULT on every activity: the read-time default is `perRecord`, so a
+      // fixture authoring it would be no oracle at all — a normalizer that dropped the key entirely
+      // would round-trip identically.
       failureResultPolicy: 'always',
       defaultModifierPolicy: 'bySubject',
       defaultModifierIds: ['mod-medicine'],
@@ -112,11 +96,8 @@ export function buildFullAuthoringFixture() {
       enabled: true,
       simple: { rollFormula: '1d20', dc: 12 },
       failureResultPolicy: 'never',
-      // Salvage's failure CONSUMPTION block, persisted since 1.7.0 and — until issue
-      // 1098 — reachable from no editor and projected nowhere. Both values are the
-      // NON-DEFAULT one: `consumeComponentOnFail` defaults TRUE via `!== false`, so a
-      // dropped field is INVERTED rather than merely absent, and `breakToolsOnFail`
-      // defaults FALSE.
+      // Salvage's failure CONSUMPTION block, persisted since 1.7.0 and — until issue 1098 —
+      // reachable from no editor and projected nowhere.
       consumption: { consumeComponentOnFail: false, breakToolsOnFail: true },
       defaultModifierPolicy: 'highest',
       defaultModifierIds: ['mod-medicine', 'mod-alchemy'],
@@ -194,10 +175,7 @@ export function buildFullAuthoringFixture() {
       dangerTags: ['unsafe'],
       includedRealmIds: [FIXTURE_REALM_ID],
       // `enabledTaskIds`, not `forcedTaskIds`: after issue 1315 manual composition IS this list,
-      // and there is no force add in manual mode to produce the other one. A world authored
-      // before that carried the task in `forcedTaskIds`; the 1.29.0 migration folds it to here,
-      // and the import upcast applies the same fold, so this fixture states the folded shape a
-      // GM can actually author today rather than the pre-migration one.
+      // and there is no force add in manual mode to produce the other one.
       enabledTaskIds: [FIXTURE_TASK_ID],
       blindSelection: { weights: { [FIXTURE_TASK_ID]: 3 } },
       conditions: { weather: 'rain', timeOfDay: 'night', visibility: '', notes: '' },
@@ -281,9 +259,7 @@ export function buildFullAuthoringFixture() {
             timeOfDay: ['day'],
             staminaCost: 2,
             toolIds: [FIXTURE_TOOL_ID],
-            // A TWO-ID check-modifier pick (issue 1095). Non-default on both axes: two
-            // ids rather than none, and a pick at all rather than inheritance — so a
-            // normalizer that dropped the key round-trips visibly differently.
+            // A TWO-ID check-modifier pick (issue 1095).
             checkModifierIds: ['mod-medicine', 'mod-alchemy'],
             dropRows: [
               {
@@ -331,13 +307,7 @@ export function buildFullAuthoringFixture() {
     },
   };
 
-  // The WORLD travel configuration (issue 1282). Its realm is the one every realm-gated
-  // environment above cites by id, and it carries the Foundry Scene Region link nested inside
-  // the realm as `sceneMappings[]`.
-  //
-  // The mapping carries an EXPLICIT id on purpose: `normalizeTravelConfig` mints one for a
-  // mapping that arrives without, so a fixture that omitted it would produce a different id on
-  // every export and the round-trip deep-equal could never hold.
+  // The WORLD travel configuration (issue 1282).
   const travelConfig = {
     revealMode: 'alwaysVisible',
     modifierVisibility: 'visible',
@@ -358,14 +328,6 @@ export function buildFullAuthoringFixture() {
   };
 
   // The WORLD character libraries (issue 1308).
-  //
-  // THREE modifier entries on purpose: one carrying BOTH bounds and one carrying NEITHER, because
-  // `min`/`max` are absence-preserving and a fixture where every entry is bounded cannot tell a
-  // round-trip that DROPS the keys from one that writes them everywhere — plus the entry a
-  // gathering drop row references, which used to live in a second library in the gathering config.
-  //
-  // The prerequisite carries a NON-NULL `value`, because the valueless operators normalize `value`
-  // to null and a fixture using one could not tell a round trip that drops the field.
   const characterLibraries = {
     characterPrerequisites: [
       {
@@ -387,11 +349,7 @@ export function buildFullAuthoringFixture() {
   return { system, recipes, environments, gatheringConfig, travelConfig, characterLibraries };
 }
 
-/**
- * The completeness contract the guard test (Q5) enforces. Each predicate reads
- * the fixture and MUST return true; a missing feature makes the guard fail so the
- * fixture cannot silently drift below the issue's required coverage.
- */
+/** The completeness contract the guard test (Q5) enforces. */
 export const REQUIRED_FIXTURE_FEATURES = Object.freeze([
   ['recipe has a check', (f) => f.recipes.some((r) => r.check?.enabled)],
   [
@@ -534,17 +492,10 @@ function slice(fixture) {
 }
 
 /**
- * Volatile-field normalizer for round-trip deep-equal: strips the envelope
- * provenance fields that legitimately change between exports (`exportedAt`,
- * `fabricateVersion`) so two exports of the same authoring data compare equal.
+ * Volatile-field normalizer for round-trip deep-equal: strips the envelope provenance fields that
+ * legitimately change between exports (`exportedAt`, `fabricateVersion`) so two exports of the same
+ * authoring data compare equal (issue 775).
  *
- * Also strips per-recipe `importSource` (issue 775): import stamps durable
- * provenance (a stable `systemId` + a volatile `importedAt`) onto every recipe it
- * writes, so the second (post-import) export legitimately carries it while the
- * first (authored) export does not. It is import-stamped provenance, not authoring
- * data, so it is normalized out of the round-trip comparison.
- *
- * @param {object} payload
  * @returns {object} a clone without volatile fields
  */
 export function normalizeExportEnvelope(payload) {

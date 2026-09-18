@@ -1,48 +1,12 @@
-/**
- * The spread detector for the scoped-entity list shells (issue 1380).
- *
- * ── WHAT IT BANS AND WHY ──────────────────────────────────────────────────────────────────────
- * A shell takes ~20 props and defaults every one of them. That is what makes it usable from four
- * lanes, and it is also what makes `<EntityCatalogueShell {...props} />` dangerous: an object
- * missing a key does not fail, it silently takes the default. A misspelled `sectionNotes` renders
- * every note empty; a misspelled `searchOf` searches the name only; a misspelled `onOpenEntry`
- * gives every row a pen that does nothing. Named props at the call site turn each of those into
- * an unused variable a linter can see.
- *
- * ── IT IS A PURE FUNCTION, AND ITS OWN FIXTURES PROVE IT ──────────────────────────────────────
- * A detector applied to a set that is empty today is exactly the shape that ships green while
- * matching nothing — this epic has already shipped one matcher that could not fail. So this is a
- * function over a STRING rather than a walk baked into a test, and
- * `tests/components/scoped-shell-prop-contract.test.js` exercises it against inline positive and
- * negative fixtures BEFORE applying it to the repository.
- *
- * ── IT KEYS ON THE IMPORT, NOT ON THE TAG NAME ────────────────────────────────────────────────
- * `import Catalogue from '.../EntityCatalogueShell.svelte'` followed by `<Catalogue {...props} />`
- * is the same defect wearing a different name, and a detector matching `<EntityCatalogueShell`
- * literally would miss it — and would then read as coverage for the next lane. So it resolves the
- * LOCAL BINDING from the import specifier's basename first and scans for that.
- */
+/** The spread detector for the scoped-entity list shells (issue 1380). */
 
 /**
  * The value one attribute is given on the FIRST `<Component …>` tag in `source`.
  *
- * ── WHY THIS EXISTS BESIDE THE SPREAD DETECTOR ────────────────────────────────────────────────
- * `paginateRows` clamps the index it RETURNS, and both the row slice and the pagination footer
- * have to read that returned value rather than the frame's own state. The frame ALSO writes the
- * clamped value back — which is correct, and which makes the defect unobservable in a settled
- * DOM: within one flush the two indices agree by construction, so a mounted assertion cannot see
- * the single wrong frame in between. Measured: handing `Pagination` the frame's raw `pageIndex`
- * left the whole mounted suite green.
- *
- * So the footer's input is pinned structurally instead, and — like the spread detector — the
- * parse is proved against a positive and a negative fixture before it is applied, because a
- * source probe that matched nothing would report exactly the same green.
- *
- * @param {string} source
  * @param {string} component the component's local binding name
  * @param {string} attribute the prop name
  * @returns {string|null} the raw attribute value, `''` for a shorthand `{pageIndex}`, or `null`
- *   when the tag or the attribute is absent
+ * when the tag or the attribute is absent
  */
 export function attributeValueOn(source, component, attribute) {
   const start = source.indexOf(`<${component}`);
@@ -58,12 +22,6 @@ export function attributeValueOn(source, component, attribute) {
 /**
  * The open tag beginning at `start`, brace-aware.
  *
- * A naive `[^>]*` stops at the first `>` in the tag, and Svelte call sites are full of arrow
- * functions — `onSelect={(id) => go(id)}` carries one in the second attribute. Counting brace
- * depth is what makes the scan reach the real end of the tag instead of truncating at the first
- * handler and reporting no spread on a tag that has one.
- *
- * @param {string} source
  * @param {number} start index of the `<`
  * @returns {string} the open tag's text, `<` to its closing `>` inclusive
  */

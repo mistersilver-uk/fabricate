@@ -1,26 +1,12 @@
 /**
  * The manager store double every manager mount suite drives (issue 1669, extracted verbatim from
  * `tests/components/manager-mounted.test.js`).
- *
- * `createStore` publishes the `viewState` shape `adminStore` publishes and records every call the
- * root makes into the array it is handed, which is what lets a case assert the SEAM an interaction
- * reached rather than only the DOM it produced.
- *
- * `tests/helpers/` is outside the `npm test` glob; `tests/helpers-manager.test.js` proves this
- * module from inside it.
  */
 import { get, writable } from 'svelte/store';
 
 /**
- * A copy of `card` carrying the projection's non-enumerable `hydrate()` seam, recording its
- * own id in `requests` when a view asks for it (issue 1081).
- *
- * Non-enumerable exactly as `adminComponentRowProjection` defines it, so the spread, the
- * `JSON.stringify` and the bulk-edit models the manager runs over these cards cannot see it.
- *
- * @param {object} card
- * @param {Set<string>} requests
- * @returns {object}
+ * A copy of `card` carrying the projection's non-enumerable `hydrate()` seam, recording its own id
+ * in `requests` when a view asks for it (issue 1081).
  */
 function withHydrateSpy(card, requests) {
   const copy = { ...card };
@@ -35,9 +21,7 @@ function withHydrateSpy(card, requests) {
   return copy;
 }
 
-// The provider declares its OWN tab set, so `ids` is a parameter rather than a copy of
-// Core's four. `tab` decorates each generated tab, which is how the chrome cases attach
-// per-tab titles, subtitles, breadcrumbs and header actions without a second factory.
+// The provider declares its OWN tab set, so `ids` is a parameter rather than a copy of Core's four.
 function downtimeProvider({
   prefix = 'Companion',
   ids = ['tracking', 'activities', 'factions', 'settings'],
@@ -61,22 +45,15 @@ function downtimeProvider({
   };
 }
 
-// Inject a recipe knowledge mode onto a selected system so tests can exercise the
-// recipe-edit inspector gating. Kept out of createStore to hold that helper under
-// the cognitive-complexity budget.
+// Inject a recipe knowledge mode onto a selected system so tests can exercise the recipe-edit
+// inspector gating.
 function applyRecipeKnowledgeMode(system, mode) {
   if (!system || !mode) return system;
   return { ...system, recipeVisibility: { knowledge: { mode } } };
 }
 
-// Merge a selected currency config onto the alchemy fixture so applySelectedSystem
-// (which re-reads systemDetails) preserves the currency config across an Edit click.
-// Mutates the passed systemDetails map. Kept out of createStore to hold that helper
-// under the cognitive-complexity budget.
-// Issue 1278 split currency across two scopes, so one fixture option still describes one
-// coherent setup but lands in two places: `enabled` (participation) on the crafting system, and
-// the ladder/strategy/provider/macros on the WORLD projection. Tests keep passing a single
-// `selectedCurrency` object; `worldCurrencyFrom` below reads the world half back out of it.
+// Merge a selected currency config onto the alchemy fixture so applySelectedSystem (which re-reads
+// systemDetails) preserves the currency config across an Edit click (issue 1278).
 function applySelectedCurrency(systemDetails, selectedCurrency) {
   if (!selectedCurrency) return;
   systemDetails.alchemy = {
@@ -98,32 +75,15 @@ function worldCurrencyFrom(selectedCurrency) {
   };
 }
 
-// Per-system crafting visibility/resolution modes (issue 1151), keyed by system id.
-// Opt-in: with no option the shared default fixture is untouched.
-//
-// These are written into `systemDetails` rather than through
-// `options.selectedSystemOverrides`, and the difference is load-bearing:
-// `applySelectedSystem` republishes `systemDetails[id]` RAW on a scope switch, while
-// the overrides only ever reach the INITIALLY selected system. A mode written the
-// second way would vanish the moment the switch under test happened, and every
-// post-switch assertion would pass vacuously. Mutates the passed map, like
-// `applySelectedCurrency` above, and is kept out of `createStore` for the same
-// cognitive-complexity reason.
+// Per-system crafting visibility/resolution modes (issue 1151), keyed by system id. Opt-in: with no
+// option the shared default fixture is untouched.
 function applySystemCraftingModes(systemDetails, modesById) {
   for (const [id, modes] of Object.entries(modesById || {})) {
     if (systemDetails[id]) systemDetails[id] = { ...systemDetails[id], ...modes };
   }
 }
 
-/**
- * Fill a test's `worldRealms` override out to the shape `adminStore` actually projects.
- *
- * The travel inspector reads the `environments` and `parties` ARRAYS, not only their counts, so a
- * fixture carrying counts alone makes it throw during render. That failure is not loud: Svelte
- * unwinds and the manager falls back to the systems route, so the assertion that fires is a
- * confusing "expected world-travel, got systems" several lines later. Normalizing here means a
- * future override cannot reintroduce it by omission.
- */
+/** Fill a test's `worldRealms` override out to the shape `adminStore` actually projects. */
 function projectedWorldRealms(realms) {
   return realms.map((realm) => ({
     description: '',
@@ -143,10 +103,7 @@ function createStore(calls = [], options = {}) {
   const selectedFeatures = options.selectedFeatures || {
     essences: true,
     effectTransfer: true,
-    // The essence property-macro gate (issue 1036). It defaults to FALSE in the real
-    // normalizer, so it is set explicitly here: without it the On-craft tab renders its
-    // both-off empty state and the Macro capability pill never appears, which would make
-    // every macro assertion in this file pass vacuously.
+    // The essence property-macro gate (issue 1036).
     propertyMacros: true,
     itemTags: true,
     gathering: true,
@@ -154,11 +111,7 @@ function createStore(calls = [], options = {}) {
     salvage: true,
   };
   // Mirrors `adminStore._buildManagedItemOptions`, which is the source of the real
-  // `selectedSystem.managedItemOptions`. `category` (always) and `difficulty` (when
-  // authored) are part of that projection and are carried here deliberately: the salvage
-  // yield picker reads options from this list (issue 676), and its read-only difficulty
-  // badge reads "No difficulty" for a component whose `difficulty` was dropped in
-  // projection. A fixture omitting them would let that regression pass green.
+  // `selectedSystem.managedItemOptions` (issue 676).
   const alchemyManagedItemOptions = options.emptyComponents
     ? []
     : [
@@ -202,46 +155,32 @@ function createStore(calls = [], options = {}) {
       name: 'Alchemy',
       description: 'Potion and essence work',
       resolutionMode: options.alchemyResolutionMode || 'alchemy',
-      // System-level alchemy check mode (issue 554). Defaults to `simple` so the
-      // Checks tab renders the simple pass/fail editor for the default fixture;
-      // tests exercising None/Tiered pass their own `alchemyConfig`.
+      // System-level alchemy check mode (issue 554).
       alchemy: options.alchemyConfig ?? {
         checkMode: 'simple',
         learnOnCraft: true,
         consumeOnFail: true,
         showAttemptHistoryToPlayers: false,
       },
-      // `enabled` defaults ON in this fixture (issue 1096), and a test that supplies its own
-      // still wins. It has to be stated now because it became LOAD-BEARING: an optional
-      // check that is off collapses its route to the "turn this check on" empty state, so a
-      // fixture that left `enabled` absent would have silently stopped rendering the editor
-      // every assertion below is about. The persisted default is still `=== true` — this is
-      // a fixture choice, not a change to the normalizer.
+      // `enabled` defaults ON in this fixture (issue 1096), and a test that supplies its own still
+      // wins.
       craftingCheck: { enabled: true, ...(options.craftingCheck || {}) },
       // The ONE modifier library (issues 1095, 1117) is NOT here any more: issue 1308 moved it to
-      // WORLD scope, so it rides the view state's `worldModifiers` slice below. The warning the
-      // old comment carried still holds there — the projection is an ALLOWLIST, and an
-      // unforwarded key renders an empty library on every activity, which is exactly the silent
-      // state this fixture exists to make reachable.
+      // WORLD scope, so it rides the view state's `worldModifiers` slice below.
       salvageResolutionMode: options.salvageResolutionMode || 'simple',
       salvageCraftingCheck: { enabled: true, ...(options.salvageCraftingCheck || {}) },
       gatheringCraftingCheck: { enabled: true, ...(options.gatheringCraftingCheck || {}) },
-      // Travel & Realms PARTICIPATION (issue 1282). The System Settings feature tile beside
-      // Currency reads it off the selected system, exactly as the Currency tile reads
-      // `requirements.currency.enabled`.
+      // Travel & Realms PARTICIPATION (issue 1282).
       gatheringRealmSettings: { enabled: options.gatheringRealmsEnabled === true },
       features: selectedFeatures,
       // Overridable so a test can supply its own component set (the Tool display
       // precedence cases resolve `componentId` against their own fixtures); defaults to
       // the alchemy list every other test relies on.
       managedItemOptions: options.managedItemOptions ?? alchemyManagedItemOptions,
-      // System-level recipe visibility config (issue 511). The Books & Scrolls
-      // surface reads the shared use/learn caps from here; left undefined unless a
-      // test supplies one (the visibility card then falls back to its defaults).
+      // System-level recipe visibility config (issue 511).
       recipeVisibility: options.recipeVisibility,
-      // Recipe items (cook books / scrolls) surfaced by the Books & Scrolls
-      // management surface (issue 511). r1 links to the first book, so the
-      // surface can show a linked-recipe count and the shared cap chips.
+      // Recipe items (cook books / scrolls) surfaced by the Books & Scrolls management surface
+      // (issue 511).
       recipeItemDefinitions: options.recipeItemDefinitions ?? [
         {
           id: 'ri1',
@@ -256,9 +195,8 @@ function createStore(calls = [], options = {}) {
           description: '',
         },
       ],
-      // Tools are system-owned: the manager reads the library from
-      // selectedSystem.tools (not gatheringConfig). Mirror the option here so the
-      // Tools browser + the gathering task editor's tool picker see them.
+      // Tools are system-owned: the manager reads the library from selectedSystem.tools (not
+      // gatheringConfig).
       tools: options.gatheringLibraryTools || [],
       essenceDefinitions: [
         {
@@ -331,9 +269,7 @@ function createStore(calls = [], options = {}) {
         img: 'icons/commodities/metal/ore-chunk-grey.webp',
         description: 'Unrefined metal.',
         tags: ['ore', 'metal'],
-        // Component category (issue 676) — the browser's grouping/filter axis. This one
-        // is deliberately a CUSTOM category that exists only in this system, so the
-        // system-switch facet-reset test has something real to hide.
+        // Component category (issue 676) — the browser's grouping/filter axis.
         category: 'Reagent',
         essences: [{ id: 'earth', name: 'Earth', icon: 'fas fa-mountain', quantity: 2 }],
         registeredItemUuidDisplay: 'Compendium.fabricate.items.iron-ore',
@@ -370,9 +306,8 @@ function createStore(calls = [], options = {}) {
         sourceMissing: false,
         showTags: true,
         showEssences: true,
-        // Mirror the normalized component shape: the `difficulty` key is always
-        // present and set to undefined when unset, so the browser must show
-        // "None" by value (not by key absence).
+        // Mirror the normalized component shape: the `difficulty` key is always present and set to
+        // undefined when unset, so the browser must show "None" by value (not by key absence).
         difficulty: undefined,
       },
       ...(options.extendedComponentCards
@@ -584,10 +519,8 @@ function createStore(calls = [], options = {}) {
         associatedItemName: 'Iron Ore',
         sourceName: 'Iron Ore',
         sourceState: 'linked',
-        // Issue 1036. `earth` is the ENABLED, fully-configured essence: a colour, a linked
-        // source, a property macro, and both usage axes non-zero. Its `componentUsageCount`
-        // (1) and `recipeUsageCount` (2) DIFFER on purpose — an impact statement that
-        // derived one from the other would pass against equal numbers.
+        // Issue 1036. `earth` is the ENABLED, fully-configured essence: a colour, a linked source,
+        // a property macro, and both usage axes non-zero.
         enabled: true,
         colorToken: 'rose',
         propertyMacroUuid: 'Macro.earth-infusion',
@@ -613,9 +546,7 @@ function createStore(calls = [], options = {}) {
         associatedItemName: null,
         sourceName: '',
         sourceState: 'none',
-        // The DISABLED, unconfigured counterpart — no colour, no source, no macro. It carries
-        // one recipe, which `earth` also carries, so the bulk impact's recipe UNION (2) is
-        // smaller than the per-essence SUM (3).
+        // The DISABLED, unconfigured counterpart — no colour, no source, no macro.
         enabled: false,
         colorToken: null,
         propertyMacroUuid: null,
@@ -715,9 +646,8 @@ function createStore(calls = [], options = {}) {
               locked: true,
               incomplete: true,
               // This suite hand-builds projected rows rather than running the real
-              // `_buildRecipeList`, so the projection's `enableBlocked` (issue 1010) has to
-              // be stated here. The row pills now read it rather than `incomplete`, and r2
-              // is exactly the off-and-un-enableable case the assertion below is about.
+              // `_buildRecipeList`, so the projection's `enableBlocked` (issue 1010) has to be
+              // stated here.
               enableBlocked: true,
               isSimple: false,
               structureLabel: 'Single step',
@@ -744,12 +674,9 @@ function createStore(calls = [], options = {}) {
       { name: 'elixirs', count: 1 },
       { name: 'potions', count: 1 },
     ],
-    // The recipe half of the Tags & Categories reference count, published as DATA by the
-    // real store (issue 1081) so the always-mounted nav badge does not have to walk the
-    // rows' detail tier for it. Left UNDEFINED by default, which is what makes the default
-    // rows' counts unchanged: an absent record means "not published", and the component
-    // falls back to walking exactly as it did before. Tests asserting on the pre-counted
-    // branch publish it, as the store does on every one of its publishes.
+    // The recipe half of the Tags & Categories reference count, published as DATA by the real store
+    // (issue 1081) so the always-mounted nav badge does not have to walk the rows' detail tier for
+    // it.
     recipeTagPlaceholderCounts: options.recipeTagPlaceholderCounts,
     recipeSearchTerm: '',
     itemSearchTerm: options.itemSearchTerm || '',
@@ -933,20 +860,14 @@ function createStore(calls = [], options = {}) {
                   dropRows: [],
                 },
               ],
-          // Opt-in only: the event library is empty by default so the many existing
-          // assertions about the encounters browser's empty state stay true. Tests that
-          // need to reach the gathering-EVENT editor pass `gatheringLibraryEvents`.
+          // Opt-in only: the event library is empty by default so the many existing assertions
+          // about the encounters browser's empty state stay true.
           events: options.gatheringLibraryEvents || [],
           tools: options.gatheringLibraryTools || [],
         },
       },
     },
-    // THE WORLD SCOPE PROJECTION, seeded from the same tool roster (issue 1373). The rules
-    // editor reads its `(tool, system)` row for the ONE fact the system's own record cannot
-    // state - whether each world-default section is inherited or overridden - and reads
-    // `member` to decide whether to offer the inherit switches and the removal callout at all.
-    // Every seeded row is a MIGRATED one: `migrateToolRequirementSections` writes all four
-    // sections overridden, so that is the state every existing world is actually in.
+    // THE WORLD SCOPE PROJECTION, seeded from the same tool roster (issue 1373).
     worldScope: {
       tool: {
         entities: (options.gatheringLibraryTools || []).map((tool) => ({ id: tool.id })),
@@ -972,15 +893,11 @@ function createStore(calls = [], options = {}) {
     // Participation is the SELECTED SYSTEM's answer; the reveal/visibility pair beside it is
     // the world's (issue 1282).
     gatheringRealmSettings: { enabled: options.gatheringRealmsEnabled === true },
-    // `memberActorUuids` is carried by the REAL projection — `adminStore` spreads the stored
-    // party before adding `memberCards` — and the card body and the page-header subtitle both
-    // read it. A double that omitted it was looser than the helper it stands for, which is
-    // exactly how a subtitle that always counted zero assigned characters would pass green.
+    // `memberActorUuids` is carried by the REAL projection — `adminStore` spreads the stored party
+    // before adding `memberCards` — and the card body and the page-header subtitle both read it.
     worldCurrency: worldCurrencyFrom(options.selectedCurrency),
     // The two character libraries are WORLD scope since issue 1308, so they ride the view state
-    // beside the currency ladder rather than the selected system. `options.modifiers` and
-    // `options.characterPrerequisites` keep their fixture names — the surfaces that read them
-    // have not moved yet, only where the data comes from.
+    // beside the currency ladder rather than the selected system.
     worldModifiers: options.modifiers || [],
     worldCharacterPrerequisites: options.characterPrerequisites || [],
     travelParties: options.travelParties || [
@@ -1060,9 +977,7 @@ function createStore(calls = [], options = {}) {
 
   function componentCardsFor(id) {
     if (options.emptyComponents) return [];
-    // Pad the managed list so the browser paginates. A selection is held on the lifted
-    // browser state, not on the page, so proving that Apply carries an id the current page
-    // does not even render needs more rows than one page holds.
+    // Pad the managed list so the browser paginates.
     const padded = options.extraComponentItems
       ? [...(componentItems[id] || []), ...options.extraComponentItems]
       : componentItems[id] || [];
@@ -1072,23 +987,15 @@ function createStore(calls = [], options = {}) {
           ? { ...item, sourceMissing: true, sourceOrigin: 'missing', sourceOriginLabel: 'Missing' }
           : item
       )
-      // Issue 1081: the real projection hands out cards carrying a NON-ENUMERABLE `hydrate()`
-      // that resolves the card's linked source document — the "Missing" verdict and the live
-      // description fallback — only when a view asks for it. Opting in records which cards
-      // the manager asked for; a fresh copy per call, because a refresh really does project
-      // fresh card objects and the request has to be re-made against them.
+      // Issue 1081: the real projection hands out cards carrying a NON-ENUMERABLE `hydrate()` that
+      // resolves the card's linked source document — the "Missing" verdict and the live description
+      // fallback — only when a view asks for it.
       .map((item) =>
         options.componentHydrationRequests
           ? withHydrateSpy(item, options.componentHydrationRequests)
           : item
       );
-    // `itemCards` is the SEARCH-FILTERED list. In production `_buildItemCards` calls
-    // `CraftingSystemManager.getItems(systemId, itemSearchTerm)`, which returns the whole
-    // managed list for an empty search and a name/description/uuid/tag-matched subset
-    // otherwise — while `selectedSystem.managedItemOptions` is built from the UNFILTERED
-    // managed items. That asymmetry is real and load-bearing (issue 676: it leaked the
-    // browser's search into the salvage yield picker), so the fixture reproduces it
-    // rather than pretending `itemCards` is always everything.
+    // `itemCards` is the SEARCH-FILTERED list (issue 676).
     const search = String(options.itemSearchTerm || '')
       .trim()
       .toLowerCase();
@@ -1134,9 +1041,7 @@ function createStore(calls = [], options = {}) {
     createSystem: () => {
       calls.push(['createSystem']);
       if (Object.hasOwn(options, 'createSystemResult')) return options.createSystemResult;
-      // Model the real action: it registers the system, SELECTS it, and refreshes before
-      // resolving. A stub that only returns an object would let the root navigate to
-      // whichever system was already selected and still pass.
+      // Model the real action: it registers the system, SELECTS it, and refreshes before resolving.
       const created = {
         id: 'created-system',
         name: 'New Crafting System',
@@ -1257,10 +1162,8 @@ function createStore(calls = [], options = {}) {
     exportRecipes: () => calls.push(['exportRecipes']),
     setRecipeSearch: (term) => calls.push(['setRecipeSearch', term]),
     // The THIRD argument is load-bearing and is captured deliberately. It carries the
-    // blocked-enable `onBlocked` sink: supplying it is what makes the real store
-    // SUPPRESS its Foundry notification. Drop it anywhere in the row → root → store
-    // chain and the in-window flash dies while the toast silently returns, so a stub
-    // that swallowed it would let that regression through green.
+    // blocked-enable `onBlocked` sink: supplying it is what makes the real store SUPPRESS its
+    // Foundry notification.
     toggleRecipeEnabled: (id, enabled, toggleOptions) => {
       calls.push(['toggleRecipeEnabled', id, enabled, toggleOptions]);
       return options.toggleRecipeEnabledResult ?? true;
@@ -1287,10 +1190,7 @@ function createStore(calls = [], options = {}) {
       return options.deleteRecipeResult ?? true;
     },
     setItemSearch: (term) => calls.push(['setItemSearch', term]),
-    // Called by the root's route effect on every scope change (issue 1462). The real store
-    // short-circuits internally, so the component calls it unconditionally and this records
-    // every call — which is why the cases assert call DELTAS across one click rather than
-    // presence.
+    // Called by the root's route effect on every scope change (issue 1462).
     clearLibrarySearches: () => calls.push(['clearLibrarySearches']),
     deleteComponent: (id) => calls.push(['deleteComponent', id]),
     // The set delete (issue 1129). `describeComponentDelete` is a SYNCHRONOUS selector the
@@ -1324,16 +1224,13 @@ function createStore(calls = [], options = {}) {
       if (options.updateComponentReject) return Promise.reject(new Error('update failed'));
       return options.updateComponentResult ?? true;
     },
-    // The set-apply bulk write (issue 772). It takes the selection `Set` directly and
-    // already refreshes internally, so the root neither converts nor re-refreshes; the
-    // recorded call is normalized to an array purely so a test can compare it.
+    // The set-apply bulk write (issue 772).
     applyComponentBulkEdit: (componentIds, edit) => {
       const ids = [...(componentIds || [])];
       calls.push(['applyComponentBulkEdit', ids, edit]);
-      // The real action returns the write RESULT, never a boolean: `null` for "nothing was
-      // written" and `{updated}` counting the components that actually CHANGED, which is
-      // what the toast names. Defaulting to `ids.length` keeps the common case honest while
-      // a test can hand back a smaller count, or `null`, to drive the other branches.
+      // The real action returns the write RESULT, never a boolean: `null` for "nothing was written"
+      // and `{updated}` counting the components that actually CHANGED, which is what the toast
+      // names.
       if (Object.hasOwn(options, 'applyComponentBulkEditResult')) {
         return options.applyComponentBulkEditResult;
       }
@@ -1350,10 +1247,7 @@ function createStore(calls = [], options = {}) {
       }
       return { updated: ids.length, recipeIds: ids };
     },
-    // The recipe set delete (issue 1132). `describeRecipeDelete` is a SYNCHRONOUS selector
-    // the root `$derived`s the panel's impact from, exactly as its component twin above is —
-    // an async double here would render an unresolved impact and the card would silently
-    // show zeroes and disable itself.
+    // The recipe set delete (issue 1132).
     describeRecipeDelete: (recipeIds) => {
       const ids = [...(recipeIds || [])];
       return (
@@ -1381,27 +1275,15 @@ function createStore(calls = [], options = {}) {
         }
       );
     },
-    // FIVE positional arguments. `colorToken` (issue 917) is the last of them, and a
-    // four-parameter stub records a call that looks identical whether the argument is
-    // threaded or silently dropped — which is exactly how the value went missing once
-    // already. Recording it is what makes the assertion below able to fail.
-    //
-    // SIX arguments as of issue 1036: the sixth is the options bag carrying `enabled` and
-    // `propertyMacroUuid`, both of which the editor can author BEFORE the first save. A
-    // five-parameter stub records a call that looks identical whether they are threaded or
-    // silently dropped — which is exactly how `colorToken` went missing once already.
+    // FIVE positional arguments. `colorToken` (issue 917) is the last of them, and a four-parameter
+    // stub records a call that looks identical whether the argument is threaded or silently dropped
+    // — which is exactly how the value went missing once already.
     addEssence: (name, description, icon, sourceComponentId, colorToken, extra) => {
       calls.push(['addEssence', name, description, icon, sourceComponentId, colorToken, extra]);
       if (options.addEssenceReject) return Promise.reject(new Error('add failed'));
       return options.addEssenceResult ?? true;
     },
-    // The essence actions issue 1036 adds beside the two above. Each is reached OPTIONAL-CHAINED
-    // from the root, so an absent export no-ops silently — these stubs are what make the wiring
-    // detectable at all.
-    //
-    // `duplicateEssence` is NOT among them any more (issue 1372, maintainer parity round 8): the
-    // store publishes no such verb and the inspector renders no such control. Leaving the stub
-    // here would make a re-added call site look wired in every mounted assertion.
+    // The essence actions issue 1036 adds beside the two above.
     setEssenceEnabled: (id, enabled) => {
       calls.push(['setEssenceEnabled', id, enabled]);
       return { updated: true, invalidatedRecipes: 0 };
@@ -1422,9 +1304,7 @@ function createStore(calls = [], options = {}) {
       calls.push(['deleteEssences', ids]);
       if (options.deleteEssencesReject) return Promise.reject(new Error('delete failed'));
       // `recipesDisabled` is in the default, not just the explicit results, because the real
-      // `adminStore.deleteEssences` always returns it (issue 1144). A double that omits it is
-      // looser than production, and every toast test that does NOT pass an explicit result would
-      // then be asserting against a shape the app never produces.
+      // `adminStore.deleteEssences` always returns it (issue 1144).
       return (
         options.deleteEssencesResult ?? {
           deleted: ids.length,
@@ -1443,9 +1323,8 @@ function createStore(calls = [], options = {}) {
       if (options.updateEssenceReject) return Promise.reject(new Error('update failed'));
       return options.updateEssenceResult ?? true;
     },
-    // Renamed from `removeEssence` in issue 1036 so the singular delete pairs with the
-    // new `deleteEssences` set delete. The store now returns a boolean rather than
-    // `undefined`, which is what lets a caller tell a cancelled confirm from a write.
+    // Renamed from `removeEssence` in issue 1036 so the singular delete pairs with the new
+    // `deleteEssences` set delete.
     deleteEssence: (id) => {
       calls.push(['deleteEssence', id]);
       return true;
@@ -1457,9 +1336,7 @@ function createStore(calls = [], options = {}) {
     },
     removeCategory: (value) => calls.push(['removeCategory', value]),
     setCategoryIcon: (name, icon) => calls.push(['setCategoryIcon', name, icon]),
-    // The COMPONENT category vocabulary (issue 676). The root calls these
-    // optional-chained, so an absent store export no-ops SILENTLY — these stubs plus
-    // the call-site assertions below are what make that detectable at all.
+    // The COMPONENT category vocabulary (issue 676).
     addComponentCategory: (value, icon) => {
       calls.push(['addComponentCategory', value, icon]);
       return options.addComponentCategoryResult ?? true;
@@ -1525,14 +1402,10 @@ function createStore(calls = [], options = {}) {
     },
     saveCraftingCheckSimple: (simple) => {
       calls.push(['saveCraftingCheckSimple', simple]);
-      // A store save that REFUSES, mirroring `saveSystemDetails`/`updateEssence`. The route
-      // exit is gated on the answer, so a fixture that could only ever succeed cannot tell a
-      // guard that inspects it from one that returns `true` unconditionally.
+      // A store save that REFUSES, mirroring `saveSystemDetails`/`updateEssence`.
       return options.saveCraftingCheckSimpleResult;
     },
-    // The Checks Studio's three-way route-exit prompt (issue 1096). It is `confirmDiscard*`
-    // like its eight siblings and returns 'save' | 'discard' | 'cancel'; `true` is the legacy
-    // discard alias the root also accepts.
+    // The Checks Studio's three-way route-exit prompt (issue 1096).
     confirmDiscardDirtyChecksDraft: (activities) => {
       calls.push(['confirmDiscardDirtyChecksDraft', activities]);
       return options.confirmDiscardChecksResult ?? true;
@@ -1634,9 +1507,8 @@ function createStore(calls = [], options = {}) {
     deleteGatheringVocabularyValue: (...args) =>
       calls.push(['deleteGatheringVocabularyValue', ...args]),
     // Participation is a CRAFTING SYSTEM write since issue 1282, so the double republishes BOTH
-    // projections of it: the System Settings tile reads `selectedSystem.gatheringRealmSettings`
-    // and the travel view-model carries its own copy. A double that moved only one of them would
-    // leave the tile stuck at its old state and read as a toggle that does nothing.
+    // projections of it: the System Settings tile reads `selectedSystem.gatheringRealmSettings` and
+    // the travel view-model carries its own copy.
     setGatheringRealmsEnabled: (systemId, enabled) => {
       calls.push(['setGatheringRealmsEnabled', systemId, enabled]);
       viewState.update((state) => ({
@@ -1746,8 +1618,7 @@ function createStore(calls = [], options = {}) {
     },
     // Also absent until issue 919. The root optional-chains to `undefined` and reads that as
     // "proceed", so the cancel branch of the save was undrivable and nothing pinned what a
-    // cancellation must leave on screen. Proceeding stays the default, which is exactly what
-    // the missing method already meant.
+    // cancellation must leave on screen.
     confirmGatheringLibraryTaskCompositionLoss: (systemId, taskId, draft) => {
       calls.push(['confirmGatheringLibraryTaskCompositionLoss', systemId, taskId, draft]);
       return options.confirmGatheringLibraryTaskCompositionLossResult !== false;
@@ -1870,8 +1741,6 @@ function createStore(calls = [], options = {}) {
     },
     // THE TWO IMMEDIATE-PERSISTENCE WRITES THE RULES EDITOR PERFORMS (issue 1373): stop using a
     // Tool in this system, and move one world-default section between inheriting and overriding.
-    // Both are the store's because both are TWO writes — a world membership record and the
-    // in-system record — and the editor must not perform half of either.
     removeToolFromSystem: (...args) => {
       calls.push(['removeToolFromSystem', ...args]);
       viewState.update((state) => ({

@@ -1,55 +1,8 @@
 /**
- * Operation counters — the class-1, machine-invariant half of the benchmark harness
- * (issue 1071).
- *
- * Wall-clock numbers cannot be committed and compared: this repository has already
- * re-estimated the Foundry `rc` walk budget three times because hosted-runner timing did not
- * match local (`scripts/lib/foundryRunBudget.js`). Counts do not have that problem. The same
- * fixture examines the same number of candidates on every machine and every Node build, so a
- * count is a value a reviewer can read in a diff and a test can assert.
- *
- * ## Why the counters live in the FIXTURE and not in `src/`
- *
- * Issue 1071 is explicitly a no-production-change issue, and instrumentation seams are #1072's
- * job. So nothing here edits the code under measurement. Instead the counters ride on the
- * inputs the code is handed:
- *
- * - {@link countingCandidates} returns a real array (`Array.isArray` still true — every
- *   resolver guards on it) whose `find` / `filter` / `some` / `every` / `findIndex` wrap the
- *   caller's predicate. The predicate of `Array.prototype.find` is invoked exactly once per
- *   element examined, so counting invocations counts candidates examined — which is the term
- *   `resolveComponentForItem`'s raw-reference tier and `findComponentByName`'s fallback scan
- *   are linear in.
- * - {@link countingActor} makes `items` a getter, so it counts BOTH how many times a hot path
- *   re-reads an actor's inventory and how many item objects that cost. That is the
- *   `sourceActors.flatMap((actor) => [...actor.items])` re-flattening `evaluateCraftability`
- *   performs once per recipe.
- * - {@link countCalls} wraps one method on one instance, for a collaborator the harness
- *   constructs itself (`SignatureValidator#signaturesOverlap`, the ingredient matcher).
- *
- * ## Non-vacuity
- *
- * A counter that cannot go up is worse than no counter: it reports a green baseline forever.
- * `tests/benchmark-harness.test.js` therefore asserts {@link countingCandidates},
- * {@link countingActor} and {@link countCalls} against a case whose expected value is derived
- * from the fixture's declared scale rather than from a recorded observation — a miss over an
- * N-component library examines at least N candidates, and a durable-flag hit examines strictly
- * fewer.
- *
- * {@link countingEnumerations} is the exception, and deliberately so rather than by omission:
- * it arrived with issue 1202 and its non-vacuity is proved where it is USED, by the two bulk
- * guards in `tests/runtime-definition-indexes.test.js`. Those redden under a
- * `for (const c of components)` reintroduction that leaves the predicate counter reading zero,
- * which is a stronger demonstration than a standalone probe: it proves the wrapper sees the
- * one shape the rest of this module cannot.
+ * Operation counters — the class-1, machine-invariant half of the benchmark harness (issue 1071).
  */
 
-/**
- * A counter bag. Keys are created on first use, so a case only pays for what it names.
- *
- * @returns {{bump: (key: string, amount?: number) => void, get: (key: string) => number,
- *   snapshot: () => Record<string, number>, reset: () => void}}
- */
+/** A counter bag. Keys are created on first use, so a case only pays for what it names. */
 export function createOperationCounters() {
   const counts = new Map();
   return {
@@ -109,20 +62,14 @@ export function countingCandidates(values, counters, key) {
 }
 
 /**
- * The array methods that reach every element through a per-element CALLBACK, and that
- * {@link countingCandidates}' `PREDICATE_METHODS` list does not carry.
- *
- * `findLastIndex` is in here rather than being a `PREDICATE_METHODS` omission worth fixing in
- * place: widening the predicate list moves every committed benchmark count that walks a
- * component array and needs a `--record` pass, which is a separate change from making a guard
- * able to fail.
+ * The array methods that reach every element through a per-element CALLBACK, and that {@link
+ * countingCandidates}' `PREDICATE_METHODS` list does not carry.
  */
 const CALLBACK_ENUMERATORS = ['forEach', 'reduce', 'reduceRight', 'flatMap', 'findLastIndex'];
 
 /**
  * The iterator-returning methods that reach every element WITHOUT a callback and that do not
- * collide with `definitionIndex`'s own instrumentation. `entries` is deliberately absent — see
- * {@link countingEnumerations}.
+ * collide with `definitionIndex`'s own instrumentation.
  */
 const ITERATOR_ENUMERATORS = ['keys', 'values'];
 
@@ -252,13 +199,6 @@ export function countingActor(actor, counters, key) {
 /**
  * Count calls to one method of one instance the harness owns.
  *
- * Deliberately per-instance and never on a prototype: a prototype patch would leak into
- * every other case in the same process and turn a shared count into a running total.
- *
- * @param {object} target
- * @param {string} method
- * @param {{bump: (key: string, amount?: number) => void}} counters
- * @param {string} key
  * @returns {() => void} A disposer restoring the original method.
  */
 export function countCalls(target, method, counters, key) {

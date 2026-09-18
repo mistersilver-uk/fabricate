@@ -1,41 +1,4 @@
-/*
- * The cascade instrument for the `manager-button` → `ManagerButton` conversion (issue 1118).
- *
- * ── WHY IT EXISTS ────────────────────────────────────────────────────────────────────────
- * Converting a hand-written manager button adds a SECOND class, `fab-manager-button`, and
- * `styles/fabricate.css` declares `.fabricate-button.manager-button.fab-manager-button` at
- * specificity (0,3,0). Every rule a converted button already matched is therefore
- * re-arbitrated, and a rule that wins today only because it sits LATER in the sheet loses
- * silently the moment the sweep is licensed to move declarations around.
- *
- * Three rounds of plan review each enumerated that hazard by hand and each round found a band
- * the previous had missed — bespoke classes at (0,2,0), then ancestor-context rules at (0,3,0)
- * that tie and lose on source order, then thirteen more selectors at that same level plus one
- * inside a container everybody had certified as safe. Hand enumeration is the defect. This
- * module derives the set BY CONSTRUCTION instead: it parses every rule in the global sheet and
- * every rule in every compiled scoped component sheet, scores specificity, resolves each rule
- * against the real call sites found in the real markup, and reports what it cannot see rather
- * than guessing.
- *
- * ── WHAT "AT RISK" MEANS HERE ────────────────────────────────────────────────────────────
- * A rule is at risk when it BOTH ties with or loses to the primitive's rule on specificity AND
- * declares at least one property the primitive's rule also declares. A tie counts even when the
- * rule currently wins on source order: the conversion sweep rewrites this sheet, so anything
- * whose appearance depends on source order is a latent repaint, not a safe one. A rule that
- * declares only properties the primitive never touches cannot be repainted and is not at risk.
- *
- * Paint counts as much as geometry. `.manager-button.is-dashed` and
- * `.manager-button.is-warning-action` declare colour and no geometry at all, so a
- * geometry-only report would miss them entirely.
- *
- * ── WHAT IT CANNOT SEE ───────────────────────────────────────────────────────────────────
- * Named, not hidden. `blindSpots()` returns the list at runtime and the inventory prints it.
- * The headline ones: an ancestor supplied by a CALLER component cannot be resolved statically,
- * so those sites are reported as `unresolved` with the candidate providers named; the role
- * classes the conversion will ADD are not modelled, because role assignment is a per-site
- * design decision; and specificity here is COMPUTED, not measured — `manager-layout.test.js`
- * remains the real-browser gate.
- */
+/** The cascade instrument for the `manager-button` → `ManagerButton` conversion (issue 1118). */
 import { compile } from 'svelte/compiler';
 
 import { collectWorkingTreeSources } from './sourceScan.js';
@@ -43,34 +6,20 @@ import { collectWorkingTreeSources } from './sourceScan.js';
 const GLOBAL_SHEET = 'styles/fabricate.css';
 const PRIMITIVE_CLASS = 'fab-manager-button';
 // The class the family is ROOTED at since issue 1502. `ManagerButton.svelte` emits it as the
-// leading literal of its `classes` array, so a site the sweep converts gains it exactly as it
-// gains `fab-manager-button`, and `collectSites` adds both synthetically for the same reason: a
-// converted site writes NEITHER in the markup this scanner reads.
-//
-// It is load-bearing here rather than cosmetic. Every re-rooted rule in the sheet now leads with
-// `.fabricate-button`, so a site model that omitted it would have those rules reaching NOTHING —
-// every winner this instrument derives would change, and the reviewed inventory's re-key would
-// stop being mechanical. A hand-written carrier picks the root up through `tokens` instead,
-// because it writes the token literally.
+// leading literal of its `classes` array, so a site the sweep converts gains it exactly as it gains
+// `fab-manager-button`, and `collectSites` adds both synthetically for the same reason: a converted
+// site writes NEITHER in the markup this scanner reads.
 const ROOT_CLASS = 'fabricate-button';
 const CONTRACT_CLASS = 'manager-button';
 const APP_ROOT_CLASS = 'fabricate-manager';
 // `ArmedDangerButton` renders the same CSS contract but is a primitive in its own right and is
 // explicitly out of the conversion's scope, so its site is enumerated and then held back.
-//
-// Held back means held back COMPLETELY: it is a consumer of the `manager-button` contract that
-// never receives `fab-manager-button`, exactly like a population-B trigger, and `collectSites`
-// models it that way. A rule chained above the primitive does not reach it, which is what makes
-// its two knowledge-row usages a real constraint on what may be re-chained rather than a
-// bookkeeping detail.
 const NON_CONVERTING_FILES = new Set(['src/ui/svelte/components/ArmedDangerButton.svelte']);
 // `SearchablePopover` takes a class STRING and renders the button itself, so these sites never
 // gain `fab-manager-button`. They are population B: enumerated, never converted.
 const TRIGGER_ATTRIBUTE = 'triggerClass';
 
-/* ────────────────────────────────────────────────────────────────────────────────────────
-   Generic text scanning
-   ──────────────────────────────────────────────────────────────────────────────────────── */
+/** Generic text scanning */
 
 /** Replaces every CSS block comment with same-length whitespace so offsets survive. */
 function blankComments(text) {
@@ -111,7 +60,6 @@ const QUOTES = ['"', "'", '`'];
  *
  * @param {string} text source
  * @param {string} separator single character
- * @returns {Array<{ start: number, text: string }>} pieces
  */
 function splitTopLevel(text, separator) {
   const pieces = [];
@@ -149,9 +97,7 @@ function matchingBrace(text, open) {
   return text.length - 1;
 }
 
-/* ────────────────────────────────────────────────────────────────────────────────────────
-   Stylesheet parsing
-   ──────────────────────────────────────────────────────────────────────────────────────── */
+/** Stylesheet parsing */
 
 function parseDeclarations(body) {
   const declarations = [];
@@ -244,14 +190,10 @@ function parseStyleSheet(text, origin) {
   return rules;
 }
 
-/* ────────────────────────────────────────────────────────────────────────────────────────
-   Selector analysis
-   ──────────────────────────────────────────────────────────────────────────────────────── */
+/** Selector analysis */
 
 const COMBINATORS = new Set(['>', '+', '~']);
-// A sentinel that cannot occur in a selector, marking compound boundaries in place.
-// Written as an ESCAPE rather than the character itself: a raw control byte in a tracked
-// source file is the same hazard issue 1118 is already rewriting three raw NULs to avoid.
+// A sentinel that cannot occur in a selector, marking compound boundaries in place (issue 1118).
 const BOUNDARY = '\u{1}';
 const ZERO_SPECIFICITY_PSEUDOS = new Set(['where']);
 const ARGUMENT_SPECIFICITY_PSEUDOS = new Set(['not', 'is', 'matches', 'any', 'has']);
@@ -335,12 +277,8 @@ function maxArgumentSpecificity(argumentList) {
 }
 
 /**
- * The argument compounds of a functional pseudo-class, when every one of them is DECIDABLE
- * against markup — that is, constrains a tag or a class rather than a runtime state.
- *
- * `:not(:disabled)` is the reason this exists. Treating its argument as a compound to negate
- * would make `.a:not(:disabled)` match nothing, because a bare `:disabled` constrains nothing
- * and therefore "matches" every element. State belongs to the qualifier-subset logic instead.
+ * The argument compounds of a functional pseudo-class, when every one of them is DECIDABLE against
+ * markup — that is, constrains a tag or a class rather than a runtime state.
  */
 function decidableArguments(argument) {
   const parsed = [];
@@ -493,9 +431,8 @@ function analyzeSelector(selector) {
     compound,
     combinatorToNext: compounds[index + 1].combinator,
   }));
-  // `.fabricate-manager` is the manager application root, asserted by the inventory's
-  // non-vacuity floor rather than assumed silently. Dropping it here is what lets every other
-  // ancestor requirement be a real question about the markup.
+  // `.fabricate-manager` is the manager application root, asserted by the inventory's non-vacuity
+  // floor rather than assumed silently.
   const rooted = ancestors.length > 0 && ancestors[0].compound.classes.includes(APP_ROOT_CLASS);
   return {
     selector,
@@ -510,9 +447,7 @@ function analyzeSelector(selector) {
   };
 }
 
-/* ────────────────────────────────────────────────────────────────────────────────────────
-   Declared-property overlap
-   ──────────────────────────────────────────────────────────────────────────────────────── */
+/** Declared-property overlap */
 
 const SIDES = ['top', 'right', 'bottom', 'left'];
 const CORNERS = ['top-left', 'top-right', 'bottom-right', 'bottom-left'];
@@ -589,9 +524,7 @@ function reportedDeclarations(declarations) {
   );
 }
 
-/* ────────────────────────────────────────────────────────────────────────────────────────
-   Svelte template scanning
-   ──────────────────────────────────────────────────────────────────────────────────────── */
+/** Svelte template scanning */
 
 const VOID_ELEMENTS = new Set([
   'area',
@@ -623,11 +556,6 @@ function blankRun(text) {
 /**
  * Blanks HTML comments and `<script>` / `<style>` BODIES in one pass, so neither can be found
  * inside the other.
- *
- * The single pass is load-bearing, not tidiness. `ExplainerCard.svelte` names `<style>` inside
- * its docblock, and a two-pass mask that blanked style blocks first swallowed the component's
- * entire markup between that word and the real `</style>` — the component then reported ZERO
- * elements and its one call site vanished from the inventory silently.
  *
  * @param {string} source the `.svelte` source
  * @returns {string} the same text, same length and same line breaks, non-markup blanked
@@ -989,10 +917,8 @@ function collectSites(trees) {
         directives: element.directives.map(({ name }) => name),
         population,
         converting,
-        // A population-B trigger is rendered by `SearchablePopover`, not written here, so it
-        // has no element of its own. Standing it as a synthetic child of the `<SearchablePopover>`
-        // tag gives it the caller's real ancestry, which is what every container rule asks
-        // about; the popover's own wrapper elements are the one link this cannot supply.
+        // A population-B trigger is rendered by `SearchablePopover`, not written here, so it has no
+        // element of its own.
         element: ownsContract ? element : { tag: 'button', attributes: [], parent: element },
       });
     }
@@ -1040,14 +966,8 @@ function isDescendant(element, ancestor) {
 }
 
 /**
- * Answers "could a CALLER, or a callee's snippet slot, supply this ancestor to that file?"
- *
- * The subtree restriction is what makes the answer worth having. Without it every component
- * reachable from `CraftingSystemManagerRoot` counts as sitting under `.manager-breadcrumbs`,
- * and the report drowns in eighty-odd false candidates per container class. With it, only a
- * component actually rendered INSIDE the matching element counts — which is exactly how
- * `ComponentEditorHeader`'s two buttons stay in the `.manager-header-actions` finding while
- * the breadcrumb noise disappears.
+ * Answers "could a CALLER, or a callee's snippet slot, supply this ancestor to that file?". The
+ * subtree restriction is what makes the answer worth having.
  *
  * @param {object} context the component trees, the render graph and its reachability closure
  * @returns {(compound: object, file: string) => Array<string>} a memoized provider lookup
@@ -1122,9 +1042,7 @@ function stripScopeHash(selector) {
     .trim();
 }
 
-/* ────────────────────────────────────────────────────────────────────────────────────────
-   The instrument
-   ──────────────────────────────────────────────────────────────────────────────────────── */
+/** The instrument */
 
 function buildRules(files, sources, sheet) {
   const global = parseStyleSheet(sheet, GLOBAL_SHEET).map((rule) => ({
@@ -1149,14 +1067,7 @@ function buildRules(files, sources, sheet) {
   }));
 }
 
-/**
- * Where one rule stands against one call site.
- *
- * A scoped rule whose KEY compound carries the hash can only ever reach its own component. A
- * scoped rule whose key does NOT — a `:global(…)` key, which Svelte emits unhashed with the
- * hash left on the ancestor — escapes into descendant components, so it is resolved like any
- * other ancestor demand but anchored to the component that declared it.
- */
+/** Where one rule stands against one call site. */
 function siteMatch(rule, site, graph) {
   const { analysis } = rule;
   if (
@@ -1198,22 +1109,7 @@ function verdictFor(order, primitive, candidate) {
   return 'ties and wins on source order only';
 }
 
-/**
- * The overlapping facets whose DECLARED VALUE actually differs between the two rules.
- *
- * An overlap is what puts a rule at risk; a divergence is what makes losing the overlap
- * visible. Most of the at-risk set is the first without the second — a container rule
- * restating the geometry the primitive copied from it in the first place — and "which of these
- * two wins is a zero-pixel question" is the load-bearing claim behind several dispositions in
- * `manager-button-cascade-inventory.test.js`. Deriving it here lets that file ASSERT the claim
- * instead of asserting a person's reading of it, so a later edit to the primitive's values
- * cannot quietly turn a documented tie into a real repaint.
- *
- * Textual, exactly like the winner-change comparison in `repaintsAt`: two spellings of one
- * computed value (`--fab-toggle-track` for the `var(--fab-bg-3)` it is declared as) count as
- * divergent here, which is blind spot 6 and is why the real-browser gate stays the arbiter of
- * pixels.
- */
+/** The overlapping facets whose DECLARED VALUE actually differs between the two rules. */
 function divergentFacets(candidate, primitive, overlap) {
   return overlap.filter((facet) => {
     const mine = declarationFor(candidate, facet);
@@ -1288,15 +1184,7 @@ function describeWinner(winner) {
   return `${winner.rule.origin}:${winner.rule.line} ${stripScopeHash(winner.rule.selector)} { ${winner.declaration.property}: ${winner.declaration.value} }`;
 }
 
-/**
- * The resting-state winner CHANGE the conversion produces at one site, per declared facet.
- *
- * This is the half a specificity table cannot give you. A rule can tie the primitive and still
- * repaint nothing, because the two declare the same value; and a rule can be nowhere near the
- * primitive's specificity and still be the site's current winner for a property the primitive
- * newly pins — which is precisely how nine unclassed clear-filters buttons move from an
- * inherited font size to a fixed one without any rule "losing" anything.
- */
+/** The resting-state winner CHANGE the conversion produces at one site, per declared facet. */
 function repaintsAt(site, matches, primitives, matchOf) {
   const before = restingRules(matches);
   const after = [
@@ -1359,9 +1247,8 @@ export function managerButtonCascade() {
       rule,
       matches,
       losses: lossesFor(rule, matches, primitives, matchOf),
-      // Site-independent: would this rule lose to the primitive IF a converted button ever
-      // matched it? That is the question an exclusion has to answer, because an excluded rule
-      // is precisely one that would be at risk but has no converting site to be at risk for.
+      // Site-independent: would this rule lose to the primitive IF a converted button ever matched
+      // it?
       wouldLose: primitives.some(
         (primitive) => qualifiersCovered(primitive, rule) && arbitrate(rule, primitive)
       ),
@@ -1419,9 +1306,7 @@ function lossesFor(rule, matches, primitives, matchOf) {
   return [...losses.values()];
 }
 
-/* ────────────────────────────────────────────────────────────────────────────────────────
-   Reporting
-   ──────────────────────────────────────────────────────────────────────────────────────── */
+/** Reporting */
 
 function describeBlindSpots({ sites, unbalanced, atRisk }) {
   const dynamic = sites.filter((site) => site.dynamic || site.directives.length > 0);
@@ -1515,8 +1400,7 @@ function renderAtRiskEntry({ rule, losses }, disposition) {
 
 /**
  * Deterministic report order. Code point, not `localeCompare`: the latter is locale-dependent, so
- * one corpus could print in two orders on two machines and every diff would carry that noise. The
- * same choice, for the same reason, as `byPath` in `sourceScan.js`.
+ * one corpus could print in two orders on two machines and every diff would carry that noise.
  */
 function byCodePoint(left, right) {
   if (left === right) return 0;

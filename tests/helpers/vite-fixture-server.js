@@ -1,19 +1,6 @@
 /**
  * The Vite dev server and Chromium instance a RENDERED fixture suite runs against.
  *
- * Two suites need the same four things and needed them identically: a Vite server rooted at the
- * repository with the real Svelte plugin, so a fixture page can import `.svelte` files from
- * `src/` and get them compiled exactly as the shipped bundle compiles them; `styles/fabricate.css`
- * served RAW, outside the CSS pipeline; NO file watcher; and a Chromium to open the page in. The
- * blocks were near-identical down to their comments, which is a SonarCloud new-code duplication
- * finding as well as two places to fix the next `ENOSPC`.
- *
- * WHAT VARIES IS TWO THINGS, and both are parameters here: the URL prefix the raw stylesheet is
- * mounted under, which each suite names after itself so a fixture page's `<link href>` says which
- * suite serves it, and any EXTRA plugin the fixture needs (`overlay-portal-host-position` stubs
- * Foundry's bundled artwork, because its subject falls back to a core icon path that no dev
- * server here can resolve).
- *
  * @see tests/components/player-select-conversion-rendered.test.js
  * @see tests/components/overlay-portal-host-position.test.js
  */
@@ -30,9 +17,6 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 
 /**
  * Serve `styles/fabricate.css` RAW, outside Vite's CSS pipeline.
- *
- * The sheet is 20k+ lines with `url()` references and layered `@import`s; running it through
- * PostCSS would rewrite or inline them for no benefit to a measurement. The page wants the bytes.
  *
  * @param {string} prefix The URL prefix to mount under, e.g. `/@overlay-host-styles/`.
  * @returns {object} a Vite plugin.
@@ -59,11 +43,8 @@ function rawStylesheetMount(prefix) {
 /**
  * A started-and-stopped Vite server plus Chromium, for a suite's `before`/`after`.
  *
- * @param {object} options
  * @param {string} options.styleMountPrefix The URL prefix `styles/fabricate.css` is served under.
  * @param {object[]} [options.extraPlugins] Further Vite plugins, applied before the Svelte one.
- * @returns {{start: () => Promise<void>, stop: () => Promise<void>, url: (path: string) => string,
- *   newPage: (options?: object) => Promise<import('playwright').Page>}}
  */
 export function createViteFixtureServer({ styleMountPrefix, extraPlugins = [] }) {
   let server = null;
@@ -105,7 +86,6 @@ export function createViteFixtureServer({ styleMountPrefix, extraPlugins = [] })
      * A repository-root-relative path as an absolute URL on this server.
      *
      * @param {string} path e.g. `/tests/fixtures/overlay-host/index.html?subject=select`.
-     * @returns {string}
      */
     url(path) {
       return `${origin}${path}`;
@@ -122,17 +102,8 @@ export function createViteFixtureServer({ styleMountPrefix, extraPlugins = [] })
 }
 
 /**
- * A real pointer press on one element: `mousedown`, `mouseup`, then the click they produce.
- *
- * Through Playwright's own mouse rather than `locator.click()` so the three events are separable
- * in a failure message, and so the sequence is unmistakably the one a user's pointer generates
- * rather than a synthesised activation that skips `mousedown` entirely. A synthesised click
- * proves nothing about a panel dismissed on `mousedown`: the dismisser never runs, and every
- * wrapper shape passes. Shared by the player (issue 1511) and manager (issue 1510) select proofs.
- *
- * @param {import('playwright').Page} page
- * @param {string} selector
- * @returns {Promise<void>}
+ * A real pointer press on one element: `mousedown`, `mouseup`, then the click they produce (issue
+ * 1511).
  */
 export async function pressPointerOn(page, selector) {
   const box = await page.locator(selector).first().boundingBox();
