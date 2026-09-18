@@ -17,7 +17,7 @@ import {
   compileManagerTree,
   importCompiledComponent,
 } from '../helpers/manager/managerCompile.js';
-import { identityLocalize } from '../helpers/manager/managerLocalization.js';
+import { identityLocalize, shippedString } from '../helpers/manager/managerLocalization.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -122,6 +122,30 @@ export async function settleBetweenTests() {
   // suite has stacked up hundreds of trees. Without this line the file needs >2 GB of heap;
   // with it the whole suite runs green under `--max-old-space-size=768`.
   await new Promise((settled) => setImmediate(settled));
+}
+
+/**
+ * The rendered hook one converted contract asks about, stated once (issue 1691). Every hook case
+ * is a call rather than its own query-and-assert pair, which is what keeps the conversions clear
+ * of the duplication gate.
+ */
+export function assertHook(container, hook, message) {
+  assert.ok(Boolean(container.querySelector(hook)), message ?? `the route renders ${hook}`);
+}
+
+/** The same question with the opposite answer: a hook the route must NOT render. */
+export function assertNoHook(container, hook, message) {
+  assert.ok(!container.querySelector(hook), message ?? `the route must not render ${hook}`);
+}
+
+/**
+ * The shipped copy for a key is on screen. Needs `useShippedLocalization()` first, because the
+ * harness otherwise localizes a key to itself and every fallback would satisfy this.
+ */
+export function assertShippedString(container, key, message) {
+  const expected = shippedString(key);
+  assert.notEqual(expected, key, `lang/en.json defines no ${key}`);
+  assert.ok(container.textContent.includes(expected), message ?? `the route renders ${key}`);
 }
 
 // The selectors are READ FROM THE REGISTRY rather than restated.

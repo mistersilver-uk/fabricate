@@ -20,11 +20,13 @@ import { walkElements } from '../helpers/svelteTemplateScan.js';
 import {
   containsLiteral,
   declaredConstant,
+  declaresAttribute,
   importsModule,
   passesProp,
   readsGlobal,
   referencesIdentifier,
   rendersComponent,
+  spellsLiteral,
 } from '../helpers/svelteStructureContract.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -433,11 +435,13 @@ function structureOf(target) {
       declares: (name) => declaredConstant(component, name),
       names: (name) => referencesIdentifier(component, name),
       spells: (text) => containsLiteral(component, text),
+      spellsExactly: (text) => spellsLiteral(component, text),
       global: (name) => readsGlobal(scope, name),
       prop: ([name, propName]) => passesProp(component, name, propName),
       reads: (path) => memberPaths(component).includes(path),
       calls: (name) => callNames(component).has(name),
       callsWith: (pair) => callsWithArgument(component, pair),
+      compares: (value) => comparesToLiteral(component, value),
       declaresProp: (name) => declaredProps(component).declared.has(name),
       requiresProp: (name) => declaredProps(component).required.has(name),
     };
@@ -451,6 +455,7 @@ function structureOf(target) {
     declares: (name) => declaredConstantOf(code, name),
     names: (name) => referencesIdentifierOf(code, name),
     spells: (text) => literalStrings(code).some((literal) => literal.includes(text)),
+    spellsExactly: (text) => literalStrings(code).includes(text),
     reads: (path) => memberPaths(code).includes(path),
     calls: (name) => callNames(code).has(name),
     callsWith: (pair) => callsWithArgument(code, pair),
@@ -474,6 +479,7 @@ const CONTRACT_CLAIMS = Object.freeze({
   namesNo: { ask: 'names', holds: false, says: (v) => `no longer names ${v}` },
   spells: { ask: 'spells', holds: true, says: (v) => `spells "${v}"` },
   spellsNo: { ask: 'spells', holds: false, says: (v) => `no longer spells "${v}"` },
+  spellsExactly: { ask: 'spellsExactly', holds: true, says: (v) => `spells "${v}" in full` },
   reads: { ask: 'reads', holds: true, says: (v) => `reads ${v}` },
   readsNo: { ask: 'reads', holds: false, says: (v) => `never reads ${v}` },
   calls: { ask: 'calls', holds: true, says: (v) => `calls ${v}()` },
@@ -514,6 +520,7 @@ function defineStructureContract(title, target, claims) {
         : [target.file, target.member, target.property].filter(Boolean).join(' > ');
     for (const [kind, rows] of Object.entries(claims)) {
       const claim = CONTRACT_CLAIMS[kind];
+      assert.equal(typeof subject[claim.ask], 'function', `${label} cannot answer "${kind}"`);
       for (const row of rows) {
         assert.equal(subject[claim.ask](row), claim.holds, `${label} ${claim.says(row)}`);
       }
@@ -752,78 +759,22 @@ describe('CraftingSystemManager source contract', () => {
     );
   });
 
-  // Issue 643 established the manager titlebar; issue 1185 reassigned its gold badge.
-  it('renders a titlebar carrying the premium signal and the system resolution', () => {
-    for (const snippet of [
-      'class="manager-titlebar"',
-      'data-manager-titlebar',
-      'class="manager-titlebar-badge"',
-      'data-manager-titlebar-premium',
-      '{#if premiumInstalled}',
-      "text('FABRICATE.Admin.Manager.Titlebar.Premium', 'PREMIUM')",
-      'data-manager-titlebar-status',
-      '{titlebarStatusLabel()}',
-    ]) {
-      assert.ok(rootSource.includes(snippet), `root titlebar should include ${snippet}`);
-    }
-    // The layer-group icon and "Crafting Systems" product label are gone (issue 643):
-    assert.equal(
-      rootSource.includes('manager-titlebar-icon'),
-      false,
-      'the duplicated titlebar app icon should be removed'
-    );
-    assert.equal(
-      rootSource.includes('manager-titlebar-product'),
-      false,
-      'the duplicated "Crafting Systems" titlebar label should be removed'
-    );
-    // Issue 1185: the Downtime route briefly led the page header with a 42px glyph tile from
-    // the prototype. No other Manager route has one, so it is gone — and with it the third
-    // header child that broke `justify-content: space-between`.
-    assert.equal(
-      rootSource.includes('manager-route-icon'),
-      false,
-      'no route may lead the page header with an identity tile of its own'
-    );
-    assert.equal(
-      rootSource.includes('data-manager-route-icon'),
-      false,
-      'and its marker attribute goes with it'
-    );
-    // Issue 1185: the system name badge is gone in BOTH states.
-    assert.equal(
-      rootSource.includes('data-manager-titlebar-system'),
-      false,
-      'the redundant crafting-system titlebar badge should be removed'
-    );
-    assert.equal(
-      rootSource.includes('Titlebar.SystemBadge'),
-      false,
-      'and its accessible-name key with it'
-    );
+  // The manager titlebar (issue 643) and its gold badge (issue 1185). What the titlebar RENDERS,
+  // in both premium states and with the chrome issue 1185 removed, is mounted in
+  // `tests/components/manager-rail-mounted.js` and in the premium-signal cases of
+  // `tests/components/manager-downtime-mounted.js`; what stays here is the derivation behind it.
+  defineStructureContract('drives the titlebar premium signal off the whole surface set', MANAGER_ROOT, {
+    declares: ['premiumInstalled'],
+    calls: ['subscribeSurfaceIds', 'routedOutcomeTierCount'],
+    compares: ['routedByCheck'],
+    spellsNo: ['Mythwright', 'mythwright'],
+  });
+
+  it('states the titlebar copy the premium mark and the outcome-tier label read', () => {
     assert.equal(
       lang.FABRICATE.Admin.Manager.Titlebar.SystemBadge,
       undefined,
       'the orphaned SystemBadge string should be deleted from lang/en.json, not left behind'
-    );
-    assert.equal(
-      /mythwright/i.test(rootSource),
-      false,
-      '"Mythwright" is a prototype theme name and must never be hard-coded into the chrome'
-    );
-    // The premium badge is driven by the REGISTRY, not by Core's Downtime route.
-    assert.ok(
-      rootSource.includes('const premiumInstalled = $derived(registeredSurfaceIds.length > 0)'),
-      'the titlebar premium signal should read the whole registered surface set'
-    );
-    assert.ok(
-      rootSource.includes('managerExtensions.subscribeSurfaceIds('),
-      'and should stay live through the registry surface-set subscription'
-    );
-    assert.equal(
-      /premiumInstalled[^\n]*downtime/i.test(rootSource),
-      false,
-      'the premium signal must not be keyed on the Core downtime surface id'
     );
     assert.equal(
       lang.FABRICATE.Admin.Manager.Titlebar.Premium,
@@ -835,54 +786,20 @@ describe('CraftingSystemManager source contract', () => {
       'Fabricate Premium is installed and connected',
       'and the accessible name and tooltip that explain it'
     );
-    // The status line reports the SYSTEM's resolution mode.
-    assert.ok(
-      rootSource.includes(
-        "selectedSystem?.resolutionMode === 'routedByCheck'\n      ? routedOutcomeTierCount(selectedSystem?.craftingCheck?.routed)"
-      ),
-      'the titlebar outcome-tier count should only be resolved for a routed-by-check system'
-    );
-    assert.ok(
-      lang.FABRICATE.Admin.Manager.Titlebar.OutcomeTiers === 'outcome tiers',
+    assert.equal(
+      lang.FABRICATE.Admin.Manager.Titlebar.OutcomeTiers,
+      'outcome tiers',
       'lang should expose the pluralized outcome-tier label the titlebar formats'
     );
   });
 
-  it('renders the rail section label and bare mono count numerals without elevating the dead Graph row', () => {
-    assert.ok(
-      rootSource.includes('class="manager-rail-title"'),
-      'the rail should carry an uppercase section label'
-    );
-    assert.ok(
-      rootSource.includes('data-manager-rail-section'),
-      'the rail section label should be addressable'
-    );
-    assert.ok(
-      lang.FABRICATE.Admin.Manager.Nav.SectionLabel === 'GM management',
+  // The rail section label, the bare-numeral counts and the planned-view placeholder are all
+  // rendered claims, mounted in `tests/components/manager-rail-mounted.js`.
+  it('localizes the rail section label', () => {
+    assert.equal(
+      lang.FABRICATE.Admin.Manager.Nav.SectionLabel,
+      'GM management',
       'the rail section label should be localized'
-    );
-    // A rail count is a BARE NUMERAL.
-    assert.ok(
-      rootSource.includes('<span class="manager-nav-count">{selectedCounts.components}</span>'),
-      'a rail count should render as a bare numeral, not a chip'
-    );
-    assert.equal(
-      rootSource.includes('manager-nav-count manager-chip'),
-      false,
-      'no rail count should borrow the content chip'
-    );
-    assert.ok(
-      rootSource.includes(
-        "<span class=\"manager-nav-planned\">{text('FABRICATE.Admin.Manager.Soon', 'Soon')}</span>"
-      ),
-      'the disabled placeholder should keep its plain Soon span, not gain a chip'
-    );
-    assert.equal(
-      rootSource.includes(
-        "<span class=\"manager-nav-count\">{text('FABRICATE.Admin.Manager.Soon', 'Soon')}</span>"
-      ),
-      false,
-      'and it must not return to the record-count vehicle, which draws numerals'
     );
   });
 
@@ -1346,18 +1263,22 @@ describe('CraftingSystemManager source contract', () => {
     );
   });
 
-  it('keeps presentational Svelte free of direct Foundry globals', () => {
-    assert.ok(
-      !/\b(?:game|ui|Hooks|CONFIG)\b/.test(rootSource),
-      'root should not directly reference Foundry globals'
-    );
+  // Scope-resolved, so a local binding, a member property or an object key named `game` is not a
+  // read — the three shapes the text regex this replaces could not tell apart. `foundry` is
+  // deliberately NOT in the set: the root reaches `globalThis.foundry.utils.parseUuid`, and
+  // `.agents/docs/foundry-and-architecture.md` requires it keep doing so.
+  defineStructureContract('keeps presentational Svelte free of direct Foundry globals', MANAGER_ROOT, {
+    readsNoGlobal: ['game', 'ui', 'Hooks', 'CONFIG'],
+  });
+
+  defineStructureContract('uses manager localization keys rather than hard-coded copy', MANAGER_ROOT, {
+    // In FULL: a substring claim here is satisfied by `…Manager.Titlebar.Premium` next door.
+    spellsExactly: ['FABRICATE.Admin.Manager.Title'],
+    // Retired with the placeholder gathering-events copy they named (issue 1372).
+    spellsNo: ['EncountersPlaceholderTitle', 'EncountersPlaceholderHint'],
   });
 
   it('uses localized manager copy keys', () => {
-    assert.ok(
-      rootSource.includes('FABRICATE.Admin.Manager.Title'),
-      'root should use manager localization keys'
-    );
     assert.ok(lang.FABRICATE.Admin.Manager, 'English localization should define manager copy');
     assert.equal(lang.FABRICATE.Admin.Manager.Title, 'Crafting systems');
     // `Nav.Components`, `Nav.Tools` and `Component.Title` are GONE (issue 1362). The three
@@ -1471,8 +1392,6 @@ describe('CraftingSystemManager source contract', () => {
       lang.FABRICATE.Admin.Manager.Environment.GatheringTabs.EncountersHint,
       'Browse reusable events before attaching them to environments.'
     );
-    assert.equal(rootSource.includes('EncountersPlaceholderTitle'), false);
-    assert.equal(rootSource.includes('EncountersPlaceholderHint'), false);
   });
 
   it('keeps changed manager and environment static localization fallbacks aligned with en.json', () => {
@@ -3969,72 +3888,45 @@ describe('CraftingSystemManager source contract', () => {
     );
   });
 
-  it('wires a collapsible left rail persisted via the manager setting seam', () => {
-    assert.ok(
-      rootSource.includes(
-        "let railCollapsed = $state(services?.getSetting?.('managerRailCollapsed') === true);"
-      ),
-      'rail collapsed state should initialize from the persisted managerRailCollapsed client setting'
-    );
-    assert.ok(
-      rootSource.includes('function toggleManagerRail()'),
-      'root should expose a rail toggle handler'
-    );
-    assert.ok(
-      rootSource.includes("services?.setSetting?.('managerRailCollapsed', railCollapsed);"),
-      'toggling the rail should persist managerRailCollapsed through the setSetting seam'
-    );
-    // The DISPLAY value, never the stored one (issue 1213). `railCollapsed` is the GM's
-    // persisted client preference and stays authoritative for what is written back; what the
-    // body renders is `railCollapsed && !railLockedOpen`, so the Downtime rail lock can force
-    // the sidebar open without permanently un-collapsing the rail on every other route.
-    assert.ok(
-      rootSource.includes(
-        "class={`manager-body ${railCollapsedDisplay ? 'is-rail-collapsed' : ''}`}"
-      ),
-      'manager-body should bind the is-rail-collapsed modifier from the displayed rail state'
-    );
-    assert.ok(
-      rootSource.includes(
-        'const railCollapsedDisplay = $derived(railCollapsed && !railLockedOpen);'
-      ),
-      'and the displayed state must be DERIVED, never written back over the stored preference'
-    );
-    assert.ok(
-      rootSource.includes('class="manager-rail-toggle manager-scope-collapse"'),
-      'the scope-card header should render the shared collapse/expand control'
-    );
-    // COUNTED, not merely present (issue 1213 review). The control is written TWICE.
-    // `(?<![-\w])` because `aria-disabled={railLockedOpen}` CONTAINS `disabled={railLockedOpen}`,
-    // so a plain substring count reports four sites for two and reads as a pass.
-    const occurrences = (attribute) =>
-      rootSource.match(new RegExp(`(?<![-\\w])${attribute.replace(/[{}]/g, '\\$&')}`, 'g'))
-        ?.length ?? 0;
-    const railToggleSites = occurrences('data-manager-rail-toggle');
-    assert.equal(railToggleSites, 2, 'the scope card renders the rail toggle once per branch');
-    for (const attribute of [
-      'aria-pressed={railCollapsedDisplay}',
-      'aria-label={railToggleLabel}',
-      'title={railToggleTitle}',
-      'disabled={railLockedOpen}',
-      'aria-disabled={railLockedOpen}',
-    ]) {
-      assert.equal(
-        occurrences(attribute),
-        railToggleSites,
+  // The collapsible left rail (issue 1213). `railCollapsed` is the GM's persisted client
+  // preference and stays authoritative for what is written back; what the body renders is
+  // `railCollapsedDisplay`, so the Downtime rail lock can force the sidebar open without
+  // permanently un-collapsing the rail on every other route. The rendered half — the disabled
+  // control, its five attributes reading the DISPLAYED state, the handler refusing a programmatic
+  // press, and nothing writing a preference under the lock — is mounted through
+  // `assertRailLockedOpen` and `assertRailLockSurvivesPresses` in
+  // `tests/components/manager-downtime-mounted.js`.
+  defineStructureContract('wires a collapsible left rail persisted via the manager setting seam', MANAGER_ROOT, {
+    spells: [
+      'managerRailCollapsed',
+      'FABRICATE.Admin.Manager.Nav.CollapseRail',
+      'FABRICATE.Admin.Manager.Nav.ExpandRail',
+    ],
+    reads: ['services.getSetting', 'services.setSetting'],
+    names: ['toggleManagerRail'],
+    declares: ['railCollapsedDisplay'],
+  });
+
+  // COUNTED, not merely present (issue 1213 review): the control is written TWICE, and a mounted
+  // case renders only one of them. Every site must carry the same five attributes, or the branch
+  // no case reaches silently loses the lock.
+  it('writes the rail toggle twice, and both sites carry the same state attributes', () => {
+    const sites = [];
+    walkElements(componentAstOf(MANAGER_ROOT).fragment, (node) => {
+      if (declaresAttribute(node, 'data-manager-rail-toggle', { directives: false })) {
+        sites.push(node);
+      }
+    });
+    assert.equal(sites.length, 2, 'the scope card renders the rail toggle once per branch');
+    for (const attribute of ['aria-pressed', 'aria-label', 'title', 'disabled', 'aria-disabled']) {
+      assert.ok(
+        sites.every((node) => declaresAttribute(node, attribute, { directives: false })),
         `every rail-toggle site must carry ${attribute}, not just the one a mounted case renders`
       );
     }
-    assert.match(
-      rootSource,
-      /function toggleManagerRail\(\)\s*\{[\s\S]{0,400}?if \(railLockedOpen\) return;/,
-      'and the handler early-returns, so a programmatic call obeys the lock too'
-    );
-    assert.ok(
-      rootSource.includes('FABRICATE.Admin.Manager.Nav.CollapseRail') &&
-        rootSource.includes('FABRICATE.Admin.Manager.Nav.ExpandRail'),
-      'rail toggle labels should be localized for both states'
-    );
+  });
+
+  it('localizes the rail toggle for both states', () => {
     assert.equal(lang.FABRICATE.Admin.Manager.Nav.CollapseRail, 'Collapse navigation rail');
     assert.equal(lang.FABRICATE.Admin.Manager.Nav.ExpandRail, 'Expand navigation rail');
   });

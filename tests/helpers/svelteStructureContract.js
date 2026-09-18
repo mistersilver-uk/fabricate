@@ -8,7 +8,7 @@
  * `tests/source-pin-ratchet.test.js` bounds, and these predicates are what it converts to.
  *
  * The residue they deliberately do not address: exact JS expression text, and a receiver that is a
- * loop variable rather than a literal. An i18n key is a literal `containsLiteral` answers, and a
+ * loop variable rather than a literal. An i18n key is a literal `spellsLiteral` answers, and a
  * `.js`/`.mjs` target is answered by the sibling predicates in `moduleAst.js` (issue 1691).
  */
 import { parse } from 'svelte/compiler';
@@ -151,19 +151,32 @@ export function referencesIdentifier(ast, name) {
 }
 
 /**
- * Whether the component spells this text in any literal it carries — a JS string, a template
- * chunk, a static attribute value or template text. Deliberately a substring match, because the
- * claims it answers are mostly absences and a looser needle makes an absence harder to fake.
+ * Every literal a component spells: a JS string, a template chunk, a static attribute value and
+ * template text alike.
+ */
+export function spelledLiterals(ast) {
+  const found = [];
+  for (const part of codeParts(ast)) {
+    found.push(...literalStrings(part));
+    for (const node of walkNodes(part)) {
+      if (node.type === 'Text' && typeof node.data === 'string') found.push(node.data);
+    }
+  }
+  return found;
+}
+
+/**
+ * Whether the component spells this text inside any literal it carries. A substring match, because
+ * a class token lives inside a multi-token `class="…"` value; for a whole i18n key or a whole
+ * attribute value, ask `spellsLiteral` instead, which a longer neighbouring key cannot satisfy.
  */
 export function containsLiteral(ast, text) {
-  const needle = String(text);
-  return codeParts(ast).some((part) => {
-    if (literalStrings(part).some((literal) => literal.includes(needle))) return true;
-    for (const node of walkNodes(part)) {
-      if (node.type === 'Text' && String(node.data ?? '').includes(needle)) return true;
-    }
-    return false;
-  });
+  return spelledLiterals(ast).some((literal) => literal.includes(String(text)));
+}
+
+/** Whether the component spells this text as a literal in full. */
+export function spellsLiteral(ast, text) {
+  return spelledLiterals(ast).includes(String(text));
 }
 
 /** The host objects through which a Foundry global is also legitimately reached. */

@@ -34,6 +34,7 @@ import {
   passesProp,
   readsGlobal,
   referencesIdentifier,
+  spellsLiteral,
   renderedComponents,
   renderedElements,
   rendersComponent,
@@ -287,6 +288,17 @@ test('containsLiteral sees an attribute value, a class token and a script string
   assert.equal(containsLiteral(declarations, 'manager-shelf'), true, 'an attribute value');
   assert.equal(containsLiteral(declarations, 'studio'), true, 'a script string');
   assert.equal(containsLiteral(declarations, 'manager-titlebar-icon'), false);
+});
+
+test('spellsLiteral needs the whole literal, which a longer neighbour cannot satisfy', () => {
+  const keys = parseComponent("<div>{text('FABRICATE.Manager.Titlebar.Premium', 'PREMIUM')}</div>");
+  assert.equal(containsLiteral(keys, 'FABRICATE.Manager.Title'), true, 'the prefix is contained');
+  assert.equal(
+    spellsLiteral(keys, 'FABRICATE.Manager.Title'),
+    false,
+    'but a key nothing spells in full is not spelled — the difference a source pin could not make'
+  );
+  assert.equal(spellsLiteral(keys, 'FABRICATE.Manager.Titlebar.Premium'), true);
 });
 
 /** The module-AST half, on a fixture rather than on a production file that may move. */
