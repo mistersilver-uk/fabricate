@@ -194,7 +194,6 @@ src/ui/SvelteFabricateApp.svelte.js	unicorn/no-top-level-side-effects
 src/ui/compendiumDirectoryContext.js	unicorn/prefer-string-replace-all
 src/ui/foundryCompat.js	unicorn/no-useless-fallback-in-spread
 src/ui/foundryCompat.js	unicorn/prefer-optional-catch-binding
-src/ui/interactableConfigView.js	unicorn/prefer-includes-over-repeated-comparisons
 src/ui/itemsDirectoryButtons.js	unicorn/prefer-dom-node-append
 src/ui/itemsDirectoryButtons.js	unicorn/prefer-spread
 src/ui/managerExtensions.js	import-x/order

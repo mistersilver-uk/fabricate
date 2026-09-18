@@ -35,7 +35,7 @@ const LEGACY_GATE_FILE_COUNT = 359;
  */
 const DEBT_COUNTS = {
   scripts: { files: 15, pairs: 96 },
-  srcUi: { files: 60, pairs: 146 },
+  srcUi: { files: 59, pairs: 145 },
   // `srcRoot` GREW at issue 1677, which is the direction this pin exists to make expensive, so the
   // reason is recorded here rather than in a commit message.
   srcRoot: { files: 17, pairs: 40 },
