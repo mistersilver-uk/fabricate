@@ -131,6 +131,62 @@ test('renders the roll total row when a finite check value is present', () => {
   assert.ok(content.includes('fabricate-craft-chat__roll-value">17<'), 'roll value rendered');
 });
 
+test('1645: a rolled result states its roll beside the produced line', () => {
+  const content = buildCraftingChatContent(
+    successModel({
+      results: [
+        {
+          name: 'Iron Sword',
+          img: 'icons/sword.png',
+          quantity: 3,
+          rolled: { formula: '1d4+1', total: 3 },
+        },
+      ],
+    }),
+    shippedLocalize
+  );
+  assert.ok(content.includes('3× Iron Sword'), 'the awarded integer still leads the row');
+  assert.ok(
+    content.includes('fabricate-craft-chat__roll">rolled 1d4+1 = 3<'),
+    'the roll is a second run of the same row, in the card\'s rolled-total treatment'
+  );
+  assert.ok(!content.includes('{formula}'), 'no unsubstituted placeholder reaches chat');
+  assert.ok(!content.includes('{total}'), 'no unsubstituted placeholder reaches chat');
+});
+
+test('1645: an empty award states the roll that produced nothing', () => {
+  const content = buildCraftingChatContent(
+    successModel({
+      results: [{ name: 'Iron Ore', img: '', quantity: 0, rolled: { formula: '1d4-8', total: -3 } }],
+    }),
+    shippedLocalize
+  );
+  assert.ok(content.includes('rolled 1d4-8 = -3, nothing produced'), 'the roll as it fell');
+  assert.ok(content.includes('Iron Ore'), 'and what it was rolled for');
+});
+
+test('1645: the SHIPPED rolled-amount sentences carry both placeholders the card substitutes', () => {
+  for (const key of ['RolledAmount', 'RolledAmountEmpty']) {
+    const value = LANG.FABRICATE.Chat[key];
+    assert.equal(typeof value, 'string', `FABRICATE.Chat.${key} must be a string leaf`);
+    assert.ok(value.includes('{formula}'), `FABRICATE.Chat.${key} must carry {formula}`);
+    assert.ok(value.includes('{total}'), `FABRICATE.Chat.${key} must carry {total}`);
+  }
+});
+
+test('1645: a fixed or malformed amount renders no rolled run at all', () => {
+  for (const rolled of [undefined, null, {}, { formula: '1d4' }, { total: 2 }]) {
+    const content = buildCraftingChatContent(
+      successModel({ results: [{ name: 'Iron Sword', img: '', quantity: 2, rolled }] }),
+      shippedLocalize
+    );
+    assert.ok(
+      !content.includes('fabricate-craft-chat__roll'),
+      `no rolled run for ${JSON.stringify(rolled)}`
+    );
+  }
+});
+
 test('shows the roll total on failure cards too', () => {
   const content = buildCraftingChatContent(failureModel({ rollValue: 4 }));
   assert.ok(
@@ -865,5 +921,57 @@ test('every rule the complications block adds is reached through a complication-
         `every branch of "${selector}" is gated on a complication-only class`
       );
     }
+  }
+});
+
+/**
+ * The rolled run is the one part of the row that MUST survive chat width (issue 1645).
+ *
+ * The item label is `nowrap` + ellipsis inside a `minmax(140px, 1fr)` track, so an amount stated in
+ * that treatment is ellipsed away beside any ordinary component name — measured, not reasoned about.
+ * The control is the shipped markup with the run moved back onto the label, and it must clip.
+ */
+test('1645: the rolled run stays readable at chat width where a label would be ellipsed', async () => {
+  const html = buildCraftingChatContent(
+    successModel({
+      results: [
+        {
+          name: 'Powdered Sagebrush Extract',
+          img: '',
+          quantity: 0,
+          rolled: { formula: '1d4-8', total: -3 },
+        },
+      ],
+    }),
+    shippedLocalize
+  );
+  const control = html.replace('fabricate-craft-chat__roll">', 'fabricate-craft-chat__label">');
+  assert.notEqual(control, html, 'the control actually moved the run onto the label treatment');
+
+  const context = await browser.newContext({
+    viewport: { width: 1280, height: 720 },
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+  try {
+    await page.setContent(
+      `<style>${FOUNDRY_CSS}</style><style>${FABRICATE_CSS}</style>` +
+        `<style>html,body{margin:0}</style>` +
+        `<div id="shipped" style="width:${CHAT_WIDTH}px">${html}</div>` +
+        `<div id="control" style="width:${CHAT_WIDTH}px">${control}</div>`
+    );
+    const measure = (root) =>
+      page.evaluate((id) => {
+        const run = document.querySelector(`#${id} .fabricate-craft-chat__item span:last-child`);
+        return { text: run.textContent, clipped: run.scrollWidth > run.clientWidth + 1 };
+      }, root);
+
+    const clipped = await measure('control');
+    assert.ok(clipped.clipped, 'control: on the label treatment the sentence is cut off');
+    const shipped = await measure('shipped');
+    assert.ok(!shipped.clipped, `the whole sentence is readable: ${shipped.text}`);
+    assert.equal(shipped.text, 'rolled 1d4-8 = -3, nothing produced', 'and it is the sentence');
+  } finally {
+    await context.close();
   }
 });

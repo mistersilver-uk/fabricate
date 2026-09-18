@@ -1320,6 +1320,7 @@
           "History": "Finished is your history browser: use its pages to review ended runs and their results. Dismissing an entry hides it only for you; the actor's history is retained."
         },
         "Quantity": "×{n}",
+        "AmountRolled": "rolled {formula} = {total}",
         "Time": {
           "DayWithPhase": "Day {day}, {phase}",
           "DayWithClock": "Day {day} {time}"
@@ -1735,7 +1736,9 @@
       "BulkSalvageOutcomeError": "Something went wrong",
       "TierStepUp": "Stepped up {steps} tier(s)",
       "TierStepDown": "Stepped down {steps} tier(s)",
-      "TierStepTarget": "Stepped to a target tier"
+      "TierStepTarget": "Stepped to a target tier",
+      "RolledAmount": "rolled {formula} = {total}",
+      "RolledAmountEmpty": "rolled {formula} = {total}, nothing produced"
     },
     "Check": {
       "Roll": {

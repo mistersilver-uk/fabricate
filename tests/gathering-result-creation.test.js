@@ -30,6 +30,7 @@ globalThis.foundry = {
 
 const { createGatheringResultCreator } = await import('../src/gatheringResultCreation.js');
 const { seededRollClass } = await import('./helpers/seededRoll.js');
+const { itemReceipt } = await import('../src/systems/runHistoryEvidence.js');
 
 const SYSTEM_ID = 'sys-780';
 
@@ -397,6 +398,33 @@ test('1645: a gathered amount that rolls to zero creates no item', async () => {
     });
     assert.equal(actor.captured.length, 0, 'nothing is created for an empty award');
     assert.equal(created.length, 0, 'and no receipt claims one was');
+  } finally {
+    if (previous === undefined) delete globalThis.Roll;
+    else globalThis.Roll = previous;
+  }
+});
+
+test('1645: a planned roll survives the run-item normalizer that rebuilds every entry', async () => {
+  const system = { id: SYSTEM_ID, components: COMPONENTS };
+  globalThis.fromUuidSync = () => null;
+  const { Roll } = seededRollClass({ totals: { '1d4+2': 5 } });
+  const previous = globalThis.Roll;
+  globalThis.Roll = Roll;
+  try {
+    const [planned] = await createGatheringResultCreator(managerWith(system)).plan({
+      actor: capturingActor(),
+      system,
+      resultGroups: [
+        {
+          results: [
+            { componentId: SOURCELESS_COMPONENT.id, quantity: 1, quantityFormula: '1d4+2' },
+          ],
+        },
+      ],
+    });
+    // `normalizeRunItems` rebuilds each entry through `itemReceipt`, which carries only the keys it
+    // names — so the journal sees the roll only because the receipt shape carries it (issue 1645).
+    assert.deepEqual(itemReceipt(planned).rolled, { formula: '1d4+2', total: 5 });
   } finally {
     if (previous === undefined) delete globalThis.Roll;
     else globalThis.Roll = previous;

@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { seededRollClass } from './helpers/seededRoll.js';
+import { itemReceipt } from '../src/systems/runHistoryEvidence.js';
 
 function setProperty(object, path, value) {
   const parts = String(path).split('.');
@@ -180,5 +181,67 @@ test('1645: a progressive salvage award forces one and drops the formula before 
   for (const result of group.results) {
     assert.equal(result.quantity, 1, 'a progressive stage awards exactly one');
     assert.equal(result.quantityFormula, null, 'the formula never reaches the resolver');
+  }
+});
+
+test('1645: the award receipt records the roll, and a fixed award records no key at all', async () => {
+  await withRoll({ totals: { '1d4+1': 4 } }, async () => {
+    const actor = capturingActor();
+    const { items } = await engine()._createResultItems(
+      actor,
+      RECIPE,
+      { resultGroups: [{ id: 'g', results: [resultRow('r1', '1d4+1')] }] },
+      null,
+      [],
+      []
+    );
+    assert.deepEqual(items.historyReceipts[0].rolled, { formula: '1d4+1', total: 4 });
+
+    const fixed = await engine()._createResultItems(
+      capturingActor(),
+      RECIPE,
+      { resultGroups: [{ id: 'g', results: [{ id: 'r1', componentId: COMPONENT.id, quantity: 2 }] }] },
+      null,
+      [],
+      []
+    );
+    assert.ok(
+      !('rolled' in fixed.items.historyReceipts[0]),
+      'omitted rather than nulled, as presence is the mode'
+    );
+  });
+});
+
+test('1645: the awarded array carries the live rolls the chat message needs', async () => {
+  await withRoll({ totals: { '1d4-8': -3 } }, async () => {
+    const { items, rolledAmounts } = await engine()._createResultItems(
+      capturingActor(),
+      RECIPE,
+      { resultGroups: [{ id: 'g', results: [resultRow('r1', '1d4-8')] }] },
+      null,
+      [],
+      []
+    );
+    const [award] = items.rolledAwards;
+    assert.equal(award.roll.total, -3, 'the evaluated Roll itself, for the dice sound');
+    assert.deepEqual(award.rolled, { formula: '1d4-8', total: -3 });
+    assert.equal(award.name, COMPONENT.name, 'named, because an empty award has no receipt to name');
+    assert.ok(!('roll' in rolledAmounts[0]), 'the returned record stays plain data');
+  });
+});
+
+test('1645: an item receipt keeps a well-formed roll and drops a malformed one', () => {
+  const receipt = itemReceipt({
+    actorUuid: 'Actor.a',
+    itemUuid: 'Actor.a.Item.i',
+    quantity: 2,
+    rolled: { formula: '1d4+1', total: 2, terms: ['dropped'] },
+  });
+  assert.deepEqual(receipt.rolled, { formula: '1d4+1', total: 2 }, 'formula and total, nothing else');
+  for (const rolled of [null, {}, { formula: '1d4' }, { formula: '', total: 1 }, { total: NaN }]) {
+    assert.ok(
+      !('rolled' in itemReceipt({ itemUuid: 'Actor.a.Item.i', quantity: 1, rolled })),
+      `malformed roll dropped: ${JSON.stringify(rolled)}`
+    );
   }
 });

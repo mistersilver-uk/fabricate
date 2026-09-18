@@ -16,6 +16,14 @@ export function receiptQuantity(value) {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
 }
 
+/** The roll a rolled amount awarded (issue 1645): `{formula, total}` and nothing more, because
+ *  this persists. `total` is the roll as it fell, so it may be negative where `quantity` is 0. */
+function rolledRecord(value) {
+  const formula = text(value?.formula);
+  const total = Number(value?.total);
+  return formula && Number.isFinite(total) ? { formula, total } : null;
+}
+
 export function itemReceipt(entry = {}) {
   const source = entry && typeof entry === 'object' ? entry : {};
   const receipt = Object.fromEntries(
@@ -29,6 +37,9 @@ export function itemReceipt(entry = {}) {
   for (const key of ['componentId', 'resultRowId', 'sourceItemUuid']) {
     if (Object.hasOwn(source, key)) receipt[key] = text(source[key]);
   }
+  // Omitted rather than nulled for a fixed amount: presence is the mode, as it is on the result.
+  const rolled = rolledRecord(source.rolled);
+  if (rolled) receipt.rolled = rolled;
   return receipt;
 }
 
