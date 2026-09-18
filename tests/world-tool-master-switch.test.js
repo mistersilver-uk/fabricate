@@ -1,31 +1,6 @@
 /**
- * The WORLD MASTER SWITCH on a Tool (issue 1373, epic 1357).
- *
- * Fabricate modelled `enabled` per `(tool, system)` only, so there was no way to switch a Tool off
- * world-wide and no way for a world screen to say it had. The maintainer's ruling is:
- *
- *     resolved = world.enabled && system.enabled          -- WORLD OFF WINS
- *
- * The per-system flag is unchanged and still means what it meant; it simply cannot re-enable a
- * world-disabled Tool.
- *
- * ## What this suite is organised around
- *
- * Every case here is a way the switch could ship looking correct and be wrong:
- *
- *  1. COMPATIBILITY. No world has ever authored this flag, so every persisted world default is
- *     missing the key. If absence did not resolve as enabled, this change would switch off every
- *     Tool in every existing world. It is proved on REAL absent-key data through the real store
- *     over a real settings seam - a literal handed straight to a resolver would prove nothing
- *     about what survives persistence.
- *  2. THE UNION. `unionScopedDefinitions` re-spreads the in-system record LAST while
- *     `## CraftingSystem` requirement 36 holds, and a normalized in-system tool carries `enabled`
- *     unconditionally - so the resolver's AND is overwritten on the read path unless the veto is
- *     re-applied over the merged rows. A suite that only tested `resolveTool` would be green while
- *     the runtime ignored the switch entirely.
- *  3. IT IS A VETO, NEVER A GRANT. The world flag must not turn a GM-disabled Tool back on.
- *  4. IT IS TOOL-ONLY. The component has no `enabled` field at all and the essence's world
- *     defaults carry no master switch, so neither normalizer may start minting one.
+ * The WORLD MASTER SWITCH on a Tool (issue 1373, epic 1357). 1. COMPATIBILITY. No world has ever
+ * authored this flag, so every persisted world default is missing the key.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
@@ -65,15 +40,7 @@ function settingsSeam(initial = {}) {
   };
 }
 
-/**
- * A tool scope store over a seam seeded with a payload that has NO `enabled` key anywhere.
- *
- * THE SEED IS THE PERSISTED MAP SHAPE, not the normalized array shape, because that is what a
- * migrated world actually holds and it is the shape a `load()` has to survive.
- *
- * @param {object} [payload]
- * @returns {{store: object, seam: object}}
- */
+/** A tool scope store over a seam seeded with a payload that has NO `enabled` key anywhere. */
 function toolStore(payload = {}) {
   const seam = settingsSeam({
     [SETTING_KEYS.TOOL_SCOPE]: {
@@ -169,8 +136,7 @@ describe('the world master switch on a Tool (issue 1373)', () => {
     it('survives the read union, where the IN-SYSTEM record otherwise decides `enabled`', () => {
       // THE SEVERE CASE. `unionScopedDefinitions` re-spreads the in-system record last while
       // requirement 36 holds, so a system tool saying `enabled: true` overwrites the resolver's
-      // answer. Without the veto over the merged rows the switch would be invisible to every
-      // runtime consumer while every resolver test stayed green.
+      // answer.
       const corpus = {
         entities: [{ id: TOOL_ID, name: 'Mining Pick' }],
         defaults: [{ id: TOOL_ID, enabled: false }],
@@ -247,11 +213,7 @@ describe('the world master switch on a Tool (issue 1373)', () => {
   });
 
   describe('the write path', () => {
-    /**
-     * The tool write family over a real store, so a case asserts what actually persists.
-     *
-     * @returns {Promise<{actions: object, store: object}>}
-     */
+    /** The tool write family over a real store, so a case asserts what actually persists. */
     async function writeFamily() {
       const { store } = toolStore();
       await store.load();

@@ -18,13 +18,8 @@ import {
 } from '../scripts/visual-parity/lib/schema.js';
 import { subjectProblems } from '../scripts/visual-parity/lib/subject.js';
 
-// The visual-parity harness runs locally and never in CI, so the parts of it that CAN be
-// tested in the Node runner are the pure ones: the rules that keep a spec honest. Everything
-// here is a rule that has already cost a round, stated as an assertion.
-//
-// `alignments` and `locatorProblems` are both from the same rework (issue 1096 follow-up): the
-// first is the class of defect a per-region measurement cannot express, and the second is what
-// made a locator DATA instead of JavaScript reconstituted in the page with `new Function`.
+// The visual-parity harness runs locally and never in CI, so the parts of it that CAN be tested in
+// the Node runner are the pure ones: the rules that keep a spec honest (issue 1096).
 
 const SPEC = () => ({
   screens: ['roll'],
@@ -81,9 +76,8 @@ test('an alignment group is the rule a per-region measurement cannot express', a
 
   await subtests.test('`top` is alignable and `bottom` is not, and the difference is stated', () => {
     // Two cards drawn SIDE BY SIDE in one grid row share a top edge, and a row gap or a stray
-    // `margin-top` on one of them is an ancestor-owned inset of exactly the class this rule
-    // exists for. A shared BOTTOM edge is not the same claim: two cards in a row end at
-    // different heights because their CONTENT differs, which is a fact about the world's data.
+    // `margin-top` on one of them is an ancestor-owned inset of exactly the class this rule exists
+    // for.
     assert.ok(ALIGNABLE_EDGES.includes('top'));
     assert.ok(!ALIGNABLE_EDGES.includes('bottom'));
     const spec = SPEC();
@@ -223,9 +217,8 @@ test('an inventory root may be a SET, and a set states its pane', async (subtest
 
   await subtests.test('a set with no pane fails, because the first part would set the floor', () => {
     // The rule the runtime test measures: this product's header band is 1398px and its content
-    // column 878px, so deriving the pane from the first part makes the ORDER of a list decide
-    // the card floor. A default nobody chose is the whole class of defect the declared pane
-    // closed, and a set re-opens it unless the pane is required.
+    // column 878px, so deriving the pane from the first part makes the ORDER of a list decide the
+    // card floor.
     const problems = inventoryRootProblems({ parts: ['header', 'main'] }, 'root');
     assert.equal(problems.length, 1);
     assert.match(problems[0], /root SET must declare its pane/);
@@ -267,9 +260,7 @@ test('the ONE relaxation of exact equality is a unit conversion, and it is bound
   });
 
   await subtests.test('0.2px STILL REPORTS — the band cannot absorb a decision', () => {
-    // The rule the whole mechanism turns on. A quarter of one half-point type step is a decision
-    // somebody made, and the band is three times narrower than the smallest step any published
-    // scale takes.
+    // The rule the whole mechanism turns on.
     assert.equal(classifyDifference('fontSize', '11.7px', '11.5px', TOLERANCES).verdict, 'drift');
     assert.equal(classifyDifference('fontSize', '11.52px', '11px', TOLERANCES).verdict, 'drift');
     assert.equal(classifyDifference('fontSize', '11.52px', '12px', TOLERANCES).verdict, 'drift');
@@ -320,12 +311,9 @@ test('a screen the subject cannot show yet is stated, not fatal', async (subtest
   });
 
   await subtests.test('a root with a stated reason passes', () => {
-    // WHY THE CHANNEL EXISTS AT ALL: a closed screen set legitimately runs ahead of the product
-    // — a route that exists as a placeholder while the PR that owes it is open — and without
-    // this the first such screen threw a raw Playwright error and killed the whole run. That is
-    // not cosmetic: the stale-exemption check runs ONLY on a full pass, so for as long as one
-    // screen aborted the run, no exemption in the spec was ever checked for outliving its
-    // difference. On this spec, the first full pass after this landed rejected two.
+    // WHY THE CHANNEL EXISTS AT ALL: a closed screen set legitimately runs ahead of the product — a
+    // route that exists as a placeholder while the PR that owes it is open — and without this the
+    // first such screen threw a raw Playwright error and killed the whole run.
     assert.deepEqual(inventoryCoverageProblems(spec({ unreachable: 'x'.repeat(40) })), []);
   });
 

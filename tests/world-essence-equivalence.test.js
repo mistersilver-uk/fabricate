@@ -1,14 +1,4 @@
-/**
- * Unit and property coverage for the `1.34.0` world-essence equivalence core (issue 1654).
- *
- * The canonical key and what it deliberately sees through, candidacy and the zero point, the
- * false-merge trap, the re-derived survivor election, the three refusal invariants, and the
- * tombstone leg.
- *
- * Every fixture comes from the one shared builder in `helpers/worldScopeCorpus.js`, and the
- * randomness is seeded (`seededRandom`): `Math.random` is S2245 and fails the quality gate, and a
- * seeded generator is what makes a property failure reproducible from its seed.
- */
+/** Unit and property coverage for the `1.34.0` world-essence equivalence core (issue 1654). */
 
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -64,9 +54,7 @@ function permuteCorpus(corpus, seed) {
   };
 }
 
-// ---------------------------------------------------------------------------
 // Totality
-// ---------------------------------------------------------------------------
 
 test('the equivalence core is TOTAL and NON-THROWING on no input at all', () => {
   assert.deepEqual(buildWorldEssenceEquivalence(), EMPTY);
@@ -128,9 +116,7 @@ test('a SELF-REFERENTIAL section value is declined rather than serialised', () =
   assert.deepEqual(result.mergeMap, {});
 });
 
-// ---------------------------------------------------------------------------
 // The canonical key (`#### D1`)
-// ---------------------------------------------------------------------------
 
 test('two world essences with the SAME NAME in different case are one essence', () => {
   const result = buildWorldEssenceEquivalence(
@@ -221,9 +207,7 @@ test('`enabled` is NOT in the key: two essences differing only in it still merge
   ]);
 });
 
-// ---------------------------------------------------------------------------
 // Candidacy and the zero point (`#### D2`)
-// ---------------------------------------------------------------------------
 
 test('THE ZERO POINT: a world essence with no live membership record never merges', () => {
   const spec = (member) => ({
@@ -329,9 +313,7 @@ test('a world essence whose members DISAGREE is declined with the section they d
   assert.deepEqual(result.mergeMap, {});
 });
 
-// ---------------------------------------------------------------------------
 // The false-merge trap (`#### D1`)
-// ---------------------------------------------------------------------------
 
 test('equal sourceComponentIds from two REFUSED component pairs never merge', () => {
   // Both systems carry `comp-1` on the world roster but hold no membership record for it, which is
@@ -417,9 +399,7 @@ test('a DOCUMENT UUID effect source is globally addressable and merges freely', 
   assert.deepEqual(result.mergeMap, { 'sys-b': { essences: { kt9: 'iron' } } });
 });
 
-// ---------------------------------------------------------------------------
 // Survivor election (`#### D3`)
-// ---------------------------------------------------------------------------
 
 test('SLUG PREFERENCE beats corpus position: a readable id never loses to a generated one', () => {
   const result = buildWorldEssenceEquivalence(
@@ -514,9 +494,7 @@ test('the local slug stem agrees with `mintEssenceId` on an unclaimed roster', (
   assert.equal(essenceSlugStem(undefined), 'essence');
 });
 
-// ---------------------------------------------------------------------------
 // The map and its three refusal invariants (`#### D4`)
-// ---------------------------------------------------------------------------
 
 test('OUTPUT UNIQUENESS refuses a merge that would make one system emit a duplicate id', () => {
   const spec = (inSystem) => ({
@@ -591,9 +569,7 @@ test('a NATIVE duplicate of a group member’s id refuses that group, as `1.30.0
       { id: 'sys-b', essences: [{ id: 'kt9', name: 'Iron' }] },
     ],
   });
-  // A hand-edited corpus carrying the same row id twice in one system. `1.30.0` refuses a pair
-  // holding one of these on its own ("such a system already has an unreachable definition and must
-  // not have a lift layered on top of it"), and the same reading applies to a merge into that id.
+  // A hand-edited corpus carrying the same row id twice in one system.
   const [first] = corpus.systems[0].essenceDefinitions;
   corpus.systems[0].essenceDefinitions.push({ ...first });
   const result = buildWorldEssenceEquivalence(corpus);
@@ -627,10 +603,7 @@ test('a NATIVE duplicate NO group touches refuses nothing', () => {
 test('a system holding a ROW but no membership record still gets a leg', () => {
   // Presence, not voting: `sys-c` holds an `essenceDefinitions` row under the loser id and no
   // membership record, so it never voted on unanimity — and it is re-keyed anyway, because it holds
-  // the entity rather than a reference to it. `unionScopedDefinitions` passes a row with no
-  // membership record through untouched, so the re-key cannot change what that row resolves to;
-  // leaving it behind would leave a definition naming a world entity this pass deletes and
-  // tombstones.
+  // the entity rather than a reference to it.
   const corpus = buildEssenceMergeCorpus({
     systems: [
       { id: 'sys-a', essences: [{ id: 'iron', name: 'Iron' }] },
@@ -687,9 +660,7 @@ test('the merge map is DISJOINT and a second application is a no-op, across ever
       }
       // Idempotence follows from disjointness, and is asserted against the applied map rather than
       // against the identity fallback: `map[survivorId] ?? survivorId === survivorId` reduces to a
-      // tautology once the loop above has proved no survivor is a key. What the migration relies on
-      // is that applying the map to its own output changes nothing, which is what `keyedRemapper`
-      // is asked here.
+      // tautology once the loop above has proved no survivor is a key.
       const remap = keyedRemapper(map);
       for (const [loserId, survivorId] of Object.entries(map)) {
         assert.equal(
@@ -706,9 +677,7 @@ test('the merge map is DISJOINT and a second application is a no-op, across ever
   assert.ok(mapped > 0, 'the premise: at least one fixture actually produces a non-empty map');
 });
 
-// ---------------------------------------------------------------------------
 // The report names things (`#### D9`)
-// ---------------------------------------------------------------------------
 
 test('every report leg carries the STORED display name, not the canonical fold', () => {
   // The stored name is padded and mixed-case, so the canonical fold (`iron ore`) and the display
@@ -807,9 +776,7 @@ test('an ABSENT name is never minted, and a stored null name is preserved', () =
   assert.ok(!('name' in result.orphaned[0]), 'an absent name must not be minted');
 });
 
-// ---------------------------------------------------------------------------
 // The tombstone leg (`#### D12`)
-// ---------------------------------------------------------------------------
 
 test('every retired id keeps the four identity fields and the systems it lived in', () => {
   const result = buildWorldEssenceEquivalence(
@@ -845,9 +812,7 @@ test('every retired id keeps the four identity fields and the systems it lived i
   assert.ok(!('iron' in result.retired));
 });
 
-// ---------------------------------------------------------------------------
 // Determinism (`#### D3`)
-// ---------------------------------------------------------------------------
 
 test('the answer is BYTE-IDENTICAL on a re-run, across every fixture', () => {
   let merged = 0;

@@ -1,21 +1,6 @@
 /**
- * The world vocabulary screen's PER-KIND copy, which is otherwise an unguarded mirror that fails
- * to an empty string (issue 1392, epic 1357).
- *
- * ── WHY THIS IS NOT COVERED BY THE TWO SHIPPED LANG GUARDS ────────────────────────────────
- * `ui-lang-keys-resolve.test.js` checks LITERAL `FABRICATE.*` keys found in source text, and this
- * screen composes every one of its strings from a table: one `panelText(panel, 'Title')` call
- * site serves three vocabularies, so the only literal in the file is the namespace base — which
- * resolves to an object and is admitted. `lang-keys-no-orphans.test.js` runs the other way and
- * credits the whole subtree from that same base. Measured on this tree: deleting 16 of the 19
- * `Scoped.WorldVocabulary.ComponentTags.*` display strings left 105 tests green, and the screen
- * rendered a blank title, a blank subline, a blank add label and a blank empty state.
- *
- * ── THE FIELD LIST IS EXTRACTED, NEVER RESTATED ───────────────────────────────────────────
- * A hand-written list of field names is the same mirror one level up: it would go stale the day
- * the page reads a new one, and the new field is exactly the case this exists to catch. So the
- * names are read out of the page's own `panelText(panel, '…')` call sites and the studio's own
- * `panelKey(panel, '…')` call sites, and the extraction carries its own floor.
+ * The world vocabulary screen's PER-KIND copy, which is otherwise an unguarded mirror that fails to
+ * an empty string (issue 1392, epic 1357).
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -46,13 +31,7 @@ function requestedFields() {
   return [...fields].sort();
 }
 
-/**
- * The ONE field pair that is legitimately per-kind rather than universal.
- *
- * A recipe category's deletion rewrites nothing anywhere in the world, so `cascadeClause`
- * answers `''` for it and never asks for either clause — its own sentence says so outright. Every
- * other field is asked for on every panel.
- */
+/** The ONE field pair that is legitimately per-kind rather than universal. */
 const CASCADE_FIELDS = new Set(['CascadeSome', 'CascadeNone']);
 
 function resolveKey(key) {

@@ -1,14 +1,4 @@
-/**
- * Guard: `lang/en.json` must have no duplicate sibling keys.
- *
- * `JSON.parse` silently keeps the LAST of two same-level duplicate keys and
- * discards the earlier one, so a duplicate is invisible to every consumer that
- * reads the parsed object — and any JSON round-trip (formatter, codemod, agent)
- * can rewrite the survivor into the dead one's slot and delete the other. This
- * happened during issue 651 (`Locked`, `StepLabel`). We therefore parse the RAW
- * text with a minimal structural tokenizer (NOT `JSON.parse`) and flag any key
- * that repeats within the same object.
- */
+/** Guard: `lang/en.json` must have no duplicate sibling keys (issue 651). */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -17,9 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-// Tokenize JSON into structural tokens plus string/literal leaves. Numbers,
-// booleans, and null collapse to a single opaque `literal` token — we only need
-// object structure and the string keys, not scalar values.
+// Tokenize JSON into structural tokens plus string/literal leaves.
 function tokenize(src) {
   const tokens = [];
   let i = 0;

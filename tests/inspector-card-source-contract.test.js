@@ -1,45 +1,7 @@
 /**
  * Source contract: the manager's card shell is written in ONE place (issue 1427).
- *
  * `class="manager-inspector-card"` was a CSS convention, like the `manager-button` one
- * `manager-button-source-contract.test.js` closes. 80 sites across 20 components wrote it out by
- * hand on a `<section>`, and `styles/fabricate.css` turned it into the padding, the hairline
- * border, the 8px radius, the surface fill and the stacked gap.
- *
- * ── WHY THIS FILE EARNS ITS PLACE WHEN NOTHING RENDERS WRONG ──────────────────────────────
- * The icon-button contract has a clause that cannot be photographed — a missing accessible name.
- * This one has no such clause, and that is worth saying rather than papering over: a card written
- * as a bare `<section>` renders visibly wrong, so the convention is self-policing in a way the
- * accessible name is not.
- *
- * What it is NOT self-policing about is enumeration. The whole argument for extracting the shell
- * is that a change to it should be one edit and its callers should be listable; a convention
- * re-established at one new site quietly restores the state where neither is true, and the next
- * reader has no way to know whether 19 callers or 20 exist. The class-only clause is the gate on
- * that. The bare-`data-*` clause is the one with teeth: it catches a real, silent DOM change the
- * conversion itself can make.
- *
- * ── THE EXEMPTIONS, AND WHY EACH IS ONE ───────────────────────────────────────────────────
- * `InspectorCard.svelte` is the primitive; it writes the class because writing it is what it is
- * for. `CraftingSystemManagerRoot.svelte` is DEFERRED, not exempt: its 32 sites are 40% of the
- * whole census, and landing a sweep's tail in a converging 12k-line root is how a refactor
- * collides with everything else in flight. Both are pinned by COUNT, so a later pass that
- * converts SOME of the root's sites reds here instead of quietly halving a deferral nobody is
- * tracking any more.
- *
- * ── WHERE THE CLAUSES THEMSELVES LIVE ─────────────────────────────────────────────────────
- * `tests/helpers/primitiveSourceContract.js`, shared with `icon-button-source-contract.test.js`,
- * which asks the same four questions about `<IconButton>`. That file records why — SonarCloud
- * measured 88 duplicated lines between the two guards while each carried its own copy, and two
- * copies drift into disagreeing about what a call site IS. This file supplies the facts the
- * clauses are stated over; everything below the exemption table is data.
- *
- * The corpus is read from the working tree rather than by shelling to `grep` (a raw NUL byte
- * makes a file BINARY to a recursive grep, and `checks/ChecksView.svelte` carries seven of this
- * sweep's sites), `<style>` blocks and comments are stripped before matching, and the tag scan
- * tracks `{}` DEPTH so an inline arrow's `>` or a COMPARISON inside an expression attribute
- * cannot end a tag early. Each of those is load-bearing and each is argued where it lives:
- * `helpers/primitiveSourceContract.js` and `helpers/svelteTagScan.js`.
+ * `manager-button-source-contract.test.js` closes.
  */
 import { definePrimitiveSourceContract } from './helpers/primitiveSourceContract.js';
 
@@ -51,9 +13,6 @@ const PRIMITIVE = 'src/ui/svelte/components/InspectorCard.svelte';
 /**
  * The `.svelte` files under `src/` that may still write the class, each with its reason and the
  * exact number of times it writes it.
- *
- * Counted rather than merely listed, and keyed on the class rather than on a line number, which
- * rots on the first edit above it.
  */
 const CLASS_EXCEPTIONS = Object.freeze([
   Object.freeze({

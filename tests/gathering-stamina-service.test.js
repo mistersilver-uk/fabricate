@@ -1,9 +1,6 @@
 /**
- * Focused unit coverage for `GatheringStaminaService` (issue 376) — the
- * per-actor stamina subsystem extracted from `GatheringRichStateService`. These
- * exercise the collaborator directly through its injected seams: economy reads
- * (`getSystemEconomy`), the expression evaluator, the calendar-aware
- * `secondsPerUnit`, the world-time `now`, and the hook/history factories.
+ * Focused unit coverage for `GatheringStaminaService` (issue 376) — the per-actor stamina subsystem
+ * extracted from `GatheringRichStateService`.
  */
 
 import test from 'node:test';
@@ -169,9 +166,7 @@ test('regenerateActorStamina adds per-interval amount and advances the anchor', 
   assert.equal(next.lastRegenWorldTime, 3 * HOUR, 'anchor advanced by consumed intervals');
 });
 
-// issue 403: `lastRegenWorldTime` is an ACCRUAL anchor and is monotonic
-// non-decreasing. A backward tick writes no actor state at all, so the anchor may
-// legitimately sit ahead of the current world time.
+// issue 403: `lastRegenWorldTime` is an ACCRUAL anchor and is monotonic non-decreasing.
 test('regenerateActorStamina freezes the anchor without gain when time runs backwards', async () => {
   const { service } = makeService({
     economy: { stamina: { enabled: true, max: '40', regen: { policy: 'overTime', unit: 'hours', amount: '2' } } },
@@ -187,10 +182,9 @@ test('regenerateActorStamina freezes the anchor without gain when time runs back
   assert.equal(staminaEntry(actor).lastRegenWorldTime, 5 * HOUR, 'the anchor never moves backwards');
 });
 
-// The pool shape `setActorStamina` produces on an actor with NO prior pool: it
-// carries the anchor forward only when a previous entry had one, so a GM
-// `setGatheringStamina` on a fresh actor yields a pool with no anchor key at all.
-// An absent anchor must SEED (not freeze), or that pool never regenerates again.
+// The pool shape `setActorStamina` produces on an actor with NO prior pool: it carries the anchor
+// forward only when a previous entry had one, so a GM `setGatheringStamina` on a fresh actor yields
+// a pool with no anchor key at all.
 test('regenerateActorStamina seeds an anchorless pool at now, then regenerates from the seed', async () => {
   const { service } = makeService({
     economy: { stamina: { enabled: true, max: '40', regen: { policy: 'overTime', unit: 'hours', amount: '2' } } },
@@ -220,21 +214,15 @@ test('regenerateActorStamina no-ops when regen is off or the pool is unmateriali
   assert.equal(await noPool.service.regenerateActorStamina({ actor: makeFakeActor(), systemId: 'sys', worldTime: HOUR }), null);
 });
 
-// --- persistence: cleared keys must not resurrect (issue 1648) --------------
-//
-// `writeState` persists through `Actor#setFlag`
-// (`src/systems/gatheringRichStateInternals.js:70`), and Foundry's `setFlag`
-// writes via `Document#update`, whose recursive merge NEVER removes a key that
-// is merely absent from the written payload. `makeFakeActor` above REPLACES its
-// flag value, so it cannot observe that: these cases use the merge-faithful
-// `FakeActor` and a `-=`-aware `update`, which is what a real actor does.
+// persistence: cleared keys must not resurrect (issue 1648). `writeState` persists through
+// `Actor#setFlag` (`src/systems/gatheringRichStateInternals.js:70`), and Foundry's `setFlag` writes
+// via `Document#update`, whose recursive merge NEVER removes a key that is merely absent from the
+// written payload.
 
 class MergingStaminaActor extends FakeActor {
   /**
-   * Foundry's flattened-path `Document#update`, reduced to what the service
-   * uses: a dotted path below the `flags` root, with an optional `-=` deletion
-   * operator on the LAST segment. Deliberately does not delete an omitted key —
-   * that is the merge behaviour these cases exist to pin.
+   * Foundry's flattened-path `Document#update`, reduced to what the service uses: a dotted path
+   * below the `flags` root, with an optional `-=` deletion operator on the LAST segment.
    */
   async update(patch) {
     for (const [path, value] of Object.entries(patch)) {

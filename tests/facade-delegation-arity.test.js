@@ -1,34 +1,13 @@
 /**
- * A facade method that delegates must not NARROW what it forwards (issue 1759).
- *
- * `main.js` wraps the run-command service in thin pass-through methods. One of them —
- * `executeJournalRunCommand` — was written to take `command` alone while its own caller passed
- * `(command, options)`. The second argument was dropped on the floor, so `interactive` reverted to
- * its `true` default: `game.fabricate.craft()` on a recipe with a check opened a roll dialog
- * nobody could answer and waited forever. The Foundry smoke met that as a 28-minute Phase E
- * timeout, across two releases.
- *
- * Why it survived a fix is the part worth keeping, because it is the shape of the trap. #1758
- * fixed the service AND the call site, and pinned that call site in `fabricate-api-surface.test.js`
- * under a comment reading "The options are FORWARDED, not dropped". Twelve lines earlier the same
- * file pinned the literal string `executeJournalRunCommand(command)` — the one-argument signature
- * doing the dropping. Both pins passed. Neither could see the gap between them, because a source
- * pin reads one line and this defect lives in the relationship between two.
- *
- * So this gate reads the relationship: for every delegating method, what it hands on must cover
- * what it declares. That generalises past the single method that happened to be wrong.
+ * A facade method that delegates must not NARROW what it forwards (issue 1759). Why it survived a
+ * fix is the part worth keeping, because it is the shape of the trap.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { test } from 'node:test';
 
-/**
- * Normalise line endings before scanning.
- *
- * The checkout is CRLF on Windows and LF in CI. A scan anchored to one of them matches nothing on
- * the other — which is this gate's own failure mode, so it is removed rather than relied upon.
- */
+/** Normalise line endings before scanning. */
 function normaliseEndings(text) {
   return text.split(String.fromCharCode(13) + '\n').join('\n');
 }
@@ -50,11 +29,8 @@ const parameterNames = (text) =>
     .filter(Boolean);
 
 /**
- * Every method that hands off to a same-named method on one of its own services, as
- * `{ method, declared, forwarded }`.
- *
- * The service property is deliberately not pinned: a new service bag inherits this guard for
- * free, which is the point of gating the defect class rather than the one instance of it.
+ * Every method that hands off to a same-named method on one of its own services, as `{ method,
+ * declared, forwarded }`.
  */
 function delegations() {
   const found = [];

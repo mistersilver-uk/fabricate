@@ -1,12 +1,4 @@
-/**
- * Coverage for the character prerequisite library CRUD in adminStore (issue 544).
- *
- * The library moved to WORLD scope in issue 1308, so it is persisted through the
- * `CharacterLibrariesStore` rather than through the crafting system, none of the actions takes a
- * crafting system id, and — the part worth pinning — none of them requires a system to be
- * SELECTED. The fake store below is the real class over an in-memory setting, so the round trip
- * goes through the real `normalizeCharacterPrerequisiteList`.
- */
+/** Coverage for the character prerequisite library CRUD in adminStore (issue 544). */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { get } from 'svelte/store';
@@ -182,13 +174,7 @@ describe('adminStore character prerequisites (system-owned)', () => {
   });
 });
 
-// The delete CONFIRMATION (issue 1308). These two lists are the only destructive edits on a page
-// framed as "settings for the selected crafting system" whose reach is the whole world, and until
-// this they were one unconfirmed click on a bare icon button.
-//
-// Every assertion below exists to kill a specific mutation. Both harnesses stub `confirmDialog`
-// to resolve true, so deleting the confirm call outright leaves the rest of the suite green —
-// only the DECLINE case notices.
+// The delete CONFIRMATION (issue 1308).
 describe('adminStore character prerequisite delete confirmation (issue 1308)', () => {
   function servicesWithConfirm(confirmed, seen = []) {
     const services = createServices({

@@ -1,29 +1,4 @@
-/**
- * End-to-end alchemy tier-4 craftability parity (issue 578).
- *
- * A submission resolvable SOLELY by the bare top-level `registeredItemUuid` tier
- * (no `uuid`/compendium/`duplicateSource`/`roles`/legacy scalar/name, and no own
- * `flags.fabricate.essences`) is bucketed to component X by the collector, but on
- * the pre-fix branch the rest of the alchemy craft path re-resolves through the
- * tier-4-BLIND shared resolvers, so the brew never completes. These tests drive the
- * REAL collector (`resolveAlchemySubmissions`) → REAL `craftAlchemy` → REAL `craft()`
- * pipeline with a REAL `RecipeManager` (so `canCraft`/`evaluateCraftability`/
- * `ingredientMatchesItem`/`_accumulateEssences` run genuinely), a REAL `IngredientSet`
- * (real `resolveIngredientSelection`), a REAL `SignatureValidator`, and a REAL
- * `ResolutionModeService`. Only `_runCraftingCheck` is stubbed (to force a pass/fail
- * without a live dice engine). NO `craft()` stub.
- *
- * The three load-bearing cases are RED on the base branch (`success:false` / essences
- * `{}` / effect not transferred) and GREEN after the full fix:
- *   1. Non-timed success — result created AND X's essence-sourced effect transferred.
- *   2. Time-gated — START/prepares (snapshot carries X's essences), FINISH creates the
- *      result with the effect transferred from the snapshot.
- *   3. Non-timed Simple FAILURE — the reserved failure result carries X's essence-sourced
- *      effect (site 7).
- * Plus: standard (non-alchemy) crafting of the same item stays unrecognized, the own-flag
- * short-circuit is preserved, and the UNMUTATED shared essence/ingredient resolvers still
- * have no tier 4.
- */
+/** End-to-end alchemy tier-4 craftability parity (issue 578). */
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -39,9 +14,7 @@ import { resolveComponentForItem } from '../src/utils/sourceUuid.js';
 import { resolveAlchemySubmissions } from '../src/utils/alchemySubmissions.js';
 import { mergeHistoryFlag } from './helpers/journal-fixtures.js';
 
-// ---------------------------------------------------------------------------
 // Globals
-// ---------------------------------------------------------------------------
 
 function getProperty(object, path) {
   if (!object || !path) return undefined;
@@ -75,22 +48,16 @@ globalThis.ui = { notifications: { info() {}, warn() {}, error() {} } };
 const SYS = 'alch-sys';
 const FIRE_ESSENCE_SRC = 'Item.FireEssence';
 
-// ---------------------------------------------------------------------------
 // Fakes
-// ---------------------------------------------------------------------------
 
-// A purely-tier-4 owned item: only a bare top-level `registeredItemUuid`. No `uuid`,
-// compendium/duplicate source, `roles`, legacy scalar, or name — invisible to
-// `getItemSourceReferences` and to the durable-flag tiers, so ONLY the bare-uuid
-// supplement can attribute it. `flags` optionally carries own essences (own-flag test).
+// A purely-tier-4 owned item: only a bare top-level `registeredItemUuid`.
 class Tier4Item {
   constructor(id, registeredItemUuid, { flags = null, quantity = 1, uuid = null } = {}) {
     this.id = id;
     this.registeredItemUuid = registeredItemUuid;
     // Optional live uuid — used ONLY by the own-flag pin, which is deliberately
-    // source-ref-resolvable (uuid overlaps the component source) so it brews on BOTH
-    // the base and fixed branches, isolating the own-flag ESSENCE short-circuit from
-    // the tier-4 ingredient fix. The tier-4-only cases pass no uuid.
+    // source-ref-resolvable (uuid overlaps the component source) so it brews on BOTH the base and
+    // fixed branches, isolating the own-flag ESSENCE short-circuit from the tier-4 ingredient fix.
     if (uuid) this.uuid = uuid;
     this.system = { quantity };
     this.parent = null;
@@ -104,10 +71,9 @@ class Tier4Item {
     return this._flags[key];
   }
   async delete() {
-    // Model Foundry's STRICT embedded delete (issue 917): `#preDeleteDocumentArray`
-    // resolves the id with `{ strict: true }` and THROWS on a missing embedded id, so
-    // a duplicate consumption-plan entry aborts mid-consumption rather than silently
-    // spending twice. A permissive fake would let that contract ship unverified.
+    // Model Foundry's STRICT embedded delete (issue 917): `#preDeleteDocumentArray` resolves the id
+    // with `{ strict: true }` and THROWS on a missing embedded id, so a duplicate consumption-plan
+    // entry aborts mid-consumption rather than silently spending twice.
     if (this._deleted) throw new Error(`Item ${this.id} was already deleted`);
     this._deleted = true;
     if (this.parent) this.parent.items = this.parent.items.filter((i) => i !== this);
@@ -184,9 +150,7 @@ function resultSourceItem(name) {
   };
 }
 
-// ---------------------------------------------------------------------------
 // Fixtures
-// ---------------------------------------------------------------------------
 
 function components() {
   return [
@@ -357,9 +321,7 @@ function brewRecords(sourceActor, comps) {
   return resolveAlchemySubmissions([sourceActor], comps, ['cX'], SYS);
 }
 
-// ===========================================================================
 // 1. Non-timed success — RED (signature gate) → GREEN (result + effect transfer)
-// ===========================================================================
 
 test('non-timed: a purely-tier-4 submission brews and transfers X\'s essence-sourced effect', async () => {
   const { engine, validator, comps } = setup({ checkMode: 'simple', resultGroups: [SUCCESS_GROUP] });
@@ -388,10 +350,8 @@ test('non-timed: a purely-tier-4 submission brews and transfers X\'s essence-sou
   assert.equal(result.results[0].effects[0].name, 'Fire Ward');
 });
 
-// ===========================================================================
-// 2. Time-gated — RED → GREEN (START prepares snapshot with X's essences, FINISH
-//    creates the result with the effect transferred from the snapshot)
-// ===========================================================================
+// 2. Time-gated — RED → GREEN (START prepares snapshot with X's essences, FINISH creates the result
+// with the effect transferred from the snapshot)
 
 test('time-gated: a purely-tier-4 submission starts, prepares an essence snapshot, and finishes with the effect transferred', async () => {
   const runManager = new CraftingRunManager();
@@ -444,10 +404,8 @@ test('time-gated: a purely-tier-4 submission starts, prepares an essence snapsho
   assert.equal(finishResult.results[0].effects[0].name, 'Fire Ward');
 });
 
-// ===========================================================================
-// 3. Non-timed Simple FAILURE — RED → GREEN (site 7: the reserved failure result
-//    carries X's essence-sourced effect)
-// ===========================================================================
+// 3. Non-timed Simple FAILURE — RED → GREEN (site 7: the reserved failure result carries X's
+// essence-sourced effect)
 
 test('non-timed Simple FAILURE: the reserved failure result carries X\'s essence-sourced effect (site 7)', async () => {
   const { engine, validator, comps } = setup({
@@ -482,9 +440,7 @@ test('non-timed Simple FAILURE: the reserved failure result carries X\'s essence
   assert.equal(result.results[0].effects[0].name, 'Fire Ward');
 });
 
-// ===========================================================================
 // 4. Standard-crafting-unaffected pin (the gating)
-// ===========================================================================
 
 test('standard (non-alchemy) craft of the same tier-4 item stays unrecognized', async () => {
   const { engine, recipe } = setup({ checkMode: 'simple', resultGroups: [SUCCESS_GROUP] });
@@ -501,9 +457,7 @@ test('standard (non-alchemy) craft of the same tier-4 item stays unrecognized', 
   assert.equal(tier4._deleted, false, 'nothing is consumed');
 });
 
-// ===========================================================================
 // 5. Own-flag short-circuit preserved
-// ===========================================================================
 
 test('own-flag short-circuit: an item carrying its own essences brews even against a component with none', async () => {
   const { engine, validator, system, comps } = setup({
@@ -533,22 +487,13 @@ test('own-flag short-circuit: an item carrying its own essences brews even again
   assert.equal(result.results[0].name, 'Elixir');
 });
 
-// ===========================================================================
-// 6. Alchemy CONSUMPTION under the shared essence block (issue 917)
-//
-// Alchemy MATCHING is a separate code path, but alchemy CONSUMPTION shares
-// `_resolveCraftSelection` -> `resolveIngredientSelection` -> `_consumeIngredients`
-// with standard crafting, and `_consumeAlchemyExtraItems` mops up whatever the plan
-// did not claim. Resolving every essence option in one shared block moves items
-// between `plan` and `extras` — so the invariant worth pinning is that the NET
-// consumption is unchanged: alchemy consumes the whole submission either way, which
-// is exactly why no otherwise-planned assertion would catch a regression here.
-// ===========================================================================
+// 6. Alchemy CONSUMPTION under the shared essence block (issue 917). Alchemy MATCHING is a separate
+// code path, but alchemy CONSUMPTION shares `_resolveCraftSelection` ->
+// `resolveIngredientSelection` -> `_consumeIngredients` with standard crafting, and
+// `_consumeAlchemyExtraItems` mops up whatever the plan did not claim.
 
-// A brew whose set authors BOTH a component group and an essence group, so the
-// submission splits across the plan (component claim + block draw) and the extras
-// sweep. `Tier4Item.delete` throws on a second delete, so a duplicated plan entry
-// fails loudly rather than silently over-spending.
+// A brew whose set authors BOTH a component group and an essence group, so the submission splits
+// across the plan (component claim + block draw) and the extras sweep.
 const BLOCK_GROUPS = [
   { id: 'g-comp', options: [{ match: { type: 'component', componentId: 'cX' }, quantity: 1 }] },
   { id: 'g-ess', options: [{ quantity: 1, match: { type: 'essence', essenceId: 'fire', amount: 2 } }] },
@@ -607,10 +552,8 @@ test('an essence allocation riding on the options never reaches an alchemy brew'
   const source = new FakeActor('src', submitted);
   const records = resolveAlchemySubmissions([source], comps, ['cX', 'cX'], SYS);
 
-  // An empty allocation means "fund the block with nothing" — it is honoured, never
-  // topped up — so if it survived the alchemy hop the brew would be refused. The
-  // recipe and set here are DISCOVERED by matching, so any allocation on `options`
-  // was scoped to something else entirely and must be stripped.
+  // An empty allocation means "fund the block with nothing" — it is honoured, never topped up — so
+  // if it survived the alchemy hop the brew would be refused.
   const result = await engine.craftAlchemy(new FakeActor('pc'), [source], records, {
     craftingSystemId: SYS,
     signatureValidator: validator,
@@ -621,9 +564,7 @@ test('an essence allocation riding on the options never reaches an alchemy brew'
   assert.equal(result.results[0].name, 'Elixir');
 });
 
-// ===========================================================================
 // 7. Non-alchemy shared resolvers still have no tier 4 (unmutated)
-// ===========================================================================
 
 test('the UNMUTATED shared essence/ingredient resolvers still have no tier 4 for the item', () => {
   const comps = components();

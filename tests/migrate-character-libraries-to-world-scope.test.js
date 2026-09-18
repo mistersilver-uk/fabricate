@@ -1,11 +1,5 @@
 // 1.28.0 — lifting the character prerequisite library and the modifier library to world scope
 // (issue 1308).
-//
-// The cases below are the ones the currency and travel migrations already pin, plus the three
-// this migration is the first to face: TWO libraries under one key (so the idempotence guard and
-// the wrote-anything predicate are disjunctions, and one library may be junk while the other is
-// valid), and id collisions that are the NORMAL case rather than a near-impossibility, because
-// preset ids are stable semantic slugs rather than randomIDs.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -41,9 +35,7 @@ test('unions both libraries across systems, keyed by id, first system winning', 
   assert.equal(built._collisions, undefined, 'no disagreement, so nothing to report');
 });
 
-// The seeded-preset case, and the reason collisions are filtered by CONTENT. A GM who seeded the
-// same bundle into two systems collides on every entry while both copies agree exactly; reporting
-// those would bury the one collision that actually changed a rule.
+// The seeded-preset case, and the reason collisions are filtered by CONTENT.
 test('an IDENTICAL colliding entry is merged silently, not reported', () => {
   const built = buildWorldCharacterLibraries([
     system('a', { characterPrerequisites: [SMITH], modifiers: [MED] }),
@@ -148,14 +140,8 @@ test('lifts, strips and reports in one pass', () => {
   );
 });
 
-// THE IDEMPOTENCE GUARD IS PER LIBRARY, and this is the case that proves why it has to be.
-//
-// A disjunction across the two lists reads "either populated library proves the lift already
-// ran". That is true of a world the ACTIVE GM migrated and false of every other way the setting
-// comes to hold entries — any GM edit writes it, and migrations run on the active GM alone. So an
-// assistant GM adding one modifier used to make the whole pass think it had already run, and the
-// strip then deleted every crafting system's prerequisites without ever lifting them: gone from
-// the systems, never in the world, recoverable from nowhere.
+// THE IDEMPOTENCE GUARD IS PER LIBRARY, and this is the case that proves why it has to be. A
+// disjunction across the two lists reads "either populated library proves the lift already ran".
 test('a library the world already owns is not re-merged, while the other half is still lifted', () => {
   const stored = { characterPrerequisites: [], modifiers: [MED] };
   const result = migrateCharacterLibrariesToWorldScope({
@@ -174,9 +160,7 @@ test('a library the world already owns is not re-merged, while the other half is
   );
 });
 
-// The same hazard from the other end: a library that is NOT lifted must NOT be stripped. Without
-// the pairing the entries exist nowhere afterwards, which is the single most destructive outcome
-// this migration can produce.
+// The same hazard from the other end: a library that is NOT lifted must NOT be stripped.
 test('a library that was not lifted is left ON the systems rather than deleted', () => {
   // `modifiers` is world-owned so it may be stripped; `characterPrerequisites` is only lifted
   // because the world lacks it. Both end up somewhere — that is the whole assertion.
@@ -208,9 +192,7 @@ test('re-running over already-stripped systems changes nothing', () => {
   assert.equal(second.systems[0], first.systems[0], 'and no system is rebuilt');
 });
 
-// The no-op that must NOT write. Emitting a freshly built pair of empty arrays over a stored `{}`
-// would register as a change and write the setting in every world that never authored either
-// library — an unexplained write in an otherwise no-op upgrade.
+// The no-op that must NOT write.
 test('a world with nothing to lift returns the STORED object, so no write is registered', () => {
   const stored = {};
   const result = migrateCharacterLibrariesToWorldScope({

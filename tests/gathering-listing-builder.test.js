@@ -49,9 +49,8 @@ function environment(overrides = {}) {
   return env;
 }
 
-// Build a real engine so the listing builder is wired with the engine's bound
-// shared-helper callbacks (the production default-construction path). Tests then
-// drive `engine.listingBuilder` directly and via the public delegators.
+// Build a real engine so the listing builder is wired with the engine's bound shared-helper
+// callbacks (the production default-construction path).
 function makeEngine({
   systems = [{ id: 'system-a', enabled: true, features: { gathering: true }, components: [] }],
   environments = [environment()],
@@ -186,9 +185,7 @@ test('discovered tasks surface revealed blind tasks with discovery counts', asyn
   assert.equal(env.discoveredTasks.length, 1);
   assert.equal(env.discoveredTasks[0].id, 'task-a');
   assert.equal(env.discoveredTasks[0].discovered, true);
-  // Discovered rows are transparent (real identity + name), not the opaque
-  // collapse. They still carry `blind: true` (the env is blind) but expose the
-  // real task id/name rather than the `blindGather` action.
+  // Discovered rows are transparent (real identity + name), not the opaque collapse.
   assert.equal(env.discoveredTasks[0].name, 'Gather Iron');
   assert.equal(env.discoveredTasks[0].action, undefined);
 });

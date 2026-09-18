@@ -1,14 +1,6 @@
 /**
- * The shared set-apply primitive `CraftingSystemManager.applyBulkEditToComponents`,
- * which folder-aware import categorization (#771) and multi-select bulk edit (#772)
- * both build on. Renamed from `applyCategoryAndTagsToComponents` in #772: the old name
- * enumerated two of the five axes and became false the moment it wrote essences.
- *
- * Category is single-valued (OVERWRITE); tags are additive (UNION, case-insensitive,
- * stored lowercase) with removals applied AFTER the union; essences REPLACE the whole
- * map; difficulty is the progressive DC. `essences` and `difficulty` are read by
- * PRESENCE, never truthiness — an empty map and a zero DC are both "clear this".
- * The write lands in ONE save().
+ * The shared set-apply primitive `CraftingSystemManager.applyBulkEditToComponents`, which
+ * folder-aware import categorization (#771) and multi-select bulk edit (#772) both build on.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -261,17 +253,8 @@ test('an ABSENT essences/difficulty key leaves both values alone', async () => {
   assert.equal(c1.difficulty, 7, 'difficulty untouched when the key is absent');
 });
 
-// ── The SALVAGE half of the re-normalization context ────────────────────────────────
-// Each written component is re-normalized under `{ validEssenceIds, ...salvageContext }`.
-// Only the essence half was pinned, so deleting `...salvageContext` left every test in
-// this file green while silently changing salvage clamping on every bulk-written
-// component — the write would stop enforcing the Simple-mode invariant that the
-// single-component path enforces, and a bulk category edit would leave behind a config
-// the engine awards a FAILURE group from.
-//
-// The raw salvage is poked on AFTER seeding on purpose: `_normalizeSystem` runs the very
-// clamp under test, so a failure-first config declared in the fixture would already be
-// clamped before the bulk write and the assertion would pass on the seed's work.
+// The SALVAGE half of the re-normalization context ──────────────────────────────── Each written
+// component is re-normalized under `{ validEssenceIds, ...salvageContext }`.
 test('re-normalizes salvage under the owning system context, so a bulk write runs the Simple clamp', async () => {
   const manager = makeLoadedManager([
     {

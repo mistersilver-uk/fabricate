@@ -1,17 +1,4 @@
-/**
- * Issue 800 — write-time RESOLUTION of source descriptions.
- *
- * Three concerns, deliberately in one file because they are one mechanism:
- *
- *  1. The option bag `enrichToHtml` passes to Foundry, asserted against the REAL
- *     implementation with `enrichHTML` stubbed. Asserting against a seam fake would
- *     test the fake, and would pass while a leak was live.
- *  2. `primeEnricherCache`'s real pack grouping — a call-count assertion on the seam
- *     alone proves only that a seam was called.
- *  3. The headline behaviour, bound at the COMPOSITION (`_buildComponentSourceSnapshot`
- *     and `refreshComponentMetadataForUpdatedItem`), not at the helper: a LABEL-LESS
- *     `@UUID[…]` becomes the referenced document's real NAME.
- */
+/** Issue 800 — write-time RESOLUTION of source descriptions. */
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -39,9 +26,7 @@ const {
   makeFakeEnricher,
 } = await import('./helpers/enricherDescriptionFixtures.js');
 
-// ---------------------------------------------------------------------------
 // 1. The option bag — REAL enrichToHtml, stubbed enrichHTML
-// ---------------------------------------------------------------------------
 
 /**
  * Install a capturing `enrichHTML` on the V13 accessor path and return the captured
@@ -131,9 +116,7 @@ test('enrichToHtml degrades to the raw text when no enricher is reachable', asyn
   assert.equal(await enrichToHtml(null), '');
 });
 
-// ---------------------------------------------------------------------------
 // 2. primeEnricherCache — the REAL pack grouping
-// ---------------------------------------------------------------------------
 
 /**
  * Fake compendium packs plus a `parseUuid` that resolves `Compendium.<packId>.Item.<id>`
@@ -203,9 +186,7 @@ test('primeEnricherCache no-ops safely without Foundry, and stays linear on adve
   assert.ok(elapsedMs < 5000, `priming took ${elapsedMs.toFixed(0)}ms — expected linear`);
 });
 
-// ---------------------------------------------------------------------------
 // 3. The headline behaviour, bound at the COMPOSITION
-// ---------------------------------------------------------------------------
 
 const SOURCE_ITEM = Object.freeze({
   documentName: 'Item',

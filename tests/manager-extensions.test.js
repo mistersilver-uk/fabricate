@@ -192,13 +192,8 @@ test('registerWorldNavProvider rejects malformed providers deterministically', (
   );
 });
 
-// STILL REQUIRED, THOUGH NOW RENDERED DIFFERENTLY PER MODE (issue 1213). Provider mode renders
-// no tab strip, and the strip was the only thing that ever rendered `accessibleName` or
-// `tooltip`. Rather than drop the requirement, provider mode consumes both on the rail
-// sub-item: `accessibleName` as its `aria-label`, `tooltip` as its native tooltip. So the
-// fields are required AND consumed in both modes, and this test is what stops a later reader
-// "tidying away" a validation whose renderer they cannot find — dropping either is a breaking
-// change to a shipped seam and has to fail here first.
+// STILL REQUIRED, THOUGH NOW RENDERED DIFFERENTLY PER MODE (issue 1213). Provider mode renders no
+// tab strip, and the strip was the only thing that ever rendered `accessibleName` or `tooltip`.
 test('accessibleName and tooltip stay required on a Manager tab', () => {
   for (const field of ['label', 'accessibleName', 'tooltip', 'icon']) {
     for (const value of ['', '   ', null, undefined, 7]) {
@@ -278,15 +273,7 @@ test('route chrome and header actions are validated as shape, not as content', (
 
 // A companion's header must be INDISTINGUISHABLE from a Core one, which means it needs the
 // treatments Core's own editors use — a ghost Back, a danger Delete, a primary Save — not just
-// `primary`. The class strings are the contract: these are the very classes
-// `CraftingSystemManagerRoot` writes for its own recipe-editor controls.
-//
-// `fabricate-button` LEADS every one of them (issue 1502). It is the button family's root —
-// the class the shared primitive emits and the class every rule in the sheet now keys on — so
-// a list that opened `manager-button` would render a companion's header action with no button
-// chrome at all. It is spelled out in full here rather than built from a shared constant
-// because these equalities ARE the seam's contract, and a contract that computes its own
-// expectation cannot fail when the seam changes.
+// `primary`. `fabricate-button` LEADS every one of them (issue 1502).
 test('an action tone renders the Manager button class Core uses for its own controls', () => {
   assert.equal(
     managerHeaderActionClass({ tone: 'primary' }),
@@ -309,11 +296,8 @@ test('an action tone renders the Manager button class Core uses for its own cont
   assert.equal(managerHeaderActionClass({}), 'fabricate-button manager-button');
   assert.equal(managerHeaderActionClass(undefined), 'fabricate-button manager-button');
 
-  // The teeth: EVERY declared tone must map to something. A tone added to the list without a
-  // class would otherwise render as a bare button and read as a stylesheet oversight. The
-  // `startsWith` half also pins the ORDER: the family root leads, and a builder that appended
-  // it instead would still contain both classes and still be unstyled by every re-rooted rule
-  // that is written root-first.
+  // The teeth: EVERY declared tone must map to something. A tone added to the list without a class
+  // would otherwise render as a bare button and read as a stylesheet oversight.
   for (const tone of ACTION_TONES) {
     const rendered = managerHeaderActionClass({ tone });
     assert.ok(
@@ -362,9 +346,7 @@ test('a header action treatment is validated like every other provider field', (
   );
 });
 
-// The runtime channel's shape contract. It is validated by the same module that validates a
-// provider, and to the same standard: a malformed update is refused with a message rather than
-// rendering broken chrome.
+// The runtime channel's shape contract.
 test('a runtime chrome update normalizes to exactly what a companion stated', () => {
   assert.equal(normalizeRouteChrome(null), null);
   assert.equal(normalizeRouteChrome(undefined), null);
@@ -440,9 +422,8 @@ test('a malformed runtime chrome update is refused with a message naming the fau
   }
 });
 
-// A hand-maintained mirror across a component boundary, with a guard so it cannot rot: the
-// seam names the tones it offers, and `Chip.svelte` is what paints them. A tone offered here
-// that the primitive drops would render as the default chip and look like a CSS bug.
+// A hand-maintained mirror across a component boundary, with a guard so it cannot rot: the seam
+// names the tones it offers, and `Chip.svelte` is what paints them.
 test('every status tone the seam offers is a tone the Chip primitive actually paints', () => {
   const chipSource = readFileSync(
     resolve(repoRoot, 'src/ui/svelte/components/Chip.svelte'),
@@ -514,10 +495,8 @@ test('the registry publishes its hooks through the injected edge and defaults to
   }
 });
 
-// ---------------------------------------------------------------------------------------
-// Issue 1302 — a tab may carry a BADGE, the tab contract becomes a closed key set, and the
-// runtime channel that restates a badge is scoped to the REGISTRATION rather than to a mount.
-// ---------------------------------------------------------------------------------------
+// Issue 1302 — a tab may carry a BADGE, the tab contract becomes a closed key set, and the runtime
+// channel that restates a badge is scoped to the REGISTRATION rather than to a mount.
 
 // Badges are attached to the shared `provider()` fixture here rather than inside it, so every
 // test above keeps registering the same badge-free tabs it always did.
@@ -569,9 +548,8 @@ function refusal(fragment) {
 }
 
 // A registry read the way CORE reads it: `subscribeNavTabBadges` replays immediately and
-// republishes on every change, so `snapshot()` is always the record the rail would render
-// from at that instant. Reading through the subscription rather than through the store's own
-// accessor also means a channel that stored correctly and published nothing fails here.
+// republishes on every change, so `snapshot()` is always the record the rail would render from at
+// that instant.
 function badgeHarness() {
   const registry = createManagerExtensionsRegistry({ emitHook: () => {} });
   let latest = null;
@@ -734,9 +712,7 @@ test('AC-5 — an unheld surface and an undeclared tab are refused, and store no
 test('AC-6 — validation precedes the liveness check, and a refused call changes nothing', () => {
   const harness = badgeHarness();
 
-  // The refusal is IDENTICAL whoever sent it. A companion feature-detecting this seam must
-  // not get `false` from one Core and a `TypeError` from another because a second module
-  // happened to register first.
+  // The refusal is IDENTICAL whoever sent it.
   for (const [badge, fragment] of REFUSED_BADGES) {
     assert.throws(
       () => harness.setBadge('nobody-holds-this', 'ledger', badge),
@@ -899,15 +875,8 @@ test('AC-22 — navTabBadgeTotal sums the RESOLVED badge once per tab, never reg
   assert.equal(navTabBadgeTotal(null, null), 0);
 
   // The same arithmetic over the record the STORE actually publishes, which is a frozen
-  // null-prototype object rather than a literal — so a total that reached for an inherited
-  // member, or that could not read that shape at all, fails here too. `toString` is deliberately
-  // among the tab ids: it is an inherited member of an ordinary object literal, so a plain
-  // `{}` snapshot plus a bare (non-`Object.hasOwn`) lookup would resolve it to a function
-  // rather than to "no badge" — the other three ids never collide with anything
-  // `Object.prototype` carries. The TOTAL alone cannot witness that on its own: `?.count ?? 0`
-  // reduces a wrongly-resolved function to 0 exactly as it reduces a correctly-resolved
-  // `null`, since neither carries a `count`. So this block also reads `resolveNavTabBadge`
-  // directly for the colliding tab, which is the one call that actually sees the function.
+  // null-prototype object rather than a literal — so a total that reached for an inherited member,
+  // or that could not read that shape at all, fails here too.
   const harness = badgeHarness();
   harness.register(
     badgedProvider({
@@ -939,16 +908,9 @@ test('AC-22 — navTabBadgeTotal sums the RESOLVED badge once per tab, never reg
 });
 
 /**
- * The mount context's typedef is the seam's contract for a module this repository cannot see,
- * and it is a hand-maintained mirror of a literal in a Svelte file — so it rots in the silent
- * direction. A member added to the context without a `@property` is a public capability with
- * no contract at all: nothing fails, nothing warns, and a companion author reading the typedef
- * is reading a list that is no longer the list. Issue 1332 added the fourth such member, which
- * is the point at which "remember to document it" stops being a plan.
- *
- * It reads the CONTEXT LITERAL rather than a mounted context on purpose. Mounting is what
- * `tests/components/manager-mounted.test.js` does, and it can only see the members Core
- * happened to build for that mount; the literal is every member there is.
+ * The mount context's typedef is the seam's contract for a module this repository cannot see, and
+ * it is a hand-maintained mirror of a literal in a Svelte file — so it rots in the silent direction
+ * (issue 1332).
  *
  * @param {string} block The typedef's own comment text.
  * @returns {string[]} Every property name it documents, in order.
@@ -1018,11 +980,10 @@ test('every member Core puts on the mount context is documented in its typedef',
 });
 
 test('the typedef names what navigateToTab refuses, as its three siblings do', () => {
-  // The acceptance this pins is documentary, so it is asserted structurally rather than by
-  // matching prose: the member's own paragraph must state the two refusals a companion cannot
-  // discover by calling it once — that a retired mount is refused, and that an unknown tab id
-  // answers rather than throws while malformed input throws. A `@property` line that merely
-  // named the member would pass a "is it documented" check and teach a companion nothing.
+  // The acceptance this pins is documentary, so it is asserted structurally rather than by matching
+  // prose: the member's own paragraph must state the two refusals a companion cannot discover by
+  // calling it once — that a retired mount is refused, and that an unknown tab id answers rather
+  // than throws while malformed input throws.
   const extensionsSource = readFileSync(resolve(repoRoot, 'src/ui/managerExtensions.js'), 'utf8');
   const start = extensionsSource.indexOf('navigateToTab Take the GM to');
   assert.notEqual(start, -1, 'the navigateToTab property is still documented on the typedef');

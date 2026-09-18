@@ -19,12 +19,8 @@ function makeService({ config = {}, userId = 'user-1' } = {}) {
   return { service, settings };
 }
 
-// Foundry `expandObject`s flag data on write: EVERY dotted key, at every depth, is split
-// into nested objects. This fixture used to store the value verbatim — a LOOSER double
-// than the real thing, and the reason every test in this file passed while blind reveals
-// never once worked in the game. A reveal keyed by the dotted actor uuid was silently
-// re-shaped into `reveals["actor:Actor"]["actor-1:env-a:task-1"]`, which no reader can
-// find, and the verbatim double hid that completely.
+// Foundry `expandObject`s flag data on write: EVERY dotted key, at every depth, is split into
+// nested objects.
 function expandDottedKeys(value) {
   if (Array.isArray(value)) return value.map(entry => expandDottedKeys(entry));
   if (!value || typeof value !== 'object') return value;

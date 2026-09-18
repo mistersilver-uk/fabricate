@@ -1,9 +1,6 @@
 /**
- * Tests for T-013: Startup Schema Migration Framework (MigrationRunner)
- *
- * Uses node:test + node:assert/strict.
- * MigrationRunner accepts getSetting/setSetting as constructor args for full testability.
- * No Foundry globals needed.
+ * Tests for T-013: Startup Schema Migration Framework (MigrationRunner). Uses node:test +
+ * node:assert/strict.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -11,9 +8,7 @@ import assert from 'node:assert/strict';
 import { MigrationRunner } from '../src/migration/MigrationRunner.js';
 import { FatalMigrationError, isFatalMigrationError } from '../src/migration/migrationErrors.js';
 
-// ---------------------------------------------------------------------------
 // Test helpers
-// ---------------------------------------------------------------------------
 
 function makeSettings(initial = {}) {
   const store = new Map(Object.entries({
@@ -48,9 +43,7 @@ function makeRunner(overrides = {}) {
   return { runner, settings };
 }
 
-// ---------------------------------------------------------------------------
 // Group 1: Registry and ordering
-// ---------------------------------------------------------------------------
 
 test('migrations run in version order: componentId migration applied from 0.0.0', async () => {
   const { runner, settings } = makeRunner({
@@ -101,9 +94,7 @@ test('no migrations pending returns without persisting anything', async () => {
   assert.equal(settings.calls.set.length, 0);
 });
 
-// ---------------------------------------------------------------------------
 // Group 2: Idempotency
-// ---------------------------------------------------------------------------
 
 test('running twice from 0.0.0 produces identical output', async () => {
   const initial = {
@@ -165,9 +156,7 @@ test('runner does not persist recipes/systems when data is identical after migra
   assert.ok(setKeys.includes('migrationVersion'));
 });
 
-// ---------------------------------------------------------------------------
 // Group 3: Corrupt record handling
-// ---------------------------------------------------------------------------
 
 test('null in recipes array is handled gracefully, valid entries still migrated', async () => {
   const { runner, settings } = makeRunner({
@@ -219,9 +208,7 @@ test('null/undefined recipes setting handled gracefully', async () => {
   await assert.doesNotReject(() => runner.run());
 });
 
-// ---------------------------------------------------------------------------
 // Group 4: Integration
-// ---------------------------------------------------------------------------
 
 test('full run from 0.0.0 applies componentId migration correctly', async () => {
   const { runner, settings } = makeRunner({
@@ -289,9 +276,7 @@ test('migrationVersion setting is updated to the highest migration version after
   assert.equal(versionCall.value, '1.34.0');
 });
 
-// ---------------------------------------------------------------------------
 // Group 5: Persistence
-// ---------------------------------------------------------------------------
 
 test('changed data triggers setSetting for recipes and systems', async () => {
   const { runner, settings } = makeRunner({
@@ -326,9 +311,7 @@ test('unchanged data only triggers setSetting for migrationVersion', async () =>
   assert.ok(setKeys.includes('migrationVersion'), 'migrationVersion should always be updated after migrations run');
 });
 
-// ---------------------------------------------------------------------------
 // Group 6: Migration 0.2.0 — clear stale top-level gathering regions
-// ---------------------------------------------------------------------------
 
 test('0.2.0 clears stale top-level gatheringConfig.vocabularies.regions', async () => {
   const { runner, settings } = makeRunner({
@@ -409,9 +392,8 @@ test('0.1.0 backward-compat: gatheringConfig is preserved across the spread-merg
 
   await runner.run();
 
-  // 0.1.0 ran (componentId rename) and 0.2.0 ran (regions cleared). The
-  // gatheringConfig should retain its biomes, conditions, and systems —
-  // only regions should change.
+  // 0.1.0 ran (componentId rename) and 0.2.0 ran (regions cleared). The gatheringConfig should
+  // retain its biomes, conditions, and systems — only regions should change.
   const saved = settings.store.get('gatheringConfig');
   assert.deepEqual(saved.vocabularies.regions, [], 'regions cleared by 0.2.0');
   assert.deepEqual(saved.vocabularies.biomes, ['forest'], 'biomes preserved across both migrations');
@@ -434,9 +416,7 @@ test('null gatheringConfig setting is handled gracefully', async () => {
   await assert.doesNotReject(() => runner.run());
 });
 
-// ---------------------------------------------------------------------------
 // Group: 0.3.0 — system-level gathering economy modes
-// ---------------------------------------------------------------------------
 
 test('0.3.0 strips env economyMode + task attemptLimit and preserves legacy mode on the system', async () => {
   const { runner, settings } = makeRunner({
@@ -528,9 +508,7 @@ test('0.3.0 maps legacy hybrid/time and is idempotent', async () => {
   assert.equal(JSON.stringify(settings.store.get('gatheringEnvironments')), before);
 });
 
-// ---------------------------------------------------------------------------
 // Group: 0.8.0 — independent stamina + resource-node limitation toggles
-// ---------------------------------------------------------------------------
 
 test('0.8.0 rewrites legacy economy.mode into independent stamina/nodes flags', async () => {
   const { runner, settings } = makeRunner({
@@ -614,9 +592,7 @@ test('0.3.0 -> 0.8.0 compose: env-level economyMode becomes the two flags', asyn
   assert.equal(settings.store.get('migrationVersion'), '1.34.0');
 });
 
-// ---------------------------------------------------------------------------
 // Group: 1.2.0 — unify stamina-regen policy name elapsedTime -> overTime
-// ---------------------------------------------------------------------------
 
 test('1.2.0 rewrites a legacy elapsedTime stamina-regen policy to overTime', async () => {
   const { runner, settings } = makeRunner({
@@ -661,9 +637,7 @@ test('1.2.0 is idempotent and leaves already-overTime economies untouched (no re
   assert.deepEqual(settings.store.get('gatheringConfig'), alreadyMigrated);
 });
 
-// ---------------------------------------------------------------------------
 // Group: Fatal migration abort, rollback, and GM recovery guidance (#178)
-// ---------------------------------------------------------------------------
 
 /**
  * Capture console.error/console.warn output for the duration of `fn`.
@@ -781,10 +755,8 @@ test('migrationVersion is unchanged after a fatal abort', async () => {
 test('fatal abort persists no partially-mutated data even when a migration mutates in place', async () => {
   const originalRecipes = [{ id: 'r1', name: 'Original' }];
   const originalSystems = [{ id: 's1', name: 'System' }];
-  // A second, successful migration runs first and returns a fresh payload; the
-  // fatal migration then mutates THAT payload in place before throwing. The
-  // runner must restore the pre-fatal checkpoint and persist nothing, so no
-  // partially-migrated recipe/system data reaches the store.
+  // A second, successful migration runs first and returns a fresh payload; the fatal migration then
+  // mutates THAT payload in place before throwing.
   const succeed = {
     version: '2.0.0',
     label: 'Succeeds first (fresh payload)',
@@ -1070,16 +1042,9 @@ test('1.6.0 recovery-warning payload is surfaced in the summary and never persis
   }
 });
 
-// ── the lossy-downgrade contract, as a RULE over the registry ────────────────
-//
-// `migrationRecoveryPrompt` renders a migration's `label` as "aborted during …" directly beside
-// the Keep/Downgrade buttons, so that string is the ONLY place a GM meets the consequences of the
-// choice they are about to make. A caveat left in a source comment is addressed to the wrong
-// reader at the wrong moment, and this is the one moment that matters.
-//
-// It is a rule rather than one entry's assertion because deleting the clause from `1.22.0`'s label
-// was green, and the next lossy migration would land with nothing at all stopping it. An entry
-// declares the fact once, machine-readably, and the label is then held to it.
+// the lossy-downgrade contract, as a RULE over the registry. `migrationRecoveryPrompt` renders a
+// migration's `label` as "aborted during …" directly beside the Keep/Downgrade buttons, so that
+// string is the ONLY place a GM meets the consequences of the choice they are about to make.
 test('every migration whose downgrade LOSES DATA names that in its own label', () => {
   const registry = new MigrationRunner({ getSetting: () => undefined, setSetting: () => {} })
     ._migrations;
@@ -1102,15 +1067,8 @@ test('every migration whose downgrade LOSES DATA names that in its own label', (
   }
 });
 
-// ---------------------------------------------------------------------------
-// Group 8: the world currency leg (issue 1278)
-//
-// The runner's settings payload went from FIVE keys to six. Every one of the five points that
-// key must appear at — read, snapshot, payload literal, change detection, writeback — is silent
-// when omitted: the migration still runs, every other setting still writes, and the whole suite
-// stays green while every upgraded world loses its currency configuration. These pin the leg
-// end to end through the real runner rather than through the pure transform.
-// ---------------------------------------------------------------------------
+// Group 8: the world currency leg (issue 1278). The runner's settings payload went from FIVE keys
+// to six.
 
 test('1.26.0 lifts per-system currency into the currencyConfig setting', async () => {
   const { runner, settings } = makeRunner({
@@ -1151,9 +1109,7 @@ test('1.26.0 lifts per-system currency into the currencyConfig setting', async (
 });
 
 test('the currencyConfig write PRECEDES the craftingSystems write, so a tear is recoverable', async () => {
-  // Systems are the SOURCE of the lift and currencyConfig is the DESTINATION. Writing the source
-  // first and then tearing would leave systems shrunk with an empty world ladder, and the re-run
-  // would find nothing to lift — the configuration would be gone with no error and no copy.
+  // Systems are the SOURCE of the lift and currencyConfig is the DESTINATION.
   const { runner, settings } = makeRunner({
     initial: {
       migrationVersion: '1.25.0',

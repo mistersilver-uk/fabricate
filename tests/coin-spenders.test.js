@@ -86,12 +86,9 @@ test('interpretMacroSpendResult interprets the macro return contract', () => {
 });
 
 /**
- * A resolver answering a runnable SCRIPT macro for every uuid.
- *
- * Injected because `MacroCoinSpender` now RESOLVES the uuid and gates on the document before it
- * delegates (issue 1301), and this suite defines no `globalThis.fromUuid`. Without it every case
- * below refuses at the gate and never reaches its own `runMacro`, so the assertions that count
- * macro invocations would pass vacuously — or, worse, read as green while proving nothing.
+ * A resolver answering a runnable SCRIPT macro for every uuid. Injected because `MacroCoinSpender`
+ * now RESOLVES the uuid and gates on the document before it delegates (issue 1301), and this suite
+ * defines no `globalThis.fromUuid`.
  */
 const resolveRunnableMacro = async () => ({ type: 'script', command: 'return true;' });
 
@@ -148,19 +145,11 @@ test('MacroCoinSpender surfaces failure objects and thrown errors as invalid', a
   assert.equal(noConfig.valid, false);
 });
 
-// ---------------------------------------------------------------------------
 // The probe's BOOLEAN contract (issue 1493)
-// ---------------------------------------------------------------------------
 
 /**
- * `buildAffordCurrencyProbe` must return `false` — the primitive — for every refusal, and this
- * file did not import it at all before issue 1493.
- *
- * The hazard is specific and silent. `src/models/match/matchTypes.js` gates the currency match on
- * `!!affordCurrency(match)`, so widening the probe to carry a reason (`{ valid: false, message }`)
- * coerces TRUTHY and turns every refusal into "affordable" — the exact inversion of the bug being
- * fixed, and one no assertion phrased as `assert.ok(!probe(match))` can catch. Hence `strictEqual`
- * against `false` on every refusal branch, and against `true` on the two that must still pass.
+ * `buildAffordCurrencyProbe` must return `false` — the primitive — for every refusal, and this file
+ * did not import it at all before issue 1493. The hazard is specific and silent.
  */
 test('buildAffordCurrencyProbe returns the primitive false on every refusal branch', () => {
   globalThis.foundry = undefined;
@@ -208,9 +197,7 @@ test('buildAffordCurrencyProbe returns false — not a message object — when n
   assert.strictEqual(probe({ unit: 'gp', amount: 1 }), false);
 });
 
-// ---------------------------------------------------------------------------
 // ActorInventoryCoinSpender.describeUnavailable (issue 1493)
-// ---------------------------------------------------------------------------
 
 test('ActorInventoryCoinSpender.describeUnavailable names the SYSTEM, and is null when usable', () => {
   const usable = new ActorInventoryCoinSpender({

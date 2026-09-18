@@ -1,26 +1,5 @@
 /**
  * The four liveness rules of `scripts/lib/stylesheetLiveClasses.js`, proved on a synthetic corpus.
- *
- * WHY SYNTHETIC. The helper's customer is `tests/styles-dead-classes.test.js`, which runs it over
- * the real tree and asserts the answer is ZERO. That is a fine ratchet and a terrible specification:
- * a helper that returned nothing at all would satisfy it forever. Every rule is therefore exercised
- * here against inputs written to exercise it, where a wrong answer is a failing assertion rather
- * than a quietly shorter list — and where the case that the tree does not currently contain (a
- * frozen map keyed dynamically, a class named only inside a comment) is still covered.
- *
- * WHY ONE TABLE OF STRING ROWS. SonarCloud counts duplication in test code, and a rule-per-suite
- * layout would repeat the same six lines of build-and-assert scaffolding once per rule. The corpus
- * is one array of `{id, file, source}` rows and the assertions are data on the same row, so adding
- * a case is a row rather than a block.
- *
- * WHY THE FILE EXTENSION IS PART OF EACH ROW. Comment stripping is per REGION and the region rules
- * are chosen by extension: a `.svelte` file's markup gets HTML comments only, its `<script>` gets
- * the JavaScript stripper and its `<style>` gets the CSS one. The `style url` row is the one that
- * fails if the `<style>` region is handed the JavaScript stripper: two slashes are not a comment
- * delimiter in CSS, so an unquoted `url(https://…)` blanks the rest of its line and takes any
- * `:global()` after it. The `markup url` row is the WEAKER half of the same story and says so on
- * its own line — an `href="…"` is quoted, and the JavaScript stripper skips quoted runs, so that
- * row pins the markup region rule without being able to fail on the `//` hazard itself.
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -36,14 +15,7 @@ import {
   ruleBlocks,
 } from '../scripts/lib/stylesheetLiveClasses.js';
 
-/**
- * One synthetic source file per row, with what its text must and must not make live.
- *
- * `live` is checked through `has`, which admits literals, the core allow-list and the positional
- * wildcards. `exact` is checked through the literal set alone, so a row claiming a CONSTRUCTED
- * class was resolved cannot be satisfied by the wildcard that the same token also contributes.
- * `dead` is checked through `has`, so it fails on any channel at all admitting the name.
- */
+/** One synthetic source file per row, with what its text must and must not make live. */
 const SOURCE_ROWS = [
   {
     id: 'literal class attribute',

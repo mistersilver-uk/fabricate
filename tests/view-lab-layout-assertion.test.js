@@ -81,11 +81,8 @@ test('rejects multi-track and none computed grids', async () => {
   );
 });
 
-// ── The track count is an INPUT (issue 1362) ────────────────────────────────────────────
-//
-// The five 1024px responsive cases assert "this stacked", and the assertion was literally
-// `tracks.length !== 1`. A full-width route asserts the opposite shape — rail plus one
-// released content column, and NO inspector — so a case has to be able to say which.
+// The track count is an INPUT (issue 1362). The five 1024px responsive cases assert "this stacked",
+// and the assertion was literally `tracks.length !== 1`.
 
 const FULL_WIDTH_EXPECTATION = {
   containerSelector: '.layout-container',

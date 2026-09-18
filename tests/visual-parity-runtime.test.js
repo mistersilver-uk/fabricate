@@ -1,29 +1,4 @@
-/**
- * The page-side runtime's CARD CLASSIFIER, run in Node against a hand-built tree.
- *
- * `installParityRuntime` is written to be serialised into a browser page, so nothing inside it
- * is importable — but it is a plain function over `globalThis.document` and
- * `globalThis.getComputedStyle`, and both of those can be supplied. That is worth the fixture
- * below, because the classifier's calibration is the one part of this harness whose defect was
- * INVISIBLE IN EVERY LOG IT PRODUCED.
- *
- * ── The defect this file exists for ────────────────────────────────────────────────────────
- * `isCard` asks whether an element spans most of its pane (`width >= rootWidth * 0.6`), and
- * `rootWidth` was read straight off the enumeration root with a `|| 1` fallback. A
- * `display: contents` element generates NO BOX — `clientWidth` is 0, `getBoundingClientRect()`
- * is 0x0 — and every screen root of the prototype this pass measures is exactly that. So the
- * prototype was classified against a ONE-PIXEL pane and the subject against its real one, which
- * is two different classifiers wearing one name:
- *
- *   - on the prototype, `>= 0.6px` made every bordered, rounded LIST ROW a card, and each was
- *     then reported as a card the subject was missing;
- *   - on the subject, `>= 635px` meant no card in a two-column grid was a card at all, so a
- *     genuinely absent narrow card could not be reported — the pass could not fail on the
- *     defect it exists for.
- *
- * A real browser is not needed to state that: what the fixture has to reproduce is a root with
- * no box and an ancestor that has one, and those are two numbers.
- */
+/** The page-side runtime's CARD CLASSIFIER, run in Node against a hand-built tree. */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -50,10 +25,6 @@ const DEFAULT_STYLE = {
 
 /**
  * Build one element of the fake tree.
- *
- * `width` is the element's BOX. `contents: true` reproduces the CSS fact this file is about: a
- * `display: contents` box is not laid out, so both width readings are zero however wide its
- * children are.
  *
  * @param {object} spec `{ tag, width, text, style, contents, children }`.
  * @returns {object} A node the runtime can walk.
@@ -84,10 +55,6 @@ function order(root, list = []) {
 
 /**
  * Enumerate a fake tree through the REAL runtime.
- *
- * The globals are installed, used and removed inside this call: the runtime reads
- * `globalThis.document` once at install and `globalThis.getComputedStyle` on every element, so
- * a test that left them behind would leak a fake DOM into every later test in the file.
  *
  * @param {object} root The root to enumerate.
  * @returns {object} `{ cards, loose }` or `{ unmeasurableRoot: true }`.
@@ -126,11 +93,6 @@ function enumerate(root) {
 /**
  * The shape both sides of the parity run draw: a 1200px pane holding a full-width card, a
  * two-thirds-width card, and a NARROW titled tile that is not a card at either width.
- *
- * The three widths are the ones that decide everything against a 0.6 ratio and a 1200px pane:
- * 1176 and 800 clear it, and 400 does not. The tile is bordered, rounded and titled — a
- * catalogue row, an essence tile — which is exactly the element the broken calibration turned
- * into a prototype-only card and then reported as MISSING on the subject.
  *
  * @param {boolean} contentsRoot Whether the screen root is `display: contents`.
  * @returns {object} The screen root, parented by a laid-out pane.
@@ -198,12 +160,8 @@ test('the card classifier measures both documents against the same pane', async 
 });
 
 /**
- * Enumerate through the REAL `inventoryOf` entry point, with a document that answers selectors
- * from a map.
- *
- * `collectInventory` above is handed its root directly; a root SET is resolved by `inventoryOf`,
- * which is where the three faults below are refused, so these tests have to go in through the
- * entry point rather than around it.
+ * Enumerate through the REAL `inventoryOf` entry point, with a document that answers selectors from
+ * a map.
  *
  * @param {object} payload `{ locator, pane }` exactly as `inventory.mjs` sends it.
  * @param {object} bySelector Selector → element.
@@ -242,17 +200,8 @@ function enumerateThroughEntryPoint(payload, bySelector, tree) {
 }
 
 /**
- * THE SHAPE THE ROOT SET EXISTS FOR, and it is this product's own.
- *
- * The prototype's screen root is one `display: contents` wrapper over the header band and the
- * body grid. The subject draws the header band, the content column and the inspector as three
- * siblings of a body grid whose fourth child is the navigation rail — which the prototype's root
- * does NOT contain. So there is no single subject element covering the prototype's ground: the
- * content column alone omits two thirds of it, and the body grid adds a rail the prototype never
- * drew.
- *
- * Widths are this screen's real ones, rounded: header band 1398, rail 220, content column 878,
- * inspector 300.
+ * THE SHAPE THE ROOT SET EXISTS FOR, and it is this product's own. The prototype's screen root is
+ * one `display: contents` wrapper over the header band and the body grid.
  *
  * @returns {object} `{ tree, bySelector }`.
  */
@@ -325,12 +274,7 @@ test('an inventory root may be a declared SET of boxes', async (subtests) => {
   });
 
   await subtests.test('the declared pane, not the first part, sets the card floor', () => {
-    // WITHOUT THE PANE RULE this is a silent re-calibration. A set has no single root, so the
-    // classifier would take its pane from whichever part is listed FIRST: the header band and
-    // the body are 1398px wide, which puts the card floor at 839px, while the content column is
-    // 878px and puts it at 527px. The 830px row is a card at one and not at the other, so the
-    // order of a list would decide the classification. `inventoryRootProblems` refuses a set
-    // with no pane, and this proves the pane the set does declare is the one that decides.
+    // WITHOUT THE PANE RULE this is a silent re-calibration.
     const { tree, bySelector } = shellScreen();
     const parts = ['header.manager-header', 'main.manager-main', 'aside.manager-inspector'];
     const floorFromMain = enumerateThroughEntryPoint(
@@ -356,9 +300,7 @@ test('an inventory root may be a declared SET of boxes', async (subtests) => {
   });
 
   await subtests.test('a part that resolves to nothing is a fault, not a shorter walk', () => {
-    // A DROPPED PART DOES NOT REPORT ITSELF. It reports every landmark under it as one the
-    // subject draws nowhere — the exact false report the set exists to end — so it has to fail
-    // here and name the part.
+    // A DROPPED PART DOES NOT REPORT ITSELF.
     const { tree, bySelector } = shellScreen();
     const result = enumerateThroughEntryPoint(
       { locator: { parts: ['header.manager-header', '.missing'] }, pane: 'main.manager-main' },

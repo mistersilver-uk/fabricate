@@ -1,38 +1,6 @@
 /**
- * Source contract: WHICH manager state is lifted, which is deliberately not, and who owns it
- * (issue 1438).
- *
- * ── WHY A SOURCE CONTRACT BESIDE THE BEHAVIOURAL TESTS ──────────────────────────────────
- *
- * `tests/components/manager-mounted.test.js` walks the real round-trip for eight surfaces: it
- * types into the real search box, takes the trip that unmounts the surface, comes back and
- * finds the term. That is the acceptance bar and this file does not restate it.
- *
- * What a mounted walk cannot cover is the part that is invisible when it is wrong:
- *
- *   (a) A slot minted in the registry but never BOUND at the root. The surface still works —
- *       it falls back to its own local state, exactly as it did before the lift — so no test
- *       reds, no error is thrown, and the only symptom is the original defect, unfixed. Three
- *       of the thirteen slots reach their surface through an intermediate component, so the
- *       binding is two hops from the registry and easy to half-write.
- *
- *   (b) The NEGATIVE. Some state MUST die with its mount, and nothing about a passing lift
- *       says so. A future change that quietly lifts an armed delete confirmation, or an
- *       editor's own picker, breaks a rule no failing test announces — the surface keeps
- *       working, and the damage is a destructive action re-confirmed against a row the GM is
- *       no longer looking at.
- *
- * ── THE NEGATIVE ROSTER CARRIES ITS REASON, PER ENTRY ───────────────────────────────────
- *
- * A bare list of names would be a list somebody deletes an entry from during a refactor with
- * no way to tell whether that was the point of the refactor. Each entry states why that state
- * is session-scoped, so removing one is a decision a reviewer can see and argue with.
- *
- * ── NON-VACUITY RUNS FIRST ──────────────────────────────────────────────────────────────
- *
- * Every clause here is a parse over hand-written Svelte, and the cheapest green available to a
- * broken parser is an empty set comparing equal to an empty set. So counts are asserted BEFORE
- * equalities, and the declaration scan is proved against a string it must NOT match.
+ * Source contract: WHICH manager state is lifted, which is deliberately not, and who owns it (issue
+ * 1438). WHY A SOURCE CONTRACT BESIDE THE BEHAVIOURAL TESTS
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -52,14 +20,7 @@ function sourceOf(repoRelativePath) {
 
 const rootSource = sourceOf(ROOT_PATH);
 
-/**
- * Every `managerBrowserState.<key>` the root BINDS, with the prop name it binds it to.
- *
- * Matched on `bind:` specifically. A plain attribute would still hand the object down and the
- * surface would still work, so this is not pedantry about syntax — it is the same `bind:` the
- * three shipped studios use, and keeping the whole family on one idiom is what stops the next
- * reader having to work out whether the difference meant something.
- */
+/** Every `managerBrowserState.<key>` the root BINDS, with the prop name it binds it to. */
 function boundSlots(source) {
   return [...source.matchAll(/bind:([A-Za-z]+)=\{managerBrowserState\.([A-Za-z]+)\}/g)].map(
     (match) => ({ prop: match[1], slot: match[2] })
@@ -105,10 +66,8 @@ describe('the lifted manager browser view-state is wired end to end (issue 1438)
   });
 
   it('reads the bound object through the same fallback idiom at every surface', () => {
-    // `browserState ?? ownBrowserState` is what makes an UNBOUND mount — every isolated
-    // component suite in `tests/components/` — keep its controls reactive. A surface that read
-    // `browserState` alone would throw on a null in exactly those suites; one that read
-    // `ownBrowserState` alone would ignore the root's object and silently keep the defect.
+    // `browserState ?? ownBrowserState` is what makes an UNBOUND mount — every isolated component
+    // suite in `tests/components/` — keep its controls reactive.
     const READERS = [
       `${MANAGER_DIR}/SystemsBrowserView.svelte`,
       `${MANAGER_DIR}/ToolsBrowserView.svelte`,
@@ -121,9 +80,7 @@ describe('the lifted manager browser view-state is wired end to end (issue 1438)
       `${MANAGER_DIR}/KnowledgeView.svelte`,
       `${MANAGER_DIR}/GrantAccessInspector.svelte`,
       `${MANAGER_DIR}/scoped/EntityListInspectorFrame.svelte`,
-      // The three studios issues 643, 676 and 1036 lifted before this one. They are asserted
-      // here rather than left implicit: the whole point of this change is that there is now ONE
-      // mechanism, and a list that quietly excused the originals would let them drift back out.
+      // The three studios issues 643, 676 and 1036 lifted before this one.
       `${MANAGER_DIR}/ComponentsBrowserView.svelte`,
       `${MANAGER_DIR}/EssenceBrowserView.svelte`,
       `${MANAGER_DIR}/RecipesBrowserView.svelte`,
@@ -171,13 +128,7 @@ describe('the lifted manager browser view-state is wired end to end (issue 1438)
   });
 });
 
-/**
- * State that MUST die with its mount, and the reason it must.
- *
- * Read as `[component, declaration, why]`. The declaration is matched as the literal `$state`
- * line, so a change that moves it onto the lifted object — the exact quiet lift this guards
- * against — fails here rather than shipping.
- */
+/** State that MUST die with its mount, and the reason it must. */
 const SESSION_SCOPED_STATE = [
   [
     'GatheringTaskEditView',
@@ -218,9 +169,7 @@ const SESSION_SCOPED_STATE = [
 
 describe('state that must NOT be lifted stays with its mount (issue 1438)', () => {
   it('detects a lifted declaration, so the clauses below are not vacuous', () => {
-    // Prove the matcher can FAIL before trusting eleven passes from it. The mutated line is the
-    // shape a quiet lift produces — the name moved onto the shared object — and the matcher must
-    // not find the local declaration in it.
+    // Prove the matcher can FAIL before trusting eleven passes from it.
     const local = "  let armedToken = $state('');";
     const lifted = '  const armedToken = $derived(ui.armedToken);';
     const declares = (source, name) => source.includes(`let ${name} = $state(`);
@@ -243,9 +192,7 @@ describe('state that must NOT be lifted stays with its mount (issue 1438)', () =
   }
 
   it("keeps the scoped list's bulk selection out of the lifted object", () => {
-    // The one axis of `EntityListInspectorFrame` deliberately left behind. A selection is an
-    // in-progress action over a SET, not a filter over rows, and its terminal actions belong to
-    // the lane that supplies the `bulk` descriptor — so it must not outlive the list it names.
+    // The one axis of `EntityListInspectorFrame` deliberately left behind.
     const frame = sourceOf(`${MANAGER_DIR}/scoped/EntityListInspectorFrame.svelte`);
     assert.ok(
       frame.includes('let selectedIds = $state(new Set())'),
@@ -265,13 +212,6 @@ describe('state that must NOT be lifted stays with its mount (issue 1438)', () =
 
 test('the two store-backed searches stay in the store, because they are not view filters', () => {
   // The decision this change had to make, pinned where a future "tidy-up" will read it.
-  //
-  // `itemSearch` and `recipeSearch` look like the eleven terms lifted here and are NOT the same
-  // thing: they are QUERY PARAMETERS the store's own data assembly consumes. `setItemSearch`
-  // awaits `refresh()`, and the refresh threads the term into `buildItemCards(…, itemSearchTerm,
-  // …)` → `systemManager.getItems(systemId, search)`. The term selects the COHORT that is
-  // fetched, hydrated and memoised, so moving it onto a view-state object would move cohort
-  // selection out of the store — a behaviour change, not a lift.
   const store = sourceOf('src/ui/svelte/stores/adminStore.js');
   assert.ok(
     store.includes("const itemSearch = writable('')"),
@@ -292,9 +232,7 @@ test('the two store-backed searches stay in the store, because they are not view
     store.includes('get(itemSearch)'),
     'the refresh must still read the term when it assembles item cards'
   );
-  // AND THE COUNTER-CLAIM THE BRIEF FOR THIS CHANGE CARRIED: neither is world state. Both are
-  // per-`createAdminStore` in-memory writables, never written to a Foundry setting, so the
-  // choice between the two mechanisms is about ROLE and not about persistence.
+  // AND THE COUNTER-CLAIM THE BRIEF FOR THIS CHANGE CARRIED: neither is world state.
   assert.ok(
     !/(setSetting|services\.setSetting)\([^)]*(itemSearch|recipeSearch)/.test(store),
     'neither search term may be persisted to a setting'

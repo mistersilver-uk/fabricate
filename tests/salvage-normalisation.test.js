@@ -38,9 +38,7 @@ function makeLoadedManager(systems = []) {
   return manager;
 }
 
-// ---------------------------------------------------------------------------
 // Group 1: System-level salvage normalisation (4 tests)
-// ---------------------------------------------------------------------------
 
 test('features.salvage defaults to true (salvage is an opt-out feature)', () => {
   const manager = makeManager();
@@ -83,9 +81,7 @@ test('salvageResolutionMode accepts canonical values, maps legacy tiered to rout
   assert.equal(invalid.salvageResolutionMode, 'simple');
 });
 
-// ---------------------------------------------------------------------------
 // Group 2: salvageCraftingCheck normalisation (5 tests)
-// ---------------------------------------------------------------------------
 
 test('default salvageCraftingCheck has enabled: false, consumeComponentOnFail: true, breakToolsOnFail: false', () => {
   const manager = makeManager();
@@ -140,9 +136,7 @@ test('salvageCraftingCheck.outcomes defaults to ["fail", "pass"]', () => {
   assert.deepEqual(system.salvageCraftingCheck.outcomes, ['fail', 'pass']);
 });
 
-// ---------------------------------------------------------------------------
 // Group 3: Component-level salvage normalisation (6 tests)
-// ---------------------------------------------------------------------------
 
 test('component salvage config is preserved even when features.salvage is off (non-destructive toggle)', () => {
   const manager = makeManager();
@@ -264,9 +258,7 @@ test('salvage resultGroups normalises id, name, and nested results with componen
   assert.equal(group.results[1].componentId, 'scrap-b');
 });
 
-// ---------------------------------------------------------------------------
 // Group 4: Edge cases (4 tests)
-// ---------------------------------------------------------------------------
 
 test('empty salvage object on component produces defaults', () => {
   const manager = makeManager();
@@ -386,9 +378,7 @@ test('full round-trip: system with salvage enabled, component with full salvage 
   assert.deepEqual(comp.salvage.currencyRequirement, { unit: 'gp', amount: 50 });
 });
 
-// ---------------------------------------------------------------------------
 // breakToolsOnFail: legacy consumeCatalystsOnFail read-fallback (1.7.0 rename)
-// ---------------------------------------------------------------------------
 
 test('normalization reads legacy consumeCatalystsOnFail as breakToolsOnFail on salvage consumption', () => {
   const manager = makeManager();
@@ -436,9 +426,7 @@ test('normalization prefers the new breakToolsOnFail key when both are present',
   assert.equal(system.craftingCheck.consumption.breakToolsOnFail, true);
 });
 
-// ---------------------------------------------------------------------------
 // Issue 764: the Simple-mode SUCCESS-FIRST retain-one clamp.
-// ---------------------------------------------------------------------------
 
 const successGroup = (id, componentId = 'scrap') => ({
   id,
@@ -617,9 +605,8 @@ test('writer path — replaceItemSource clamps the existing Simple groups', asyn
 
 test('writer path — addItemFromUuid threads the Simple context to the clamp', async () => {
   // The import-add call site: an imported Item carries no salvage today, so the clamp is a
-  // practical no-op — but a snapshot that DID carry a multi-group Simple salvage must be
-  // clamped, which pins the context threading at this writer (an unthreaded site would
-  // ship green). Stub the source-resolution collaborators so the snapshot carries salvage.
+  // practical no-op — but a snapshot that DID carry a multi-group Simple salvage must be clamped,
+  // which pins the context threading at this writer (an unthreaded site would ship green).
   const manager = makeLoadedManager([SIMPLE_SYSTEM([])]);
   globalThis.fromUuid = async () => ({ documentName: 'Item', name: 'Relic', img: 'icons/svg/item-bag.svg' });
   manager._resolveImportedComponentSourceData = async () => ({
@@ -649,10 +636,8 @@ test('writer path — addItemFromUuid threads the Simple context to the clamp', 
   delete globalThis.fromUuid;
 });
 
-// --- The Simple-slot formula gate, DERIVED through a real writer (finding 1) --------
-// These drive `_salvageNormalizationContext` reading `salvageCraftingCheck.simple.rollFormula`
-// specifically. Feeding the boolean directly (simpleContext) would not catch a derivation
-// that mistakenly OR-ed across the simple/routed/progressive slots — these do.
+// The Simple-slot formula gate, DERIVED through a real writer (finding 1) -------- These drive
+// `_salvageNormalizationContext` reading `salvageCraftingCheck.simple.rollFormula` specifically.
 
 test('reserved failure group is RETAINED when the SIMPLE slot has a formula (via _normalizeSystem)', () => {
   const manager = makeManager();
@@ -681,8 +666,6 @@ test('reserved failure group is DROPPED when ONLY a non-simple slot has a formul
     features: { salvage: true },
     salvageResolutionMode: 'simple',
     // A formula in the ROUTED and PROGRESSIVE slots only; the SIMPLE slot is unauthored.
-    // The Simple engine reads only the simple slot, so the reserved failure group must NOT
-    // be retained — an OR across slots would wrongly keep it.
     salvageCraftingCheck: {
       routed: { type: 'relative', rollFormula: '1d20', relativeOutcomes: [] },
       progressive: { rollFormula: '1d20' },

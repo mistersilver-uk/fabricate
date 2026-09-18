@@ -1,32 +1,6 @@
 /**
- * The `1.32.0` component-essence election (issue 1371 r18-store, maintainer ruling M31).
- *
- * `essences` becomes a component world-default SECTION in this change, which means
- * `normalizeInherit` starts reading an ABSENT `inherit.essences` as INHERITING. Every membership
- * record `1.30.0` wrote carries exactly that absence, so once a world map exists an unmarked
- * record would follow it whatever its own system authored. This pass therefore does two things
- * at once, per world component: it ELECTS the world map from the oldest system that has rules
- * for the component, and it MARKS every membership record inheriting where that system's own
- * map equals the elected one and overriding — with its own map stored — where it does not.
- *
- * ## THE RULE, STATED, AND PINNED BELOW ARM BY ARM
- *
- * - the donor is the OLDEST system (stored corpus position, the `1.30.0` exception) holding an
- *   in-system row for the component; its normalized map is the world map;
- * - an EMPTY donor map elects nothing — absence-preserving, as `category` is;
- * - a record whose system's own map EQUALS the elected one (absence reading as empty) is marked
- *   `inherit.essences: true`; one that differs is marked `false` and carries its own map;
- * - a record with no in-system row left has nothing to preserve and is marked inheriting;
- * - an entity ANY of whose records already carries a boolean switch is left ALONE, world map and
- *   records both, which is what makes a re-run and a run after `1.30.0` a no-op;
- * - resolution at migration time is unchanged BY CONSTRUCTION: an inheriting record equals the
- *   world map, and an overriding one answers its own.
- *
- * ## THE PROOF THAT MATTERS IS THROUGH THE REAL UNION
- *
- * A marked corpus is only correct if the read union answers each system its own values, so the
- * decisive arm runs `resolveComponentScope` over the migrated payload after a real store `load()`
- * — the normalizers are where an absent switch either survives or is minted away.
+ * The `1.32.0` component-essence election (issue 1371 r18-store, maintainer ruling M31). THE RULE,
+ * STATED, AND PINNED BELOW ARM BY ARM
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -50,9 +24,8 @@ function migratedRecord(entityId, systemId) {
 }
 
 /**
- * The world a `1.31.0` install actually holds: three systems, oldest first, all holding rules
- * for `ingot`; the oldest and the middle agree on the map and the youngest does not. A second
- * component `dust` has NO essences anywhere.
+ * The world a `1.31.0` install actually holds: three systems, oldest first, all holding rules for
+ * `ingot`; the oldest and the middle agree on the map and the youngest does not.
  */
 function migratedWorld() {
   return {
@@ -194,11 +167,7 @@ test('a malformed payload is skipped rather than repaired, and never throws', ()
 });
 
 test('a row that EXISTS but authored no essences map reads as EMPTY, so it OVERRIDES (issue 1371 r19-store2)', () => {
-  // Rule 2's own words are "absence reading as empty". The `own`-falsy branch is written for a
-  // record with NO ROW LEFT; a row that is present and simply carries no `essences` key is a
-  // system that authored none, which DIFFERS from a non-empty elected map. Unreachable from what
-  // this module writes (`_normalizeComponent` always emits an object) and reachable through the
-  // export upcast and a hand-edited payload.
+  // Rule 2's own words are "absence reading as empty".
   const data = migratedWorld();
   delete data.systems[2].components[0].essences;
   migrateComponentEssenceSections(data);
@@ -263,13 +232,7 @@ test('a record whose ids carry whitespace still finds its donor and its own row 
 test('and the DONOR half of the same claim: padding the OLDEST record still elects from the oldest system (issue 1371 r20-store3)', () => {
   // Quality round 6, R4. There are TWO downstream lookups keyed on the trimmed system id —
   // `decideEntity`'s and `electFromDonor`'s — and the case above pads the YOUNGEST record, so the
-  // donor is found either way and only one of the two was measured. Reverting `electFromDonor` to
-  // `bySystem.get(record.systemId)` left 1,074 tests green while electing the world map from the
-  // YOUNGEST system and inverting every record's mark.
-  //
-  // BOTH `sys-old` AND `sys-mid` are padded, and that is what makes the case discriminating rather
-  // than thorough: `sys-mid` holds the same normalized map as `sys-old`, so padding the oldest
-  // alone leaves the mid system electing the identical answer and the mutation survives.
+  // donor is found either way and only one of the two was measured.
   const data = migratedWorld();
   const keys = ['sys-old', 'sys-mid'].map((systemId) => membershipKey('ingot', systemId));
   for (const [index, systemId] of ['sys-old', 'sys-mid'].entries()) {

@@ -1,11 +1,4 @@
-/*
- * Per-worktree-stable Foundry container identity (issue #827 Phase 2) — PURE coverage.
- *
- * This test imports ONLY the playwright-free `foundryRunIdentity.js` module — never a
- * `scripts/foundry-test*.mjs` harness script (those top-level-import playwright and/or
- * autorun `main()`, so importing one launches Chromium then `process.exit()`s, killing
- * the whole `node --test` run as `# cancelled`). No docker, no network.
- */
+/** Per-worktree-stable Foundry container identity (issue #827 Phase 2) — PURE coverage. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 

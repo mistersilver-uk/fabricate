@@ -165,11 +165,7 @@ test('current-only lifecycle operations expose a stable lifecycle error', () => 
   assert.equal(error.code, 'UNSUPPORTED_LIFECYCLE_VERSION');
 });
 
-/**
- * Both guards below were deletable with every suite green (issue 1648, Q-M2). The existing
- * applying-order case is caught by the one-applying-effect rule rather than by the ORDER rule,
- * and nothing read a persisted journal whose applied effect carries no receipt at all.
- */
+/** Both guards below were deletable with every suite green (issue 1648, Q-M2). */
 test('an effect may only start applying at the head of the planned remainder', () => {
   const planned = transitionExecutionJournal(null, { type: 'plan', plan });
   const start = (journal, effectId) =>

@@ -1,16 +1,6 @@
 /**
  * `getCurrencyRequirementConfig` composing its two scopes (issue 1278) — and specifically the
  * degenerate half, which is the ONE new failure mode the relocation introduces.
- *
- * Before the move, "the system says currency is on" and "the ladder exists" were the same fact,
- * carried by one record. They are now two records that can disagree: a crafting system can have
- * `requirements.currency.enabled === true` while the world config is absent, empty, or malformed
- * — an upgraded world before its GM visits World > Currency, an import into a world that refused
- * the merge, a hand-edited setting.
- *
- * The rule that must hold in every one of those states is that DISPLAY AGREES WITH EXECUTION:
- * the afford probe reads false, and the spend refuses, for exactly the same reason. A state where
- * the probe says affordable and the spend then fails would strand a player mid-craft.
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -34,8 +24,7 @@ const RECIPE = { id: 'r1', craftingSystemId: 'sys-currency' };
 
 /**
  * Run `run()` with `globalThis.game` set to a minimal stub carrying `system.id` and an empty
- * `fabricate` accessor, restoring whatever was there before. Shared by every describe block below
- * that reaches `describeUnavailableCoinSpender`'s `globalThis.game?.system?.id` read.
+ * `fabricate` accessor, restoring whatever was there before.
  */
 function withGame(systemId, run) {
   const previous = globalThis.game;
@@ -133,14 +122,8 @@ describe('the two-scope composition when both halves are present', () => {
 });
 
 /**
- * The refusal carries its REASON (issue 1493).
- *
- * The defect: a world whose currency cannot be resolved refused the option silently.
- * `resolveCurrencyContext` learned exactly why and then discarded it, so the constant-`false` probe
- * stopped the option ever being selected, the engine's currency gate was handed nothing to check,
- * and the craft died claiming the player could not afford a cost the system had never priced.
- *
- * Two causes, deliberately not conflated, because only one of them has an object to ask.
+ * The refusal carries its REASON (issue 1493). The defect: a world whose currency cannot be
+ * resolved refused the option silently.
  */
 describe('the refusal reason for a VALID ladder with no usable coin spender', () => {
   const VALID_INVENTORY_WORLD = makeWorldCurrencyConfig({ spendStrategy: 'actorInventory' });
@@ -201,11 +184,8 @@ describe('the refusal reason for a VALID ladder with no usable coin spender', ()
   });
 
   it('keeps the reason SYSTEM-framed, never actor-framed', () => {
-    // The cause is that the world has no way to spend coins in this game system:
-    // `_resolveAdapter` reads `game.system.id` and takes no actor. Telling a GM the problem is
-    // "this actor" sends them to a character sheet to fix a world setting — and it is the same
-    // conflation as the genuinely per-actor sentence in `CoinSpenders.readCoins`, which must stay
-    // where it is.
+    // The cause is that the world has no way to spend coins in this game system: `_resolveAdapter`
+    // reads `game.system.id` and takes no actor.
     withGame('dnd5e', () => {
       const seams = { ...seamsFor(VALID_INVENTORY_WORLD), actorInventoryCoinSpender: null };
       const reason = resolveCurrencyContext(RECIPE, seams).spenderUnavailableReason;
@@ -218,9 +198,8 @@ describe('the refusal reason for a VALID ladder with no usable coin spender', ()
   });
 
   it('leaves the reason off an INVALID profile, which already carries its own error', () => {
-    // Two fields, two causes: `error` is "the ladder is broken", `spenderUnavailableReason` is
-    // "the ladder is fine but nothing can spend it". A context that set both would make a caller
-    // choosing between them arbitrary.
+    // Two fields, two causes: `error` is "the ladder is broken", `spenderUnavailableReason` is "the
+    // ladder is fine but nothing can spend it".
     withGame('dnd5e', () => {
       const context = resolveCurrencyContext(
         RECIPE,
@@ -240,16 +219,7 @@ describe('the refusal reason for a VALID ladder with no usable coin spender', ()
   });
 });
 
-/**
- * The joined error list is CAPPED (issue 1493 follow-up).
- *
- * `validateCurrencyProfile` returns one error per malformed unit, so an uncapped join renders a
- * whole paragraph into `context.error` — a chat message and, via the requirement rail, an
- * accessible name. Each fixture unit here omits ONLY `actorPath` (empty `contains`, a real
- * label/abbreviation/id), so under `actorProperty` it contributes EXACTLY one
- * "is missing an actor data path" error and nothing else — the count of listed faults is
- * therefore exactly `min(n, 3)`, which is what each assertion below checks for.
- */
+/** The joined error list is CAPPED (issue 1493 follow-up). */
 describe('the joined profile-error list caps its listed faults (issue 1493)', () => {
   function unitsMissingActorPath(n) {
     return Array.from({ length: n }, (_, i) => ({
@@ -300,29 +270,10 @@ describe('the joined profile-error list caps its listed faults (issue 1493)', ()
 /**
  * A player-facing currency refusal reads consistently regardless of cause (issue 1493 follow-up),
  * and `checkCurrencySpends`'s two refusal branches now diverge on HOW, following a reachability
- * finding traced for issue 1493's round-2 follow-up:
- *
- *   - The `spenderUnavailableReason` branch is a real production path — a valid profile whose
- *     spender turns out to be unusable is not detected until here — and
- *     `spenderUnavailableReason` is always a single short sentence (never a joined validator
- *     list), so it still carries {@link withCurrencySetupDirective}'s "ask your GM" suffix.
- *   - The `context.error` branch renders the SAME constant sentence
- *     `CraftingEngine._formatMissingItems` uses instead now, dropping the composed validator
- *     detail (and the directive) entirely. `context.error` truthy ALSO makes
- *     `buildCurrencyAffordProbe` constant-`false`, which makes
- *     `IngredientSet.resolveIngredientSelection` refuse to ever choose a currency option for its
- *     group — so a REAL craft against an invalid profile never reaches `checkCurrencySpends` with
- *     a non-empty spend list at all; it fails earlier, at `_formatMissingItems`, which is the
- *     reported defect's actual path. The test below drives `checkCurrencySpends` directly with a
- *     hand-built `SPENDS` array specifically BECAUSE no real selection can produce that
- *     combination: it exercises the branch as a defensive guard, not as evidence the path is
- *     live — do not read it as proof of a reachable production state.
- *
- * `spendCurrencySpends` and `refundCurrencySpends` compose from the SAME context fields but only
- * ever `console.error` the result (the deduction/refund neither abort nor surface to a caller a
- * player can read), so they — and the raw context fields themselves, read by the GM editor's
- * validation report and the requirement rail — must NOT carry the directive. Both are pinned as
- * negative controls below.
+ * finding traced for issue 1493's round-2 follow-up:. The `spenderUnavailableReason` branch is a
+ * real production path — a valid profile whose spender turns out to be unusable is not detected
+ * until here — and `spenderUnavailableReason` is always a single short sentence (never a joined
+ * validator list), so it still carries {@link withCurrencySetupDirective}'s "ask your GM" suffix.
  */
 describe('the player-facing currency setup directive (issue 1493)', () => {
   const DIRECTIVE = /Ask your GM to finish the world's currency setup \(Crafting Systems/;

@@ -1,15 +1,7 @@
 /**
- * The guardrail for the bug class that has now shipped three times: a player-reachable
- * code path writing shared state the acting client may not write (issue 302, Region
- * Behaviours; issue 970, actor documents; the gathering environment node pool).
- *
- * Every persistence fake in this suite is omnipotent — a `Map.set` that cannot refuse —
- * so "forgot to route this through the GM" is invisible to `npm test`. These tests use
- * `makeSettingsSeam({ isGM: false })`, which refuses world-scope writes exactly as the
- * server does, and prove:
- *
- *   1. the seam CAN fail (a mechanical check that never fails is worthless), and
- *   2. the gathering depletion path no longer trips it.
+ * The guardrail for the bug class that has now shipped three times: a player-reachable code path
+ * writing shared state the acting client may not write (issue 302, Region Behaviours; issue 970,
+ * actor documents; the gathering environment node pool).
  */
 
 import test from 'node:test';
@@ -43,11 +35,8 @@ function environmentRecord() {
     id: 'env-1',
     craftingSystemId: SYS,
     name: 'Iron Hills',
-    // Disabled so the REAL store's "an enabled environment needs a task" validation
-    // passes on a record whose tasks come from the library, not the record. Nothing on
-    // the depletion path reads `enabled` — `_writeNodeState` only patches nodeRuntime —
-    // and using the real store is the whole point: its validation and its `setSetting`
-    // call are what an in-memory fake elides.
+    // Disabled so the REAL store's "an enabled environment needs a task" validation passes on a
+    // record whose tasks come from the library, not the record.
     enabled: false,
     selectionMode: 'targeted',
     tasks: [],
@@ -141,10 +130,7 @@ const attempt = {
 };
 
 test('GUARD: an unrouted depletion on a player client reproduces the shipped bug', async () => {
-  // This is the regression the guardrail exists to catch. With no GM-routing seam the
-  // real store reaches `setSetting(gatheringEnvironments)` and the player seam refuses,
-  // exactly as Foundry's server did. If this test ever stops rejecting, the seam has
-  // been neutered and the guardrail is worthless.
+  // This is the regression the guardrail exists to catch.
   const seam = makeSettingsSeam({ isGM: false, userName: 'Randall' });
   const { service } = makeRichState({ seam });
 

@@ -1,13 +1,9 @@
 /**
- * Tests for the 1.9.0 migration
- * (src/migration/migrateSplitRoutedResolutionModes.js): splitting the single
- * crafting `routed` mode into `routedByIngredients` / `routedByCheck` by majority
- * provider (ties → routedByIngredients, zero-recipe → routedByIngredients), with
- * minority reconciliation (drop the now-meaningless resultSelection + log), the
- * provider drop on every migrated recipe, the untouched salvage/gathering `routed`
- * enums, idempotency, and purity.
- *
- * node:test + node:assert/strict. Pure functions; no Foundry globals.
+ * Tests for the 1.9.0 migration (src/migration/migrateSplitRoutedResolutionModes.js): splitting the
+ * single crafting `routed` mode into `routedByIngredients` / `routedByCheck` by majority provider
+ * (ties → routedByIngredients, zero-recipe → routedByIngredients), with minority reconciliation
+ * (drop the now-meaningless resultSelection + log), the provider drop on every migrated recipe, the
+ * untouched salvage/gathering `routed` enums, idempotency, and purity.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';

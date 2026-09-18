@@ -108,10 +108,7 @@ test('deriveExtensionSurfaces snapshots the registry in its own registration ord
   );
 });
 
-// The player Downtime experimental gate (issue 1257). It is TEMPORARY and tied to the premium
-// Downtime Studio being unreleased, so these cases go when the Studio ships — but while it is
-// shut, a player window that still offered the companion's tabs would advertise exactly the
-// feature the Manager's own gate withholds from the GM.
+// The player Downtime experimental gate (issue 1257).
 test('the downtime surface is the only id the gate names, and the gate defaults to shut', () => {
   assert.equal(PLAYER_DOWNTIME_SURFACE_ID, 'downtime');
 

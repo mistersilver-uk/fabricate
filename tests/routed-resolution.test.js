@@ -138,9 +138,7 @@ describe('routed recipe resolution', () => {
     assert.deepEqual(failed.groups, []);
   });
 
-  // Single-result-group exemption (mirrors routedByIngredients' "one group → no
-  // mapping required"). One group whose name does NOT match the outcome and which
-  // carries no checkOutcomeIds must still be produced on a non-failure outcome.
+  // Single-result-group exemption (mirrors routedByIngredients' "one group → no mapping required").
   function singleGroupStep() {
     return step({
       resultGroups: [
@@ -198,11 +196,10 @@ describe('routed recipe resolution', () => {
   });
 
   it('a stray leftover resultSelection.provider does not raise a STRUCTURAL name error', () => {
-    // The model is mode-unaware. A routed recipe should never carry a
-    // resultSelection (the migration drops it), but a stray leftover `check`
-    // provider on result groups with colliding/reserved names must NOT block
-    // persistence — structural validation (the persistence gate) waives the
-    // alchemy name check.
+    // The model is mode-unaware. A routed recipe should never carry a resultSelection (the
+    // migration drops it), but a stray leftover `check` provider on result groups with
+    // colliding/reserved names must NOT block persistence — structural validation (the persistence
+    // gate) waives the alchemy name check.
     const recipe = new Recipe({
       id: 'stray',
       name: 'Stray',
@@ -375,9 +372,8 @@ describe('routed recipe resolution', () => {
     });
   }
 
-  // Back-compat regression guard: legacy persisted `mapped`/`tiered` data still
-  // resolves correctly AFTER the canonical pipeline (manager token-normalizer +
-  // 1.4.0 migration). `mapped → routedByIngredients`, `tiered → routedByCheck`.
+  // Back-compat regression guard: legacy persisted `mapped`/`tiered` data still resolves correctly
+  // AFTER the canonical pipeline (manager token-normalizer + 1.4.0 migration).
   it('legacy mapped token normalizes to routedByIngredients and resolves by ingredientSet', () => {
     const manager = new CraftingSystemManager(null);
     const system = manager._normalizeSystem({ id: 'sys-routed', resolutionMode: 'mapped' });

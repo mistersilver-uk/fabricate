@@ -13,12 +13,7 @@ const srcManifest = JSON.parse(readFileSync(join(ROOT, 'module.json'), 'utf8'));
 // running it here proves the BUILT manifest — no full Vite build required.
 const builtManifest = rewriteModuleJson(srcManifest);
 
-/**
- * `compatibility.maximum` is a Foundry KILL-SWITCH, not a hint. A set integer `maximum` makes
- * `testAvailability` compute `majorOnly: true` -> `REQUIRES_CORE_DOWNGRADE` -> the module is
- * `unavailable` and will neither load nor install the day the next Foundry generation ships.
- * Issue #627 task 2.6 removes it so the public release does not ship the kill-switch.
- */
+/** `compatibility.maximum` is a Foundry KILL-SWITCH, not a hint (issue 627). */
 for (const [label, manifest] of [
   ['source module.json', srcManifest],
   ['built dist/module.json', builtManifest],
@@ -32,8 +27,7 @@ for (const [label, manifest] of [
   });
 
   // Sibling trap: `verified` (and `minimum`) keep working ONLY because Foundry auto-detects
-  // `majorOnly` from a BARE MAJOR via `Number.isInteger(Number(x))`. "Normalising" "14" to
-  // "14.0.0" switches majorOnly OFF -> REQUIRES_CORE_DOWNGRADE -> uninstallable for every v14 user.
+  // `majorOnly` from a BARE MAJOR via `Number.isInteger(Number(x))`.
   test(`${label} keeps compatibility.verified a bare integer (majorOnly auto-detect)`, () => {
     const verified = manifest.compatibility.verified;
     assert.equal(Number.isInteger(Number(verified)), true, 'verified must parse as an integer');

@@ -1,17 +1,4 @@
-/**
- * Guard against CSS bleed out of Fabricate's windows.
- *
- * `styles/fabricate.css` is loaded globally into the Foundry document (via
- * `module.json`'s "styles" field and, in dev, the `src/main.js` import). Every
- * rule therefore applies page-wide unless its selector is namespaced under a
- * `.fabricate*` root class. Historically a few orphaned global utility rules
- * (`.badge`, `.btn-icon`) leaked into other modules' sheets — e.g. the D&D 5e
- * character sheet's `.ac-badge.badge` Armor Class element.
- *
- * This test parses the stylesheet and asserts that every top-level (and
- * at-rule-nested) selector starts with `.fabricate` or `:root`, so any new
- * unscoped selector fails CI instead of silently bleeding.
- */
+/** Guard against CSS bleed out of Fabricate's windows. */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -51,10 +38,8 @@ function splitTopLevelCommas(prelude) {
 }
 
 /**
- * Collect every selector prelude in the stylesheet. We track brace depth and
- * read the text preceding each `{`. At-rule preludes (`@media`, `@container`,
- * ...) are skipped, but their bodies are still walked so nested rules are
- * validated. Declaration blocks (text after `{`, before `}`) are ignored.
+ * Collect every selector prelude in the stylesheet. We track brace depth and read the text
+ * preceding each `{`.
  */
 function collectSelectors(css) {
   const selectors = [];

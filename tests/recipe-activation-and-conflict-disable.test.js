@@ -1,7 +1,6 @@
 /**
  * The recipe validity contract: a recipe may be persisted while invalid/incomplete, but may only be
- * activated (enabled === true) when fully valid. Plus RecipeManager.disableSignatureConflicts, which
- * reconciles alchemy systems after a deletion by disabling every recipe in a signature conflict.
+ * activated (enabled === true) when fully valid.
  */
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
@@ -150,12 +149,8 @@ describe('RecipeManager.disableSignatureConflicts', () => {
   });
 
   it('leaves a recipe enabled when its only collision partner is already disabled', async () => {
-    // Issue 649: `SignatureValidator.validateSystem` is now enabled-scoped, so the scan
-    // is the exact complement of the runtime matcher's `if (!recipe.enabled) continue;`.
-    // A disabled recipe no longer counts against the gate, so the still-enabled recipe
-    // (whose sole collision partner is disabled) is collision-free among the enabled set
-    // and STAYS enabled — the domain-correct outcome (no runtime ambiguity), and
-    // `disableSignatureConflicts` reports nothing.
+    // Issue 649: `SignatureValidator.validateSystem` is now enabled-scoped, so the scan is the
+    // exact complement of the runtime matcher's `if (!recipe.enabled) continue;`.
     const manager = makeManager();
     manager.save = async () => {};
     manager.recipes.set('r-a', new Recipe(completeRecipe('r-a', 'A', 'comp-a', { enabled: false })));

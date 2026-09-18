@@ -1,6 +1,4 @@
-/**
- * Tests for teaser mode normalization in Recipe and CraftingSystemManager
- */
+/** Tests for teaser mode normalization in Recipe and CraftingSystemManager */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 

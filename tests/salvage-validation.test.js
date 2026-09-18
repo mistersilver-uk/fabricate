@@ -7,9 +7,7 @@ import assert from 'node:assert/strict';
 
 const { ResolutionModeService } = await import('../src/systems/ResolutionModeService.js');
 
-// ---------------------------------------------------------------------------
 // Helper builders
-// ---------------------------------------------------------------------------
 
 function buildSystem(overrides = {}) {
   return {
@@ -43,9 +41,7 @@ function buildService() {
   return new ResolutionModeService(null);
 }
 
-// ---------------------------------------------------------------------------
 // Group 1: Pre-checks (4 tests)
-// ---------------------------------------------------------------------------
 
 test('pre-check — component has no salvage data → valid (no errors)', () => {
   const service = buildService();
@@ -96,9 +92,7 @@ test('pre-check — alchemy salvageResolutionMode → invalid with clear error',
   );
 });
 
-// ---------------------------------------------------------------------------
 // Group 2: Simple mode (3 tests)
-// ---------------------------------------------------------------------------
 
 test('simple mode — exactly 1 result group → valid', () => {
   const service = buildService();
@@ -161,9 +155,8 @@ test('simple mode — 2 result groups → invalid', () => {
 });
 
 test('simple mode — one success + one reserved failure group → valid (issue 764)', () => {
-  // The Simple clamp emits `[success, reserved-failure]` when the Simple check slot has a
-  // formula; validation must never reject a clamp-emitted shape. It counts SUCCESS groups
-  // (`role !== 'failure'`), so exactly one success + a tolerated reserved failure is valid.
+  // The Simple clamp emits `[success, reserved-failure]` when the Simple check slot has a formula;
+  // validation must never reject a clamp-emitted shape.
   const service = buildService();
   const component = buildComponent({
     salvage: {
@@ -207,16 +200,8 @@ test('simple mode — two SUCCESS groups still invalid even with a reserved fail
   );
 });
 
-// ---------------------------------------------------------------------------
-// Group 3: Routed mode
-//
-// Routing keys on the salvage check's routed outcome-tier NAMES (the same source
-// the authoring UI offers and the runtime routes by), NOT the legacy flat
-// `outcomes` list. Validation requires every SUCCESS tier to route to a real
-// result group; failure tiers may stay unrouted. When the check defines no tiers,
-// the gap is reported once at the SYSTEM level (see system-validation tests), so
-// the component itself is not faulted.
-// ---------------------------------------------------------------------------
+// Group 3: Routed mode. Routing keys on the salvage check's routed outcome-tier NAMES (the same
+// source the authoring UI offers and the runtime routes by), NOT the legacy flat `outcomes` list.
 
 function buildRoutedSystem(overrides = {}) {
   return buildSystem({
@@ -342,10 +327,8 @@ test('legacy tiered salvageResolutionMode token normalizes to routed and validat
 });
 
 test('routed mode — no outcome tiers defined → valid (gap deferred to system level)', () => {
-  // The reported bug: a routed salvage check with no outcome tiers left every
-  // component permanently critical with no UI path to author routing. The
-  // component must now validate; the missing tiers surface as a single
-  // system-level issue instead.
+  // The reported bug: a routed salvage check with no outcome tiers left every component permanently
+  // critical with no UI path to author routing.
   const service = buildService();
   const system = buildRoutedSystem({
     salvageCraftingCheck: {
@@ -412,9 +395,7 @@ test('routed mode — dangling route to a deleted group → invalid', () => {
   );
 });
 
-// ---------------------------------------------------------------------------
 // Group 4: Progressive mode (5 tests)
-// ---------------------------------------------------------------------------
 
 function buildProgressiveSystem(components = [], overrides = {}) {
   return buildSystem({
@@ -518,13 +499,9 @@ test('progressive mode — empty results array in single group → invalid', () 
   );
 });
 
-// ---------------------------------------------------------------------------
-// Group 5: Messages never leak an internal component / result id (issue 611)
-//
-// A salvage validation message must identify the component by its author-given
-// NAME, or a name-free phrase when unnamed — never the raw internal id. The same
-// applies to a progressive result (reported by 1-based position, not its id).
-// ---------------------------------------------------------------------------
+// Group 5: Messages never leak an internal component / result id (issue 611). A salvage validation
+// message must identify the component by its author-given NAME, or a name-free phrase when unnamed
+// — never the raw internal id.
 
 const SECRET_COMPONENT_ID = 'secret-internal-component-id';
 

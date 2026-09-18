@@ -1,11 +1,4 @@
-/**
- * Q2 — migrateExportPayload idempotency + legacy upcast.
- *
- * A legacy (schema 1) export `{ fabricateVersion, system, recipes }` upcasts to
- * schema 2 with the gathering-authoring fields; the migrator is idempotent:
- *   - migrate(migrate(v1)) deep-equals migrate(v1)
- *   - migrate(v2) is a no-op
- */
+/** Q2 — migrateExportPayload idempotency + legacy upcast. */
 
 import test from 'node:test';
 import assert from 'node:assert/strict';

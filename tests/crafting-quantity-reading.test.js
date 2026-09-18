@@ -1,23 +1,4 @@
-/**
- * THE QUANTITY READINGS THE RETIRED TAG USED TO OWN (issue 1506).
- *
- * `QuantityTag` was a chip that rendered a label and a value, and the VALUE was composed at each
- * of its six call sites: `state.have ?? 0` twice, a `${have}/${need}` ratio once, a `×${have}`
- * stack count once. The component itself formatted nothing. So retiring it into `Chip` would have
- * left those four readings spelled out at the call sites with no home and no test — four copies
- * of "what a count looks like when a model hands you `undefined`", in two files, with the one
- * place they could have been compared gone.
- *
- * They are one module here for the same reason `craftingRecipeStatus.js` and `journalRunStatus.js`
- * are modules: a pure, closed presentation vocabulary is unit-testable and a template literal
- * inside a `.svelte` markup block is not.
- *
- * WHAT IS DELIBERATELY TOTAL. Every reading answers with a number, whatever the model handed
- * over. The retired call sites were total only where someone had remembered `?? 0`: the stack
- * count rendered the string `×undefined` for a stack with no `have`, and the ratio rendered
- * `undefined/undefined`. That is the behaviour these cases pin, and it is a repair rather than a
- * reproduction, so it is asserted rather than left to be discovered.
- */
+/** THE QUANTITY READINGS THE RETIRED TAG USED TO OWN (issue 1506). */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 

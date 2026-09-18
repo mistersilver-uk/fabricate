@@ -1,11 +1,5 @@
 // The read side of the WORLD character libraries (issue 1308): `resolveModifierLibrary` and
 // `resolveCharacterPrerequisiteLibrary`.
-//
-// WHY THIS SUITE EXISTS, AND WHY IT IS NOT REDUNDANT. Every runtime reader of these two libraries
-// goes through this module, and the five older suites that exercise those readers all hand-build
-// systems carrying the LEGACY in-system keys. So they stay green through the world arm being
-// deleted outright: they prove the fallback works and say nothing about the relocation. This
-// suite drives the world arm directly, and pins the union that keeps an unmigrated client working.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -35,8 +29,7 @@ test('reads the WORLD library when the setting has been written', () => {
 });
 
 // The window this union exists for: migrations run on the ACTIVE GM alone, so every player and
-// every assistant GM reads an unwritten setting for at least one session. Without the fallback
-// their tools, books and checks resolve nothing at all.
+// every assistant GM reads an unwritten setting for at least one session.
 test('falls back to the system’s surviving legacy copy while the setting is UNWRITTEN', () => {
   const seam = store({ seeded: false });
   const system = { modifiers: [LEGACY_MOD], characterPrerequisites: [LEGACY_PRE] };

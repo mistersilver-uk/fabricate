@@ -1,25 +1,4 @@
-/**
- * Direct proof for the shared manager harness in `tests/helpers/manager/` (issue 1669).
- *
- * `tests/components/manager-mounted.test.js` already drives the store double, the locators and the
- * mount helpers 520 times over, so their happy paths need nothing here. What a green mounted run
- * cannot prove is everything this file asserts:
- *
- *   - the DERIVATION is complete. The compile list stopped being 161 hand-written paths and became
- *     a walk of the root's own import closure, and the failure mode it inherits is silent: a
- *     component the tree renders and the list omits does not fail the suite, it HANGS it, and
- *     `node --test` reports the blocked tests as `# cancelled` rather than `# fail`.
- *   - the two THROW paths that make an incomplete list loud. Neither is reached by a passing run,
- *     which is exactly the shape of guarantee that rots unobserved, so the closure check is
- *     mutated here and asserted to red.
- *   - `act` really waits. A settle helper that returned early would leave the mounted suite
- *     asserting the pre-click screen, and some of those assertions would still pass.
- *   - the locators resolve against the LIVE mount target rather than a captured element.
- *
- * `tests/helpers/` is outside the `npm test` glob and `tests/*.test.js` is inside it, so this file
- * runs and the helpers it imports do not run as suites of their own — the `sourceScan.js` /
- * `source-scan.test.js` arrangement, for the same reason.
- */
+/** Direct proof for the shared manager harness in `tests/helpers/manager/` (issue 1669). */
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -37,10 +16,7 @@ import { setupDOM, teardownDOM } from './helpers/svelte-dom.js';
 
 const closure = deriveManagerModuleClosure();
 
-// The positive control for everything below. The derivation is a graph walk, and the cheapest
-// green available to a broken walk is an empty result that every later assertion then quantifies
-// over vacuously. The floors are far under the measured 242 components and 149 modules, because
-// the claim is "this reached the real tree", not "the tree is exactly this size".
+// The positive control for everything below.
 test('the derivation reaches the real manager graph and splits it by what the tree does with it', () => {
   assert.ok(
     closure.components.length > 200,
@@ -66,14 +42,6 @@ test('the derivation reaches the real manager graph and splits it by what the tr
 });
 
 // THE ACCEPTANCE CRITERION ITSELF, and its negative control.
-//
-// `assertCompiledSvelteClosure` re-walks the root with its own narrow matcher, so running it over
-// the derived set asks the question the hand list could only answer by inspection: is this list
-// closed over everything the mounted root's static graph reaches?
-//
-// The control is what makes the answer worth anything. Dropping one component and asserting the
-// throw names it proves the check can red at all — a check that silently found nothing would pass
-// this clause over an empty graph, which is the failure the walk exists to convert into a loud one.
 test('the derived compile list is closed over the root graph, and the check can still red', () => {
   const compiled = new Set(closure.components);
   assert.doesNotThrow(() => assertCompiledSvelteClosure(compiled, MANAGER_ROOT));
@@ -108,9 +76,7 @@ test('a derived path that is not on disk is named rather than compiled into a ha
   );
 });
 
-// `act` is the click-then-settle sequence the mounted suite runs ~900 times. The claim under test
-// is the AWAIT: a handler that defers its work must have finished before `act` returns, or the
-// assertion after it reads the pre-click screen.
+// `act` is the click-then-settle sequence the mounted suite runs ~900 times.
 test('act drains the microtasks a handler queued, which a bare click does not', async () => {
   let settled = 0;
   const element = {

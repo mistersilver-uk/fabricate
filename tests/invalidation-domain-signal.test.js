@@ -1,24 +1,4 @@
-/**
- * The scoped crafting-data change signal, END TO END (issue 1078 part B1, under #1070).
- *
- * ## Why every case starts at a real mutation
- *
- * This programme has shipped five guards that reported a property while observing nothing, and
- * the shape they all shared is that their entry point was DOWNSTREAM of publication: build a
- * payload, hand it to the routing function, count what it called. Such a guard passes with the
- * publish call deleted, because it never needed one.
- *
- * So every case below enters through something a GM or a replicating client actually does —
- * `updateRecipe`, a `save({put, domains})`, `handleFabricateSettingChange` — and exits through
- * the shipped `subscribeCraftingDataChange`, one subscription per store carrying the shipped
- * `STORE_DOMAINS[store]`. Deleting either half of a publisher takes a counter to zero.
- *
- * ## The fallback counter is asserted, not inferred
- *
- * "The journal did not reload" is true both when routing narrowed it out and when nothing was
- * emitted at all. Every narrowing case therefore also asserts the emission count and that the
- * broad-fallback counter did not move, so the narrowing is OBSERVED rather than inferred.
- */
+/** The scoped crafting-data change signal, END TO END (issue 1078 part B1, under #1070). */
 import assert from 'node:assert/strict';
 import { after, describe, it } from 'node:test';
 
@@ -53,12 +33,7 @@ const SYSTEMS_SETTING_KEY = `fabricate.${SETTING_KEYS.CRAFTING_SYSTEMS}`;
 const scopeSummary = (payload) =>
   payload.scopes.map((scope) => [scope.systemId, [...scope.domains]]);
 
-/**
- * A world plus an attached bus, torn down after the case.
- *
- * @param {() => object} buildWorld
- * @returns {{world: object, bus: object}}
- */
+/** A world plus an attached bus, torn down after the case. */
 function wiredWorld(buildWorld = twoSystemWorld) {
   const world = buildWorld();
   const bus = installCraftingDataBus();
@@ -215,9 +190,8 @@ describe('publisher 2 — a local crafting-system mutation', () => {
 
   it('keeps a save that deliberately does NOT announce silent, and carries its domains forward', async () => {
     // `save()` records and the NOTIFIER drains, which is what keeps the paths that save without
-    // announcing (`options.notifySystems: false`, the singular component delete) as silent as
-    // they were before this issue. A save that emitted directly would refresh the app on every
-    // one of them.
+    // announcing (`options.notifySystems: false`, the singular component delete) as silent as they
+    // were before this issue.
     const { world, bus } = wiredWorld();
     tracked(bus);
     const system = world.systemManager.getSystem(SYS_A);
@@ -272,14 +246,7 @@ describe('publisher 2 — a local crafting-system mutation', () => {
 });
 
 describe('publisher 3 — a replicated change on a remote-shaped client', () => {
-  /**
-   * Drive the bridge exactly as `main.js` drives it on a client that did not write.
-   *
-   * @param {object} world
-   * @param {object} bus
-   * @param {string} settingKey
-   * @returns {boolean}
-   */
+  /** Drive the bridge exactly as `main.js` drives it on a client that did not write. */
   const replicate = (world, bus, settingKey) =>
     handleFabricateSettingChange(settingKey, {
       craftingSystemManager: world.systemManager,
@@ -336,14 +303,7 @@ describe('publisher 3 — a replicated change on a remote-shaped client', () => 
 describe('the SYSTEM-VALIDITY GATE reaches the gathering store', () => {
   // The regression this group exists for: `gathering` renders none of a system's check
   // configuration, so a Consuming-stores column derived from DIRECT fact reads omitted
-  // `resolution-config` and `materials-and-yield` from it. But the gathering listing runs the
-  // system-validity gate — `GatheringEngine._playerCandidateEnvironments` drops every
-  // environment of a system whose `computeSystemVisibility` reports `blocksSystem`, for non-GM
-  // viewers only — and those blockers are produced from exactly those two domains.
-  //
-  // The payload is well-formed and correctly attributed in the failing case, so NO fail-safe can
-  // catch it. Only a positive control on the store can, which is why `gathering` needs one for
-  // every domain it consumes rather than only for the three whose facts it renders.
+  // `resolution-config` and `materials-and-yield` from it.
   it('reloads GATHERING when a resolution-config fact moves, from a warmed baseline', async () => {
     const { world, bus } = wiredWorld();
     tracked(bus);
@@ -353,15 +313,8 @@ describe('the SYSTEM-VALIDITY GATE reaches the gathering store', () => {
     bus.reset();
 
     // `toolBreakage` is the `resolution-config` fact this fixture can move in ISOLATION: it
-    // rewrites exactly one top-level key and triggers no recipe migration, so the single
-    // emission below is unambiguously what reloaded the gathering store.
-    //
-    // The vivid gate input would be `resolutionMode: 'routedByCheck'` with no routed formula,
-    // which is precisely what `routedCheckNoFormula` blocks on — and it is the same domain. It
-    // is NOT the fixture here because a mode change additionally migrates recipes and announces
-    // a second, broad recipe signal, which would leave "gathering reloaded" attributable to
-    // either one. The row under test is `resolution-config -> gathering`; the gate is why that
-    // row exists.
+    // rewrites exactly one top-level key and triggers no recipe migration, so the single emission
+    // below is unambiguously what reloaded the gathering store.
     await world.systemManager.updateSystem(SYS_A, {
       toolBreakage: { authority: 'checkDriven' },
     });
@@ -417,19 +370,12 @@ describe('the SYSTEM-VALIDITY GATE reaches the gathering store', () => {
   });
 });
 
-// ---------------------------------------------------------------------------------------------
 // publisher 4 — a replicated WORLD SCOPE write (issue 1359, epic 1357)
-// ---------------------------------------------------------------------------------------------
 
 describe('publisher 4 — a replicated world scope write', () => {
   /**
    * The domains each key announces, restated here as LITERAL tokens rather than imported from
    * `domainsForSystemFields`.
-   *
-   * Deliberate: the bridge DERIVES them from `SYSTEM_FIELD_DOMAINS` so it cannot drift, and a test
-   * that derived them the same way would assert `x === x` and would stay green if both moved
-   * together. Writing the tokens out is what makes a reclassification a decision somebody has to
-   * come here and make.
    */
   const SCOPE_KEYS = [
     {
@@ -506,10 +452,8 @@ describe('publisher 4 — a replicated world scope write', () => {
 
 describe('the fail-safe: an unattributable change routes broadly', () => {
   it('runs reload -> delta -> emit -> FALLBACK for a pure corpus reordering', () => {
-    // A reordering is the only production-reachable producer of an empty domain set, which
-    // makes it the sole end-to-end proof that the fail-safe is wired at all. The assertion is
-    // the routing CONSEQUENCE, not the delta shape — `reload-scoped-invalidation.test.js`
-    // already pins `reordered === true` and has never been red.
+    // A reordering is the only production-reachable producer of an empty domain set, which makes it
+    // the sole end-to-end proof that the fail-safe is wired at all.
     const { world, bus } = wiredWorld();
     tracked(bus);
     world.write(null, storedRecipes(world.env).toReversed());
@@ -536,11 +480,8 @@ describe('the fail-safe: an unattributable change routes broadly', () => {
   });
 
   it('poisons a MIXED payload when any one scope is attributable to nothing', () => {
-    // `PendingChangeDomains#record` and `craftingDataChange()` are the two places an explicit
-    // empty domain set can arrive, and they must agree. Dropping only the offending scope would
-    // route the payload narrowly on the OTHER leg's domains while the unattributable one
-    // vanished — a stale read model. Production-reachable: both `_domainsForSystemEdit` and
-    // `_domainsForRecipeEdit` answer `[]` for a no-op edit, and two saves can precede one drain.
+    // `PendingChangeDomains#record` and `craftingDataChange()` are the two places an explicit empty
+    // domain set can arrive, and they must agree.
     const { bus } = wiredWorld();
     tracked(bus);
 
@@ -614,15 +555,9 @@ describe('the fail-safe: an unattributable change routes broadly', () => {
 
 describe('an unattributable leg poisons the whole pending attribution', () => {
   it('drains to NOTHING when one recorded leg named no domain', () => {
-    // The 12 lines of JSDoc on `PendingChangeDomains#record` explain why an explicit empty
-    // array must poison the WHOLE set rather than merely skip its own leg, and nothing observed
-    // it: replacing the poison with a bare `return` left the entire suite green.
-    //
-    // It is production-reachable. `_domainsForSystemEdit` and `_domainsForRecipeEdit` both
-    // answer `[]` for an edit the delta reports no change for, `save({put, domains})` feeds that
-    // straight in, and two saves before one drain is all it takes. Draining the attributed leg
-    // alone would route the payload narrowly on ITS domains while the unattributable one
-    // vanished — a stale read model.
+    // The 12 lines of JSDoc on `PendingChangeDomains#record` explain why an explicit empty array
+    // must poison the WHOLE set rather than merely skip its own leg, and nothing observed it:
+    // replacing the poison with a bare `return` left the entire suite green.
     const pending = new PendingChangeDomains();
 
     pending.record([INVALIDATION_DOMAINS.LABELLING], SYS_A);
@@ -642,10 +577,8 @@ describe('an unattributable leg poisons the whole pending attribution', () => {
   });
 
   it('treats an OMITTED domain set as every domain, not as unattributable', () => {
-    // The two "I cannot say" answers are different: omitted means "every domain", which keeps
-    // an unannotated mutation site safe, and an explicit empty array means "attributable to
-    // nothing". Conflating them would make every unannotated save route broadly through the
-    // FALLBACK rather than through a correctly widened payload.
+    // The two "I cannot say" answers are different: omitted means "every domain", which keeps an
+    // unannotated mutation site safe, and an explicit empty array means "attributable to nothing".
     const pending = new PendingChangeDomains();
 
     pending.record(undefined, SYS_A);
@@ -688,21 +621,12 @@ describe('two independent clients over a replicated corpus copy converge', () =>
     // Two independent manager pairs, each with its OWN settings store and its own `Hooks` bus —
     // which is the property that makes the signal a `Hooks.callAll` rather than a module-local
     // emitter, since `globalThis.Hooks` is read at call time by every publisher.
-    //
-    // Deliberately NOT one shared settings Map: each `remoteClient()` allocates a fresh one and
-    // the reader is seeded with a `structuredClone`, so no object identity survives between the
-    // two. That is what replication actually delivers — a serialized copy — and it is a STRONGER
-    // fixture than a shared seam, which could let a reader pass on an identity the wire would
-    // have destroyed.
     const systems = [persistedSystem(SYS_A, ['Iron Ore'])];
     const writer = remoteClient({
       systems,
       recipes: [persistedRecipe('r-a1', SYS_A, `${SYS_A}-c0`)],
     });
-    // The reader's PRE-EDIT corpus is the writer's, byte for byte. Building it a second time
-    // from the fixture would stamp fresh `metadata` timestamps, and the reader would then
-    // attribute `labelling` as well as `narrative` — a fixture artefact that would have read
-    // as the taxonomy failing to narrow.
+    // The reader's PRE-EDIT corpus is the writer's, byte for byte.
     const preEdit = structuredClone(writer.env.settings.get(SETTING_KEYS.RECIPES));
     const writerBus = tracked(installCraftingDataBus());
 

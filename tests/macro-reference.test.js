@@ -1,14 +1,6 @@
 /**
- * Issue 1036 — `src/utils/macroReference.js`: resolving a linked Macro for an authoring
- * surface, and deciding whether a dropped one may be linked at all.
- *
- * Criterion 7's `type !== 'script'` half is pinned HERE, at the chokepoint, rather than at
- * a control's rendered state. The check cannot live in a drop PREDICATE — a drag payload's
- * `type` is the document name (`'Macro'`), and the macro's own type needs `await fromUuid`
- * — so the predicate accepts a Macro document and this function decides whether that macro
- * is runnable. Foundry defaults a NEW Macro to `type: 'chat'`, so a GM who pastes
- * JavaScript into a fresh macro and never changes the type produces exactly the payload
- * this rejects, and `MacroExecutor.run` guards only that `command` is a string.
+ * Issue 1036 — `src/utils/macroReference.js`: resolving a linked Macro for an authoring surface,
+ * and deciding whether a dropped one may be linked at all.
  */
 
 import assert from 'node:assert/strict';
@@ -38,9 +30,7 @@ function withoutResolver() {
   };
 }
 
-// ---------------------------------------------------------------------------
 // evaluateMacroDrop — criterion 7, the `type !== 'script'` half
-// ---------------------------------------------------------------------------
 
 test('1036/7: a dropped Macro whose type is not `script` is REJECTED, with a reason', async () => {
   const restore = withDocuments({
@@ -124,9 +114,7 @@ test('1036/7: with NO resolver installed the check fails OPEN', async () => {
   const restore = withoutResolver();
   try {
     const result = await evaluateMacroDrop('Macro.unknowable');
-    // Outside a live world nothing can be checked. Refusing every drop there would make the
-    // control unusable in the View Lab and untestable in a mounted suite, while proving
-    // nothing whatever about real data.
+    // Outside a live world nothing can be checked.
     assert.equal(result.accepted, true);
     assert.equal(result.uuid, 'Macro.unknowable');
     assert.equal(result.reason, null);
@@ -135,9 +123,7 @@ test('1036/7: with NO resolver installed the check fails OPEN', async () => {
   }
 });
 
-// ---------------------------------------------------------------------------
 // resolveMacroName — the two behaviours lifted out of SimpleCraftingCheckEditor
-// ---------------------------------------------------------------------------
 
 test('1036: resolveMacroName reports the document NAME once it resolves', async () => {
   const restore = withDocuments({ 'Macro.dc': { name: 'Scaling DC', type: 'script' } });

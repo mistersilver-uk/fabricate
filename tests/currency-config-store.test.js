@@ -1,17 +1,7 @@
 /**
- * `CurrencyConfigStore` — the persistence shell over the `currencyConfig` WORLD setting
- * (issue 1278).
- *
- * The store is deliberately thin: read, normalize, write. The ladder EDITS live in `adminStore`
- * (covered by `stores/admin-store-currency.test.js`), composed from the same shared helpers the
- * modifier and prerequisite lists use, so mirroring them here as store methods would be a second
- * implementation of one set of rules.
- *
- * What this suite pins is the shell's own contract, and the one policy decision inside it:
- * persistence is NOT gated on profile validity. A GM authors a ladder incrementally, so the
- * moment they add the first of two units the profile is transiently invalid; refusing that write
- * would make the editor unusable. Validity is resolved at craft time instead, in
- * `resolveCurrencyContext`, which surfaces a clear error and refuses to spend.
+ * `CurrencyConfigStore` — the persistence shell over the `currencyConfig` WORLD setting (issue
+ * 1278). What this suite pins is the shell's own contract, and the one policy decision inside it:
+ * persistence is NOT gated on profile validity.
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -53,9 +43,8 @@ describe('CurrencyConfigStore', () => {
   });
 
   it('never carries an `enabled` flag, because participation is per crafting system', async () => {
-    // The world owns the ladder; `requirements.currency.enabled` on a crafting system owns
-    // whether that system participates. Letting `enabled` survive into the world config would
-    // reintroduce exactly the two-sources-of-truth ambiguity issue 1278 removed.
+    // The world owns the ladder; `requirements.currency.enabled` on a crafting system owns whether
+    // that system participates (issue 1278).
     const { store, persisted } = makeStore({ enabled: true, units: [] });
     assert.equal('enabled' in store.get(), false);
 
@@ -126,9 +115,7 @@ describe('CurrencyConfigStore', () => {
   });
 
   it('resolves a LEGACY provider config forward rather than leaving it unreadable', async () => {
-    // A pre-1278 world could carry `provider: 'system'` with a `systemAdapter`. The shared
-    // normalizer maps that to a spend strategy and the matching preset ladder, so an upgraded
-    // world keeps working without the GM re-authoring anything.
+    // A pre-1278 world could carry `provider: 'system'` with a `systemAdapter`.
     const { store } = makeStore({ provider: 'system', systemAdapter: 'pf2e' });
     const config = store.get();
 
@@ -138,9 +125,7 @@ describe('CurrencyConfigStore', () => {
   });
 
   it('PERSISTS an invalid profile rather than blocking the GM mid-edit', async () => {
-    // The half-authored state a GM is always passing through: one unit, no actor path. It must
-    // still save — the editor would be unusable otherwise, and the craft path refuses to spend
-    // against an invalid profile anyway.
+    // The half-authored state a GM is always passing through: one unit, no actor path.
     const { store, persisted } = makeStore();
     await store.save({ units: [{ id: 'gp', label: 'Gold', actorPath: '' }] });
 
@@ -158,11 +143,8 @@ describe('CurrencyConfigStore', () => {
 });
 
 describe('CurrencyConfigStore under overlapping edits', () => {
-  // Callers read-modify-write, and the editor fires one of those per keystroke on a label field,
-  // so a second edit routinely starts while the first write is still in flight. If the cache is
-  // published only after the await, that second edit reads the pre-first-edit config and clobbers
-  // it — the GM's typing silently disappears. The per-system path this replaced was safe by
-  // construction, so publishing late would have been a regression rather than a new limitation.
+  // Callers read-modify-write, and the editor fires one of those per keystroke on a label field, so
+  // a second edit routinely starts while the first write is still in flight.
   function makeSlowStore(delayMs) {
     const settings = { currencyConfig: { units: [{ id: 'gp', label: 'Gold' }] } };
     const store = new CurrencyConfigStore({

@@ -31,12 +31,7 @@ test('normalizes defaults: disabled, empty members, null travel actor, no overri
 });
 
 test('a party with NO travel actor can be enabled', async () => {
-  // The gate this replaces rejected the save. It bought nothing: such a party senses no
-  // scene regions, so `resolveCurrentRealms` already returns the unresolved shape and its
-  // members gather exactly as an actor in NO party does — not as they would with realms
-  // disabled, which is a different claim and a false one (an unresolved realm still
-  // blocks an inclusion-gated environment). Downtime parties group characters without
-  // ever standing on a map, and the gate made that an unreachable state.
+  // The gate this replaces rejected the save.
   const { store } = makeStore();
   const party = await store.create({ name: 'Heroes' });
   const enabled = await store.setEnabled(party.id, true);
@@ -47,7 +42,6 @@ test('a party with NO travel actor can be enabled', async () => {
 test('an actor still cannot be a member of two enabled travel-actor-less parties', async () => {
   // The composite-uniqueness invariant is INDEPENDENT of the removed gate: dropping the
   // travel-actor requirement must not open a second route to an ambiguous resolution.
-  // Before the removal this pair could not both be enabled for the wrong reason.
   const { store } = makeStore();
   const a = await store.create({ name: 'A', memberActorUuids: ['Actor.alice'] });
   await store.setEnabled(a.id, true);
@@ -148,10 +142,8 @@ test('setCurrentRealmOverride stamps updatedAt/updatedByUserId; clear empties re
 });
 
 test('collapses a legacy per-system override map on read, newest wins', () => {
-  // Two layers of legacy at once: the pre-1.1.0 `currentRegionOverrides`/`regionIds` names AND
-  // the per-system keying issue 1282 removed. A party read before the 1.27.0 migration runs
-  // still has to resolve to one place, and the GM's most recent statement is the one that
-  // survives — the same rule the migration applies on disk.
+  // Two layers of legacy at once: the pre-1.1.0 `currentRegionOverrides`/`regionIds` names AND the
+  // per-system keying issue 1282 removed.
   const { store } = makeStore({
     saved: [{
       id: 'p-legacy',

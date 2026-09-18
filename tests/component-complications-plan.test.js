@@ -1,11 +1,6 @@
 /**
- * `src/utils/complicationPlan.js` — the PURE decision half of progressive component
- * complications (issue 1286), and the two player-facing projections that live beside it.
- *
- * Every award in this suite is produced by the REAL `resolveProgressiveAward` loop rather than
- * hand-written, because the whole point of the five-bucket model is that it agrees with the
- * loop's own stopping behaviour. A hand-built `{awarded, haltedResult}` would pass whatever
- * the classifier happened to believe.
+ * `src/utils/complicationPlan.js` — the PURE decision half of progressive component complications
+ * (issue 1286), and the two player-facing projections that live beside it.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -695,11 +690,8 @@ test('1286: the run-record keys are a subset of the public projection', () => {
 // ── the leaf assertion ──────────────────────────────────────────────────────
 
 test('1286: complicationPlan.js imports NOTHING but the frozen vocabularies', () => {
-  // The `manager-color-tokens.js` precedent asserts ZERO imports, which would fail a module
-  // that legitimately imports one thing. The ALLOWLIST form is what this module needs: it must
-  // read the vocabularies rather than restate them, and it must not acquire a runtime import —
-  // a player view-model importing this leaf would otherwise gain `checkRoll.js`'s whole
-  // sixteen-module closure, in every mounted Svelte suite that declares its closure verbatim.
+  // The `manager-color-tokens.js` precedent asserts ZERO imports, which would fail a module that
+  // legitimately imports one thing.
   const source = readFileSync(join(ROOT, 'src', 'utils', 'complicationPlan.js'), 'utf8');
   const specifiers = [...source.matchAll(/^\s*import\s[^'"]*['"]([^'"]+)['"]/gm)].map(
     (match) => match[1]

@@ -1,14 +1,4 @@
-/**
- * Tests for T-014: Stale Preferences Cleanup
- *
- * Pure unit tests — no FoundryVTT globals required.
- * Uses injectable getSetting/setSetting mocks.
- *
- * Group 1: lastManagedCraftingSystem validation (3 tests)
- * Group 2: lastGatheringActor cleanup (3 tests)
- * Group 3: Progressive-order preferences cleanup (3 tests)
- * Group 4: Combined behaviour (2 tests)
- */
+/** Tests for T-014: Stale Preferences Cleanup. Pure unit tests — no FoundryVTT globals required. */
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -18,9 +8,7 @@ import {
   isGatheringActorSelectableByUser
 } from '../src/config/preferencesCleanup.js';
 
-// ---------------------------------------------------------------------------
 // Test helpers
-// ---------------------------------------------------------------------------
 
 function makeSettings(initial = {}) {
   const store = new Map(Object.entries({
@@ -59,9 +47,7 @@ function makeGatheringActorResolvers({ actorsById = {}, selectableActorIds = [] 
   };
 }
 
-// ---------------------------------------------------------------------------
 // Group 1: lastManagedCraftingSystem validation
-// ---------------------------------------------------------------------------
 
 test('resets lastManagedCraftingSystem to empty when it references a missing system', async () => {
   const { store, calls, getSetting, setSetting } = makeSettings({
@@ -135,9 +121,7 @@ test('leaves lastManagedCraftingSystem unchanged when it is already empty', asyn
   assert.equal(setCall, undefined, 'setSetting should NOT be called when value is already empty');
 });
 
-// ---------------------------------------------------------------------------
 // Group 2: lastGatheringActor cleanup
-// ---------------------------------------------------------------------------
 
 test('resets lastGatheringActor when the remembered actor no longer resolves', async () => {
   const { store, calls, getSetting, setSetting } = makeSettings({
@@ -233,9 +217,7 @@ test('preserves lastGatheringActor when cleanup runs without gathering actor res
 test('gathering actor selectability is based on actor existence and ownership only', () => {
   assert.equal(isGatheringActorSelectableByUser(null, { isGM: true }), false);
   assert.equal(isGatheringActorSelectableByUser({ id: 'npc-1', type: 'npc' }, { isGM: true }), true);
-  // Ownership is asked of the PASSED user and no one else (issue 1288). A fixture
-  // asserting `isOwner: true` used to pass here, which is precisely why the GM-side relay
-  // could not see that `isOwner` answers about the AMBIENT user instead.
+  // Ownership is asked of the PASSED user and no one else (issue 1288).
   assert.equal(
     isGatheringActorSelectableByUser({
       id: 'group-1',
@@ -256,16 +238,14 @@ test('gathering actor selectability is based on actor existence and ownership on
   assert.equal(isGatheringActorSelectableByUser({ id: 'actor-1', type: 'character' }, { id: 'user-1', isGM: false }), false);
 });
 
-// The two shapes that became REACHABLE once the `isOwner` disjunct stopped short-circuiting
-// ahead of `testUserPermission` (issue 1288). Both must DENY: a security predicate that
-// throws is an outage, and one that falls through to `ownership.default` is an escalation.
+// The two shapes that became REACHABLE once the `isOwner` disjunct stopped short-circuiting ahead
+// of `testUserPermission` (issue 1288).
 test('the ownership predicate denies a nullish or id-string user rather than throwing', () => {
   const actor = {
     id: 'actor-1',
     type: 'character',
-    // Foundry's real `testUserPermission` reads `user.isGM` as its FIRST statement, so a
-    // null viewer throws there rather than returning false. `GatheringListingBuilder`
-    // defaults `viewer` to exactly that on two public read paths.
+    // Foundry's real `testUserPermission` reads `user.isGM` as its FIRST statement, so a null
+    // viewer throws there rather than returning false.
     testUserPermission: (user, permission) => user.isGM === true || permission === 'OWNER'
   };
 
@@ -277,18 +257,11 @@ test('the ownership predicate denies a nullish or id-string user rather than thr
   assert.equal(isGatheringActorSelectableByUser(actor, 'user-1'), false, 'a user id denies');
 });
 
-// ---------------------------------------------------------------------------
-// Group 3: Progressive-order preferences cleanup
-//
-// Keys are NAMESPACED (`recipe:<id>` / `salvage:<componentId>`) — issue 651. The keys are
-// the load-bearing part: a prefix-blind `validRecipeIds.has(key)` is false for every
-// namespaced key, so the first run would wipe the whole map, and under `user` scope that
-// wipe is a replicated document write destructive across every device the player uses.
-// The no-op assertions below are what catch that.
-//
-// Values are result IDS (matching `meta.awardedResultIds` and `applyPlayerResultOrder`),
-// not indices. Earlier fixtures used both shapes contradictorily; ids are canonical.
-// ---------------------------------------------------------------------------
+// Group 3: Progressive-order preferences cleanup. Keys are NAMESPACED (`recipe:<id>` /
+// `salvage:<componentId>`) — issue 651. The keys are the load-bearing part: a prefix-blind
+// `validRecipeIds.has(key)` is false for every namespaced key, so the first run would wipe the
+// whole map, and under `user` scope that wipe is a replicated document write destructive across
+// every device the player uses.
 
 test('removes progressive-order entries for missing recipes', async () => {
   const { store, getSetting, setSetting } = makeSettings({
@@ -403,9 +376,7 @@ test('drops unknown-prefix and legacy BARE-id keys (D14 policy)', async () => {
   );
 });
 
-// ---------------------------------------------------------------------------
 // Group 4: Combined behaviour
-// ---------------------------------------------------------------------------
 
 test('cleans both stale system and stale recipe preferences in one call', async () => {
   const { store, calls, getSetting, setSetting } = makeSettings({
@@ -449,15 +420,10 @@ test('does nothing when all preferences are valid — no setSetting calls for ei
   assert.equal(calls.set.length, 0, 'setSetting should not be called at all when all preferences are valid');
 });
 
-// ---------------------------------------------------------------------------
 // Group 5: the component id set is REQUIRED (issue 1261)
-// ---------------------------------------------------------------------------
 
 test('omitting validComponentIds throws rather than pruning every salvage: key', async () => {
   // Issue 1196's shape reached through an omitted ARGUMENT rather than an incomplete corpus.
-  // The parameter used to default to `new Set()`, so a caller that forgot it silently rewrote
-  // the whole progressive-order map with every `salvage:<componentId>` key dropped — a
-  // corpus-derived prune against a basis of nothing, on a healthy world, with no error.
   const { store, calls, getSetting, setSetting } = makeSettings({
     progressiveResultOrder: { 'salvage:comp-live': ['r1', 'r2'] }
   });

@@ -1,19 +1,6 @@
 /**
- * THE AGENT BINDINGS ARE GENERATED, AND THIS IS THE PROOF THAT THEY STILL ARE (issue #1676).
- *
- * The 43 files under `.claude/agents/` and `.codex/agents/` are rendered from
- * `scripts/lib/agentBindingRoles.js`. Hand-maintained, they had drifted: eight wordings of the
- * one `ESCALATE_TIER` sentence, and a `fabricate_domain_expert` verdict instruction on the
- * Claude side and absent on the Codex side.
- *
- * WHAT TOOL/SANDBOX PARITY MEANS NOW, because it changed. It used to compare two independently
- * authored files. Both sides now come from one role record, so comparing the rendered files
- * would be the generator agreeing with itself. The rule moved up a level: `toolParityErrors` is
- * applied to the RECORD, before `writeBindings` will write anything. Parity is no longer "two
- * files agree"; it is "the single source declaring a read-only sandbox cannot also hand out a
- * mutation tool". Test 3 drives it against a deliberately unsafe record, because an invariant
- * only ever checked against a roster that satisfies it is indistinguishable from one that is
- * never evaluated.
+ * THE AGENT BINDINGS ARE GENERATED, AND THIS IS THE PROOF THAT THEY STILL ARE (issue #1676). WHAT
+ * TOOL/SANDBOX PARITY MEANS NOW, because it changed.
  */
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
@@ -59,9 +46,7 @@ test('1. every binding on disk is byte-identical to its render, so `--write` is 
 });
 
 test('2. a hand edit to either provider fails the gate, and the failure names the line', () => {
-  // A NEGATIVE CONTROL PROVES NOTHING UNTIL THE MUTATION IS PROVEN TO HAVE APPLIED. Each case
-  // asserts the perturbed text really differs from the real file before asserting the gate sees
-  // it — a replacement that silently matched nothing would otherwise read as a passing guard.
+  // A NEGATIVE CONTROL PROVES NOTHING UNTIL THE MUTATION IS PROVEN TO HAVE APPLIED.
   const cases = [
     {
       file: '.claude/agents/fabricate-implementer-large.md',
@@ -142,8 +127,7 @@ test('3. the generator cannot emit a spawn tool, or a mutation tool into a read-
 
 test('4. the render gate is wired into the command line, not just importable', () => {
   // `main()` is driven by tests/agent-model-tiers.test.js over a synthetic fixture repo, so the
-  // render gate cannot live inside it. It is composed in `allErrors`, which is what the CLI runs
-  // — so this fails if that call site is ever dropped.
+  // render gate cannot live inside it.
   assert.deepEqual(allErrors(REPOSITORY_ROOT), [], 'the real checkout must pass every gate');
   assert.ok(
     bindingRenderErrors(readWith('.codex/agents/fabricate-orchestrator.toml', 'name = "x"\n'))
@@ -174,9 +158,8 @@ test('5. the roster and the AGENTS.md bindings table name exactly the same roles
 });
 
 test('6. the escalation contract is authored in the templates and nowhere a person hand-maintains', () => {
-  // THE ACCEPTANCE THIS CHANGE WAS BUILT TO. 51 hand-maintained `ESCALATE_TIER` statements
-  // across 36 binding files go to zero authored ones. The sentence still reaches every binding —
-  // it is rendered — so what is counted here is AUTHORED occurrences: the files a person edits.
+  // THE ACCEPTANCE THIS CHANGE WAS BUILT TO. 51 hand-maintained `ESCALATE_TIER` statements across
+  // 36 binding files go to zero authored ones.
   const source = (rel) => readFileSync(path.join(REPOSITORY_ROOT, rel), 'utf8');
   const CONTRACT = 'This binding is model tier';
 
@@ -189,10 +172,6 @@ test('6. the escalation contract is authored in the templates and nowhere a pers
   );
 
   // (b) And in no role record, which is the half that would quietly reintroduce per-role drift.
-  //     The records are JSON rather than a JS literal — ten of them sharing a key sequence is
-  //     172 tokens of self-duplication to a copy-paste detector, and `sonar.cpd.exclusions` is
-  //     inert under Automatic Analysis — so the data file is what must be read here. Reading the
-  //     loader instead would match nothing and pass vacuously.
   const roles = source('scripts/lib/agentBindingRoles.json');
   assert.ok(!roles.includes(CONTRACT), 'per-role data must not restate the escalation contract');
   assert.ok(
@@ -201,11 +180,7 @@ test('6. the escalation contract is authored in the templates and nowhere a pers
   );
 
   // (c) WHAT IS STILL IN THE ROLE DATA, pinned so it cannot grow. Five per-role VERDICT sentences
-  //     mention `ESCALATE_TIER` while telling a role what to emit. They are not the contract and
-  //     they cannot be templated as they stand: there are three Claude wordings and one Codex
-  //     wording, `fabricate_domain_expert` uses a different sentence shape, and its Codex binding
-  //     omits the verdict instruction altogether. Reconciling those dialects changes what 36
-  //     agents are told, so it is its own change; this number must not rise before then.
+  // mention `ESCALATE_TIER` while telling a role what to emit.
   assert.equal(
     roles.match(/ESCALATE_TIER/g).length,
     5,

@@ -120,8 +120,7 @@ test('validateReleaseTag throws on an unknown kind — a caller bug is never a v
 
 test('a refusal names the value it was actually given, never [object Object]', () => {
   // These messages are read by an operator staring at a failed release, so they have to name the
-  // input. `String(value)` renders an object as "[object Object]", which names nothing — Sonar's
-  // S6551 flags exactly that, and wrapping the interpolation in String() does not fix it.
+  // input.
   assert.match(validateReleaseTag({ tag: 'v1.0.0' }).error, /\{"tag":"v1\.0\.0"\}/);
   assert.match(validateReleaseTag(['v1.0.0']).error, /\["v1\.0\.0"\]/);
   assert.throws(
@@ -226,10 +225,8 @@ test('--filter --kind stable echoes only the promoted tags', () => {
 });
 
 test('--filter fails EAGERLY on a bad --kind, before it reads stdin', () => {
-  // The kind used to be checked lazily, per input line — and the normal case is EMPTY stdin (no
-  // new tag at HEAD), so a typo'd kind had no line to fail on and exited 0 reporting "no tags".
-  // Combined with the pipe (`… | node … | sort`), which only fails the step under `shell: bash`'s
-  // pipefail, that is a green run that mints a tag and publishes nothing to S3.
+  // The kind used to be checked lazily, per input line — and the normal case is EMPTY stdin (no new
+  // tag at HEAD), so a typo'd kind had no line to fail on and exited 0 reporting "no tags".
   const result = runCli(['--filter', '--kind', 'betaa'], '');
 
   assert.equal(result.status, 2);

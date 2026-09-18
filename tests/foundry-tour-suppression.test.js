@@ -31,8 +31,7 @@ function fakeStorage(initial = {}) {
 
 test('the storage key is the dotted setting id verbatim', () => {
   // `core.tourProgress` is registered {scope: "client"}, and ClientSettings#setClient writes
-  // client-scope settings to localStorage under the setting id itself. A namespaced or
-  // prefixed key would write somewhere Foundry never reads, and suppress nothing.
+  // client-scope settings to localStorage under the setting id itself.
   assert.equal(TOUR_PROGRESS_STORAGE_KEY, 'core.tourProgress');
 });
 
@@ -114,9 +113,8 @@ test('the harness seeds tours on the CONTEXT, before the first page exists', asy
 });
 
 test('the inlined page copy stays consistent with the tested module', () => {
-  // `addInitScript` serializes its callback into the page, where this module's imports do not
-  // exist — so the merge logic is necessarily duplicated there. This pins the copy against the
-  // module's constants: it cannot silently start writing a different key or a -1 index.
+  // `addInitScript` serializes its callback into the page, where this module's imports do not exist
+  // — so the merge logic is necessarily duplicated there.
   const harnessPromise = readFile(HARNESS_PATH, 'utf8');
   return harnessPromise.then((harness) => {
     const call = harness.slice(harness.indexOf('async function suppressFoundryTours'));
@@ -141,10 +139,8 @@ test('the inlined page copy stays consistent with the tested module', () => {
 });
 
 test('overlay detection is diagnostic only — it can never fail a healthy run', async () => {
-  // Issue #996: the first attempt asserted "is the Items tab selected" with a selector that
-  // does not match on Foundry 14, and failed a run whose sidebar was open, populated and
-  // healthy. The craft button is the readiness signal; an overlay probe may only ENRICH the
-  // resulting error. Pin both halves of that contract.
+  // Issue #996: the first attempt asserted "is the Items tab selected" with a selector that does
+  // not match on Foundry 14, and failed a run whose sidebar was open, populated and healthy.
   const harness = await readFile(HARNESS_PATH, 'utf8');
 
   assert.ok(

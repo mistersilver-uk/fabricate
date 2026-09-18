@@ -1,44 +1,4 @@
-/**
- * Scoped reload invalidation and container identity (issue 1078 part A, under #1070).
- *
- * ## What was broken, and why it did not look broken
- *
- * A world setting replicates as ONE `Setting` document whose entire value is a JSON string.
- * A remote client re-parses the whole corpus, so NO object reference survives the wire — and
- * both managers' `reload()` then replaced their in-memory map outright and advanced every
- * system's revision token whenever anything changed at all.
- *
- * The consequence is not subtle once stated: every retained guard this programme shipped
- * missed unconditionally on every client except the writer's. `signatureGuardsMatch` compares
- * `previous.recipeMap === next.recipeMap` and `previous.components === next.components`;
- * `getDefinitionIndex` is a `WeakMap` keyed on the candidate ARRAY OBJECT. A replaced map and
- * a freshly parsed component array fail all three by construction, on every reload, for any
- * edit anywhere in the world. Two landed optimisations did nothing for any player.
- *
- * Eighteen of the twenty-two tests below fail on the parent commit; the other four are
- * no-regression assertions the base already satisfied, and it is worth being exact about
- * which, because two of them pass there for a reason that flatters them. `names both systems
- * when a recipe MOVES between them` and `does NOT reuse a system whose component changed
- * under a CONSTANT-LENGTH array` both assert the MUST-NOT-narrow direction, which a reload
- * that invalidates everything satisfies for free; they earn their place against a future
- * over-narrowing, not against the defect this file was written for. The remaining two —
- * `persists the rewritten component exactly as the whole-corpus save did` and `writes nothing
- * and advances nothing when no component matched` — pin the persistence behaviour the two
- * narrowed saves had to preserve byte for byte.
- *
- * The tests are grouped by the three axes a reload now decides separately — what it
- * invalidates, what it advances, and what identity it preserves — because the failure that
- * matters is one axis silently going broad.
- *
- * ## The reuse licence, stated once
- *
- * A record is eligible for identity preservation ONLY when the delta reports it structurally
- * equal, which is `jsonEquals` over the whole record. Anything coarser — reusing arrays
- * because the id set is unchanged — hands back a same-object, same-length array whose
- * ELEMENTS moved, and that is precisely the hole clause 3 of `definitionIndex`'s invalidation
- * rule exists to close. The constant-length element replacement is therefore its own named
- * test, and it asserts the index MISSES.
- */
+/** Scoped reload invalidation and container identity (issue 1078 part A, under #1070). */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
@@ -63,12 +23,7 @@ const { readSignatureCounters, resetSignatureCounters } = await import(
   '../src/systems/SignatureValidator.js'
 );
 
-/**
- * Both narrow scopes plus the entity scope, read in one go.
- *
- * The assertion every narrowing test makes is a COMPARISON of the two systems' tokens across
- * one reload, so capturing them singly is what the helper exists to prevent.
- */
+/** Both narrow scopes plus the entity scope, read in one go. */
 const systemTokens = (systemManager) => ({
   a: systemManager.revision(REVISION_SCOPES.system(SYS_A)),
   b: systemManager.revision(REVISION_SCOPES.system(SYS_B)),
@@ -80,28 +35,15 @@ const recipeTokens = (recipeManager) => ({
   domain: recipeManager.revision(REVISION_SCOPES.recipes),
 });
 
-/**
- * Publish one compendium pack of Item documents on the CURRENT `game`.
- *
- * `installFoundryEnv` deliberately owns no pack list, and each `remoteClient()` reinstalls
- * `game` wholesale, so this attaches to the world the calling test just built and is torn
- * down with it.
- *
- * @param {string} packId
- * @param {object[]} documents
- * @returns {void}
- */
+/** Publish one compendium pack of Item documents on the CURRENT `game`. */
 function installPack(packId, documents) {
   const packs = new Map([[packId, { getDocuments: async () => documents }]]);
   globalThis.game.packs = { get: (id) => packs.get(id) ?? null };
 }
 
 /**
- * A repository seam whose replicated snapshot a test can WITHDRAW between two reloads,
- * standing in for a document-backed adapter that has none.
- *
- * @param {object[]} records
- * @returns {{snapshot: object[]|null, readReplicatedSnapshot: () => object[]|null}}
+ * A repository seam whose replicated snapshot a test can WITHDRAW between two reloads, standing in
+ * for a document-backed adapter that has none.
  */
 function withdrawableSnapshot(records) {
   const seam = { snapshot: records, readReplicatedSnapshot: () => seam.snapshot };
@@ -111,9 +53,7 @@ function withdrawableSnapshot(records) {
 /** How many full signature audits have been compiled since the last reset. */
 const audits = () => readSignatureCounters().reportBuilds;
 
-// ---------------------------------------------------------------------------
 // The repair: two shipped guards that missed on every remote client
-// ---------------------------------------------------------------------------
 
 describe('issue 1078 — a no-op remote reload no longer defeats the shipped guards', () => {
   it("preserves the recipe map identity, so signatureGuardsMatch's recipeMap clause holds", () => {
@@ -176,11 +116,8 @@ describe('issue 1078 — a no-op remote reload no longer defeats the shipped gua
 
   it('holds every identity across a reload from the shape a SAVE actually persists', async () => {
     // Every other test in this file seeds the LEGACY `items` shape and reloads from that, so
-    // without this one the suite never exercises the steady state a real world sits in: the
-    // corpus a `save()` wrote, re-read by the very next `updateSetting` hook. Both hydrators
-    // have to be idempotent for the optimisation to hold there, and nothing else asserts it —
-    // a non-idempotent normalizer would turn every reload on every client back into a full
-    // rebuild with the whole suite green.
+    // without this one the suite never exercises the steady state a real world sits in: the corpus
+    // a `save()` wrote, re-read by the very next `updateSetting` hook.
     const { systemManager, recipeManager, env } = twoSystemWorld();
     await systemManager.save();
     await recipeManager.save();
@@ -222,9 +159,7 @@ describe('issue 1078 — a no-op remote reload no longer defeats the shipped gua
   });
 });
 
-// ---------------------------------------------------------------------------
 // Narrowing: an edit in one system leaves another alone
-// ---------------------------------------------------------------------------
 
 describe('issue 1078 — a reload advances only the systems that actually changed', () => {
   it('leaves an unrelated system token, record and index untouched by a system edit', () => {
@@ -294,15 +229,12 @@ describe('issue 1078 — a reload advances only the systems that actually change
   });
 });
 
-// ---------------------------------------------------------------------------
 // The reuse licence, and the cases that must NOT reuse
-// ---------------------------------------------------------------------------
 
 describe('issue 1078 — identity is preserved only where the record is structurally equal', () => {
   it('does NOT reuse a system whose component changed under a CONSTANT-LENGTH array', () => {
-    // The named case. The array keeps its object shape and its length; only a field of one
-    // element moved. Neither the array-identity clause nor the length clause can see that,
-    // which is why the licence is record-level structural equality and nothing coarser.
+    // The named case. The array keeps its object shape and its length; only a field of one element
+    // moved.
     const { systemManager, env, write } = twoSystemWorld();
     const staleArray = systemManager.getSystem(SYS_A).components;
     const staleIndex = getDefinitionIndex(staleArray);
@@ -387,10 +319,7 @@ describe('issue 1078 — identity is preserved only where the record is structur
   });
 
   it('routes a pure recipe REORDERING broadly on all three axes', () => {
-    // The recipes-side mirror of the systems-side reorder test below it. Without this the
-    // whole `reordered` branch of `RecipeManager.reload()` — map replacement, cohort drop and
-    // broad advance alike — is deletable with the suite green, even though the spec row this
-    // change adds makes broad routing on an unattributable change a MUST.
+    // The recipes-side mirror of the systems-side reorder test below it.
     const { recipeManager, env, write } = twoSystemWorld();
     const staleRecipe = recipeManager.getRecipe('r-a1');
     const staleMap = recipeManager.recipes;
@@ -421,11 +350,7 @@ describe('issue 1078 — identity is preserved only where the record is structur
       ['r-b1', 'r-a2', 'r-a1'],
       'and the replacement map carries the persisted order'
     );
-    // The cohort read, warmed above, still answers correctly after the reorder. It does NOT
-    // pin the eager `_cohortCache = null`, which is removable green: `_recipeCohorts` also
-    // re-validates on read against the map object, its size and the domain token, and a
-    // replaced map fails the first clause on its own. The assertion is here for the answer,
-    // not for the mechanism.
+    // The cohort read, warmed above, still answers correctly after the reorder.
     const cohort = recipeManager.getRecipes({ craftingSystemId: SYS_A });
     assert.deepEqual(
       cohort.map((entry) => entry.id),
@@ -463,9 +388,7 @@ describe('issue 1078 — identity is preserved only where the record is structur
   });
 });
 
-// ---------------------------------------------------------------------------
 // consumeReloadDelta
-// ---------------------------------------------------------------------------
 
 describe('issue 1078 — consumeReloadDelta is one-shot and reload keeps its boolean', () => {
   it('returns the delta once and then nothing', () => {
@@ -509,11 +432,8 @@ describe('issue 1078 — consumeReloadDelta is one-shot and reload keeps its boo
   });
 
   it('clears the pending delta when the backend has no replicated snapshot to read', () => {
-    // `readReplicatedSnapshot()` is an OPTIONAL repository capability whose base
-    // implementation returns `null` — the honest answer for anything document-backed. The
-    // settings-backed adapter never does, so nothing else in the suite reaches the `!saved`
-    // early return, and the eager clear that precedes it is the only thing stopping the
-    // PREVIOUS reload's delta from being consumed after a reload that read nothing at all.
+    // `readReplicatedSnapshot()` is an OPTIONAL repository capability whose base implementation
+    // returns `null` — the honest answer for anything document-backed.
     installFoundryEnv();
     const seams = {
       systems: withdrawableSnapshot([{ id: SYS_A, name: 'System A', components: [] }]),
@@ -539,9 +459,7 @@ describe('issue 1078 — consumeReloadDelta is one-shot and reload keeps its boo
   });
 });
 
-// ---------------------------------------------------------------------------
 // The two narrowed bare saves
-// ---------------------------------------------------------------------------
 
 describe('issue 1078 — the item-sync metadata refresh names the systems it touched', () => {
   it('does not advance an unrelated system when a GM renames a source item', async () => {
@@ -594,10 +512,8 @@ describe('issue 1078 — the item-sync metadata refresh names the systems it tou
 
   it('does not advance an unrelated system when a compendium pack is imported', async () => {
     // The sibling of the rename test above, and the reason it is here rather than in
-    // `compendium-drop.test.js`: that suite replaces `save` with a no-op stub, so the only
-    // suite exercising `addItemsFromPack` is structurally blind to which save branch it takes.
-    // A bare `save()` takes the whole-corpus branch and advances EVERY system's token for an
-    // import into one of them — the precise over-broad behaviour this change removes.
+    // `compendium-drop.test.js`: that suite replaces `save` with a no-op stub, so the only suite
+    // exercising `addItemsFromPack` is structurally blind to which save branch it takes.
     const { systemManager } = twoSystemWorld();
     installPack('world.ore-pack', [
       { id: 'doc-a', documentName: 'Item', name: 'Silver Ore', img: 'silver.png' },

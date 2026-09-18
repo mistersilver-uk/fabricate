@@ -1,12 +1,7 @@
 /**
- * The authority reports a refusal as `{ success: false, reason }` with NO `message`,
- * and every player surface used to read `message` alone — so a `ledger-missing` craft
- * toasted the literal text `undefined` and a refused brew/attempt was silent.
- *
- * Two guards live here: the reason vocabulary is a hand-maintained MIRROR of the
- * literals `journalRunAuthority.js`/`journalRunCommands.js` can return, so it is
- * re-derived from those sources on every run rather than trusted; and the chain
- * `journalRefusalMessage` implements is pinned to always answer a string.
+ * The authority reports a refusal as `{ success: false, reason }` with NO `message`, and every
+ * player surface used to read `message` alone — so a `ledger-missing` craft toasted the literal
+ * text `undefined` and a refused brew/attempt was silent.
  */
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
@@ -25,18 +20,9 @@ import {
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 // DISCOVERED, not listed. This guard was first written against two named files, and the
-// ledger-arbitration module that landed later carried four more reason literals that it
-// therefore could not see — `ledger-create-denied` and `ledger-create-failed` would have
-// reached a player as the generic fallback with nothing red.
-//
-// CORRECTION: this comment used to claim a `journalRun*.js` glob "cannot be blind to the next
-// such module". That was wrong, and `authority-unavailable` proved it — minted at five sites in
-// `src/main.js` and one in `src/ui/SvelteFabricateApp.svelte.js`, neither of which this glob
-// will ever match, and unmapped for as long as it existed. The glob covers the AUTHORITY
-// MODULES, not every minting site; a reason minted at an edge is invisible here, so the edges
-// now mint through `authorityUnavailableRefusal`/`authorityUnavailableAvailability` in
-// `journalRunCommands.js` and the vocabulary has one home this scan can reach. The floor below
-// keeps the glob itself from silently matching nothing.
+// ledger-arbitration module that landed later carried four more reason literals that it therefore
+// could not see — `ledger-create-denied` and `ledger-create-failed` would have reached a player as
+// the generic fallback with nothing red.
 const AUTHORITY_SOURCE_DIR = 'src/systems';
 const AUTHORITY_SOURCE_PATTERN = /^journalRun[A-Za-z]*\.js$/;
 
@@ -108,11 +94,7 @@ describe('journal run reason vocabulary', () => {
     );
   });
 
-  // THE OTHER DIRECTION, and it is not symmetry for its own sake. `ledger-already-exists` outlived
-  // the refusal that produced it and sat here pointing at an `AuthoritySetup.*` string for a
-  // dialog that had been deleted — unreachable, so nothing above could see it. Every HYPHENATED
-  // key is an authority reason and must still be one; the camelCase keys are the UI's own
-  // `actions.disabledReason` vocabulary and are deliberately exempt.
+  // THE OTHER DIRECTION, and it is not symmetry for its own sake.
   it('maps no reason the authority can no longer return', () => {
     const derived = authorityReasons();
     const stale = Object.keys(JOURNAL_RUN_REASON_KEYS).filter(
@@ -153,11 +135,9 @@ describe('journal run reason vocabulary', () => {
     assert.notEqual(choiceText, materialsText);
   });
 
-  // Issue 1648, F5. `choiceRequired` fires for an unmade ROUTE, an unmade OPTION pick and an
-  // unmade ESSENCE allocation, and its one sentence named only the first — so a player on a
-  // single-route stage was told to choose a route that has one value while the real gap was an
-  // allocation. The route decision keeps that sentence under its own code; what remains says
-  // what it actually is, and says it without naming a route.
+  // Issue 1648, F5. `choiceRequired` fires for an unmade ROUTE, an unmade OPTION pick and an unmade
+  // ESSENCE allocation, and its one sentence named only the first — so a player on a single-route
+  // stage was told to choose a route that has one value while the real gap was an allocation.
   it('gives the route decision its own code and stops the other choices naming a route', () => {
     const routeText = journalRunReasonMessage('routeRequired', localizeFromLang);
     const choiceText = journalRunReasonMessage('choiceRequired', localizeFromLang);
@@ -181,8 +161,7 @@ describe('journal run reason vocabulary', () => {
   });
 
   // Issue 1648, D-029/M19. The badge and the filter tab are one vocabulary, and the maintainer's
-  // consequence note is explicit that they must not diverge. `Status.waiting` is gone entirely:
-  // a leaf left behind is a word a later reader can reintroduce.
+  // consequence note is explicit that they must not diverge.
   it('keeps the merged badge and the merged filter tab on one word', () => {
     assert.equal(
       langLeaf('FABRICATE.App.Journal.Filters.Status.InProgress'),
@@ -228,9 +207,8 @@ describe('journalRefusalMessage chain', () => {
   });
 });
 
-// ── Issue 1648: a failed CHECK is an outcome, and reporting it as a refusal told the
-// player "Something went wrong while crafting. Nothing was consumed." while the chat
-// card itemised what the failure policy had just consumed.
+// Issue 1648: a failed CHECK is an outcome, and reporting it as a refusal told the player
+// "Something went wrong while crafting.
 describe('isResolvedFailureOutcome', () => {
   it('answers true only for a disposition a stage that RAN can mint', () => {
     assert.equal(isResolvedFailureOutcome({ success: false, disposition: 'failed' }), true);

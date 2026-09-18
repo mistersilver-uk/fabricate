@@ -1,15 +1,7 @@
 /**
- * `BulkSalvageChatCard` — the aggregated result card for a bulk run (issue 859).
- *
- * The module is a PURE MARKUP BUILDER: it never touches `game`, `ui` or `ChatMessage`,
- * so every case below is a plain model in and a string out with no Foundry stubs. The
- * "which token did the applier receive" assertions live in
- * `tests/bulk-chat-visibility.test.js`, which imports the module that actually owns that
- * decision — a pin here could only ever mirror it.
- *
- * The per-system `features.chatOutput` gate is the SERVICE's (only it holds the crafting
- * systems), so the one test of it below drives the real service and asserts on the card
- * that reached the poster — the join, not a re-derivation of it.
+ * `BulkSalvageChatCard` — the aggregated result card for a bulk run (issue 859). The module is a
+ * PURE MARKUP BUILDER: it never touches `game`, `ui` or `ChatMessage`, so every case below is a
+ * plain model in and a string out with no Foundry stubs.
  */
 
 import { describe, it } from 'node:test';
@@ -96,9 +88,8 @@ describe('buildBulkSalvageChatContent: N subjects, each with its own roll', () =
   });
 
   it("shows a non-success subject's engine message but never a success's", () => {
-    // A success has already said everything it has to say through its outcome copy and
-    // its recovered items; repeating the engine's message would be noise. A failure's
-    // message ("Not enough Iron Ore. Need 2, have 1") is the only place it can say WHY.
+    // A success has already said everything it has to say through its outcome copy and its
+    // recovered items; repeating the engine's message would be noise.
     const html = card({
       ...MODEL,
       subjects: [
@@ -153,13 +144,11 @@ describe('buildBulkSalvageChatContent: the three roll-up statuses', () => {
   });
 
   it('falls back for an INHERITED status key too, never interpolating a prototype member', () => {
-    // `status` is data, and the modifier lookup is a plain index into a frozen map, so a
-    // truthiness test on the lookup reaches `Object.prototype`: `STATUS_MODIFIERS.constructor`
-    // is the truthy `Object` function, and stringifying it into the class attribute emitted
-    // `class="fabricate-craft-chat--function Object() { [native code] }"` — attribute
-    // injection from a status token. `Object.hasOwn` is what closes it, and this is the pin
-    // that keeps it closed; the `partial` case above passes either way, since `partial` is
-    // not a prototype member.
+    // `status` is data, and the modifier lookup is a plain index into a frozen map, so a truthiness
+    // test on the lookup reaches `Object.prototype`: `STATUS_MODIFIERS.constructor` is the truthy
+    // `Object` function, and stringifying it into the class attribute emitted
+    // `class="fabricate-craft-chat--function Object() { [native code] }"` — attribute injection
+    // from a status token.
     for (const status of ['constructor', 'toString', '__proto__']) {
       const html = card({ status, actorNames: ['Akra'], subjects: [] });
       assert.match(
@@ -214,9 +203,8 @@ describe('sumChatEntriesByName: aggregation by name AND image', () => {
   });
 
   it('keeps two same-named entries with DIFFERENT images apart', () => {
-    // Component ids are not globally unique across systems, so two systems can each
-    // author an "Iron Ingot" with its own art. Merging them would show one row with the
-    // wrong picture.
+    // Component ids are not globally unique across systems, so two systems can each author an "Iron
+    // Ingot" with its own art. Merging them would show one row with the wrong picture.
     const summed = sumChatEntriesByName([
       { name: 'Iron Ingot', img: 'icons/a.webp', quantity: 1 },
       { name: 'Iron Ingot', img: 'icons/b.webp', quantity: 1 },
@@ -293,9 +281,8 @@ describe('buildBulkSalvageChatContent: empty sections are omitted, not emptied',
 });
 
 describe('buildBulkSalvageChatContent: authored names are escaped', () => {
-  // Component names, actor names and engine messages are all author- or player-supplied
-  // and all land in the card's markup. `esc` is the shared escaper, so this pins that
-  // every interpolation goes through it rather than one route being missed.
+  // Component names, actor names and engine messages are all author- or player-supplied and all
+  // land in the card's markup.
   const HOSTILE = '<img src=x onerror="alert(1)"> & "quoted"';
 
   it('escapes a subject name', () => {
@@ -373,10 +360,8 @@ describe('the per-system chatOutput gate reaches the card, not just the model', 
     const { posted, result } = await runTwoSystems({ chatOutputA: true, chatOutputB: false });
     assert.equal(posted.length, 1);
     assert.match(posted[0].content, /Iron Ore/);
-    // Mutation control: both rows must genuinely SUCCEED and the qualifying row's
-    // acknowledged award must reach the table. Without these the subject row still
-    // renders its component name when every row errored, so the filter reads as proved
-    // by a card built from two failures.
+    // Mutation control: both rows must genuinely SUCCEED and the qualifying row's acknowledged
+    // award must reach the table.
     assert.equal(result.counts.succeeded, 2, 'every salvage row must genuinely succeed');
     assert.match(posted[0].content, /comp-ore ingot/, 'and its recovered contribution');
     assert.doesNotMatch(posted[0].content, /Boar Hide/);

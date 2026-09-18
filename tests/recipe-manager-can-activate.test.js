@@ -1,26 +1,7 @@
 /**
- * `RecipeManager.canActivateRecipe` — the ONE predicate for "activation would refuse this"
- * (issue 1010), shared by the recipe browser's `Can't enable` pill, the bulk edit panel's
- * pre-flight count and the bulk write's own per-recipe gate.
- *
- * The suite is written as an EQUIVALENCE table rather than a list of expectations, because
- * the contract is not "these fixtures are invalid" — it is that the predicate and the write
- * agree. Every case therefore runs twice against two freshly built managers: once asking
- * `canActivateRecipe`, once actually attempting `updateRecipe(id, {enabled: true})`, and the
- * two answers are asserted equal. A hardcoded expectation is asserted as well, so a case
- * that stops exercising what it names (e.g. a fixture that quietly became valid) fails
- * instead of agreeing vacuously.
- *
- * The precondition matters: the equivalence is stated for a recipe with `enabled !== true`,
- * because `updateRecipe` only runs its activation gate on a TRANSITION into the enabled
- * state. An already-enabled recipe is covered by its own case, which pins the widened
- * predicate the row's `Incomplete` pill now reads.
- *
- * The alchemy signature-collision case is load-bearing and not decoration: without it the
- * suite passes against an implementation that hands the STORED (disabled) recipe to
- * `_validateRecipeForActivation` instead of a clone with `enabled: true`, because
- * `SignatureValidator.validateSystem` filters `recipes.filter((r) => r?.enabled)` and would
- * drop the candidate out of its own scan.
+ * `RecipeManager.canActivateRecipe` — the ONE predicate for "activation would refuse this" (issue
+ * 1010), shared by the recipe browser's `Can't enable` pill, the bulk edit panel's pre-flight count
+ * and the bulk write's own per-recipe gate.
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -66,9 +47,7 @@ globalThis.ui = { notifications: { info() {}, warn() {}, error() {} } };
 const { Recipe } = await import('../src/models/Recipe.js');
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
 
-// ---------------------------------------------------------------------------
 // Fixtures
-// ---------------------------------------------------------------------------
 
 /** A complete, craftable recipe: one ingredient set, one populated result group. */
 function completeData(overrides = {}) {
@@ -253,9 +232,8 @@ describe('RecipeManager.canActivateRecipe', () => {
   });
 
   it('reads an ALREADY-ENABLED broken recipe as blocked too, which is the widened Incomplete branch', () => {
-    // `updateRecipe` runs its activation gate only on a transition INTO enabled, so this
-    // recipe is un-refused by the write while still carrying the same blocker. The row pill
-    // splits on `enabled`, not on the predicate, and this is the branch that proves it.
+    // `updateRecipe` runs its activation gate only on a transition INTO enabled, so this recipe is
+    // un-refused by the write while still carrying the same blocker.
     const data = brokenData({ enabled: true });
     const manager = buildManager({ data, peers: [] });
 

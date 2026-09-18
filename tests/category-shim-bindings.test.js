@@ -1,52 +1,6 @@
 /**
- * THE CATEGORY HELPERS ARE ONE IMPLEMENTATION, AND THE SHIMS ARE BINDINGS RATHER THAN COPIES
- * (issue #1663).
- *
- * `componentCategories.js` and `recipeCategories.js` exported the same six things with the entity
- * word substituted, and their five functions were identical character-for-character modulo that
- * word. They are now ONE implementation in `categoryNormalization.js` plus two re-export bindings.
- * What must not happen next is a re-divergence: a shim that declares a second literal, or binds
- * the wrong original, or grows a seventh export, is back where the issue started and nothing else
- * in the suite would notice.
- *
- * WHY THIS IS AN AST GATE AND NOT A SOURCE-TEXT ONE. Three reasons, all of them structural:
- *  - a text rule for "only re-export statements" has to tolerate Prettier's line wrapping, a
- *    trailing comma and a header comment, and every tolerance widens the hole it is guarding;
- *  - `ast.body` node-type equality ENUMERATES WHAT IS ALLOWED rather than listing what is
- *    forbidden, so an unanticipated form is red by construction instead of silently permitted;
- *  - this file needs no row in `tests/source-pin-ledger.txt`, which matters because epic #1658 is
- *    converting source-text pins to AST reads and a new text-pinning gate would go the wrong way.
- *    NOT because it is an AST gate — being one proves nothing. `tests/scalar-helper-duplicates.test.js`
- *    is an AST gate and scores 2, at its two reads whose argument resolves to a binding that SPELLS
- *    `src/utils/scalars.js`. This file scores 0 because no read here NAMES a `src/` path at all: the
- *    paths arrive as loop variables over `SHIMS` and over the corpus walk, and `countPinSites` scores
- *    the named path. Measured, not assumed: `countPinSites` from `tests/helpers/sourcePinSites.js`
- *    scores this file 0 and `tests/source-pin-ratchet.test.js` stays green with no row added.
- *    Hoisting either shim path into a `const` read through would make this a two-site file.
- *
- * THE `.svelte` SCAN IS LOAD-BEARING, not thoroughness. `tests/helpers/sourceScan.js` says of its
- * own default that "`.svelte` is load-bearing — real call sites live there"; `AGENTS.md` records
- * issue 1050, where reasoning that Svelte is invisible to SonarCloud shipped a duplication failure
- * with 93 of its 98 duplicated lines in one `.svelte` file; and the first draft of the sibling gate
- * `tests/scalar-helper-duplicates.test.js` scanned `.js` only and was blind to a live, divergent
- * seventh `normalizeTag`.
- *
- * That scan needs an ANCHOR, and this gate has none of its own. No `.svelte` file declares any of
- * the eighteen names today, and the one `PINNED_EXCEPTIONS` file — `craftingStore.svelte.js` — ends
- * in `.js`, so narrowing the walk to `{ extensions: ['.js'] }` returns a byte-identical result and
- * leaves every other assertion here green. The sibling gate is anchored by its `normalizeTag`
- * exception in a real `.svelte` file; this one pins the corpus the walk actually visited instead.
- *
- * WHAT THIS GATE CANNOT SEE, beyond the stated limit below: a SWAPPED binding. The AST half and the
- * runtime half both read `SHIMS`, so a swap applied consistently to the shim and to that constant
- * passes both. `tests/component-category-utils.test.js` and `tests/recipe-category-utils.test.js`
- * are what catch it — each asserts a distinguishing VALUE for all six names per kind, so
- * `getCategoryLabel` exported as `normalizeRecipeCategory` reds there. This is a structure gate;
- * the behaviour proof lives in those two suites.
- *
- * STATED LIMIT, as the scalar gate states its own: a brand-new SEVENTH copy of this logic under a
- * DIFFERENT name is not caught here — nothing names it, so nothing can look for it. SonarCloud's
- * duplication detector is the backstop for that case, and it counts `src/**` and `tests/**` alike.
+ * THE CATEGORY HELPERS ARE ONE IMPLEMENTATION, AND THE SHIMS ARE BINDINGS RATHER THAN COPIES (issue
+ * #1663).
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -75,13 +29,7 @@ const SHARED_NAMES = Object.freeze([
   'normalizeCustomCategoryNames',
 ]);
 
-/**
- * Each shim's public surface as `exported name -> the shared name it must bind`.
- *
- * This mapping is the pin that catches a shim binding the WRONG original — a swap of
- * `getCategoryLabel` for `normalizeCategoryName` would still be a re-export of the right module,
- * still be six names, and still type-check as far as anything else here is concerned.
- */
+/** Each shim's public surface as `exported name -> the shared name it must bind`. */
 const SHIMS = Object.freeze({
   'src/utils/componentCategories.js': Object.freeze({
     GENERAL_COMPONENT_CATEGORY: 'GENERAL_CATEGORY_NAME',
@@ -101,14 +49,7 @@ const SHIMS = Object.freeze({
   }),
 });
 
-/**
- * Six per shim, pinned as a number.
- *
- * `SHIMS` above is this gate's ONLY record of each shim's surface, and `RETIRED_NAMES` is derived
- * from it — so a name deleted from a shim AND from its mapping is green on every assertion here,
- * and silently drops out of the retired scan, licensing a fresh declaration of it anywhere under
- * `src/`. Pinning the count turns that into an edit to a number, which a reviewer sees.
- */
+/** Six per shim, pinned as a number. */
 const SHIM_EXPORT_COUNT = 6;
 
 test('each shim still carries exactly six public names', () => {
@@ -118,19 +59,7 @@ test('each shim still carries exactly six public names', () => {
   assert.equal(RETIRED_NAMES.length, 2 * SHIM_EXPORT_COUNT);
 });
 
-/**
- * The shared module's exports as a plain object.
- *
- * Copied rather than indexed directly because `import-x/namespace` cannot validate a COMPUTED
- * reference into an imported namespace, and the lookups below are computed by construction — the
- * whole point is that the mapping, not this file's syntax, decides which original each name binds.
- * A spread preserves identity, which is what every assertion here compares.
- *
- * It is a SNAPSHOT taken at module evaluation. Every export here is a `const` or a function
- * declaration and none is ever reassigned, so the snapshot IS the live binding; introduce a
- * reassigned `let` export and this copy would silently diverge from it while the shim's live
- * binding moved, and the failure message below would not describe that.
- */
+/** The shared module's exports as a plain object. */
 const SHARED_EXPORTS = { ...categoryNormalization };
 
 /** The loaded namespace per shim path, so the AST half and the runtime half name one list. */
@@ -139,29 +68,12 @@ const NAMESPACES = Object.freeze({
   'src/utils/recipeCategories.js': recipeCategories,
 });
 
-/**
- * The twelve entity-worded names, retired as DECLARATIONS.
- *
- * After the shims land these exist only as export SPECIFIERS, which are not declarations — so a
- * copy-paste of the old body back into either shim, or into any third file, is caught here and
- * named by file. This is the important half of the declaration scan: the six shared names being
- * declared once is the easy direction.
- */
+/** The twelve entity-worded names, retired as DECLARATIONS. */
 const RETIRED_NAMES = Object.freeze(
   [...new Set(Object.values(SHIMS).flatMap((mapping) => Object.keys(mapping)))].sort(byCodePoint)
 );
 
-/**
- * Retired names that are still declared somewhere, recorded rather than merged.
- *
- * `craftingStore.svelte.js` keeps its own `GENERAL_RECIPE_CATEGORY`, and the exception is written
- * down for the reason its own comment gives: "A local copy keeps the store import-free." Importing
- * the shim would pull the shared module graph into a store whose unit-test compiler deliberately
- * resolves nothing. It is also used for the OPPOSITE ordering — the store pins the reserved bucket
- * LAST in the category filter, where `getEffectiveCategoryNames` puts it FIRST — so it is not the
- * same value doing the same job. Same shape, and the same reasoning, as the `normalizeTag`
- * exception in `tests/scalar-helper-duplicates.test.js`.
- */
+/** Retired names that are still declared somewhere, recorded rather than merged. */
 const PINNED_EXCEPTIONS = Object.freeze({
   GENERAL_RECIPE_CATEGORY: ['src/ui/svelte/stores/craftingStore.svelte.js'],
 });
@@ -169,12 +81,8 @@ const PINNED_EXCEPTIONS = Object.freeze({
 const REPOSITORY_ROOT = path.join(import.meta.dirname, '..');
 
 /**
- * One tracked file's text.
- *
- * The only source TEXT this gate touches, and it is handed straight to a parser: every assertion
- * below is on the parsed tree, never on the characters. No `includes`, `assert.match` or regex
- * `test` is applied to any of it, and no read here names a `src/` path — the paths arrive as loop
- * variables over `SHIMS` and over the corpus walk — so the file scores zero source-pin sites.
+ * One tracked file's text. The only source TEXT this gate touches, and it is handed straight to a
+ * parser: every assertion below is on the parsed tree, never on the characters.
  */
 const sourceText = (file) => readFileSync(path.join(REPOSITORY_ROOT, file), 'utf8');
 
@@ -212,13 +120,8 @@ test('each shim is nothing but re-exports of the shared implementation', () => {
       `${shim} must contain re-export statements and nothing else`
     );
     for (const node of ast.body) {
-      // `export const GENERAL_COMPONENT_CATEGORY = 'general';` is an `ExportNamedDeclaration`
-      // TOO, with a `declaration` and no `source` — and it is exactly the re-divergence this
-      // catches. A null declaration is what makes the node a re-export rather than a definition,
-      // so it is asserted FIRST: checked after the `source` assertion it could NEVER fail, because
-      // `export const x = 1 from 'm'` is not grammatical and a node carrying a `source` therefore
-      // cannot also carry a `declaration`. Ordered this way the re-inlined literal reds on the
-      // assertion that describes it rather than on a confusing "may only re-export from" message.
+      // `export const GENERAL_COMPONENT_CATEGORY = 'general';` is an `ExportNamedDeclaration` TOO,
+      // with a `declaration` and no `source` — and it is exactly the re-divergence this catches.
       assert.equal(
         node.declaration ?? null,
         null,
@@ -267,10 +170,7 @@ test('the shims resolve to the SAME objects as the shared implementation, at run
 });
 
 test('only the two shims import the shared implementation', () => {
-  // The shared module's header calls the shims its only sanctioned importers. Unenforced that is
-  // prose, and this is the ONE place the entity-neutral naming is riskier than what it replaced:
-  // at a direct call site nothing in `normalizeCategoryName` says WHICH stored vocabulary the
-  // argument came from, which is exactly the mistake `normalizeComponentCategory` made impossible.
+  // The shared module's header calls the shims its only sanctioned importers.
   const importers = [];
   for (const [file, source] of Object.entries(collectSources(`${repoRoot}/src`))) {
     if (file === SHARED) continue;
@@ -289,9 +189,7 @@ test('only the two shims import the shared implementation', () => {
 });
 
 test('the two shims hand out one function, not two that agree today', () => {
-  // ASSERTED DIRECTLY RATHER THAN BY TRANSITIVITY, so the failure message names both shims. Via
-  // the shared module the same fact is two assertions apart, and the reader of a red build would
-  // have to join them to see that the component and recipe paths had come apart.
+  // ASSERTED DIRECTLY RATHER THAN BY TRANSITIVITY, so the failure message names both shims.
   assert.strictEqual(
     componentCategories.normalizeComponentCategory,
     recipeCategories.normalizeRecipeCategory,
@@ -304,16 +202,7 @@ test('the two shims hand out one function, not two that agree today', () => {
   );
 });
 
-/**
- * Every declaration of `names` under `src/`, as `name -> ['file:line', …]`.
- *
- * PARSED, not grepped. A regex over `const <name>` matches the word inside a comment or a string —
- * and both shims and this file's own prose NAME the retired helpers, so a text scan would be
- * answered with an allowlist covering exactly the files the gate exists to police.
- *
- * `VariableDeclarator` as well as `FunctionDeclaration`, because `GENERAL_CATEGORY_NAME` is a
- * string constant and a re-declared copy of it is the failure mode `===` cannot see (below).
- */
+/** Every declaration of `names` under `src/`, as `name -> ['file:line', …]`. */
 /** The files the declaration walk actually visited, so a test can pin the extensions it used. */
 let walkedFiles = [];
 
@@ -337,13 +226,7 @@ function declarationsOf(names) {
   return found;
 }
 
-/**
- * One walk of `src/` for all eighteen names, memoized.
- *
- * The corpus parse costs several seconds, and the two scans below want the same tree; doing it
- * twice doubles the cost of this file inside `npm test` for no extra proof. Seeded with every
- * wanted name so an absent name reads as "declared nowhere" rather than as a missing key.
- */
+/** One walk of `src/` for all eighteen names, memoized. */
 let scanned = null;
 function declarations() {
   scanned ??= declarationsOf([...SHARED_NAMES, ...RETIRED_NAMES]);
@@ -352,13 +235,7 @@ function declarations() {
 
 test('the declaration walk really covers .svelte, not only .js', () => {
   // THE ONLY ASSERTION THAT CAN SEE THE `.svelte` HALF, and it exists because that half is
-  // currently inert. No `.svelte` file declares any of the eighteen names today, and the one
-  // `PINNED_EXCEPTIONS` file — `craftingStore.svelte.js` — ends in `.js`, so narrowing
-  // `declarationsOf` to `{ extensions: ['.js'] }` returns a BYTE-IDENTICAL result map and leaves
-  // every other assertion in this file green. The corpus floor above cannot catch it either: that
-  // floor builds its own `.js`-only corpus by construction. `tests/scalar-helper-duplicates.test.js`
-  // is anchored by its `normalizeTag` exception in a real `.svelte` file; this gate has no such
-  // anchor, so it pins the corpus the walk visited instead.
+  // currently inert.
   declarations();
   const components = walkedFiles.filter((file) => file.endsWith('.svelte'));
   assert.ok(
@@ -424,10 +301,7 @@ test('no retired entity-worded helper is declared again, except where it is reco
 test('the AST binding assertion is not redundant with the runtime one', () => {
   // `GENERAL_CATEGORY_NAME` IS THE STRING `'general'`, so `===` on it proves nothing at all: any
   // copy-pasted `export const GENERAL_COMPONENT_CATEGORY = 'general';` satisfies the runtime
-  // identity check above, forever, on every machine. TWO STRUCTURAL assertions carry that name
-  // instead: the shim's body holding a re-export with a null `declaration`, and the retired-name
-  // scan finding no `GENERAL_COMPONENT_CATEGORY` declared anywhere under `src/`. Neither is
-  // duplicative of the runtime test; do not delete either as though it were.
+  // identity check above, forever, on every machine.
   assert.equal(typeof categoryNormalization.GENERAL_CATEGORY_NAME, 'string');
   assert.strictEqual(
     componentCategories.GENERAL_COMPONENT_CATEGORY,
@@ -452,8 +326,7 @@ test('the gate can actually fail', () => {
   assert.deepEqual(functions, ['normalizeRecipeCategory']);
 
   // AND THE PARSE MUST DISTINGUISH A RE-DECLARATION FROM A RE-EXPORT, which is the one distinction
-  // every assertion in this file rests on. Both are `ExportNamedDeclaration`; only `source` tells
-  // them apart.
+  // every assertion in this file rests on.
   const [declaration] = declared.body;
   assert.equal(declaration.type, 'ExportNamedDeclaration');
   assert.equal(declaration.source ?? null, null, 'a declaration has no source module');

@@ -109,10 +109,8 @@ test('routes every label through the localize function', () => {
   }
 });
 
-// A d100 gather whose only drop row misses its threshold still reports success, because
-// d100 status is decided by EVENTS, not by drops. Before this the card dropped the empty
-// results section and rendered a bare "Gathering Successful" header — a spent node, no
-// items, and no explanation, which is indistinguishable from the module being broken.
+// A d100 gather whose only drop row misses its threshold still reports success, because d100 status
+// is decided by EVENTS, not by drops.
 test('a SUCCESS that awarded nothing says so instead of rendering a bare header', () => {
   const content = buildGatheringChatContent(fullModel({ components: [] }));
   assert.ok(

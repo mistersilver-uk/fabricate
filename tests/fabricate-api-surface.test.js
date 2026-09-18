@@ -14,11 +14,6 @@ const mainSource = readFileSync(mainPath, 'utf8');
 /**
  * Assert one public hook namespace is on the aggregate, correctly named, and documented.
  *
- * Shared by the two namespaces rather than copied per namespace: the Jekyll API reference
- * hand-lists these names, so it is a MIRROR of `config/hooks.js` and mirrors rot silently — a
- * renamed constant would leave third parties subscribing to a string nothing publishes, with
- * nothing failing until someone read the page.
- *
  * @param {string} domain Hook domain segment (`manager`, `player`).
  * @param {Readonly<Record<string, string>>} namespace The exported constant bag.
  */
@@ -85,10 +80,8 @@ test('Fabricate exposes deleteRecipe on the main Foundry API object', () => {
     mainSource.includes('async deleteRecipe(recipeId)'),
     'Fabricate should expose a deleteRecipe method on the main game.fabricate API object'
   );
-  // Issue 1132: it routes through the CASCADING set primitive rather than the
-  // `RecipeManager` leaf, so the public API and the GM studio cannot disagree about what
-  // deleting a recipe reaches. Its return value changed from `undefined` to the result
-  // object at the same time.
+  // Issue 1132: it routes through the CASCADING set primitive rather than the `RecipeManager` leaf,
+  // so the public API and the GM studio cannot disagree about what deleting a recipe reaches.
   assert.ok(
     mainSource.includes(
       'return await this.craftingSystemManager.deleteRecipes(recipe.craftingSystemId, [recipeId]);'
@@ -98,9 +91,8 @@ test('Fabricate exposes deleteRecipe on the main Foundry API object', () => {
 });
 
 test('Fabricate bridges replicated crafting-data setting changes into local refresh hooks', () => {
-  // Matched as a pattern rather than a literal line, so an added or removed named import
-  // from the same module cannot fail an assertion whose subject is the wiring. What must
-  // hold is that main.js takes the handler from the bridge module.
+  // Matched as a pattern rather than a literal line, so an added or removed named import from the
+  // same module cannot fail an assertion whose subject is the wiring.
   assert.match(
     mainSource,
     /import \{[^}]*\bhandleFabricateSettingChange\b[^}]*\} from '\.\/config\/settingChangeBridge\.js'/,
@@ -118,10 +110,8 @@ test('Fabricate bridges replicated crafting-data setting changes into local refr
 });
 
 test('Fabricate routes gathering node depletion to the active GM', () => {
-  // A player cannot write the world setting the environment node pools live in, so
-  // the decrement MUST be relayed. These pin the wiring: the pure routing module is
-  // unit-tested elsewhere, but every one of those tests stays green if main.js never
-  // injects the seam or never registers the inbound route.
+  // A player cannot write the world setting the environment node pools live in, so the decrement
+  // MUST be relayed.
   assert.ok(
     mainSource.includes('createGatheringNodeDepletionWriter') &&
       mainSource.includes('routeGatheringNodeDepleteMessage') &&
@@ -158,10 +148,8 @@ test('Fabricate gates matured timed gathering runs to the primary GM', () => {
 
 test('Fabricate wires RecipeManager to the live crafting-system manager', () => {
   // BOTH seams are pinned. `getCraftingSystem` resolves one system; `getCraftingSystemManager`
-  // (issue 1072) is the manager itself, which the twelve paths that used to read
-  // `game.fabricate` inline now route through — including `_validateSignatures`. Losing that
-  // second line would silently send those paths back to the `ready`-hook global, where they
-  // cannot be instrumented, cached or indexed by the performance programme.
+  // (issue 1072) is the manager itself, which the twelve paths that used to read `game.fabricate`
+  // inline now route through — including `_validateSignatures`.
   assert.match(
     mainSource,
     /this\.recipeManager\s*=\s*new RecipeManager\(\{\s*getCraftingSystem:\s*\(systemId\)\s*=>\s*this\.craftingSystemManager\?\.getSystem\?\.\(systemId\)\s*\?\?\s*null,\s*getCraftingSystemManager:\s*\(\)\s*=>\s*this\.craftingSystemManager\s*\?\?\s*null,\s*currencyConfigStore:\s*this\.currencyConfigStore,?\s*\}\)/s,
@@ -171,10 +159,7 @@ test('Fabricate wires RecipeManager to the live crafting-system manager', () => 
 
 test('Fabricate wires the world currency config into both currency readers', () => {
   // Currency is world scope since issue 1278, and `getCurrencyRequirementConfig` composes the
-  // per-system `enabled` flag with the world's ladder. Both readers must therefore hold the
-  // store: RecipeManager for craftability projection, CraftingEngine for the afford gate and
-  // the spend/refund paths. Without it they fall back to the `game.fabricate` global, which is
-  // exactly the un-instrumentable path issue 1072 removed.
+  // per-system `enabled` flag with the world's ladder.
   assert.ok(
     mainSource.includes('this.currencyConfigStore = new CurrencyConfigStore({'),
     'main.js should construct the world currency config store'
@@ -245,9 +230,7 @@ test('the location API methods gate on isGatheringRealmsEnabled (no-op when disa
 });
 
 test('Fabricate registers a GM-only discipline on realm mutators', () => {
-  // The reveal mutator validates the realm against the WORLD library (issue 1282). `systemId`
-  // survives on the public method as the GATE — whether that system surfaces travel at all —
-  // and no longer as the thing the realm must belong to.
+  // The reveal mutator validates the realm against the WORLD library (issue 1282).
   assert.ok(
     mainSource.includes('validateRealmExists: this.gatheringRealmStore?.get?.()'),
     'reveal validates the realm exists in the world travel config'
@@ -270,10 +253,9 @@ test('game.fabricate.gathering exposes the canonical realm helpers', () => {
 });
 
 test('Fabricate wires the crafting listing builder with a component resolver (issue 1075)', () => {
-  // The builder's privilege gates and matching logic are unit-tested directly, but the
-  // composition that hands them a resolver is not: without this line every crafting row's
-  // owned-material tally silently reads as if the player owns nothing, and no existing
-  // test goes red.
+  // The builder's privilege gates and matching logic are unit-tested directly, but the composition
+  // that hands them a resolver is not: without this line every crafting row's owned-material tally
+  // silently reads as if the player owns nothing, and no existing test goes red.
   assert.ok(
     mainSource.includes("import { findMatchingComponent, resolveItemEssences } from './utils/essenceResolver.js';"),
     'main.js should import the same component resolver InventoryListingBuilder matches with'
@@ -286,9 +268,7 @@ test('Fabricate wires the crafting listing builder with a component resolver (is
 
 test('Fabricate hydrates the crafting recipe detail phase through the crafting listing builder (issue 1075)', () => {
   // `hydrateCraftingRecipe` is the detail-phase companion to the cheap `listCraftingForActor`
-  // summary rows (issue 1075). The builder's `buildRecipeDetail` re-evaluation is unit-tested
-  // directly, but nothing else pins that this method actually routes there rather than, say,
-  // re-deriving a summary row or returning a stale cached value.
+  // summary rows (issue 1075).
   assert.ok(
     mainSource.includes(
       'hydrateCraftingRecipe({ recipeId = null, actorId = null, componentSourceActorIds = null } = {}) {'
@@ -305,9 +285,7 @@ test('Fabricate exposes the versioned Journal command and per-user dismissal sea
   for (const method of [
     'executeJournalRunCommand(command, options)',
     // Two arguments, load-bearing. This pin used to read the one-argument form, and sat twelve
-    // lines above another pin whose comment claimed the options were forwarded. Both passed while
-    // the facade dropped them (issue 1759); tests/facade-delegation-arity.test.js now gates the
-    // relationship rather than either line.
+    // lines above another pin whose comment claimed the options were forwarded (issue 1759).
     'dismissJournalRun(options)',
     'getDismissedJournalRunKeys(options)',
     'getJournalRunAuthorityAvailability()',

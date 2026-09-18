@@ -1,9 +1,8 @@
 /**
- * CraftingEngine.craftAlchemy — the player-workbench additions:
- *   - the tried-dead-end memory write on a fizzle (shape, gating, dedup);
- *   - the signature-key DRIFT guard (engine write == shared helper the store uses);
- *   - the discovery routing (a matched brew delegates to craft() as an alchemy
- *     attempt so learnRecipeOnCraft/consume/produce run, honouring `interactive`).
+ * CraftingEngine.craftAlchemy — the player-workbench additions: - the tried-dead-end memory write
+ * on a fizzle (shape, gating, dedup); - the signature-key DRIFT guard (engine write == shared
+ * helper the store uses); - the discovery routing (a matched brew delegates to craft() as an
+ * alchemy attempt so learnRecipeOnCraft/consume/produce run, honouring `interactive`).
  */
 
 import test from 'node:test';
@@ -27,10 +26,8 @@ const { SignatureValidator } = await import('../src/systems/SignatureValidator.j
 const { canonicalSignatureKey } = await import('../src/utils/alchemySignatureKey.js');
 const { toAlchemyRecords } = await import('./helpers/alchemySubmissionRecords.js');
 
-// ---------------------------------------------------------------------------
 // FakeDocument flag store (doubly-nested, matching setFabricateFlag), per
 // tests/alchemy-mode.test.js.
-// ---------------------------------------------------------------------------
 
 function getPathValue(object, path) {
   return String(path)
@@ -61,9 +58,7 @@ class FakeActor {
   }
 }
 
-// ---------------------------------------------------------------------------
 // Fixtures
-// ---------------------------------------------------------------------------
 
 function component(id, registeredItemUuid) {
   return { id, name: id, originItemUuid: registeredItemUuid, registeredItemUuid };
@@ -116,9 +111,7 @@ function setup(alchemyCfg, { recipes, components }) {
   return { engine, validator };
 }
 
-// ---------------------------------------------------------------------------
 // Dead-end memory
-// ---------------------------------------------------------------------------
 
 test('a fizzle records the canonical dead-end key per system when showAttemptHistoryToPlayers is on', async () => {
   const components = [component('ash', 'Item.ash'), component('ember', 'Item.ember')];
@@ -187,9 +180,7 @@ test('DRIFT guard: the engine dead-end write uses the SAME canonical key the sto
   assert.equal(written, canonicalSignatureKey({ ash: 2, quick: 1 }));
 });
 
-// ---------------------------------------------------------------------------
 // Discovery routing
-// ---------------------------------------------------------------------------
 
 test('a matched brew delegates to craft() as an alchemy attempt, honouring `interactive`', async () => {
   const components = [component('ash', 'Item.ash')];

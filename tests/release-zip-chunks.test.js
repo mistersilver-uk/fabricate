@@ -1,19 +1,4 @@
-/**
- * THE ARCHIVE-COMPLETENESS GATE (issue 1565).
- *
- * The defect this exists for: a client holding a cached entry script asks for a hashed chunk the
- * installed package no longer contains. Nothing in the release path proved the reverse case —
- * that an archive we PUBLISH carries every file its own entry script asks for. `validateDist`
- * checks only manifest-listed files, and `verifyManagerChunkSplit` reads `dist/`, not the
- * archive, so a packaging regression that dropped `chunks/` would have shipped with green gates.
- *
- * WHY THE POSITIVE CASES USE THE REAL `zipDirectory`. A gate that reads archives has to be
- * proven against archives a real producer made, because the interesting failures are all in the
- * member names: `zip -r` writes bare POSIX names, bsdtar `tar -a` on Windows writes `./`-prefixed
- * ones, and `Compress-Archive` has historically written backslashes. The real producer here emits
- * only the first shape, so the other two are HAND-BUILT central directories further down — the
- * only honest way to exercise a name shape this machine cannot produce.
- */
+/** THE ARCHIVE-COMPLETENESS GATE (issue 1565). */
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
 import { writeFileSync } from 'node:fs';
@@ -35,10 +20,7 @@ import {
   releaseZipName,
 } from '../scripts/lib/releaseZipChunks.js';
 
-// AT MODULE SCOPE, so no execution order can get past it. Every negative row below asserts the
-// gate's own label as an `includes` FRAGMENT, and `includes('')` is true of any string at all — so
-// an accidentally empty label would make each of those rows pass over any message, or none. The
-// same guard the console literals carry in `tests/release-build.test.js`, for the same reason.
+// AT MODULE SCOPE, so no execution order can get past it.
 assert.equal(typeof ARCHIVE_CHUNK_GATE_LABEL, 'string', 'the gate label must be a string');
 assert.ok(
   ARCHIVE_CHUNK_GATE_LABEL.length > 0,
@@ -46,9 +28,7 @@ assert.ok(
 );
 
 /**
- * Run `act` and hand back the error it threw. `assert.throws` returns nothing, and every negative
- * proof here has to inspect the MESSAGE: several distinct refusals live in one function, and
- * "it threw" cannot tell them apart.
+ * Run `act` and hand back the error it threw.
  *
  * @param {() => unknown} act The call under test.
  * @returns {Error} The thrown error.
@@ -64,10 +44,6 @@ function captureThrow(act) {
 
 /**
  * Build a `dist/`-shaped tree and zip it with the REAL producer, ONCE PER DISTINCT TREE.
- *
- * Memoised on the tree object because several rows check different manifests against the same
- * archive, and `zipDirectory` shells out to the platform zip with `stdio: 'inherit'` — so each
- * extra call is both a subprocess and a block of "adding: ..." noise in the test log.
  *
  * @param {Record<string, string>} files Archive-relative POSIX paths to file contents.
  * @returns {Promise<string>} Absolute path to the archive.
@@ -118,18 +94,11 @@ const SHORT_TREE = Object.freeze(
   )
 );
 
-// ───────────────────────────────────────────────────────────────────────────
 // The archive assertion, over archives the real producer made.
-//
-// One table, because every row is the same three steps over a different tree and manifest, and a
-// per-row copy of them is exactly the near-identical block the duplication gate fails.
-// ───────────────────────────────────────────────────────────────────────────
 
 /**
  * Each row: what it is, the tree to zip, the manifest to check it against, and either `null` for
- * "must not throw" or the substrings the thrown message MUST carry. A row that expects a failure
- * names the GATE and the offending MEMBER, never merely "it threw" — several distinct refusals
- * live in this one function and a bare rejection cannot tell them apart.
+ * "must not throw" or the substrings the thrown message MUST carry.
  */
 const ARCHIVE_ROWS = [
   {
@@ -233,19 +202,14 @@ for (const row of ARCHIVE_ROWS) {
   });
 }
 
-// ───────────────────────────────────────────────────────────────────────────
 // Member-name shapes this machine's producer cannot emit, as hand-built archives.
-// ───────────────────────────────────────────────────────────────────────────
 
 /**
- * Write a minimal STORED (method 0) zip whose member names are written VERBATIM, in both the
- * local headers and the central directory. `zipDirectory` cannot produce a `./`-prefixed or
- * backslash-separated name on this platform, so the only way to exercise those shapes is to
- * write the central directory by hand.
+ * Write a minimal STORED (method 0) zip whose member names are written VERBATIM, in both the local
+ * headers and the central directory.
  *
  * @param {string} zipPath Absolute path of the archive to create.
  * @param {Array<[string, string]>} members Verbatim member names with their contents.
- * @returns {void}
  */
 function writeStoredZip(zipPath, members) {
   const localParts = [];
@@ -293,8 +257,7 @@ function writeStoredZip(zipPath, members) {
 
 /**
  * The two producer shapes, as the member names each would write for the SAME complete tree, plus
- * the directory entry a real producer also records. If normalisation were dropped, `readEntry`'s
- * exact-name match would miss the entry script and the gate would refuse a complete archive.
+ * the directory entry a real producer also records.
  */
 const HAND_BUILT_SHAPES = [
   {
@@ -341,9 +304,7 @@ test('a hand-built archive short its one chunk still fails, whatever the name sh
   }
 });
 
-// ───────────────────────────────────────────────────────────────────────────
 // The pure parts.
-// ───────────────────────────────────────────────────────────────────────────
 
 test('normalizeArchiveMemberName folds every producer shape onto one name', () => {
   assert.equal(normalizeArchiveMemberName('main.js'), 'main.js');
@@ -436,12 +397,8 @@ test('findMissingChunkReferences survives a reference cycle and still reaches bo
   assert.deepEqual(result.referenced.toSorted(), ['chunks/a-1.js', 'chunks/b-2.js']);
 
   // r3 review finding 4. Terminating here rests on the walk's `visited` check, and removing it
-  // makes the loop spin SYNCHRONOUSLY and forever — which `node --test`'s timeout cannot
-  // interrupt, because that is a timer and the event loop never turns. CI would hang to the job
-  // timeout while the queue grew without limit. The walk therefore also refuses once it has
-  // dequeued more members than the archive holds, so a broken guard fails fast and named. That
-  // bound is unreachable through this API while the guard works (only present members are ever
-  // enqueued, at most once each), so it is proved by mutation control rather than asserted here.
+  // makes the loop spin SYNCHRONOUSLY and forever — which `node --test`'s timeout cannot interrupt,
+  // because that is a timer and the event loop never turns.
 });
 
 test('the name-mismatch refusal names both archive names and does not read as a skip', () => {
@@ -465,13 +422,8 @@ test('isReleaseZipName recognises a published archive and nothing else', () => {
     assert.ok(!isReleaseZipName(name), `${name} must not read as a published archive`);
   }
 
-  // THE `v` IS REQUIRED, DELIBERATELY, and this row exists so that narrowness is a decision
-  // rather than an accident. `release-s3.js` builds its per-target cohort archives under the
-  // other shape, `${moduleId}-${version}.zip` with no `v`, and this predicate does not match
-  // them. It does not have to: those are written into a per-target directory under the staging
-  // root (`join(stagingDir, target.label)`) and never into `dist/`, which is the only directory
-  // `release.js` scans with this predicate. Matching them would mean this gate could mistake a
-  // cohort archive for the published one; refusing them cannot hide a real `dist/` archive.
+  // THE `v` IS REQUIRED, DELIBERATELY, and this row exists so that narrowness is a decision rather
+  // than an accident.
   assert.ok(
     !isReleaseZipName('fabricate-0.1.0.zip'),
     "release-s3's cohort archive shape is not the published archive, and never lands in dist/"

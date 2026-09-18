@@ -1,31 +1,4 @@
-/**
- * The ENGINE-side gate on the retired `@craftingmod` placeholder (issue 1094).
- *
- * `_runCraftingCheck` asks `resolveActiveCraftingCheckFormula` — the POST-shim selector
- * every GM surface asks — whether the active check can roll, instead of each of its five
- * gates reading its own slot's RAW `rollFormula`. This file exists because that change had
- * NO regression protection: a reviewer mutated the reading back to the pre-shim one
- * (preserving slot resolution and trimming) and the whole suite stayed green, because
- * nothing seeded a placeholder-carrying formula through `_runCraftingCheck`.
- *
- * What the missing gate costs, per mode, and it is not symmetric:
- *
- * - alchemy `simple` — `_runSimpleCheck` is entered, `evaluateCheckRoll` strips the formula
- *   to `''` and reports `engine: false`, and `runFormulaPassFail` turns "no engine" into a
- *   NON-BLOCKING `success: true`. The brew then succeeds UNCONDITIONALLY with its DC
- *   ignored, AND consumes — which is why the alchemy rows are also driven through the real
- *   `craft()` below rather than stopping at the check's return value.
- * - alchemy `tiered`, `routedByCheck`, `progressive` — the `requiresCheck` /
- *   `checkRequired` misconfiguration abort never fires, so the craft rolls nothing and
- *   routes to nothing while still consuming.
- * - `simple` / `routedByIngredients` — the optional pass/fail layer is entered for a check
- *   that cannot roll, instead of being skipped as a check that is simply not there.
- *
- * TWO SHAPES ARE DRIVEN THROUGH EVERY MODE, because they reach `checkUsable: false` by
- * different steps of the shim and a partial gate could catch one and miss the other:
- * `@craftingmod` alone (an ADDITIVE placement that strips to the empty string) and
- * `1d20 * @craftingmod` (a REFUSED placement, left as authored and answered `''`).
- */
+/** The ENGINE-side gate on the retired `@craftingmod` placeholder (issue 1094). */
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -48,10 +21,8 @@ const { CraftingEngine } = await import('../src/systems/CraftingEngine.js');
 
 /**
  * A dice engine that is PRESENT and answers realistically, so nothing here passes for the
- * uninteresting reason that `globalThis.Roll` was missing: `evaluateCheckRoll`'s very first
- * line reports `engine: false` without one, which is the same non-blocking shape the bug
- * produces. `validate` is the recorded Foundry oracle; `evaluate` rolls a fixed high total,
- * so a check that IS entered passes loudly rather than failing for want of a total.
+ * uninteresting reason that `globalThis.Roll` was missing: `evaluateCheckRoll`'s very first line
+ * reports `engine: false` without one, which is the same non-blocking shape the bug produces.
  */
 function installRoll() {
   const validator = recordedFoundryRoll([]);
@@ -77,11 +48,7 @@ const UNUSABLE_FORMULAS = Object.freeze([
 const ACTOR = { id: 'a1', name: 'Crafter', items: [], uuid: 'Actor.a1' };
 const RECIPE = { craftingSystemId: 'sys-1', name: 'Widget' };
 
-/**
- * Install a system and return the engine plus a record of which check RUNNER was entered.
- * The runners are wrapped rather than replaced, so "was it entered" is observed at the one
- * seam the gate decides, and a runner that IS entered still behaves.
- */
+/** Install a system and return the engine plus a record of which check RUNNER was entered. */
 function installSystem(system) {
   const engine = new CraftingEngine({}, null, null);
   globalThis.game = {
@@ -233,12 +200,8 @@ test('the same harness DOES enter each runner on an authored, usable formula', a
   }
 });
 
-// ── zero mutation, proved through the REAL craft() ─────────────────────────
-//
-// The check's `misconfigured: true` is only half the claim; the other half is what
-// `craft()` does with it. These drive the whole pipeline so the ingredient item itself is
-// the witness: with the gate, it is never updated or deleted and no tool is broken; without
-// it, the alchemy `simple` row succeeds unconditionally AND consumes.
+// zero mutation, proved through the REAL craft(). The check's `misconfigured: true` is only half
+// the claim; the other half is what `craft()` does with it.
 
 function buildFakeItem(id, quantity = 1) {
   return {

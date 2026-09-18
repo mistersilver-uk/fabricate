@@ -1,8 +1,6 @@
 /**
- * Tests for the 0.6.0 Catalyst → Tool migration (src/migration/migrateCatalystsToTools.js)
- * and its registration in MigrationRunner.
- *
- * node:test + node:assert/strict. Pure functions; no Foundry globals.
+ * Tests for the 0.6.0 Catalyst → Tool migration (src/migration/migrateCatalystsToTools.js) and its
+ * registration in MigrationRunner.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -10,9 +8,7 @@ import assert from 'node:assert/strict';
 import { migrateCatalystsToTools } from '../src/migration/migrateCatalystsToTools.js';
 import { MigrationRunner } from '../src/migration/MigrationRunner.js';
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 function system(id, extra = {}) {
   return { id, name: id, ...extra };
@@ -22,9 +18,7 @@ function recipe(id, systemId, extra = {}) {
   return { id, craftingSystemId: systemId, ...extra };
 }
 
-// ---------------------------------------------------------------------------
 // Mapping matrix
-// ---------------------------------------------------------------------------
 
 test('degradesOnUse:false maps to presence-only breakageChance:0 + flagBroken (no item flag)', () => {
   const systems = [system('sys-1')];
@@ -80,9 +74,7 @@ test('degradesOnUse:true with null maxUses maps to limitedUses maxUses:null', ()
   assert.deepEqual(tool.breakage, { mode: 'limitedUses', maxUses: null });
 });
 
-// ---------------------------------------------------------------------------
 // Dedupe — collapse
-// ---------------------------------------------------------------------------
 
 test('identical catalysts across recipes collapse to one shared library tool', () => {
   const systems = [system('sys-1')];
@@ -113,9 +105,7 @@ test('duplicate identical catalysts within a single array collapse to one toolId
   assert.equal(out.recipes[0].toolIds.length, 1);
 });
 
-// ---------------------------------------------------------------------------
 // Dedupe — negative
-// ---------------------------------------------------------------------------
 
 test('semantically different catalysts on the same componentId are NOT merged', () => {
   const systems = [system('sys-1')];
@@ -149,9 +139,7 @@ test('different maxUses on the same componentId produce distinct tools', () => {
   assert.equal(out.systems[0].tools.length, 2);
 });
 
-// ---------------------------------------------------------------------------
 // All granularities: recipe / step / ingredientSet / salvage
-// ---------------------------------------------------------------------------
 
 test('recipe, step, step-set, and recipe-set catalysts all migrate to toolIds', () => {
   const systems = [system('sys-1')];
@@ -223,9 +211,7 @@ test('a salvage catalyst and an identical recipe catalyst in the same system col
   assert.deepEqual(out.systems[0].components[0].salvage.toolIds, [id]);
 });
 
-// ---------------------------------------------------------------------------
 // Missing system / robustness
-// ---------------------------------------------------------------------------
 
 test('recipe with a missing crafting system is skipped untouched (not thrown)', () => {
   const systems = [system('sys-1')];
@@ -262,9 +248,7 @@ test('catalyst systemItemId alias is honored as componentId', () => {
   assert.equal(out.systems[0].tools[0].componentId, 'legacy');
 });
 
-// ---------------------------------------------------------------------------
 // Existing library tool reuse
-// ---------------------------------------------------------------------------
 
 test('an existing equivalent library tool is reused rather than duplicated', () => {
   const systems = [system('sys-1', {
@@ -300,9 +284,7 @@ test('an existing tool WITH a requirement gate is not reused (catalysts had no r
   assert.notEqual(out.recipes[0].toolIds[0], 'gated-tool');
 });
 
-// ---------------------------------------------------------------------------
 // Idempotency
-// ---------------------------------------------------------------------------
 
 test('running twice produces identical output', () => {
   const systems = [system('sys-1')];
@@ -339,17 +321,8 @@ test('generated tool ids are stable across runs', () => {
 });
 
 // The assertion above compares two calls WITHIN one run, so it holds no matter what
-// `generateToolId` hashes — including after a change to the hash input that silently
-// renumbers every tool in every already-migrated world. `system.tools[].id` is PERSISTED
-// data and the migration's documented idempotency is a promise about a world that has
-// already run it: a re-run must resolve the same dedupe key to the same id, or it appends
-// duplicate library tools and orphans every `toolIds` reference written by the first pass.
-//
-// The one input most likely to be "tidied" by a later reader is the U+0000 separator in
-// `generateToolId`'s FNV-1a input (`${systemId}\0${dedupeKey}`) — it is invisible in a
-// diff, and until issue 1118 it was a RAW NUL byte, which made GNU grep classify the file
-// as binary and skip it in any search lacking `-a`. So the id is pinned to a literal here.
-// If this value moves, the change is a data migration, not a refactor.
+// `generateToolId` hashes — including after a change to the hash input that silently renumbers
+// every tool in every already-migrated world (issue 1118).
 test('generateToolId is pinned to a golden value (persisted ids must never drift)', () => {
   const out = migrateCatalystsToTools(
     [recipe('r1', 'sys-1', { catalysts: [{ componentId: 'forge', degradesOnUse: false }] })],
@@ -374,9 +347,7 @@ test('migratedCount reflects the number of catalysts converted', () => {
   assert.equal(out.migratedCount, 2);
 });
 
-// ---------------------------------------------------------------------------
 // MigrationRunner integration + version gate
-// ---------------------------------------------------------------------------
 
 function makeSettings(initial = {}) {
   const store = new Map(Object.entries({
@@ -430,10 +401,8 @@ test('version gate: 0.6.0 conversion is NOT re-applied when migrationVersion is 
 
   const summary = await runner.run();
 
-  // The 0.6.0 catalyst CONVERSION is gated out: no library Tool is created and the
-  // catalysts are not turned into toolIds. The later 1.7.0 migration still strips the
-  // residual dead catalysts array (the engine only reads toolIds), so the recipe is
-  // re-persisted by that strip alone.
+  // The 0.6.0 catalyst CONVERSION is gated out: no library Tool is created and the catalysts are
+  // not turned into toolIds.
   const recipes = settings.store.get('recipes');
   const systems = settings.store.get('craftingSystems');
   assert.equal(systems[0].tools?.length ?? 0, 0, 'no Tool created when the 0.6.0 conversion is gated');
@@ -458,9 +427,8 @@ test('the dead gathering task.catalysts survives 0.6.0 but is stripped by 1.7.0'
 
   await runner.run();
 
-  // 0.6.0 never walks gatheringConfig (its pure function only returns recipes/systems);
-  // the dead task.catalysts field is removed later by the 1.7.0 strip, which re-persists
-  // gatheringConfig.
+  // 0.6.0 never walks gatheringConfig (its pure function only returns recipes/systems); the dead
+  // task.catalysts field is removed later by the 1.7.0 strip, which re-persists gatheringConfig.
   const setKeys = settings.calls.set.map(c => c.key);
   assert.ok(setKeys.includes('gatheringConfig'), 'gatheringConfig re-persisted by the 1.7.0 strip');
   assert.equal(

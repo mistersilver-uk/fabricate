@@ -1,27 +1,6 @@
 /**
- * DOMAIN.md CARRIES NO COLUMN PADDING, AND THE TRANSFORM THAT REMOVED IT LOSES NOTHING (issue #1661).
- *
- * `DOMAIN.md` was 827 KB, of which 441 KB was spaces — every table cell padded to its column's
- * width so the pipes line up in a monospace editor. A routine change loads it before any source
- * file, so that alignment is paid for on every read, and nothing enforces it either:
- * `.markdownlint-cli2.jsonc` turns `MD060` off on the stated ground that pipe alignment is
- * "impractical to maintain by hand". Re-emitted with one space per cell it is 396 KB, and no cell
- * content changed.
- *
- * WHY THIS IS A TEST AND NOT JUST A COMMIT. Two properties have to hold, and neither is visible in
- * a 900-line diff:
- *
- *   1. NO CELL CONTENT CHANGED. The transform is content-preserving by construction, but "by
- *      construction" is a claim about code, and the code was wrong the first time: a naive
- *      `line.split('|')` splits on the ESCAPED pipes in `` `'success' \| 'failure' \| 'none'` ``,
- *      turning a four-column row into six. markdownlint's `MD056` caught that one — "extra data
- *      will be missing" — but it only caught it because the column count changed. A lost cell that
- *      happened to keep the count would have shipped.
- *   2. THE PADDING DOES NOT COME BACK. `MD060` is off, so `npm run lint:md` will not notice if a
- *      later edit re-pads a table, and an editor that "formats on save" will do it silently.
- *
- * So this asserts the property on the real file, and the falsification below proves each assertion
- * can fail.
+ * DOMAIN.md CARRIES NO COLUMN PADDING, AND THE TRANSFORM THAT REMOVED IT LOSES NOTHING (issue
+ * #1661).
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -40,18 +19,7 @@ import {
 const REPOSITORY_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DOMAIN = readFileSync(path.join(REPOSITORY_ROOT, 'DOMAIN.md'), 'utf8');
 
-/**
- * The size `DOMAIN.md` must stay under, in bytes.
- *
- * 420 KB against 396 KB measured: headroom for the document to keep growing as the domain model
- * does, but not enough to absorb a re-padded table — the padding this removed was 441 KB on its
- * own, so any meaningful return of it breaks this before it breaks anything else.
- *
- * NOT the 120 KB the issue asked for. That number was written before the transform was measured,
- * and reflow cannot reach it: unpadded, the two glossary sections alone are ~340 KB of prose in
- * table cells. Reaching 120 KB means relocating those sections, which is a separate change with a
- * separate argument — see this issue's Deviations.
- */
+/** The size `DOMAIN.md` must stay under, in bytes. */
 const MAXIMUM_BYTES = 420 * 1024;
 
 /** The file's real size on disk. `String#length` counts UTF-16 units, and 165 lines here are
@@ -63,17 +31,7 @@ const TABLE_ROWS = DOMAIN.split('\n').filter((line) => isTableRow(line));
 
 test('DOMAIN.md is the corpus these assertions think it is', () => {
   // A guard over a file that stopped having tables — or stopped being read — reports success
-  // forever. Both inputs are floored.
-  // 219 rows across four tables, and the number is worth stating exactly because two looser
-  // counts are close enough to be mistaken for it. `line.startsWith('|')` answers 316 and
-  // `/^\s*\|/` answers 326; the difference is 107 lines of an ASCII tree of the world-settings
-  // layout (`|- World settings`), ten of them indented. `isTableRow` excludes every one of them
-  // because they do not CLOSE with a pipe — the fence they sit in plays no part in it, and
-  // `reflowTables` skips fenced content separately.
-  //
-  // A floor above the real corpus fails forever, and the obvious fix for that is to lower it
-  // until it passes — at which point it measures nothing. So this is derived, with enough slack
-  // to survive an edit but not a deleted table.
+  // forever.
   assert.equal(TABLE_ROWS.length, 219, 'the DOMAIN.md table corpus changed size');
   assert.ok(DOMAIN.length > 100_000, 'DOMAIN.md is far smaller than any version of this document');
 });
@@ -106,9 +64,7 @@ test('DOMAIN.md stays under its size ceiling', () => {
 });
 
 test('splitRow keeps an escaped pipe inside its cell', () => {
-  // THE BUG THIS TRANSFORM SHIPPED ON ITS FIRST ATTEMPT, pinned as a fixture. `DOMAIN.md` really
-  // carries this shape; a splitter that reads `\|` as a separator silently reports six columns
-  // where there are four.
+  // THE BUG THIS TRANSFORM SHIPPED ON ITS FIRST ATTEMPT, pinned as a fixture.
   const cell = "(`'success' \\| 'failure' \\| 'none'`)";
   const row = `| outcome | ${cell} | default |`;
   assert.deepEqual(splitRow(row), ['outcome', cell, 'default']);
@@ -145,10 +101,8 @@ test('the reflow is falsifiable in every direction it claims', () => {
   assert.equal(isTableRow('A sentence with a | pipe in it.'), false);
 
   // 4b. A FENCE IS VERBATIM. The fixture is deliberately a PADDED table: an already-canonical one
-  //     would survive by coincidence rather than by fence handling, and an earlier draft of this
-  //     test used exactly that and proved nothing. `DOMAIN.md` documents its own conventions, so a
-  //     fenced before/after example of padding is content the gate must not rewrite — and without
-  //     this the fixed-point assertion above would REQUIRE rewriting it.
+  // would survive by coincidence rather than by fence handling, and an earlier draft of this test
+  // used exactly that and proved nothing.
   const fenced = '```markdown\n| col |   col |\n| --- | ------ |\n```\n';
   assert.equal(reflowTables(fenced), fenced);
   assert.deepEqual(paddedRows(fenced), []);

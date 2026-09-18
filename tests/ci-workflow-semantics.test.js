@@ -6,15 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 // The workflow-source walkers and the `if:` tokenizer/evaluator this file used to inline now live
 // in tests/helpers/workflow-source.js, shared with tests/forward-port-workflow.test.js (issue
-// #1001). The extraction is behaviour-preserving, and the proof is that the `test(...)` body below
-// is byte-identical to its pre-extraction form while `npm test` stays green: `parseJobs` still
-// indexes jobs by indentation, so a walker that stopped filtering comments would give ci.yml a
-// spurious job key and fail the `deepEqual` assertions loudly, and every `if:` in ci.yml is
-// single-line while its only block scalars are `run:` bodies this file never reads.
-//
-// `section` is imported rather than re-implemented as a local closure for the same duplication
-// reason. `parseWorkflow` sits OUTSIDE the `test(...)` body, so this does not touch the identity
-// that proves the extraction behaviour-preserving.
+// #1001).
 import {
   children,
   entries,
@@ -27,9 +19,7 @@ import {
   unwrap,
   value,
 } from './helpers/workflow-source.js';
-// The gate's bound defaults are READ, not restated (issue 1133). Restating them here would create a
-// second source of truth for the arithmetic this file exists to check, which is the failure the
-// check itself is about.
+// The gate's bound defaults are READ, not restated (issue 1133).
 import {
   GRACE_MS,
   MAX_POLLS,
@@ -109,9 +99,8 @@ test('CI semantically isolates edited metadata runs and fully gates ready_for_re
 test('a red unit-tests job re-prints its failing tests at the END of the job log', () => {
   const workflow = readFileSync('.github/workflows/ci.yml', 'utf8');
 
-  // `node --test`'s TAP reporter emits ~119,000 lines, so every `not ok` on a red run sits past
-  // the bounded tail the log APIs serve. The end-of-job re-print is the only thing that makes a
-  // red run readable, and a green run never exercises it (issue 1654).
+  // `node --test`'s TAP reporter emits ~119,000 lines, so every `not ok` on a red run sits past the
+  // bounded tail the log APIs serve (issue 1654).
   assert.match(
     workflow,
     /npm test 2>&1 \| tee "\$RUNNER_TEMP\/unit-tests\.tap"/,
@@ -142,19 +131,7 @@ test('a red unit-tests job re-prints its failing tests at the END of the job log
   );
 });
 
-// ────────────────────────────────────────────────────────────────────────────────────────────────
 // The screenshot gate's sequencing contract (issue 1133).
-//
-// A SECOND `test(...)`, deliberately, rather than additions inside the one above: that test's header
-// argues its byte-identical body is the proof the helper extraction was behaviour-preserving, and
-// appending to it would destroy that argument for nothing.
-//
-// What this pins is VALUE ORDERING — that the script's own `capture-did-not-conclude` diagnosis
-// fires before GitHub kills the job, and that the poll product can actually reach the wall-clock
-// ceiling. That is a diagnostic-quality property. TERMINATION itself is proven by
-// `tests/screenshot-evidence-matching.test.js` case (g2) and the iteration cap, not by an
-// inequality.
-// ────────────────────────────────────────────────────────────────────────────────────────────────
 
 const MS_PER_MINUTE = 60_000;
 
@@ -214,14 +191,7 @@ test('the screenshot gate awaits the capture run for its own head, within pinned
     'the gate step interpolates a workflow expression into its shell body; pass it through env: instead'
   );
 
-  // EVERY shell variable reaching the CLI is double-quoted. An unquoted one that renders EMPTY
-  // vanishes from the argument list entirely, so the flag before it swallows the flag after it and
-  // argument parsing fails before the gate's first step runs — a red the `screenshots-exempt` label
-  // cannot clear, because parsing precedes the label check. This is not hypothetical:
-  // `$PR_HEAD_REPO` is empty whenever a contributor deletes their fork while the pull request is
-  // open, since `github.event.pull_request.head.repo` is then null. The CLI's half of that contract
-  // — an empty string is a VALUE, and the gate degrades on it — is case (p5) in
-  // tests/screenshot-evidence-matching.test.js.
+  // EVERY shell variable reaching the CLI is double-quoted.
   const quotedFlagValues = gateStep.run.match(/--[a-z-]+ "\$[A-Za-z_]+"/g) ?? [];
   assert.ok(
     quotedFlagValues.length >= 5,
@@ -238,20 +208,14 @@ test('the screenshot gate awaits the capture run for its own head, within pinned
   );
 
   // The producer's own selection inputs, requested identically, so the two selections are the same
-  // by construction rather than by coincidence. ONE paginated call feeds both the filename list and
-  // the patch map — two calls could snapshot different heads.
+  // by construction rather than by coincidence.
   assert.match(gateStep.run, /patch: \(\.patch \/\/ ""\)/);
   assert.match(gateStep.run, /@json/);
   assert.match(gateStep.run, /--await-capture/);
   assert.match(gateStep.run, /--patches-file/);
 
   // The GATE's own `--head-sha`, which nothing pinned: the assertion below covers the producer's
-  // publish step only, and the two are separate flags on separate jobs. It stopped being loud when
-  // the matcher learned to read an absent head as "cannot judge head" rather than as "every frame is
-  // stale" — the right degradation for `npm run screenshots:ui:check`, but it means deleting this
-  // flag now disables the staleness rule SILENTLY and passes the previous head's frames on every UI
-  // pull request. Case (p10) in tests/screenshot-evidence-matching.test.js pins the CLI half of that
-  // composition; this is the half that says CI always supplies a head to judge against.
+  // publish step only, and the two are separate flags on separate jobs.
   assert.match(gateStep.run, /--head-sha "\$HEAD_SHA"/);
   assert.equal(gateStep.env.HEAD_SHA, '${{ github.event.pull_request.head.sha }}');
 
@@ -280,10 +244,7 @@ test('the screenshot gate awaits the capture run for its own head, within pinned
     `maxWait (${MAX_WAIT_MS}) is not below the job ceiling (${jobCeilingMs}), so GitHub kills the job before the script can say why it gave up`
   );
 
-  // The fork-eligibility expression is compared SEMANTICALLY, over a truth table. A string
-  // comparison would pass for `!=` written as `==` and vice versa, which are exactly the mutations
-  // that matter; and the helper's `evaluate` throws on function calls by design, so this must be
-  // an evaluation rather than a parse-and-diff.
+  // The fork-eligibility expression is compared SEMANTICALLY, over a truth table.
   const eligibility = unwrap(gateStep.env.CAPTURE_ELIGIBLE);
   const captureIf = unwrap(capture.if);
   for (const sameRepo of [true, false]) {
@@ -308,10 +269,7 @@ test('the screenshot gate awaits the capture run for its own head, within pinned
   assert.equal(publishStep.env.HEAD_SHA, '${{ github.event.pull_request.head.sha }}');
 });
 
-// The release config and the workflows that carry its secrets (issue #1761). `release.s3.config.json`
-// names the environment variable each channel's tester segment arrives in, and the workflows forward
-// a secret of that name; a half-done rename fails at publish time, the one moment it cannot be
-// retried safely, because a refused early-access publish leaves the channel head behind its tag.
+// The release config and the workflows that carry its secrets (issue #1761).
 
 const REPOSITORY_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const WORKFLOWS = path.join(REPOSITORY_ROOT, '.github', 'workflows');
@@ -364,11 +322,7 @@ const inlineChannels = (run) => [
   ...[...run.matchAll(/\bchannel:\s*([^,\n}]+)/g)].map((m) => m[1]),
 ];
 
-/**
- * Every channel a shell body pins itself to, and whether any reference resolves at run time. A step
- * that reads its channel from a workflow input or a loop variable could be publishing to any of
- * them, so only a body whose every reference is a literal may be excused a secret.
- */
+/** Every channel a shell body pins itself to, and whether any reference resolves at run time. */
 function pinnedChannels(run) {
   const source = String(run ?? '');
   const channels = new Set();
@@ -385,10 +339,7 @@ function pinnedChannels(run) {
 
 /**
  * Whether a shell body reaches `release-s3.js` at all — running it, or inline-importing the layout
- * helpers that derive the same tester manifest keys from the same secret. Three steps do the
- * latter, and an anchored `node scripts/release-s3.js` left all three unpoliced. The dry run in
- * promote-to-public.yml that merely echoes the command it would have run is excused by its own
- * literal `public` channel, not by a narrower matcher here that an inline importer hides behind.
+ * helpers that derive the same tester manifest keys from the same secret.
  */
 const referencesReleaseS3 = (run) => /scripts\/release-s3\.js/.test(String(run ?? ''));
 

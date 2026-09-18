@@ -1,31 +1,4 @@
-/**
- * Issue 1036 — criterion 8/21 END TO END, across the START/FINISH boundary.
- *
- * The behaviour gate's timed-craft half is THREE collaborating sites, and every other
- * test in this change pins them one at a time:
- *
- *  1. `_startTimedStep` builds the snapshot (`_snapshotEssenceEnabled`) and passes it to
- *     `markStepPrepared`;
- *  2. `markStepPrepared`'s literal — a whitelist REBUILD — has to name `essenceEnabled`
- *     or the key is silently dropped;
- *  3. `_finishTimedStep` reads it back (`_resumedEssenceEnabled`) and threads it into
- *     `_createResultItems`.
- *
- * A leaf-by-leaf suite cannot see a break in the WIRING between them, and the failure is
- * silent in the worst direction: drop the key at (1) and `markStepPrepared` stores `{}`,
- * which `_resumedEssenceEnabled` reads as "no snapshot" and answers with an ALL-TRUE map,
- * so a GM who disabled an essence at START gets its property macro AND its effect
- * transfer at FINISH. That is precisely what criterion 8 forbids, and it ships green.
- *
- * So these two tests drive the REAL `craft()` → `_startTimedStep` → persisted actor-flag
- * run → matured `craft()` → `_finishTimedStep` path with a REAL `CraftingRunManager`, and
- * assert the CRAFTED ITEM. Only `_runCraftingCheck` is stubbed.
- *
- * Both flip the live enabled state MID-RUN, in opposite directions, which is what makes
- * them discriminating: the snapshot and the live definition disagree at FINISH, so a
- * FINISH that consulted the live definition — or one that lost the snapshot — produces
- * the opposite item in each.
- */
+/** Issue 1036 — criterion 8/21 END TO END, across the START/FINISH boundary. */
 
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -43,9 +16,7 @@ const GATE_SECONDS = 3600;
 
 installEngineGlobals();
 
-// ---------------------------------------------------------------------------
 // Fakes — an actor whose run flag really round-trips, and items that really vanish
-// ---------------------------------------------------------------------------
 
 class FakeItem {
   constructor(id, name, quantity = 1, essences = null) {
@@ -115,9 +86,7 @@ class FakeActor {
   }
 }
 
-// ---------------------------------------------------------------------------
 // The system, the recipe, and the world
-// ---------------------------------------------------------------------------
 
 function buildSystem(fireEnabled) {
   return {
@@ -235,10 +204,8 @@ function setupWorld(system) {
 }
 
 /**
- * Arm a timed craft, flip the essence's LIVE enabled state while the gate matures, then
- * mature it and finish.
- *
- * @param {{enabledAtStart: boolean, enabledAtFinish: boolean}} timeline
+ * Arm a timed craft, flip the essence's LIVE enabled state while the gate matures, then mature it
+ * and finish.
  */
 async function runTimedCraft({ enabledAtStart, enabledAtFinish }) {
   const system = buildSystem(enabledAtStart);

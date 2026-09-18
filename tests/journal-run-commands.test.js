@@ -233,8 +233,6 @@ describe('journal run command protocol', () => {
    * `source-owner-required` was spelled, localized and vocabulary-tested, but nothing proved it
    * FIRES (issue 1648, Q-H5): deleting the gate, or making `journalSourcesOwnedBy` return `true`,
    * left every suite green while a non-GM could consume materials off an actor they do not own.
-   * Only `authorize`/`execute` are substituted here — the gate, `resolveJournalSourceActors` and
-   * `journalSourcesOwnedBy` are the production ones, compiled out of `main.js`.
    */
   it('refuses a craft drawing materials from a source actor the sender does not own', async () => {
     const originalGame = globalThis.game;
@@ -467,15 +465,9 @@ describe('journal run command protocol', () => {
   });
 
   it('never opens a roll prompt for the public craft API, and settles the check itself', async () => {
-    // Issue 1683. `promptCheck` awaits a HUMAN and has no timeout of its own -- `sendCommand`
-    // has one, the prompt does not -- so a macro or script calling `game.fabricate.craft()` hung
-    // forever the moment the craft reached a stage with a check. It became reachable when run
-    // start began committing the first stage for a recipe with no time requirement, which made
-    // `canExecuteImmediately` true and took the public path through `execute`.
-    //
-    // Driven through the REAL `executeJournalRunCommand`, because the defect lived in the seam
-    // between it and `executePublicCraft`: every other case here stubs `executeCommand`, so
-    // nothing exercised the prompt branch at all.
+    // Issue 1683. `promptCheck` awaits a HUMAN and has no timeout of its own -- `sendCommand` has
+    // one, the prompt does not -- so a macro or script calling `game.fabricate.craft()` hung
+    // forever the moment the craft reached a stage with a check.
     let promptCalls = 0;
     const executed = [];
     const { service } = commandHarness({
@@ -523,12 +515,9 @@ describe('journal run command protocol', () => {
   });
 
   it('finishes a ready public gather in one call, and leaves a waiting one alone', async () => {
-    // Issue 1759. Issue 1648 gave gathering a versioned lifecycle and `startGatheringAttempt`
-    // began selecting it unconditionally, which routes a READY attempt away from the engine's
-    // immediate resolution and into a started run awaiting execution. Crafting was given
-    // `executePublicCraft` for exactly this in the same work; gathering was not. So every macro
-    // calling `game.fabricate.startGatheringAttempt()` went on answering `accepted: true` and
-    // awarding nothing -- a silent behaviour change in a documented public API.
+    // Issue 1759. Issue 1648 gave gathering a versioned lifecycle and `startGatheringAttempt` began
+    // selecting it unconditionally, which routes a READY attempt away from the engine's immediate
+    // resolution and into a started run awaiting execution.
     const executed = [];
     const ready = await executePublicGather({
       requestStart: async () => ({
@@ -537,9 +526,8 @@ describe('journal run command protocol', () => {
         requiresExecution: true,
         canExecuteImmediately: true,
         runId: 'gather-1',
-        // Top-level, as the command service's NORMALISED result carries it -- it lifts the
-        // revision out and drops the run document. A fixture shaped `run: { runRevision }` passes
-        // while production sends `undefined`.
+        // Top-level, as the command service's NORMALISED result carries it -- it lifts the revision
+        // out and drops the run document.
         runRevision: 4,
         blockedReasons: [],
       }),
@@ -569,9 +557,8 @@ describe('journal run command protocol', () => {
         requiresExecution: true,
         canExecuteImmediately: false,
         runId: 'gather-2',
-        // Top-level, as the command service's NORMALISED result carries it -- it lifts the
-        // revision out and drops the run document. A fixture shaped `run: { runRevision }` passes
-        // while production sends `undefined`.
+        // Top-level, as the command service's NORMALISED result carries it -- it lifts the revision
+        // out and drops the run document.
         runRevision: 1,
       }),
       actor: { uuid: 'Actor.a' },
@@ -597,9 +584,7 @@ describe('journal run command protocol', () => {
   });
 
   it('reports a ready gather whose execution failed as accepted but unsuccessful', async () => {
-    // The start result is kept UNDER the settled one rather than replaced. An attempt that was
-    // accepted and then failed to execute is both of those things at once, and a caller reading
-    // `accepted` must not be told the attempt never happened.
+    // The start result is kept UNDER the settled one rather than replaced.
     const settled = await executePublicGather({
       requestStart: async () => ({
         accepted: true,
@@ -607,9 +592,8 @@ describe('journal run command protocol', () => {
         requiresExecution: true,
         canExecuteImmediately: true,
         runId: 'gather-3',
-        // Top-level, as the command service's NORMALISED result carries it -- it lifts the
-        // revision out and drops the run document. A fixture shaped `run: { runRevision }` passes
-        // while production sends `undefined`.
+        // Top-level, as the command service's NORMALISED result carries it -- it lifts the revision
+        // out and drops the run document.
         runRevision: 2,
       }),
       actor: { uuid: 'Actor.a' },
@@ -628,9 +612,8 @@ describe('journal run command protocol', () => {
         requiresExecution: true,
         canExecuteImmediately: true,
         runId: 'gather-4',
-        // Top-level, as the command service's NORMALISED result carries it -- it lifts the
-        // revision out and drops the run document. A fixture shaped `run: { runRevision }` passes
-        // while production sends `undefined`.
+        // Top-level, as the command service's NORMALISED result carries it -- it lifts the revision
+        // out and drops the run document.
         runRevision: 1,
       }),
       actor: { uuid: 'Actor.a' },
@@ -1109,11 +1092,8 @@ describe('journal run command protocol', () => {
   });
 
   /**
-   * QE2-8 reported that `journalStore`'s cancel discriminator now lets the prepare-token
-   * RELEASE fall through to a refresh. It cannot: `executeJournalRunCommand` consumes the
-   * release's answer itself and returns its own `roll-cancelled` refusal, so the
-   * `{success: true, cancelled: true}` shape never leaves this module. Pinned here, because
-   * the reading that made the report plausible is one nothing failed on.
+   * QE2-8 reported that `journalStore`'s cancel discriminator now lets the prepare-token RELEASE
+   * fall through to a refresh.
    */
   it('keeps a dismissed roll a refusal, and never returns the release command answer', async () => {
     const run = { id: 'released-run', lifecycleVersion: 1, runRevision: 2, status: 'waiting' };
@@ -1887,15 +1867,7 @@ describe('journal run pause lifecycle at the real command boundary', () => {
     'leaves the authority usable for a DIFFERENT run after a real cancel settles',
     withGlobals(async () => {
       // M25: the maintainer cancelled one of seven runs and every remaining run then reported
-      // `claim-held` with NO claim page on the ledger. This drives the real cancel through the
-      // real authority and asks the two questions that separate a retained claim from a stale
-      // READING of one: is the ledger's claim gone when the command settles, and is the next
-      // command on a DIFFERENT run refused?
-      //
-      // The mid-command observation reproduces `main.js`'s own wiring: creating the claim page
-      // fires `createJournalEntryPage`, whose handler refreshes availability. That refusal is
-      // TRUE while the command runs, which is what makes a reading of it taken then so
-      // dangerous once the command finishes.
+      // `claim-held` with NO claim page on the ledger.
       const { authority, commandOn, ledger, runs } = await pauseHarness({ runCount: 2 });
       const [first, second] = runs;
       const observed = [];

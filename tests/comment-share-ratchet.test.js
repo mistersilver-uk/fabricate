@@ -1,8 +1,6 @@
 /**
- * Ratchets the comment-line share per directory (issue 1657), so Phase 1 sweeps of this epic
- * can each lower `tests/comment-share-ledger.txt` without a later sweep silently re-growing it.
- * Root roll-ups are derived here and printed on mismatch; the ledger itself pins directories only.
- * This file is itself in the `tests` bucket it pins, so editing these comments moves that number.
+ * Ratchets the comment-line share per directory (issue 1657), so Phase 1 sweeps of this epic can
+ * each lower `tests/comment-share-ledger.txt` without a later sweep silently re-growing it.
  */
 import assert from 'node:assert/strict';
 import { readdirSync, statSync } from 'node:fs';
@@ -73,20 +71,10 @@ function advanceInsideQuote(line, index, state, syntax) {
 }
 
 /**
- * A line is a comment line iff it begins inside a block still open from a prior line, or its
- * first token opens one — except that a `blockClose` with code after it, and code before a
- * trailing `lineComment`, deliberately count as CODE, so a comment moved on or off its own line
- * is a non-event rather than a ratchet trip. One function, called with a different `syntax` per
- * extension and svelte region, so no per-type copy exists for the duplication gate.
- *
- * A `'` or `"` string held open only by a trailing backslash line-continuation is not tracked:
- * state resets at the next line's entry rather than swallowing the file. No file in this corpus
- * uses that construct.
- *
- * @param {string} line
- * @param {{inBlock: boolean, quote: string|null}} state
- * @param {{blockOpen: string, blockClose: string, lineComment: string|null, quotes: boolean}} syntax
- * @returns {boolean}
+ * A line is a comment line iff it begins inside a block still open from a prior line, or its first
+ * token opens one — except that a `blockClose` with code after it, and code before a trailing
+ * `lineComment`, deliberately count as CODE, so a comment moved on or off its own line is a
+ * non-event rather than a ratchet trip.
  */
 function classifyLine(line, state, syntax) {
   // Only a template literal legally spans a line, so `'` and `"` state never carries: an
@@ -209,7 +197,6 @@ function extensionOf(file) {
 /**
  * Keyed by every directory directly holding a scanned file, counting only files directly in it —
  * not the coarser one-child-per-root key a redistribution inside a subtree could hide behind.
- * Root roll-ups are derived here, never pinned, so there is exactly one source of truth.
  */
 function buildLedger(corpus) {
   const buckets = new Map();
@@ -232,11 +219,7 @@ function rollUpByRoot(ledger) {
   return rollup;
 }
 
-/**
- * Every symlink under `root` whose target is a directory, repo-relative. Scoped to these four
- * roots only — `sourceScan.js`'s own symlink-safety note verifies `src`, `styles`, and `lang`,
- * not `tests` or `scripts`, so this gate proves its own two new roots directly.
- */
+/** Every symlink under `root` whose target is a directory, repo-relative. */
 function findSymlinkedDirectories(root) {
   const found = [];
   const walk = (dir) => {

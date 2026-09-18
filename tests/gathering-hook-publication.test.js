@@ -22,10 +22,9 @@ const system = { id: 'system-a', name: 'Alchemy', features: {} };
 const environment = { id: 'env-1', name: 'Whispering Woods', selectionMode: 'targeted' };
 const task = { id: 'task-1', name: 'Harvest Moonpetal' };
 
-// Mirrors the real runtime shapes the engine hands the publisher: createdResults
-// from normalizeRunItems ({actorUuid,itemUuid,quantity} — no componentId), and
-// usedTools as tool-breakage plan entries (componentId, itemRef, mode, broken,
-// evidence). componentId for gathered items is recovered from checkResult.items.
+// Mirrors the real runtime shapes the engine hands the publisher: createdResults from
+// normalizeRunItems ({actorUuid,itemUuid,quantity} — no componentId), and usedTools as
+// tool-breakage plan entries (componentId, itemRef, mode, broken, evidence).
 function baseArgs(overrides = {}) {
   return {
     viewer: gmViewer,
@@ -472,11 +471,9 @@ test('processWorldTime does not resolve or publish a timed completion on a non-p
     resumeTimedRuns: () => false,
   });
 
-  // Previously the run completed on EVERY client and only the public hook was
-  // suppressed — so two clients raced to write run flags, create the gathered items,
-  // burn tool durability and deplete the node pool for one run. Maturation is now
-  // gated as a whole (mirroring CraftingRunManager's issue-656 fix), so a non-primary
-  // GM resolves nothing at all.
+  // Previously the run completed on EVERY client and only the public hook was suppressed — so two
+  // clients raced to write run flags, create the gathered items, burn tool durability and deplete
+  // the node pool for one run.
   assert.equal(result.completed.length, 0, 'the run is left for the primary GM to resolve');
   assert.equal(result.processed.length, 0, 'no side effects are applied on this client');
   assert.equal(completionOf(hooks), undefined, 'and no public hook is published');

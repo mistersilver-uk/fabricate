@@ -1,7 +1,6 @@
 /**
- * Tests for Recipe.minSuccessOutcomeId — the optional per-recipe reference to a
- * fixed-type routed check's minimum success tier. Mirrors the checkTierId pattern:
- * a trimmed non-empty string or null, round-tripping through toJSON/fromJSON.
+ * Tests for Recipe.minSuccessOutcomeId — the optional per-recipe reference to a fixed-type routed
+ * check's minimum success tier.
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';

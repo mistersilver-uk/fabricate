@@ -1,15 +1,6 @@
 /**
- * Issue 595: structural / resolution-mode validation errors must be user-facing —
- * localized and free of leaked internal step/set/result ids on EVERY resolution
- * mode. This is the follow-up to #550 (signature collisions); it covers the
- * remaining uncoded structural strings in `ResolutionModeService` and the
- * `RecipeManager` SAVE path.
- *
- * These tests RED-fail on the pre-fix behavior (the cardinality / reference-
- * integrity strings fall back to the internal step/set id when unnamed, and the
- * save-path `invalid resultGroupId` rides a plain `Error` whose message leaks the
- * ids) and pass once each failure carries a stable `code` + human-readable params
- * (name-or-1-based-position) that the localizer maps to id-free copy.
+ * Issue 595: structural / resolution-mode validation errors must be user-facing — localized and
+ * free of leaked internal step/set/result ids on EVERY resolution mode.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -243,10 +234,8 @@ test('localizeRecipePersistenceError returns null for a plain (non-persistence) 
   );
 });
 
-// --- Base MODEL structural strings (issue 595 review): these ride the same save
-// path + RecipePersistenceError toast as the resolution-mode strings, so they must
-// be id-free too. Each drives the RecipeManager save path and asserts the localized
-// toast leaks no 16-char id (and no raw essence id).
+// Base MODEL structural strings (issue 595 review): these ride the same save path +
+// RecipePersistenceError toast as the resolution-mode strings, so they must be id-free too.
 
 const echo = (key) => key; // Foundry echoes an absent key → built-in fallback used
 

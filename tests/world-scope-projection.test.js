@@ -1,12 +1,4 @@
-/**
- * The world-scope projection and write path (issue 1362, epic 1357).
- *
- * The projection and the actions are tested from ONE fixture corpus, because the properties
- * that matter are relationships between them: what the projection says a component carries has
- * to be what the actions are able to write, and the three shapes a screen must not infer -
- * a component's single section, its absent `enabled` flag, and the additive tag set - are
- * assertions about both halves at once.
- */
+/** The world-scope projection and write path (issue 1362, epic 1357). */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -54,12 +46,8 @@ const NORMALIZERS = {
 };
 
 /**
- * A real `ScopedDefinitionStore` over an in-memory setting, so the actions run against the
- * shipped read/normalize/persist path rather than a fake that would accept anything.
- *
- * @param {string} entityType
- * @param {unknown} [seed]
- * @returns {{store: object, read: () => unknown}}
+ * A real `ScopedDefinitionStore` over an in-memory setting, so the actions run against the shipped
+ * read/normalize/persist path rather than a fake that would accept anything.
  */
 function storeFor(entityType, seed = undefined) {
   let value = seed;
@@ -321,12 +309,7 @@ test('setEnabled is ABSENT on the component type and present on the other two', 
 });
 
 test('the two TOOL break-mode and repair actions are declared on the tool family ALONE', () => {
-  // AC-5. THE POSITIVE HALF IS MANDATORY. An absence-only check passes on a family that
-  // returns `{}`, so this asserts presence on `tool` before it asserts absence on the other
-  // two - the same shape `setEnabled` above is pinned in, and for the same reason: these are
-  // STRUCTURALLY ABSENT rather than present-and-refusing, so a caller cannot conclude a write
-  // landed. Declaring either on the base literal instead of inside the tool guard reds the
-  // component and essence halves.
+  // AC-5. THE POSITIVE HALF IS MANDATORY.
   const tool = createWorldScopeEntityActions({ entityType: 'tool', getStore: () => null });
   for (const action of ['setWorldToolBreakage', 'setWorldRepairRequirements']) {
     assert.equal(action in tool, true, `${action} is declared on the tool family`);
@@ -374,9 +357,8 @@ test('adding a TOOL to a system seeds repairRequirements as a structural COPY', 
   const { actions, store } = actionsFor('tool');
   await actions.createEntity({ id: 'hammer' });
   await actions.updateWorldDefaultSection('hammer', 'breakage', { mode: 'uses' });
-  // The world defaults carry the seed list; `updateWorldDefaultSection` cannot write it,
-  // because `repairRequirements` is not a section. Seed the setting directly, exactly as the
-  // migration and an import do.
+  // The world defaults carry the seed list; `updateWorldDefaultSection` cannot write it, because
+  // `repairRequirements` is not a section.
   const raw = store.get();
   raw.defaults.hammer.repairRequirements = [{ id: 'group-1', options: [{ componentId: 'iron' }] }];
   await store.save(raw);
@@ -518,13 +500,9 @@ test('copyMembership clones sections independently and stamps NO provenance key'
   assert.equal('copiedFromSystemId' in copy, false);
 });
 
-// ── The COMPOSITION, which is the thing `adminStore` actually calls ───────────────────────
-//
-// `createWorldScopeEntityActions` had every property below asserted of it and the composition
-// over it had NONE, so `createWorldScopeActions` could have returned `{}` and shipped green.
-// That is the shape this repository keeps paying for: a covered leaf under an uncovered
-// composition root, where the root is the only thing production reaches. PRs 6a-c build
-// directly on `store.worldScope`, so it is asserted here as its own subject.
+// The COMPOSITION, which is the thing `adminStore` actually calls. `createWorldScopeEntityActions`
+// had every property below asserted of it and the composition over it had NONE, so
+// `createWorldScopeActions` could have returned `{}` and shipped green.
 
 test('the composition builds all four families and wires each to its own store', async () => {
   const stores = {
@@ -566,9 +544,7 @@ test('the composition builds all four families and wires each to its own store',
 
 test('the composition preserves each type\'s KEY SET, which is part of the contract', () => {
   const actions = createWorldScopeActions({ getStores: {} });
-  // The structural absences survive composition. A composition that built every type from one
-  // descriptor would hand the component path a `setEnabled` the normalizer drops, and the
-  // essence and tool paths tag writes neither carries.
+  // The structural absences survive composition.
   assert.equal('setEnabled' in actions.component, false);
   assert.equal('setWorldTags' in actions.component, true);
   assert.equal('setMutedTags' in actions.component, true);
@@ -584,17 +560,9 @@ test('the composition preserves each type\'s KEY SET, which is part of the contr
   );
 });
 
-// ── THE FOURTH FAMILY IS NOT A FOURTH DESCRIPTOR (issue 1374, then issue 1392) ───────────────
-//
-// `adminStore` supplied a fourth `getStores` leg from issue 1374, matching the read path's
-// four, because that file is a gateway `### GM World Scoped Entity Routes` requirement 7 closes
-// to the vocabulary lane. Issue 1392 declared the FAMILY, here, in a file that lane owns.
-//
-// IT IS ATTACHED AFTER THE DESCRIPTOR LOOP RATHER THAN ADDED TO `WRITE_DESCRIPTORS`, and this
-// is the guard on that: every verb the generic builder mints presupposes an entity roster,
-// world defaults and membership records, and the World Vocabulary has none of the three. A
-// fourth descriptor would publish `createEntity`, `addToSystem` and `setSection` on a family
-// where none of them can mean anything.
+// THE FOURTH FAMILY IS NOT A FOURTH DESCRIPTOR (issue 1374, then issue 1392). `adminStore` supplied
+// a fourth `getStores` leg from issue 1374, matching the read path's four, because that file is a
+// gateway `### GM World Scoped Entity Routes` requirement 7 closes to the vocabulary lane.
 
 test('the vocabulary family mints its OWN key set, not the scoped-entity one', () => {
   const actions = createWorldScopeActions({
@@ -612,9 +580,7 @@ test('the vocabulary family mints its OWN key set, not the scoped-entity one', (
   );
   assert.equal(typeof actions.vocabulary.addEntry, 'function');
   assert.equal(typeof actions.vocabulary.removeEntry, 'function');
-  // THE ABSENCES ARE THE ASSERTION. `createEntity` on the vocabulary family is what declaring
-  // it as a fourth `WRITE_DESCRIPTORS` entry would produce, and `addEntry` on the component
-  // family is what folding the two builders into one would produce.
+  // THE ABSENCES ARE THE ASSERTION.
   assert.equal('createEntity' in actions.vocabulary, false);
   assert.equal('addToSystem' in actions.vocabulary, false);
   assert.equal('addEntry' in actions.component, false);
@@ -646,17 +612,11 @@ test('the first createEntity SEEDS the setting and flips isSeeded per sub-key', 
   assert.deepEqual(Object.keys(read()).sort(), ['defaults', 'entities', 'membership']);
 });
 
-// ── The World Vocabulary leg (issue 1362) ────────────────────────────────────────────────────
-//
-// It is the fourth leg of a projection whose other three are scoped-entity corpora, and it
-// exists NOW for a one-way-door reason: `adminStore.js` and `CraftingSystemManagerRoot.svelte`
-// are two of the gateway files `### GM World Scoped Entity Routes` requirement 7 closes to
-// PR 7, so neither the store leg nor the badge that reads it could be added later.
-//
-// `total` IS THE ASSERTION, not a convenience. The consumer reads `worldScope.vocabulary.total`
-// and nothing else pins the name: a producer that published `count`, or left the caller to read
-// `entries.length`, would leave the badge on 0 forever with every other test in this repository
-// still green.
+// The World Vocabulary leg (issue 1362). It is the fourth leg of a projection whose other three are
+// scoped-entity corpora, and it exists NOW for a one-way-door reason: `adminStore.js` and
+// `CraftingSystemManagerRoot.svelte` are two of the gateway files `### GM World Scoped Entity
+// Routes` requirement 7 closes to PR 7, so neither the store leg nor the badge that reads it could
+// be added later.
 
 test('the vocabulary projection sums all three vocabularies into `total`', () => {
   const state = projectWorldVocabulary({
@@ -695,10 +655,7 @@ test('an absent vocabulary store publishes an UNAVAILABLE zero rather than an ab
 });
 
 test('buildWorldScopeState reads the OPTIONAL fourth store leg and publishes vocabulary.total', () => {
-  // The producer half of requirement 7's closure. `adminStore._worldScopeStores` hands this
-  // function a `vocabulary` leg read through `services.getVocabularyScopeStore?.() ?? null`, so
-  // PR 7 registers a store and a service accessor — neither of them a gateway path — and never
-  // reopens `adminStore.js`.
+  // The producer half of requirement 7's closure.
   const withoutStore = buildWorldScopeState({ stores: {}, systems: [] });
   assert.equal(withoutStore.worldScope.vocabulary.total, 0);
   assert.equal(withoutStore.worldScope.vocabulary.available, false);

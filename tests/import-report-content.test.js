@@ -8,9 +8,8 @@ import assert from 'node:assert/strict';
 
 const { buildImportReportContent } = await import('../src/systems/importReportContent.js');
 
-// Deterministic localize double: echoes the key + count so assertions can check
-// that keys and counts are threaded through, and proves labels are localized
-// (never raw enum tokens).
+// Deterministic localize double: echoes the key + count so assertions can check that keys and
+// counts are threaded through, and proves labels are localized (never raw enum tokens).
 function localize(key, data) {
   if (data && 'count' in data) return `${key}#${data.count}`;
   return key;

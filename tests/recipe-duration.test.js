@@ -1,13 +1,4 @@
-/**
- * Recipe-level duration (`timeRequirement`) for the implicit (single) step.
- *
- * Covers:
- *   - normalization (clamp negatives, drop all-zero, round-trip via toJSON);
- *   - getExecutionSteps' implicit step inherits the recipe-level timeRequirement,
- *     while explicit multi-step recipes keep their own per-step time;
- *   - validation accepts well-formed unit values and rejects negative /
- *     non-finite values, mirroring the per-step time validation.
- */
+/** Recipe-level duration (`timeRequirement`) for the implicit (single) step. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -26,9 +17,7 @@ globalThis.ui = { notifications: { info: () => {}, warn: () => {}, error: () => 
 
 const { Recipe } = await import('../src/models/Recipe.js');
 
-// ---------------------------------------------------------------------------
 // Normalization + serialization
-// ---------------------------------------------------------------------------
 
 test('recipe-level timeRequirement normalizes and clamps negatives', () => {
   const recipe = new Recipe({ timeRequirement: { minutes: 30, hours: 2, days: -5 } });
@@ -64,9 +53,7 @@ test('recipe-level timeRequirement round-trips through toJSON / fromJSON', () =>
   assert.deepEqual(rehydrated.timeRequirement, recipe.timeRequirement);
 });
 
-// ---------------------------------------------------------------------------
 // getExecutionSteps
-// ---------------------------------------------------------------------------
 
 test('getExecutionSteps implicit step inherits the recipe-level timeRequirement', () => {
   const recipe = new Recipe({
@@ -117,9 +104,7 @@ test('multi-step recipes keep their own per-step timeRequirement', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Validation
-// ---------------------------------------------------------------------------
 
 test('validate accepts a well-formed recipe-level timeRequirement', () => {
   const recipe = new Recipe({

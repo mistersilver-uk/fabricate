@@ -96,9 +96,8 @@ test('localize with data without game.i18n returns key', () => {
 
 // --- confirmDialog ---
 
-// The options bag is SHAPED on the way through (issue 1154) rather than forwarded
-// verbatim — `tests/confirm-dialog-shape.test.js` owns that contract for both confirm
-// seams. This case owns only the call-and-return wiring.
+// The options bag is SHAPED on the way through (issue 1154) rather than forwarded verbatim —
+// `tests/confirm-dialog-shape.test.js` owns that contract for both confirm seams.
 test('confirmDialog calls DialogV2.confirm and returns result', async () => {
   const opts = { title: 'Are you sure?' };
   globalThis.foundry = {

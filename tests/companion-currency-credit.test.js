@@ -1,31 +1,5 @@
 /**
- * `creditCurrency`'s behaviour — the Currency Credit the companion contract publishes
- * (issue 1301).
- *
- * The member MOVES MONEY onto a player's sheet through a mechanism Fabricate does not own, so
- * the claims worth a suite of their own are all about what it may state as fact:
- *
- *   1. **`credited` is an OBSERVATION, never a restatement of the request.** Under
- *      `actorInventory` the shipped spender manufactures `{ valid: true }` out of a VOID
- *      `addCoins`, so without a `readCoins` observation the member would report `credited: 50`
- *      for a write it never saw.
- *   2. **`0` means Fabricate can PROVE it; `null` means it cannot.** One rule, stated twice —
- *      by the scalar and by the published zero-mutation retry set — so the two can never
- *      disagree. `creditFailed` answering `0` would state a third party's word as Fabricate's
- *      own proof.
- *   3. **A misconfiguration is not a domain answer.** Four spellings of "the macro never ran"
- *      answer `creditNotConfigured` identically, because from the GM's side deleting a macro
- *      and switching its type to `chat` are the same action.
- *
- * The check and the credit share ONE denomination resolution, and AC-10 drives both members
- * against a ladder carrying a DECOY unit whose abbreviation collides with the real one — which
- * is what makes that criterion able to fail at all, since any re-derivation agrees on a
- * single-`gp` fixture.
- *
- * **AC-33 is not here.** It asserts what a player-cancelled craft reports when Foundry
- * discards the currency write, and it lives in `tests/crafting-cancel-craft.test.js` beside the
- * run fixture and the rest of that member's truth table — copying that fixture here would be a
- * duplication block, and the criterion belongs next to the answers it moves.
+ * `creditCurrency`'s behaviour — the Currency Credit the companion contract publishes (issue 1301).
  */
 
 import assert from 'node:assert/strict';
@@ -69,20 +43,15 @@ const GM = { id: 'user-gm', isGM: true };
 
 /**
  * A `game` global, because `resolveCoinSpender` reads a BARE `game.fabricate?.…` on both of its
- * accessor fallbacks (`currencyAffordance.js:144`, `:152`) rather than the `globalThis.game?.`
- * the ladder reader uses one function above it, whose own docblock records why: a bare
- * reference throws `ReferenceError` in any context without the Foundry global. Under Foundry
- * the global always exists, so this models production rather than papering over a defect — but
- * it is why a cell that injects NO spender needs it, and the asymmetry is worth knowing about.
+ * accessor fallbacks (`currencyAffordance.js:144`, `:152`) rather than the `globalThis.game?.` the
+ * ladder reader uses one function above it, whose own docblock records why: a bare reference throws
+ * `ReferenceError` in any context without the Foundry global.
  */
 globalThis.game = globalThis.game ?? { fabricate: {} };
 
 /**
- * A three-rung ladder — `gp` -> 10 `sp` -> 10 `cp` — so `gp` prices at 100 copper, PLUS a
- * DECOY whose `abbreviation` is `gp` and whose id is not.
- *
- * The decoy is what makes AC-10 able to fail: `findCurrencyUnit` matches on exact id, so on a
- * single-`gp` fixture any second, re-derived resolution agrees with the first by luck.
+ * A three-rung ladder — `gp` -> 10 `sp` -> 10 `cp` — so `gp` prices at 100 copper, PLUS a DECOY
+ * whose `abbreviation` is `gp` and whose id is not.
  */
 const LADDER = [
   {
@@ -109,14 +78,7 @@ const LADDER = [
   },
 ];
 
-/**
- * The same ladder WITHOUT the decoy, for the `actorInventory` cells.
- *
- * That strategy validates every unit against the pf2e denominations (`pp`/`gp`/`sp`/`cp`), so a
- * `trade-bar` decoy makes the whole profile invalid and every case below would answer
- * `ladderInvalid` before reaching a spender. `gp` still prices at 100 copper, which is what the
- * observed delta is measured against.
- */
+/** The same ladder WITHOUT the decoy, for the `actorInventory` cells. */
 const INVENTORY_LADDER = LADDER.slice(0, 3);
 
 const MACROS = { canAfford: 'Macro.afford', decrement: 'Macro.dec', increment: 'Macro.inc' };
@@ -124,21 +86,7 @@ const MACROS = { canAfford: 'Macro.afford', decrement: 'Macro.dec', increment: '
 /** A resolver answering a runnable SCRIPT macro, since no `fromUuid` exists under `node --test`. */
 const runnableMacro = async () => ({ type: 'script', command: 'return true;' });
 
-/**
- * What `credited` must be for EVERY declared outcome, at the standard 50 gp request.
- *
- * Written out as the RULE rather than computed from the member's own list of provably-zero
- * outcomes, and that is the whole point: an expectation read back from the implementation
- * agrees with the implementation by construction, so deleting six outcomes from that list would
- * change the code and the expectation together and nothing would fail. The rule itself is
- * three-valued — the AMOUNT when Fabricate observed the credit, `0` when it can PROVE nothing
- * moved (`creditNotConfigured` and every refusal taken before any mechanism ran), and `null`
- * when a mechanism ran and it cannot prove what that mechanism did.
- *
- * The regression this catches runs the DANGEROUS way: a provable zero reporting itself as
- * `null` reads as "unknown", which is the collapse the three-token vocabulary exists to
- * prevent, and `null` is what a caller is told not to treat as retry-safe.
- */
+/** What `credited` must be for EVERY declared outcome, at the standard 50 gp request. */
 const EXPECTED_CREDITED = new Map([
   // the mechanism ran and Fabricate OBSERVED the credit
   [COMPANION_OUTCOMES.credited, 50],
@@ -216,9 +164,7 @@ function inventorySpender({ balances = [1000, 1000], refund } = {}) {
   };
 }
 
-// ---------------------------------------------------------------------------
 // AC-10 — ONE denomination resolution, not two
-// ---------------------------------------------------------------------------
 
 describe('AC-10 — the check and the credit resolve the same coin the same way', () => {
   const SOURCE = readFileSync(
@@ -282,9 +228,7 @@ describe('AC-10 — the check and the credit resolve the same coin the same way'
   });
 });
 
-// ---------------------------------------------------------------------------
 // AC-11 / AC-13 — the right macro, and never `refundCurrencySpends`
-// ---------------------------------------------------------------------------
 
 describe('AC-11 — the credit runs the INCREMENT macro, as an award', () => {
   it('invokes the increment uuid with caller "award", a null recipe and a null system', async () => {
@@ -336,9 +280,7 @@ describe('AC-13 — `refundCurrencySpends` is not on the path', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // AC-12 — the credit discrimination, driven from every producer
-// ---------------------------------------------------------------------------
 
 describe('AC-12 — every producer of a failed credit is discriminated', () => {
   const macroSeams = (extra) =>
@@ -463,10 +405,9 @@ describe('AC-12 — every producer of a failed credit is discriminated', () => {
     const unresolvable = await ask(macroSeams({ resolveMacro: async () => null }));
     assert.equal(unresolvable.outcome, COMPANION_OUTCOMES.checkUnavailable);
 
-    // A `macro` world with NO `canAfford` configured answers `ladderInvalid` — NOT
-    // `notAffordable`, which the plan's prose implies: `collectMacroConfigErrors` REQUIRES
-    // `canAfford` and `decrement`, so the profile fails validation and no spender is ever
-    // resolved. The refusal precedes every marker, which is why it cannot have moved.
+    // A `macro` world with NO `canAfford` configured answers `ladderInvalid` — NOT `notAffordable`,
+    // which the plan's prose implies: `collectMacroConfigErrors` REQUIRES `canAfford` and
+    // `decrement`, so the profile fails validation and no spender is ever resolved.
     const unconfigured = await ask(
       macroSeams({ macros: { ...MACROS, canAfford: '' }, runMacro: async () => true })
     );
@@ -481,9 +422,7 @@ describe('AC-12 — every producer of a failed credit is discriminated', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // AC-14 — the integer rule, and the deliberate asymmetry with the check
-// ---------------------------------------------------------------------------
 
 describe('AC-14 — the credit refuses what it cannot write exactly', () => {
   const REFUSED = [
@@ -537,9 +476,7 @@ describe('AC-14 — the credit refuses what it cannot write exactly', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // AC-16 / AC-17 — the election, and the gate order
-// ---------------------------------------------------------------------------
 
 describe('AC-16 — the election gate is ZERO WRITES for the credit too', () => {
   it('refuses an unelected broadcast without invoking the spender', async () => {
@@ -611,9 +548,7 @@ describe('AC-17 — the two published gate-order consequences hold for the credi
   });
 });
 
-// ---------------------------------------------------------------------------
 // AC-18 — every outcome, in this member's OWN words
-// ---------------------------------------------------------------------------
 
 describe('AC-18 — the driven vocabulary equals the declared vocabulary', () => {
   async function driveEveryOutcome() {
@@ -736,9 +671,7 @@ describe('AC-18 — the driven vocabulary equals the declared vocabulary', () =>
   });
 });
 
-// ---------------------------------------------------------------------------
 // AC-28 / AC-32 — the credit is VERIFIED, and reaches the gate-resolved actor
-// ---------------------------------------------------------------------------
 
 describe('AC-28 (D0) — the credit is argument-accurate and observed', () => {
   it('(a) hands the spender the RESOLVED request, not a re-derived one', async () => {
@@ -769,9 +702,7 @@ describe('AC-28 (D0) — the credit is argument-accurate and observed', () => {
   });
 
   it('(c) reports a DISCARDED actor.update as creditNotConfigured, never as a credit', async () => {
-    // `Document#update` resolves `undefined` when the whole diff is empty. The shipped spender
-    // answered `{ valid: true }` regardless, so this cell would have said `credited: 50` for a
-    // write Foundry threw away.
+    // `Document#update` resolves `undefined` when the whole diff is empty.
     const target = actor();
     let attempts = 0;
     target.update = async () => {
@@ -857,9 +788,7 @@ describe('AC-32 (D0) — the actorInventory credit is an OBSERVATION', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // AC-34 / AC-35 — the macro gate, and the shipped zero-update refund
-// ---------------------------------------------------------------------------
 
 describe('AC-34 — four spellings of "the macro never ran", answered identically', () => {
   const SPELLINGS = [
@@ -892,13 +821,8 @@ describe('AC-34 — four spellings of "the macro never ran", answered identicall
   }
 
   it('keeps the script gate at the CALL SITE, never in the executor', () => {
-    // The other half of this criterion — "`MacroExecutor.js` is unchanged by this PR" — is a
-    // DIFF check, which no unit test can make; it is discharged from the changed-file list at
-    // review. What IS enforceable is the property that check protects, and it already ships as
-    // an absence in `tests/macro-executor.test.js`: centralising the type check there would
-    // turn a chat-type essence property macro from a silent warn into a per-essence,
-    // per-result error notification. Asserted here too, because this change is the one that
-    // gains a reason to move it.
+    // The other half of this criterion — "`MacroExecutor.js` is unchanged by this PR" — is a DIFF
+    // check, which no unit test can make; it is discharged from the changed-file list at review.
     const executor = readFileSync(
       new URL('../src/utils/MacroExecutor.js', import.meta.url),
       'utf8'
@@ -912,10 +836,7 @@ describe('AC-34 — four spellings of "the macro never ran", answered identicall
 describe('AC-35 — the shipped ZERO-UPDATE refund still succeeds', () => {
   it('answers valid without ever calling actor.update', async () => {
     // `buildCurrencyRefundUpdates` answers `{ valid: true, updates: {} }` for a non-positive
-    // amount. Implementing the write-truth test OUTSIDE the zero-updates guard would turn this
-    // legitimate no-op into a reported failure on the shipped `refundCurrencySpends` path. It
-    // is unreachable from `creditCurrency`, which refuses a non-positive amount first — which
-    // is exactly why it needs a criterion of its own.
+    // amount.
     const profile = validateCurrencyProfile(LADDER);
     const unit = profile.units.find((entry) => entry.id === 'gp');
     const target = actor({ gp: 1 });

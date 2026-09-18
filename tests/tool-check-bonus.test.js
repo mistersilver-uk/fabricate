@@ -208,11 +208,10 @@ test('labeled formula terms strip bracket and control characters', () => {
 // ── appendCheckModifierTerm (issue 1094) ────────────────────────────────────
 
 test('the check-modifier flavour label is the fixed ASCII literal Modifiers', () => {
-  // Deliberately NOT localized, and this is a correctness constraint rather than an i18n
-  // oversight: the label lands inside a roll formula, and `parsePlainDiceGroups` splits on
-  // flavour brackets, so a localized label containing a `\d*d\d+` token would be tokenized
-  // as a phantom crit-eligible die group — a tokenizer that also backs `hasPlainD20` and
-  // `applyD20Advantage`.
+  // Deliberately NOT localized, and this is a correctness constraint rather than an i18n oversight:
+  // the label lands inside a roll formula, and `parsePlainDiceGroups` splits on flavour brackets,
+  // so a localized label containing a `\d*d\d+` token would be tokenized as a phantom crit-eligible
+  // die group — a tokenizer that also backs `hasPlainD20` and `applyD20Advantage`.
   assert.equal(CHECK_MODIFIER_TERM_LABEL, 'Modifiers');
 });
 
@@ -231,11 +230,9 @@ test('appendCheckModifierTerm appends a fractional value, which the grammar acce
   assert.equal(appendCheckModifierTerm('1d20', { value: -0.25 }), '1d20 - 0.25[Modifiers]');
 });
 
-// A7. `Constant = _ [0-9]+ ("." [0-9]+)?` has NO exponent production, so `+ 1e-7[Modifiers]`
-// parses as `StringTerm("1e")` minus `NumericTerm(7[Modifiers])` and THROWS at evaluate
-// (`allowStrings` defaults false). The term is skipped rather than rounded: a check
-// modifier is the GM's arithmetic, and silently substituting a different number is worse
-// than contributing nothing.
+// A7. `Constant = _ [0-9]+ ("." [0-9]+)?` has NO exponent production, so `+ 1e-7[Modifiers]` parses
+// as `StringTerm("1e")` minus `NumericTerm(7[Modifiers])` and THROWS at evaluate (`allowStrings`
+// defaults false).
 test('appendCheckModifierTerm SKIPS a value that stringifies to exponent notation', () => {
   for (const value of [1e-7, -1e-7, 1e21, -1e21, Number.MIN_VALUE, Number.MAX_VALUE]) {
     assert.equal(

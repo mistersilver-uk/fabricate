@@ -1,8 +1,7 @@
 /**
- * Unit tests for T-005: Add features.effectTransfer Toggle
- *
- * Group 1: _normalizeFeatures includes effectTransfer (3 tests)
- * Group 2: CraftingEngine gates effect transfer on system feature (4 tests)
+ * Unit tests for T-005: Add features.effectTransfer Toggle. Group 1: _normalizeFeatures includes
+ * effectTransfer (3 tests) Group 2: CraftingEngine gates effect transfer on system feature (4
+ * tests)
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -10,9 +9,7 @@ import assert from 'node:assert/strict';
 import { CraftingSystemManager } from '../src/systems/CraftingSystemManager.js';
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 
-// ---------------------------------------------------------------------------
 // Globals required for the modules to load
-// ---------------------------------------------------------------------------
 
 function getProperty(object, path) {
   if (!object || !path) return undefined;
@@ -34,9 +31,7 @@ globalThis.ui = {
   notifications: { info: () => {}, warn: () => {}, error: () => {} }
 };
 
-// ---------------------------------------------------------------------------
 // Group 1: _normalizeFeatures includes effectTransfer
-// ---------------------------------------------------------------------------
 
 test('effectTransfer defaults to false when not specified', () => {
   const manager = new CraftingSystemManager({ getRecipes: () => [] });
@@ -57,10 +52,8 @@ test('effectTransfer is false when set to a non-boolean truthy value', () => {
   assert.equal(result.effectTransfer, false);
 });
 
-// ---------------------------------------------------------------------------
-// #102: complexRecipes is removed as a normalized feature, but survives as a
-// legacy compatibility input that seeds multiStepRecipes.
-// ---------------------------------------------------------------------------
+// 102: complexRecipes is removed as a normalized feature, but survives as a legacy compatibility
+// input that seeds multiStepRecipes.
 
 test('#102: complexRecipes is no longer emitted as a normalized feature', () => {
   const manager = new CraftingSystemManager({ getRecipes: () => [] });
@@ -86,9 +79,7 @@ test('#102: an explicit multiStepRecipes wins over the legacy complexRecipes see
   );
 });
 
-// ---------------------------------------------------------------------------
 // Helpers for Group 2
-// ---------------------------------------------------------------------------
 
 /**
  * Configure globalThis.game with a crafting system whose features.effectTransfer
@@ -211,9 +202,8 @@ async function runCraftAndCheckTransfer(transferEffectsFlag, effectTransferValue
   // Provide a minimal fake source item lookup
   globalThis.fromUuid = async (uuid) => null;
 
-  // Override _createSingleResult to call our instrumented _transferEffects
-  // but still honour the conditional logic we're testing.
-  // We do this by patching the system to return managedItems and a fake created item.
+  // Override _createSingleResult to call our instrumented _transferEffects but still honour the
+  // conditional logic we're testing.
   const fakeCreatedItem = { id: 'created-1', uuid: 'Item.created-1', system: { quantity: 1 } };
 
   const sourceActor = { id: 'a1', name: 'Crafter', items: [ingredientItem] };
@@ -244,9 +234,7 @@ async function runCraftAndCheckTransfer(transferEffectsFlag, effectTransferValue
   return transferEffectsCalled;
 }
 
-// ---------------------------------------------------------------------------
 // Group 2: CraftingEngine gates effect transfer on system feature
-// ---------------------------------------------------------------------------
 
 test('effect transfer executes when both recipe.transferEffects and system features.effectTransfer are true', async () => {
   const called = await runCraftAndCheckTransfer(true, true);

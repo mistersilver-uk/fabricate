@@ -1,13 +1,10 @@
 /**
- * Tests for the 1.6.0 migration
- * (src/migration/migrateRemoveResultSelectionProviders.js): removing the legacy
- * routed result-selection providers `macroOutcome`/`rollTableOutcome` and
- * canonicalizing routing on `check`, across recipe-level + per-step + alchemy
- * recipe-level containers, dropping `rollTableUuid`, stripping gathering-task
- * `resultSelection`, the recovery-warning payload, idempotency, purity, and the
- * chained 1.4.0 → 1.6.0 (former-tiered + upgrading-world catch-up) path.
- *
- * node:test + node:assert/strict. Pure functions; no Foundry globals.
+ * Tests for the 1.6.0 migration (src/migration/migrateRemoveResultSelectionProviders.js): removing
+ * the legacy routed result-selection providers `macroOutcome`/`rollTableOutcome` and canonicalizing
+ * routing on `check`, across recipe-level + per-step + alchemy recipe-level containers, dropping
+ * `rollTableUuid`, stripping gathering-task `resultSelection`, the recovery-warning payload,
+ * idempotency, purity, and the chained 1.4.0 → 1.6.0 (former-tiered + upgrading-world catch-up)
+ * path.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,11 +12,8 @@ import assert from 'node:assert/strict';
 import { migrateRemoveResultSelectionProviders } from '../src/migration/migrateRemoveResultSelectionProviders.js';
 import { migrateLegacyResolutionModes } from '../src/migration/migrateLegacyResolutionModes.js';
 
-// ---------------------------------------------------------------------------
-// Fixture helpers (DRY: tiny shape factories so no case re-declares a large
-// literal — satisfies the Sonar new-code duplication gate the way
-// migrate-legacy-resolution-modes.test.js does).
-// ---------------------------------------------------------------------------
+// Fixture helpers (DRY: tiny shape factories so no case re-declares a large literal — satisfies the
+// Sonar new-code duplication gate the way migrate-legacy-resolution-modes.test.js does).
 
 function selection(provider, extra = {}) {
   return { provider, ...extra };
@@ -56,9 +50,7 @@ function selectionOf(out, index = 0) {
   return out.recipes[index].resultSelection;
 }
 
-// ---------------------------------------------------------------------------
 // Recipe-level rewrite
-// ---------------------------------------------------------------------------
 
 test('recipe-level macroOutcome → check; macroUuid kept', () => {
   const out = migrate({ recipes: [routedRecipe('macroOutcome', { selectionExtra: { macroUuid: 'Macro.x' } })] });
@@ -81,9 +73,7 @@ test('ingredientSet recipe is left untouched', () => {
   assert.equal(selectionOf(out).provider, 'ingredientSet');
 });
 
-// ---------------------------------------------------------------------------
 // Per-step rewrite
-// ---------------------------------------------------------------------------
 
 test('per-step resultSelection providers are rewritten and rollTableUuid dropped', () => {
   const out = migrate({
@@ -103,9 +93,7 @@ test('per-step resultSelection providers are rewritten and rollTableUuid dropped
   assert.equal('rollTableUuid' in steps[1].resultSelection, false);
 });
 
-// ---------------------------------------------------------------------------
 // Alchemy recipe-level (no steps[])
-// ---------------------------------------------------------------------------
 
 test('alchemy recipe-level (no steps) macroOutcome → check', () => {
   const out = migrate({
@@ -116,9 +104,7 @@ test('alchemy recipe-level (no steps) macroOutcome → check', () => {
   assert.equal('steps' in out.recipes[0], false, 'no steps[] on the alchemy recipe');
 });
 
-// ---------------------------------------------------------------------------
 // Gathering-task resultSelection stripping
-// ---------------------------------------------------------------------------
 
 test('gathering routed task resultSelection is stripped entirely', () => {
   const out = migrate({
@@ -137,9 +123,7 @@ test('gathering task without resultSelection is left untouched', () => {
   assert.deepEqual(out.gatheringConfig.systems['sys-1'].tasks[0], gatheringTask('task-clean'));
 });
 
-// ---------------------------------------------------------------------------
 // Recovery-warning payload
-// ---------------------------------------------------------------------------
 
 test('recovery-warning payload collects dropped roll-table recipes/steps and stripped gathering tasks', () => {
   const out = migrate({
@@ -168,9 +152,7 @@ test('recovery-warning payload collects dropped roll-table recipes/steps and str
   ]);
 });
 
-// ---------------------------------------------------------------------------
 // Idempotency + purity
-// ---------------------------------------------------------------------------
 
 test('running twice is a no-op and reports an empty warning payload on the second pass', () => {
   const first = migrate({
@@ -206,9 +188,7 @@ test('non-array recipes / non-object gatheringConfig pass through unchanged', ()
   });
 });
 
-// ---------------------------------------------------------------------------
 // Chained 1.4.0 → 1.6.0 (former-tiered + upgrading-world catch-up)
-// ---------------------------------------------------------------------------
 
 test('a tiered system migrated by 1.4.0 to routedByCheck has no resultSelection for 1.6.0 to touch', () => {
   const systems = [{ id: 'sys-1', name: 'Tiered', resolutionMode: 'tiered' }];

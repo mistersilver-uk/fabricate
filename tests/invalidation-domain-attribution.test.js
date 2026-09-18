@@ -1,18 +1,6 @@
 /**
- * Every mutation site attributes its invalidation domains (issue 1078 part B1, task A2).
- *
- * ## Why this is a COUNTING guard rather than a pinned list
- *
- * Omitting `domains` is legal and means "every domain", which is the safe direction and is
- * therefore also SILENT: a new mutation site that forgets to say what it changed produces a
- * correct app and an over-broad refresh, and no behavioural test can see it. An earlier
- * revision of the plan tried to enumerate the sites by line number and was stale before it was
- * reviewed — `CraftingSystemManager` has 26 `this.save(` sites, not the twenty it listed.
- *
- * So this counts them instead. It asserts a floor on how many sites the scan found (the
- * premise, without which every "all of them are annotated" assertion below is vacuous over an
- * empty set), and then that EVERY one of them is annotated. Adding a site is fine; adding one
- * that says nothing is not.
+ * Every mutation site attributes its invalidation domains (issue 1078 part B1, task A2). Why this
+ * is a COUNTING guard rather than a pinned list
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -36,11 +24,8 @@ function codeLines(source) {
 }
 
 /**
- * Split a class body into `methodName -> body`, using the two-space indentation every method
- * of these two classes is declared at.
- *
- * @param {string} source
- * @returns {Map<string, string>}
+ * Split a class body into `methodName -> body`, using the two-space indentation every method of
+ * these two classes is declared at.
  */
 function methodBodies(source) {
   const bodies = new Map();
@@ -82,9 +67,8 @@ describe('CraftingSystemManager attributes every persistence site', () => {
   });
 
   it('names only real domains in its hoisted attributions', () => {
-    // The hoisted `*_FACTS` constants are derived through `domainsForSystemFields`, so a typo
-    // in a FIELD name falls to the every-domain fail-safe rather than to an unknown domain.
-    // This is the other half: nothing hand-lists a domain string the taxonomy does not have.
+    // The hoisted `*_FACTS` constants are derived through `domainsForSystemFields`, so a typo in a
+    // FIELD name falls to the every-domain fail-safe rather than to an unknown domain.
     const quoted = systemManagerSource.match(/domains: \[[^\]]*]/g) ?? [];
     for (const literal of quoted) {
       for (const name of literal.match(/'([^']+)'/g) ?? []) {
@@ -110,11 +94,8 @@ describe('CraftingSystemManager attributes every persistence site', () => {
 
 describe('RecipeManager attributes every map mutation', () => {
   const bodies = methodBodies(recipeManagerSource);
-  // The exemptions are NAMED rather than pattern-matched, so widening the set is a diff a
-  // reviewer sees. `constructor` allocates the empty map; `initialize()` is a LOAD, not a
-  // change — nothing has moved for a consumer to be told about, and it announces nothing.
-  // Attributing in either would leave a pending every-domain record for the first real edit of
-  // the session to drag broad.
+  // The exemptions are NAMED rather than pattern-matched, so widening the set is a diff a reviewer
+  // sees.
   const LOAD_ONLY = new Set(['constructor', 'initialize']);
   const mutators = [...bodies].filter(
     ([name, body]) =>
@@ -142,8 +123,7 @@ describe('RecipeManager attributes every map mutation', () => {
 
   it('keeps _advanceRecipeRevision reachable from the attributing path', () => {
     // `_recordChange` is the ONE mutation-site call: it advances the entity revisions AND
-    // attributes. A site calling `_advanceRecipeRevision` directly is either a load or a
-    // replication path, both of which attribute through `_advanceFactScopes` instead.
+    // attributes.
     for (const [name, body] of bodies) {
       if (!body.includes('this._advanceRecipeRevision(')) continue;
       if (name === '_recordChange' || LOAD_ONLY.has(name)) continue;
@@ -166,9 +146,7 @@ describe('RecipeManager attributes every map mutation', () => {
 
 describe('the signal stays UNPUBLISHED', () => {
   it('is absent from the published hook contract', () => {
-    // `src/config/hooks.js` is the documented integration surface. This signal deliberately
-    // stays out of it: its payload is an internal delta shape that #1092 will change, and
-    // publishing it now would freeze it.
+    // `src/config/hooks.js` is the documented integration surface.
     assert.ok(
       !read('src/config/hooks.js').includes('craftingDataChanged'),
       'promoting this hook owes it a three-segment name, a schemaVersion, an entry here and a ' +

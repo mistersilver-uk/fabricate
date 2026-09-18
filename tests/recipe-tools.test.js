@@ -1,21 +1,8 @@
-/**
- * Recipe-level Tool support.
- *
- * Covers:
- *   - `toolIds` normalization + serialization at recipe / step / ingredient-set
- *     granularity (trim, drop empties, dedupe, round-trip via toJSON);
- *   - getExecutionSteps surfaces the implicit step's toolIds;
- *   - RecipeManager.getToolsForSet resolves recipe-wide ids plus active set ids
- *     against the per-system library and skips unknown ids;
- *   - evaluateCraftability produces toolStates + missing.tools (present vs.
- *     missing tool in actor inventory), and gates canCraft on tool presence.
- */
+/** Recipe-level Tool support. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-// ---------------------------------------------------------------------------
 // Foundry globals required for module load
-// ---------------------------------------------------------------------------
 
 globalThis.foundry = {
   utils: {
@@ -34,9 +21,7 @@ const { IngredientSet } = await import('../src/models/IngredientSet.js');
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
 const { component, roleItem } = await import('./helpers/componentIdentityFixtures.js');
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 function item(name) {
   return {
@@ -50,9 +35,8 @@ function actor(items, rollData = {}) {
 }
 
 /**
- * Install a crafting-system manager exposing a single system with the given
- * components + tools, resolved by `RecipeManager` via
- * `game.fabricate.getCraftingSystemManager()`.
+ * Install a crafting-system manager exposing a single system with the given components + tools,
+ * resolved by `RecipeManager` via `game.fabricate.getCraftingSystemManager()`.
  */
 function installSystem({
   id = 'sys-1',
@@ -88,9 +72,7 @@ function toolComponent(id, name) {
   return { id, name };
 }
 
-// ---------------------------------------------------------------------------
 // Normalization + serialization
-// ---------------------------------------------------------------------------
 
 test('recipe-level toolIds normalize: trim, drop empties, dedupe', () => {
   const recipe = new Recipe({ toolIds: ['  t-1 ', 't-1', '', null, 't-2', '   '] });
@@ -190,9 +172,7 @@ test('getExecutionSteps explicit steps preserve their own toolIds', () => {
   assert.deepEqual(recipe.getExecutionSteps()[0].toolIds, ['step-tool']);
 });
 
-// ---------------------------------------------------------------------------
 // getToolsForSet
-// ---------------------------------------------------------------------------
 
 test('getToolsForSet resolves recipe-wide plus named routed-set Tool ids and dedupes', () => {
   installSystem({
@@ -269,9 +249,7 @@ test('getToolsForSet returns [] when the recipe has no system', () => {
   assert.deepEqual(manager.getToolsForSet(recipe, new IngredientSet({ id: 's' })), []);
 });
 
-// ---------------------------------------------------------------------------
 // evaluateCraftability — toolStates / missing.tools
-// ---------------------------------------------------------------------------
 
 function craftableRecipe({ toolIds = [], setToolIds = [], setName = 'Ingredient route' } = {}) {
   return new Recipe({
@@ -600,11 +578,8 @@ test('canCraft passes through missing.tools', () => {
   assert.equal(result.missing.tools.length, 1);
 });
 
-// ---------------------------------------------------------------------------
-// toolMatchesItemByIdentity — durable-identity gate for usage/breakage. Retargeted
-// onto the TOOL's own identity `roles[sys].toolId` (issue 561, superseding the #557
-// component-scoped gate). The tool is a first-class item carrying its own source refs.
-// ---------------------------------------------------------------------------
+// toolMatchesItemByIdentity — durable-identity gate for usage/breakage. Retargeted onto the TOOL's
+// own identity `roles[sys].toolId` (issue 561, superseding the #557 component-scoped gate).
 
 const HAMMER_TOOL = {
   id: 'tool-hammer',

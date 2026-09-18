@@ -1,16 +1,4 @@
-/**
- * JOINING HARD WRAPS CHANGES NO CONTENT AND NO STRUCTURE (issue #1661, phase 5).
- *
- * `AGENTS.md` requires one sentence per line and `markdownlint-sentences-per-line` does not
- * enforce it: the rule flags a line carrying a SECOND sentence and has no notion of a sentence
- * running past a line break, so a wrapped sentence raises nothing. `markdownWraps.js` closes that
- * gap, and rewriting prose across 147 tracked documents has to prove two things no diff review of
- * 161 joins establishes by eye: that nothing was reworded, asserted by collapsing whitespace and
- * comparing; and that nothing structural was swallowed, since a naive detector joins front matter,
- * fences, tables, block attributes, setext underlines and blockquote boundaries, each of which
- * corrupts the file while `npm run lint:md` still reports zero issues. The fixtures drive
- * `wrappedSites` at exact line numbers, because a detector that reports nothing satisfies both.
- */
+/** JOINING HARD WRAPS CHANGES NO CONTENT AND NO STRUCTURE (issue #1661, phase 5). */
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
@@ -48,13 +36,7 @@ function corpus() {
     });
 }
 
-/**
- * Whitespace runs collapsed and blockquote markers dropped.
- *
- * The markers go for the same reason the whitespace does: joining two quoted lines removes the
- * continuation's `>`, which is the transform working. That is the one mutation this normalisation
- * cannot see, so it is pinned separately and exactly by the blockquote assertions below.
- */
+/** Whitespace runs collapsed and blockquote markers dropped. */
 function normalise(text) {
   return text
     .split('\n')

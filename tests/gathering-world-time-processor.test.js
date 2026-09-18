@@ -127,11 +127,7 @@ describe('GatheringWorldTimeProcessor', () => {
   });
 
   // issue 403: on a backward world-time tick the accrual anchor freezes and
-  // `respawnInteractableNode` reports `changed: false`. Unlike the environment
-  // path — which guards its hook on the count actually moving — this pass fired
-  // `fabricate.gathering.nodeRespawned` on every `changed` result, so the freeze
-  // also removes a spurious zero-gain emission AND a region-behaviour document
-  // write per unlinked interactable per backward tick.
+  // `respawnInteractableNode` reports `changed: false`.
   it('skips the behaviour write and the nodeRespawned hook when the scoped pool reports no change', async () => {
     const { scene } = scopedBehavior();
     const hookCalls = [];

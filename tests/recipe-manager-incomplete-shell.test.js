@@ -77,9 +77,8 @@ function makeCompleteRecipeData(overrides = {}) {
   };
 }
 
-// An explicit multi-step recipe whose only step is missing its ingredient set
-// (it has a populated result group, so it is structurally consistent). It is a
-// non-craftable shell: structurally valid, but it fails completeness.
+// An explicit multi-step recipe whose only step is missing its ingredient set (it has a populated
+// result group, so it is structurally consistent).
 function makeMultiStepShellData(overrides = {}) {
   return {
     id: overrides.id || `recipe-${++idSeq}`,
@@ -243,10 +242,8 @@ describe('RecipeManager incomplete recipe shells', () => {
   });
 
   it('creates a shell in a routed-mode system; cardinality completeness is waived by allowIncomplete', async () => {
-    // A brand-new shell has no ingredient sets / result groups yet — a completeness
-    // gap waived by allowIncomplete. The routed modes derive their routing basis
-    // from the system mode and carry no per-recipe provider, so there is no
-    // provider requirement to surface.
+    // A brand-new shell has no ingredient sets / result groups yet — a completeness gap waived by
+    // allowIncomplete.
     const manager = makeManager();
     const csm = {
       getSystem: (id) =>
@@ -389,9 +386,8 @@ describe('Recipe validate() vs validateStructure()', () => {
   });
 
   it('validateStructure() waives an incomplete ingredient group/option (authoring draft persists)', () => {
-    // An empty group and a match-less option are in-progress authoring states: the
-    // ingredient editor creates them before the GM picks a component/tag. They must
-    // persist structurally so the edit is not silently dropped.
+    // An empty group and a match-less option are in-progress authoring states: the ingredient
+    // editor creates them before the GM picks a component/tag.
     const recipe = new Recipe({
       craftingSystemId: 'sys-1',
       ingredientSets: [
@@ -440,11 +436,8 @@ describe('Recipe validate() vs validateStructure()', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Store path with the real RecipeManager — exercises toggleRecipeEnabled,
-// duplicateRecipe, and the derived `incomplete` view-model field through the
-// actual adminStore, not stubbed manager fakes.
-// ---------------------------------------------------------------------------
+// Store path with the real RecipeManager — exercises toggleRecipeEnabled, duplicateRecipe, and the
+// derived `incomplete` view-model field through the actual adminStore, not stubbed manager fakes.
 
 const STORE_SYSTEM_ID = 'sys-store';
 

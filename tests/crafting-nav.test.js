@@ -1,11 +1,8 @@
 /**
  * Tests for the Crafting sub-tab navigation model
- * (src/ui/svelte/apps/manager/crafting/craftingNav.js): the conditional sub-tab
- * set derived from `visibilityMode`, the active-view → sub-tab mapping, the
- * crafting-route membership test, and the availability/redirect pair the manager
- * router reconciles the active view with (issue 1151).
- *
- * node:test + node:assert/strict. Pure, dependency-free module.
+ * (src/ui/svelte/apps/manager/crafting/craftingNav.js): the conditional sub-tab set derived from
+ * `visibilityMode`, the active-view → sub-tab mapping, the crafting-route membership test, and the
+ * availability/redirect pair the manager router reconciles the active view with (issue 1151).
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -74,25 +71,8 @@ test('an unknown/absent visibility mode falls back to knowledge (Books & Scrolls
   ]);
 });
 
-// The Knowledge surface (issue 785) is gated on
-// `effect.showBooksScrolls || resolutionMode === 'alchemy'`, which is strictly
-// WIDER than the Books & Scrolls gate. All four cells of the gate matrix are
-// pinned below; `global` + alchemy is the cell that motivates the widening
-// (learned recipes are the sole reveal source there, so a showBooksScrolls-only
-// gate would leave the GM no lever at all) and `restricted` + alchemy is the cell
-// that shows Access and Knowledge but NOT Books & Scrolls.
-//
-// ONE table serves the nav-item set, the redirect target and the per-view
-// availability answers (issue 1151), rather than three parallel arrays repeating
-// the same eight (visibilityMode, resolutionMode) pairs: a second copy of the
-// cell list is exactly the near-identical block SonarCloud's new-code duplication
-// gate counts against `tests/**`.
-//
-// `redirect` is the view `resolveCraftingRedirect` resolves for the cell: the
-// FIRST mode-conditional entry the system offers, in rail order, and `recipes`
-// when it offers none. That is deliberately NOT the Checks sibling's `items[0]`,
-// which would always be `recipes` here and would move a GM off the surface that
-// governs who may see what onto a browser.
+// The Knowledge surface (issue 785) is gated on `effect.showBooksScrolls || resolutionMode ===
+// 'alchemy'`, which is strictly WIDER than the Books & Scrolls gate.
 const CRAFTING_MODE_CASES = [
   {
     visibilityMode: 'global',
@@ -104,9 +84,8 @@ const CRAFTING_MODE_CASES = [
     visibilityMode: 'global',
     resolutionMode: 'alchemy',
     expected: ['recipes', 'knowledge', 'settings'],
-    // The settled edge case: a `global` alchemy system DOES offer a
-    // mode-conditional entry, so sending the GM to Recipes would assert it offers
-    // none.
+    // The settled edge case: a `global` alchemy system DOES offer a mode-conditional entry, so
+    // sending the GM to Recipes would assert it offers none.
     redirect: 'knowledge',
   },
   {
@@ -303,14 +282,7 @@ test('isCraftingRoute is true for every crafting view and false otherwise', () =
   }
 });
 
-// Root-source pin, mirroring the one in `tests/checks-nav.test.js`. The rail and the
-// router must read ONE argument object: if the router built its own bag the two could
-// disagree about what the selected system offers, which is the whole defect issue 1151
-// reports. `craftingNavArgs.visibilityMode` is pinned to the DEFAULTED
-// `craftingVisibilityMode` because that same derived feeds `BooksScrollsView`,
-// `RecipeItemEditor` and `ItemPageInspector` — and `RecipeItemEditor`'s own prop default
-// is `'item'`, so a bare `selectedSystem?.visibilityMode` would silently flip its Limits
-// card from learning caps to use caps for a system with no persisted mode.
+// Root-source pin, mirroring the one in `tests/checks-nav.test.js` (issue 1151).
 test('the manager root reads one craftingNavArgs for both the rail and the router', () => {
   const rootSource = readFileSync(
     resolve(repoRoot, 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte'),

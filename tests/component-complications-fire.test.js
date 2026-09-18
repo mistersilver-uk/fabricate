@@ -1,19 +1,6 @@
 /**
- * `src/systems/complicationRuntime.js` and `evaluateSideRoll` — the EFFECTFUL half of
- * progressive component complications (issue 1286).
- *
- * Three things are pinned here that nothing else can pin:
- *
- *  1. **The condition gate FAILS CLOSED** on every uncertainty, and resolves its comparand
- *     through `resolveCheckFormulaDisplay` — which substitutes roll data WITHOUT rolling — so
- *     a `1d6` comparand does not quietly re-roll on every evaluation and mean something
- *     different each time the same gate is asked.
- *  2. **Nothing here can cost a resolution its award.** A complication is strictly downstream
- *     of a committed award, so a throwing condition roll, a malformed effect roll and a
- *     garbage plan all resolve rather than reject.
- *  3. **The GM request carries ADDRESSING ONLY.** A payload naming a macro uuid, an audience
- *     or chat content would let any authenticated player ask a GM client to execute arbitrary
- *     code at GM authority. The key set is asserted exactly, not by sampling.
+ * `src/systems/complicationRuntime.js` and `evaluateSideRoll` — the EFFECTFUL half of progressive
+ * component complications (issue 1286). Three things are pinned here that nothing else can pin:
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -43,11 +30,7 @@ function complication(overrides = {}) {
   return complications[0];
 }
 
-/**
- * A one-stage salvage plan for the given complications. The five-bucket mapping is proved
- * against the real award loop in `component-complications-plan.test.js`; this suite only needs
- * a plan to fire.
- */
+/** A one-stage salvage plan for the given complications. */
 function planOf(authored, { bucket = 'full' } = {}) {
   const produced = { id: 'iron', name: 'Iron Ingot', complications: authored };
   return planComplications({
@@ -672,12 +655,7 @@ function gmRow(overrides = {}) {
   };
 }
 
-/**
- * The card's real English, so a copy assertion reads what a GM reads.
- *
- * A key-only stub was fine while the card's strings were labels; they are sentences now, and
- * a stub would let this suite agree with itself about copy that `lang/en.json` does not carry.
- */
+/** The card's real English, so a copy assertion reads what a GM reads. */
 const CARD_LANG = JSON.parse(
   readFileSync(new URL('../lang/en.json', import.meta.url), 'utf8')
 ).FABRICATE.Chat.GmComplication;
@@ -751,10 +729,8 @@ test('1286: a hostile authored description cannot inject markup into the GM card
 });
 
 test('1286: the row is a STACK of labelled sections, not a run of columns', () => {
-  // The live defect this replaced: the row's notes were siblings of `__label` inside a
-  // `display: flex` grid cell, so a three-letter severity drew as `M o r` down three lines.
-  // The structural half of the fix is asserted here; `tests/crafting-chat-card.test.js`
-  // asserts the stylesheet half, and neither can see the other's.
+  // The live defect this replaced: the row's notes were siblings of `__label` inside a `display:
+  // flex` grid cell, so a three-letter severity drew as `M o r` down three lines.
   const content = buildGmComplicationCardContent(
     {
       entries: [
@@ -778,9 +754,8 @@ test('1286: the row is a STACK of labelled sections, not a run of columns', () =
   assert.deepEqual(sectionText(content, 'effect'), ['What happens', 'Acid damage: 10 (2d6)']);
   assert.equal(sectionText(content, 'attention'), null, 'a healthy macro adds no section');
 
-  // Every one of the row's runs is inside the ONE label. That is what makes the column
-  // direction reachable at all: a note left outside it is a flex column again, whatever the
-  // stylesheet says.
+  // Every one of the row's runs is inside the ONE label. That is what makes the column direction
+  // reachable at all: a note left outside it is a flex column again, whatever the stylesheet says.
   const [, label] = content.split('__label">');
   assert.ok(
     label.indexOf('</span></li>') > label.indexOf('data-fabricate-complication-section="effect"'),
@@ -803,9 +778,7 @@ test('1286: the row is a STACK of labelled sections, not a run of columns', () =
 });
 
 test('1286: the audience note joins the CONTEXT line, not the head line', () => {
-  // It rode the head beside the severity first. `Major · Shown to the player` is 188px of a
-  // 266px chat row as an uppercase tracked eyebrow, so it wrapped and undid the head — and
-  // it is context of the same kind as the component's name anyway.
+  // It rode the head beside the severity first.
   const seen = buildGmComplicationCardContent(
     { entries: [gmRow({ visibility: 'visible' })] },
     cardLocalize
@@ -840,10 +813,8 @@ test('1286: the claimed stage outcome is worded as a REPORT, never stated flat',
       ['Why it fired', sentence],
       `the ${bucket} bucket reads as a report`
     );
-    // The obligation, in the form the spec states it: the GM cannot re-derive the bucket, so
-    // the card may not assert it. Each sentence carries the attribution in its own grammar
-    // rather than behind a separate "Reported by the acting client" label a GM must translate
-    // (`openspec/specs/recipes-and-steps/spec.md` § "The relay payload carries ADDRESSING ONLY").
+    // The obligation, in the form the spec states it: the GM cannot re-derive the bucket, so the
+    // card may not assert it.
     assert.ok(
       /reports/.test(sentence),
       `the ${bucket} sentence attributes rather than asserts`
@@ -925,9 +896,7 @@ test('1286: a macro that threw is reported, and one that ran adds no noise', () 
 });
 
 test('1286: the consequence roll leads with its TOTAL, under the name the GM gave it', () => {
-  // `Effect roll: 2d6 = 10` read as though it were the check the complication fired on. It
-  // has no target and nothing to miss, so the number a GM narrates leads and the formula
-  // follows it as provenance.
+  // `Effect roll: 2d6 = 10` read as though it were the check the complication fired on.
   const labelled = buildGmComplicationCardContent(
     {
       entries: [
@@ -977,12 +946,8 @@ test('1286: the consequence roll leads with its TOTAL, under the name the GM gav
 });
 
 test('1286: a roll this side DECLINED by audience is not reported as a roll that failed', () => {
-  // The reachable case, from three independent editor controls: a complication that is
-  // `visible`, carries a macro, AND authors an effect roll. `needsGmClient` is true because
-  // of the macro, so the delivery lands here; `rollGmComplicationEffect` then refuses by
-  // audience — the roll belongs to the acting player's own dice, and the total it produced
-  // is already on the card as the acting client's claim. Keyed on `requested`, the card
-  // stated "Effect roll: 4" and "Effect roll failed: 1d6" two lines apart.
+  // The reachable case, from three independent editor controls: a complication that is `visible`,
+  // carries a macro, AND authors an effect roll.
   const declined = buildGmComplicationCardContent(
     {
       entries: [
@@ -1076,11 +1041,9 @@ test('1286: a severity outside the vocabulary resolves no key rather than render
     'a label key interpolated from an authored token would render as garbage forever'
   );
   // The other half, and the one a bare `MAP[token]` fails: `Object.freeze` does not detach
-  // `Object.prototype`, so `SEVERITY_KEYS.constructor` is the `Object` CONSTRUCTOR — truthy,
-  // so the guard above passes and the card then renders `function Object() { [native code] }`
-  // as the complication's severity. `constructor` is a reachable token because the persisted
-  // shape deliberately PRESERVES a malformed severity and Fabricate imports third-party
-  // systems, so this is an authored string reaching a lookup, not a hypothetical.
+  // `Object.prototype`, so `SEVERITY_KEYS.constructor` is the `Object` CONSTRUCTOR — truthy, so the
+  // guard above passes and the card then renders `function Object() { [native code] }` as the
+  // complication's severity.
   assert.equal(content.includes('native code'), false, 'and no prototype member reaches it');
   assert.equal(content.includes('__complication-tags'), false, 'so the row draws no tags at all');
   assert.ok(content.includes('data-fabricate-complication-severity="constructor"'));
@@ -1105,8 +1068,7 @@ test('1286: an AWARDED stage with no result id fires no stageMissed complication
 
   // `resolveProgressiveAward` pushes a result into `awarded` whatever its id, and only the
   // classifier's own id set drops it — so an id-less stage that WAS awarded is invisible in
-  // `awarded` here. Classifying it as `unreached` would fire "you missed the iron ingot" on
-  // a component the player is holding; `skipped` is the bucket that contributes to nothing.
+  // `awarded` here.
   const authored = complication({
     visibility: 'visible',
     name: 'You missed it',
@@ -1153,11 +1115,10 @@ function appliedRow(overrides = {}) {
 }
 
 test('1286: every card row carries its OWN bucket, total and macro outcome', () => {
-  // The whole reason this projection is a pure export rather than an inline map in
-  // `main.js`: the augmentation used to pair a projected row with `applied[index]`, and
-  // `main.js` cannot be imported under `node --test`, so a text pin could not tell
-  // `applied[index]` from `applied[0]` — under which every row would report row zero's
-  // stage, its claimed total and its macro outcome. Two rows that disagree on all three.
+  // The whole reason this projection is a pure export rather than an inline map in `main.js`: the
+  // augmentation used to pair a projected row with `applied[index]`, and `main.js` cannot be
+  // imported under `node --test`, so a text pin could not tell `applied[index]` from `applied[0]` —
+  // under which every row would report row zero's stage, its claimed total and its macro outcome.
   const entries = gmComplicationCardEntries([
     appliedRow({
       component: { id: 'iron', name: 'Iron Ingot' },
@@ -1223,9 +1184,8 @@ function planInBucket(authored, { bucket, matchedTriggerIds = [] }) {
     resolutionId: 'res-1',
     stages: [{ resultId: 'r1', componentId: 'iron', component: produced }],
     award: {
-      // The partial tail IS a member of `awarded`, and `bucketFor` tests `partial` first —
-      // mirrored here rather than simplified, or the oracle would drive a shape the loop
-      // never produces.
+      // The partial tail IS a member of `awarded`, and `bucketFor` tests `partial` first — mirrored
+      // here rather than simplified, or the oracle would drive a shape the loop never produces.
       awarded: bucket === 'full' || bucket === 'partial' ? [{ id: 'r1' }] : [],
       partialResult: bucket === 'partial' ? { id: 'r1' } : null,
       haltedResult: bucket === 'halted' ? { id: 'r1' } : null,
@@ -1246,14 +1206,10 @@ const CLAUSE_OF_REASON = {
 };
 
 test('1286: every reason the GM card names really did fire the complication', () => {
-  // THE ORACLE. `complicationReasons` re-derives the firing's reasons on the GM client from
-  // the GM's own authored record plus the claimed bucket, deliberately rather than reading a
-  // relayed list — `resolution-modes/spec.md` § Progressive Awarding turns down a fourth
-  // client-supplied claim on that payload by name. Re-derivation means a private mirror of
-  // `complicationPlan.js`'s clause/bucket table, and a mirror drifts. So the mirror is not
-  // trusted: every (match mode, clause set, bucket) the planner can produce is driven through
-  // the REAL planner, and every reason the card would name must appear in that firing's own
-  // matched conditions. The card may say less than the truth; it may never say something else.
+  // THE ORACLE. `complicationReasons` re-derives the firing's reasons on the GM client from the
+  // GM's own authored record plus the claimed bucket, deliberately rather than reading a relayed
+  // list — `resolution-modes/spec.md` § Progressive Awarding turns down a fourth client-supplied
+  // claim on that payload by name.
   const buckets = ['full', 'partial', 'halted', 'unreached'];
   const stageSets = [[], ['stageAwarded'], ['stagePartial'], ['stageMissed'], ['stageAwarded', 'stageMissed']];
   let named = 0;

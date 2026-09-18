@@ -1,17 +1,4 @@
-/**
- * Tests for issue 552: player-facing per-slot ingredient option overrides.
- *
- * Covers the ONE resolver seam (IngredientSet.resolveIngredientSelection) both
- * consumers route through, plus the RecipeManager display projection:
- *   - an override selects a satisfiable non-default option (it wins)
- *   - an override to a SHORT option reports THAT option's have/need (no fallback)
- *   - a tag-stack override consumes the chosen held item
- *   - a currency override routes to currencySpends (decision 3)
- *   - NO override is byte-for-byte the first-satisfiable default
- *   - an out-of-range override falls back to the default
- *   - evaluateCraftability display (ingredientStates + ingredientChoices) reflects
- *     the SAME option the resolver consumes (display == consumed, issue 553)
- */
+/** Tests for issue 552: player-facing per-slot ingredient option overrides. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 

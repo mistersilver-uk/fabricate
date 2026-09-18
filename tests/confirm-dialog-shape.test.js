@@ -1,38 +1,12 @@
-/**
- * The confirm seam's OPTIONS SHAPE (issue 1154), pinned across BOTH wrappers.
- *
- * `services.confirmDialog` is the only yes/no primitive in the app, and two things about
- * the bag it forwards are read by nothing unless they are mapped first. Verified against
- * the real builds rather than the docs:
- *
- *  - `ApplicationV2#title` is `_loc(this.options.window.title)` — V14.365
- *    `client/applications/api/application.mjs:319-321`, V13.351 the same getter at
- *    `:287` — and `DEFAULT_OPTIONS.window.title` is `""`. Nothing reads a TOP-LEVEL
- *    `title`, so an unmapped one renders an empty title bar.
- *  - `DialogV2.confirm` merges `yes`/`no` over defaults with `mergeObject` — V14.365
- *    `client/applications/api/dialog.mjs:346-354`, V13.351 `:315-323` — and
- *    `mergeObject` iterates `Object.keys(other)`, which is `[]` for a function. So a
- *    bare `yes: () => 'x'` contributes NOTHING: not its label and not its callback.
- *
- * The mapping deliberately does NOT reuse `normalizeDialogOptions`. That normalizer
- * injects `buttons: [{ action: 'close', … }]` when `buttons` is absent, and
- * `DialogV2.confirm` then does `config.buttons ??= []; config.buttons.unshift(yes, no)` —
- * a THREE-button confirm on every site. The `does not invent buttons` case below is that
- * trap, held open.
- *
- * VERSION NOTE: the DEFAULT labels are the literals `"Yes"`/`"No"` on V13.351 and the
- * i18n keys `"COMMON.Yes"`/`"COMMON.No"` on V14.365, so nothing here asserts a default
- * label — only that a SUPPLIED one survives, which is version-independent.
- */
+/** The confirm seam's OPTIONS SHAPE (issue 1154), pinned across BOTH wrappers. */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { confirmDialog as compatConfirmDialog } from '../src/ui/foundryCompat.js';
 import { confirmDialog as bridgeConfirmDialog } from '../src/ui/svelte/util/foundryBridge.js';
 
-// Both wrappers are the same seam for the same primitive; the manager app wires
-// foundryCompat and the player app wires foundryBridge. Running one table over both is
-// what stops them drifting apart again.
+// Both wrappers are the same seam for the same primitive; the manager app wires foundryCompat and
+// the player app wires foundryBridge.
 const SEAMS = [
   ['foundryCompat', compatConfirmDialog],
   ['foundryBridge', bridgeConfirmDialog],

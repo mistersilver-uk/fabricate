@@ -1,13 +1,9 @@
 /**
- * Unit tests for T-045: CraftingEngine.salvage() method
- *
- * 18 tests across 6 groups:
- *  Group 1: Input validation (3 tests)
- *  Group 2: Component resolution and feature validation (3 tests)
- *  Group 3: Salvage validation + ownership + tool checks (3 tests)
- *  Group 4: Salvage check failure + consumption policy (3 tests)
- *  Group 5: Success path — consume, create, record run (3 tests)
- *  Group 6: SalvageRun record shape and history management (3 tests)
+ * Unit tests for T-045: CraftingEngine.salvage() method. 18 tests across 6 groups: Group 1: Input
+ * validation (3 tests) Group 2: Component resolution and feature validation (3 tests) Group 3:
+ * Salvage validation + ownership + tool checks (3 tests) Group 4: Salvage check failure +
+ * consumption policy (3 tests) Group 5: Success path — consume, create, record run (3 tests) Group
+ * 6: SalvageRun record shape and history management (3 tests)
  */
 
 import test from 'node:test';
@@ -28,9 +24,7 @@ for (const timed of [false, true]) {
   });
 }
 
-// ---------------------------------------------------------------------------
 // Globals
-// ---------------------------------------------------------------------------
 
 function getProperty(obj, path) {
   if (!obj || !path) return undefined;
@@ -63,9 +57,7 @@ globalThis.ui = { notifications: { info: () => {}, warn: () => {}, error: () => 
 // fromUuid is overridden per test or defaults to null
 globalThis.fromUuid = async () => null;
 
-// ---------------------------------------------------------------------------
 // Builders
-// ---------------------------------------------------------------------------
 
 function makeItem(id, name, quantity = 1) {
   const item = {
@@ -265,9 +257,7 @@ function setupGame(system, actor) {
   return salvageRunManager;
 }
 
-// ---------------------------------------------------------------------------
 // Group 1: Input validation
-// ---------------------------------------------------------------------------
 
 test('salvage() returns failure when actorUuid resolves to null', async () => {
   const engine = makeEngine();
@@ -310,9 +300,7 @@ test('salvage() returns failure when componentId not found in system', async () 
   assert.equal(result.salvageRun, null);
 });
 
-// ---------------------------------------------------------------------------
 // Group 2: Feature validation
-// ---------------------------------------------------------------------------
 
 test('salvage() returns failure when features.salvage is not enabled on system', async () => {
   const engine = makeEngine();
@@ -360,9 +348,7 @@ test('salvage() returns failure when validateSalvage reports errors', async () =
   assert.match(result.message, /result group/i);
 });
 
-// ---------------------------------------------------------------------------
 // Group 3: Ownership and tool checks
-// ---------------------------------------------------------------------------
 
 test('salvage() returns failure when actor does not have enough component items', async () => {
   const engine = makeEngine();
@@ -477,9 +463,7 @@ test('salvage() passes checks when actor has enough items and tools present', as
   );
 });
 
-// ---------------------------------------------------------------------------
 // Group 4: Salvage check failure + consumption policy
-// ---------------------------------------------------------------------------
 
 test('salvage() returns failure when salvage check fails', async () => {
   const fakeResolutionService = {
@@ -638,9 +622,7 @@ test('salvage(): a cancelled interactive check aborts with zero mutation and no 
 });
 
 test('misconfigured required salvage check: salvage aborts with ZERO mutation (no consume/break)', async () => {
-  // routed salvage with no authored roll formula is a GM-side misconfiguration. The
-  // real _runSalvageCraftingCheck flags it `misconfigured`, and salvage() must abort
-  // before any consumption even though the policy WOULD consume + break on a failure.
+  // routed salvage with no authored roll formula is a GM-side misconfiguration.
   const fakeResolutionService = {
     validateSalvage: () => ({ valid: true, errors: [] }),
     resolveResultGroups: () => ({ groups: [], meta: {} }),
@@ -794,9 +776,7 @@ test('a retry after a misconfigured abort creates a fresh run rather than reusin
   );
 });
 
-// ---------------------------------------------------------------------------
 // Group 5: Success path
-// ---------------------------------------------------------------------------
 
 test('salvage() consumes component item on success', async () => {
   const fakeResolutionService = {
@@ -834,10 +814,8 @@ test('salvage() consumes component item on success', async () => {
   );
 });
 
-// Issue 675: the player summary reports "with a roll of N", so the engine must thread
-// the rolled total onto the TOP-LEVEL result — not only onto `salvageRun`, which is
-// null on the runless path. A rolled check surfaces the number; a no-check salvage
-// surfaces null so the UI omits the roll phrase entirely.
+// Issue 675: the player summary reports "with a roll of N", so the engine must thread the rolled
+// total onto the TOP-LEVEL result — not only onto `salvageRun`, which is null on the runless path.
 test('salvage() threads the rolled total onto the top-level result (issue 675)', async () => {
   const fakeResolutionService = {
     validateSalvage: () => ({ valid: true, errors: [] }),
@@ -976,9 +954,7 @@ test('salvage() creates result items on success', async () => {
   assert.ok(result.results.length > 0, 'Should have created at least one result item');
 });
 
-// ---------------------------------------------------------------------------
 // Group 6: SalvageRun record shape and history
-// ---------------------------------------------------------------------------
 
 test('salvage() creates a SalvageRun record with correct shape on success', async () => {
   const fakeResolutionService = {
@@ -1106,9 +1082,7 @@ test('salvage() appends run to actor flags history and respects 50-entry limit',
   assert.equal(history[0].componentId, 'comp-1', 'Newest run should be first');
 });
 
-// ---------------------------------------------------------------------------
 // Group 7: Simple mode -- full validate-consume-create flow
-// ---------------------------------------------------------------------------
 
 test('salvage() simple mode creates result items with correct quantities from result group', async () => {
   const resultComp1 = { id: 'scrap-iron', name: 'Scrap Iron', registeredItemUuid: null };
@@ -1194,9 +1168,7 @@ test('salvage() simple mode uses only the first result group when component has 
   );
 });
 
-// ---------------------------------------------------------------------------
 // Group 8: Routed mode -- outcome routing
-// ---------------------------------------------------------------------------
 
 test('salvage() routed mode routes to correct result group based on check outcome', async () => {
   const passComp = { id: 'gold-nugget', name: 'Gold Nugget', registeredItemUuid: null };
@@ -1368,9 +1340,7 @@ test('_resolveSalvageResultGroups routed salvage routes by outcomeRouting (forme
   assert.equal(passResult[0].id, 'rg-pass');
 });
 
-// ---------------------------------------------------------------------------
 // Group 9: Progressive mode -- difficulty-based awarding
-// ---------------------------------------------------------------------------
 
 test('_resolveSalvageResultGroups progressive mode awards results up to check value by difficulty', () => {
   const engine = makeEngine();
@@ -1499,22 +1469,8 @@ test('_resolveSalvageResultGroups progressive exceed mode awards only when value
 });
 
 test('_resolveSalvageResultGroups progressive forces quantity 1 — an ordered list has no counts', () => {
-  // READ THIS BEFORE "RESTORING" THE AUTHORED QUANTITY (issue 676).
-  //
-  // Progressive is an ORDERED LIST OF INDIVIDUAL RESULTS. Repetition is expressed by
-  // listing the same component twice — never by a count — because the award loop spends
-  // the roll budget PER ENTRY: it charges the component's difficulty once and awards the
-  // entry once. A `quantity: 2` was therefore two items for the price of one entry's
-  // difficulty, which is not a rule the mode has.
-  //
-  // Recipes already forced this (`ResolutionModeService._resolveProgressive`:
-  // `awarded.map((result) => ({ ...result, quantity: 1 }))`). Salvage did not, so it
-  // returned the authored objects by identity and `_createResultItems` wrote
-  // `itemData.system.quantity = result.quantity` — set 2, get 2. This test pins the
-  // two paths to the SAME rule.
-  //
-  // `quantity` stays in the stored model (the normalizer still clamps it) and is inert
-  // here, so no migration is needed: an authored 2 simply stops being honoured.
+  // READ THIS BEFORE "RESTORING" THE AUTHORED QUANTITY (issue 676). Progressive is an ORDERED LIST
+  // OF INDIVIDUAL RESULTS.
   const engine = makeEngine();
   const resultGroup = {
     id: 'rg-1',
@@ -1557,9 +1513,8 @@ test('_resolveSalvageResultGroups progressive forces quantity 1 — an ordered l
 });
 
 test('_resolveSalvageResultGroups progressive partial mode awards a final partial result on remainder', () => {
-  // partial: full results while `remaining >= cost`, then ONE final result on any
-  // leftover `remaining > 0`. value 4, costs 3 then 5 → item-a fully (remaining 1),
-  // item-b as the partial tail (remaining 1 > 0), then stop.
+  // partial: full results while `remaining >= cost`, then ONE final result on any leftover
+  // `remaining > 0`.
   const engine = makeEngine();
   const resultGroup = {
     id: 'rg-1',
@@ -1607,9 +1562,8 @@ test('_resolveSalvageResultGroups progressive partial mode awards a final partia
 });
 
 test('_resolveSalvageResultGroups progressive mode skips results with invalid difficulty and continues', () => {
-  // Salvage skips (continue) a result whose component difficulty is missing/<1
-  // rather than failing the whole award. value 6: item-a (cost 2) awarded, item-b
-  // (no difficulty) skipped, item-c (cost 3) awarded → both valid results awarded.
+  // Salvage skips (continue) a result whose component difficulty is missing/<1 rather than failing
+  // the whole award.
   const engine = makeEngine();
   const resultGroup = {
     id: 'rg-1',
@@ -1705,11 +1659,8 @@ test('salvage() progressive mode creates items matching awarded results', async 
 
   assert.equal(result.success, true);
   assert.equal(actor.createdItems.length, 1, 'Only item-a should be created (cost 2 <= value 3)');
-  // ONE item, though the group authors `quantity: 2` — the BEHAVIOUR CHANGE of issue 676,
-  // asserted end-to-end through `_createResultItems`. Progressive is an ordered list of
-  // individual results; a count was never a rule of the mode, and honouring one gave two
-  // items for one entry's difficulty. Recipes have always forced this; salvage now does
-  // too. See `_resolveSalvageResultGroups progressive forces quantity 1` for the why.
+  // ONE item, though the group authors `quantity: 2` — the BEHAVIOUR CHANGE of issue 676, asserted
+  // end-to-end through `_createResultItems`.
   assert.equal(
     actor.createdItems[0].system.quantity,
     1,
@@ -1717,9 +1668,7 @@ test('salvage() progressive mode creates items matching awarded results', async 
   );
 });
 
-// ---------------------------------------------------------------------------
 // Group 10: Failure consumption policy -- all four combinations
-// ---------------------------------------------------------------------------
 
 test('salvage failure: consumeComponent=true, consumeCatalysts=true -- both consumed', async () => {
   const fakeResolutionService = {
@@ -1929,16 +1878,13 @@ test('salvage failure: consumeComponent=false, consumeCatalysts=false -- nothing
   assert.equal(tool.used, false, 'Tool should NOT be broken (breakToolsOnFail=false)');
 });
 
-// ---------------------------------------------------------------------------
 // Group 11: Integration test -- end-to-end salvage flow with real ResolutionModeService
-// ---------------------------------------------------------------------------
 
 const { ResolutionModeService } = await import('../src/systems/ResolutionModeService.js');
 
 test('end-to-end salvage: resolve actor, validate, check, consume, create, record run', async () => {
-  // Wire up real ResolutionModeService (not mocked) so validateSalvage runs the actual logic.
-  // The system manager is provided via game.fabricate.getCraftingSystemManager.
-  // We stub only _runSalvageCraftingCheck since it needs MacroExecutor.
+  // Wire up real ResolutionModeService (not mocked) so validateSalvage runs the actual logic. The
+  // system manager is provided via game.fabricate.getCraftingSystemManager.
 
   const scrapComp = { id: 'scrap-metal', name: 'Scrap Metal', registeredItemUuid: null };
   const toolItem = makeItem('acid-vial', 'Acid Vial', 1);
@@ -2043,9 +1989,7 @@ test('end-to-end salvage: resolve actor, validate, check, consume, create, recor
 });
 
 test('salvage run createdResults record the awarding componentId, in award order (issue 659)', async () => {
-  // A single result group awards two distinct components. The persisted run's
-  // createdResults must carry each awarding componentId (not the pre-fix
-  // hardcoded null), and in the order the results were awarded.
+  // A single result group awards two distinct components.
   const scrapIron = { id: 'scrap-iron', name: 'Iron Scrap', registeredItemUuid: null };
   const scrapWood = { id: 'scrap-wood', name: 'Wood Scrap', registeredItemUuid: null };
 
@@ -2203,21 +2147,8 @@ test('processPendingSalvageRuns() auto-completes timed salvage runs after world-
   );
 });
 
-// ---------------------------------------------------------------------------
-// Group 7 (issue 859): the additive `salvage()` return flags, and `suppressChat`,
-// each driven THROUGH `salvage()` rather than through the poster.
-//
-// `tests/salvage-chat-output.test.js` invokes `_postSalvageChatMessage` DIRECTLY, so a
-// poster-level test cannot see a missed thread — and the flag has TWO call sites (the
-// rolled-failure path and the success path). Forgetting one means a 10-item bulk run
-// with 4 failures posts the aggregate card PLUS 4 stray per-item cards, green.
-//
-// The assertions are therefore on the CAPTURED CONTENT, never on a `ChatMessage.create`
-// call count: the per-roll `Roll#toMessage` dice posts are deliberately KEPT (they are
-// the Dice So Nice trigger), so an interactive run legitimately creates messages even
-// with the salvage card suppressed. A count assertion would fail against correct
-// behaviour.
-// ---------------------------------------------------------------------------
+// Group 7 (issue 859): the additive `salvage()` return flags, and `suppressChat`, each driven
+// THROUGH `salvage()` rather than through the poster.
 
 /** The markup root only the SALVAGE CARD carries — never a dice post. */
 const SALVAGE_CARD_MARKUP = 'fabricate-craft-chat';
@@ -2381,13 +2312,9 @@ test('salvage(): a misconfigured CHECK returns misconfigured: true', async () =>
 });
 
 test('an UNSUPPORTED salvage mode is refused on all three MUTATING engine paths', async () => {
-  // `resolveSalvageCheck` coerces an unsupported token to `simple` for display and pairs
-  // it with `unsupportedMode: true`, so every reader that would MUTATE has to test the
-  // flag before reading the mode. That contract is pinned in the pure resolver's own
-  // suite; these three are the real, mutating call sites, where getting it wrong awards
-  // `resultGroups[0]` and breaks tools for a configuration `validateSalvage` already
-  // rejects. Defence in depth — `validateSalvage` refuses the same system first — so this
-  // is one cheap assertion per path rather than a suite.
+  // `resolveSalvageCheck` coerces an unsupported token to `simple` for display and pairs it with
+  // `unsupportedMode: true`, so every reader that would MUTATE has to test the flag before reading
+  // the mode.
   const engine = makeEngine();
   const component = makeComponent({ name: 'Test Component' });
   const system = makeSystem({
@@ -2424,11 +2351,8 @@ test('an UNSUPPORTED salvage mode is refused on all three MUTATING engine paths'
 });
 
 test('salvage(): a validateSalvage ABORT returns misconfigured: true as well', async () => {
-  // Branch two of two, and the one that actually fires in a wired world: this gate runs
-  // BEFORE the check, so a GM-side config error never reaches the check's own
-  // misconfigured return. Without the flag here the player is told "Nothing recovered"
-  // for a configuration only their GM can fix — and the whole `misconfigured` row of the
-  // bulk outcome table would be dead in production.
+  // Branch two of two, and the one that actually fires in a wired world: this gate runs BEFORE the
+  // check, so a GM-side config error never reaches the check's own misconfigured return.
   const engine = makeEngine({
     resolutionModeService: {
       validateSalvage: () => ({ valid: false, errors: ['two success groups in simple mode'] }),
@@ -2464,9 +2388,8 @@ test('salvage(): a rolled failure carries NO misconfigured flag', async (t) => {
 });
 
 test('salvage(): a time-gated run returns waiting: true ALONGSIDE success: true', async () => {
-  // The flag exists so a caller need not re-derive "started, come back later" from
-  // `results == null` — which is also what a no-result success looks like. `success` is
-  // deliberately unchanged, so no existing consumer regresses.
+  // The flag exists so a caller need not re-derive "started, come back later" from `results ==
+  // null` — which is also what a no-result success looks like.
   const salvageRunManager = new SalvageRunManager();
   const engine = makeEngine({
     resolutionModeService: {
@@ -2522,19 +2445,8 @@ test('salvage(): a genuine no-result success carries NO waiting flag', async () 
   assert.deepEqual(result.results, [], 'it resolved; it just had nothing to award');
 });
 
-// ---------------------------------------------------------------------------
-// Group 8 (issue 1098): the FAILURE AWARD — a capability salvage never had.
-//
-// Until this issue `salvage()` returned inside `if (!checkResult.success)` BEFORE
-// `_resolveSalvageResultGroups`, so a failed salvage awarded nothing whatever a component
-// authored. Two canonical statements and one in-code comment said that was deliberate;
-// all three are retracted, and this group is what makes the retraction checkable.
-//
-// EVERY TEST HERE DRIVES `salvage()`, never `_resolveSalvageResultGroups` alone. The
-// resolver could select the right group and the branch still report an empty award on
-// three separate seams — the run record, the chat card and the return value — and a
-// resolver-level test cannot see any of them.
-// ---------------------------------------------------------------------------
+// Group 8 (issue 1098): the FAILURE AWARD — a capability salvage never had. EVERY TEST HERE DRIVES
+// `salvage()`, never `_resolveSalvageResultGroups` alone.
 
 /** A component whose CLAMPED groups are [success, failure] — CF1's trap, exactly. */
 function makeFailureAwardComponent() {
@@ -2602,10 +2514,7 @@ test('salvage(): a failed check under always awards the reserved failure group, 
   const result = await engine.salvage(actor.uuid, system.id, component.id);
 
   assert.equal(result.success, false, 'it is still a FAILED salvage');
-  // CF1's trap, asserted directly. `resultGroups[0]` is the SUCCESS group by the
-  // `_normalizeSalvage` retain-one clamp, so an index-based selection — which is exactly
-  // what `slice(0, 1)` would have produced — awards the full success salvage output on a
-  // failed check. The NAMES distinguish the two: a length-only assertion cannot.
+  // CF1's trap, asserted directly.
   assert.equal(actor.createdItems.length, 1, 'exactly one item was awarded');
   assert.equal(
     actor.createdItems[0].name,
@@ -2636,10 +2545,7 @@ test('salvage(): the failure award is reported on the return value, the run reco
     'in the SUCCESS branch shape — carrying the component id, not just a uuid'
   );
 
-  // 3. THE RENDERED CHAT CARD, read as HTML rather than as the arguments passed to the
-  //    poster. `buildResultCard`'s failure branch built its sections from `model.consumed`
-  //    and `model.tools` ONLY and never read `model.results`, so a threaded award rendered
-  //    as nothing — an argument-level assertion passes on a card that shows nothing.
+  // 3. THE RENDERED CHAT CARD, read as HTML rather than as the arguments passed to the poster.
   const card = created.find((payload) => String(payload.content).includes(SALVAGE_CARD_MARKUP));
   assert.ok(card, 'the salvage card was posted');
   assert.match(String(card.content), /Ruined scraps/, 'the failure card renders the awarded item');
@@ -2727,22 +2633,13 @@ test('_resolveSalvageResultGroups: routed selects the FAILING tier name through 
   );
 });
 
-// ---------------------------------------------------------------------------
-// Group 12: Progressive component complications (issue 1286)
-//
-// The firing site sits between `_awardSalvageResultGroups` and
-// `_postSalvageChatMessage`: after the award is committed, before the card. These
-// assert WHAT fires and — at least as importantly — the four places that must fire
-// NOTHING (the failure branch, the two non-progressive modes, and a second occurrence
-// of an already-fired complication).
-// ---------------------------------------------------------------------------
+// Group 12: Progressive component complications (issue 1286). The firing site sits between
+// `_awardSalvageResultGroups` and `_postSalvageChatMessage`: after the award is committed, before
+// the card.
 
 /**
- * One authored complication. `visibility` defaults to `gmOnly`, so every firing
- * produces a GM request and the delivery spy counts firings end to end. Neither roll
- * is enabled: a condition roll and an effect roll are the RUNTIME's concern and are
- * covered by that module's own suite; enabling either here would only stub Foundry's
- * `Roll` back into a test about the engine's call sites.
+ * One authored complication. `visibility` defaults to `gmOnly`, so every firing produces a GM
+ * request and the delivery spy counts firings end to end.
  */
 function complication({
   id = 'cx',
@@ -2904,9 +2801,8 @@ test('salvage(): a MISSED stage fires, and reads the halt the award loop reporte
 });
 
 test('salvage(): NEGATIVE CONTROL — the FAILURE branch fires nothing at all', async () => {
-  // `_resolveSalvageResultGroups` returns [] for a failed progressive check, so there are
-  // no stages, no award and no candidates. That is a stated requirement, not an accident:
-  // a failed salvage must not fire the complications a successful one would have.
+  // `_resolveSalvageResultGroups` returns [] for a failed progressive check, so there are no
+  // stages, no award and no candidates.
   const { engine, writer, actor, component, system } = progressiveSalvageWorld({
     checkSuccess: false,
     complicationsA: [complication()],
@@ -2963,10 +2859,8 @@ test('salvage(): NEGATIVE CONTROL — simple mode fires nothing, and still selec
 });
 
 test('salvage(): a component listed twice fires TWICE, once per result entry', async () => {
-  // Repetition is how a progressive result set asks for more of a result, so listing
-  // item-a twice is two awards. `r-1` is granted and `r-2` halts the loop, so a
-  // complication clausing on both outcomes fires on each entry for the outcome THAT entry
-  // had — and a `1d6` on it rolls twice, because two awards went two ways.
+  // Repetition is how a progressive result set asks for more of a result, so listing item-a twice
+  // is two awards.
   const { engine, writer, actor, component, system } = progressiveSalvageWorld({
     results: [
       { id: 'r-1', componentId: 'item-a', quantity: 1 },
@@ -2997,9 +2891,8 @@ test('salvage(): a component listed twice fires TWICE, once per result entry', a
 });
 
 test('salvage(): the RUN RECORD order decides which stage fires, not the authored order', async () => {
-  // The order is captured onto the run at start, so a world-time-resumed salvage is
-  // independent of whichever client wins the race. Reversing it moves the budget onto a
-  // different stage, and the firing must follow the award rather than the authored list.
+  // The order is captured onto the run at start, so a world-time-resumed salvage is independent of
+  // whichever client wins the race.
   const salvageRunManager = new SalvageRunManager();
   const { engine, writer, actor, component, system } = progressiveSalvageWorld({
     complicationsA: [complication({ id: 'ca', when: { stageAwarded: true } })],

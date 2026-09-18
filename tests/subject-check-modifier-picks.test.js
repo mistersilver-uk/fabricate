@@ -1,20 +1,6 @@
 /**
- * Issue 1095 — the SUBJECT check-modifier pick, asserted against each of the FOUR
- * whitelist rebuilds that emit it.
- *
- * WHY THIS FILE EXISTS RATHER THAN LEANING ON THE ROUND-TRIP. The KEEP-mode export
- * round-trip (`tests/authoring-export-roundtrip.test.js`) carries these fields too, but its
- * harness's `systemManager` is a plain `Map` with no normalization at all
- * (`tests/helpers/authoringExportHarness.js`) — so removing the emit from any of the three
- * normalizers leaves that suite GREEN. It proves the fixture survives JSON and the
- * importer; it cannot prove a normalizer emits anything. Every assertion below was
- * confirmed to go RED when the key is deleted from the ONE normalizer it exercises.
- *
- * The subtle half is the same on all three subjects, and it is the half a copy gets wrong:
- * an AUTHORED EMPTY array is a real pick of ZERO (nothing is appended to the roll), an
- * ABSENT one INHERITS the activity's default set, and the two resolve to DIFFERENT rolls
- * rather than to an error. Authoredness is decided by `Array.isArray` AT ENTRY, so a pick
- * whose members are junk stays an authored pick.
+ * Issue 1095 — the SUBJECT check-modifier pick, asserted against each of the FOUR whitelist
+ * rebuilds that emit it.
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -110,11 +96,9 @@ test('_normalizeSalvage survives a whole-system normalize, alongside its sibling
   assert.equal(Object.hasOwn(byId.get('c3').salvage, 'checkModifierIds'), false);
 });
 
-// ── gathering: GatheringTask.checkModifierIds, through BOTH mirrors ──────────
-//
-// `GatheringTask` is normalized by TWO mirrored whitelist rebuilds, and a key emitted by
-// one and not the other survives ONE save path and is dropped on the other — silently, and
-// in one direction only. Both are driven here, each through a path that reaches only it.
+// gathering: GatheringTask.checkModifierIds, through BOTH mirrors. `GatheringTask` is normalized by
+// TWO mirrored whitelist rebuilds, and a key emitted by one and not the other survives ONE save
+// path and is dropped on the other — silently, and in one direction only.
 
 /** Drive `normalizeLibraryTask` (`GatheringRichStateService`) over a raw config. */
 function normalizeThroughRichState(task) {
@@ -147,11 +131,9 @@ test('normalizeLibraryTask preserves authoredness on all five inputs', () => {
 });
 
 test('_normalizeGatheringTask — the adminStore MIRROR — answers identically', async () => {
-  // The mirror is module-private, so it is driven through the ONE public path that reaches
-  // it: the store's `gatheringConfig` projection, which normalizes the whole persisted
-  // config through `_normalizeGatheringTask`. Anything the mirror drops here is dropped on
-  // every manager save of a gathering task, whatever `normalizeLibraryTask` does — and in
-  // one direction only, which is why both mirrors are asserted rather than one.
+  // The mirror is module-private, so it is driven through the ONE public path that reaches it: the
+  // store's `gatheringConfig` projection, which normalizes the whole persisted config through
+  // `_normalizeGatheringTask`.
   const { createAdminStore } = await import('../src/ui/svelte/stores/adminStore.js');
   const { get } = await import('svelte/store');
 

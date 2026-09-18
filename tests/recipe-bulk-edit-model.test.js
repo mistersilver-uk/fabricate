@@ -1,34 +1,7 @@
 /**
- * Issue 1010 — the recipe browser's pure bulk staging model.
- *
- * Everything the recipe bulk edit can be reasoned about without a DOM lives in
- * `src/utils/recipeBulkEditModel.js`; the Svelte surfaces are wiring. This suite owns the
- * semantics the plan pinned as easy to get subtly wrong, and each of them is a case that
- * can actually fail:
- *
- * - the check tier's THREE distinct instructions — leave alone, clear to the default DC,
- *   set a named tier — round-tripping through one `<select>` value without `''` and
- *   `'__default__'` ever collapsing into each other;
- * - `checkTierId` being emitted on PRESENCE of its staged flag, never on the truthiness of
- *   its value, so a staged `null` survives — asserted with `Object.hasOwn` on both sides,
- *   because `edit.checkTierId === undefined` cannot tell an absent key from a present one;
- * - `enabled: false` and `locked: false` surviving the same projection, for the same reason;
- * - a book never being simultaneously staged for add and for remove, asserted against a
- *   HAND-BUILT hostile draft so the invariant is proven structural in the model's own
- *   normalization rather than merely a property of the setter that usually feeds it;
- * - a removal-only draft counting as a change, so `Apply` enables for it;
- * - the per-book selection count being read from each projected row's `recipeItemIds`,
- *   which is basis-aware, and NEVER from a definition's own `recipeIds`;
- * - the check-tier gate reporting each of its five reasons, and reporting `available` only
- *   when the gate is open AND the system actually authors tiers;
- * - the blocked-enable forecast counting the same rows the row pill pills — in particular
- *   NOT counting an already-enabled blocked recipe, which the activation gate never refuses.
- *
- * The SELECTION half is not re-tested here: it lives in `bulkSelectionModel.js` and is
- * pinned by `bulk-selection-model.test.js`. This suite only pins that the recipe-flavoured
- * aliases really are those functions.
- *
- * Top-level under `tests/` deliberately: the `npm test` glob covers `tests/*.test.js`.
+ * Issue 1010 — the recipe browser's pure bulk staging model. Everything the recipe bulk edit can be
+ * reasoned about without a DOM lives in `src/utils/recipeBulkEditModel.js`; the Svelte surfaces are
+ * wiring.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
@@ -133,9 +106,8 @@ describe('recipe bulk edit model (issue 1010) — the staged draft', () => {
 });
 
 describe('recipe bulk edit model — the recipe-book op setter', () => {
-  // The control SETS an op rather than advancing a cycle, so the model must be idempotent
-  // per op and reachable in one step from any starting state. A cycle-shaped helper could
-  // not express "the GM pressed Remove" without knowing what they had pressed before.
+  // The control SETS an op rather than advancing a cycle, so the model must be idempotent per op
+  // and reachable in one step from any starting state.
   it('setBulkRecipeBookOp lands on the named op from ANY starting state, in one call', () => {
     const start = {
       none: createRecipeBulkDraft(),
@@ -260,17 +232,9 @@ describe('recipe bulk edit model — countRecipeBookMembership', () => {
   });
 
   // THE POINT OF THIS HELPER. Membership resolves through the monotone
-  // `system.membershipResolvesByRecipeIds` marker, and while it is unset it resolves through
-  // the legacy `recipe.recipeItemId` scalar — so a book that holds every selected recipe can
-  // still carry an EMPTY `definition.recipeIds`. A count sourced from the definition would
-  // report "holds none selected" on exactly the legacy worlds that most need this axis, and
-  // would disable Remove for a book the GM can see on every one of those rows.
-  //
-  // The rows below are what `_buildRecipeList` projects for such a system:
-  // `recipeItemIds` comes from `recipeItemDefinitionsContaining` (`utils/recipeItemMembership.js`),
-  // which takes the basis as a parameter and is therefore basis-aware.
-  // `tests/recipe-book-membership-basis.test.js` proves that projection against a real
-  // legacy-basis store; this case proves the counter reads it rather than the definition.
+  // `system.membershipResolvesByRecipeIds` marker, and while it is unset it resolves through the
+  // legacy `recipe.recipeItemId` scalar — so a book that holds every selected recipe can still
+  // carry an EMPTY `definition.recipeIds`.
   it('reads each row\'s basis-aware recipeItemIds, never a definition\'s own recipeIds', () => {
     const legacyBasisDefinition = { id: 'tome', resolvedName: 'Forgecraft Folio', recipeIds: [] };
     const rows = [membershipRow('r1', ['tome']), membershipRow('r2', ['tome'])];
@@ -478,10 +442,8 @@ describe('recipe bulk edit model — describeRecipeCheckTierAxis', () => {
     assert.equal(describeRecipeCheckTierAxis({ ...routed, tierOptions: [] }).reason, 'noTiers');
   });
 
-  // The reachability claim, taken from the REAL producer of `craftingCheckMode` rather than
-  // from a `null` this suite typed itself. If `resolveActiveCraftingCheckFormula` ever stops
-  // returning a `null` slot for alchemy-`none`, or the gate stops distinguishing it, this
-  // fails — which is the only way the JSDoc's "reachable" claim stays honest.
+  // The reachability claim, taken from the REAL producer of `craftingCheckMode` rather than from a
+  // `null` this suite typed itself.
   it('reports noCheck for the alchemy system the resolver gives a null slot', () => {
     const system = {
       resolutionMode: 'alchemy',
@@ -541,9 +503,8 @@ describe('recipe bulk edit model — countBlockedRecipeEnables', () => {
   });
 
   it('counts an ALREADY-ENABLED blocked recipe as 0', () => {
-    // The activation gate fires only on a false -> true transition, so an enabled recipe is
-    // never refused however broken it is — its row wears `Incomplete`, not `Can't enable`.
-    // Counting it would let the panel claim more recipes will stay off than rows are pilled.
+    // The activation gate fires only on a false -> true transition, so an enabled recipe is never
+    // refused however broken it is — its row wears `Incomplete`, not `Can't enable`.
     assert.equal(countBlockedRecipeEnables([row('a', true, true)], 'enable'), 0);
     assert.equal(
       countBlockedRecipeEnables([row('a', true, true), row('b', false, true)], 'enable'),

@@ -1,20 +1,4 @@
-/**
- * Tests for timed crafting-step consumption (fix/crafting-timed-step-consumption).
- *
- * A crafting step whose time requirement resolves to > 0 seconds now consumes
- * its components (and currency) at START — the call that ARMS the world-time
- * gate — then resumes at maturity (FINISH) to run the crafting check and create
- * results WITHOUT re-consuming. Covers:
- *   1. _formatMissingItems renders component display names.
- *   2. A timed step consumes at START (gate-arm call), leaving a waiting run.
- *   3. After maturity, FINISH produces results without the components present and
- *      completes the run to history.
- *   4. Essence transfer works via the persisted resolvedEssences snapshot.
- *   5. A failed final check does NOT refund and completes the run as failed.
- *   6. Missing components at START leave NO lingering active run (zombie guard)
- *      and the message includes component names.
- *   7. Non-timed step behaviour is unchanged (consume at finish, produce results).
- */
+/** Tests for timed crafting-step consumption (fix/crafting-timed-step-consumption). */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -70,9 +54,7 @@ function reloadLegacyHistory(actor, recipe, system) {
   }).buildListing({ actor, viewer: game.user }).history[0];
 }
 
-// ---------------------------------------------------------------------------
 // Foundry / game globals
-// ---------------------------------------------------------------------------
 
 function getProperty(object, path) {
   if (!object || !path) return undefined;
@@ -103,9 +85,7 @@ globalThis.foundry = {
 };
 globalThis.ui = { notifications: { info() {}, warn() {}, error() {} } };
 
-// ---------------------------------------------------------------------------
 // Fakes
-// ---------------------------------------------------------------------------
 
 class FakeItem {
   constructor(id, name, quantity = 1) {
@@ -124,8 +104,7 @@ class FakeItem {
     return this;
   }
   // Applies ANY flattened payload key by dotted path rather than the hardcoded default
-  // stack-quantity one (issue 1024). A fake keyed on one literal cannot tell a routed
-  // site from an unrouted one, because the unconfigured default IS that literal.
+  // stack-quantity one (issue 1024).
   async update(payload) {
     this._updates.push({ ...payload });
     for (const [key, value] of Object.entries(payload)) setProperty(this, key, value);
@@ -184,9 +163,7 @@ function publishResultSource(system, componentId, item) {
   globalThis.fromUuid = async (uuid) => uuid === item.uuid ? item : null;
 }
 
-// A duck-typed ingredient set whose resolveIngredientSelection matches items by
-// componentId. `currencySpends` defaults to empty (component-only recipes); the issue-902
-// settlement tests pass a real plan so the START path runs the currency deduction.
+// A duck-typed ingredient set whose resolveIngredientSelection matches items by componentId.
 function buildIngredientSet(id, ingredientDefs, currencySpends = []) {
   return {
     id,
@@ -262,9 +239,7 @@ function buildRecipeManager({ ingredientSet, canCraft = true, missing = null }) 
   };
 }
 
-// `worldCurrency` is the issue-1278 world currency configuration. It is optional because most
-// tests in this file never touch currency; the ones that do pass the ladder they authored, which
-// no longer rides on the crafting system.
+// `worldCurrency` is the issue-1278 world currency configuration.
 function setupGame(system, worldTime = 1000, worldCurrency = null) {
   globalThis.game = {
     fabricate: {
@@ -291,9 +266,7 @@ function timedStep({ id = 'step-1', ingredientSets, resultGroups = [] } = {}) {
   };
 }
 
-// ---------------------------------------------------------------------------
 // 1. _formatMissingItems renders component display names
-// ---------------------------------------------------------------------------
 
 test('_formatMissingItems renders component display names from the system components', () => {
   const system = {
@@ -335,9 +308,7 @@ test('_formatMissingItems falls back to getDescription when no component name re
   assert.equal(message, 'Mystery Herb: have 1, need 3');
 });
 
-// ---------------------------------------------------------------------------
 // 2. Timed step consumes at START (gate-arm call), leaving a waiting run
-// ---------------------------------------------------------------------------
 
 test('timed step consumes components at START (gate arm), leaving a waitingTime run', async () => {
   const system = {
@@ -431,13 +402,8 @@ for (const boundary of ['prepared', 'gate']) {
   }
 }
 
-// ---------------------------------------------------------------------------
-// 2c. The same START consumption under a CONFIGURED stack-quantity path (issue 1024,
-//     acceptance criterion 6). The wood carries ONLY `system.qtd` — no `system.quantity`
-//     key at all — so the assertions below cannot pass on an unrouted engine, which is
-//     the whole point: the unconfigured default IS `system.quantity`, so a fixture that
-//     carried both would stay green either way.
-// ---------------------------------------------------------------------------
+// 2c. The same START consumption under a CONFIGURED stack-quantity path (issue 1024, acceptance
+// criterion 6).
 
 const { configureItemStackQuantityPath, resetItemStackQuantityPath } = await import(
   '../src/systems/itemStackQuantity.js'
@@ -486,10 +452,8 @@ test('a timed step START decrements the CONFIGURED stack-quantity field, never d
   assert.equal(wood.system.quantity, undefined, 'the item never grew a default-path key');
 });
 
-// ---------------------------------------------------------------------------
-// 2b. When the system's time requirements are DISABLED, a step's timeRequirement
-//     does NOT arm a gate — the craft resolves immediately (issue 714).
-// ---------------------------------------------------------------------------
+// 2b. When the system's time requirements are DISABLED, a step's timeRequirement does NOT arm a
+// gate — the craft resolves immediately (issue 714).
 
 test('a timed step resolves immediately when requirements.time.enabled === false', async () => {
   const system = {
@@ -568,9 +532,7 @@ test('a timed step still arms a gate when requirements.time is absent (default o
   assert.equal(activeRuns[0].status, 'waitingTime');
 });
 
-// ---------------------------------------------------------------------------
 // 3. FINISH produces results without components present, completes to history
-// ---------------------------------------------------------------------------
 
 test('timed step FINISH produces results without the components present and completes the run', async () => {
   const system = {
@@ -623,10 +585,9 @@ test('timed step FINISH produces results without the components present and comp
   assert.equal(history[0].status, 'succeeded');
   const consumed = history[0].steps[0].consumedIngredients;
   assert.equal(consumed.length, 1, 'run history records the consumed component');
-  // Issue 738: the timed FINISH path must persist the consume-time name/img/componentId
-  // (captured into the START snapshot before the source items were deleted), exactly like
-  // the immediate craft paths do via mapConsumedIngredientRef. Regression guard: this ref
-  // previously dropped to a bare {actorUuid,itemUuid,quantity}, blanking the history row.
+  // Issue 738: the timed FINISH path must persist the consume-time name/img/componentId (captured
+  // into the START snapshot before the source items were deleted), exactly like the immediate craft
+  // paths do via mapConsumedIngredientRef.
   assert.equal(consumed[0].name, 'Wood', 'the timed-step run persists the consume-time name');
   assert.equal(consumed[0].img, 'icons/wood.png', 'the timed-step run persists the consume-time img');
   assert.equal(consumed[0].componentId, 'wood', 'the timed-step run persists the componentId');
@@ -715,10 +676,8 @@ test('timed FINISH excludes partially consumed ingredient docs while revalidatin
   );
 });
 
-// ---------------------------------------------------------------------------
-// 3b. Disabling time requirements MID-RUN must still resume an already-armed
-//     gate — the flag gates arming a NEW gate only, never re-consumes (issue 714)
-// ---------------------------------------------------------------------------
+// 3b. Disabling time requirements MID-RUN must still resume an already-armed gate — the flag gates
+// arming a NEW gate only, never re-consumes (issue 714)
 
 test('an already-armed gate still resumes (no double consume) when time requirements are disabled mid-run', async () => {
   const system = {
@@ -773,9 +732,7 @@ test('an already-armed gate still resumes (no double consume) when time requirem
   assert.equal(runManager.getRunHistory(craftingActor).length, 1, 'the completed run is archived');
 });
 
-// ---------------------------------------------------------------------------
 // 4. Essence transfer via the persisted resolvedEssences snapshot
-// ---------------------------------------------------------------------------
 
 test('timed step transfers effects via the persisted resolvedEssences snapshot', async () => {
   const essenceSourceItem = new FakeItem('fire-src', 'Fire Crystal', 1);
@@ -832,9 +789,7 @@ test('timed step transfers effects via the persisted resolvedEssences snapshot',
   delete globalThis.fromUuid;
 });
 
-// ---------------------------------------------------------------------------
 // 5. Failed final check does NOT refund; completes as failed (no zombie)
-// ---------------------------------------------------------------------------
 
 test('timed step failed FINISH check does not refund and completes the run as failed', async () => {
   const system = {
@@ -894,9 +849,7 @@ test('timed step failed FINISH check does not refund and completes the run as fa
   assert.equal(projected.presentationSnapshot.name, 'Timed Step');
 });
 
-// ---------------------------------------------------------------------------
 // 6. Missing components at START: no lingering run + component names in message
-// ---------------------------------------------------------------------------
 
 test('timed step with missing components at START leaves no active run and names components', async () => {
   const system = {
@@ -942,9 +895,7 @@ test('timed step with missing components at START leaves no active run and names
   assert.equal(runManager.getRunHistory(craftingActor).length, 0, 'no history entry — the attempt never began');
 });
 
-// ---------------------------------------------------------------------------
 // 7. Non-timed step behaviour unchanged (consume + produce at finish)
-// ---------------------------------------------------------------------------
 
 test('non-timed step still consumes at finish and produces results (regression guard)', async () => {
   const system = {
@@ -992,15 +943,10 @@ test('non-timed step still consumes at finish and produces results (regression g
   assert.equal(runManager.getRunHistory(craftingActor).length, 1, 'the completed run is archived');
 });
 
-// ---------------------------------------------------------------------------
-// Collapsed multi-step chain (issue 710)
-//
-// When a system's multi-step feature is OFF, a recipe that still carries authored
-// steps runs as ONE atomic craft action: its steps execute back-to-back in a
-// single craft() call, per-step time gates are summed into one gate, and mid-chain
-// failure follows the existing per-step failure policy. The steps are never
-// deleted; re-enabling the feature restores the normal step-by-step flow.
-// ---------------------------------------------------------------------------
+// Collapsed multi-step chain (issue 710). When a system's multi-step feature is OFF, a recipe that
+// still carries authored steps runs as ONE atomic craft action: its steps execute back-to-back in a
+// single craft() call, per-step time gates are summed into one gate, and mid-chain failure follows
+// the existing per-step failure policy.
 
 function collapsedStep({ id, ingredientSets, resultComponentId, timeRequirement = null }) {
   return {
@@ -1215,19 +1161,8 @@ test('multi-step feature ON is NOT collapsed: one craft call resolves a single s
   assert.equal(active[0].currentStepIndex, 1, 'the run advanced to the second step, awaiting a new trigger');
 });
 
-// ---------------------------------------------------------------------------
-// START-phase currency SETTLEMENT (issue 902)
-//
-// A timed step consumes currency at START and records the consumption on the run.
-// It must record what actually SETTLED, never the intended plan: the record is the
-// sole input to the cancel reversal's refund, so a spend that never settled would
-// be handed back as currency the actor never paid.
-//
-// Failure is injected at the `spender.spend` seam. Underfunding cannot reach here —
-// `checkCurrencySpends` runs over every group and aborts the whole craft before any
-// mutation, so `markStepPrepared` is never called and the test would read identically
-// before and after the fix.
-// ---------------------------------------------------------------------------
+// START-phase currency SETTLEMENT (issue 902). A timed step consumes currency at START and records
+// the consumption on the run.
 
 const { ActorPropertyCoinSpender } = await import('../src/systems/CoinSpenders.js');
 const { aggregateCurrencySpends } = await import('../src/systems/currencyAffordance.js');
@@ -1241,12 +1176,8 @@ const {
   makeWorldCurrencyConfig,
 } = await import('./helpers/currency-spend-fixtures.js');
 
-// Drive a timed craft's START phase with a real currency profile and a delegating
-// spender spy, and hand back everything the money assertions need.
-//
-// `t` is the node:test context, used ONLY to register the `fromUuidSync` teardown
-// through `t.after` — which runs even when an assertion throws mid-test, unlike a bare
-// `delete` at the end of a test body, which leaks the global on the first failure.
+// Drive a timed craft's START phase with a real currency profile and a delegating spender spy, and
+// hand back everything the money assertions need.
 async function startTimedCurrencyCraft({
   t,
   units,
@@ -1430,10 +1361,7 @@ test('START records exactly the SETTLED group when the second of two groups fail
   assert.equal(context.craftingActor.system.currency.gem, 9, 'the unsettled spend mints nothing');
 });
 
-// The PARTIAL refund — one terminal base unit returned, another stranded. It is the
-// middle value the object-valued `currencyRefund` return exists to express, and it is
-// production-reachable: `validateCurrencyProfile` accepts a two-terminal profile.
-// Both spends SETTLE here (so both are recorded); the failure is injected on the REFUND.
+// The PARTIAL refund — one terminal base unit returned, another stranded.
 
 test('reverseRunConsumption reports a PARTIAL refund when one group returns and another fails', async (t) => {
   const currencySpends = [

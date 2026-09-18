@@ -1,18 +1,13 @@
 /**
- * Unit tests for T-050: Salvage Destructive Change Handling
- *
- * 12 tests across 3 groups:
- *  Group 1: Mode change disables invalid salvage configs (4 tests)
- *  Group 2: Feature disable cleans up salvage runs (4 tests)
- *  Group 3: Component deletion cleans up salvage runs (4 tests)
+ * Unit tests for T-050: Salvage Destructive Change Handling. 12 tests across 3 groups: Group 1:
+ * Mode change disables invalid salvage configs (4 tests) Group 2: Feature disable cleans up salvage
+ * runs (4 tests) Group 3: Component deletion cleans up salvage runs (4 tests)
  */
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-// ---------------------------------------------------------------------------
 // Globals
-// ---------------------------------------------------------------------------
 
 let idSeq = 0;
 globalThis.foundry = {
@@ -28,9 +23,7 @@ globalThis.game = { user: { isGM: true }, actors: [] };
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
 const { ResolutionModeService } = await import('../src/systems/ResolutionModeService.js');
 
-// ---------------------------------------------------------------------------
 // Builders
-// ---------------------------------------------------------------------------
 
 function makeManager(resolutionService = null) {
   const recipeManagerStub = {
@@ -50,9 +43,7 @@ function makeManager(resolutionService = null) {
   return mgr;
 }
 
-/**
- * Create an actor stub with a salvageRuns history flag.
- */
+/** Create an actor stub with a salvageRuns history flag. */
 function makeActor(id, salvageRunsHistory = null) {
   const flags = {};
   if (salvageRunsHistory !== null) {
@@ -75,9 +66,7 @@ function makeActor(id, salvageRunsHistory = null) {
   };
 }
 
-// ---------------------------------------------------------------------------
 // Group 1: Mode change disables invalid salvage configs
-// ---------------------------------------------------------------------------
 
 test('Changing salvageResolutionMode from simple to routed disables components without outcomeRouting', async () => {
   // Simple mode requires exactly 1 result group. Routed requires outcomeRouting + check enabled.
@@ -132,10 +121,9 @@ test('Changing salvageResolutionMode from simple to routed disables components w
 });
 
 test('Changing salvageResolutionMode from routed to simple clamps to one success group and stays enabled (issue 764)', async () => {
-  // Issue 764: routed→simple no longer DISABLES a multi-group component — the
-  // success-first retain-one clamp keeps its first success group at index 0 and salvage
-  // stays enabled, so the player's Salvage tab is restored automatically. A naming warn
-  // discloses the dropped surplus group.
+  // Issue 764: routed→simple no longer DISABLES a multi-group component — the success-first
+  // retain-one clamp keeps its first success group at index 0 and salvage stays enabled, so the
+  // player's Salvage tab is restored automatically.
   const warnMessages = [];
   globalThis.ui.notifications.warn = (msg) => warnMessages.push(msg);
 
@@ -265,9 +253,7 @@ test('GM notification sent when components are disabled by mode change', async (
   );
 });
 
-// ---------------------------------------------------------------------------
 // Group 2: Feature disable cleans up salvage runs
-// ---------------------------------------------------------------------------
 
 test('Disabling salvage takes effect and cleans up this system\'s salvage runs', async () => {
   const systemId = 'sys-cleanup';
@@ -377,9 +363,7 @@ test('Salvage stays on, so a no-op feature update triggers no salvage-run flag w
   assert.equal(actor._setFlagCalled, false, 'setFlag should NOT be called when salvage was already disabled');
 });
 
-// ---------------------------------------------------------------------------
 // Group 3: Component deletion cleans up salvage runs
-// ---------------------------------------------------------------------------
 
 test('Deleting a component removes salvage run history referencing that component', async () => {
   const systemId = 'sys-del';

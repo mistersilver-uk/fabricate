@@ -1,20 +1,4 @@
-/**
- * Source contract for the decoupled forward-port (issue #1001).
- *
- * The forward-port merges `release` back into `main` so the prerelease line's next version is
- * numbered above the stable version the release line just published. It is the one operation that
- * can unjam a prerelease line that has fallen below a published stable version, and it pushes to
- * `main` through a ruleset-bypass App token — the repository's highest-consequence automated write.
- *
- * Every assertion here is structural rather than textual wherever a textual match would pass for
- * code that is wrong in the exact way the assertion exists to catch: the `enabled` gate is
- * EVALUATED, the guard ordering is asserted by STEP INDEX, and the reusable-workflow seam is read by
- * walking into `on.workflow_call.secrets` rather than by grepping the file.
- *
- * Built on the shared tests/helpers/workflow-source.js primitives (no re-inlined parsing:
- * `sonar.cpd.exclusions` is inert under SonarCloud Automatic Analysis and `tests/**` duplication
- * counts against the gate).
- */
+/** Source contract for the decoupled forward-port (issue #1001). */
 
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
@@ -36,59 +20,29 @@ const RELEASE = `${WORKFLOW_DIR}/release.yml`;
 const PROMOTE_TO_PUBLIC = `${WORKFLOW_DIR}/promote-to-public.yml`;
 
 /**
- * How BOTH entry points must reference the reusable forward-port (issue #1619).
- *
- * NOT `./.github/workflows/forward-port.yml`. A `./` reference resolves the callee at the CALLER's
- * commit, and `release.yml`'s forward-port job runs on `release` — a line that structurally LAGS
- * `main` between promotions. Under `./`, the release line runs whatever forward-port.yml `release`
- * happens to carry, which is by construction older than `main`'s.
- *
- * The v1.9.6 forward-port (run 34100631738) is the measured case: `release` still carried the
- * pre-#1418 gate, which refuses any content outright, so the first release-line hotfix jammed even
- * though the provenance verifier written for exactly that case had already shipped on `main`. A
- * manual dispatch off `main` then passed the same merge with no override.
- *
- * Pinning the ref is what makes #1418's gate reachable from the line that needs it. This constant
- * exists so both call sites are asserted against ONE value rather than two string literals that can
- * drift apart — which is the same failure this whole source contract exists to catch.
- *
- * AND NOT `@main` either. A mutable ref means whoever can push to `main` changes what the release
- * line executes under the ruleset-bypassing App token; SonarCloud rates that a HIGH security finding
- * on new code and fails the gate (measured on PR #1620), which is why
- * `aws-actions/configure-aws-credentials` is SHA-pinned here too. So the reference is an immutable
- * commit, and the BUMP OBLIGATION that creates — a change to forward-port.yml must move this SHA, or
- * the release line keeps running the older gate — is asserted by test 6c below.
+ * How BOTH entry points must reference the reusable forward-port (issue #1619). Pinning the ref is
+ * what makes #1418's gate reachable from the line that needs it.
  */
 const FORWARD_PORT_USES =
   'mistersilver-uk/fabricate/.github/workflows/forward-port.yml@2de9e4d00a5553dec4912cec93fae8b8099fd488';
 
 /**
- * A job's `uses:` with any trailing YAML comment removed.
- *
- * A SHA pin is unreadable without a comment saying what it points at, so this repository writes them
- * as `<ref>@<sha> # <what>` (see `aws-actions/configure-aws-credentials`). That is ordinary YAML and
- * GitHub resolves it correctly, but `helpers/workflow-source.js` reads scalars literally and hands
- * back the comment as part of the value. A `uses:` reference can never contain whitespace, so its
- * first token IS the whole reference — no general comment-stripping (which would be wrong for
- * scalars that may legitimately contain `#`) is needed or attempted here.
+ * A job's `uses:` with any trailing YAML comment removed. A SHA pin is unreadable without a comment
+ * saying what it points at, so this repository writes them as `<ref>@<sha> # <what>` (see
+ * `aws-actions/configure-aws-credentials`).
  */
 const usesOf = (job) => String(job.uses ?? '').split(/\s+/)[0];
 
 /**
- * The content gate's shared shell (issue #1418).
- *
- * The gate is needed at the first pass AND inside the push retry, which re-performs the merge
- * against a freshly fetched `main` and is therefore a second merge no gate has seen. GitHub Actions
- * offers neither YAML anchors nor reuse of a step from inside another step's `run:`, so writing it
- * once means a script both bodies invoke — and the contract below is asserted against that script,
- * not against a copy of its text in either `run:` body.
+ * The content gate's shared shell (issue #1418). The gate is needed at the first pass AND inside
+ * the push retry, which re-performs the merge against a freshly fetched `main` and is therefore a
+ * second merge no gate has seen.
  */
 const GATE_SCRIPT = 'scripts/forward-port-content-gate.sh';
 
 /**
  * The shared shell that completes a CONFLICTED forward-port from a supplied resolution (issue
- * #1439). Needed at the same two call sites and for the same reason, and it makes NO verdict: it
- * builds the commit, and the gate above decides it.
+ * #1439).
  */
 const COMPLETE_MERGE_SCRIPT = 'scripts/forward-port-complete-merge.sh';
 
@@ -101,15 +55,7 @@ const VERIFIER_RESOLUTION = 'VERIFIER="${GATE_DIR}/forward-port-provenance.mjs"'
 /** How the gate invokes it. Distinct from the resolution above, which also names the file. */
 const VERIFIER_INVOCATION = 'node "$VERIFIER"';
 
-/**
- * The four `--flag=` arguments the verifier's every decision depends on.
- *
- * `--repository=` and `--accepted-bases=` are the two the verifier refuses to default: without a
- * repository an association naming a DIFFERENT repository qualifies, and without an accepted-base
- * list nothing could ever qualify. Dropping either from the invocation is silent here otherwise —
- * the parameters are proven honoured by `tests/forward-port-provenance.test.js`, but nothing else
- * pins what production actually passes.
- */
+/** The four `--flag=` arguments the verifier's every decision depends on. */
 const VERIFIER_FLAGS = ['--repository=', '--accepted-bases=', '--per-page=', '--max-commits='];
 
 /** How both `run:` bodies invoke the shared gate. */
@@ -117,13 +63,9 @@ const GATE_INVOCATION = /bash scripts\/forward-port-content-gate\.sh/;
 
 // The load-bearing tokens of the merge, tolerant of quoting and intervening whitespace. NOT a
 // literal substring: the point is to find every implementation of the merge, however it is written.
-// Deliberately does NOT require the `chore:` subject, so that a duplicate implementation written
-// with any other message is still COUNTED by the single-implementation assertion.
 const MERGE_TOKENS = /git\s+merge\s+--no-ff\s+['"]?origin\/release['"]?/;
 
-// The full merge contract: the same tokens PLUS the non-releasing Conventional Commit subject. A
-// releasing type here would make the beta.yml run this push triggers mint an unjustified bump off a
-// commit that carries no file change at all.
+// The full merge contract: the same tokens PLUS the non-releasing Conventional Commit subject.
 const MERGE_IMPLEMENTATION = new RegExp(`${MERGE_TOKENS.source}\\s+-m\\s+["']?chore:`);
 
 /** The inputs BOTH entry points must declare, so a caller and a dispatch behave identically. */
@@ -137,14 +79,7 @@ const INPUT_NAMES = [
   'override_hint',
 ];
 
-/**
- * The inputs `workflow_dispatch` declares and `workflow_call` must NOT (issue #1439).
- *
- * This breaks the symmetry above deliberately. No automated caller has a conflict resolution to
- * supply, and a called workflow able to carry one would be a route by which a TREE could reach
- * `main` from inside a promotion — a structural absence beats an asserted one, so the constant
- * splits rather than the assertion widening.
- */
+/** The inputs `workflow_dispatch` declares and `workflow_call` must NOT (issue #1439). */
 const DISPATCH_ONLY_INPUT_NAMES = ['resolution_ref', 'resolution_effect'];
 
 // The defaults each entry point must declare. `dry_run` diverges ON PURPOSE (see assertion 2).
@@ -194,10 +129,6 @@ function forwardPortSteps() {
 /**
  * The shared gate script's executable lines: comments and blank lines removed, each trimmed.
  *
- * Comments are stripped because this file's header documents the very environment variables and
- * commands the assertions below look for, and matching the prose would let the code drift behind
- * its own explanation — the failure mode every structural assertion in this file exists to avoid.
- *
  * @returns {string[]} The statements, in order.
  */
 function scriptStatements(file) {
@@ -213,10 +144,6 @@ function gateScriptStatements() {
 
 /**
  * Every shell function a script defines, by name, as its body text.
- *
- * The guard's own `case` is a SLICE of the file, so a check written against that slice stops at
- * `esac` — and a guarantee about what the guard may not do (read the override, print its hint) is
- * worth nothing if the guard can delegate to a function that does it one line further down.
  *
  * @param {string} file The script.
  * @returns {Map<string, string>} Function name to body.
@@ -266,10 +193,6 @@ function statementIndex(statements, token, description) {
  * The statements of the `if` block opened by the statement containing `token`, exclusive of its
  * opener and its matching `fi`.
  *
- * Nesting-aware, because the assertion it exists for — that a branch is REACHABLE ONLY from inside
- * another — is otherwise unwriteable as a text match. `if …; then` and `fi` are counted, so an inner
- * `if` inside the block does not close it early and moving a statement out of the block is caught.
- *
  * @param {string[]} statements The gate script's statements.
  * @param {string} token A substring of the opening `if`.
  * @param {string} description What that `if` guards, for the failure message.
@@ -304,14 +227,7 @@ function stepLabel(step, index) {
   return `step ${index + 1} (${step.name || step.uses || '(unnamed)'})`;
 }
 
-/**
- * Evaluate a JOB-level `if:` that opens with `always()`.
- *
- * The shared evaluator implements no function calls and THROWS on one (see the helper's header), so
- * `always()` is substituted with a tautology, which models its meaning exactly: it disables the
- * implicit `success()` wrapping and contributes nothing else. Evaluating rather than
- * substring-matching is the whole point — `&&` -> `||` leaves every conjunct present in the string.
- */
+/** Evaluate a JOB-level `if:` that opens with `always()`. */
 function gateValue(raw, context) {
   return Boolean(evaluate(unwrap(raw).replaceAll('always()', "'x' == 'x'"), context));
 }
@@ -353,14 +269,9 @@ test('forward-port.yml declares every input on BOTH entry points, and bounds its
       assert.ok(Object.hasOwn(declared, name), `on.${trigger}.inputs declares '${name}'`);
     }
 
-    // The DEFAULT VALUES are load-bearing, and each of these three flips silently:
-    //   * `enabled: false` would make every automated forward-port a permanent, success-reporting
-    //     no-op — the exact defect this change exists to remove, shipped inert and green.
-    //   * `allow_content: true` would degrade the content gate to a warning on BOTH entry points,
-    //     letting an unreviewed file change ride the one push that bypasses pull-request review.
-    //   * the workflow_dispatch `dry_run: true` is what makes the hand-run recovery lever safe to
-    //     point at `main`; flipped to false, a maintainer probing the workflow pushes for real. The
-    //     workflow_call default is deliberately the opposite: a caller states its own intent.
+    // The DEFAULT VALUES are load-bearing, and each of these three flips silently: * `enabled:
+    // false` would make every automated forward-port a permanent, success-reporting no-op — the
+    // exact defect this change exists to remove, shipped inert and green.
     for (const [name, expected] of Object.entries(EXPECTED_DEFAULTS[trigger])) {
       assert.ok(
         Object.hasOwn(defaultEntry(name), 'default'),
@@ -402,9 +313,7 @@ test('every step after the skip notice is gated by `enabled`, proven by EVALUATI
   assert.ok(steps.length >= 10, 'the forward-port job carries the full step decomposition');
 
   // Evaluated under BOTH values of dry_run with a permissive `steps` stub, so only `enabled` is
-  // isolated. An exact-string match on `if: ${{ inputs.enabled }}` would fail on CORRECT code
-  // (steps 9 and 10 legitimately also read dry_run), and a substring match would PASS for
-  // `${{ inputs.enabled || github.event_name == 'workflow_dispatch' }}`, which is not a gate at all.
+  // isolated.
   for (const dryRun of [true, false]) {
     const context = {
       inputs: { enabled: false, dry_run: dryRun },
@@ -506,8 +415,7 @@ test('promote-to-public.yml job 2 delegates, never skips, and names a REACHABLE 
   assert.equal(job.secrets.RELEASE_BOT_KEY, '${{ secrets.RELEASE_BOT_KEY }}');
 
   // Deliberately UNGUARDED: the `guard` job has already established, against the real channel
-  // heads, exactly what is being promoted. It must be present and EMPTY — a wrong-shaped value here
-  // would make the tipguard mismatch forever, skipping the backstop while reporting success.
+  // heads, exactly what is being promoted.
   assert.ok(Object.hasOwn(job.with, 'expected_tag'), 'job 2 passes an explicit expected_tag');
   assert.equal(unquote(job.with.expected_tag), '');
 
@@ -515,10 +423,7 @@ test('promote-to-public.yml job 2 delegates, never skips, and names a REACHABLE 
   assert.match(hint, /forward-port\.yml/, 'the override hint names the workflow to dispatch');
   assert.match(hint, /allow_content: true/, 'the override hint names the override input');
   assert.match(hint, /re-run this promotion/, 'the override hint names the follow-up step');
-  // `allow_content` is settable only from forward-port.yml's dispatch path. A hint telling a
-  // maintainer mid-promotion to "re-run with allow_content: true" would name an input that does not
-  // exist on the workflow they are running — the same impossible-remedy defect this issue exists to
-  // eliminate.
+  // `allow_content` is settable only from forward-port.yml's dispatch path.
   for (const promotionInput of ['version', 'source_channel', 'dry_run']) {
     assert.ok(
       !new RegExp(`\\b${promotionInput}\\b`).test(hint),
@@ -538,13 +443,7 @@ test('promote-to-public.yml job 2 delegates, never skips, and names a REACHABLE 
 // ── 6b ──────────────────────────────────────────────────────────────────────────────────────────
 
 test('NO workflow reaches the forward-port through a `./` reference (issue #1619)', () => {
-  // The two assertions above pin the callers this repository has TODAY. This one pins the property
-  // for callers it does not have yet, and it is the assertion that would actually have caught the
-  // v1.9.6 jam: `./` was correct-looking, passed review, and silently bound the release line to its
-  // own stale copy of the gate.
-  //
-  // Scanned over the raw source rather than the parsed `uses:` of the two known jobs, so a THIRD
-  // caller added later cannot reintroduce the defect without tripping this.
+  // The two assertions above pin the callers this repository has TODAY.
   const offenders = readdirSync(WORKFLOW_DIR)
     .filter((file) => file.endsWith('.yml') || file.endsWith('.yaml'))
     .filter((file) =>
@@ -563,15 +462,10 @@ test('NO workflow reaches the forward-port through a `./` reference (issue #1619
 // ── 6c ──────────────────────────────────────────────────────────────────────────────────────────
 
 test('the forward-port reference is an immutable SHA naming THIS repository and a real callee', () => {
-  // A pinned reference is only as good as its target. A typo in the owner/repo half does not fail
-  // at parse time — it fails at dispatch, on the release line, with the callee unresolvable and the
-  // prerelease line already jammed. Both halves are checked here instead.
+  // A pinned reference is only as good as its target.
   const [path, ref] = FORWARD_PORT_USES.split('@');
 
-  // IMMUTABLE, not a branch or tag. `@main` would track the reviewed gate automatically, but a
-  // mutable ref lets whoever can push to `main` change what the release line executes under the
-  // ruleset-bypassing App token — a HIGH security finding that fails the Sonar gate on new code.
-  // The cost is a bump obligation, which is exactly why this assertion is here to name it.
+  // IMMUTABLE, not a branch or tag.
   assert.match(
     ref,
     /^[0-9a-f]{40}$/,
@@ -623,9 +517,7 @@ test('promote-to-public.yml still orders the forward-port before the publish and
   }
 
   // ...and EVALUATED. Job 4 performs the two IRREVERSIBLE steps — `gh release edit --draft=false`
-  // and the registry POST. `&&` -> `||` keeps all four conjuncts in the string while making the
-  // un-draft reachable after a failed guard, a failed forward-port, or a failed publish; no
-  // substring check can tell the two apart.
+  // and the registry POST.
   const upstream = ['guard', 'forward-port', 'publish'];
   const ran = (results) =>
     gateValue(gate, {
@@ -654,8 +546,7 @@ test('exactly ONE workflow implements the release-into-main merge', () => {
     .filter((file) => MERGE_TOKENS.test(read(`${WORKFLOW_DIR}/${file}`)));
 
   // Two is the regression this change exists to prevent (a second copy of the App-token push to
-  // main, which is how the two entry points drifted apart in the first place). Zero would make
-  // every other assertion here vacuous.
+  // main, which is how the two entry points drifted apart in the first place).
   assert.deepEqual(implementers, ['forward-port.yml']);
 });
 
@@ -688,12 +579,7 @@ test('the forward-port pushes as the App installation token, never as GITHUB_TOK
 
   // checkout stores its own credential as an `http.extraheader` in a TEMP config file, and an
   // Authorization header beats the credential in a remote URL — so a persisted credential silently
-  // wins over the App token, and no later `git config --unset-all` can reach it. The usual "it
-  // fails loudly at push time" reasoning is only half true: it holds while the ruleset rejects the
-  // github-actions[bot] merge commit, but if the ruleset ever permits that push, the merge LANDS
-  // and beta.yml never fires (a GITHUB_TOKEN push triggers no downstream workflow) — the run is
-  // green, the merge is in, and no prerelease is minted above the released version. Which is the
-  // defect, silently restored.
+  // wins over the App token, and no later `git config --unset-all` can reach it.
   const checkoutIndex = steps.findIndex((step) => step.uses.startsWith('actions/checkout@'));
   assert.notEqual(checkoutIndex, -1, 'forward-port.yml checks out main');
   assert.equal(steps[checkoutIndex].with['persist-credentials'], 'false');
@@ -710,8 +596,7 @@ test('the forward-port pushes as the App installation token, never as GITHUB_TOK
 
   // The literal EXPRESSION syntax, not a bare `GITHUB_TOKEN` substring: this repository's workflow
   // comments routinely discuss GITHUB_TOKEN in prose (and forward-port.yml's own comments explain
-  // exactly why it is not used). A GITHUB_TOKEN push is not the ruleset bypass actor and does not
-  // trigger the downstream beta.yml run.
+  // exactly why it is not used).
   assert.ok(
     !/\$\{\{\s*secrets\.GITHUB_TOKEN\s*\}\}/.test(source),
     'forward-port.yml never resolves ${{ secrets.GITHUB_TOKEN }}'
@@ -751,14 +636,11 @@ test('the content gate DELEGATES to the shared script and fails the job on its r
   const mergeIndex = stepIndex(steps, MERGE_IMPLEMENTATION, 'merges origin/release');
   const gate = steps[stepIndex(steps, GATE_INVOCATION, 'gates on content', mergeIndex + 1)];
 
-  // The gate no longer ASKS a human to confirm authorship; it establishes provenance itself. The
-  // decision therefore lives in one script both call sites invoke, and this asserts the wiring —
-  // the script's own contract is asserted against the script, below.
+  // The gate no longer ASKS a human to confirm authorship; it establishes provenance itself.
   assert.match(gate.run, GATE_INVOCATION, 'the content gate invokes the shared gate script');
 
   // Printing the diff and continuing detects nothing: a commit landed straight on `release` would
-  // turn this ruleset-bypassing push into an unreviewed code path onto the default branch. The
-  // script's refusal must therefore END the job, not annotate it.
+  // turn this ruleset-bypassing push into an unreviewed code path onto the default branch.
   assert.ok(/\bexit 1\b/.test(gate.run), 'the content gate exits non-zero');
   assert.match(
     gate.run,
@@ -847,12 +729,7 @@ test('"this merge introduced nothing" is decided by a RE-MERGE, never by a combi
   // THE FINDING THIS REPLACED. `git diff-tree --cc -r --no-commit-id --name-only <merge>` being
   // empty cannot express the question: `--name-only` follows the `-c` FILE selection ("files
   // modified from all parents") and `--cc`'s hunk compression only ever affects PATCH output, so it
-  // never reaches the name list. A clean auto-merge in which one file took hunks from both sides
-  // and a genuine EVIL merge of the same two parents print exactly the same thing. Measured against
-  // this repository's own history, 5 of the last 38 merges reachable from origin/main have a
-  // non-empty combined diff and every one of them invented nothing — two of them on CHANGELOG.md,
-  // which is the release path itself. `tests/forward-port-content-gate.test.js` demonstrates the
-  // indistinguishability against real constructed merges; this keeps the predicate from coming back.
+  // never reaches the name list.
   assert.ok(
     !/git diff-tree\s+--cc/.test(body),
     'the gate decides merge content from a combined diff again. It cannot: the command answers ' +
@@ -884,10 +761,7 @@ test('"this merge introduced nothing" is decided by a RE-MERGE, never by a combi
 test('a git that cannot run the predicate REFUSES rather than falling back to the broken one', () => {
   const body = gateScriptStatements().join('\n');
 
-  // `git merge-tree --write-tree` arrived in git 2.38. The only fallback available is the combined
-  // diff above, which answers the wrong question — so an older git must be an explicit, loud
-  // refusal. A silent fallback would restore the defect on the one push that bypasses review, on a
-  // runner nobody was looking at.
+  // `git merge-tree --write-tree` arrived in git 2.38.
   assert.match(body, /GIT_VERSION="\$\(git --version\)"/, "git's version is read");
   assert.match(
     body,
@@ -895,9 +769,7 @@ test('a git that cannot run the predicate REFUSES rather than falling back to th
     'the 2.38 floor is asserted explicitly'
   );
 
-  // The version test must precede the first use, or it guards nothing. Anchored on the INVOCATION
-  // and not on the bare command name: the refusal messages above name `git merge-tree --write-tree`
-  // in prose, and an index taken over those would compare the check against its own explanation.
+  // The version test must precede the first use, or it guards nothing.
   const statements = gateScriptStatements();
   assert.ok(
     statementIndex(statements, 'GIT_MINOR" -lt 38', 'asserts the git floor') <
@@ -943,9 +815,7 @@ test("the verifier's EXIT STATUS decides the job, and cannot be swallowed", () =
     `${GATE_SCRIPT} must resolve the verifier from its own directory: ${VERIFIER_RESOLUTION}`
   );
 
-  // Every flag the decision depends on is PASSED, not merely accepted. Dropping `--accepted-bases=`
-  // would silently fall back to the library default, and dropping `--repository=` would make the
-  // verifier refuse everything for the wrong reason — neither is visible in any other assertion.
+  // Every flag the decision depends on is PASSED, not merely accepted.
   for (const flag of VERIFIER_FLAGS) {
     assert.ok(invocation.includes(flag), `the verifier invocation passes ${flag}: ${invocation}`);
   }
@@ -988,19 +858,12 @@ test('the own-merge guard fails the job and is NOT overridable', () => {
     'the guard runs the re-merge predicate against the merge the push actually lands'
   );
 
-  // The only verdict that passes UNCONDITIONALLY, and the guard's polarity in one. Inverting the
-  // case so `content-free` is the one that fails turns the guard into one that fires precisely when
-  // the merge is clean, which no other assertion here would notice. (`remerge-conflicted` can also
-  // pass since issue #1439, but only through the resolution checks below, never by falling through:
-  // its arm carries no bare `;;`.)
+  // The only verdict that passes UNCONDITIONALLY, and the guard's polarity in one (issue 1439).
   assert.match(guard, /^content-free\) ;;$/m, '`content-free` passes the guard with no further test');
   assert.match(guard, /"carries-content "\*\)/, 'an invented-content merge has its own branch');
   assert.match(guard, /\bexit 1\b/, 'the own-merge guard fails the job');
 
-  // A single-parent HEAD is NOT a refusal. `git merge --no-ff` reports "Already up to date." and
-  // creates no commit when the freshly fetched origin/main already contains origin/release, which
-  // the retry path genuinely reaches — and this guard is non-overridable, so failing there would
-  // fail a run, with no operator lever, for having had nothing to do.
+  // A single-parent HEAD is NOT a refusal.
   assert.match(
     guard,
     /"parent-count 0" \| "parent-count 1"\)/,
@@ -1012,14 +875,8 @@ test('the own-merge guard fails the job and is NOT overridable', () => {
     'the no-merge-created branch must not fail the job'
   );
 
-  // allow_content lets an operator vouch for content that exists somewhere to be reviewed. Content
-  // invented by a conflict resolution exists nowhere else, so it has been reviewed nowhere and no
-  // override applies to it.
-  //
-  // Asserted over the guard AND over every function it reaches, transitively. The `case` is read as
-  // a SLICE of the file, so a check that stopped at `esac` would be satisfied by a guard that
-  // delegated the forbidden read to a helper one line further down — and since issue #1439 the guard
-  // delegates its whole resolution branch to exactly such a helper.
+  // allow_content lets an operator vouch for content that exists somewhere to be reviewed (issue
+  // 1439).
   const helpers = reachableFunctions(shellFunctionBodies(GATE_SCRIPT), guard);
   assert.ok(
     helpers.includes('verify_resolution'),
@@ -1068,16 +925,8 @@ test('the gate PASSES the verification parameters production depends on, at thei
   const statements = gateScriptStatements();
 
   // Each of these three is one string that defines the meaning of the whole gate, each defaulted in
-  // the shell rather than in the verifier, and each invisible to every other assertion in this file.
-  //
-  //   * ACCEPTED_BASES is what "reviewed against the release line" MEANS. Widened to `release,main`
-  //     the gate accepts the exact counter-example this issue is built on — pull request #1414,
-  //     merged and reviewed, against `main`.
-  //   * MAX_COMMITS is the safety bound on the range shape the design will decide at all.
-  //   * PER_PAGE is what makes a possibly-truncated association page recognisable. GitHub caps
-  //     `per_page` at 100, so a default above it can never be reached and the truncation guard can
-  //     never fire — turning "this may be incomplete" into a confident refusal of a commit whose
-  //     pull request is on page 2. Fail-closed-with-a-lie, which is worse than fail-closed.
+  // the shell rather than in the verifier, and each invisible to every other assertion in this
+  // file. ACCEPTED_BASES is what "reviewed against the release line" MEANS.
   for (const declaration of [
     'ACCEPTED_BASES="${ACCEPTED_BASES:-release}"',
     'PER_PAGE="${PER_PAGE:-100}"',
@@ -1107,13 +956,7 @@ test('the allow_content override is reachable ONLY from a refusal, never from an
   const refusal = ifBlockStatements(statements, '[ "$VERDICT" -eq 1 ]', 'branches on a refusal');
 
   // The override fires on a REFUSAL — a verdict in which the verifier established what the content
-  // is and could not attribute it. Fired on ANY non-zero verdict it swallows the whole unverifiable
-  // class: a rate-limited read, a 403 from the App installation missing `Pull requests: Read` (the
-  // single most likely first-run failure of this feature), an unreadable evidence file, a
-  // possibly-truncated page, an association naming another repository, a range above the cap, or
-  // `node` missing altogether (127). Every one of those would be waved through identically to a
-  // genuine refusal — an absence of evidence accepted as an absence of unreviewed content, which is
-  // the one substitution this change exists to remove.
+  // is and could not attribute it.
   const overrides = statements.filter((statement) => statement.includes('ALLOW_CONTENT'));
   assert.ok(overrides.length > 0, `${GATE_SCRIPT} implements the allow_content override at all`);
   for (const statement of overrides) {
@@ -1142,11 +985,6 @@ test('the decided set and the collected set are ONE list, not two git invocation
   const statements = gateScriptStatements();
 
   // `git log … >commits.txt` decides the range; the evidence loop must be driven by that same file.
-  // Driven by a SECOND `git rev-list` over the same range they agree today, and their failure
-  // directions are not symmetric: a commit in commits.txt with no evidence fails closed, but a
-  // commit produced only by the second listing is never handed to the verifier and is silently
-  // never decided at all — a fail-open the verifier cannot see, because it never learns the commit
-  // existed.
   assert.match(
     statements.join('\n'),
     /done <"\$WORK\/commits\.txt"/,
@@ -1171,8 +1009,7 @@ test('the association read authenticates as the App installation, on both paths'
   );
 
   // The job holds only `contents: read`, and a called workflow can never exceed its caller's grant,
-  // so the read MUST use the App installation token minted in this job. Assertion 9 already forbids
-  // the GITHUB_TOKEN expressions in the workflow; this pins the positive half at both call sites.
+  // so the read MUST use the App installation token minted in this job.
   for (const step of steps.filter((candidate) => GATE_INVOCATION.test(candidate.run))) {
     assert.equal(
       step.env.GH_TOKEN,
@@ -1193,8 +1030,7 @@ test('Node is provisioned before the gate, gated like the rest of the chain, wit
   assert.ok(setupIndex < gateIndex, 'Node must be available before the gate runs the verifier');
 
   // The verifier and its library are zero-dependency by design, so this job stays a git merge plus
-  // one `node` invocation. An `npm ci` here would put the whole dependency tree — and its failure
-  // modes — on the path that pushes to `main`.
+  // one `node` invocation.
   assert.ok(
     !steps.some((step) => /\bnpm ci\b/.test(step.run)),
     'the forward-port job must not install dependencies'
@@ -1218,12 +1054,7 @@ test('the push retry RE-GATES on content and never re-fetches origin/release', (
 
   // The retry re-performs the merge against the freshly fetched tip (a bare re-push of the stale
   // merge commit fails identically and would make the "retry" a no-op), so the retry is a SECOND
-  // merge that no gate has seen. "An advanced main can only make an empty diff more true" holds
-  // only when `theirs` equals the merge base; an empty diff can also come from a three-way
-  // RESOLUTION that landed on `ours`, and in that regime an advanced main can flip the resolution
-  // and carry content onto the one code path that bypasses pull-request review.
-  // Comment lines are stripped first: this step's own comments quote the merge and the fetch it is
-  // reasoning about, and an index taken over the prose would not be an index into the code.
+  // merge that no gate has seen.
   const body = push.run
     .split('\n')
     .filter((line) => !line.trim().startsWith('#'))
@@ -1253,10 +1084,7 @@ test('the push retry RE-GATES on content and never re-fetches origin/release', (
     'the retry content gate must FAIL the job, not print and push anyway'
   );
 
-  // ...and ANCHORED to the gate, exactly as assertion 11 anchors the first pass. A decoy that
-  // swallows the gate's status while leaving an unrelated `exit 1` nearby survives the presence
-  // check above — and this is the path that runs when `main` moved mid-run: a second merge no gate
-  // has otherwise seen, about to be pushed with the ruleset-bypass token.
+  // ...and ANCHORED to the gate, exactly as assertion 11 anchors the first pass.
   assert.match(
     beforeRePush,
     new RegExp(`${GATE_INVOCATION.source}[^\\n]*\\|\\|\\s*exit 1`),
@@ -1264,9 +1092,7 @@ test('the push retry RE-GATES on content and never re-fetches origin/release', (
   );
 
   // Freezing the `theirs` side to the ref the first gate validated is load-bearing: re-fetching
-  // origin/release would import a tip nothing gated. Shell COMMENT lines are stripped first —
-  // step 10's own comment quotes step 4's `git fetch origin main release --force --tags` precisely
-  // to say "do not copy this here", and matching that would fail on correct code.
+  // origin/release would import a tip nothing gated.
   const fetches = push.run
     .split('\n')
     .filter((line) => !line.trim().startsWith('#'))
@@ -1322,9 +1148,7 @@ test('both guards are present, ordered before the push, consumed, and never fail
     'the tipguard only applies when expected_tag is non-empty'
   );
 
-  // A guard that runs but is consumed by nothing is the way the remedy ships INERT. Each consumer
-  // must re-test BOTH outputs: a skipped step's outputs are the empty string, so chaining off one
-  // of them would leave the other unread.
+  // A guard that runs but is consumed by nothing is the way the remedy ships INERT.
   const ancestryOutput = `steps.${steps[ancestryIndex].id}.outputs.already`;
   const tipguardOutput = `steps.${tipguard.id}.outputs.mismatch`;
 
@@ -1337,13 +1161,7 @@ test('both guards are present, ordered before the push, consumed, and never fail
     }
   }
 
-  // ...but PRESENCE is not CONSUMPTION. `steps.ancestry.outputs.already` reads identically in
-  // `!= 'true'` and in `== 'true'`, and the inverted form makes the merge run ONLY when the
-  // forward-port has already happened and never when it is needed — the remedy ships inert, every
-  // assertion green. `!= 'false'` inverts it the same way. So the guards' MEANING is evaluated as a
-  // truth table, and the dry-run/push pair is pinned by `dry_run` polarity in both directions:
-  // step 9 must run only on a dry run, step 10 only on a real one. (`!inputs.dry_run` ->
-  // `inputs.dry_run` on step 10 makes a `dry_run: true` public promotion really push to `main`.)
+  // ...but PRESENCE is not CONSUMPTION.
   const context = (already, mismatch, dryRun) => ({
     inputs: { enabled: true, dry_run: dryRun },
     steps: { ancestry: { outputs: { already } }, tipguard: { outputs: { mismatch } } },
@@ -1455,8 +1273,7 @@ test('the completion script runs at BOTH merge sites, anchored, and never withou
     .filter(({ step }) => COMPLETION_INVOCATION.test(step.run));
 
   // Two, and exactly the two sites that merge: the first pass, and the push retry which re-performs
-  // the merge against a freshly fetched `main`. One would mean a path lost its conflict handling —
-  // the silent direction, because a conflicted forward-port there just reds with a generic exit.
+  // the merge against a freshly fetched `main`.
   const mergeIndex = stepIndex(steps, MERGE_IMPLEMENTATION, 'merges origin/release');
   const pushIndex = stepIndex(steps, /git push origin HEAD:main/, 'pushes to main');
   assert.deepEqual(
@@ -1479,12 +1296,7 @@ test('the completion script runs at BOTH merge sites, anchored, and never withou
     assert.equal(step.env.RESOLUTION_REF, '${{ inputs.resolution_ref }}');
     assert.equal(step.env.RESOLUTION_EFFECT, '${{ inputs.resolution_effect }}');
 
-    // THE COMPLETION MAY NEVER BE REACHED WITHOUT ITS VERDICT. The completion script makes none, so
-    // a path that completed a conflicted merge and did not then run the gate would push a
-    // human-supplied tree to `main` with nothing having checked it. The retry satisfies this inside
-    // its own body; the merge step satisfies it through the gate STEP that follows — and that is
-    // asserted by EVALUATING both conditions over every guard combination, not by comparing their
-    // `if:` strings, because two conditions can read alike and gate differently.
+    // THE COMPLETION MAY NEVER BE REACHED WITHOUT ITS VERDICT.
     const afterCompletion = step.run.slice(step.run.search(COMPLETION_INVOCATION));
     if (GATE_INVOCATION.test(afterCompletion)) continue;
 
@@ -1493,10 +1305,7 @@ test('the completion script runs at BOTH merge sites, anchored, and never withou
       .filter((candidate) => GATE_INVOCATION.test(candidate.run));
     assert.ok(laterGates.length > 0, `${stepLabel(step, index)} is followed by no content gate`);
 
-    // ONE later gate step must run in EVERY context this one does. The union of several is not
-    // enough and asserting it would be vacuous here: the push retry carries a gate of its own, so a
-    // union is satisfied on real runs by the retry and on dry runs by the first-pass gate, while the
-    // merge this step completed goes ungated on both.
+    // ONE later gate step must run in EVERY context this one does.
     const contexts = [];
     for (const enabled of [true, false]) {
       for (const already of ['true', 'false', '']) {
@@ -1543,11 +1352,8 @@ test('the completion script builds the merge itself, pushes nothing, and makes n
 
   // The runbook quotes these two phrases verbatim to tell an operator how to read the job log, and
   // nothing else guards that mirror: reword either message and the runbook silently starts
-  // describing output the job no longer produces, on a path that runs once every few years.
-  //
-  // The runbook is `.github/workflows/README.md` since issue #1661 moved the CI narrative out of
-  // `CONTRIBUTING.md` to sit beside the YAML. The assertion follows the prose rather than the
-  // filename — a mirror pinned to a file the text has left is a mirror of nothing.
+  // describing output the job no longer produces, on a path that runs once every few years (issue
+  // 1661).
   const runbook = read('.github/workflows/README.md');
   for (const quoted of [
     "the forward-port's merge of origin/release into main CONFLICTED",
@@ -1557,9 +1363,7 @@ test('the completion script builds the merge itself, pushes nothing, and makes n
     assert.ok(runbook.includes(quoted), `the CI runbook must still quote ${JSON.stringify(quoted)}`);
   }
 
-  // BOTH PARENTS, IN THAT ORDER, and the tree taken wholesale. The order records `origin/main` as
-  // the first parent, which is what makes the pushed commit a merge INTO main; taking the tree
-  // object rather than driving the conflicted index is what lets a resolution express a DELETION.
+  // BOTH PARENTS, IN THAT ORDER, and the tree taken wholesale.
   assert.match(
     body,
     /git commit-tree "\$\{RESOLUTION\}\^\{tree\}" -p origin\/main -p origin\/release/,

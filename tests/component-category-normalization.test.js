@@ -1,8 +1,6 @@
 /**
- * Issue 676 — `Component.category` + `CraftingSystem.componentCategories` normalization,
- * and the decision-8(a) salvage-enable clamp that enforces Component Requirement 5.
- *
- * Covers AC6 (partly), AC7, AC9 and AC10(c).
+ * Issue 676 — `Component.category` + `CraftingSystem.componentCategories` normalization, and the
+ * decision-8(a) salvage-enable clamp that enforces Component Requirement 5.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -22,8 +20,7 @@ globalThis.game = { user: { isGM: true } };
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
 
 // A manager holding real, normalized systems with `save()` stubbed — the house pattern
-// (`buildManager` in compendium-drop.test.js). Needed to exercise the REAL `updateItem`
-// rather than a hand-rebuilt imitation of it.
+// (`buildManager` in compendium-drop.test.js).
 function makeLoadedManager(systems = []) {
   const manager = makeManager();
   for (const system of systems) {
@@ -38,9 +35,7 @@ function makeManager() {
   return new CraftingSystemManager({ getRecipes: () => [] });
 }
 
-// ---------------------------------------------------------------------------
 // Component.category
-// ---------------------------------------------------------------------------
 
 test('component.category defaults to general with no migration', () => {
   const manager = makeManager();
@@ -59,9 +54,7 @@ test('component.category round-trips a custom token verbatim through renormaliza
   assert.equal(manager._normalizeComponent(once).category, 'Reagent');
 });
 
-// ---------------------------------------------------------------------------
 // CraftingSystem.componentCategories — the sibling vocabulary
-// ---------------------------------------------------------------------------
 
 test('componentCategories normalizes to unique trimmed strings and never persists general', () => {
   const manager = makeManager();
@@ -98,18 +91,13 @@ test('componentCategories survives a re-normalization round trip', () => {
   assert.deepEqual(manager._normalizeSystem(once).componentCategories, ['Reagent']);
 });
 
-// ---------------------------------------------------------------------------
 // Decision 8(a) — the normalizer clamp. AC10(c).
-// ---------------------------------------------------------------------------
 
 const GROUP = { id: 'g1', name: 'Scraps', results: [{ id: 'r1', componentId: 'c2', quantity: 1 }] };
 
 test('AC10(c): _normalizeSalvage clamps enabled to false when resultGroups is empty', () => {
   const manager = makeManager();
-  // This is the assertion that covers import, copy-mode and migration — none of which
-  // touch the UI. `CraftingSystemExporter` has no salvage handling at all, so without
-  // the clamp an imported `{enabled: true, resultGroups: []}` lands verbatim and
-  // violates Component Requirement 5 with no GM surface involved.
+  // This is the assertion that covers import, copy-mode and migration — none of which touch the UI.
   const clamped = manager._normalizeSalvage({ enabled: true, resultGroups: [] });
   assert.equal(clamped.enabled, false);
   assert.deepEqual(clamped.resultGroups, []);
@@ -124,9 +112,8 @@ test('AC10(c): _normalizeSalvage clamps enabled to false when resultGroups is em
 
 test('AC10(c): the clamp also fires when every authored group is dropped as invalid', () => {
   const manager = makeManager();
-  // `_normalizeSalvageResultGroup` filters unusable groups, so `resultGroups` can
-  // normalize to empty even when the INPUT array was not. Clamping against the raw
-  // input rather than the normalized local would miss this.
+  // `_normalizeSalvageResultGroup` filters unusable groups, so `resultGroups` can normalize to
+  // empty even when the INPUT array was not.
   const clamped = manager._normalizeSalvage({ enabled: true, resultGroups: [null, undefined] });
   assert.deepEqual(clamped.resultGroups, []);
   assert.equal(clamped.enabled, false);
@@ -135,8 +122,6 @@ test('AC10(c): the clamp also fires when every authored group is dropped as inva
 test('the clamp only ever turns enabled OFF — it never seeds it on (decision 6)', () => {
   const manager = makeManager();
   // A component with authored results but no explicit `enabled` must read DISABLED.
-  // This is the deliberate, user-confirmed decision-6 consequence; a clamp that
-  // "helpfully" enabled it would flip every component in every world.
   const absent = manager._normalizeSalvage({ resultGroups: [GROUP] });
   assert.equal(absent.enabled, false);
 
@@ -151,24 +136,12 @@ test('enabled survives normalization when at least one result group exists', () 
   assert.equal(salvage.resultGroups.length, 1);
 });
 
-// ---------------------------------------------------------------------------
 // updateItem's shallow spread — the Scope-out assertion the delta requires
-// ---------------------------------------------------------------------------
 
 test('a save payload that omits category preserves it (the REAL updateItem)', async () => {
-  // The component-editor screen (`ComponentEditorRoot.svelte`) does not author `category`
-  // and is deliberately out of scope for issue 676. It stays safe ONLY because `updateItem`
-  // spreads `{...existing, ...updates}`, so an omitted key is preserved rather than dropped.
-  // The delta said "asserted, not assumed".
-  //
-  // Its save no longer reaches `updateItem` directly for the ESSENCE axis — see the
-  // r19-store2 block at the foot of this file — but it still reaches it for everything
-  // else, so this contract is unchanged and still load-bearing for it.
-  //
-  // This calls the REAL `updateItem`. An earlier version hand-rebuilt the spread inline
-  // and so asserted JS spread semantics rather than Fabricate's: mutating updateItem to
-  // `{ ...updates, id: itemId }` — dropping the existing-spread, which is exactly the
-  // regression the Scope-out fears — left it green.
+  // The component-editor screen (`ComponentEditorRoot.svelte`) does not author `category` and is
+  // deliberately out of scope for issue 676. It stays safe ONLY because `updateItem` spreads
+  // `{...existing, ...updates}`, so an omitted key is preserved rather than dropped.
   const manager = makeLoadedManager([
     {
       id: 'sys1',
@@ -192,9 +165,7 @@ test('updateItem applies an explicitly authored category', async () => {
   assert.equal(updated.category, 'Reagent');
 });
 
-// ---------------------------------------------------------------------------
 // Per-category icons (issue 689)
-// ---------------------------------------------------------------------------
 
 test('categoryIcons / componentCategoryIcons round-trip only for existing categories', () => {
   const manager = makeManager();
@@ -232,28 +203,11 @@ test('updateSystem REPLACES the whole icon map (removal persists without -=)', a
   assert.deepEqual(persisted.categoryIcons, { elixirs: 'fas fa-vial' });
 });
 
-// ---------------------------------------------------------------------------
-// The standalone component editor's SAVE, and the essence override rule
-// (issue 1371 r19-store2)
-// ---------------------------------------------------------------------------
-//
+// The standalone component editor's SAVE, and the essence override rule (issue 1371 r19-store2).
 // The standalone editor window used to call `manager.updateItem(...)` directly, so a GM editing a
 // component's essences through it wrote a map the read union SHADOWS for every pair whose
 // `inherit.essences` switch is on — which, after the `1.32.0` election, is every component in a
-// one-system world. The manager's own store had been put on the flag-before-values order; this
-// second entry point had not, and two entry points that disagree about what a write means is the
-// defect this closes.
-//
-// THAT WINDOW WAS NEVER REACHED FROM AN ITEM SHEET, and earlier revisions of these comments said it
-// was. Its only constructor call was `SvelteCraftingSystemManagerApp`'s `services.onEditComponent`,
-// which nothing consumed — the manager root binds its own in-page route to every `onEditComponent`
-// prop — so issue 1520 deleted the application as orphaned.
-//
-// WHAT THESE TESTS DRIVE OUTLIVED IT. The save decision was extracted to
-// `svelte/util/componentEditorSave.js` before the deletion, and `ComponentEditorRoot.svelte` — the
-// screen the window hosted — is still in the tree with its own coverage. So this block is a
-// contract on the SEAM, not on the window: any surface that saves a component-editor draft goes
-// through it, and none of them may restate the override rule.
+// one-system world.
 
 const { overrideAwareComponentWrite, saveComponentEditorDraft } = await import(
   '../src/ui/svelte/util/componentEditorSave.js'
@@ -270,7 +224,6 @@ const { membershipKey } = await import('../src/systems/scopedDefinitions.js');
  * `essences` section `sys1` INHERITS — the state the `1.32.0` pass leaves behind.
  *
  * @param {object} [inherit] the membership record's inherit map.
- * @returns {{store: object, persisted: () => object}}
  */
 function makeInheritingScopeStore(inherit = {}, worldEssences = { fire: 3 }) {
   let persisted = {
@@ -293,10 +246,8 @@ function makeInheritingScopeStore(inherit = {}, worldEssences = { fire: 3 }) {
 /**
  * The manager the app writes through, with the read union wired the way the shipped one is.
  *
- * @param {object} scopeStore
  * @param {object} [essences] the in-system row's own map.
  * @param {object[]} [essenceDefinitions] this system's roster.
- * @returns {{manager: object, calls: object[]}}
  */
 function makeEditorManager(
   scopeStore,
@@ -337,9 +288,6 @@ function makeEditorManager(
 /**
  * The draft the editor hands its save: one essence stepper, in `buildComponentEditorUpdates`'
  * contract.
- *
- * @param {number} quantity
- * @returns {object}
  */
 function essenceDraft(quantity) {
   return {
@@ -381,10 +329,7 @@ test('1371 r19: the editor save flips the essence switch BEFORE the values land 
 });
 
 test('1371 r19: a save that only RESTATES the resolved map writes no essences at all', async () => {
-  // The editor sends its essence axis on every save. Restating what the system already resolves
-  // has authored nothing, so it must not flip a switch the GM never touched, nor overwrite the
-  // system's dormant own map — the map an inheriting system falls back to if the world section is
-  // later cleared.
+  // The editor sends its essence axis on every save.
   const { store, persisted } = makeInheritingScopeStore();
   const { manager, calls } = makeEditorManager(store);
   const writeComponent = overrideAwareComponentWrite({
@@ -470,23 +415,15 @@ test('1371 r19: an empty draft writes nothing and is not a failure', async () =>
   assert.deepEqual(calls, []);
 });
 
-// ---------------------------------------------------------------------------
-// The SEED the editor was opened on, and the write it may make from it
-// (issue 1371 r20-store3, reviewer round 6 findings 1 and 2)
-// ---------------------------------------------------------------------------
-//
-// The cases above hand-build the draft, which is how the defect survived: they stage maps seeded
-// from the resolved world map, and the app could not produce one for an inheriting pair. It read
-// `system.components` — the PERSISTED row — so on an inheriting pair it drew the dormant numbers,
-// and because the editor sends its essence axis on every save, a save that touched only a tag
-// DIFFERED from the resolved map, read as an authored override, flipped the switch and pinned the
-// dormant map. These drive the seam the app drives, seeded the way the app seeds it.
+// The SEED the editor was opened on, and the write it may make from it (issue 1371 r20-store3,
+// reviewer round 6 findings 1 and 2). The cases above hand-build the draft, which is how the defect
+// survived: they stage maps seeded from the resolved world map, and the app could not produce one
+// for an inheriting pair.
 
 /**
  * The component-editor screen's own seed, transcribed: the persisted record with its essence map
  * overlaid from the read union, through `buildComponentEditorState`.
  *
- * @param {object} manager
  * @returns {object} the editor state.
  */
 function appEditorState(manager) {
@@ -497,12 +434,8 @@ function appEditorState(manager) {
 }
 
 /**
- * A save from that state with the rows exactly as they were drawn and ONE tag ticked — the
- * "changed something else" save every finding here is about.
- *
- * @param {object} state
- * @param {object} writeComponent
- * @returns {Promise<boolean>}
+ * A save from that state with the rows exactly as they were drawn and ONE tag ticked — the "changed
+ * something else" save every finding here is about.
  */
 function saveWithOnlyATagTouched(state, writeComponent) {
   return saveComponentEditorDraft(
@@ -559,8 +492,7 @@ test('1371 r20: the app-seeded editor saves a tag change with NO essence write a
 
 test('1371 r20: an essence the world map carries and this system does not define SURVIVES a save', async () => {
   // `data-models`, `### Component scope`: a world map is NOT narrowed to the ids a given system
-  // holds. `buildEditableEssenceOptions` maps over the system's own roster, so `moss` has no row —
-  // and before this it was silently dropped from `updates.essences` on the next save.
+  // holds.
   const { store, persisted } = makeInheritingScopeStore({}, { fire: 3, moss: 1 });
   const { manager, calls } = makeEditorManager(store);
   manager.updateSystem('sys1', { itemTags: ['bar'] });
@@ -640,35 +572,30 @@ test('1371 r20: a value write that THROWS puts the switch it flipped back', asyn
   );
 });
 
-// The editor APP's own branch was pinned here as source until issue 1520. The application it read
-// — `src/ui/SvelteComponentEditorApp.svelte.js` — was orphaned (its only constructor call was a
+// The editor APP's own branch was pinned here as source until issue 1520. The application it read —
+// `src/ui/SvelteComponentEditorApp.svelte.js` — was orphaned (its only constructor call was a
 // manager service nothing consumed) and has been deleted, so the pin and its `readFileSync` went
-// with it: a top-level read of a deleted file throws at MODULE LOAD and fails this whole suite,
-// not one test. What that pin guarded is unchanged and still covered — the save decision itself
-// lives in `svelte/util/componentEditorSave.js` and is driven behaviourally above.
+// with it: a top-level read of a deleted file throws at MODULE LOAD and fails this whole suite, not
+// one test.
 
 // The editor ROOT's own branch, pinned as source because it is a `.svelte` module: the alternative
-// is a hand-written mirror of `handleSave` that keeps passing however the real one is written. The
-// behavioural case below drives what this emits.
+// is a hand-written mirror of `handleSave` that keeps passing however the real one is written.
 const EDITOR_ROOT_SOURCE = readFileSync(
   new URL('../src/ui/svelte/apps/ComponentEditorRoot.svelte', import.meta.url),
   'utf8'
 );
 
 // The MANAGER root's own hop, pinned as source for the same reason as the two above: it is a
-// 16,000-line `.svelte` module, and the one branch that matters here is a single forwarded
-// argument no mounted case can see — `ComponentEditView` states the baseline and the store
-// consumes it, and both halves are driven behaviourally, but the verb BETWEEN them is a mirror.
-// Deleting the argument left every suite in the repository green (measured, issue 1371 r22).
+// 16,000-line `.svelte` module, and the one branch that matters here is a single forwarded argument
+// no mounted case can see — `ComponentEditView` states the baseline and the store consumes it, and
+// both halves are driven behaviourally, but the verb BETWEEN them is a mirror (issue 1371).
 const MANAGER_ROOT_SOURCE = readFileSync(
   new URL('../src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte', import.meta.url),
   'utf8'
 );
 
 test('1371 r22: the manager root forwards the editor’s stated baseline to the store verb', () => {
-  // Foundry integrator round 8, finding 1(b). Without this the rule falls back to "this caller was
-  // seeded from the read union", which was true of the in-page editor only while the item card's
-  // essence run WAS that union — a premise revision 21 falsified from the other direction.
+  // Foundry integrator round 8, finding 1(b).
   assert.ok(
     MANAGER_ROOT_SOURCE.includes('async function saveComponentEdit(itemId, updates, { baseline } = {})'),
     'the save seam accepts the editor’s third argument'
@@ -692,25 +619,16 @@ test('1371 r21: the editor root emits the seed’s two facts WITH the rows it dr
   );
 });
 
-// ---------------------------------------------------------------------------
-// The BASELINE is a fact about the RENDER (issue 1371 r21-store4)
-// ---------------------------------------------------------------------------
-//
-// Round 6 gave the rule a stated baseline; round 7 found that both hops carrying it were unproven
-// (quality N1 — every fixture's baseline EQUALLED the resolved map, so unwiring either hop changed
-// nothing) and that the app re-derived it at SAVE time (Foundry integrator finding 2), which is a
-// different world's answer the moment a replicated `componentScope` write lands while the window
-// is open.
+// The BASELINE is a fact about the RENDER (issue 1371 r21-store4). Round 6 gave the rule a stated
+// baseline; round 7 found that both hops carrying it were unproven (quality N1 — every fixture's
+// baseline EQUALLED the resolved map, so unwiring either hop changed nothing) and that the app
+// re-derived it at SAVE time (Foundry integrator finding 2), which is a different world's answer
+// the moment a replicated `componentScope` write lands while the window is open.
 
 /**
  * The draft `ComponentEditorRoot.handleSave` emits from a rendered state, with one tag ticked.
  *
- * It carries the seed's two facts BESIDE the rows, which is the whole correction: they describe
- * the state that was drawn, and `saveComponentEditorDraft` prefers them over anything the caller
- * re-derives later.
- *
  * @param {object} state the rendered editor state.
- * @returns {object}
  */
 function rootEmittedDraft(state) {
   return {
@@ -726,11 +644,7 @@ function rootEmittedDraft(state) {
 }
 
 test('1371 r21: a FRACTIONAL world quantity does not turn an untouched save into an override', async () => {
-  // Quality N1, and the case that makes both `{baseline}` hops falsifiable. The steppers clamp, so
-  // an untouched save of the rendered rows produces `{fire: 2}` while the RESOLVED map — the
-  // fallback the rule uses when no baseline is stated — is `{fire: 2.5}`. Unwire either hop and
-  // the two differ, so a save that ticked a tag flips the switch and pins the pair to `{fire: 2}`.
-  // Reachable through an import or a hand-edited setting; unreachable from the module's own writes.
+  // Quality N1, and the case that makes both `{baseline}` hops falsifiable.
   const { store, persisted } = makeInheritingScopeStore({}, { fire: 2.5 });
   const { manager, calls } = makeEditorManager(store);
   manager.updateSystem('sys1', { itemTags: ['bar'] });
@@ -760,9 +674,7 @@ test('1371 r21: a FRACTIONAL world quantity does not turn an untouched save into
 
 test('1371 r21: a world edit landing WHILE the editor is open does not flip an untouched save', async () => {
   // Foundry integrator finding 2. The window registers no hooks, so the GM is still looking at
-  // `{fire: 3}` when the world map becomes `{fire: 3, water: 4}`. Re-deriving the baseline at save
-  // time compares the rendered rows against a map they were never drawn from, reads the difference
-  // as an authored override, and pins the pair to the stale map with a durable, replicated write.
+  // `{fire: 3}` when the world map becomes `{fire: 3, water: 4}`.
   const { store, persisted } = makeInheritingScopeStore();
   const { manager, calls } = makeEditorManager(store);
   manager.updateSystem('sys1', { itemTags: ['bar'] });

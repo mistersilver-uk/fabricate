@@ -1,14 +1,4 @@
-/**
- * Issue 917 — `RecipeManager` read side of the shared essence pool.
- *
- * `craftability.essencePool` is what the player's requirement rail renders and edits,
- * so these tests pin the numbers whose meaning changed: `delivered` (the essence
- * amount the resolved allocation supplies a requirement) versus `owned` (the amount
- * held), and `carriers[].ownedUnits` (ITEM units, net of the set's non-essence plan).
- * They also pin the two projections that go silently wrong: the `6/4 ✗` a player under-
- * allocation used to render, and the sibling essence tile whose consumed item is only
- * reachable through the block entry's `essenceGroupIds`.
- */
+/** Issue 917 — `RecipeManager` read side of the shared essence pool. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -97,9 +87,7 @@ function requirementFor(result, groupId) {
   return result.essencePool.requirements.find((entry) => entry.groupId === groupId);
 }
 
-// ---------------------------------------------------------------------------
 // Presence and gating.
-// ---------------------------------------------------------------------------
 
 test('a set with essence requirements exposes a pool of requirements, carriers and allocation', () => {
   const manager = makeManager({
@@ -163,10 +151,8 @@ test('an unauthored colour reads null, which every surface renders as the theme 
   assert.equal(requirementFor(result, 'g-rad').colorToken, null);
 });
 
-// ---------------------------------------------------------------------------
-// `ownedUnits` is net of the non-essence plan. A raw `system.quantity` read would
-// offer the player units the craft cannot spend.
-// ---------------------------------------------------------------------------
+// `ownedUnits` is net of the non-essence plan. A raw `system.quantity` read would offer the player
+// units the craft cannot spend.
 
 test('carriers[].ownedUnits is net of the set’s non-essence consumption plan', () => {
   const manager = makeManager({
@@ -185,9 +171,7 @@ test('carriers[].ownedUnits is net of the set’s non-essence consumption plan',
   );
 });
 
-// ---------------------------------------------------------------------------
 // The per-essence-id attribution partition, through the read side.
-// ---------------------------------------------------------------------------
 
 test('two requirements naming one essence each read their own need, never the id total', () => {
   const manager = makeManager({ definitions: [{ id: 'radiant', name: 'Radiant' }] });
@@ -262,9 +246,7 @@ test('a short essence requirement never marks a fully delivered sibling missing'
   assert.equal(shadowTile.satisfied, true, 'a delivered requirement is not dragged down');
 });
 
-// ---------------------------------------------------------------------------
 // Threading and attribution.
-// ---------------------------------------------------------------------------
 
 test('a threaded allocation steers which held stack the plan spends', () => {
   const manager = makeManager({ definitions: [{ id: 'radiant', name: 'Radiant' }] });
@@ -289,9 +271,7 @@ test('a threaded allocation steers which held stack the plan spends', () => {
 });
 
 test('a sibling essence tile resolves its consumed item through the block entry’s group ids', () => {
-  // The block emits ONE plan entry per item key naming ONE `ingredient`. A tile
-  // reading only `entry.ingredient` would resolve `consumedItem: null` for every
-  // sibling requirement the same entry funds.
+  // The block emits ONE plan entry per item key naming ONE `ingredient`.
   const manager = makeManager({
     definitions: [
       { id: 'radiant', name: 'Radiant' },

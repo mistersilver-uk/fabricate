@@ -38,8 +38,6 @@ test('a flat expression reduces exactly and reports that it does not roll', () =
 });
 
 // The classification is a fact the walk OBSERVES, not a second opinion about the same text.
-// It is asserted against real Foundry's own answer — `new Roll(x).isDeterministic === false`
-// — for every parseable row of the recorded table.
 test('rollsDice agrees with Foundry`s own determinism verdict on every recorded row', () => {
   for (const [expression] of RECORDED_EXPRESSION_MEANS) {
     assert.equal(
@@ -72,9 +70,7 @@ test('the computed average matches the measured mean of the real 14.365 engine',
   }
 });
 
-// The rows the module's header used to describe as "well under one point" and is not. They
-// are recorded so the limitation is a measurement a reviewer can check, and so that a future
-// change which DOES model them reddens this test rather than passing silently.
+// The rows the module's header used to describe as "well under one point" and is not.
 test('the counting modifiers are recorded as the wrong quantity, not as a near miss', () => {
   const counting = RECORDED_EXPRESSION_MEANS.filter(([, , , kind]) =>
     kind.startsWith('WRONG QUANTITY')
@@ -139,12 +135,7 @@ test('`d%` is refused, because real 14.365 refuses to parse it', () => {
   );
 });
 
-// A word beginning with `d` must not be read as a die. Foundry`s own grammar admits any
-// letter as faces, which would make `damage` parse as "one d, faces a, modifiers mage"; the
-// reducer restricts faces to the denominations `CONFIG.Dice.terms` configures.
-// `FunctionTerm#function` is `CONFIG.Dice.functions[fn] ?? Math[fn]`, resolved CASE-SENSITIVELY,
-// and `CONFIG.Dice.functions` is `{}`. A lowercasing walk therefore valued an expression Foundry
-// throws on — measured: `MAX(1d4, 2)` reduced to 2.5 while the engine refused to roll it at all.
+// A word beginning with `d` must not be read as a die.
 test('function names are resolved case-sensitively, exactly as Foundry resolves them', () => {
   for (const shouty of ['MAX(1d4, 2)', 'Min(1d4, 2)', 'FLOOR(1d8)', 'Abs(1d4)', 'Sqrt(4)']) {
     assert.ok(Number.isNaN(reduceRollExpression(shouty).value), `${shouty} is not a Math member`);

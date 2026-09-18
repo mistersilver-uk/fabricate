@@ -23,9 +23,7 @@ class FakeActor {
     this.name = name;
     this.uuid = `Actor.${name.replace(/\s+/g, '-')}`;
     this._flags = {};
-    // A real Foundry actor always answers this. The startup cleanup passes only
-    // touch actors THIS client may write (issue 970), so a fixture that omitted it
-    // would be silently skipped rather than exercised.
+    // A real Foundry actor always answers this (issue 970).
     this.isOwner = isOwner;
   }
 
@@ -377,9 +375,8 @@ test('CraftingRunManager freezes and resumes v1 gates while preserving legacy wo
   assert.equal(resumed.pausedDurationSeconds, 100);
   assert.equal(resumed.pauseState, null);
   assert.equal(resumed.runRevision, 3);
-  // The container persists through a MERGING flag write, which never removes a key deleted from
-  // a nested object. A resume that only deleted `pauseState` left the stored run paused at the
-  // resumed revision, so the next pause refused with RUN_ALREADY_PAUSED and deadlocked the run.
+  // The container persists through a MERGING flag write, which never removes a key deleted from a
+  // nested object.
   manager.invalidateCache(actor.id);
   assert.equal(manager.getActiveRun(actor, run.id).pauseState, null);
   const repaused = await manager.pauseRun(actor, run.id, { expectedRevision: 3 });
@@ -597,11 +594,8 @@ test('CraftingRunManager.completeRun never archives a duplicate history id (lega
   );
 });
 
-// Foundry's setFlag performs a RECURSIVE MERGE that never removes keys deleted
-// from an object, so a run removed from `active` would linger in the stored flag
-// and resurrect on reload. This actor reproduces that merge (and the `-=` deletion
-// that `_persist` must issue to counter it); the default FakeActor.setFlag simply
-// replaces the value and cannot catch the regression.
+// Foundry's setFlag performs a RECURSIVE MERGE that never removes keys deleted from an object, so a
+// run removed from `active` would linger in the stored flag and resurrect on reload.
 class MergeActor {
   constructor(name = 'Merge') {
     this.id = `id-${name}`;
@@ -811,19 +805,9 @@ test('CraftingRunManager: discardRun removes from active WITHOUT archiving to hi
   assert.equal(await manager.discardRun(actor, 'no-such-id'), null, 'unknown id returns null');
 });
 
-// --- Spec 002 (Data Models) "CraftingRun Requirements" invariants ---------
-// Rule 4: `finishedAt` is required for terminal statuses (`succeeded`, `failed`,
-//   `cancelled`) and must be absent for non-terminal statuses (`inProgress`,
-//   `waitingTime`).
-// Rule 2: `currentStepIndex` must be `null` for terminal statuses.
-// `completeRun` is the sole funnel through which every terminal transition
-// passes, so these guards pin all three terminal paths against it.
-//
-// NOTE ON "absent": the model represents an unfinished run as `finishedAt:
-// undefined` (an own key with an undefined value), not a missing key. The
-// normative meaning of "absent" here is "carries no finish timestamp", so these
-// tests assert `=== undefined`, NOT key-absence. Asserting the key were missing
-// would wrongly fail against the model's own `createRun` shape.
+// Spec 002 (Data Models) "CraftingRun Requirements" invariants --------- Rule 4: `finishedAt` is
+// required for terminal statuses (`succeeded`, `failed`, `cancelled`) and must be absent for
+// non-terminal statuses (`inProgress`, `waitingTime`).
 const TERMINAL_PATHS = {
   succeeded: (manager, actor, run) => manager.completeStepSuccess(actor, run, 0, {}),
   failed: (manager, actor, run) => manager.completeStepFailure(actor, run, 0, 'check failed'),
@@ -926,9 +910,7 @@ test('CraftingRunManager: currentStepIndex is null for terminal statuses and non
 });
 
 test('CraftingRunManager: a terminal run finishing at world time 0 records finishedAt=0 (present, not absent) (spec 002 rule 4)', async () => {
-  // Precision guard: world time 0 is a valid, PRESENT finish timestamp. A naive
-  // truthy check (`if (finishedAt)`) would misread 0 as absent and mis-order
-  // history by finish time, so pin that 0 is distinct from undefined.
+  // Precision guard: world time 0 is a valid, PRESENT finish timestamp.
   setupGlobals(0);
   const manager = new CraftingRunManager();
   const actor = new FakeActor('ZeroTime');
@@ -1131,11 +1113,8 @@ test('CraftingRunManager: cleanupInvalidRuns keeps a fizzle on a valid system, p
   );
 });
 
-// Issue 970: both startup cleanup passes run on EVERY client and write directly to
-// actor documents (there is no GM relay). A player owns only their own characters,
-// so an un-filtered walk had them attempt `Actor#update` on every other character in
-// the world; Foundry refuses it, `setFabricateFlag` rejects by design, and the
-// rejection propagated out of `initialize()` before `ready` was ever set.
+// Issue 970: both startup cleanup passes run on EVERY client and write directly to actor documents
+// (there is no GM relay).
 test('CraftingRunManager: the startup cleanup passes skip actors this client cannot write', async () => {
   setupGlobals();
   const manager = new CraftingRunManager();
