@@ -25,15 +25,30 @@ import {
   isD0SectionNeededForTargets,
 } from '../scripts/lib/screenshotCaptureMap.js';
 import { runFixturedScreenshotSection } from '../scripts/lib/smokeSectionFixture.js';
+import { VIEW_LAB_CASE_FILES } from '../scripts/lib/viewLabCases.js';
 
 const HARNESS = readFileSync('scripts/foundry-test-run.mjs', 'utf8');
 const CAPTURE_MAP_SRC = readFileSync('scripts/lib/screenshotCaptureMap.js', 'utf8');
 const SECTION_FIXTURE_SRC = readFileSync('scripts/lib/smokeSectionFixture.js', 'utf8');
-// The two things that author click targets against the rendered manager: the Foundry smoke harness
-// and the View Lab case registry.
+// Every case file the registry manifest names, so a scan reads the whole corpus and every offender
+// it reports names the file the step is actually authored in.
+const CASE_FILES = VIEW_LAB_CASE_FILES.map(({ path }) => ({
+  path,
+  source: readFileSync(path, 'utf8'),
+}));
+
+/** @returns {{path: string, source: string}} The one case file whose source holds `text`. */
+function caseFileHolding(text) {
+  const holders = CASE_FILES.filter(({ source }) => source.includes(text));
+  assert.equal(holders.length, 1, `exactly one case file must contain: ${text}`);
+  return holders[0];
+}
+
+// The things that author click targets against the rendered manager: the Foundry smoke harness and
+// the View Lab case files.
 const CAPTURE_PRODUCERS = [
   { path: 'scripts/foundry-test-run.mjs', source: HARNESS },
-  { path: 'scripts/lib/viewLabCases.js', source: readFileSync('scripts/lib/viewLabCases.js', 'utf8') },
+  ...CASE_FILES,
 ];
 const KNOWLEDGE_LABELS = [
   'manager-knowledge-owned-copies',
@@ -405,9 +420,7 @@ test('the Foundry Map capture uses a deterministic click while View Lab retains 
   assert.match(mapInteraction, /await mapDestination\.click\(\)/);
   assert.doesNotMatch(mapInteraction, /\.press\('(?:Enter|Space)'\)/);
 
-  const viewLabCases = CAPTURE_PRODUCERS.find(
-    ({ path }) => path === 'scripts/lib/viewLabCases.js'
-  ).source;
+  const viewLabCases = caseFileHolding("id: 'manager-world-travel-long-label-focus'").source;
   const keyboardCaseStart = viewLabCases.indexOf(
     "id: 'manager-world-travel-long-label-focus'"
   );
@@ -1056,22 +1069,22 @@ test('no capture producer drives a converted select with Playwright’s <select>
 // Rules list's essence filter and the system Tool Rules list's sort. All three are issue 1510's
 // later phases to retire, so the surface this clause covers is still shrinking towards zero.
 test('no View Lab step drives a converted select with the registry’s native `select:` verb', () => {
-  const registry = CAPTURE_PRODUCERS.find(
-    ({ path }) => path === 'scripts/lib/viewLabCases.js'
-  ).source;
   // The step's own literal shape: a `selector` string immediately followed by the `select:` key,
   // which is how every one of these steps is authored.
-  const steps = [
-    ...registry.matchAll(/\{\s*selector:\s*(['"`])([^'"`]*)\1\s*,\s*select:/g),
-  ];
   const offenders = [];
-  for (const match of steps) {
-    const selector = match[2];
-    for (const hook of CONVERTED_SELECT_HOOKS) {
-      if (!selector.includes(hook)) continue;
-      offenders.push(`scripts/lib/viewLabCases.js: \`${selector}\` is driven by a \`select:\` step`);
+  let steps = [];
+  for (const { path, source } of CASE_FILES) {
+    const found = [...source.matchAll(/\{\s*selector:\s*(['"`])([^'"`]*)\1\s*,\s*select:/g)];
+    steps = [...steps, ...found];
+    for (const match of found) {
+      const selector = match[2];
+      for (const hook of CONVERTED_SELECT_HOOKS) {
+        if (!selector.includes(hook)) continue;
+        offenders.push(`${path}: \`${selector}\` is driven by a \`select:\` step`);
+      }
     }
   }
+  const registry = CASE_FILES.map(({ source }) => source).join('\n');
   // THE NON-VACUITY FLOOR IS THE CONVERTED SET, NOT THE SURVIVING NATIVE ONE (issue 1510). A floor
   // over the SURVIVING natives shrinks to zero as this conversion finishes and takes the ban with
   // it.

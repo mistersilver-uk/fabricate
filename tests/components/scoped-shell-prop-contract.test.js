@@ -5,6 +5,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { relative, resolve, sep } from 'node:path';
 
 import { listSvelteComponents } from '../../scripts/lib/svelteComponentFiles.js';
+import { VIEW_LAB_CASE_FILES } from '../../scripts/lib/viewLabCases.js';
 import {
   attributeValueOn,
   detectShellSpreads,
@@ -1257,7 +1258,10 @@ describe('the shared validation tab states its entry face as an opt-in prop', ()
 
 /** THIS SCREEN'S POINTER HIT-TESTS ARE IN THE CAPTURE REGISTRY. */
 describe('the entry’s pointer proofs survive in the capture registry', () => {
-  const registry = () => sourceOf('scripts/lib/viewLabCases.js');
+  // Every case file the manifest names, as one text: this screen's cases moved out of the index
+  // with the split (issue 1671), and which file holds them is not this suite's concern.
+  const registry = () =>
+    VIEW_LAB_CASE_FILES.map(({ path }) => sourceOf(path)).join('\n');
 
   it('carries a centre-hit on the world tag chip, which the page still emits', () => {
     // `moss`, not `fuel` (issue 1371 r15-entry): the run offers the vocabulary's tags alone.

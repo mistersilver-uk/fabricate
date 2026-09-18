@@ -466,7 +466,10 @@ describe('GatheringPartiesTab (mounted)', () => {
     const lock = root.querySelector(
       '[data-travel-panel="parties"] [data-party-realm-override-unavailable]'
     );
-    assert.ok(Boolean(lock), 'viewLabCases.js:3269 matches on exactly this pair');
+    assert.ok(
+      Boolean(lock),
+      "the `manager-world-parties-no-selection` case's `expectSelector` matches on exactly this pair"
+    );
     assert.match(lock.textContent, /Enable Travel & Realms/);
     assert.ok(!root.querySelector('.manager-travel-parties-override-trigger'));
   });
