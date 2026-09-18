@@ -1541,6 +1541,7 @@ test('the gate and the producer arm on the same predicate, and an armed gate sel
     'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
     'styles/fabricate.css',
     'src/ui/model/componentBrowserModel.js',
+    'src/ui/svelte/util/foundryIconCatalogue.json',
     'scripts/lib/viewLabCases.js',
     'docs/README.md',
     'main.js',
@@ -1567,4 +1568,12 @@ test('the gate and the producer arm on the same predicate, and an armed gate sel
   assert.equal(hasUiChanges(mixed), true);
   assert.equal(labHasUiChanges(mixed), true);
   assert.ok(mapChangedFilesToCases(mixed).length > 0);
+
+  // The catalogue arms the gate as any `src/ui/` path does, so its anchor must admit the `.json`.
+  assert.ok(
+    mapChangedFilesToCases(['src/ui/svelte/util/foundryIconCatalogue.json']).some(
+      (viewCase) => viewCase.id === 'manager-system-edit-lists'
+    ),
+    'the committed icon catalogue must select the case whose frame renders the icon picker'
+  );
 });

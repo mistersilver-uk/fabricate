@@ -106,6 +106,7 @@ const entryHarness = createMountedComponentHarness({
     'src/ui/svelte/util/essencePreviewRow.js',
     'src/ui/svelte/util/foundryIconVocabulary.js',
     'src/ui/svelte/util/foundryIconCatalogue.js',
+    'src/ui/svelte/util/foundryIconCatalogue.json',
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/listboxNavigation.js',
     'src/ui/svelte/util/overlayHost.js',

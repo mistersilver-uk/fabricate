@@ -13,6 +13,7 @@ const vocabularyHarness = createMountedComponentHarness({
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/util/essenceIcons.js',
     'src/ui/svelte/util/foundryIconCatalogue.js',
+    'src/ui/svelte/util/foundryIconCatalogue.json',
     'src/ui/svelte/util/foundryIconVocabulary.js',
     'src/ui/svelte/util/iconPickerPopover.js',
     'src/ui/svelte/util/listboxNavigation.js',

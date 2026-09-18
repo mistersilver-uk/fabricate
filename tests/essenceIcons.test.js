@@ -113,6 +113,12 @@ describe('the catalogue Foundry can actually render', () => {
     assert.ok(Object.isFrozen(entry.aliases), 'an entry alias list must be frozen too');
   });
 
+  // The loader parses JSON, which yields mutable objects, so all three exports are frozen by it.
+  it('freezes the two release records as well as the definitions', () => {
+    assert.ok(Object.isFrozen(FOUNDRY_ICON_BUNDLE_RELEASE), 'the bundle release must be frozen');
+    assert.ok(Object.isFrozen(FOUNDRY_ICON_FREE_INTERSECTION), 'the free release must be frozen');
+  });
+
   // Aliases are why offering one name per glyph refuses no name.
   it('records every name the bundle gives a glyph, and resolves each of them', () => {
     const gear = findCuratedIcon('gear');

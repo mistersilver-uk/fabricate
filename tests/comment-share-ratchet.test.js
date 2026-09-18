@@ -10,8 +10,6 @@ import { test } from 'node:test';
 import { byCodePoint, ledgerGate } from './helpers/ratchetBaseline.js';
 import { collectWorkingTreeSources, repoRoot } from './helpers/sourceScan.js';
 
-// `readFileSync` + `JSON.parse`, not `import ... with { type: 'json' }`: this repo's ESLint
-// parser rejects the import-attribute syntax, as `scripts/lib/designSystemPrimitives.js` notes.
 const LEDGER_PATH = resolve(import.meta.dirname, 'comment-share-ledger.txt');
 
 /** The command that re-derives the ledger, named in every drift message so it is actionable. */
