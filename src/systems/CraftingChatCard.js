@@ -133,7 +133,8 @@ export function rolledAmountText(rolled, quantity, localize = (key) => key) {
  *
  * A `rolled` amount adds a second run to the row in the card's own `__roll` treatment, which is
  * what {@link renderRollTotal} states a check total in and is the one run here that must not be
- * ellipsed away at chat width. An entry without one renders byte-identically.
+ * ellipsed away at chat width; `__item-roll` names the per-row instance so a rule may reach it
+ * without reaching the card-level total row. An entry without one renders byte-identically.
  */
 export function renderItem({ name, img, quantity, rolled }, localize = (key) => key) {
   const label = Number(quantity) > 1 ? `${Number(quantity)}× ${esc(name)}` : esc(name);
@@ -142,7 +143,10 @@ export function renderItem({ name, img, quantity, rolled }, localize = (key) => 
     '<li class="fabricate-craft-chat__item">',
     `<img class="fabricate-craft-chat__icon" src="${esc(img || ITEM_FALLBACK_IMG)}" alt="" />`,
     `<span class="fabricate-craft-chat__label">${label}</span>`,
-    note ? `<span class="fabricate-craft-chat__roll">${esc(note)}</span>` : '',
+    note
+      ? '<span class="fabricate-craft-chat__roll fabricate-craft-chat__item-roll">' +
+        `${esc(note)}</span>`
+      : '',
     '</li>',
   ].join('');
 }

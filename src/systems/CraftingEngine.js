@@ -78,6 +78,7 @@ import { resolveRolledAmount, rolledAwardRecord } from './rolledAmountResolver.j
 import { getCommittedExecutionOutcome, observeExecutionJournal } from './runExecutionJournal.js';
 import {
   attachAwardReceipts,
+  attachRolledAwards,
   awardReceipts,
   createItemReceiptCollector,
   itemReceipt,
@@ -156,6 +157,17 @@ export function rollTotalForCard(checkResult) {
  * `runFormulaRouted` emits `data.tierStepApplied` only on an actual tier change (issue 975). */
 function tierStepForCard(checkResult) {
   return checkResult?.data?.tierStepApplied ?? null;
+}
+
+/** What a result card states about the rolled amounts an awarded array carries (issue 1645): the
+ * live rolls the message rides them on, and the empty awards that created no item and so have no
+ * receipt to render, making the award itself the row. Shared by the crafting and salvage posters. */
+function rolledAwardChatParts(awarded) {
+  const awards = awarded?.rolledAwards ?? [];
+  return {
+    rolls: awards.map((award) => award.roll).filter(Boolean),
+    emptyAwards: awards.filter((award) => award.quantity === 0),
+  };
 }
 
 /** One award's rolled-amount evidence (issue 1645): the persistable record, plus the live `Roll` and
@@ -5650,7 +5662,7 @@ export class CraftingEngine {
               essenceEnabled,
               resolveComponent,
               receiptCollector,
-              rolledAmounts: rolledAwards,
+              rolledAwards,
             }
           );
 
@@ -5664,14 +5676,12 @@ export class CraftingEngine {
       throw receiptCollector.failure(error);
     }
 
-    // The awarded array carries its rolled-amount evidence as it already carries its receipts, so
-    // every chat poster has it without a call site relaying it; the record set stays plain data.
-    const items = attachAwardReceipts(createdItems, receiptCollector.snapshot());
-    Object.defineProperty(items, 'rolledAwards', { value: Object.freeze(rolledAwards) });
     return {
-      items,
+      items: attachRolledAwards(
+        attachAwardReceipts(createdItems, receiptCollector.snapshot()),
+        rolledAwards
+      ),
       resolutionMeta: resolved?.meta || null,
-      rolledAmounts: rolledAwards.map(({ roll, rolled, name, img, ...record }) => record),
     };
   }
 
@@ -5689,7 +5699,7 @@ export class CraftingEngine {
       essenceEnabled = null,
       resolveComponent,
       receiptCollector = null,
-      rolledAmounts = null,
+      rolledAwards = null,
     } = {}
   ) {
     let sourceItem;
@@ -5739,7 +5749,7 @@ export class CraftingEngine {
     const { amount, rolled, roll } = await resolveRolledAmount(result, craftingActor, {
       Roll: diceEngine(),
     });
-    if (rolled) rolledAmounts?.push(rolledAwardEvidence(result, rolled, amount, roll, itemData));
+    if (rolled) rolledAwards?.push(rolledAwardEvidence(result, rolled, amount, roll, itemData));
     if (amount === 0) return null;
     if (hasStackQuantity(itemData) || !sourceItem) {
       setStackQuantity(itemData, amount);
@@ -6834,10 +6844,7 @@ export class CraftingEngine {
     const localize = (key) => game.i18n?.localize?.(key) ?? key;
 
     const toolEntries = this._resolveToolChatEntries(tools, system);
-    // Attached to the awarded array by `_createResultItems` (issue 1645). The evaluated rolls ride
-    // along on the message so Foundry sounds the dice and Dice So Nice animates them.
-    const rolledAwards = createdResults?.rolledAwards ?? [];
-    const rolls = rolledAwards.map((award) => award.roll).filter(Boolean);
+    const { rolls, emptyAwards } = rolledAwardChatParts(createdResults);
 
     // Resolve to a plain, Foundry-free model, then render via the shared pure
     // builder (mirrors the gathering card: resolve names/images here, format there).
@@ -6846,11 +6853,7 @@ export class CraftingEngine {
         status: success ? 'succeeded' : 'failed',
         actorName: craftingActor?.name || '',
         recipeName: recipe?.name || '',
-        // An empty award created no item and so has no receipt; the award itself is the row.
-        results: [
-          ...awardReceipts(createdResults),
-          ...rolledAwards.filter((award) => award.quantity === 0),
-        ],
+        results: [...awardReceipts(createdResults), ...emptyAwards],
         consumed: (consumedIngredients || []).map(({ item, quantity }) => ({
           name: item?.name || '',
           img: item?.img || '',
@@ -6865,8 +6868,8 @@ export class CraftingEngine {
       localize
     );
 
-    // The custom `content` survives the rolls because the card has child elements, and a crafting
-    // card is never whispered, so carrying rolls hides it from nobody.
+    // The rolls sound the dice and animate Dice So Nice. The custom `content` survives them because
+    // the card has child elements, and a result card is never whispered, so they hide it from nobody.
     try {
       await ChatMessage.create({
         speaker: ChatMessage.getSpeaker({ actor: craftingActor }),

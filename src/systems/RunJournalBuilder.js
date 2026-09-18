@@ -2319,8 +2319,9 @@ export class RunJournalBuilder {
       art: stringOrNull(mapped.img),
       icon: stringOrNull(result?.icon),
       tint: stringOrNull(result?.tint ?? result?.colorToken),
-      // A rolled row has no resolved amount to preview, so it states its expression instead.
-      qty: mapped.amountLabel ? null : (numberOrNull(result?.quantity) ?? 1),
+      // The authored amount stays a number a view can read; the expression rides BESIDE it, because
+      // an absent `qty` reads as "not recorded" rather than as an amount nobody can preview.
+      qty: numberOrNull(result?.quantity) ?? 1,
       amountLabel: mapped.amountLabel ?? null,
       chance,
     });

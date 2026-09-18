@@ -91,12 +91,14 @@ function withRoll(seed, run) {
 }
 
 const engine = () => new CraftingEngine({ canCraft: () => ({ canCraft: false }) }, null, null);
+/** The persistable half of the attached evidence, without the live `Roll` or the card's own fields. */
+const record = (awards) => awards.map(({ roll, rolled, name, img, ...rest }) => rest);
 const resultRow = (id, quantityFormula) => ({ id, componentId: COMPONENT.id, quantity: 1, quantityFormula });
 
 test('1645: the crafted stack is the seeded roll total, rolled once against the crafter', async () => {
   await withRoll({ totals: { '1d4+1': 4 } }, async ({ calls }) => {
     const actor = capturingActor();
-    const { items, rolledAmounts } = await engine()._createResultItems(
+    const { items } = await engine()._createResultItems(
       actor,
       RECIPE,
       { resultGroups: [{ id: 'g', results: [resultRow('r1', '1d4+1')] }] },
@@ -110,7 +112,7 @@ test('1645: the crafted stack is the seeded roll total, rolled once against the 
     assert.equal(items.historyReceipts[0].quantity, 4, 'and so is the receipt');
     assert.equal(calls.length, 1, 'ONE roll for one result');
     assert.deepEqual(calls[0].data, { abilities: { str: { mod: 3 } } }, 'against the crafter');
-    assert.deepEqual(rolledAmounts, [
+    assert.deepEqual(record(items.rolledAwards), [
       { resultId: 'r1', componentId: COMPONENT.id, formula: '1d4+1', total: 4, quantity: 4 },
     ]);
   });
@@ -119,7 +121,7 @@ test('1645: the crafted stack is the seeded roll total, rolled once against the 
 test('1645: a result rolling to zero creates no item and is still reported', async () => {
   await withRoll({ totals: { '1d4-8': -3, '1d4+1': 2 } }, async ({ calls }) => {
     const actor = capturingActor();
-    const { items, rolledAmounts } = await engine()._createResultItems(
+    const { items } = await engine()._createResultItems(
       actor,
       RECIPE,
       {
@@ -135,7 +137,7 @@ test('1645: a result rolling to zero creates no item and is still reported', asy
     assert.equal(actor.captured.length, 1, 'only the second result produced anything');
     assert.equal(items.historyReceipts.length, 1, 'an empty award writes no receipt');
     assert.equal(calls.length, 2, 'one roll per result');
-    assert.deepEqual(rolledAmounts[0], {
+    assert.deepEqual(record(items.rolledAwards)[0], {
       resultId: 'r1',
       componentId: COMPONENT.id,
       formula: '1d4-8',
@@ -148,7 +150,7 @@ test('1645: a result rolling to zero creates no item and is still reported', asy
 test('1645: a fixed result still awards its authored quantity and rolls nothing', async () => {
   await withRoll({}, async ({ calls }) => {
     const actor = capturingActor();
-    const { rolledAmounts } = await engine()._createResultItems(
+    const { items } = await engine()._createResultItems(
       actor,
       RECIPE,
       { resultGroups: [{ id: 'g', results: [{ id: 'r1', componentId: COMPONENT.id, quantity: 3 }] }] },
@@ -158,7 +160,7 @@ test('1645: a fixed result still awards its authored quantity and rolls nothing'
     );
     assert.equal(actor.captured[0].system.quantity, 3);
     assert.equal(calls.length, 0, 'no formula, no roll');
-    assert.deepEqual(rolledAmounts, [], 'and nothing to report');
+    assert.deepEqual(items.rolledAwards, [], 'and nothing to report');
   });
 });
 
@@ -214,7 +216,7 @@ test('1645: the award receipt records the roll, and a fixed award records no key
 
 test('1645: the awarded array carries the live rolls the chat message needs', async () => {
   await withRoll({ totals: { '1d4-8': -3 } }, async () => {
-    const { items, rolledAmounts } = await engine()._createResultItems(
+    const { items, ...returned } = await engine()._createResultItems(
       capturingActor(),
       RECIPE,
       { resultGroups: [{ id: 'g', results: [resultRow('r1', '1d4-8')] }] },
@@ -226,7 +228,8 @@ test('1645: the awarded array carries the live rolls the chat message needs', as
     assert.equal(award.roll.total, -3, 'the evaluated Roll itself, for the dice sound');
     assert.deepEqual(award.rolled, { formula: '1d4-8', total: -3 });
     assert.equal(award.name, COMPONENT.name, 'named, because an empty award has no receipt to name');
-    assert.ok(!('roll' in rolledAmounts[0]), 'the returned record stays plain data');
+    assert.deepEqual(Object.keys(returned), ['resolutionMeta'], 'the evidence rides on the array');
+    assert.ok(Object.isFrozen(items.rolledAwards), 'as an immutable per-invocation snapshot');
   });
 });
 

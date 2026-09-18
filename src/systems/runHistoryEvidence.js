@@ -183,6 +183,13 @@ export function attachAwardReceipts(items, receipts) {
   return items;
 }
 
+/** The same carrier for a rolled amount's evidence (issue 1645): the chat poster reads it off the
+ *  awarded array rather than a call site relaying it. Holds a live `Roll` and is never persisted. */
+export function attachRolledAwards(items, awards) {
+  Object.defineProperty(items, 'rolledAwards', { value: Object.freeze(list(awards)) });
+  return items;
+}
+
 export function awardReceipts(items) {
   if (!Array.isArray(items)) return [];
   if (items.length > 0 && !Array.isArray(items.historyReceipts))

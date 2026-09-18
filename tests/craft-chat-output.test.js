@@ -18,7 +18,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
-import { attachAwardReceipts } from '../src/systems/runHistoryEvidence.js';
+import { attachAwardReceipts, attachRolledAwards } from '../src/systems/runHistoryEvidence.js';
 
 /**
  * The published card renders ACKNOWLEDGED awards only: production hands
@@ -38,13 +38,6 @@ function awardedResults(entries) {
       ...(entry.rolled && { rolled: entry.rolled }),
     }))
   );
-}
-
-/** `_createResultItems` attaches this to the array it returns, so a bare array would again stand in
- *  for a caller that cannot exist (issue 1645). */
-function withRolledAwards(items, awards) {
-  Object.defineProperty(items, 'rolledAwards', { value: Object.freeze(awards) });
-  return items;
 }
 
 /** One award's evidence in the shape `rolledAwardEvidence` builds. */
@@ -646,7 +639,7 @@ test('_postCraftChatMessage: a rolled award states its roll and carries the eval
   resetChat();
 
   const roll = { total: 3, formula: '1d4+1' };
-  const createdResults = withRolledAwards(
+  const createdResults = attachRolledAwards(
     awardedResults([
       {
         name: 'Iron Sword',
@@ -682,7 +675,7 @@ test('_postCraftChatMessage: an empty award is a row of its own and still sounds
   resetChat();
 
   const roll = { total: -3, formula: '1d4-8' };
-  const createdResults = withRolledAwards(awardedResults([]), [
+  const createdResults = attachRolledAwards(awardedResults([]), [
     rolledAward({ formula: '1d4-8', total: -3, quantity: 0, roll }),
   ]);
 
