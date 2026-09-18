@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { enrichHistoricalConsumption, historicalItemSources } from '../../src/systems/historyItemEvidence.js';
 import { gatheringHistoryEvidence } from '../../src/systems/gatheringHistoryEvidence.js';
-import { RunJournalBuilder } from '../../src/systems/RunJournalBuilder.js';
+import { RunJournalBuilder } from '../../src/ui/presenters/RunJournalBuilder.js';
 import { legacyGatheringEvidence as legacyGather } from '../helpers/journal-fixtures.js';
 
 const physical = (fields = {}) => ({ actorUuid: 'Actor.a', itemUuid: 'Actor.a.Item.material', quantity: 2, ...fields });

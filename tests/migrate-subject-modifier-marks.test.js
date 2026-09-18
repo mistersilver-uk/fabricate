@@ -13,7 +13,7 @@ const { MigrationRunner } = await import('../src/migration/MigrationRunner.js');
 const { migrateExportPayload } = await import('../src/migration/migrateExportPayload.js');
 const { FABRICATE_EXPORT_SCHEMA_VERSION } = await import('../src/systems/authoringExport.js');
 const { resolveEligibleModifierIds } = await import('../src/systems/checkModifierResolver.js');
-const { projectComponentSummary } = await import('../src/systems/summaryProjection.js');
+const { projectComponentSummary } = await import('../src/ui/presenters/summaryProjection.js');
 
 const CATALOGUE = [
   { id: 'med', label: 'Medicine', expression: '@med' },

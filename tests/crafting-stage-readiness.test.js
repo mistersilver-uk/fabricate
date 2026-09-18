@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 
 import { createPersistedCraftingHistory, historyItem } from './helpers/journal-fixtures.js';
 import { IngredientSet } from '../src/models/IngredientSet.js';
-import { RunJournalBuilder } from '../src/systems/RunJournalBuilder.js';
+import { RunJournalBuilder } from '../src/ui/presenters/RunJournalBuilder.js';
 
 let requests = 0;
 const grant = () => ({ requestId: `readiness-${++requests}`, executionGrant: 'grant' });

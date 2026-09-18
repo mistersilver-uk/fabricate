@@ -7,7 +7,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
-import { CraftingListingBuilder } from '../src/systems/CraftingListingBuilder.js';
+import { CraftingListingBuilder } from '../src/ui/presenters/CraftingListingBuilder.js';
 import { CraftingRunManager } from '../src/systems/CraftingRunManager.js';
 
 // Foundry / game globals

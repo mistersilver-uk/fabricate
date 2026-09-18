@@ -264,11 +264,11 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   // formatter.
   'src/ui/svelte/util/recipeDuration.js',
   'src/systems/characterLibraries.js',
-  'src/systems/CraftingListingBuilder.js',
+  'src/ui/presenters/CraftingListingBuilder.js',
   // Same rule, issue 1091: the browse-status vocabulary and its precedence rule moved out of the
   // builder into an import-free leaf so #1091's summary projection can share them without pulling
   // the builder in.
-  'src/systems/craftingBrowseStatus.js',
+  'src/ui/presenters/craftingBrowseStatus.js',
   // Same rule, issue 1055: the builder resolves the displayed check formula through the
   // SAME check-modifier context the engine rolls, so it imports the resolver.
   'src/systems/checkModifierResolver.js',
@@ -290,7 +290,7 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   // Same rule, issue 1075: the builder's SUMMARY phase projects each browsable recipe through
   // #1091's canonical summary, which reads held quantities from #1077's per-pass inventory
   // snapshot.
-  'src/systems/summaryProjection.js',
+  'src/ui/presenters/summaryProjection.js',
   'src/utils/componentCategories.js',
   // #1663: the ONE implementation behind both category shims; imports nothing.
   'src/utils/categoryNormalization.js',

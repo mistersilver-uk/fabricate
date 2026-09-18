@@ -6,7 +6,7 @@ import { chromium } from 'playwright';
 
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { getItemSourceReferences } from '../../src/utils/sourceUuid.js';
-import { RunJournalBuilder } from '../../src/systems/RunJournalBuilder.js';
+import { RunJournalBuilder } from '../../src/ui/presenters/RunJournalBuilder.js';
 import { ResolutionModeService } from '../../src/systems/ResolutionModeService.js';
 import { RecipeVisibilityService } from '../../src/systems/RecipeVisibilityService.js';
 import { IngredientSet } from '../../src/models/IngredientSet.js';

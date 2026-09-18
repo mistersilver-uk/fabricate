@@ -31,7 +31,7 @@ const harness = createMountedComponentHarness({
   componentPath: 'src/ui/svelte/apps/manager/ImportReportModal.svelte',
 });
 
-// Shaped exactly like `buildImportReportContent` output (see src/systems/importReportContent.js).
+// Shaped exactly like `buildImportReportContent` output (see src/ui/presenters/importReportContent.js).
 const REPORTED_CONTENT = {
   title: 'Import report',
   headline: 'Import succeeded — 3 reference(s) need attention.',

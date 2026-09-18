@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {
   CraftingListingBuilder,
   CRAFTING_BROWSE_STATUS,
-} from '../src/systems/CraftingListingBuilder.js';
+} from '../src/ui/presenters/CraftingListingBuilder.js';
 import { ResolutionModeService } from '../src/systems/ResolutionModeService.js';
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { DEFAULT_RECIPE_IMAGE } from '../src/models/Recipe.js';

@@ -11,7 +11,7 @@ import { resolve } from 'node:path';
 
 import { getFabricateFlag, setFabricateFlag } from '../../src/config/flags.js';
 import { isGatheringActorSelectableByUser } from '../../src/config/preferencesCleanup.js';
-import { AlchemyListingBuilder } from '../../src/systems/AlchemyListingBuilder.js';
+import { AlchemyListingBuilder } from '../../src/ui/presenters/AlchemyListingBuilder.js';
 import {
   resolveBulkCheckDecision as resolveStandaloneBulkCheckDecision,
   rollActorCheck as rollStandaloneActorCheck,

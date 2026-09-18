@@ -11,7 +11,7 @@ import {
 } from '../helpers/svelte-component-harness.js';
 import { makeCraftingRun, makeGatheringRun, makeSucceededRun, createPersistedCraftingHistory, createPersistedGatheringHistory, createPersistedSalvageHistory, createPersistedFizzleHistory, legacyGatheringEvidence } from '../helpers/journal-fixtures.js';
 import { GatheringRichStateService } from '../../src/systems/GatheringRichStateService.js';
-import { RunJournalBuilder } from '../../src/systems/RunJournalBuilder.js';
+import { RunJournalBuilder } from '../../src/ui/presenters/RunJournalBuilder.js';
 import { GatheringRunManager } from '../../src/systems/GatheringRunManager.js';
 import { GatheringEngine } from '../../src/systems/GatheringEngine.js';
 import { CraftingRunManager } from '../../src/systems/CraftingRunManager.js';

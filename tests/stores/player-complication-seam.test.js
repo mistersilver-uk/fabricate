@@ -10,8 +10,8 @@ import {
   authoredComplication,
   visibleComplicationPair,
 } from '../helpers/complicationFixtures.js';
-import { InventoryListingBuilder } from '../../src/systems/InventoryListingBuilder.js';
-import { CraftingListingBuilder } from '../../src/systems/CraftingListingBuilder.js';
+import { InventoryListingBuilder } from '../../src/ui/presenters/InventoryListingBuilder.js';
+import { CraftingListingBuilder } from '../../src/ui/presenters/CraftingListingBuilder.js';
 import { ResolutionModeService } from '../../src/systems/ResolutionModeService.js';
 
 const GM = { isGM: true };

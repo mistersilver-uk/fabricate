@@ -10,11 +10,11 @@ import { fileURLToPath } from 'node:url';
 
 import { chromium } from 'playwright';
 
-import { buildBulkSalvageChatContent } from '../src/systems/BulkSalvageChatCard.js';
-import { buildCraftingChatContent } from '../src/systems/CraftingChatCard.js';
+import { buildBulkSalvageChatContent } from '../src/ui/presenters/BulkSalvageChatCard.js';
+import { buildCraftingChatContent } from '../src/ui/presenters/CraftingChatCard.js';
 import { buildGmComplicationCardContent } from '../src/systems/complicationRuntime.js';
-import { buildGatheringChatContent } from '../src/systems/GatheringChatCard.js';
-import { buildSalvageChatContent } from '../src/systems/SalvageChatCard.js';
+import { buildGatheringChatContent } from '../src/ui/presenters/GatheringChatCard.js';
+import { buildSalvageChatContent } from '../src/ui/presenters/SalvageChatCard.js';
 
 /** The SHIPPED localization, so a placeholder assertion reads the real string. */
 const LANG = JSON.parse(

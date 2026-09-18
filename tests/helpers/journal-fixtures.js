@@ -168,7 +168,7 @@ export async function createPersistedCraftingHistory({
 } = {}) {
   const { CraftingEngine } = await import('../../src/systems/CraftingEngine.js');
   const { CraftingRunManager } = await import('../../src/systems/CraftingRunManager.js');
-  const { RunJournalBuilder } = await import('../../src/systems/RunJournalBuilder.js');
+  const { RunJournalBuilder } = await import('../../src/ui/presenters/RunJournalBuilder.js');
   const { IngredientSet } = await import('../../src/models/IngredientSet.js');
   const { makeWorldCurrencyConfig } = await import('./currency-spend-fixtures.js');
   const { ActorPropertyCoinSpender } = await import('../../src/systems/CoinSpenders.js');
@@ -418,7 +418,7 @@ export async function createPersistedGatheringHistory({ mode = 'straight', timed
   const { GatheringRunManager } = await import('../../src/systems/GatheringRunManager.js');
   const { GatheringRichStateService } = await import('../../src/systems/GatheringRichStateService.js');
   const { createGatheringResultCreator } = await import('../../src/gatheringResultCreation.js');
-  const { RunJournalBuilder } = await import('../../src/systems/RunJournalBuilder.js');
+  const { RunJournalBuilder } = await import('../../src/ui/presenters/RunJournalBuilder.js');
   const { routedRoll, routedSystemCheck } = await import('./gathering.js');
   const saved = Object.fromEntries(['game', 'foundry', 'Roll', 'ChatMessage', 'fromUuidSync'].map((key) => [key, globalThis[key]]));
   const actor = historyActor('gatherer');
@@ -496,7 +496,7 @@ export async function createPersistedGatheringHistory({ mode = 'straight', timed
 export async function createPersistedSalvageHistory({ timed = false } = {}) {
   const { CraftingEngine } = await import('../../src/systems/CraftingEngine.js');
   const { SalvageRunManager } = await import('../../src/systems/SalvageRunManager.js');
-  const { RunJournalBuilder } = await import('../../src/systems/RunJournalBuilder.js');
+  const { RunJournalBuilder } = await import('../../src/ui/presenters/RunJournalBuilder.js');
   const saved = { game: globalThis.game, foundry: globalThis.foundry, fromUuid: globalThis.fromUuid };
   const actor = historyActor('salvager');
   const input = historyItem(actor, 0);
@@ -531,7 +531,7 @@ export async function createPersistedSalvageHistory({ timed = false } = {}) {
 export async function createPersistedFizzleHistory({ versioned = false, consume = true, refuse = false, refuseSettlement = false } = {}) {
   const { CraftingEngine } = await import('../../src/systems/CraftingEngine.js');
   const { CraftingRunManager } = await import('../../src/systems/CraftingRunManager.js');
-  const { RunJournalBuilder } = await import('../../src/systems/RunJournalBuilder.js');
+  const { RunJournalBuilder } = await import('../../src/ui/presenters/RunJournalBuilder.js');
   const saved = { game: globalThis.game, foundry: globalThis.foundry };
   const viewer = { id: 'fizzle-owner', isGM: false };
   const actor = historyActor('fizzle');

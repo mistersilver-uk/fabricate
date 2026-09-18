@@ -23,7 +23,7 @@ import { RecipeVisibilityService } from '../src/systems/RecipeVisibilityService.
 import { CraftingRunManager } from '../src/systems/CraftingRunManager.js';
 import { SalvageRunManager } from '../src/systems/SalvageRunManager.js';
 import { GatheringRunManager } from '../src/systems/GatheringRunManager.js';
-import { RunJournalBuilder } from '../src/systems/RunJournalBuilder.js';
+import { RunJournalBuilder } from '../src/ui/presenters/RunJournalBuilder.js';
 import { itemReceipt, nativeHistoryRecord } from '../src/systems/runHistoryEvidence.js';
 import { ResolutionModeService } from '../src/systems/ResolutionModeService.js';
 import { installFoundryShim } from './view-lab/foundry/installFoundryShim.js';

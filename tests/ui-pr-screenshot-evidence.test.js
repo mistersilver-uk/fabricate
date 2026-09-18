@@ -986,8 +986,8 @@ describe('UI PR screenshot evidence', () => {
     // #727 pills — RollResultBox lives under the crafting detail sources.
     assert.ok(idsFor('src/ui/svelte/apps/crafting/detail/RollResultBox.svelte').includes('player-crafting-roll-result'));
     // #727 roll total — the chat card markup is built in CraftingChatCard.js.
-    assert.deepEqual(idsFor('src/systems/CraftingChatCard.js'), ['chat-craft-card']);
-    assert.deepEqual(idsFor('src/systems/SalvageChatCard.js'), ['chat-craft-card']);
+    assert.deepEqual(idsFor('src/ui/presenters/CraftingChatCard.js'), ['chat-craft-card']);
+    assert.deepEqual(idsFor('src/ui/presenters/SalvageChatCard.js'), ['chat-craft-card']);
     // #735 row rendering — the shared VocabularyPanel renders the item-tags rows.
     assert.ok(idsFor('src/ui/svelte/apps/manager/VocabularyPanel.svelte').includes('manager-tags-categories-tags-tab'));
     // 1429 — the vocabulary tab strip, extracted OUT of `TagsCategoriesView`.
@@ -1112,7 +1112,7 @@ describe('UI PR screenshot evidence', () => {
   it('maps the #492 import-report render files to the manager-import-report recipe', () => {
     for (const file of [
       'src/ui/SvelteCraftingSystemManagerApp.svelte.js',
-      'src/systems/importReportContent.js',
+      'src/ui/presenters/importReportContent.js',
       // Issue 877 moved the rendering into a Svelte modal built on the shared chrome.
       'src/ui/svelte/apps/manager/ImportReportModal.svelte',
       'src/ui/svelte/apps/manager/ManagerModal.svelte',

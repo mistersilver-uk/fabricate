@@ -64,11 +64,11 @@ const BASE_SCAN = Object.freeze({
  * The live tree's measurement, asserted as an EXACT EQUALITY rather than as a floor (issue 1371).
  */
 const SCAN_TOTALS = Object.freeze({
-  // #1648: eight unique tool/receipt reads in two engine files; #1666: five relocated files.
-  matches: 183,
-  lines: 165,
-  files: 23,
-  pairs: 136,
+  // #1648: eight unique tool/receipt reads in two engines; #1666 and #1665 relocated ten files.
+  matches: 168,
+  lines: 153,
+  files: 18,
+  pairs: 124,
   collisionGroups: 17,
   collisionSites: 46,
 });
@@ -89,8 +89,6 @@ const LEDGER = Object.freeze([
   ['src/systems/AlchemySignatureReport.js', "this.components = components;", 1, 'parameter'],
   ['src/systems/AlchemySignatureReport.js', "this.components,", 1, 'parameter'],
   ['src/systems/AlchemySignatureReport.js', "this._validator.describeConflict(first, second, this.components)", 1, 'parameter'],
-  ['src/systems/BulkSalvageChatCard.js', "heading: loc(SALVAGE_CHAT_KEYS.tools),", 1, 'not-a-system'],
-  ['src/systems/BulkSalvageChatCard.js', "entries: model.tools,", 1, 'not-a-system'],
   ['src/systems/BulkSalvageService.js', "item.tools = brokenToolEntries(salvageRun, entry.system);", 1, 'not-a-system'],
   ['src/systems/BulkSalvageService.js', "tools: dedupeTools(subjects.flatMap((item) => item.tools)),", 1, 'not-a-system'],
   ['src/systems/CompendiumImporter.js', "const components = Array.isArray(systemData.components) ? systemData.components : [];", 1, 'import'],
@@ -103,9 +101,6 @@ const LEDGER = Object.freeze([
   ['src/systems/CompendiumImporter.js', "summary.components.remapped.push({", 2, 'import'],
   ['src/systems/CompendiumImporter.js', "summary.components.unresolved.push({", 1, 'import'],
   ['src/systems/CompendiumImporter.js', "summary.components.retained.push({", 1, 'import'],
-  ['src/systems/CraftingChatCard.js', "renderSection({ heading: loc(keys.tools), entries: model.tools, modifier: 'tools' }),", 1, 'not-a-system'],
-  ['src/systems/CraftingChatCard.js', "const forfeited = [...(model.consumed || []), ...(model.tools || [])];", 1, 'not-a-system'],
-  ['src/systems/CraftingChatCard.js', "tools: model.tools,", 1, 'not-a-system'],
   ['src/systems/CraftingEngine.js', "toolItems: toolValidation.tools,", 4, 'not-a-system'],
   ['src/systems/CraftingEngine.js', "usedToolPairs = toolValidation.tools;", 1, 'not-a-system'],
   ['src/systems/CraftingEngine.js', "usedToolsOnFail = await this._applyToolBreakage(executionRecipe, toolValidation.tools, {", 1, 'not-a-system'],
@@ -172,10 +167,6 @@ const LEDGER = Object.freeze([
   ['src/systems/CraftingSystemManager.js', "? inputSystem.components", 1, 'writer'],
   ['src/systems/CraftingSystemManager.js', "(Array.isArray(normalizedSystem?.components) ? normalizedSystem.components : []).map(", 1, 'writer'],
   ['src/systems/CraftingSystemManager.js', "systems.flatMap((system) => (system.components || []).map((component) => component.id))", 1, 'destructive-basis'],
-  ['src/systems/GatheringChatCard.js', "succeeded && (!Array.isArray(model.components) || model.components.length === 0);", 1, 'not-a-system'],
-  ['src/systems/GatheringChatCard.js', "? renderEmptyResults(loc(CHAT_KEYS.components), loc(CHAT_KEYS.nothing))", 1, 'not-a-system'],
-  ['src/systems/GatheringChatCard.js', "heading: loc(CHAT_KEYS.components),", 1, 'not-a-system'],
-  ['src/systems/GatheringChatCard.js', "entries: model.components,", 1, 'not-a-system'],
   ['src/systems/GatheringDropReferenceValidator.js', "if (Array.isArray(systemOrComponents?.components)) {", 1, 'guard'],
   ['src/systems/GatheringEngine.js', "if (taskTools.tools.length > 0) {", 1, 'not-a-system'],
   ['src/systems/GatheringEngine.js', "tools: taskTools.tools,", 2, 'not-a-system'],
@@ -184,10 +175,7 @@ const LEDGER = Object.freeze([
   ['src/systems/GatheringEngine.js', "const tools = resolvedTools.tools;", 2, 'not-a-system'],
   ['src/systems/GatheringRichStateService.js', "const toolSource = Array.isArray(system?.tools)", 1, 'guard'],
   ['src/systems/GatheringRichStateService.js', "tools: normalizeList(config?.tools).map(normalizeLibraryTool).filter(Boolean),", 1, 'not-a-system'],
-  ['src/systems/InventoryListingBuilder.js', "toolLookup.tools.length === 0", 1, 'not-a-system'],
-  ['src/systems/InventoryListingBuilder.js', "for (const inlineTool of Array.isArray(task?.tools) ? task.tools : []) {", 1, 'not-a-system'],
   ['src/systems/RecipeManager.js', "previous.components === next.components &&", 1, 'not-a-system'],
-  ['src/systems/SalvageChatCard.js', "tools: model.tools,", 1, 'not-a-system'],
   ['src/systems/SignatureValidator.js', "const conflicts = this._auditEntries(compiled.entries, compiled.components);", 1, 'parameter'],
   ['src/systems/SignatureValidator.js', "components: compiled.components,", 1, 'parameter'],
   ['src/systems/SignatureValidator.js', "conflicts: this._auditEntries(compiled.entries, compiled.components),", 1, 'parameter'],
@@ -224,7 +212,10 @@ const POSITIVE_ANCHORS = Object.freeze([
     'const components = Array.isArray(system.components) ? system.components : [];',
   ],
   ['src/systems/CraftingEngine.js', 'toolItems: toolValidation.tools,'],
-  ['src/systems/InventoryListingBuilder.js', 'toolLookup.tools.length === 0'],
+  [
+    'src/systems/worldScopeEntityGrouping.js',
+    'componentsBySystem.set(trimmedString(system.id), arrayOf(system.components));',
+  ],
   [
     'src/systems/CompendiumImporter.js',
     'const components = Array.isArray(systemData.components) ? systemData.components : [];',

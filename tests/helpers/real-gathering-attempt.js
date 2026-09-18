@@ -104,7 +104,7 @@ export async function runRealGatheringAttempt({
   worldTime = 100,
 } = {}) {
   const { GatheringRunManager } = await import('../../src/systems/GatheringRunManager.js');
-  const { RunJournalBuilder } = await import('../../src/systems/RunJournalBuilder.js');
+  const { RunJournalBuilder } = await import('../../src/ui/presenters/RunJournalBuilder.js');
   const { createGatheringResultCreator } = await import('../../src/gatheringResultCreation.js');
   const keys = ['game', 'foundry', 'Roll', 'ChatMessage', 'fromUuidSync'];
   const saved = Object.fromEntries(keys.map((key) => [key, globalThis[key]]));

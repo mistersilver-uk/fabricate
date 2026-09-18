@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { GatheringEngine } from '../src/systems/GatheringEngine.js';
-import { GatheringListingBuilder } from '../src/systems/GatheringListingBuilder.js';
+import { GatheringListingBuilder } from '../src/ui/presenters/GatheringListingBuilder.js';
 
 const player = { id: 'user-1', isGM: false };
 const gm = { id: 'gm-1', isGM: true };

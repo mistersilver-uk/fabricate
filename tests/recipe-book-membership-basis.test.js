@@ -44,7 +44,7 @@ globalThis.fromUuidSync = () => null;
 const { SETTING_KEYS } = await import('../src/config/settings.js');
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
 const { RecipeVisibilityService } = await import('../src/systems/RecipeVisibilityService.js');
-const { InventoryListingBuilder } = await import('../src/systems/InventoryListingBuilder.js');
+const { InventoryListingBuilder } = await import('../src/ui/presenters/InventoryListingBuilder.js');
 const { createAdminStore } = await import('../src/ui/svelte/stores/adminStore.js');
 
 const SYSTEM_ID = 'sys1';

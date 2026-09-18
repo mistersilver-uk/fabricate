@@ -20,7 +20,7 @@ globalThis.foundry = globalThis.foundry || { utils: { getProperty: () => undefin
 const { resolveToolForItem } = await import('../src/utils/sourceUuid.js');
 const { matchGatheringTools } = await import('../src/gatheringToolRuntime.js');
 const { RecipeManager } = await import('../src/systems/RecipeManager.js');
-const { InventoryListingBuilder } = await import('../src/systems/InventoryListingBuilder.js');
+const { InventoryListingBuilder } = await import('../src/ui/presenters/InventoryListingBuilder.js');
 
 /**
  * Install the canonical world behind `game.fabricate.getCraftingSystemManager()`, which is
