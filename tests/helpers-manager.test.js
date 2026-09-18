@@ -32,8 +32,8 @@ test('the derivation reaches the real manager graph and splits it by what the tr
     'a compiled entry is always a component'
   );
   assert.ok(
-    closure.modules.every((path) => path.endsWith('.js')),
-    'a copied entry is always a plain module'
+    closure.modules.every((path) => /\.(?:js|json)$/.test(path)),
+    'a copied entry is always a plain module or a JSON data file'
   );
   const absent = [...closure.components, ...closure.modules].filter(
     (path) => !existsSync(resolve(repoRoot, path))
