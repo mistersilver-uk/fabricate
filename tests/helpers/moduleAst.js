@@ -4,19 +4,13 @@
  */
 import { parseForESLint } from 'svelte-eslint-parser';
 
-/**
- * The parser selects its mode from the extension, so the name must end `.svelte.js`; nothing reads
- * the file system, and no claim is made about where the source came from.
- */
+/** The parser selects its mode from the extension, so the name must end `.svelte.js`. */
 const PROBE_FILE_PATH = 'probe.svelte.js';
 
 /** Keys that make the tree cyclic or carry no child nodes, so a walk must not follow them. */
 const SKIPPED_KEYS = new Set(['parent', 'loc', 'range', 'tokens', 'comments']);
 
-/**
- * @param {string} source
- * @returns {{ast: object, scopeManager: object}} `loc` and `range` are unshifted from `source`.
- */
+/** `loc` and `range` on the result are unshifted from `source`. */
 export function parseModule(source) {
   const { ast, scopeManager } = parseForESLint(String(source ?? ''), {
     filePath: PROBE_FILE_PATH,
@@ -72,14 +66,13 @@ export function identifierNames(node) {
   return names;
 }
 
-/** Declaration nodes that name a module this one depends on, statically. */
 const SPECIFIER_TYPES = Object.freeze([
   'ImportDeclaration',
   'ExportNamedDeclaration',
   'ExportAllDeclaration',
 ]);
 
-/** Every module specifier a subtree names in a static import or a re-export. */
+/** Every specifier a subtree names in a static import or re-export. */
 export function importedModules(node) {
   const specifiers = [];
   for (const inner of walkNodes(node)) {
@@ -90,7 +83,7 @@ export function importedModules(node) {
   return specifiers;
 }
 
-/** Every module specifier a subtree names in an `import(…)` with a literal argument. */
+/** Every specifier a subtree names in an `import(…)` with a literal argument. */
 export function lazilyImportedModules(node) {
   const specifiers = [];
   for (const inner of walkNodes(node)) {
@@ -101,23 +94,16 @@ export function lazilyImportedModules(node) {
   return specifiers;
 }
 
-/**
- * Whether a module statically imports or re-exports this specifier. Static and lazy are separate
- * questions: a module deferred to its own chunk is imported one way and forbidden the other.
- */
+/** Static and lazy are separate questions: a chunked module is imported one way, not the other. */
 export function importsModule(node, specifier) {
   return importedModules(node).includes(specifier);
 }
 
-/** Whether a module reaches this specifier through a dynamic `import(…)`. */
 export function importsModuleLazily(node, specifier) {
   return lazilyImportedModules(node).includes(specifier);
 }
 
-/**
- * Whether a subtree mentions this name anywhere — including as a property key or a member name,
- * which is what makes it sound for the absence claims it mostly serves.
- */
+/** Anywhere, property keys and member names included, which is what makes an absence sound. */
 export function referencesIdentifier(node, name) {
   return identifierNames(node).has(name);
 }

@@ -16,7 +16,6 @@ import {
   walkNodes,
 } from '../helpers/moduleAst.js';
 import { componentAstOf, componentScopeOf, moduleAstOf } from '../helpers/parsedSource.js';
-import { walkElements } from '../helpers/svelteTemplateScan.js';
 import {
   containsLiteral,
   declaredConstant,
@@ -257,12 +256,9 @@ function sourceName(filePath) {
   return filePath.replace(`${repoRoot}\\`, '').replace(`${repoRoot}/`, '');
 }
 
-// --- The AST contract vocabulary (issue 1691) ------------------------------------------
 // A structural claim is a ROW in a `defineStructureContract` table, never another
-// parse-and-assert pair: the repeated pair is the shape the duplication gate fails, and the
-// table is what let 600 source-text pins become claims about shape rather than about spelling.
+// parse-and-assert pair: the repeated pair is the shape the duplication gate fails (issue 1691).
 
-/** The AST of ONE class member, bounding a claim the way a text slice used to bound it. */
 function classMemberAst(ast, name) {
   for (const node of walkNodes(ast)) {
     if (node.type === 'MethodDefinition' && node.key?.name === name) return node;
@@ -270,7 +266,15 @@ function classMemberAst(ast, name) {
   throw new Error(`no class member \`${name}\``);
 }
 
-/** The value of ONE object-literal property, so a claim about a service reaches only that one. */
+/** Every element or component node in a template, for the claims that COUNT render sites. */
+function templateNodes(component) {
+  const nodes = [];
+  for (const node of walkNodes(component.fragment)) {
+    if (node.type === 'RegularElement' || node.type === 'Component') nodes.push(node);
+  }
+  return nodes;
+}
+
 function propertyAst(node, name) {
   for (const inner of walkNodes(node)) {
     if (inner.type === 'Property' && inner.key?.name === name) return inner.value;
@@ -297,7 +301,6 @@ function memberPaths(node) {
   return paths;
 }
 
-/** Every name a subtree invokes, whether `fn()` or `object.fn()`. */
 function callNames(node) {
   const names = new Set();
   for (const inner of walkNodes(node)) {
@@ -307,7 +310,7 @@ function callNames(node) {
   return names;
 }
 
-/** Every hook event a subtree registers on Foundry's bus, directly or through a mapped list. */
+/** Directly, or through a mapped list. */
 function hookNames(node) {
   const events = new Set();
   for (const inner of walkNodes(node)) {
@@ -316,8 +319,7 @@ function hookNames(node) {
       const [event] = inner.arguments;
       if (event?.type === 'Literal' && typeof event.value === 'string') events.add(event.value);
     }
-    // `['createActor', 'deleteActor'].map((hook) => Hooks.on(hook, …))` names its events in the
-    // mapped list; the registration itself carries only the loop variable.
+    // A mapped list names its events; the registration itself carries only the loop variable.
     const source = inner.callee?.object;
     if (calledName(inner) !== 'map' || source?.type !== 'ArrayExpression') continue;
     if ([...walkNodes(inner.arguments[0] ?? {})].some(registersAHook)) {
@@ -327,7 +329,6 @@ function hookNames(node) {
   return events;
 }
 
-/** Whether one node is a registration on Foundry's hook bus. */
 function registersAHook(node) {
   if (node?.type !== 'CallExpression') return false;
   const called = calledName(node);
@@ -346,7 +347,6 @@ function inOperatorKeys(node, objectName) {
   return keys;
 }
 
-/** Whether a subtree compares anything against this literal value. */
 function comparesToLiteral(node, value) {
   for (const inner of walkNodes(node)) {
     if (inner.type !== 'BinaryExpression') continue;
@@ -357,7 +357,6 @@ function comparesToLiteral(node, value) {
   return false;
 }
 
-/** Whether a subtree declares a class extending `name(...)`. */
 function extendsCallOf(node, name) {
   for (const inner of walkNodes(node)) {
     if (inner.type !== 'ClassDeclaration' && inner.type !== 'ClassExpression') continue;
@@ -382,7 +381,6 @@ function declaredProps(ast) {
   return { declared, required };
 }
 
-/** Every name a module exports, whether declared inline or listed in an export clause. */
 function exportedNames(node) {
   const names = new Set();
   for (const inner of walkNodes(node)) {
@@ -398,7 +396,6 @@ function exportedNames(node) {
   return names;
 }
 
-/** Whether a subtree calls `name` with a reference to `argument` among its arguments. */
 function callsWithArgument(node, [name, argument]) {
   for (const inner of walkNodes(node)) {
     if (inner.type !== 'CallExpression' || calledName(inner) !== name) continue;
@@ -408,9 +405,8 @@ function callsWithArgument(node, [name, argument]) {
 }
 
 /**
- * One target's parsed form with the claim vocabulary bound to the predicate set for its kind. A
- * target is a repo-relative path, optionally narrowed to one class member and one of its
- * properties — the AST equivalent of the bounded text slice it replaces.
+ * A repo-relative path, optionally narrowed to one class member and one of its properties — the
+ * AST equivalent of the bounded text slice it replaces — with the claims its kind can answer.
  */
 function structureOf(target) {
   const { file, member, property } = typeof target === 'string' ? { file: target } : target;
@@ -489,7 +485,6 @@ const CONTRACT_CLAIMS = Object.freeze({
   readsNoGlobal: { ask: 'global', holds: false, says: (v) => `reads no ${v} global directly` },
 });
 
-/** The `.js` targets this suite states contracts about, named once. */
 const APP_SHELL = 'src/ui/SvelteCraftingSystemManagerApp.svelte.js';
 const MAIN = 'src/main.js';
 const MANAGER_ROOT = 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte';
@@ -517,9 +512,6 @@ function defineStructureContract(title, target, claims) {
 }
 
 describe('CraftingSystemManager source contract', () => {
-  // The page-session registry is the SHELL's, threaded into the root as a prop; the root renders
-  // the Downtime host against it. What the root then does with it is mounted behaviour, proved
-  // across `tests/components/manager-downtime-mounted.js`.
   defineStructureContract(
     'injects the exact page-session manager extension registry into the Svelte root',
     APP_SHELL,
@@ -541,9 +533,8 @@ describe('CraftingSystemManager source contract', () => {
     }
   );
 
-  // ONE owner of the active Downtime provider, and it is the shell: the rail renders the active
-  // tab set while the host is UNMOUNTED, so the host takes the live provider as a prop and
-  // subscribes to nothing. A mount fault is reported UP rather than healed locally.
+  // The rail renders the active tab set while the host is UNMOUNTED, so the shell owns the live
+  // provider and the host takes it as a prop.
   defineStructureContract('keeps one owner of the active Downtime provider', MANAGER_ROOT, {
     reads: ['managerExtensions.subscribe'],
     names: ['WORLD_DOWNTIME_SURFACE_ID'],
@@ -554,8 +545,6 @@ describe('CraftingSystemManager source contract', () => {
     callsWith: [['onProviderFault', 'activeProvider']],
   });
 
-  // Core's own tab id list is content, not contract: nothing on the seam may read it, and the ids
-  // live beside the copy and icons they index.
   defineStructureContract(
     'never enumerates the tab ids the registry will accept',
     MANAGER_EXTENSIONS,
@@ -568,12 +557,7 @@ describe('CraftingSystemManager source contract', () => {
     { exports: ['CORE_DOWNTIME_PREVIEW_TAB_IDS'] }
   );
 
-  // The cross-component handoff that NAMES the companion panel (issue 1213). Root owns the rail
-  // label id, stated once, and threads it down; the host consumes it and derives no id of its own.
-  // That the panel region really resolves to the rail label is mounted in
-  // `tests/components/manager-downtime-mounted.js`, which reads the region's `aria-labelledby`
-  // back to the label span it points at, and the same file mounts the `accessibleName` the
-  // sub-item consumes in provider mode.
+  // Root owns the rail label id, stated once; the host derives no id of its own (issue 1213).
   defineStructureContract(
     'owns the rail label id and threads it into the Downtime host',
     MANAGER_ROOT,
@@ -592,19 +576,16 @@ describe('CraftingSystemManager source contract', () => {
     { requiresProp: ['navLabelId'], spellsNo: ['manager-downtime-nav'] }
   );
 
-  // AC-15 — both badge render sites sit inside the provider-mode branch (issue 1302). That guard,
-  // the rollup's visibility and the zero-in-core-fallback derivations are mounted in the `AC-11`
-  // to `AC-15` cases of `tests/components/manager-downtime-mounted.js`, which assert that no badge
-  // and no rollup reach Core's preview row. What a mounted case cannot say is how MANY render
-  // sites exist: a third one added outside the guard would satisfy every one of them.
+  // What the `AC-11` to `AC-15` mounted cases cannot say is how MANY render sites exist: a third
+  // one added outside the provider-mode guard would satisfy every one of them (issue 1302).
   it('renders the Downtime badge at exactly two sites', () => {
-    const sites = [];
-    walkElements(componentAstOf(MANAGER_ROOT).fragment, (node) => {
-      const named = (node.attributes ?? []).some((attribute) =>
-        String(attribute.name ?? '').startsWith('data-world-downtime-badge')
-      );
-      if (named) sites.push(node.name);
-    });
+    const sites = templateNodes(componentAstOf(MANAGER_ROOT))
+      .filter((node) =>
+        (node.attributes ?? []).some((attribute) =>
+          String(attribute.name ?? '').startsWith('data-world-downtime-badge')
+        )
+      )
+      .map((node) => node.name);
     assert.equal(
       sites.length,
       2,
@@ -612,12 +593,11 @@ describe('CraftingSystemManager source contract', () => {
     );
   });
 
-  // A Downtime companion is disposed BEFORE ApplicationV2 removes its Svelte target. That ordering
-  // is asserted against the real production class, on a recording ApplicationV2 base, by
-  // `tests/components/manager-extension-composition.test.js`.
+  // The companion is disposed BEFORE ApplicationV2 removes its Svelte target; that ordering is
+  // asserted against the real class by `tests/components/manager-extension-composition.test.js`.
 
-  // The window's own height is owned by `scripts/lib/foundryChromeSpec.js` and deep-equalled
-  // against the real `DEFAULT_OPTIONS` by `tests/view-lab-app-options-parity.test.js`.
+  // The window height is owned by `scripts/lib/foundryChromeSpec.js` and deep-equalled against the
+  // real `DEFAULT_OPTIONS` by `tests/view-lab-app-options-parity.test.js`.
   defineStructureContract('self-registers as the sole crafting system manager app', APP_SHELL, {
     extendsCall: ['SvelteApplicationMixin'],
     callsWith: [['registerCraftingSystemManagerApp', 'SvelteCraftingSystemManagerApp']],
@@ -629,8 +609,7 @@ describe('CraftingSystemManager source contract', () => {
     ],
   });
 
-  // The GM-only manager subtree is deferred to its own chunk (issue 150), so the static import is
-  // as load-bearing by its absence as the dynamic one is by its presence.
+  // Deferred to its own chunk (issue 150): the static import matters by its absence.
   defineStructureContract('defers the GM-only manager subtree to a lazy chunk', MAIN, {
     importsNo: [
       './ui/SvelteRecipeManagerApp.svelte.js',
@@ -640,10 +619,8 @@ describe('CraftingSystemManager source contract', () => {
     names: ['loadCraftingSystemManagerAppClass'],
   });
 
-  // The access rosters are the manager's only Foundry user/ownership surface.
-  // `Document#testUserPermission` short-circuits EVERY GM (Assistant included, since `User#isGM`
-  // is `hasRole(ASSISTANT)`) to OWNER, so GMs must be filtered FIRST. No other file in the tree
-  // states that `Users#players` is the roster this reads, so it stays asserted here.
+  // `Document#testUserPermission` short-circuits EVERY GM to OWNER, so GMs are filtered FIRST. No
+  // other file states that `Users#players` is the roster this reads, so it stays asserted here.
   defineStructureContract('derives the access rosters from the non-GM roster', APP_SHELL, {
     reads: ['game.users.players'],
     calls: ['_playerUsers'],
@@ -657,7 +634,6 @@ describe('CraftingSystemManager source contract', () => {
     { calls: ['hasRole'], spells: ['PLAYER'], reads: ['globalThis.CONST.USER_ROLES.PLAYER'] }
   );
 
-  // Everything this labels comes from the GM-free roster, so a GM role never reaches it.
   defineStructureContract(
     'labels only the roles a grantable user can hold',
     { file: APP_SHELL, member: '_userRoleLabel' },
@@ -675,7 +651,6 @@ describe('CraftingSystemManager source contract', () => {
     }
   );
 
-  // The runtime predicate applies no type filter: the granted ids resolve over EVERY world actor.
   defineStructureContract(
     'resolves granted character ids over every world actor',
     { file: APP_SHELL, member: '_buildServices', property: 'getAccessCharacterActors' },
@@ -694,8 +669,7 @@ describe('CraftingSystemManager source contract', () => {
     { reads: ['this._services.getWorldItemOptions', 'this._services.resolveToolSource'] }
   );
 
-  // THE FIFTH WIRING EDIT OF ISSUE 1392. The manager must resolve the world vocabulary store
-  // through `game.fabricate`, under the accessor name the adminStore's read and write legs call.
+  // Under the accessor name the adminStore's read and write legs already call (issue 1392).
   defineStructureContract(
     'hands the world VOCABULARY store to the manager, which nothing else can see',
     { file: APP_SHELL, member: '_buildServices', property: 'getVocabularyScopeStore' },
@@ -717,8 +691,8 @@ describe('CraftingSystemManager source contract', () => {
     }
   );
 
-  // The `fabricate.ready` one-shot itself is asserted byte-identically by
-  // `tests/components/manager-launch-readiness.test.js`, which also replays the deferred open.
+  // The `fabricate.ready` one-shot is asserted byte-identically, and its deferred open replayed,
+  // by `tests/components/manager-launch-readiness.test.js`.
   defineStructureContract(
     'guards manager startup against unready Fabricate services',
     { file: APP_SHELL, member: '_buildServices' },
@@ -747,10 +721,7 @@ describe('CraftingSystemManager source contract', () => {
     );
   });
 
-  // The manager titlebar (issue 643) and its gold badge (issue 1185). What the titlebar RENDERS,
-  // in both premium states and with the chrome issue 1185 removed, is mounted in
-  // `tests/components/manager-rail-mounted.js` and in the premium-signal cases of
-  // `tests/components/manager-downtime-mounted.js`; what stays here is the derivation behind it.
+  // What the titlebar RENDERS is mounted; what stays here is the derivation behind it (issue 1185).
   defineStructureContract('drives the titlebar premium signal off the whole surface set', MANAGER_ROOT, {
     declares: ['premiumInstalled'],
     calls: ['subscribeSurfaceIds', 'routedOutcomeTierCount'],
@@ -781,8 +752,6 @@ describe('CraftingSystemManager source contract', () => {
     );
   });
 
-  // The rail section label, the bare-numeral counts and the planned-view placeholder are all
-  // rendered claims, mounted in `tests/components/manager-rail-mounted.js`.
   it('localizes the rail section label', () => {
     assert.equal(
       lang.FABRICATE.Admin.Manager.Nav.SectionLabel,
@@ -1251,10 +1220,8 @@ describe('CraftingSystemManager source contract', () => {
     );
   });
 
-  // Scope-resolved, so a local binding, a member property or an object key named `game` is not a
-  // read — the three shapes the text regex this replaces could not tell apart. `foundry` is
-  // deliberately NOT in the set: the root reaches `globalThis.foundry.utils.parseUuid`, and
-  // `.agents/docs/foundry-and-architecture.md` requires it keep doing so.
+  // `foundry` is deliberately NOT in the set: the root reaches `globalThis.foundry.utils.parseUuid`
+  // and `.agents/docs/foundry-and-architecture.md` requires it keep doing so.
   defineStructureContract('keeps presentational Svelte free of direct Foundry globals', MANAGER_ROOT, {
     readsNoGlobal: ['game', 'ui', 'Hooks', 'CONFIG'],
   });
@@ -1262,7 +1229,6 @@ describe('CraftingSystemManager source contract', () => {
   defineStructureContract('uses manager localization keys rather than hard-coded copy', MANAGER_ROOT, {
     // In FULL: a substring claim here is satisfied by `…Manager.Titlebar.Premium` next door.
     spellsExactly: ['FABRICATE.Admin.Manager.Title'],
-    // Retired with the placeholder gathering-events copy they named (issue 1372).
     spellsNo: ['EncountersPlaceholderTitle', 'EncountersPlaceholderHint'],
   });
 
@@ -3591,7 +3557,6 @@ describe('CraftingSystemManager source contract', () => {
     );
   });
 
-  // Manager UUID copies go through the Foundry V13 clipboard service and bypass neither leg of it.
   defineStructureContract(
     'copies a UUID through the Foundry clipboard service',
     { file: APP_SHELL, member: '_buildServices' },
@@ -3725,10 +3690,8 @@ describe('CraftingSystemManager source contract', () => {
   // `doc?.pack` guard re-projects the whole world for a compendium write, flattening a
   // `[hook, id]` tuple leaks the listener across every manager reopen, and removing an
   // `isGM` gate hands a player a GM mutation.
-  // Only actor-owned, NON-compendium items can change the projection. `Document#pack` falls back
-  // to `this.parent?.pack`, so an Item embedded in a compendium Actor is readable straight off the
-  // embedded doc. `scheduleKnowledgeRefresh` is a TOTAL no-op unless the surface is open, which is
-  // why the actor hooks mark the learned-recipe index stale rather than rebuilding it.
+  // `Document#pack` falls back to `this.parent?.pack`, so a compendium-actor item is readable off
+  // the embedded doc; and `scheduleKnowledgeRefresh` no-ops unless the Knowledge surface is open.
   defineStructureContract(
     'registers the Knowledge hook set, filtered to what can change the projection',
     { file: APP_SHELL, member: '_registerUserHooks' },
@@ -3768,7 +3731,6 @@ describe('CraftingSystemManager source contract', () => {
     assert.ok(destructured, 'the unregister side destructures the tuple');
   });
 
-  // The GM gate is `isGM`, NOT `activeGM`: this is a single-client surface.
   defineStructureContract(
     'gates the Knowledge seam on isGM and denies a non-GM with the GM-only message',
     { file: APP_SHELL, member: '_knowledgeActor' },
@@ -3781,8 +3743,6 @@ describe('CraftingSystemManager source contract', () => {
     { calls: ['_knowledgeActor'] }
   );
 
-  // All four mutating methods reach the gate directly, return its denial, and delegate the
-  // Foundry-free mutation body to the plain-JS collaborator.
   const KNOWLEDGE_MUTATIONS = Object.freeze([
     ['_expendRecipeItemUse', 'expendOwnedRecipeItemUse'],
     ['_deleteOwnedRecipeItem', 'deleteOwnedRecipeItemCopy'],
@@ -3798,9 +3758,8 @@ describe('CraftingSystemManager source contract', () => {
     );
   }
 
-  // ANTI-PIN (issue 1024). A positive `isPlayerCharacterActor` assertion would be a tautology that
-  // survives a WRONG import, so the claim is that the hardcoded actor type is ABSENT — provably
-  // red before issue 1024 at both the Access and the Knowledge roster — plus the import.
+  // ANTI-PIN (issue 1024): a positive `isPlayerCharacterActor` claim is a tautology that survives a
+  // WRONG import, so the claim is that the hardcoded actor type is ABSENT, plus the import.
   defineStructureContract(
     'reaches the player-character roster through the shared, GM-configurable predicate', APP_SHELL,
     {
@@ -3876,14 +3835,9 @@ describe('CraftingSystemManager source contract', () => {
     );
   });
 
-  // The collapsible left rail (issue 1213). `railCollapsed` is the GM's persisted client
-  // preference and stays authoritative for what is written back; what the body renders is
-  // `railCollapsedDisplay`, so the Downtime rail lock can force the sidebar open without
-  // permanently un-collapsing the rail on every other route. The rendered half — the disabled
-  // control, its five attributes reading the DISPLAYED state, the handler refusing a programmatic
-  // press, and nothing writing a preference under the lock — is mounted through
-  // `assertRailLockedOpen` and `assertRailLockSurvivesPresses` in
-  // `tests/components/manager-downtime-mounted.js`.
+  // `railCollapsed` is the stored preference; the body renders `railCollapsedDisplay`, so the
+  // Downtime rail lock forces the sidebar open without un-collapsing every other route. The
+  // rendered half is mounted through `assertRailLockedOpen` and `assertRailLockSurvivesPresses`.
   defineStructureContract('wires a collapsible left rail persisted via the manager setting seam', MANAGER_ROOT, {
     spells: [
       'managerRailCollapsed',
@@ -3895,16 +3849,12 @@ describe('CraftingSystemManager source contract', () => {
     declares: ['railCollapsedDisplay'],
   });
 
-  // COUNTED, not merely present (issue 1213 review): the control is written TWICE, and a mounted
-  // case renders only one of them. Every site must carry the same five attributes, or the branch
-  // no case reaches silently loses the lock.
+  // COUNTED, not merely present (issue 1213 review): a mounted case renders one of the two sites,
+  // so the branch it does not reach would lose the lock silently.
   it('writes the rail toggle twice, and both sites carry the same state attributes', () => {
-    const sites = [];
-    walkElements(componentAstOf(MANAGER_ROOT).fragment, (node) => {
-      if (declaresAttribute(node, 'data-manager-rail-toggle', { directives: false })) {
-        sites.push(node);
-      }
-    });
+    const sites = templateNodes(componentAstOf(MANAGER_ROOT)).filter((node) =>
+      declaresAttribute(node, 'data-manager-rail-toggle', { directives: false })
+    );
     assert.equal(sites.length, 2, 'the scope card renders the rail toggle once per branch');
     for (const attribute of ['aria-pressed', 'aria-label', 'title', 'disabled', 'aria-disabled']) {
       assert.ok(

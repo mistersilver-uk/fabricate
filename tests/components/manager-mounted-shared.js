@@ -34,11 +34,9 @@ async function prepareManagerSuite() {
       format: (key) => key,
     },
   };
-  // `randomID` through the shared installer rather than a local copy; it leaves `game` alone,
-  // which `installFoundryEnv` does not. Without these two the root's `newStepId` and
-  // `isEmbeddedItemUuid` take their undefined-parser fallbacks silently, and the second of those
-  // calls EVERY uuid embedded. `embedded` is derived here because that is the field the guard
-  // reads, and a stub without it answers "not embedded" for an embedded uuid instead.
+  // The shared installer rather than a local copy; it leaves `game` alone, which
+  // `installFoundryEnv` does not. Without these the root's `newStepId` and `isEmbeddedItemUuid`
+  // take their undefined-parser fallbacks silently, and the second calls EVERY uuid embedded.
   installFoundryUtilsEnv();
   globalThis.foundry.utils.parseUuid = (uuid) => {
     const parts = String(uuid ?? '').split('.');
@@ -124,24 +122,16 @@ export async function settleBetweenTests() {
   await new Promise((settled) => setImmediate(settled));
 }
 
-/**
- * The rendered hook one converted contract asks about, stated once (issue 1691). Every hook case
- * is a call rather than its own query-and-assert pair, which is what keeps the conversions clear
- * of the duplication gate.
- */
+/** One rendered hook, as a call rather than another query-and-assert pair (issue 1691). */
 export function assertHook(container, hook, message) {
   assert.ok(Boolean(container.querySelector(hook)), message ?? `the route renders ${hook}`);
 }
 
-/** The same question with the opposite answer: a hook the route must NOT render. */
 export function assertNoHook(container, hook, message) {
   assert.ok(!container.querySelector(hook), message ?? `the route must not render ${hook}`);
 }
 
-/**
- * The shipped copy for a key is on screen. Needs `useShippedLocalization()` first, because the
- * harness otherwise localizes a key to itself and every fallback would satisfy this.
- */
+/** Needs `useShippedLocalization()`: the harness otherwise localizes a key to itself. */
 export function assertShippedString(container, key, message) {
   const expected = shippedString(key);
   assert.notEqual(expected, key, `lang/en.json defines no ${key}`);

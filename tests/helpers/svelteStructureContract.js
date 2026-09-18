@@ -1,8 +1,6 @@
 /**
- * Structural questions about a Svelte component, answered from its AST instead of from its text
- * (issue 1658), so a rename, an import reorder or an extraction does not break a test that never
- * cared how the component was written. `tests/svelte-structure-contract.test.js` pins the two
- * paragraphs below, so condense them only together with that test.
+ * Structural questions about a Svelte component, answered from its AST rather than its text
+ * (issue 1658). `tests/svelte-structure-contract.test.js` pins the two paragraphs below.
  *
  * Do not add a string `includes` on component source to a test. That is the shape
  * `tests/source-pin-ratchet.test.js` bounds, and these predicates are what it converts to.
@@ -27,15 +25,11 @@ import { attributeNamed, walkElements } from './svelteTemplateScan.js';
 /** Directives that genuinely bind a prop; `class:`, `style:`, `use:`, `on:` and friends do not. */
 const PROP_DIRECTIVES = Object.freeze(new Set(['BindDirective']));
 
-/** Parse one component's source into the AST the predicates below read. */
 export function parseComponent(source) {
   return parse(String(source ?? ''), { modern: true });
 }
 
-/**
- * The same component in the OTHER vocabulary: an ESTree parse with a scope manager, which
- * `parseComponent` does not produce and which `readsGlobal` cannot answer without.
- */
+/** The OTHER vocabulary: the scope-resolved parse `parseComponent` does not produce. */
 export function parseComponentScope(source) {
   return parseForESLint(String(source ?? ''), {
     filePath: 'probe.svelte',
@@ -70,7 +64,7 @@ export function renderedElements(ast) {
     start: node.start,
     tag: node.name.toLowerCase(),
   }));
-  // `walkElements` visits only RegularElement and Component, so a dynamic tag needs its own pass.
+  // `walkElements` visits RegularElement and Component only, so a dynamic tag needs its own pass.
   const dynamic = [];
   for (const node of walkNodes(ast.fragment ?? ast)) {
     if (node.type !== 'SvelteElement') continue;
@@ -101,10 +95,7 @@ export function declaresAttribute(node, name, { directives = true } = {}) {
   );
 }
 
-/**
- * Whether every occurrence of `componentName` declares `propName`. False when the component is not
- * rendered at all, so a caller cannot read a vacuous true as a satisfied contract.
- */
+/** False when the component is not rendered, so a vacuous true cannot read as a contract. */
 export function passesProp(ast, componentName, propName) {
   const occurrences = collect(
     ast,
@@ -114,20 +105,15 @@ export function passesProp(ast, componentName, propName) {
   return occurrences.every((node) => declaresAttribute(node, propName));
 }
 
-/** Both script blocks, in source order; the two places a component may declare or import. */
 function scriptBodies(ast) {
   return [ast.instance?.content?.body ?? [], ast.module?.content?.body ?? []];
 }
 
-/** The scripts and the template: everywhere a component spells code. */
 function codeParts(ast) {
   return [...scriptBodies(ast), ast.fragment ?? {}];
 }
 
-/**
- * Every module specifier the component depends on: both script blocks, static and dynamic imports,
- * and re-exports.
- */
+/** Both script blocks, static and dynamic imports, and re-exports. */
 export function importedModules(ast) {
   return scriptBodies(ast).flatMap((body) => [
     ...importedModuleSpecifiers(body),
@@ -135,25 +121,18 @@ export function importedModules(ast) {
   ]);
 }
 
-/** Whether the component imports or re-exports the given module specifier. */
 export function importsModule(ast, specifier) {
   return importedModules(ast).includes(specifier);
 }
 
-/** Whether either script, or a `{@const}`, declares `const <name>`. */
 export function declaredConstant(ast, name) {
   return codeParts(ast).some((part) => declaresConstant(part, name));
 }
 
-/** Whether the component names this identifier in a script or a template expression. */
 export function referencesIdentifier(ast, name) {
   return codeParts(ast).some((part) => namesIdentifier(part, name));
 }
 
-/**
- * Every literal a component spells: a JS string, a template chunk, a static attribute value and
- * template text alike.
- */
 export function spelledLiterals(ast) {
   const found = [];
   for (const part of codeParts(ast)) {
@@ -165,24 +144,17 @@ export function spelledLiterals(ast) {
   return found;
 }
 
-/**
- * Whether the component spells this text inside any literal it carries. A substring match, because
- * a class token lives inside a multi-token `class="…"` value; for a whole i18n key or a whole
- * attribute value, ask `spellsLiteral` instead, which a longer neighbouring key cannot satisfy.
- */
+/** A SUBSTRING match; for a whole i18n key ask `spellsLiteral`, which a neighbour cannot satisfy. */
 export function containsLiteral(ast, text) {
   return spelledLiterals(ast).some((literal) => literal.includes(String(text)));
 }
 
-/** Whether the component spells this text as a literal in full. */
 export function spellsLiteral(ast, text) {
   return spelledLiterals(ast).includes(String(text));
 }
 
-/** The host objects through which a Foundry global is also legitimately reached. */
 const GLOBAL_HOSTS = Object.freeze(new Set(['globalThis', 'window', 'self']));
 
-/** The property a member expression reads, for a plain name or a string-literal index. */
 function memberName(node) {
   if (!node.computed) return node.property?.type === 'Identifier' ? node.property.name : undefined;
   return node.property?.type === 'Literal' && typeof node.property.value === 'string'
@@ -191,10 +163,8 @@ function memberName(node) {
 }
 
 /**
- * Whether a component reads the named global, on the scope-resolved parse `parseComponentScope`
- * returns. Both legs are required: a free reference (`game.user` in the template) and a member read
- * off a free host (`globalThis.game.user`, the prevailing form). Scope resolution is what makes a
- * local `const game`, an `obj.game` property and an object key named `game` all answer false.
+ * Both legs are required: a free reference (`game.user`) and a member read off a free host
+ * (`globalThis.game.user`). Scope resolution is what denies a local `const game` and an `obj.game`.
  */
 export function readsGlobal({ ast, scopeManager }, name) {
   const free = scopeManager?.globalScope?.through ?? [];

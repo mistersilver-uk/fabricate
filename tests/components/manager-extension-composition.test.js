@@ -161,9 +161,8 @@ test('a forced close never consults the companion, however dirty it is', async (
 });
 
 /**
- * The companion is asked BEFORE Core's own guards, and that order is the guarantee. Core's guards
- * can SAVE — a tool draft, an environment draft — so a save that landed for a close the companion
- * then refused would have written world data for a window that stayed open.
+ * Core's own guards can SAVE, so a save landing for a close the companion then refused would have
+ * written world data for a window that stayed open. The companion is therefore asked FIRST.
  */
 test('asks the companion before the Core guards that can save, and a veto writes nothing', async () => {
   const { lifecycle, asked } = await closeWithCompanionGuard({

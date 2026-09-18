@@ -59,9 +59,7 @@ export function registerRailCases() {
   });
 
 
-  // The manager titlebar (issue 643) and what issue 1185 took off it: the duplicated app icon and
-  // product label, the per-route identity tile, and the crafting-system name badge. Each of those
-  // is asserted by its ABSENCE, because each was removed and each would be silent if it returned.
+  // What issue 1185 took off the titlebar is asserted by its ABSENCE: each would return silently.
   it('renders the titlebar and its resolution status, without the chrome issue 1185 removed', () => {
     useShippedLocalization();
     mountManager();
@@ -91,8 +89,7 @@ export function registerRailCases() {
     assertShippedString(target, 'FABRICATE.Admin.Manager.Nav.SectionLabel');
   });
 
-  // A rail count is a BARE NUMERAL, not a chip, and the disabled placeholder is not a count at all
-  // — the record-count vehicle draws numerals, so a `Soon` inside one reads as a quantity.
+  // The record-count vehicle draws numerals, so a `Soon` inside one reads as a quantity.
   it('draws rail counts as bare numerals and the placeholder as a plain Soon span', () => {
     useShippedLocalization();
     // Graph is the only planned view, and it is behind the experimental gate.

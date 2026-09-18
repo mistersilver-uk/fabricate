@@ -1,7 +1,6 @@
 /**
- * Proves every predicate `tests/helpers/svelteStructureContract.js` exports, the module-AST
- * predicates beside them, and the AST-only read seam they are reached through — plus that each
- * header still states the policy it exists to enforce (issues 1658, 1691).
+ * Proves every structure predicate, the module-AST predicates beside them, the AST-only read seam
+ * they are reached through, and that each header still states its policy (issues 1658, 1691).
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -42,7 +41,6 @@ import {
 } from './helpers/svelteStructureContract.js';
 import { walkElements } from './helpers/svelteTemplateScan.js';
 
-/** A second fixture for the shapes the first deliberately does not carry. */
 const EDGE_FIXTURE = [
   '<script module>',
   "  export const KIND = 'x';",
@@ -174,7 +172,6 @@ test('importedModules sees the module script, a re-export and a dynamic import',
   assert.ok(found.includes('./dynamic.js'), 'dynamic import');
 });
 
-/** A real component and a real module, so the seam is proved against the tree it reads. */
 const ROOT_COMPONENT = 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte';
 const APP_MODULE = 'src/ui/SvelteCraftingSystemManagerApp.svelte.js';
 
@@ -213,7 +210,6 @@ test('the seam header still forbids the one text-shaped route an AST return leav
   assert.match(header, /JSON\.stringify\(ast\)\.includes/);
 });
 
-/** `game` read once per place a component can spell code, so each leg is proved alone. */
 const GLOBAL_READ_FIXTURES = Object.freeze({
   'the instance script': "<script>const who = game.user.name;</script><div>{who}</div>",
   'the module script': "<script module>export const who = game.user.name;</script><div />",
@@ -228,7 +224,6 @@ for (const [place, source] of Object.entries(GLOBAL_READ_FIXTURES)) {
   });
 }
 
-/** The three shapes a `\bgame\b` regex called reads and a scope-resolved predicate must not. */
 const GLOBAL_NEGATIVE_FIXTURES = Object.freeze({
   'a local binding of the same name': '<script>const game = { user: 1 };</script><div>{game.user}</div>',
   'a member property of another object': '<script>const who = props.game.user;</script><div>{who}</div>',
@@ -246,11 +241,9 @@ test('readsGlobal answers per name, and the manager root reads none of the four'
   for (const name of ['game', 'ui', 'Hooks', 'CONFIG']) {
     assert.equal(readsGlobal(root, name), false, `the root must not read ${name}`);
   }
-  // A host read the name set deliberately EXCLUDES, proving the predicate would have seen it.
   assert.equal(readsGlobal(root, 'foundry'), true, 'the root does reach globalThis.foundry.utils');
 });
 
-/** One fixture for the three structural predicates the negatives converted onto. */
 const DECLARATION_FIXTURE = [
   '<script module>',
   "  const KIND = 'studio';",
@@ -301,7 +294,6 @@ test('spellsLiteral needs the whole literal, which a longer neighbour cannot sat
   assert.equal(spellsLiteral(keys, 'FABRICATE.Manager.Titlebar.Premium'), true);
 });
 
-/** The module-AST half, on a fixture rather than on a production file that may move. */
 const MODULE_FIXTURE = [
   "import { registerApp } from './registry.js';",
   "export * from './surface.js';",
