@@ -1,7 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <!--
   The condition-modifier cards and the character-modifier search, suggestions and reference rows
-  for ONE record: a gathering task's drop, or a gathering event. Written once (issue 1707).
+  for one record: a gathering task's drop, or a gathering event. Written once (issue 1707).
 
   `subject` is the record a modifier attaches to, never the persisted condition `kind` this markup
   binds. It picks the hook prefix, feeds the card-copy helpers their `scope`, and gates the
@@ -19,7 +19,10 @@
   import { localize } from '../../../util/foundryBridge.js';
 
   let {
-    /** `'drop'` or `'event'`: the record a modifier attaches to, not a condition kind. */
+    /**
+     * `'drop'` or `'event'`: the record a modifier attaches to, not a condition kind. It also
+     * feeds the copy helpers' `scope`, where any non-`'event'` value resolves the `Tasks.*` keys.
+     */
     subject = 'drop',
     /** That record itself, which the shared readers below take. */
     row = null,
@@ -65,9 +68,9 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  // LITERALS, not composed: every mirror guard that resolves a selector greps `src/` for the
+  // Literals, not composed: every mirror guard that resolves a selector greps `src/` for the
   // attribute name (the View Lab registry's does), and a composed name is invisible to all of
-  // them. So the eight NAMES are written twice and the 300 lines of MARKUP once.
+  // them. So the eight names are written twice and the 300 lines of markup once.
   const HOOK_NAMES = Object.freeze({
     drop: Object.freeze({
       conditionModifiers: 'data-gathering-drop-condition-modifiers',
@@ -91,9 +94,10 @@
     }),
   });
 
-  /** One hook attribute, spread so its NAME follows the subject rather than the call site. */
+  /** One hook attribute, spread so its name follows the subject rather than the call site. */
   function hook(name, value = '') {
-    return { [HOOK_NAMES[subject][name]]: value };
+    const names = HOOK_NAMES[subject] ?? HOOK_NAMES.drop;
+    return { [names[name]]: value };
   }
 </script>
 

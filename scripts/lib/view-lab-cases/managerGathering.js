@@ -482,7 +482,7 @@ export const CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
       /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView)/,
-      // This is the only frame that draws the EVENT half of the shared modifier panel, and neither
+      // This is the only frame that draws the event half of the shared modifier panel, and neither
       // pattern above reaches `environment/` (issue 1707).
       /^src\/ui\/svelte\/apps\/manager\/environment\/GatheringModifierEditor\.svelte$/,
     ],
@@ -490,7 +490,7 @@ export const CASES = Object.freeze([
   managerCase({
     id: 'manager-gathering-task-drop-modifiers-normal',
     label: 'Manager — Gathering task drop modifiers normal',
-    // BEYOND the smoke: its walk never selects a drop, so no existing frame draws this column.
+    // Beyond the smoke: its walk never selects a drop, so no existing frame draws this column.
     reaches: 'beyond',
     smokeLabels: [],
     query: { system: 'lab-herbalism' },
@@ -507,7 +507,7 @@ export const CASES = Object.freeze([
       { selector: '[data-gathering-drop-condition-modifiers="biome"]', scroll: true },
     ],
     expectView: 'gathering-task-edit',
-    // The DROP half of the shared modifier panel, which no other case in the registry reaches.
+    // The drop half of the shared modifier panel, which no other case in the registry reaches.
     expectSelector:
       '.fabricate-manager .manager-inspector [data-gathering-drop-condition-modifiers="biome"]',
     kinds: ['manager', 'environments'],
