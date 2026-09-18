@@ -733,12 +733,8 @@ test('(e) the register of unadjudicated shared components is exactly what is rec
   assert.ok(
     domain.length >= 50,
     `only ${domain.length} components outside ${PRIMITIVE_DIRECTORY} clear the ${MEMBERSHIP_BAR}-` +
-      `caller bar, against the 65 this tree holds — 68 until issue 1710 promoted EmptyState, ` +
-      `Callout and SegmentedControl into ${PRIMITIVE_DIRECTORY}. The floor is 50 rather than one ` +
-      'step below the count because this domain is what the rail empties: every further promotion ' +
-      'out of apps/ lowers it, so a floor set against the current figure reds on the next ' +
-      'correct move. With none, the register is empty and this property is satisfied by a broken ' +
-      'scan.'
+      'caller bar, against the 65 this tree holds. With none, the register is empty and this ' +
+      'property is satisfied by a broken scan.'
   );
   assert.ok(
     domain.some((file) => MANIFEST_ROWS.some((row) => row.path === file)),
@@ -793,6 +789,17 @@ test('(e) every registered path is a real, unadjudicated component', () => {
     `a register row names a file under ${PRIMITIVE_DIRECTORY}, which is outside this property's ` +
       'domain entirely — those are covered by the manifest clauses above, and a row here would be ' +
       'checked by nothing while looking checked'
+  );
+});
+
+test('(e) exactly one shared member row still lives outside the primitive directory', () => {
+  assert.deepEqual(
+    MANIFEST_ROWS.filter(
+      (row) => row.scope === 'shared' && !row.path.startsWith(PRIMITIVE_DIRECTORY)
+    ).map((row) => row.path),
+    ['src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte'],
+    'the design-system spec names this set; a promotion or a new shared row outside ' +
+      `${PRIMITIVE_DIRECTORY} must update that sentence with it`
   );
 });
 

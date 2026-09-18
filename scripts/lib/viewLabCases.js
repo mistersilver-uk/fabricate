@@ -5441,9 +5441,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     // case whose whole subject is that there is nothing to list.
     expectSelector: '.fabricate-manager [data-complications-section] [data-complications-empty]',
     kinds: ['manager', 'components', 'complications'],
-    // Deliberately no pattern for `components/EmptyState.svelte`: `BROAD_SIGNAL_PATTERN` matches
-    // `^src/ui/svelte/components/`, and `selectRenderFileCases` `continue`s on a broad-signal file
-    // before reading any case's `sourceMatches`, so such an entry is unreachable.
+    // Deliberately no pattern for `components/EmptyState.svelte`, for the reason
+    // `manager-systems-empty` records above.
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/component\/ComponentComplicationsSection\.svelte$/,
     ],
