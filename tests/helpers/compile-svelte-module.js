@@ -74,8 +74,9 @@ export function createSvelteModuleCompiler(prefix = 'fabricate-svelte-') {
   }
 
   /**
-   * Copy every plain `.js` module the entry transitively imports, then compile and import it — the
-   * same thing {@link load} does, minus the hand-maintained copy list.
+   * Copy every plain `.js` module the entry transitively imports and compile every `.svelte.js`
+   * one, then compile and import the entry — the same thing {@link load} does, minus the
+   * hand-maintained copy list.
    *
    * @param {string} entryPath repo-relative path to a `.svelte.js` runes module.
    * @returns {Promise<object>} the module namespace.
@@ -96,14 +97,17 @@ export function createSvelteModuleCompiler(prefix = 'fabricate-svelte-') {
           );
         }
         if (seen.has(importedPath)) continue;
-        if (importedPath.endsWith('.svelte') || importedPath.endsWith('.svelte.js')) {
+        if (importedPath.endsWith('.svelte')) {
           throw new Error(
-            `${importerPath} imports ${importedPath}; loadWithClosure copies plain modules only, ` +
-              'so compile that one explicitly or use the mounted component harness'
+            `${importerPath} imports the component ${importedPath}; loadWithClosure handles ` +
+              'modules only, so use the mounted component harness'
           );
         }
         seen.add(importedPath);
-        copyPlain(importedPath);
+        // A rune module is compiled rather than copied, and still walked: its own plain imports
+        // have to be copied in too (issue 1673).
+        if (importedPath.endsWith('.svelte.js')) compile(importedPath);
+        else copyPlain(importedPath);
         pending.push(importedPath);
       }
     }
