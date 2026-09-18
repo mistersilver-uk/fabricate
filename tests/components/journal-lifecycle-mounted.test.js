@@ -60,7 +60,10 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/journal/stageHeading.js',
     'src/ui/svelte/apps/journal/runRecovery.js',
   ],
-  runeModules: ['src/ui/svelte/stores/journalStore.svelte.js'],
+  runeModules: [
+    'src/ui/svelte/stores/browseListing.svelte.js',
+    'src/ui/svelte/stores/journalStore.svelte.js',
+  ],
   compiledModules: [
     ...SELECT_COMPILED_MODULES,
     ...PLAYER_APP_COMPILED_MODULES,

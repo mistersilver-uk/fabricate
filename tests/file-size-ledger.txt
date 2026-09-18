@@ -208,14 +208,14 @@ src/ui/svelte/stores/adminStore.js::createAdminStore>_createTravelSection>buildS
 src/ui/svelte/stores/adminStore.js::createAdminStore>refresh	278
 src/ui/svelte/stores/adminStore.js::createAdminStore>updateEnvironmentDraft	131
 src/ui/svelte/stores/adminSystemInspectorProjection.js::buildSelectedSystemViewData	313
-src/ui/svelte/stores/alchemyStore.svelte.js::createAlchemyStore	644
+src/ui/svelte/stores/alchemyStore.svelte.js::createAlchemyStore	636
 src/ui/svelte/stores/craftingSourcesStore.svelte.js::createCraftingSourcesStore	126
 src/ui/svelte/stores/craftingStore.svelte.js	1029
 src/ui/svelte/stores/craftingStore.svelte.js::createCraftingStore	944
 src/ui/svelte/stores/inventoryStore.svelte.js	1796
 src/ui/svelte/stores/inventoryStore.svelte.js::createInventoryStore	1222
 src/ui/svelte/stores/inventoryStore.svelte.js::createInventoryStore>salvage	137
-src/ui/svelte/stores/journalStore.svelte.js::createJournalStore	560
+src/ui/svelte/stores/journalStore.svelte.js::createJournalStore	538
 src/ui/svelte/stores/worldScopeActions.js	881
 src/ui/svelte/stores/worldScopeActions.js::createWorldScopeEntityActions	467
 src/ui/svelte/stores/worldScopeActions.js::createWorldVocabularyActions	128

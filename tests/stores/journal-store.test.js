@@ -6,35 +6,16 @@
 
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
-import { compileModule } from 'svelte/compiler';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
-import { rewriteClientImports } from '../helpers/rewriteClientImports.js';
+import { createSvelteModuleCompiler } from '../helpers/compile-svelte-module.js';
 import { expectedMemberKinds, storeMemberKinds } from '../helpers/storeMemberKinds.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
-let tempRoot;
+let compiler;
 let createJournalStore;
-
-
-function writeCompiledModule(sourcePath) {
-  const source = readFileSync(resolve(repoRoot, sourcePath), 'utf8');
-  const compiled = compileModule(source, { filename: sourcePath, generate: 'client', dev: true });
-  const destination = join(tempRoot, `${sourcePath}.js`);
-  mkdirSync(dirname(destination), { recursive: true });
-  writeFileSync(destination, rewriteClientImports(compiled.js.code));
-}
-
-/** Copy a plain `.js` leaf the compiled store imports into the temp tree. */
-function writePlainModule(sourcePath) {
-  const destination = join(tempRoot, sourcePath);
-  mkdirSync(dirname(destination), { recursive: true });
-  writeFileSync(destination, readFileSync(resolve(repoRoot, sourcePath), 'utf8'));
-}
 
 const EN = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8'));
 
@@ -164,20 +145,15 @@ const JOURNAL_STORE_SHAPE = {
 
 describe('journalStore', () => {
   before(async () => {
-    tempRoot = mkdtempSync(join(tmpdir(), 'fabricate-journal-'));
-    symlinkSync(resolve(repoRoot, 'node_modules'), join(tempRoot, 'node_modules'), 'junction');
-    // Issue 1648: the authority-refusal wording. A leaf the store imports but the
-    // temp tree lacks throws in `before` and CANCELS every subtest here.
-    writePlainModule('src/ui/svelte/util/journalRunReasons.js');
-    writeCompiledModule('src/ui/svelte/stores/journalStore.svelte.js');
-    createJournalStore = (await import(pathToFileURL(join(
-      tempRoot,
-      'src/ui/svelte/stores/journalStore.svelte.js.js'
-    )))).createJournalStore;
+    compiler = createSvelteModuleCompiler('fabricate-journal-');
+    // The store's real import graph, walked rather than restated (issue 1286).
+    ({ createJournalStore } = await compiler.loadWithClosure(
+      'src/ui/svelte/stores/journalStore.svelte.js'
+    ));
   });
 
   after(() => {
-    rmSync(tempRoot, { recursive: true, force: true });
+    compiler.cleanup();
   });
 
   it('returns exactly the 57 public members the journal view reads, each still a getter', () => {
@@ -221,7 +197,6 @@ describe('journalStore', () => {
     });
   }
 
-  // Issue 1648: manual setup is GONE.
   it('offers no manual authority setup and passes a blocked run its reason untouched', async () => {
     const blocked = run({
       lifecycleContract: 'current',
@@ -334,8 +309,7 @@ describe('journalStore', () => {
     assert.deepEqual(store.activeRuns, [], 'search is applied after the pre-filter counts');
   });
 
-  // Issue 1648, D-029/M19. `Waiting` and `In progress` collapse into one badge, and the filter
-  // vocabulary must not diverge from the badge vocabulary.
+  // `Waiting` and `In progress` wear one badge, so the filter vocabulary must match it.
   it('selects both merged statuses from the one In progress tab, and counts them together', async () => {
     const activeRuns = [
       run({ id: 'craft-ready', derivedStatus: 'ready' }),
@@ -712,8 +686,7 @@ describe('journalStore', () => {
     assert.equal(setup.calls.command.length, 2);
   });
 
-  // Issue 1648: a versioned-run authority refusal is `{success:false, reason}` with no `message`,
-  // so `safeCommandMessage` produced '' — an EMPTY command-error notice and no toast at all.
+  // An authority refusal is `{success: false, reason}` with no `message` to echo.
   it('words a reason-only command refusal in both the notice and the toast', async () => {
     const current = run({ ...ACTIVE[0], lifecycleContract: 'current', lifecycleVersion: 1 });
     const setup = makeServices({
@@ -758,8 +731,7 @@ describe('journalStore', () => {
     }
   });
 
-  // Issue 1648: finishing a timed run from the Journal whose CHECK fails is an outcome the run's
-  // own history records, not a command error.
+  // A failed CHECK is an outcome the run's own history records, not a command error.
   it('reports a resolved failed check as an outcome, not as a command error', async () => {
     const current = run({ ...ACTIVE[0], lifecycleContract: 'current', lifecycleVersion: 1 });
     const setup = makeServices({
@@ -815,8 +787,7 @@ describe('journalStore', () => {
     assert.equal(setup.calls.list, 2, 'the cancelled command does not trigger another refresh');
   });
 
-  // Issue 1648, M25. A versioned cancel SUCCEEDS with `cancelled: true` — the run was cancelled —
-  // and the store used to read that as "the user dismissed a prompt" and return before its refresh.
+  // A versioned cancel answers `{success: true, cancelled: true}`, which is a change to re-read.
   it('refreshes after a successful versioned cancel, so a mid-command claim cannot outlive it', async () => {
     const target = run({ id: 'target', lifecycleContract: 'current', lifecycleVersion: 1 });
     const other = run({ id: 'other', lifecycleContract: 'current', lifecycleVersion: 1 });
@@ -975,9 +946,7 @@ describe('journalStore', () => {
     assert.equal(store.busyRunId, '', 'busy flag cleared');
   });
 
-  // Issue 966: without a catch, a throw from the Foundry edge became an unhandled
-  // rejection inside the click handler — no toast, no refresh, no state change, so
-  // the button visibly did nothing and the real cause was invisible.
+  // A throw from the Foundry edge is caught, so the click handler cannot reject silently.
   it('advance surfaces a thrown error and clears busy instead of rejecting', async () => {
     const setup = makeServices({ advanceThrows: true });
     const store = await loadedStore(setup);
