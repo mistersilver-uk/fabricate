@@ -25,7 +25,7 @@ import {
   mintEssenceId,
   worldAddressableEffectSources,
 } from '../src/ui/svelte/apps/manager/scoped/essenceScoped.js';
-import { WORLD_IDENTITY_FIELDS } from '../src/migration/worldScopeEntityGrouping.js';
+import { WORLD_IDENTITY_FIELDS } from '../src/systems/worldScopeEntityGrouping.js';
 import { membershipKey } from '../src/systems/scopedDefinitions.js';
 import { createWorldScopeActions } from '../src/ui/svelte/stores/worldScopeActions.js';
 import {

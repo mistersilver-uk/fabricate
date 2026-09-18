@@ -16,7 +16,7 @@ const SRC_FILES = [
   'src/models/Tool.js',
   'src/migration/migrateLegacyResolutionModes.js',
   'src/migration/migrateSplitRoutedResolutionModes.js',
-  'src/migration/migrateRecipeForModeChange.js',
+  'src/systems/migrateRecipeForModeChange.js',
 ].map((relPath) => join(repoRoot, relPath));
 
 // `00N-<domain>.md` (the retired filename form) — used over specs AND src.

@@ -4,9 +4,8 @@
  * the facts arrive at different moments on different clients' timelines.
  */
 
+import { composeFindingsNotice, localizeNoticeClause } from '../migration/migrationNoticeDetail.js';
 import { localizeWith } from '../utils/localizeWithFallback.js';
-
-import { composeFindingsNotice, localizeNoticeClause } from './migrationNoticeDetail.js';
 
 function arrayOf(value) {
   return Array.isArray(value) ? value : [];

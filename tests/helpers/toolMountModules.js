@@ -29,7 +29,7 @@ export const TOOL_TREE_COMPILED_MODULES = Object.freeze([
 
 /** The WORLD SCOPE closure, spread on top of `TOOL_TREE_RAW_MODULES`. */
 export const WORLD_TOOL_SCOPE_RAW_MODULES = Object.freeze([
-  'src/migration/worldScopeEntityGrouping.js',
+  'src/systems/worldScopeEntityGrouping.js',
   'src/systems/componentScope.js',
   'src/systems/essenceScope.js',
   'src/systems/scopedDefinitionStore.js',

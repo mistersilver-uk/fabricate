@@ -14,7 +14,7 @@ import {
   WORLD_SCOPE_ESSENCE_DEFENSIVE_SITES,
   WORLD_SCOPE_ESSENCE_REFERENCE_SITES,
   WORLD_SCOPE_REFERENCE_SITES,
-} from '../src/migration/worldScopeReferenceRewrite.js';
+} from '../src/systems/worldScopeReferenceRewrite.js';
 import { installFoundryStubs } from './helpers/worldScopeCorpus.js';
 
 installFoundryStubs();

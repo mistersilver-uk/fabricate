@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { WORLD_IDENTITY_FIELDS } from '../src/migration/worldScopeEntityGrouping.js';
+import { WORLD_IDENTITY_FIELDS } from '../src/systems/worldScopeEntityGrouping.js';
 import { reportWorldIdentityDrift } from '../src/systems/worldIdentityDrift.js';
 
 const ENTITY_FIELDS = { components: 'components', essences: 'essenceDefinitions', tools: 'tools' };

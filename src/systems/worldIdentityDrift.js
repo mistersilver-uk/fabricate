@@ -87,10 +87,10 @@
  * re-spread of the whole record.
  */
 
-import { WORLD_IDENTITY_FIELDS } from '../migration/worldScopeEntityGrouping.js';
 import { isPlainObject } from '../utils/scalars.js';
 
 import { subKeyEntries } from './scopedDefinitionStore.js';
+import { WORLD_IDENTITY_FIELDS } from './worldScopeEntityGrouping.js';
 
 const ENTITY_TYPES = Object.freeze(['components', 'essences', 'tools']);
 

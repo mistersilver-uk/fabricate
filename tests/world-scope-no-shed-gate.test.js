@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import {
   ENTITY_TYPE_FIELDS,
   WORLD_IDENTITY_FIELDS,
-} from '../src/migration/worldScopeEntityGrouping.js';
+} from '../src/systems/worldScopeEntityGrouping.js';
 
 import { stripComments } from './helpers/sourceScan.js';
 import { installFoundryStubs } from './helpers/worldScopeCorpus.js';

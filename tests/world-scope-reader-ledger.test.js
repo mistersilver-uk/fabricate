@@ -16,8 +16,10 @@ import { collectSources, repoRoot, stripComments } from './helpers/sourceScan.js
 const MATCHER =
   /(?:\.|[\w$)\]]\[\s*['"])(?:components|essenceDefinitions|tools)\b/g;
 
-/** The two directories the sweep deliberately did not enter. */
+/** The directories the sweep did not enter, and the file whose bare string constants are JSON paths. */
 const EXCLUDED_PREFIXES = Object.freeze(['src/ui/', 'src/migration/']);
+const PATH_CONSTANT_FILES = Object.freeze(new Set(['src/systems/worldScopeReferenceRewrite.js']));
+const STRING_CONSTANT_LINE = /^\s*'[^']*',?\s*$/;
 
 /** Every reason a raw read may still be here, each drawn from the delta's `#### D5`. */
 const REASONS = Object.freeze({
@@ -35,6 +37,9 @@ const REASONS = Object.freeze({
     'a destructive prune basis: widening or narrowing it deletes real data, so it reads the ' +
     'persisted record',
   import: 'the import path builds the system from the in-system arrays for every field',
+  'rewrite-walk':
+    'the shared reference walk rewrites the raw payload in place, so it reads the in-system ' +
+    'arrays that payload carries',
   export: 'the export path writes the in-system arrays at schema 6',
   guard:
     'an `Array.isArray` GUARD whose consequent IS repointed; the guard asks what the record ' +
@@ -59,11 +64,11 @@ const BASE_SCAN = Object.freeze({
  * The live tree's measurement, asserted as an EXACT EQUALITY rather than as a floor (issue 1371).
  */
 const SCAN_TOTALS = Object.freeze({
-  // #1648: eight unique validated-tool/receipt reads in the same two engine files.
-  matches: 168,
-  lines: 152,
-  files: 18,
-  pairs: 123,
+  // #1648: eight unique tool/receipt reads in two engine files; #1666: five relocated files.
+  matches: 183,
+  lines: 165,
+  files: 23,
+  pairs: 136,
   collisionGroups: 17,
   collisionSites: 46,
 });
@@ -196,7 +201,20 @@ const LEDGER = Object.freeze([
   ['src/systems/importReferenceResolver.js', "for (const tool of arrayOf(slice.tools)) reportToolComponentRefs(tool);", 1, 'import'],
   ['src/systems/importReferenceResolver.js', "for (const component of arrayOf(system.components)) {", 1, 'import'],
   ['src/systems/importReferenceResolver.js', "for (const def of arrayOf(system.essenceDefinitions)) {", 1, 'import'],
+  ['src/systems/worldScopeReferenceRewrite.js', "for (const component of arrayOf(system.components)) {", 1, 'rewrite-walk'],
+  ['src/systems/worldScopeReferenceRewrite.js', "for (const definition of arrayOf(system.essenceDefinitions)) {", 1, 'rewrite-walk'],
+  ['src/systems/worldScopeReferenceRewrite.js', "for (const tool of arrayOf(system.tools)) {", 1, 'rewrite-walk'],
+  ['src/systems/worldScopeReferenceRewrite.js', "for (const tool of arrayOf(slice.tools)) {", 1, 'rewrite-walk'],
+  ['src/systems/remapWorldScopeIdentityFlags.js', "for (const [oldId, newId] of Object.entries(perSystem?.components ?? {})) {", 1, 'not-a-system'],
+  ['src/systems/remapWorldScopeIdentityFlags.js', "const remapComponent = legLookup(perSystem.components);", 1, 'not-a-system'],
+  ['src/systems/remapWorldScopeIdentityFlags.js', "const remapTool = legLookup(perSystem.tools);", 1, 'not-a-system'],
+  ['src/systems/remapWorldScopeIdentityFlags.js', "const remapComponent = legLookup(rekeyMap[systemId]?.components);", 1, 'not-a-system'],
+  ['src/systems/restampOwnedItemComponentIdentity.js', "const components = Array.isArray(system?.components) ? system.components : [];", 1, 'restamp'],
   ['src/systems/startupPassComposition.js', "new Set((system.components || []).map((component) => component.id)),", 1, 'destructive-basis'],
+  ['src/systems/worldScopeEntityGrouping.js', "componentsBySystem.set(trimmedString(system.id), arrayOf(system.components));", 1, 'basis'],
+  ['src/systems/worldScopeEntityNotice.js', "components: Number(created.components) || 0,", 1, 'not-a-system'],
+  ['src/systems/worldScopeEntityNotice.js', "tools: Number(created.tools) || 0,", 1, 'not-a-system'],
+  ['src/systems/worldScopeEntityNotice.js', "const createdTotal = counts.components + counts.essences + counts.tools;", 1, 'not-a-system'],
 ]);
 
 /** NAMED LIVE ANCHORS in four distinct files, the other half of the positive control. */
@@ -221,7 +239,9 @@ function scan() {
   const files = new Set();
   for (const [file, text] of Object.entries(sources)) {
     if (EXCLUDED_PREFIXES.some((prefix) => file.startsWith(prefix))) continue;
+    const skipConstants = PATH_CONSTANT_FILES.has(file);
     for (const line of stripComments(text).split('\n')) {
+      if (skipConstants && STRING_CONSTANT_LINE.test(line)) continue;
       const found = line.match(MATCHER);
       if (!found) continue;
       totals.matches += found.length;
@@ -269,7 +289,7 @@ describe('the world-scope reader ledger', () => {
       SCAN_TOTALS,
       'The live scan no longer matches the committed totals. If you have LEGITIMATELY added or ' +
         'removed a raw read of a crafting system’s `components`, `essenceDefinitions` or `tools` ' +
-        'anywhere under `src/` outside `src/ui/**` and `src/migration/**` — including a chat ' +
+        'anywhere under `src/` outside the excluded prefixes and files — including a chat ' +
         'view-model field or any other non-system receiver — then update the LEDGER entry and ' +
         'these six numbers together. If you have not, the MATCHER has changed and is now finding ' +
         'the wrong population.'

@@ -158,7 +158,7 @@ import {
   remapCompletedCleanly,
   remapWorldEssenceIdentityFlags as remapEssenceFlagsAcrossActors,
   remapWorldScopeIdentityFlags as remapIdentityFlagsAcrossActors,
-} from './migration/remapWorldScopeIdentityFlags.js';
+} from './systems/remapWorldScopeIdentityFlags.js';
 import { hasPendingWorldScopeRekey } from './systems/worldScopeRekeyPending.js';
 // THE SHARED READ SEAM (issue 1370). Seven call sites in this file enter through it, and this file
 // is outside the CI lint glob — so an omitted import here is a ReferenceError that no lint, no test
@@ -166,8 +166,8 @@ import { hasPendingWorldScopeRekey } from './systems/worldScopeRekeyPending.js';
 import { resolvedComponentsFor, resolvedToolsFor } from './systems/scopedEntityReads.js';
 import { readPersistedCraftingSystems } from './systems/SettingsCraftingDefinitionRepository.js';
 import { reportWorldIdentityDrift } from './systems/worldIdentityDrift.js';
-import { restampOwnedItemComponentIdentity } from './migration/restampOwnedItemComponentIdentity.js';
-import { buildWorldEssenceMergeNotice, buildWorldScopeEntityNotice, buildWorldScopeIdentityRemapNotice, describeWorldIdentityDrift } from './migration/worldScopeEntityNotice.js';
+import { restampOwnedItemComponentIdentity } from './systems/restampOwnedItemComponentIdentity.js';
+import { buildWorldEssenceMergeNotice, buildWorldScopeEntityNotice, buildWorldScopeIdentityRemapNotice, describeWorldIdentityDrift } from './systems/worldScopeEntityNotice.js';
 import { composeMigrationNotice, logMigrationNoticeDetail } from './migration/migrationNoticeDetail.js';
 import { buildMigrationRecoveryPrompt } from './migration/migrationRecoveryPrompt.js';
 import { buildRetiredCraftingModNotice } from './migration/migrateRetireCraftingModToken.js';

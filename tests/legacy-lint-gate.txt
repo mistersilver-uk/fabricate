@@ -138,7 +138,6 @@ src/migration/migrateMaxModifierPicks.js
 src/migration/migrateMoveRoutedByIngredientsCheck.js
 src/migration/migrateNodeRespawnIntervals.js
 src/migration/migrateNodeRespawnModes.js
-src/migration/migrateRecipeForModeChange.js
 src/migration/migrateRecipeItemCapsPerItem.js
 src/migration/migrateRemoveLegacyCheckSources.js
 src/migration/migrateRemoveResultSelectionProviders.js
@@ -164,14 +163,8 @@ src/migration/migrateWorldScopeEntities.js
 src/migration/migrationErrors.js
 src/migration/migrationHelpers.js
 src/migration/migrationRecoveryPrompt.js
-src/migration/remapWorldScopeIdentityFlags.js
 src/migration/respawnTraversal.js
-src/migration/restampOwnedItemComponentIdentity.js
 src/migration/worldEssenceEquivalence.js
-src/migration/worldScopeDefaults.js
-src/migration/worldScopeEntityGrouping.js
-src/migration/worldScopeEntityNotice.js
-src/migration/worldScopeReferenceRewrite.js
 src/models/Ingredient.js
 src/models/IngredientGroup.js
 src/models/IngredientSet.js
@@ -269,6 +262,7 @@ src/systems/importReportContent.js
 src/systems/invalidationDomains.js
 src/systems/inventorySnapshot.js
 src/systems/itemStackQuantity.js
+src/systems/migrateRecipeForModeChange.js
 src/systems/modifierLibrary.js
 src/systems/mutationCleanupComposition.js
 src/systems/nodeRespawnMath.js
@@ -277,7 +271,9 @@ src/systems/pooledAllocation.js
 src/systems/progressiveCheckSandbox.js
 src/systems/recipeItemPartyLearnPool.js
 src/systems/recipeKeyedFlagEntries.js
+src/systems/remapWorldScopeIdentityFlags.js
 src/systems/resolvedComponentEssences.js
+src/systems/restampOwnedItemComponentIdentity.js
 src/systems/revisionTokens.js
 src/systems/runContainerCoherence.js
 src/systems/runContainerStore.js
@@ -295,7 +291,11 @@ src/systems/toolBreakageAuthority.js
 src/systems/toolCheckBonus.js
 src/systems/toolScope.js
 src/systems/worldIdentityDrift.js
+src/systems/worldScopeDefaults.js
+src/systems/worldScopeEntityGrouping.js
+src/systems/worldScopeEntityNotice.js
 src/systems/worldScopeImportMerge.js
+src/systems/worldScopeReferenceRewrite.js
 src/systems/worldScopeRekeyPending.js
 src/systems/worldScopeStores.js
 src/systems/worldVocabulary.js

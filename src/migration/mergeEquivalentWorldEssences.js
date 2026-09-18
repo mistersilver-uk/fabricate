@@ -7,11 +7,10 @@
 
 import { ESSENCE_SECTIONS, resolveEssence } from '../systems/essenceScope.js';
 import { membershipKey } from '../systems/scopedDefinitions.js';
-
-import { readScopePayload } from './migrateWorldScopeEntities.js';
-import { clone, isPlainObject } from './migrationHelpers.js';
-import { buildWorldEssenceEquivalence } from './worldEssenceEquivalence.js';
-import { ENTITY_TYPE_FIELDS, ESSENCE_EFFECT_SOURCE_FIELDS } from './worldScopeEntityGrouping.js';
+import {
+  ENTITY_TYPE_FIELDS,
+  ESSENCE_EFFECT_SOURCE_FIELDS,
+} from '../systems/worldScopeEntityGrouping.js';
 import {
   keyedRemapper,
   rewriteEssenceQuantityMap,
@@ -20,7 +19,11 @@ import {
   rewriteRecipeReferences,
   rewriteSystemReferences,
   rewriteToolReferences,
-} from './worldScopeReferenceRewrite.js';
+} from '../systems/worldScopeReferenceRewrite.js';
+
+import { readScopePayload } from './migrateWorldScopeEntities.js';
+import { clone, isPlainObject } from './migrationHelpers.js';
+import { buildWorldEssenceEquivalence } from './worldEssenceEquivalence.js';
 
 /** The `craftingSystem` array essences are stored under, read from the one list that names it. */
 const ESSENCE_DEFINITIONS_FIELD = ENTITY_TYPE_FIELDS.essences;

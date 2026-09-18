@@ -6,11 +6,10 @@
  */
 
 import { FABRICATE_FLAG_NAMESPACE, isSafeFlagKeySegment } from '../config/flags.js';
+import { composeFindingsNotice } from '../migration/migrationNoticeDetail.js';
+import { compareSemver } from '../migration/MigrationRunner.js';
 import { canonicalSignatureKey } from '../utils/alchemySignatureKey.js';
 import { isPlainObject } from '../utils/scalars.js';
-
-import { composeFindingsNotice } from './migrationNoticeDetail.js';
-import { compareSemver } from './MigrationRunner.js';
 
 /** The migration version that PRODUCES the re-key map this pass consumes. */
 export const WORLD_SCOPE_MIGRATION_VERSION = '1.30.0';

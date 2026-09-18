@@ -786,12 +786,6 @@ describe('CraftingSystemManagerRoot recipe-edit machinery', () => {
   it('never seeds an alchemy routing provider on Complex (the per-recipe provider is retired)', () => {
     // Alchemy now routes on the system-level alchemy.checkMode.
     assert.ok(
-      !rootSource.includes(
-        "import { chooseSeedProvider } from '../../../../migration/migrateRecipeForModeChange.js'"
-      ),
-      'root no longer imports the retired provider-choice contract'
-    );
-    assert.ok(
       !rootSource.includes('chooseSeedProvider('),
       'root no longer seeds an alchemy resultSelection.provider'
     );

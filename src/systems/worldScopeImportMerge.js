@@ -81,6 +81,10 @@
  * only look opposite because the actions are opposite.
  */
 
+import { isPlainObject } from '../utils/scalars.js';
+
+import { membershipKey } from './scopedDefinitions.js';
+import { subKeyEntries } from './scopedDefinitionStore.js';
 import {
   FALLBACK_EXPOSED_SECTIONS,
   isWorldAddressable,
@@ -88,12 +92,8 @@ import {
   RESERVED_CATEGORY,
   sectionIsAuthoredBy,
   WORLD_DEFAULT_SECTIONS,
-} from '../migration/worldScopeDefaults.js';
-import { ESSENCE_EFFECT_SOURCE_FIELDS } from '../migration/worldScopeEntityGrouping.js';
-import { isPlainObject } from '../utils/scalars.js';
-
-import { membershipKey } from './scopedDefinitions.js';
-import { subKeyEntries } from './scopedDefinitionStore.js';
+} from './worldScopeDefaults.js';
+import { ESSENCE_EFFECT_SOURCE_FIELDS } from './worldScopeEntityGrouping.js';
 
 /**
  * The system token the INCOMING membership records are counted under while the re-check runs.

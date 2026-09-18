@@ -4,10 +4,7 @@
  * owns every rule, the load-bearing rewrite-before-payload order included.
  */
 
-import { cloneJson, isPlainObject } from '../utils/scalars.js';
-
-import { markComponentEssenceInheritance } from './migrateComponentEssenceSections.js';
-import { electWorldDefault } from './worldScopeDefaults.js';
+import { electWorldDefault } from '../systems/worldScopeDefaults.js';
 import {
   buildWorldScopeGrouping,
   ENTITY_TYPE_FIELDS,
@@ -15,14 +12,17 @@ import {
   isRefusedPair,
   REKEYABLE_ENTITY_TYPES,
   WORLD_IDENTITY_FIELDS,
-} from './worldScopeEntityGrouping.js';
+} from '../systems/worldScopeEntityGrouping.js';
 import {
   keyedRemapper,
   rewriteGatheringSliceReferences,
   rewriteMembershipReferences,
   rewriteRecipeReferences,
   rewriteSystemReferences,
-} from './worldScopeReferenceRewrite.js';
+} from '../systems/worldScopeReferenceRewrite.js';
+import { cloneJson, isPlainObject } from '../utils/scalars.js';
+
+import { markComponentEssenceInheritance } from './migrateComponentEssenceSections.js';
 
 /** The `data` keys the three scope payloads travel under inside the migration runner. */
 export const SCOPE_PAYLOAD_KEYS = Object.freeze({

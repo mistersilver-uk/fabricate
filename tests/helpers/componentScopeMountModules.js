@@ -28,7 +28,7 @@ export const COMPONENT_SCOPE_LEAF_MODULES = Object.freeze([
   'src/systems/componentScope.js',
   'src/systems/essenceScope.js',
   'src/systems/toolScope.js',
-  'src/migration/worldScopeEntityGrouping.js',
+  'src/systems/worldScopeEntityGrouping.js',
   'src/utils/sourceReferenceUnion.js',
 ]);
 

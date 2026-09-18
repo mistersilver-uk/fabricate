@@ -59,7 +59,7 @@ const harness = createMountedComponentHarness({
     // #1663: the ONE implementation behind both category shims; imports nothing.
     'src/utils/categoryNormalization.js',
     'src/utils/recipeCategories.js',
-    'src/migration/worldScopeEntityGrouping.js',
+    'src/systems/worldScopeEntityGrouping.js',
     'src/systems/componentScope.js',
     'src/systems/essenceScope.js',
     'src/systems/scopedDefinitionStore.js',

@@ -193,6 +193,9 @@ package.json
 package-lock.json
 src/main.js
 src/migration/**
+src/systems/remapWorldScopeIdentityFlags.js
+src/systems/restampOwnedItemComponentIdentity.js
+src/systems/worldScopeReferenceRewrite.js
 scripts/**
 .github/workflows/**
 release.config.js

@@ -27,7 +27,7 @@ import {
   unambiguousComponentRemap,
   unambiguousEssenceRemap,
   worldEssenceMergeLegs,
-} from '../src/migration/remapWorldScopeIdentityFlags.js';
+} from '../src/systems/remapWorldScopeIdentityFlags.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 

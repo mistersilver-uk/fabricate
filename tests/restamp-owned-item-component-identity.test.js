@@ -10,7 +10,7 @@ import { setFabricateFlag } from '../src/config/flags.js';
 import {
   planOwnedItemComponentRestamp,
   restampOwnedItemComponentIdentity,
-} from '../src/migration/restampOwnedItemComponentIdentity.js';
+} from '../src/systems/restampOwnedItemComponentIdentity.js';
 import { findMatchingComponent } from '../src/utils/essenceResolver.js';
 import { resolveComponentForItem } from '../src/utils/sourceUuid.js';
 
