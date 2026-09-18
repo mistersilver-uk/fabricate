@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
- * Regenerates Fabricate's icon catalogue from the Font Awesome bundle a Foundry install ships,
- * intersected with the names Font Awesome publishes in its free release.
+ * Emits `src/ui/svelte/util/foundryIconCatalogue.json` from the Font Awesome bundle a Foundry
+ * install ships. Every name it writes must appear in the pinned free release, and CI fails on one
+ * that does not: `tests/iconCatalogueGenerator.test.js`, with `candle-holder` as negative control.
  */
 
 import fs from 'node:fs';
@@ -30,7 +31,7 @@ const OUTPUT_PATH = path.join(
   'ui',
   'svelte',
   'util',
-  'foundryIconCatalogue.js'
+  'foundryIconCatalogue.json'
 );
 
 const CLASSIC_SOLID_FACE = 'fa-solid-900.woff2';
@@ -97,7 +98,6 @@ export function freeIconNamesFrom(cssText, source = 'The stylesheet') {
 /**
  * The free name set, read from the pinned `@fortawesome/fontawesome-free` devDependency.
  *
- * @param {string} [stylesheetPath]
  * @returns {{ release: { edition: string, version: string }, names: Set<string> }}
  */
 // eslint-disable-next-line unicorn/no-exports-in-scripts -- dual-mode CLI, imported by the guard.
@@ -150,14 +150,13 @@ export function intersectWithFreeIconNames(definitions, freeNames) {
     .sort((left, right) => (left.iconCode < right.iconCode ? -1 : 1));
 }
 
-// The catalogue's row encoding. One entry per line as `iconCode|label|alias,alias`, with the alias
+// The catalogue's row encoding. One string per glyph, `iconCode|label|alias,alias`, with the alias
 // field omitted when a glyph has no other names.
-const ROW_DELIMITER = '\n';
 const FIELD_DELIMITER = '|';
 const ALIAS_DELIMITER = ',';
 
-// Anything that could end a field, end a row, end the template literal that holds the rows, or
-// begin an escape or a substitution inside it.
+// Anything that could end a field or a row. The backtick, backslash and `${` cases are inert
+// under JSON escaping and stay refused anyway: a row is a string a human reads in review.
 const UNENCODABLE_FIELD = /[|,`\\\n\r\u{2028}\u{2029}]|\$\{/u;
 
 /**
@@ -193,148 +192,20 @@ function renderCatalogueRow({ iconCode, label, aliases }) {
   return fields.join(FIELD_DELIMITER);
 }
 
-// Exported as well as run: the catalogue round-trip test renders a module and parses it back,
-// which is the only check that the emitted row encoding still decodes to the entries measured.
+// Exported as well as run: the round-trip test renders the catalogue and parses it back, which is
+// the only check that the emitted row encoding still decodes to the entries measured.
 // eslint-disable-next-line unicorn/no-exports-in-scripts -- dual-mode CLI, imported by tests.
-export function renderCatalogueModule({ release, freeRelease, definitions, measurements }) {
-  const rows = definitions.map((definition) => renderCatalogueRow(definition)).join(ROW_DELIMITER);
-  const proOnlyGlyphs = measurements.classicGlyphs - measurements.offeredGlyphs;
-
-  return `// GENERATED FILE — do not hand-edit. Regenerate with:
-//   node scripts/generate-icon-catalogue.mjs <foundry>/resources/app/public/fonts/fontawesome
-//
-// The icons Fabricate offers: every glyph the Font Awesome bundle Foundry ships can render whose
-// name Font Awesome ALSO publishes in its free release. Both halves are measured rather than taken
-// from published metadata — the first from the stylesheet a Foundry install serves, the second
-// from the \`@fortawesome/fontawesome-free\` devDependency.
-//
-// Foundry bundles Font Awesome ${releaseLabel(release)}.
-// The free release intersected against is Font Awesome ${freeRelease.edition} ${freeRelease.version}.
-//
-// WHY THE INTERSECTION IS NOT OPTIONAL. Foundry ships Font Awesome Pro under its own commercial
-// licence and puts the terms in the bundle, at \`public/fonts/fontawesome/LICENSE.txt\`, in both
-// the 13 and the 14 lines:
-//
-//   "Font Awesome Pro is included under commercial license by Foundry Gaming LLC for their own
-//    usage in Foundry Virtual Tabletop. Font Awesome icons included in the Font Awesome Pro icon
-//    set may not be used, re-packaged, or referenced in code by third party package developers
-//    unless they obtain their own Font Awesome Pro license from https://fontawesome.com/."
-//
-// Fabricate is a third-party package developer and holds no Pro licence, and a catalogue of names
-// is exactly what "referenced in code" describes. Shipping no \`.woff2\` is therefore not enough to
-// clear the clause — the NAME is the thing it names. So a glyph is offered only when at least one
-// of the names Foundry's bundle gives it also appears in the free stylesheet, and only its free
-// names are recorded, because an alias is a referenced name too: it is searched by the picker and
-// resolved for data a GM already saved.
-//
-// What that leaves is a name Font Awesome publishes itself, under CC BY 4.0 for the icons and SIL
-// OFL 1.1 for the fonts. Fabricate may write it. Foundry then draws it from whichever face that
-// client has loaded — the Pro face, on a Pro-bundled Foundry — which is Foundry's own licensed use
-// of its own font, from a name Fabricate did not take from Foundry's copy of it.
-//
-// The oracle is a devDependency and NOTHING under \`src/\` imports it: it is read at generation
-// time, and by the licensing guard in tests/iconCatalogueGenerator.test.js that fails CI when any
-// committed name leaves the free set. It is version-pinned exactly rather than by range, because
-// the names it publishes are what decide what this file is allowed to contain.
-//
-// Measured from Foundry ${measurements.foundryVersion}'s bundle:
-//   ${measurements.glyphRules} rules assign a glyph, over ${measurements.declaredNames} \`.fa-\` names.
-//   ${measurements.classicGlyphs} of those glyphs are classic; the rest are the ${measurements.brandGlyphs} the brands face draws.
-//   The classic solid and regular faces carry an identical ${measurements.classicFaceCodepoints}-codepoint cmap.
-//   ${measurements.offeredGlyphs} classic glyphs carry a free name and are the entries below.
-//   The other ${proOnlyGlyphs} are Pro-only names, every one of which Foundry draws and this declines to write.
-//
-// \`candle-holder\` is the worked example, and it now runs the other way round. Foundry renders it,
-// a companion module offers it, and this catalogue deliberately does NOT — it is a Pro-only name,
-// so offering \`candle-holder\` would be Fabricate referencing a Pro icon in code. It is not
-// absent because it could not be measured; it was measured, and then declined.
-//
-// THE ENTRY SHAPE, and the three decisions behind it:
-//
-// \`iconCode\` — the name the vocabulary offers and persists. Several names routinely share one
-// glyph (\`.fa-baby-carriage,.fa-carriage-baby{--fa:"\\f77d"}\` is one picture under two names), so
-// there is one entry per GLYPH, not per name. Which name is offered is a presentation choice and
-// not a claim about Font Awesome's canonical spelling: the bundle cannot answer that, because
-// every one of its ${measurements.multiNameRules} multi-name selector lists is sorted alphabetically and the order
-// therefore carries no information. \`preferredIconName\` in scripts/lib/fontAwesomeBundle.js states
-// the tie-break it uses instead.
-//
-// \`aliases\` — every other FREE name the bundle gives the same glyph, kept rather than discarded.
-// They are searchable and they resolve, so offering one name refuses none: a GM who types \`cog\`
-// finds the gear, and a module that persisted \`fas fa-cog\` gets the gear's row. They also make the
-// curated vocabulary's exclusions sound, because an exclusion describes what a glyph DEPICTS and a
-// depiction cannot be dodged by spelling: \`automobile\` is the same drawing as \`car\`.
-//
-// \`hasRegular\` — GONE, and deliberately so rather than left stale. It was meaningful under the
-// old free-metadata catalogue, where the regular weight covered a small subset. It is not
-// meaningful here, because the classic solid and regular faces Foundry ships carry the same
-// ${measurements.classicFaceCodepoints} codepoints: the field would read \`true\` for every entry and distinguish nothing,
-// while making a picker offer two rows of the same drawing at two weights. The \`far\` prefix is
-// still accepted and still renders; it is simply not a second row.
-//
-// THE ROW ENCODING, and why the entries below are text rather than object literals. One entry per
-// line, fields separated by \`|\`: \`iconCode|label|alias,alias\`, with the alias field omitted when
-// a glyph has no other names. The obvious form — one object literal per glyph — is what this file
-// used to hold, and it read well; it also handed a copy-paste detector thousands of near-identical
-// token sequences, and SonarCloud duly failed this file as duplicated new code. A template literal
-// is ONE token, so the same data costs one. The generator refuses to emit a field containing a
-// delimiter, a newline, a backtick, a backslash or a \`\${\` — it throws, naming the entry — because
-// a file that parses back into something other than what was measured is worse than a generation
-// that fails. Parsing costs one split per file and two per row, at module load.
-//
-// VERSION COUPLING, on both sides. This file describes ONE Foundry release's bundle narrowed by
-// ONE free release's names. When Foundry bumps Font Awesome, rerun the generator against the new
-// install: names are added, and Font Awesome does retire and re-alias names between majors, so an
-// icon a GM chose can become an alias of another glyph. When the free release moves, rerun it too
-// — Font Awesome promotes Pro icons into the free set, and each promotion is an icon Fabricate may
-// now offer and does not. Running the generator with \`--check\` reports whether either moved
-// without writing.
-
-const ICON_ROWS = \`
-${rows}
-\`;
-
-const definitions = ICON_ROWS.split('\\n')
-  .filter((row) => row.length > 0)
-  .map((row) => {
-    const [iconCode, label, aliases] = row.split('|');
-    return Object.freeze({
-      iconCode,
-      label,
-      aliases: Object.freeze(aliases === undefined ? [] : aliases.split(',')),
-    });
-  });
-
-/**
- * Every icon Foundry's bundled Font Awesome can render under a name Font Awesome publishes for
- * free, brands excluded.
- *
- * Frozen ENTRY BY ENTRY, not just as an array: \`Object.freeze\` is shallow, and the curated
- * vocabulary is a filter of this array, so an unfrozen entry would hand any caller a writable
- * handle on a row every Fabricate picker renders from.
- *
- * @type {ReadonlyArray<{ iconCode: string, label: string, aliases: ReadonlyArray<string> }>}
- */
-export const FOUNDRY_ICON_DEFINITIONS = Object.freeze(definitions);
-
-/** The Font Awesome release Foundry bundles, which this catalogue was measured from. */
-export const FOUNDRY_ICON_BUNDLE_RELEASE = Object.freeze({
-  edition: '${release.edition}',
-  version: ${release.version === null ? 'null' : `'${release.version}'`},
-  foundryVersion: '${measurements.foundryVersion}',
-});
-
-/**
- * The free release whose names this catalogue was narrowed to.
- *
- * Recorded rather than inferred so the licensing guard can say WHICH free set the committed names
- * were checked against, and fail when the pinned devDependency moves away from it.
- */
-export const FOUNDRY_ICON_FREE_INTERSECTION = Object.freeze({
-  edition: '${freeRelease.edition}',
-  version: '${freeRelease.version}',
-});
-`;
+export function renderCatalogueJson({ release, freeRelease, definitions, measurements }) {
+  const catalogue = {
+    bundleRelease: {
+      edition: release.edition,
+      version: release.version ?? null,
+      foundryVersion: measurements.foundryVersion,
+    },
+    freeIntersection: { edition: freeRelease.edition, version: freeRelease.version },
+    rows: definitions.map((definition) => renderCatalogueRow(definition)),
+  };
+  return `${JSON.stringify(catalogue, null, 2)}\n`;
 }
 
 function readFoundryVersion(bundleRoot) {
@@ -364,7 +235,7 @@ function resolveBundle(argument) {
   return { bundleRoot, stylesheet, webfonts: path.join(bundleRoot, 'webfonts') };
 }
 
-/** Everything the emitted module reports about the bundle it was measured from. */
+/** Everything the generator reports about the bundle it measured. */
 function measureBundle({ foundryVersion, rules, definitions, offered, brandCodepoints, classic }) {
   return {
     foundryVersion,
@@ -426,7 +297,7 @@ function main() {
     classic: classicCodepoints,
   });
 
-  const rendered = renderCatalogueModule({
+  const rendered = renderCatalogueJson({
     release,
     freeRelease,
     definitions: offered,

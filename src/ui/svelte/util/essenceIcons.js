@@ -129,9 +129,10 @@ const PREFIX_ALIASES = Object.freeze({
  * A key here must name something the vocabulary can actually offer, which the drift guard in
  * `tests/essenceIconCompatibility.test.js` enforces. That bites hardest on the fantasy staples:
  * Font Awesome Free publishes no `sword`, `axe`, `dagger`, `mace`, `bow`, `castle`, `chest`,
- * `crystal` or singular `coin` glyph, and Fabricate may reference only Free names (see the
- * licensing note in `foundryIconCatalogue.js`), so those keys had nothing left to hang on and are
- * gone rather than left as dead weight. `coins` survives and still carries money and treasure.
+ * `crystal` or singular `coin` glyph, and Fabricate may reference only Free names (see
+ * `openspec/specs/ui-integration/spec.md`, `#### Icon vocabulary`), so those keys had nothing left
+ * to hang on and are gone rather than left as dead weight. `coins` survives and still carries
+ * money and treasure.
  * `bag` went for a different reason: `bag-shopping` is the only Free member and curation excludes
  * it as modern shopping. If Font Awesome promotes any of them into the free set, the key comes
  * back with the glyph.

@@ -64,7 +64,8 @@ It mutates repository secrets in two repositories, so it stays a deliberate loca
 
 ## Icon catalogue
 
-`generate-icon-catalogue.mjs` regenerates `src/ui/svelte/util/foundryIconCatalogue.js` from the Font Awesome bundle a Foundry install ships.
+`generate-icon-catalogue.mjs` regenerates `src/ui/svelte/util/foundryIconCatalogue.json` from the Font Awesome bundle a Foundry install ships.
+`src/ui/svelte/util/foundryIconCatalogue.js` is a loader over that JSON and is hand-maintained.
 
 ```bash
 node scripts/generate-icon-catalogue.mjs   "C:/Program Files/Foundry Virtual Tabletop/resources/app/public/fonts/fontawesome"

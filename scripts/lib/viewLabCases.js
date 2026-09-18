@@ -1666,7 +1666,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       // The expression field this screen is now the only caller of (issue 1373).
       /^src\/ui\/svelte\/apps\/manager\/RollDataExpressionInput\.svelte$/,
       // The icon vocabulary the shared picker lists (issue 1269).
-      /^src\/ui\/svelte\/util\/(?:essenceIcons|foundryIconVocabulary|foundryIconCatalogue)\.js$/,
+      /^src\/ui\/svelte\/util\/(?:essenceIcons|foundryIconVocabulary|foundryIconCatalogue)\.(?:js|json)$/,
       // The positioning seam the open picker's panel is placed by (issue 1500).
       ...ANCHORED_POPOVER_SOURCES,
     ],
