@@ -8,7 +8,7 @@ import { chromium } from 'playwright';
 import { compile } from 'svelte/compiler';
 
 // The frame's lifted view-state factory, so the paged mount below states the SHIPPED shape.
-import { createScopedListBrowserState } from '../../src/utils/managerBrowserViewState.js';
+import { createScopedListBrowserState } from '../../src/ui/model/managerBrowserViewState.js';
 import {
   COMPONENT_SYSTEMS,
   componentScopeFor,

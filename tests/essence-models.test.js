@@ -16,25 +16,25 @@ import {
   setBulkEssenceIcon,
   setBulkEssenceStatus,
   toBulkEssenceEdit,
-} from '../src/utils/essenceBulkEditModel.js';
+} from '../src/ui/model/essenceBulkEditModel.js';
 import {
   buildEssenceBrowserModel,
   createEssenceBrowserState,
   essenceStatusCounts,
   filterEssences,
   sortEssences,
-} from '../src/utils/essenceBrowserModel.js';
+} from '../src/ui/model/essenceBrowserModel.js';
 import {
   essenceEditorValidation,
   selectableEssenceOptions,
-} from '../src/utils/essenceValidation.js';
+} from '../src/ui/model/essenceValidation.js';
 import { recipeReferencesEssence } from '../src/utils/recipeEssenceReferences.js';
 import { makeEssenceRow } from './helpers/makeEssenceRow.js';
 import {
   RECIPE_BULK_STATUS_VALUES,
   setBulkRecipeStatus,
   toBulkRecipeEdit,
-} from '../src/utils/recipeBulkEditModel.js';
+} from '../src/ui/model/recipeBulkEditModel.js';
 
 // Criterion 10 — the bulk-edit projection is PRESENCE-gated, over all eight combinations
 

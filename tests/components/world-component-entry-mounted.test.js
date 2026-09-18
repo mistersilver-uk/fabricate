@@ -32,7 +32,7 @@ const harness = createComponentScopeHarness({
     'src/ui/svelte/util/dropUtils.js',
     'src/ui/svelte/apps/manager/scoped/scopedEntryDraft.js',
     // The issue-1036 essence offer projection the `Essence contribution` card applies (M31).
-    'src/utils/essenceValidation.js',
+    'src/ui/model/essenceValidation.js',
   ],
   compiledExtras: [
     // THE ENTRY'S OWN THREE CHILDREN (issue 1371, parity round 4). Each is imported STATICALLY by

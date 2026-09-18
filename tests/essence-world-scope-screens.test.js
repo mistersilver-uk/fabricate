@@ -35,7 +35,7 @@ import {
 import {
   ESSENCE_VALIDATION_CHECKS,
   essenceEditorValidation,
-} from '../src/utils/essenceValidation.js';
+} from '../src/ui/model/essenceValidation.js';
 import { essenceValidationPresentation } from '../src/ui/svelte/apps/manager/essences/essenceStudio.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -113,8 +113,8 @@ describe('requirement 7 correction — the reopened gateway grew a seam, not a d
     assert.deepEqual(
       specifiers.filter((specifier) => /essence/i.test(specifier)).sort(),
       [
-        '../../../../utils/essenceBrowserModel.js',
-        '../../../../utils/essenceBulkEditModel.js',
+        '../../../model/essenceBrowserModel.js',
+        '../../../model/essenceBulkEditModel.js',
         './EssenceBrowserView.svelte',
         './EssenceEditView.svelte',
         './essences/EssenceBehaviorPreview.svelte',

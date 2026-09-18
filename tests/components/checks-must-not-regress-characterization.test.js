@@ -28,7 +28,7 @@ const harness = createMountedComponentHarness({
     ...CHECKS_TREE_RAW_MODULES,
     'src/ui/svelte/actions/dragDrop.js',
     'src/ui/svelte/util/dropUtils.js',
-    'src/utils/macroReference.js',
+    'src/ui/model/macroReference.js',
   ],
   compiledModules: [
     ...CHECKS_TREE_COMPILED_MODULES,

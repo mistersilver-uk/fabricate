@@ -1,6 +1,6 @@
 /**
  * Issue 1010 — the recipe browser's pure bulk staging model. Everything the recipe bulk edit can be
- * reasoned about without a DOM lives in `src/utils/recipeBulkEditModel.js`; the Svelte surfaces are
+ * reasoned about without a DOM lives in `src/ui/model/recipeBulkEditModel.js`; the Svelte surfaces are
  * wiring.
  */
 import assert from 'node:assert/strict';
@@ -8,7 +8,7 @@ import { describe, it } from 'node:test';
 
 import { resolveActiveCraftingCheckFormula } from '../src/systems/checkModifierResolver.js';
 import * as sharedSelection from '../src/utils/bulkSelectionModel.js';
-import { createRecipeBrowserState } from '../src/utils/recipeBrowserModel.js';
+import { createRecipeBrowserState } from '../src/ui/model/recipeBrowserModel.js';
 import {
   RECIPE_CHECK_TIER_DEFAULT,
   RECIPE_CHECK_TIER_UNCHANGED,
@@ -29,7 +29,7 @@ import {
   setRecipeSelection,
   toBulkRecipeEdit,
   toggleRecipeSelection,
-} from '../src/utils/recipeBulkEditModel.js';
+} from '../src/ui/model/recipeBulkEditModel.js';
 
 /** The two book lists, the only part of a draft the membership cases care about. */
 const books = (draft) => ({ bookAdd: draft.bookAdd, bookRemove: draft.bookRemove });

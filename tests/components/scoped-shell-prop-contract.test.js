@@ -1032,7 +1032,7 @@ describe('componentScoped.js stays the import-free leaf its consumers assume', (
     const panel = sourceOf(`${SCOPED_DIR}/ComponentCatalogueBulkPanel.svelte`);
     assert.match(
       panel,
-      /import \{ paginateRows \} from '\.\.\/\.\.\/\.\.\/\.\.\/\.\.\/utils\/browserPagination\.js';/,
+      /import \{ paginateRows \} from '\.\.\/\.\.\/\.\.\/\.\.\/model\/browserPagination\.js';/,
       'the catalogue bulk panel holds it instead, inside the catalogue harness’s own closure'
     );
     assert.match(

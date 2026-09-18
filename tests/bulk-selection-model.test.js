@@ -17,7 +17,7 @@ import {
   pruneComponentSelection,
   setComponentSelection,
   toggleComponentSelection,
-} from '../src/utils/componentBulkEditModel.js';
+} from '../src/ui/model/componentBulkEditModel.js';
 
 describe('bulk selection model (issue 772) — describing the selection', () => {
   const describe_ = (pageIds, filteredIds, selectedIds) =>

@@ -5,7 +5,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import test from 'node:test';
 
-import { selectableEssenceOptions, visibleEssenceOptions } from '../src/utils/essenceValidation.js';
+import { selectableEssenceOptions, visibleEssenceOptions } from '../src/ui/model/essenceValidation.js';
 
 const repoRoot = resolve(import.meta.dirname, '..');
 const uiRoot = join(repoRoot, 'src/ui');

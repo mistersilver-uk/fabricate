@@ -68,7 +68,7 @@ const harness = createComponentScopeHarness({
     'src/ui/svelte/actions/dragDrop.js',
     'src/ui/svelte/util/dropUtils.js',
     'src/ui/svelte/apps/manager/scoped/scopedEntryDraft.js',
-    'src/utils/essenceValidation.js',
+    'src/ui/model/essenceValidation.js',
   ],
   compiledExtras,
 });

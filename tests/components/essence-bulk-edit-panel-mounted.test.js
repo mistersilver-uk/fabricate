@@ -17,7 +17,7 @@ import {
   SELECT_COMPILED_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
-import { createEssenceBulkDraft, toBulkEssenceEdit } from '../../src/utils/essenceBulkEditModel.js';
+import { createEssenceBulkDraft, toBulkEssenceEdit } from '../../src/ui/model/essenceBulkEditModel.js';
 import { makeEssenceRow } from '../helpers/makeEssenceRow.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -43,7 +43,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/actions/portal.js',
     'src/ui/svelte/actions/anchoredPopover.js',
     'src/ui/svelte/util/overlayBounds.js',
-    'src/utils/essenceBulkEditModel.js',
+    'src/ui/model/essenceBulkEditModel.js',
     'src/utils/bulkSelectionModel.js',
   ],
   compiledModules: [

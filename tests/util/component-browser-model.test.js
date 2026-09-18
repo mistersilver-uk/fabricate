@@ -15,8 +15,8 @@ import {
   groupComponentsByCategory,
   paginateComponents,
   sortComponents,
-} from '../../src/utils/componentBrowserModel.js';
-import { countByCategory } from '../../src/utils/browserGroupCounts.js';
+} from '../../src/ui/model/componentBrowserModel.js';
+import { countByCategory } from '../../src/ui/model/browserGroupCounts.js';
 
 const ROWS = [
   { id: 'a', name: 'Iron Ore', category: 'Metal', essences: [{ id: 'earth', name: 'Earth', quantity: 2 }] },

@@ -17,7 +17,7 @@ import {
   groupRecipesByCategory,
   paginateRecipes,
   sortRecipes
-} from '../../src/utils/recipeBrowserModel.js';
+} from '../../src/ui/model/recipeBrowserModel.js';
 import { buildInterleavedCategoryOrder } from '../helpers/interleavedCategoryLibrary.js';
 
 function makeRecipe(overrides = {}) {

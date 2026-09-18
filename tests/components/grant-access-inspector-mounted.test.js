@@ -26,7 +26,7 @@ const harness = createMountedComponentHarness({
     // #1663: the ONE implementation behind both category shims; imports nothing.
     'src/utils/categoryNormalization.js',
     // The inspector's lifted roster view-state (issue 1438).
-    'src/utils/managerBrowserViewState.js'
+    'src/ui/model/managerBrowserViewState.js'
   ],
   compiledModules: [
     'src/ui/svelte/components/Medallion.svelte',

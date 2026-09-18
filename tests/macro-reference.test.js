@@ -1,5 +1,5 @@
 /**
- * Issue 1036 — `src/utils/macroReference.js`: resolving a linked Macro for an authoring surface,
+ * Issue 1036 — `src/ui/model/macroReference.js`: resolving a linked Macro for an authoring surface,
  * and deciding whether a dropped one may be linked at all.
  */
 
@@ -11,7 +11,7 @@ const {
   MACRO_DROP_REJECTED_NOT_SCRIPT,
   evaluateMacroDrop,
   resolveMacroName,
-} = await import('../src/utils/macroReference.js');
+} = await import('../src/ui/model/macroReference.js');
 
 /** Install a `fromUuid` over a plain uuid → document map, and return a restore function. */
 function withDocuments(documents) {

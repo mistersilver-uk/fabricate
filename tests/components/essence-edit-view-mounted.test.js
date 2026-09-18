@@ -33,8 +33,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/actions/anchoredPopover.js',
     'src/ui/svelte/util/overlayBounds.js',
     'src/ui/svelte/actions/dragDrop.js',
-    'src/utils/macroReference.js',
-    'src/utils/essenceValidation.js',
+    'src/ui/model/macroReference.js',
+    'src/ui/model/essenceValidation.js',
     // RecipeItemEditor/ToolEditView/EssenceEditView resolve.
     'src/ui/svelte/apps/manager/validationFocus.js',
     // …and the announcement half beside it (issue 1517, review r1).
@@ -59,7 +59,7 @@ const harness = createMountedComponentHarness({
     // shipped counter. The harness validates this closure and names the miss, unlike the
     // hand-rolled trees elsewhere.
     'src/systems/worldVocabulary.js',
-    'src/utils/vocabularyUsage.js',
+    'src/ui/model/vocabularyUsage.js',
     'src/utils/componentCategories.js',
     // #1663: the ONE implementation behind both category shims; imports nothing.
     'src/utils/categoryNormalization.js',

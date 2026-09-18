@@ -24,7 +24,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/actions/anchoredPopover.js',
     'src/ui/svelte/util/overlayBounds.js',
     // Each vocabulary panel's lifted search term (issue 1438).
-    'src/utils/managerBrowserViewState.js',
+    'src/ui/model/managerBrowserViewState.js',
     'src/utils/scalars.js',
   ],
   compiledModules: [

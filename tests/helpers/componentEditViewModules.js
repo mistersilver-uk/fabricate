@@ -25,7 +25,7 @@ export const COMPONENT_EDIT_VIEW_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/componentEditor.js',
   // The add-new essence offer projection (issue 1036); ComponentEditView imports it to
   // withhold a disabled essence from the quantity grid.
-  'src/utils/essenceValidation.js',
+  'src/ui/model/essenceValidation.js',
   // The component category vocabulary (issue 676) is imported by ComponentEditView too, and is no
   // longer restated here: issue 1392 put it in `COMPONENT_SCOPE_LEAF_MODULES` above, because
   // `worldVocabulary.js` asks it whether a name is the general bucket and every tree spreading that
@@ -47,9 +47,9 @@ export const COMPONENT_EDIT_VIEW_RAW_MODULES = Object.freeze([
   'src/ui/svelte/util/overlayHost.js',
   // The complications section (issue 1286).
   'src/utils/componentComplications.js',
-  'src/utils/complicationSummary.js',
+  'src/ui/model/complicationSummary.js',
   'src/systems/characterPrerequisites.js',
-  'src/utils/macroReference.js',
+  'src/ui/model/macroReference.js',
   // `ItemDropZone`'s payload resolver — it covers BOTH shipped drag shapes, so the macro
   // drop and the identity strip's item drop read one implementation.
   'src/ui/svelte/util/dropUtils.js',

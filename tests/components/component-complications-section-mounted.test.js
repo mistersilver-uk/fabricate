@@ -62,8 +62,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/actions/anchoredPopover.js',
     'src/ui/svelte/util/overlayBounds.js',
     'src/utils/componentComplications.js',
-    'src/utils/complicationSummary.js',
-    'src/utils/macroReference.js',
+    'src/ui/model/complicationSummary.js',
+    'src/ui/model/macroReference.js',
     'src/systems/characterPrerequisites.js',
     // The ONE derivation of a `<Stepper>`'s three accessible names from its field label
     // (issue 1050). The roll condition's comparand reaches it (issue 1286).

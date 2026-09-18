@@ -11,7 +11,7 @@ import {
 import {
   componentScopeValidation,
   componentScopeValidationPresentation,
-} from '../../src/utils/componentScopeValidation.js';
+} from '../../src/ui/model/componentScopeValidation.js';
 import {
   componentAttributionNote,
   componentBulkEssenceCarried,
