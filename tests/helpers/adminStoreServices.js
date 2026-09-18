@@ -103,6 +103,11 @@ function dialogAccessors({ confirmations, localizations, notifications, confirm 
   };
 }
 
+/**
+ * The shared services double. `overrides` reaches the returned services object, never the managers
+ * inside it, so a suite whose items live under a key other than `system.items`, or whose write log
+ * is read positionally, composes its own manager through `overrides.getCraftingSystemManager`.
+ */
 export function createServices(system, recipes = [], capture = [], overrides = {}) {
   const { updateRecipe, settings, systemWrites, dialogCapture, ...serviceOverrides } = overrides;
   const systems = [system];

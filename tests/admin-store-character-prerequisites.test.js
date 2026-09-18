@@ -6,9 +6,9 @@ import { get } from 'svelte/store';
 import { createAdminStore } from '../src/ui/svelte/stores/adminStore.js';
 import { normalizeCharacterPrerequisiteList } from '../src/systems/characterPrerequisites.js';
 import { CharacterLibrariesStore } from '../src/systems/CharacterLibrariesStore.js';
+import { createServices as createSharedServices } from './helpers/adminStoreServices.js';
 
 function createServices({ prerequisites = [], foundrySystemId = 'dnd5e' } = {}) {
-  const store = {};
   let idSeq = 0;
   const system = {
     id: 'sys1',
@@ -33,37 +33,16 @@ function createServices({ prerequisites = [], foundrySystemId = 'dnd5e' } = {}) 
     },
     randomID: () => `mgr-${++idSeq}`,
   });
-  const systemManager = {
-    getSystems: () => [system],
-    getSystem: (id) => (id === system.id ? system : null),
-    getItems: () => system.components || system.items || [],
-    createSystem: async () => system,
-    deleteSystem: async () => {},
-    deleteItem: async () => {},
-    updateSystem: async (id, updates = {}) => {
-      if (id !== system.id) return null;
-      Object.assign(system, updates);
-      return system;
-    },
-  };
-  return {
-    getSetting: (key) => store[key] ?? null,
-    setSetting: async (key, value) => {
-      store[key] = value;
-    },
-    getCraftingSystemManager: () => systemManager,
+  return createSharedServices(system, [], [], {
+    settings: {},
+    systemWrites: [],
     getCharacterLibrariesStore: () => characterLibrariesStore,
-    getRecipeManager: () => ({ getRecipes: () => [], getRecipe: () => null }),
     getGatheringEnvironmentStore: () => ({ list: () => [], save: async () => true }),
     getFoundrySystemId: () => foundrySystemId,
-    getScriptMacros: () => [],
-    getSceneOptions: () => [],
-    notify: { info: () => {}, warn: () => {}, error: () => {} },
     confirmDialog: async () => true,
-    localize: (key) => key,
     _system: system,
     _worldSetting: worldSetting,
-  };
+  });
 }
 
 async function storeFor(overrides) {

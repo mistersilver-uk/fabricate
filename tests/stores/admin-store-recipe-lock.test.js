@@ -36,8 +36,6 @@ function makeRecipe(overrides = {}) {
 }
 
 function createServices({ recipes, system = {}, updateRecipe, notify }) {
-  // The shared factory, with this suite's only two departures from it stated
-  // explicitly rather than re-listing the other twelve fields.
   return createSharedServices(
     makeSystem({ visibilityMode: undefined, craftingCheck: {}, ...system }),
     recipes,
