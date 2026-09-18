@@ -50,7 +50,12 @@ const SHIPPED_COMPONENT_NAMES = new Set(
   SHIPPED_COMPONENT_PATHS.map((file) => path.basename(file, '.svelte'))
 );
 
-/** The directory `AGENTS.md` and `spec.md` both name when they prohibit an unrecorded primitive. */
+/**
+ * The directory `AGENTS.md` and `spec.md` both name when they prohibit an unrecorded primitive.
+ *
+ * Its `startsWith` test decides only where a manifest row is compulsory (issue 1481 item 2); a
+ * component in a nested `apps/manager` directory may hold a row and is not compelled to.
+ */
 const PRIMITIVE_DIRECTORY = 'src/ui/svelte/components/';
 
 test('the corpus every property below quantifies over is alive', () => {
