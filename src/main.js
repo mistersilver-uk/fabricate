@@ -3060,6 +3060,9 @@ class Fabricate {
       actor: selectedActor,
       executeCommand: (command, commandOptions) =>
         this.executeJournalRunCommand(command, commandOptions),
+      // The gathering screen's `interactive: true` reaches the execute, so a required check still
+      // opens its roll dialog; a macro's omitted flag stays the silent route (issue 1780).
+      interactive: withRememberedActor.interactive === true,
     });
   }
 

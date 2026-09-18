@@ -1,7 +1,7 @@
 src/canvas/InteractableManager.js	901
 src/canvas/InteractableManager.js::_spawnInteractableRegion	107
 src/canvas/interactableResolution.js::buildRegionSpawnRequest	109
-src/main.js	4682
+src/main.js	4685
 src/main.js::Hooks.once#2	208
 src/main.js::_runMigrations	145
 src/main.js::bindFabricateGlobal	136
@@ -101,8 +101,8 @@ src/systems/journalRunAuthority.js::createFoundryJournalRunAuthority	171
 src/systems/journalRunAuthority.js::createJournalRunAuthority	597
 src/systems/journalRunAuthority.js::createJournalRunAuthority>run	129
 src/systems/journalRunAuthority.js::createJournalRunAuthority>run>queue	127
-src/systems/journalRunCommands.js	1085
-src/systems/journalRunCommands.js::createJournalRunCommandService	411
+src/systems/journalRunCommands.js	1100
+src/systems/journalRunCommands.js::createJournalRunCommandService	412
 src/systems/journalRunCommands.js::createJournalRunCommandService>executeOperation	179
 src/systems/scopedDefinitionStore.js	888
 src/systems/systemValidation.js::collectSystemBlockers	180

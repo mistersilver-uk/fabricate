@@ -176,7 +176,9 @@ function installEngineAuthority(engine, authority) {
  * @param {object[]} options.sourceActors Resolved material-source Actor documents.
  * @param {object} options.recipe Resolved Recipe.
  * @param {string|null} [options.ingredientSetId]
- * @param {object} [options.options] Run ID and explicit ingredient/essence choices.
+ * @param {object} [options.options] Run ID, explicit ingredient/essence choices, and the
+ *   `interactive` flag: `true` from the crafting UI opens the roll dialog for a required check,
+ *   absent or `false` (the public API's default) settles it on the engine's own defaults.
  * @param {Function} [options.executeCommand] Authoritative command client.
  * @param {Function} [options.resolveUuid] Optional created-result document resolver.
  * @returns {Promise<object>} Start/wait, execution or refusal result, with resolved results when available.
@@ -237,8 +239,12 @@ export async function executePublicCraft({
         sourceActorUuids: actorUuidList(sourceActors),
       },
     },
-    // The public API never opens a roll dialog: it has no user to answer one.
-    { interactive: false }
+    // The caller's flag, not a constant (issue 1780). The crafting UI passes `interactive: true`
+    // and expects the roll dialog; a macro omits it and `craftRecipe` defaults it to false, which
+    // is the non-interactive route issue 1683 added so the API never waits on a prompt nobody
+    // answers. Hard-coding `false` here silenced the player app's prompt the moment `main.js`
+    // started forwarding these options.
+    { interactive: options?.interactive === true }
   );
   if (!Array.isArray(settled?.createdResultUuids) || typeof resolveUuid !== 'function') {
     return settled;
@@ -281,10 +287,17 @@ export async function executePublicCraft({
  * @param {Function} options.requestStart Bound versioned start, already viewer-scoped.
  * @param {object} options.actor Resolved Actor document, not an id or UUID string.
  * @param {Function} [options.executeCommand] Authoritative command client.
+ * @param {boolean} [options.interactive] The caller's flag: `true` from the gathering screen
+ *   opens the roll dialog for a required check, `false` (the public API's default) settles it.
  * @returns {Promise<object>} The start result for a waiting or refused attempt, else the start
  *   result with its execution outcome applied over it.
  */
-export async function executePublicGather({ requestStart, actor, executeCommand = null } = {}) {
+export async function executePublicGather({
+  requestStart,
+  actor,
+  executeCommand = null,
+  interactive = false,
+} = {}) {
   if (typeof requestStart !== 'function') return operationUnavailable();
   const started = await requestStart();
   if (started?.accepted !== true) return started;
@@ -313,8 +326,9 @@ export async function executePublicGather({ requestStart, actor, executeCommand 
       action: 'execute',
       payload: { trigger: 'manual' },
     },
-    // The public API never opens a roll dialog: it has no user to answer one.
-    { interactive: false }
+    // The caller's flag, for the reason `executePublicCraft` gives (issue 1780): the gathering
+    // screen passes `interactive: true` and expects its roll dialog.
+    { interactive: interactive === true }
   );
   return { ...started, ...settled };
 }
@@ -1002,11 +1016,12 @@ export function createJournalRunCommandService({
   /**
    * Run one Journal command, resolving a required check on the way.
    *
-   * `interactive` is the CALLER'S, and it is false for the public API by contract: a macro or a
-   * script has no one to answer a dialog, and `promptCheck` awaits a human with no timeout of its
-   * own -- `sendCommand` has one, the prompt does not. A non-interactive caller therefore settles
-   * the check with the engine's own defaults instead of opening it, which is the same route a
-   * player takes after answering (issue 1683).
+   * `interactive` is the CALLER'S. The Journal and the crafting and gathering screens pass
+   * `true`; the public API defaults it to `false` because a macro or a script has no one to
+   * answer a dialog, and `promptCheck` awaits a human with no timeout of its own -- `sendCommand`
+   * has one, the prompt does not. A non-interactive caller therefore settles the check with the
+   * engine's own defaults instead of opening it, which is the same route a player takes after
+   * answering (issue 1683).
    */
   async function executeJournalRunCommand(command, { interactive = true } = {}) {
     const first = await sendCommand(command);
