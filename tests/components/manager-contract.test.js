@@ -194,18 +194,6 @@ const worldToolEntrySource = readFileSync(
   'utf8'
 );
 const appSource = readFileSync(appPath, 'utf8');
-const hostSource = readFileSync(
-  resolve(repoRoot, 'src/ui/svelte/apps/manager/downtime/WorldDowntimeExtensionHost.svelte'),
-  'utf8'
-);
-const managerExtensionsSource = readFileSync(
-  resolve(repoRoot, 'src/ui/managerExtensions.js'),
-  'utf8'
-);
-const previewProviderSource = readFileSync(
-  resolve(repoRoot, 'src/ui/svelte/apps/manager/downtime/worldDowntimePreviewProvider.js'),
-  'utf8'
-);
 const lang = JSON.parse(readFileSync(langPath, 'utf8'));
 
 const managerSource = [
