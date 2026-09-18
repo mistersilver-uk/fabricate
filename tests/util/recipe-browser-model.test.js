@@ -517,6 +517,12 @@ describe('recipeBrowserModel — active-filter chips', () => {
       ]
     );
   });
+
+  it('makes no chip for a non-string search term, so the affordance matches what the toolbar holds', () => {
+    assert.deepEqual(describeActiveFilters({ search: 42 }), []);
+    assert.deepEqual(describeActiveFilters({ search: ['a'] }), []);
+    assert.deepEqual(describeActiveFilters({ search: '  ore  ' }), [{ id: 'search', value: 'ore' }]);
+  });
 });
 
 describe('recipeBrowserModel — the whole pipeline', () => {

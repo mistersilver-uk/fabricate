@@ -490,8 +490,8 @@ describe('1036 — essenceBrowserModel', () => {
     assert.deepEqual(describeActiveEssenceFilters(), []);
   });
 
-  it('charts the RAW filter value, because a chip the GM cannot see is a filter they cannot clear', () => {
-    // The allowed lists coerce the FILTER to `all`; the chip still reports what the state holds.
+  it('charts the raw filter value, because a chip the GM cannot see is a filter they cannot clear', () => {
+    // The allowed lists coerce the filter to `all`; the chip still reports what the state holds.
     assert.equal(filterEssences(ROWS, { status: 'sideways' }).length, ROWS.length);
     assert.deepEqual(describeActiveEssenceFilters({ status: 'sideways' }), [
       { id: 'status', value: 'sideways' },

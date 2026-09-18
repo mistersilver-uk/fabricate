@@ -24,7 +24,9 @@ export const COMPONENT_SORT_KEYS = Object.freeze([
   'salvage',
 ]);
 
-/** The essence filter's two predicate values, offered ahead of the per-essence entries (issue 1371). */
+/**
+ * The essence filter's two predicate values, offered ahead of the per-essence entries (issue 1371).
+ */
 export const COMPONENT_ESSENCE_FILTER_ANY = '__any';
 export const COMPONENT_ESSENCE_FILTER_NONE = '__none';
 

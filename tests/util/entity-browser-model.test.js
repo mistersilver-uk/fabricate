@@ -106,8 +106,8 @@ describe('entity browser model — filtering (issue 1688)', () => {
   it('coerces an unrecognised value to `all` on an axis with an allowed list, and not otherwise', () => {
     assert.equal(filterEntities(ROWS, { grade: 'bogus' }, PLAIN).length, ROWS.length);
     assert.deepEqual(names(filterEntities(ROWS, { grade: 'fine' }, PLAIN)), ['Anvil', 'Crucible']);
-    // `state` has no allowed list, so an unknown value reaches the predicate and matches nothing.
-    assert.equal(filterEntities(ROWS, { state: 'bogus' }, PLAIN).length, ROWS.length);
+    // `kind` has no allowed list, so an unknown value reaches the predicate and matches nothing.
+    assert.equal(filterEntities(ROWS, { kind: 'bogus' }, PLAIN).length, 0);
   });
 
   it('answers an empty list for rows that are not an array', () => {
@@ -130,6 +130,14 @@ describe('entity browser model — sorting (issue 1688)', () => {
       names(sortEntities(ROWS, { key: 'name', direction: 'desc' }, PLAIN)),
       ['Ember', 'Crucible', 'Bellows', 'Anvil', 'Alembic']
     );
+    // The fallback is the whole comparator, direction included, not just the sort value.
+    assert.deepEqual(names(sortEntities(ROWS, { key: 'bogus', direction: 'desc' }, PLAIN)), [
+      'Ember',
+      'Crucible',
+      'Bellows',
+      'Anvil',
+      'Alembic',
+    ]);
   });
 
   it('breaks a tie on the sort value by ascending name, in both directions', () => {

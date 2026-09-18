@@ -352,15 +352,15 @@ describe('component browser model — the assembled model (issue 1688)', () => {
     { id: 'm', name: 'Mud' },
   ];
 
-  it('holds `filtered` UNSORTED and `sorted` as the whole ordered cohort', () => {
+  it('holds `filtered` unsorted and `sorted` as the whole ordered cohort', () => {
     const model = buildComponentBrowserModel(MIXED, { sortKey: 'name', pageSize: 2 });
     assert.deepEqual(names(model.filtered), ['Zinc Ingot', 'Amber', 'Mud'], 'input order kept');
     assert.deepEqual(names(model.sorted), ['Amber', 'Mud', 'Zinc Ingot']);
-    // `sorted` is the WHOLE cohort, not the page: the view slices its own window out of it.
+    // `sorted` is the whole cohort, not the page: the view slices its own window out of it.
     assert.deepEqual(names(model.page), ['Amber', 'Mud']);
   });
 
-  it('emits NO groups when grouping is off, because the view groups its own window', () => {
+  it('emits no groups when grouping is off, because the view groups its own window', () => {
     assert.deepEqual(buildComponentBrowserModel(MIXED, { groupByCategory: false }).groups, []);
     assert.deepEqual(
       buildComponentBrowserModel(MIXED, { groupByCategory: true }).groups.map(

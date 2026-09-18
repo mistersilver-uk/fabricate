@@ -60,8 +60,8 @@ function numeric(value) {
 
 /**
  * How the essence library shapes the shared pipeline. It has no category, so it never groups, and
- * both axes carry an allowed list: an uncoerced `source` would read as `needs-attention` and reject
- * every row. The lists coerce the filter and not the chips, which report the raw values.
+ * both axes carry an allowed list: an uncoerced `source` would read as `needs-attention` and hide
+ * every healthy row. The lists coerce the filter and not the chips, which report the raw values.
  */
 const ESSENCE_ADAPTER = Object.freeze({
   rowsKey: 'essences',
