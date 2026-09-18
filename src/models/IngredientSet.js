@@ -1,11 +1,19 @@
 import { getFabricateFlag } from '../config/flags.js';
-// `itemStackQuantity.js` never touches `game`, `ui`, `Hooks` or `CONFIG` — it receives
-// the configured path by push — so importing it here does NOT break the ingredient
-// model's Foundry-free contract (`openspec/specs/data-models/spec.md:1328`).
-import { readStackQuantity } from '../systems/itemStackQuantity.js';
 import { clampAllocation, deliveredEssences, greedyAllocate } from '../utils/essenceAllocation.js';
 
 import { IngredientGroup } from './IngredientGroup.js';
+import {
+  INGREDIENT_SEARCH_NODE_CAP,
+  buildItemPlanForOption,
+  candidateStacksWithAvailability,
+  chargeNode,
+  commitItemPlan,
+  enumerateUnitPlans,
+  itemKeyOf,
+  planSignature,
+  seedRemaining,
+  undoLedger,
+} from './ingredientLedger.js';
 import { getMatchHandler } from './match/matchTypes.js';
 import {
   isEmptyArray,
@@ -27,13 +35,8 @@ export const INGREDIENT_SET_OMITTED_WHEN_DEFAULT = {
   resultGroupId: isNull,
 };
 
-/** Node/subset budget for the item-level backtracking assignment search (issue 663). */
-export const INGREDIENT_SEARCH_NODE_CAP = 200_000;
-
-/**
- * The SCAN context: everything the candidate generators read that is neither the option being
- * considered nor the group it belongs to.
- */
+// Re-exported so callers of the model keep reading the cap from it while the ledger owns the value.
+export { INGREDIENT_SEARCH_NODE_CAP } from './ingredientLedger.js';
 
 /**
  * A union-find (disjoint-set) forest over `size` vertices, with path compression and a
@@ -260,20 +263,6 @@ export class IngredientSet {
   }
 
   /**
-   * Build the initial remaining-quantity ledger (item key -> available units), shared by the search
-   * and the greedy pass.
-   */
-  _initialRemaining(availableItems) {
-    const remaining = new Map();
-    for (const item of availableItems) {
-      // BLOCKING routing site (issue 1024): this ledger is what the whole consumption plan is
-      // computed from.
-      remaining.set(this._itemKey(item), readStackQuantity(item));
-    }
-    return remaining;
-  }
-
-  /**
    * The author-order greedy resolution (the pre-issue-663 behaviour), retained as the deterministic
    * `missingGroups` source and the bounded-search safeguard fallback.
    */
@@ -285,7 +274,7 @@ export class IngredientSet {
       // The greedy pass is a {@link SCAN} too, so the candidate generators read one shape whichever
       // resolution stage is driving them.
       index: ctx.index ?? null,
-      remaining: this._initialRemaining(availableItems),
+      remaining: seedRemaining(availableItems),
       plan: [],
       currencySpends: [],
     };
@@ -294,7 +283,7 @@ export class IngredientSet {
 
     const members = outcomes.filter((outcome) => outcome.member).map((outcome) => outcome.member);
     const block = this._resolveEssenceBlock(members, availableItems, pass.remaining, ctx);
-    this._commitItemPlan(block.plan, pass.plan, pass.remaining);
+    commitItemPlan(block.plan, pass.plan, pass.remaining);
 
     const { selectedIngredients, missingGroups } = this._collectGreedyOutcomes(outcomes, block);
     return {
@@ -342,13 +331,13 @@ export class IngredientSet {
     if (option?.match?.type === 'essence') {
       return { member: this._essenceMember(group, option) };
     }
-    const candidate = this._buildPlanForIngredient(option, override.heldItemId, pass);
+    const candidate = buildItemPlanForOption(option, override.heldItemId, pass);
     if (!candidate.ok) {
       return {
         missing: { group, ingredient: option, have: candidate.have, need: option.quantity },
       };
     }
-    this._commitItemPlan(candidate.plan, pass.plan, pass.remaining);
+    commitItemPlan(candidate.plan, pass.plan, pass.remaining);
     return { option };
   }
 
@@ -359,9 +348,9 @@ export class IngredientSet {
     for (const option of options) {
       if (option?.match?.type === 'currency') continue;
       if (option?.match?.type === 'essence') return { member: this._essenceMember(group, option) };
-      const candidate = this._buildPlanForIngredient(option, null, pass);
+      const candidate = buildItemPlanForOption(option, null, pass);
       if (candidate.ok) {
-        this._commitItemPlan(candidate.plan, pass.plan, pass.remaining);
+        commitItemPlan(candidate.plan, pass.plan, pass.remaining);
         return { option };
       }
       if (!bestMissing || candidate.have > bestMissing.have) {
@@ -467,7 +456,7 @@ export class IngredientSet {
         matcher ? matcher(option, item) : option.matches(item)
       );
       optionItems.set(option, matched);
-      for (const item of matched) keys.add(this._itemKey(item));
+      for (const item of matched) keys.add(itemKeyOf(item));
     }
     return keys;
   }
@@ -502,14 +491,14 @@ export class IngredientSet {
     const essenceIds = new Set(essenceOptions.map((member) => member.essenceId).filter(Boolean));
     if (essenceOptions.length === 0) return null;
 
-    const seeded = this._initialRemaining(availableItems);
+    const seeded = seedRemaining(availableItems);
     const resolveEssences = ctx?.resolveEssences;
     const carriers = [];
     const ceiling = new Map();
     const seen = new Set();
 
     for (const item of availableItems) {
-      const itemKey = this._itemKey(item);
+      const itemKey = itemKeyOf(item);
       if (seen.has(itemKey)) continue;
       seen.add(itemKey);
 
@@ -629,7 +618,7 @@ export class IngredientSet {
       ctx,
       budget,
       index: ctx.index,
-      remaining: this._initialRemaining(availableItems),
+      remaining: seedRemaining(availableItems),
       // The shared undo journal: `[key, previousValue, key, previousValue, ...]` in write order.
       journal: [],
     };
@@ -692,7 +681,7 @@ export class IngredientSet {
       const choice = this._firstGroupChoice(group, frame);
       if (!choice) return null;
       if (!choice.currency && !choice.member) {
-        this._commitItemPlan(choice.plan, [], frame.remaining);
+        commitItemPlan(choice.plan, [], frame.remaining);
       }
       return { chosen: [choice], block: null };
     }
@@ -722,7 +711,7 @@ export class IngredientSet {
     if (position >= component.groups.length) {
       return this._searchComponentTerminal(component, state, frame);
     }
-    if (this._chargeNode(budget)) return false;
+    if (chargeNode(budget)) return false;
 
     const group = this.ingredientGroups[component.groups[position]];
     for (const choice of this._groupChoices(group, frame)) {
@@ -739,18 +728,9 @@ export class IngredientSet {
     return false;
   }
 
-  /** Charge one node against the shared safeguard budget. */
-  _chargeNode(budget) {
-    if (++budget.nodes > INGREDIENT_SEARCH_NODE_CAP) {
-      budget.capHit = true;
-      return true;
-    }
-    return false;
-  }
-
   /** The terminal node of one component's traversal. */
   _searchComponentTerminal(component, state, frame) {
-    if (this._chargeNode(frame.budget)) return false;
+    if (chargeNode(frame.budget)) return false;
     return component.ownsBlock ? this._settleEssenceBlock(state, frame) : true;
   }
 
@@ -759,7 +739,7 @@ export class IngredientSet {
     if (choice.member) {
       state.essenceMembers.push(choice.member);
     } else if (!choice.currency) {
-      this._commitItemPlan(choice.plan, state.plan, frame.remaining, frame.journal);
+      commitItemPlan(choice.plan, state.plan, frame.remaining, frame.journal);
     }
   }
 
@@ -770,7 +750,7 @@ export class IngredientSet {
     } else if (!choice.currency) {
       state.plan.length -= choice.plan.length;
     }
-    this._undoLedger(frame.remaining, frame.journal, mark);
+    undoLedger(frame.remaining, frame.journal, mark);
   }
 
   /**
@@ -785,20 +765,9 @@ export class IngredientSet {
       frame.ctx
     );
     if (!block.ok) return false;
-    this._commitItemPlan(block.plan, state.plan, frame.remaining, frame.journal);
+    commitItemPlan(block.plan, state.plan, frame.remaining, frame.journal);
     state.block = block;
     return true;
-  }
-
-  /**
-   * Revert `remaining` to the state it held when the caller took `mark`, by replaying the shared
-   * undo journal backwards to that mark and truncating it.
-   */
-  _undoLedger(remaining, journal, mark) {
-    for (let index = journal.length - 2; index >= mark; index -= 2) {
-      remaining.set(journal[index], journal[index + 1]);
-    }
-    journal.length = mark;
   }
 
   /** Lazily yield the ordered candidate choices for one group against the current `remaining`. */
@@ -844,97 +813,25 @@ export class IngredientSet {
   }
 
   /**
-   * Candidate item plans for a component/tag option: the greedy front-loaded pick first (via {@link
-   * _buildPlanForIngredient}), then every distinct alternative unit-count assignment over the
-   * matching stacks that also meets `quantity`.
+   * Candidate item plans for a component/tag option: the greedy front-loaded pick first, then every
+   * distinct alternative unit-count assignment over the matching stacks that also meets `quantity`.
    */
   *_componentTagOptionChoices(option, restrictItemId, scan) {
     const { budget } = scan;
-    const greedy = this._buildPlanForIngredient(option, restrictItemId, scan);
+    const greedy = buildItemPlanForOption(option, restrictItemId, scan);
     if (!greedy.ok) return;
 
     yield { option, plan: greedy.plan, currency: null };
 
-    const seen = new Set([this._planSignature(greedy.plan)]);
-    const matchingItems = this._matchingItemsWithAvail(option, restrictItemId, scan);
-    for (const plan of this._enumerateUnitPlans(option, matchingItems, option.quantity, budget)) {
+    const seen = new Set([planSignature(greedy.plan)]);
+    const matchingItems = candidateStacksWithAvailability(option, restrictItemId, scan);
+    for (const plan of enumerateUnitPlans(option, matchingItems, option.quantity, budget)) {
       if (budget.capHit) return;
-      const signature = this._planSignature(plan);
+      const signature = planSignature(plan);
       if (seen.has(signature)) continue;
       seen.add(signature);
       yield { option, plan, currency: null };
     }
-  }
-
-  /**
-   * The matching stacks (respecting `matcher`/`restrictItemId`) with a positive remaining count, in
-   * availableItems order — the domain the unit-count enumeration draws from (mirrors {@link
-   * _buildPlanForIngredient}'s filter, with the availability snapshotted so later `remaining`
-   */
-  _matchingItemsWithAvail(option, restrictItemId, scan) {
-    const out = [];
-    for (const item of this._optionCandidates(option, restrictItemId, scan)) {
-      const avail = Number(scan.remaining.get(this._itemKey(item)) || 0);
-      if (avail > 0) out.push({ item, avail });
-    }
-    return out;
-  }
-
-  /** The stacks an option matches, in `availableItems` order. */
-  _optionCandidates(option, restrictItemId, scan) {
-    const { index, matcher, availableItems } = scan;
-    const pool =
-      index?.optionItems.get(option) ??
-      availableItems.filter((item) => (matcher ? matcher(option, item) : option.matches(item)));
-    if (!restrictItemId) return pool;
-    return pool.filter((item) => this._itemKey(item) === restrictItemId);
-  }
-
-  /**
-   * Enumerate the distinct unit-count plans over `matchingItems` consuming exactly `need` units,
-   * front-loaded (greedy) first.
-   */
-  *_enumerateUnitPlans(option, matchingItems, need, budget) {
-    yield* this._enumerateUnitPlansFrom(option, matchingItems, 0, need, [], budget);
-  }
-
-  /**
-   * Recursive helper for {@link _enumerateUnitPlans}: assign `remainingNeed` units across
-   * `matchingItems[index..]`, taking the most from the earliest stack first so the first complete
-   * plan is the front-loaded greedy pick.
-   */
-  *_enumerateUnitPlansFrom(option, matchingItems, index, remainingNeed, entries, budget) {
-    if (this._chargeNode(budget)) return;
-    if (remainingNeed === 0) {
-      yield entries.map((entry) => ({
-        item: entry.item,
-        quantity: entry.quantity,
-        ingredient: option,
-      }));
-      return;
-    }
-    if (index >= matchingItems.length) return;
-
-    const { item, avail } = matchingItems[index];
-    const maxHere = Math.min(avail, remainingNeed);
-    for (let take = maxHere; take >= 0; take -= 1) {
-      if (budget.capHit) return;
-      if (take > 0) entries.push({ item, quantity: take });
-      yield* this._enumerateUnitPlansFrom(
-        option,
-        matchingItems,
-        index + 1,
-        remainingNeed - take,
-        entries,
-        budget
-      );
-      if (take > 0) entries.pop();
-    }
-  }
-
-  /** A canonical dedup key for a candidate item plan. */
-  _planSignature(plan) {
-    return plan.map((entry) => `${this._itemKey(entry.item)}x${entry.quantity}`).join('|');
   }
 
   /**
@@ -959,61 +856,6 @@ export class IngredientSet {
     const handler = getMatchHandler(option.match);
     if (!handler.affords(option.match, { affordCurrency })) return null;
     return handler.getCurrencySpend(option.match);
-  }
-
-  /**
-   * Append a chosen option's item plan entries to the running plan and deduct their quantities from
-   * the remaining pool (shared by the default and override paths so the remaining-quantity
-   * bookkeeping stays identical).
-   */
-  _commitItemPlan(candidatePlan, plan, remaining, journal = null) {
-    for (const entry of candidatePlan) {
-      plan.push(entry);
-      const key = this._itemKey(entry.item);
-      const previous = remaining.get(key) || 0;
-      if (journal) journal.push(key, previous);
-      remaining.set(key, Math.max(0, previous - entry.quantity));
-    }
-  }
-
-  /** The greedy front-loaded item plan for one option against `scan.remaining`. */
-  _buildPlanForIngredient(ingredient, restrictItemId, scan) {
-    // A currency option is never item-satisfiable: short-circuit to not-satisfiable so the resolver
-    // never item-matches it (currency is chosen by the affordability probe in the fallback pass,
-    // not here).
-    if (ingredient?.match?.type === 'currency') {
-      return { ok: false, plan: [], have: 0 };
-    }
-
-    let neededQuantity = ingredient.quantity;
-    const optionPlan = [];
-    let totalAvailable = 0;
-
-    // The matching stacks, from the per-pass index when there is one.
-    const matchingItems = this._optionCandidates(ingredient, restrictItemId, scan);
-
-    for (const item of matchingItems) {
-      const key = this._itemKey(item);
-      const availableQty = Number(scan.remaining.get(key) || 0);
-      if (availableQty <= 0) continue;
-
-      totalAvailable += availableQty;
-      if (neededQuantity <= 0) continue;
-
-      const toConsume = Math.min(neededQuantity, availableQty);
-      optionPlan.push({
-        item,
-        quantity: toConsume,
-        ingredient,
-      });
-      neededQuantity -= toConsume;
-    }
-
-    return {
-      ok: neededQuantity <= 0,
-      plan: optionPlan,
-      have: totalAvailable,
-    };
   }
 
   /** One essence requirement's membership of the set's essence block. */
@@ -1102,7 +944,7 @@ export class IngredientSet {
     const seen = new Set();
 
     for (const item of availableItems) {
-      const itemKey = this._itemKey(item);
+      const itemKey = itemKeyOf(item);
       if (seen.has(itemKey)) continue;
       seen.add(itemKey);
 
@@ -1200,10 +1042,6 @@ export class IngredientSet {
       suggested: block.suggested,
       totals: block.delivered,
     };
-  }
-
-  _itemKey(item) {
-    return item.uuid || item.id;
   }
 
   /**
