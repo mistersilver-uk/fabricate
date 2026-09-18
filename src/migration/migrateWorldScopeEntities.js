@@ -257,7 +257,7 @@ function collectSystemReferences(system, recipes, gatheringSlice) {
 function computeFlaggedForReview(systems, recipes, gatheringConfig, worldRoster) {
   const flagged = [];
   forEachSystem(systems, (system) => {
-    const systemId = trimmedString(system?.id);
+    const systemId = trimmedString(system.id);
     if (!systemId) return;
     const ownComponents = new Set(
       arrayOf(system.components)
@@ -328,7 +328,7 @@ export function migrateWorldScopeEntities(data) {
   }
 
   forEachSystem(systems, (system) => {
-    const systemId = trimmedString(system?.id);
+    const systemId = trimmedString(system.id);
     if (!systemId) return;
     const perSystem = rekeyMap[systemId];
     if (!perSystem) return;
@@ -383,7 +383,7 @@ export function migrateWorldScopeEntities(data) {
 
   let overriddenRecords = 0;
   forEachSystem(systems, (system) => {
-    const systemId = trimmedString(system?.id);
+    const systemId = trimmedString(system.id);
     if (!systemId) return;
     for (const entityType of ENTITY_TYPES) {
       if (isRefusedPair(grouping.refusals, systemId, entityType)) continue;

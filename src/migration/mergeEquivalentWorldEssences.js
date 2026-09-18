@@ -151,7 +151,7 @@ function freezeInheritedSections(record, loserDefault, inSystemRows) {
 function indexInSystemEssences(systems) {
   const bySystem = new Map();
   forEachSystem(systems, (system) => {
-    const systemId = trimmedString(system?.id);
+    const systemId = trimmedString(system.id);
     if (!systemId) return;
     const byId = new Map();
     for (const record of arrayOf(system[ESSENCE_DEFINITIONS_FIELD])) {
@@ -253,7 +253,7 @@ export function mergeEquivalentWorldEssences(data) {
   }
 
   forEachSystem(systems, (system) => {
-    const systemId = trimmedString(system?.id);
+    const systemId = trimmedString(system.id);
     if (!systemId) return;
     const legs = perSystemLegs[systemId];
     if (!legs) return;

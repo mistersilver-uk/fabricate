@@ -146,7 +146,7 @@ test('mapSystems returns a new array and writes nothing back into the caller’s
     assert.strictEqual(
       systems[index],
       before[index],
-      'the input array must be left alone — MigrationRunner detects change by comparing it'
+      'the input array must be left alone: the caller keeps its own pre-migration array'
     );
   }
   assert.deepStrictEqual(rebuilt[0], { id: 'a', rebuilt: true }, 'the rebuild lands in the result');

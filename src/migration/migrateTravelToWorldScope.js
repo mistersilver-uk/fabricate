@@ -58,11 +58,11 @@ export function buildWorldTravelConfig(systems) {
         collisions.push({
           realmId: id,
           keptFrom: seen.get(id),
-          discardedFrom: isPlainObject(system) ? String(system.id || '') : '',
+          discardedFrom: String(system.id || ''),
         });
         continue;
       }
-      seen.set(id, isPlainObject(system) ? String(system.id || '') : '');
+      seen.set(id, String(system.id || ''));
       // `craftingSystemId` is deliberately dropped: a world realm has no owning system.
       const { craftingSystemId: _ownerDropped, ...rest } = clone(realm);
       realms.push(rest);
