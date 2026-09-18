@@ -1,6 +1,7 @@
 scripts	2657
 scripts/foundry	13
-scripts/lib	3259
+scripts/lib	1706
+scripts/lib/view-lab-cases	1646
 scripts/visual-parity	51
 scripts/visual-parity/lib	129
 src	1249

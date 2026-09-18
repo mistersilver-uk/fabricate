@@ -120,7 +120,7 @@ jobs:
           # lines and 406s beyond it, which under `bash -e` kills the step before selection runs.
           #
           # Each entry's `patch` comes along for the ride, because the selector uses it: a change
-          # confined to case-object literals in `viewLabCases.js` selects those cases instead of
+          # confined to case-object literals in `scripts/lib/view-lab-cases/` selects those cases instead of
           # surface coverage, which is the difference between a two-minute capture and a
           # four-minute one. The library never reads git itself — it is a pure function of what
           # this step hands it — and it widens back to surface coverage (one frame of every route
