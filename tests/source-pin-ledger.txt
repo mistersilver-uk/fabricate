@@ -174,7 +174,7 @@ tests/quantity-literal-gate.test.js	6
 tests/recipe-set-delete-cascade.test.js	5
 tests/recipe-visibility-service.test.js	5
 tests/run-manager-cache-invalidation.test.js	2
-tests/scalar-helper-duplicates.test.js	2
+tests/scalar-helper-duplicates.test.js	1
 tests/scoped-definition-read-and-basis.test.js	12
 tests/scoped-definitions.test.js	2
 tests/scoped-entity-list-model.test.js	8

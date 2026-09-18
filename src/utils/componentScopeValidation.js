@@ -1,9 +1,7 @@
 /**
- * The world Component entry's Validation model (issue 1371, epic 1357). Pure and FOUNDRY-FREE. The
- * check, its severity and its presentation are registered TOGETHER, because the row builder filters
- * before it maps and an unpresented check is dropped in silence. No resolution-dependent check
- * belongs here: `hasSourceLink` answers PRESENCE only. `worldCategory` and `worldTags` are warnings
- * and must not be promoted to blocking — a component with neither is a legitimate authored state.
+ * The world Component entry's Validation model. Pure and Foundry-free, with each check's severity
+ * and presentation registered beside it, because the row builder filters before it maps.
+ * `hasSourceLink` answers presence only, and `worldCategory`/`worldTags` never block.
  */
 
 import { stringOrEmpty as trimmed } from './scalars.js';
@@ -14,9 +12,8 @@ export const COMPONENT_SCOPE_VALIDATION_CHECKS = Object.freeze([
   'name',
   'worldCategory',
   'worldTags',
-  // ── THE SYSTEM-SCOPE PASS ────────────────────────────────────────────────────────────────
-  // `systemRules` is the gate: with no membership record `systemCategory` is not merely passing, it
-  // is unanswerable, so the evaluator RETURNS after `systemRules` and the later row is omitted
+  // `systemRules` gates the system-scope pass: with no membership record `systemCategory` is
+  // unanswerable, so the evaluator returns after it and omits the later row.
   'systemRules',
   'systemCategory',
 ]);
@@ -76,7 +73,6 @@ export const COMPONENT_SCOPE_VALIDATION_GROUPS = Object.freeze([
 function checkApplies(id, { systemKnown, member }) {
   if (!SYSTEM_CHECKS.includes(id)) return true;
   if (!systemKnown) return false;
-  // THE EARLY RETURN.
   if (id === 'systemRules') return true;
   return member;
 }
@@ -157,7 +153,7 @@ function checkTitle(id, check, phrase, context) {
           'FABRICATE.Admin.Manager.Scoped.Component.Validation.WorldCategorySet',
           'World category is set',
         ],
-    // THE SINGULAR IS A KEY, NOT A ROUNDING.
+    // The singular is its own key, not a rounding of the plural.
     worldTags: missing
       ? ['FABRICATE.Admin.Manager.Scoped.Component.Validation.WorldTagsMissing', 'No world tags']
       : oneOrMany(

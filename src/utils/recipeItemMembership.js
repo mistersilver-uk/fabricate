@@ -1,10 +1,7 @@
 /**
- * Which recipe item definitions CONTAIN a recipe — the ONE implementation of that rule (issue 1155),
- * replacing five copies that had already drifted. Membership is canonically the definition's
- * `recipeIds[]`; the recipe's legacy scalar resolves it only while `membershipResolvesByRecipeIds`
- * is unset, and that marker is a PARAMETER, never inferred from the arrays (issue 1011). A PRESENT
- * `recipeItemId` never falls through to the uuid leg. A LEAF but for `scalars.js`: the `recipeIds[]`
- * lookup is injected so `definitionIndex.js` can serve it, while the rule itself never is.
+ * Which recipe item definitions contain a recipe. Membership is the definition's `recipeIds[]`; the
+ * recipe's legacy scalar resolves it only while `membershipResolvesByRecipeIds` is unset, and that
+ * marker is a parameter, never inferred. A present `recipeItemId` never reaches the uuid leg.
  */
 
 import { stringOrEmpty as trimmed } from './scalars.js';
@@ -52,9 +49,8 @@ export function recipeItemDefinitionsContaining(
   const recipeId = trimmed(recipe?.id);
   if (!recipeId) return [];
 
-  // The caller's OWN array, never a filtered copy: `getDefinitionIndex` caches by array identity,
-  // so handing an index-backed lookup a fresh array per call would rebuild the whole index on every
-  // access check — the exact per-check cost issue 1076 removed.
+  // The caller's own array, never a filtered copy: `getDefinitionIndex` caches by array identity,
+  // so a fresh array per call would rebuild the whole index on every access check.
   const defs = toArray(definitions);
   const byRecipeId = lookups.byRecipeId ?? DEFAULT_LOOKUPS.byRecipeId;
   const byMembership = toArray(byRecipeId(defs, recipeId));

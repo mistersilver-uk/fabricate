@@ -1,10 +1,7 @@
 /**
- * What deleting a set of recipes reaches, and the leaves BOTH the statement and the write count
- * through (issue 1132) — the agreement is structural, not asserted. Two recipe-item numbers that
- * legitimately differ: `affectedIds` (what will no longer CONTAIN these recipes, the figure the GM
- * sees) and `prunes` (the `recipeIds[]` arrays the write rewrites, empty under the legacy basis as
- * a theorem of marker inference rather than by branching on it). A LEAF on purpose: a store the
- * mounted Svelte suites pull in imports it, so its own imports are held to zero-cost modules.
+ * What deleting a set of recipes reaches, counted once for both the statement and the write. Two
+ * recipe-item numbers differ by design: `affectedIds` is what stops containing these recipes, and
+ * `prunes` is the `recipeIds[]` arrays the write rewrites. A leaf: its imports stay zero-cost.
  */
 import { getFabricateFlag } from '../config/flags.js';
 import { readLearnedRecipeEntries } from '../systems/recipeKeyedFlagEntries.js';
@@ -61,10 +58,7 @@ export function planRecipeItemMembershipPrune(definitions, recipes, membershipRe
   return { affectedIds: [...affected], prunes };
 }
 
-/**
- * Build the `recipeId -> Set(actorId)` learned-knowledge index for the actors THIS client may write
- * (issue 970).
- */
+/** The `recipeId -> Set(actorId)` learned-knowledge index, over the actors this client may write. */
 export function buildLearnedRecipeActorIndex(actors) {
   const index = new Map();
   const raw = Array.isArray(actors?.contents) ? actors.contents : actors;
@@ -93,11 +87,7 @@ export function selectLearnerActorIds(learnerIndex, recipeIds) {
   return [...union];
 }
 
-/**
- * What a delete of the selected recipes would actually do — the impact statement the bulk panel
- * renders BEFORE the GM arms the control, and the same arithmetic the singular confirmation dialog
- * reports.
- */
+/** What a delete would do: the impact the bulk panel states before the arm, and the dialog's own. */
 export function describeRecipeDeleteImpact(recipeIds, context = {}) {
   const requested = new Set([...(recipeIds || [])].map((id) => trimmed(id)).filter(Boolean));
   if (requested.size === 0)

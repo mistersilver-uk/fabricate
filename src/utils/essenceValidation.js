@@ -9,10 +9,7 @@ export function selectableEssenceOptions(essenceOptions) {
   );
 }
 
-/**
- * What an essence-editing surface RENDERS: everything {@link selectableEssenceOptions} offers, plus
- * everything the caller says is already in play.
- */
+/** What a surface renders: every selectable option, plus whatever the caller says is in play. */
 export function visibleEssenceOptions(essenceOptions, isRetained = () => false) {
   const options = Array.isArray(essenceOptions) ? essenceOptions : [];
   const offered = new Set(selectableEssenceOptions(options).map((option) => option?.id));
@@ -28,13 +25,11 @@ export const ESSENCE_VALIDATION_CHECKS = Object.freeze([
   'macro',
   'source',
   'usage',
-  // ── THE WORLD-SCOPE PASS (issue 1372) ──────────────────────────────────────────────────── Three
-  // checks over the WORLD DEFAULTS, which exist only on the world entry editor.
+  // The world-scope pass: three checks over the world defaults, which only the world entry has.
   'worldEffectSource',
   'worldMacro',
   'worldUsage',
-  // ── THE SYSTEM-SCOPE PASS (issue 1372) ─────────────────────────────────────────────────── Five
-  // checks about THIS system's membership record.
+  // The system-scope pass: five checks over this system's membership record.
   'systemRules',
   'systemEnabled',
   'systemEffectSource',
