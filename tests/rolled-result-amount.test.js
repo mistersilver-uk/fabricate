@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { seededRollClass } from './helpers/seededRoll.js';
+import { hasRollDataPath, maximisedTotal } from '../src/utils/rollFormulaRollability.js';
 
 globalThis.foundry = { utils: { randomID: () => 'rid' } };
 
@@ -36,13 +37,55 @@ test('1645: an empty or whitespace formula reads back as absent, and a real one 
 });
 
 test('1645: validate({ Roll }) accepts a rollable formula and one that depends on the actor', () => {
-  const { Roll } = seededRollClass({ maxima: { '1d4+1': 5, '0 + 1d2': 2, '0': 0 } });
+  const { Roll, calls } = seededRollClass({
+    maxima: {
+      '1d4+1': 5,
+      '@abilities.str.mod + 1d2': 2,
+      '@abilities.str.mod': 0,
+      '@scale.rogue.sneak-attack + 1d4': 4,
+    },
+  });
   assert.deepEqual(fixed({ quantityFormula: '1d4+1' }).validate({ Roll }).errors, []);
   const actorDependent = fixed({ quantityFormula: '@abilities.str.mod + 1d2' });
-  assert.deepEqual(actorDependent.validate({ Roll }).errors, [], 'paths neutralised to 0 first');
+  assert.deepEqual(actorDependent.validate({ Roll }).errors, [], 'a path-bearing formula parses');
   const wholly = fixed({ quantityFormula: '@abilities.str.mod' });
   assert.deepEqual(wholly.validate({ Roll }).errors, [], 'a maximum of 0 is undecidable, not wrong');
   assert.deepEqual(fixed().validate({ Roll }).errors, [], 'a fixed result is unaffected');
+  // A hyphen inside a path is core's own pattern, and a formula cut at one leaves a `StringTerm`
+  // that throws under evaluation — which reported a valid recipe as unrollable and blocked crafting.
+  const hyphenated = fixed({ quantityFormula: '@scale.rogue.sneak-attack + 1d4' });
+  assert.deepEqual(hyphenated.validate({ Roll }).errors, [], 'a hyphenated path is one path');
+  assert.deepEqual(
+    calls.map((call) => call.formula),
+    [
+      '1d4+1',
+      '@abilities.str.mod + 1d2',
+      '@abilities.str.mod',
+      '@scale.rogue.sneak-attack + 1d4',
+    ],
+    'every formula reaches `Roll` verbatim, because `Roll.parse` substitutes the references'
+  );
+});
+
+test('1645: a roll-data path is recognised in both of the forms core substitutes', () => {
+  for (const formula of [
+    '@abilities.str.mod + 1',
+    '@scale.rogue.sneak-attack + 1d4',
+    '@{abilities.str.mod} + 1',
+    '@{scale.rogue.sneak-attack}',
+  ]) {
+    assert.equal(hasRollDataPath(formula), true, formula);
+  }
+  for (const formula of ['1d4+1', '', null, 'max(1d4, 2)']) {
+    assert.equal(hasRollDataPath(formula), false, `${formula}`);
+  }
+});
+
+test('1645: the maximised reading hands the formula to `Roll` exactly as authored', () => {
+  const { Roll, calls } = seededRollClass({ maxima: { '@x + 1d2': 2 } });
+  assert.equal(maximisedTotal('@x + 1d2', Roll), 2);
+  assert.equal(calls[0].formula, '@x + 1d2', 'no local substitution stands in for `Roll.parse`');
+  assert.deepEqual(calls[0].evaluateSync, { maximize: true });
 });
 
 test('1645: validate({ Roll }) refuses a path-free formula that can never award anything', () => {

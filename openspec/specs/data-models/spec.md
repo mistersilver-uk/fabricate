@@ -3044,7 +3044,7 @@ Result = {
    It is validated the way a crafting check's formula is: `Roll.validate` is parse-only and passes an expression that cannot evaluate, so a formula is usable only where it evaluates to a finite total.
    An empty or absent `quantityFormula` leaves the amount fixed at `quantity`, which is the state every result persisted before this change is in.
    `resolveRolledAmount` is the one seam that turns a result plus the crafting character into the integer awarded, and a formula resolves ONCE per result per award; `awardCountFormula` and `selectionFormula` resolve through that same seam.
-   The rollability floor is a maximised evaluation with every `@path` neutralised to zero rather than a parse: a path-free formula whose maximised total is not finite, or is zero or less, can never award anything and is an authoring error.
+   The rollability floor is a maximised evaluation of the formula AS AUTHORED rather than a parse, core substituting every roll-data path it cannot resolve with zero: a path-free formula whose maximised total is not finite, or is zero or less, can never award anything and is an authoring error.
    A path-bearing formula is accepted wherever it parses, because no actor-free reading can decide it.
 The authoring surface for all of it — the chooser as a segmented control in the group header, the award strategy, the range cell per alternative and the currency reward's naming body — is specified by the `design-system` capability, under the requirements "A result-side choice group states who chooses and how many it awards" and "One requirement row serves both sides of a recipe".
 This section states only what is persisted.
