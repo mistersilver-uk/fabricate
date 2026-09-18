@@ -87,7 +87,7 @@ const RECIPE_BULK_EDIT_MATCHES = [
   /^src\/ui\/svelte\/apps\/manager\/Recipe/,
   /^src\/ui\/svelte\/apps\/manager\/recipes?\//,
   BULK_EDIT_CHROME_PATTERN,
-  /^src\/utils\/recipeBulkEditModel\.js$/,
+  /^src\/ui\/model\/recipeBulkEditModel\.js$/,
 ];
 
 /** The trigger set the ten system Tool Rules list frames share (issue 1373). */
@@ -2235,7 +2235,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world', 'scoped'],
-    sourceMatches: [/^src\/utils\/componentScopeValidation\.js$/],
+    sourceMatches: [/^src\/ui\/model\/componentScopeValidation\.js$/],
   }),
   managerCase({
     // The frame the world Component entry and the system component rules editor share stacks its
@@ -2358,7 +2358,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       // The inspector's foot action, which this case draws and did not claim (issue 1446).
       /^src\/ui\/svelte\/apps\/manager\/InspectorActionButton\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/essenceScoped\.js$/,
-      /^src\/utils\/scopedEntityListModel\.js$/,
+      /^src\/ui\/model\/scopedEntityListModel\.js$/,
     ],
   }),
   managerCase({
@@ -2551,7 +2551,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityListInspectorFrame\.svelte$/,
       // The page window itself. It is restated on the lifted view-state, and a change there with
       // no claim would publish a frame of some other screen as evidence that the pager moved.
-      /^src\/utils\/managerBrowserViewState\.js$/,
+      /^src\/ui\/model\/managerBrowserViewState\.js$/,
     ],
   }),
   managerCase({
@@ -2678,9 +2678,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/scoped\/EntityListInspectorFrame\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/scoped\/WorldToolCataloguePage\.svelte$/,
-      // The model that answers the query. It cannot SELECT this frame today — `src/utils/` is
-      // not a render path — and it is declared because it is what the frame is evidence ABOUT.
-      /^src\/utils\/scopedEntityListModel\.js$/,
+      // The model that answers the query.
+      /^src\/ui\/model\/scopedEntityListModel\.js$/,
     ],
   }),
   managerCase({
@@ -6141,10 +6140,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/VocabularyTabs\.svelte$/,
     ],
   }),
-  // Every case below carries the same `sourceMatches`, and it is wider than the shipped one in two
-  // ways that both mattered: the shipped `/apps\/manager\/Essence/` is case-SENSITIVE, so it
-  // matched neither the new lowercase `essences/` directory nor the pure models under `src/utils/`,
-  // and a redesign confined to those would have published no essence frame at all.
+  // Every case below carries the same `sourceMatches` set (issue 1372).
   managerCase({
     id: 'manager-essences-normal',
     label: 'Manager — Essences normal',
@@ -6165,7 +6161,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/library\/LibraryShelf\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/InspectorActionButton\.svelte$/,
       /^src\/ui\/svelte\/util\/(?:essenceIcons|managerColorTokens)\.js$/,
-      /^src\/utils\/essence(?:BrowserModel|BulkEditModel|Validation)\.js$/,
+      /^src\/ui\/model\/essence(?:BrowserModel|BulkEditModel|Validation)\.js$/,
     ],
   }),
   managerCase({
@@ -6187,7 +6183,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/library\/LibraryShelf\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/InspectorActionButton\.svelte$/,
       /^src\/ui\/svelte\/util\/(?:essenceIcons|managerColorTokens)\.js$/,
-      /^src\/utils\/essence(?:BrowserModel|BulkEditModel|Validation)\.js$/,
+      /^src\/ui\/model\/essence(?:BrowserModel|BulkEditModel|Validation)\.js$/,
     ],
   }),
   managerCase({
@@ -6214,7 +6210,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/library\/LibraryShelf\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/InspectorActionButton\.svelte$/,
       /^src\/ui\/svelte\/util\/(?:essenceIcons|managerColorTokens)\.js$/,
-      /^src\/utils\/essence(?:BrowserModel|BulkEditModel|Validation)\.js$/,
+      /^src\/ui\/model\/essence(?:BrowserModel|BulkEditModel|Validation)\.js$/,
     ],
   }),
   managerCase({
@@ -6280,7 +6276,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/library\/LibraryCard\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/InspectorActionButton\.svelte$/,
       /^src\/ui\/svelte\/util\/(?:essenceIcons|managerColorTokens)\.js$/,
-      /^src\/utils\/essence(?:BrowserModel|BulkEditModel|Validation)\.js$/,
+      /^src\/ui\/model\/essence(?:BrowserModel|BulkEditModel|Validation)\.js$/,
     ],
   }),
   managerCase({
@@ -6304,7 +6300,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/Essence(?:Browser|Edit)View\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/essences\//,
       /^src\/ui\/svelte\/util\/(?:essenceIcons|managerColorTokens)\.js$/,
-      /^src\/utils\/essence(?:BrowserModel|BulkEditModel|Validation)\.js$/,
+      /^src\/ui\/model\/essence(?:BrowserModel|BulkEditModel|Validation)\.js$/,
     ],
   }),
   managerCase({
@@ -6331,7 +6327,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/Essence(?:Browser|Edit)View\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/essences\//,
       /^src\/ui\/svelte\/util\/(?:essenceIcons|managerColorTokens)\.js$/,
-      /^src\/utils\/essence(?:BrowserModel|BulkEditModel|Validation)\.js$/,
+      /^src\/ui\/model\/essence(?:BrowserModel|BulkEditModel|Validation)\.js$/,
       BULK_DELETE_CARD_PATTERN,
     ],
   }),
@@ -10254,7 +10250,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       // `BROAD_SHADOWED_SOURCE_MATCHES` register precisely because the file was already a broad
       // signal, so `selectRenderFileCases` never read it.
       /^src\/ui\/svelte\/apps\/manager\/checks\/SimpleCraftingCheckEditor\.svelte$/,
-      /^src\/utils\/macroReference\.js$/,
+      /^src\/ui\/model\/macroReference\.js$/,
     ],
   }),
   managerCase({

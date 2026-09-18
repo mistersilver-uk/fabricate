@@ -1540,7 +1540,7 @@ test('the gate and the producer arm on the same predicate, and an armed gate sel
     'tests/view-lab/world/labContent.js',
     'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
     'styles/fabricate.css',
-    'src/utils/componentBrowserModel.js',
+    'src/ui/model/componentBrowserModel.js',
     'scripts/lib/viewLabCases.js',
     'docs/README.md',
     'main.js',

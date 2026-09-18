@@ -532,6 +532,7 @@ The immutability, completeness, and one-build-per-publish contracts are specifie
 - Svelte is the only UI templating system.
 Do not add or reintroduce Handlebars templates.
 - UI shells live in `src/ui/*.js` and `src/ui/*.svelte.js`.
+- `src/ui/model/` holds the Foundry-free view models the UI owns — pure filtering, sorting, pagination, selection and validation logic with no Foundry global and no importer outside `src/ui/`.
 - Svelte UI components live in `src/ui/svelte/apps/` and `src/ui/svelte/components/`.
 - Svelte stores live in `src/ui/svelte/stores/`.
 - Domain and runtime logic lives under `src/models/`, `src/systems/`, `src/utils/`, `src/integrations/`, `src/config/`, and related `src/` modules.
