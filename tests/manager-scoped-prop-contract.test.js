@@ -132,7 +132,10 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   './downtime/WorldDowntimeExtensionHost.svelte',
   './downtime/routeChromeChannel.js',
   './downtime/worldDowntimePreviewProvider.js',
-  './environment/CharacterModifierBoundsRow.svelte',
+  // ADDED BY ISSUE 1707, which wrote the twice-authored gathering modifier panel once and
+  // REMOVED `./environment/CharacterModifierBoundsRow.svelte`: both of its root call sites were
+  // inside the two spans that moved, so the root no longer renders it at all.
+  './environment/GatheringModifierEditor.svelte',
   './environment/GatheringRuleLimitStepper.svelte',
   './essences/EssenceBehaviorPreview.svelte',
   './essences/EssenceBrowserInspector.svelte',

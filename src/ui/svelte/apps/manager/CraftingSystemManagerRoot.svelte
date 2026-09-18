@@ -2,7 +2,7 @@
 <script>
   import { onDestroy, untrack } from 'svelte';
   import ChanceSlider from '../../components/ChanceSlider.svelte';
-  import CharacterModifierBoundsRow from './environment/CharacterModifierBoundsRow.svelte';
+  import GatheringModifierEditor from './environment/GatheringModifierEditor.svelte';
   import GatheringRuleLimitStepper from './environment/GatheringRuleLimitStepper.svelte';
   import Chip from '../../components/Chip.svelte';
   import Kicker from '../../components/Kicker.svelte';
@@ -11315,405 +11315,64 @@
                         </div>
                       </section>
 
-                      {#each ['biome', 'timeOfDay', 'weather'] as kind (kind)}
-                        {@const cardTitle = gatheringModifierCardTitle(kind, 'task')}
-                        {@const cardHint = gatheringModifierCardHint(kind, 'task')}
-                        {@const availableConditions = gatheringConditionAvailableOptions(
-                          selectedGatheringDrop,
-                          kind
-                        )}
-                        {@const pickerSelection = gatheringDropModifierPickerSelection(kind)}
-                        {@const attachedModifiers = gatheringConditionModifierRows(
-                          selectedGatheringDrop,
-                          kind
-                        )}
-                        <section
-                          class="fabricate-card manager-inspector-card manager-drop-editor-condition-modifier-card"
-                          data-gathering-drop-condition-modifiers={kind}
-                        >
-                          <header class="manager-character-modifier-row-card-header">
-                            <div class="manager-character-modifier-row-card-heading">
-                              <h3 class="manager-card-title">{cardTitle}</h3>
-                              <p class="manager-muted">{cardHint}</p>
-                            </div>
-                          </header>
-                          <div
-                            class="manager-condition-modifier-add-row"
-                            data-gathering-drop-condition-modifier-picker={kind}
-                          >
-                            <label
-                              class="fabricate-field manager-field manager-condition-modifier-picker"
-                            >
-                              <span class="visually-hidden"
-                                >{text(
-                                  'FABRICATE.Admin.Manager.Environment.Tasks.ConditionPickerLabel',
-                                  'Condition'
-                                )}</span
-                              >
-                              <select
-                                value={pickerSelection}
-                                disabled={availableConditions.length === 0}
-                                data-tooltip={availableConditions.length === 0
-                                  ? text(
-                                      'FABRICATE.Admin.Manager.Environment.Tasks.AllConditionsAdded',
-                                      'All conditions already added.'
-                                    )
-                                  : null}
-                                onchange={(event) =>
-                                  setGatheringDropModifierPickerSelection(
-                                    kind,
-                                    event.currentTarget.value
-                                  )}
-                              >
-                                {#each availableConditions as option (option.id)}
-                                  <option value={option.id}>{option.label || option.id}</option>
-                                {/each}
-                              </select>
-                            </label>
-                            <button
-                              type="button"
-                              class="fabricate-icon-button manager-icon-button"
-                              aria-label={text(
-                                'FABRICATE.Admin.Manager.Environment.Tasks.AddConditionModifier',
-                                'Add modifier'
-                              )}
-                              title={text(
-                                'FABRICATE.Admin.Manager.Environment.Tasks.AddConditionModifier',
-                                'Add modifier'
-                              )}
-                              disabled={availableConditions.length === 0 || !pickerSelection}
-                              data-tooltip={availableConditions.length === 0
-                                ? text(
-                                    'FABRICATE.Admin.Manager.Environment.Tasks.AllConditionsAdded',
-                                    'All conditions already added.'
-                                  )
-                                : null}
-                              onclick={() =>
-                                addGatheringDropModifier(
-                                  selectedGatheringDrop.id,
-                                  kind,
-                                  pickerSelection
-                                )}
-                            >
-                              <i class="fas fa-plus" aria-hidden="true"></i>
-                            </button>
-                          </div>
-                          <div class="manager-condition-modifier-row-list">
-                            {#each attachedModifiers as modifier (modifier.id)}
-                              <article
-                                class={`manager-condition-modifier-row-reference ${gatheringModifierValueClass(modifier)}`}
-                                data-gathering-drop-modifier-id={modifier.id}
-                              >
-                                <header class="manager-character-modifier-row-reference-header">
-                                  <span class="manager-character-modifier-icon">
-                                    <i
-                                      class={gatheringModifierKindIcon(kind, modifier.conditionId)}
-                                      aria-hidden="true"
-                                    ></i>
-                                  </span>
-                                  <span class="manager-character-modifier-row-reference-label"
-                                    >{gatheringConditionLabel(kind, modifier.conditionId) ||
-                                      modifier.conditionId}</span
-                                  >
-                                  <label class="manager-condition-modifier-value">
-                                    <span class="visually-hidden"
-                                      >{text(
-                                        'FABRICATE.Admin.Manager.Environment.Tasks.ModifierValue',
-                                        'Modifier value'
-                                      )}</span
-                                    >
-                                    <input
-                                      type="text"
-                                      inputmode="numeric"
-                                      value={gatheringModifierDisplayValue(modifier)}
-                                      aria-label={text(
-                                        'FABRICATE.Admin.Manager.Environment.Tasks.ModifierValue',
-                                        'Modifier value'
-                                      )}
-                                      oninput={(event) =>
-                                        updateGatheringDropModifier(
-                                          selectedGatheringDrop.id,
-                                          kind,
-                                          modifier.id,
-                                          signedToOperatorValue(event.currentTarget.value)
-                                        )}
-                                      onkeydown={(event) =>
-                                        onGatheringDropModifierKeydown(
-                                          selectedGatheringDrop.id,
-                                          kind,
-                                          modifier,
-                                          event
-                                        )}
-                                    />
-                                    <span aria-hidden="true">%</span>
-                                  </label>
-                                  <button
-                                    type="button"
-                                    class="fabricate-icon-button manager-icon-button is-danger manager-character-modifier-row-reference-delete"
-                                    aria-label={text(
-                                      'FABRICATE.Admin.Manager.Environment.Tasks.DeleteModifier',
-                                      'Delete modifier'
-                                    )}
-                                    onclick={() =>
-                                      deleteGatheringDropModifier(
-                                        selectedGatheringDrop.id,
-                                        kind,
-                                        modifier.id
-                                      )}
-                                  >
-                                    <i class="fas fa-trash" aria-hidden="true"></i>
-                                  </button>
-                                </header>
-                              </article>
-                            {:else}
-                              <EmptyState
-                                compact
-                                icon="fas fa-sliders"
-                                title={text(
-                                  'FABRICATE.Admin.Manager.Environment.Tasks.NoConditionModifiers',
-                                  'No modifiers attached.'
-                                )}
-                              />
-                            {/each}
-                          </div>
-                        </section>
-                      {/each}
-
-                      <section
-                        class="fabricate-card manager-inspector-card manager-character-modifier-row-card"
-                        data-gathering-drop-character-modifiers
-                      >
-                        <header class="manager-character-modifier-row-card-header">
-                          <div class="manager-character-modifier-row-card-heading">
-                            <h3 class="manager-card-title">
-                              {text(
-                                'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.RowSectionTitle',
-                                'Character modifiers'
-                              )}
-                            </h3>
-                            <p class="manager-muted">
-                              {text(
-                                'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.RowSectionHint',
-                                'Modifiers adjust the final chance based on the attempting character.'
-                              )}
-                            </p>
-                          </div>
-                        </header>
-                        <div class="manager-character-modifier-add-search-row">
-                          <label
-                            bind:this={characterModifierSearchAnchor}
-                            class="fabricate-search manager-search is-compact manager-character-modifier-add-search"
-                            data-gathering-drop-character-modifier-search
-                          >
-                            <i class="fas fa-search" aria-hidden="true"></i>
-                            <input
-                              type="search"
-                              value={characterModifierSearchTerm}
-                              oninput={(event) => {
-                                characterModifierSearchTerm = event.currentTarget.value;
-                              }}
-                              placeholder={text(
-                                'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.AddSearchPlaceholder',
-                                'Search character modifiers...'
-                              )}
-                              aria-label={text(
-                                'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.AddSearchLabel',
-                                'Search character modifiers to add'
-                              )}
-                              disabled={selectedSystemModifiers.length === 0}
-                              data-tooltip={selectedSystemModifiers.length === 0
-                                ? text(
-                                    'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.LibraryEmptyHint',
-                                    'Add a modifier to the system library first to reference it here.'
-                                  )
-                                : null}
-                            />
-                            {#if characterModifierSearchSuggestions.length > 0}
-                              <div
-                                class="manager-tag-suggestions manager-character-modifier-add-suggestions"
-                                class:is-above={characterModifierSearchOpenUp}
-                                data-gathering-drop-character-modifier-suggestions
-                              >
-                                {#each characterModifierSearchSuggestions as option (option.id)}
-                                  <button
-                                    type="button"
-                                    class="manager-tag-suggestion manager-character-modifier-add-suggestion"
-                                    data-gathering-drop-character-modifier-suggestion={option.id}
-                                    onclick={() =>
-                                      pickCharacterModifierForRow(
-                                        selectedGatheringDrop.id,
-                                        option.id
-                                      )}
-                                  >
-                                    <i class={option.icon || 'fa-solid fa-user'} aria-hidden="true"
-                                    ></i>
-                                    <span>{option.label || option.id}</span>
-                                  </button>
-                                {/each}
-                              </div>
-                            {/if}
-                          </label>
-                        </div>
-                        <div class="manager-character-modifier-row-list">
-                          {#each rowCharacterModifiers(selectedGatheringDrop) as ref (ref.id)}
-                            {@const libraryEntry = characterModifierLibraryEntry(ref.modifierId)}
-                            {@const hasOverride = characterModifierIsCustomized(ref)}
-                            {@const operatorClass = characterModifierOperatorClass(ref.operator)}
-                            <article
-                              class="manager-character-modifier-row-reference"
-                              data-gathering-drop-character-modifier-ref={ref.id}
-                            >
-                              <header class="manager-character-modifier-row-reference-header">
-                                <span class="manager-character-modifier-icon"
-                                  ><i class={characterModifierIconForRef(ref)} aria-hidden="true"
-                                  ></i></span
-                                >
-                                <span class="manager-character-modifier-row-reference-label"
-                                  >{characterModifierLabelForRef(ref)}</span
-                                >
-                                {#if !libraryEntry}
-                                  <span
-                                    class="manager-character-modifier-stale-warning"
-                                    data-tooltip={text(
-                                      'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.UnknownModifier',
-                                      'Unknown modifier ({id})'
-                                    ).replace('{id}', ref.modifierId)}
-                                  >
-                                    <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"
-                                    ></i>
-                                  </span>
-                                {/if}
-                                <label
-                                  class={`manager-character-modifier-operator-select ${operatorClass}`}
-                                >
-                                  <span class="visually-hidden"
-                                    >{text(
-                                      'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Operator',
-                                      'Operator'
-                                    )}</span
-                                  >
-                                  <select
-                                    value={ref.operator || '+'}
-                                    onchange={(event) =>
-                                      onUpdateDropCharacterModifier(
-                                        selectedGatheringDrop.id,
-                                        ref.id,
-                                        { operator: event.currentTarget.value }
-                                      )}
-                                  >
-                                    <option value="+"
-                                      >{text(
-                                        'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OperatorPositive',
-                                        'Positive'
-                                      )}</option
-                                    >
-                                    <option value="-"
-                                      >{text(
-                                        'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OperatorNegative',
-                                        'Negative'
-                                      )}</option
-                                    >
-                                  </select>
-                                </label>
-                                <button
-                                  type="button"
-                                  class="fabricate-icon-button manager-icon-button is-danger manager-character-modifier-row-reference-delete"
-                                  aria-label={text(
-                                    'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.DeleteRowReference',
-                                    'Delete character modifier reference'
-                                  )}
-                                  onclick={() =>
-                                    onDeleteDropCharacterModifier(selectedGatheringDrop.id, ref.id)}
-                                >
-                                  <i class="fas fa-trash" aria-hidden="true"></i>
-                                </button>
-                              </header>
-                              <CharacterModifierBoundsRow
-                                min={ref.min}
-                                max={ref.max}
-                                onChange={(patch) =>
-                                  onUpdateDropCharacterModifier(
-                                    selectedGatheringDrop.id,
-                                    ref.id,
-                                    patch
-                                  )}
-                              />
-                              <div class="manager-character-modifier-override-row">
-                                <button
-                                  type="button"
-                                  class={`fabricate-toggle manager-status-toggle ${hasOverride ? 'is-on' : 'is-off'}`}
-                                  aria-pressed={hasOverride}
-                                  aria-label={text(
-                                    'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideToggle',
-                                    'Override?'
-                                  )}
-                                  onclick={() =>
-                                    setCharacterModifierOverrideEnabled(
-                                      selectedGatheringDrop.id,
-                                      ref,
-                                      !hasOverride,
-                                      libraryEntry
-                                    )}
-                                >
-                                  <span class="manager-status-toggle-track" aria-hidden="true">
-                                    <span class="manager-status-toggle-knob"></span>
-                                  </span>
-                                  <span class="manager-status-toggle-label">
-                                    {hasOverride
-                                      ? text(
-                                          'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideToggleOn',
-                                          'Overridden'
-                                        )
-                                      : text(
-                                          'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideToggle',
-                                          'Override?'
-                                        )}
-                                  </span>
-                                </button>
-                              </div>
-                              {#if hasOverride}
-                                <p class="manager-muted manager-character-modifier-override-hint">
-                                  {text(
-                                    'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideHint',
-                                    'Overrides the library expression for this row.'
-                                  )}
-                                </p>
-                                <label
-                                  class="fabricate-field manager-field"
-                                  for={`drop-${selectedGatheringDrop.id}-character-modifier-${ref.id}-expression`}
-                                >
-                                  <span
-                                    >{text(
-                                      'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Expression',
-                                      'Expression'
-                                    )}</span
-                                  >
-                                  <input
-                                    type="text"
-                                    id={`drop-${selectedGatheringDrop.id}-character-modifier-${ref.id}-expression`}
-                                    value={ref.expressionOverride || ''}
-                                    oninput={(event) =>
-                                      onUpdateDropCharacterModifier(
-                                        selectedGatheringDrop.id,
-                                        ref.id,
-                                        { expressionOverride: event.currentTarget.value }
-                                      )}
-                                  />
-                                </label>
-                              {/if}
-                            </article>
-                          {:else}
-                            <EmptyState
-                              compact
-                              icon="fas fa-sliders"
-                              title={text(
-                                'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.RowEmpty',
-                                'No character modifiers attached.'
-                              )}
-                            />
-                          {/each}
-                        </div>
-                      </section>
+                      <GatheringModifierEditor
+                        subject="drop"
+                        row={selectedGatheringDrop}
+                        idPrefix={`drop-${selectedGatheringDrop.id}`}
+                        suggestions={characterModifierSearchSuggestions}
+                        characterModifierLibrary={selectedSystemModifiers}
+                        {characterModifierSearchOpenUp}
+                        bind:characterModifierSearchAnchor
+                        bind:characterModifierSearchTerm
+                        {gatheringConditionAvailableOptions}
+                        {gatheringConditionLabel}
+                        {gatheringConditionModifierRows}
+                        {gatheringModifierCardHint}
+                        {gatheringModifierCardTitle}
+                        {gatheringModifierDisplayValue}
+                        {gatheringModifierKindIcon}
+                        {gatheringModifierValueClass}
+                        {signedToOperatorValue}
+                        {rowCharacterModifiers}
+                        {characterModifierIconForRef}
+                        {characterModifierIsCustomized}
+                        {characterModifierLabelForRef}
+                        {characterModifierLibraryEntry}
+                        {characterModifierOperatorClass}
+                        modifierPickerSelection={gatheringDropModifierPickerSelection}
+                        onSelectModifierPickerOption={setGatheringDropModifierPickerSelection}
+                        onAddConditionModifier={(kind, conditionId) =>
+                          addGatheringDropModifier(selectedGatheringDrop.id, kind, conditionId)}
+                        onUpdateConditionModifier={(kind, modifierId, value) =>
+                          updateGatheringDropModifier(
+                            selectedGatheringDrop.id,
+                            kind,
+                            modifierId,
+                            value
+                          )}
+                        onConditionModifierKeydown={(kind, modifier, event) =>
+                          onGatheringDropModifierKeydown(
+                            selectedGatheringDrop.id,
+                            kind,
+                            modifier,
+                            event
+                          )}
+                        onDeleteConditionModifier={(kind, modifierId) =>
+                          deleteGatheringDropModifier(selectedGatheringDrop.id, kind, modifierId)}
+                        onPickCharacterModifier={(modifierId) =>
+                          pickCharacterModifierForRow(selectedGatheringDrop.id, modifierId)}
+                        onUpdateCharacterModifier={(refId, patch) =>
+                          onUpdateDropCharacterModifier(selectedGatheringDrop.id, refId, patch)}
+                        onDeleteCharacterModifier={(refId) =>
+                          onDeleteDropCharacterModifier(selectedGatheringDrop.id, refId)}
+                        onSetCharacterModifierOverride={(ref, enabled, libraryEntry) =>
+                          setCharacterModifierOverrideEnabled(
+                            selectedGatheringDrop.id,
+                            ref,
+                            enabled,
+                            libraryEntry
+                          )}
+                      />
                     </div>
                   </div>
                 {:else if (editingGatheringTask?.resolutionMode || 'd100') === 'd100'}
@@ -11753,364 +11412,41 @@
             {#if currentView === 'gathering-event-edit' && editingGatheringEvent}
               <div class="manager-drop-inspector-stack" data-gathering-event-inspector-stack>
                 <div class="manager-drop-inspector-scroll">
-                  {#each ['biome', 'timeOfDay', 'weather'] as kind (kind)}
-                    {@const cardTitle = gatheringModifierCardTitle(kind, 'event')}
-                    {@const cardHint = gatheringModifierCardHint(kind, 'event')}
-                    {@const availableConditions = gatheringConditionAvailableOptions(
-                      editingGatheringEvent,
-                      kind
-                    )}
-                    {@const pickerSelection = gatheringEventModifierPickerSelection(kind)}
-                    {@const attachedModifiers = gatheringConditionModifierRows(
-                      editingGatheringEvent,
-                      kind
-                    )}
-                    <section
-                      class="fabricate-card manager-inspector-card manager-drop-editor-condition-modifier-card"
-                      data-gathering-event-condition-modifiers={kind}
-                    >
-                      <header class="manager-character-modifier-row-card-header">
-                        <div class="manager-character-modifier-row-card-heading">
-                          <h3 class="manager-card-title">{cardTitle}</h3>
-                          <p class="manager-muted">{cardHint}</p>
-                        </div>
-                      </header>
-                      <div
-                        class="manager-condition-modifier-add-row"
-                        data-gathering-event-condition-modifier-picker={kind}
-                      >
-                        <label
-                          class="fabricate-field manager-field manager-condition-modifier-picker"
-                        >
-                          <span class="visually-hidden"
-                            >{text(
-                              'FABRICATE.Admin.Manager.Environment.Tasks.ConditionPickerLabel',
-                              'Condition'
-                            )}</span
-                          >
-                          <select
-                            value={pickerSelection}
-                            disabled={availableConditions.length === 0}
-                            data-tooltip={availableConditions.length === 0
-                              ? text(
-                                  'FABRICATE.Admin.Manager.Environment.Tasks.AllConditionsAdded',
-                                  'All conditions already added.'
-                                )
-                              : null}
-                            onchange={(event) =>
-                              setGatheringEventModifierPickerSelection(
-                                kind,
-                                event.currentTarget.value
-                              )}
-                          >
-                            {#each availableConditions as option (option.id)}
-                              <option value={option.id}>{option.label || option.id}</option>
-                            {/each}
-                          </select>
-                        </label>
-                        <button
-                          type="button"
-                          class="fabricate-icon-button manager-icon-button"
-                          aria-label={text(
-                            'FABRICATE.Admin.Manager.Environment.Tasks.AddConditionModifier',
-                            'Add modifier'
-                          )}
-                          title={text(
-                            'FABRICATE.Admin.Manager.Environment.Tasks.AddConditionModifier',
-                            'Add modifier'
-                          )}
-                          disabled={availableConditions.length === 0 || !pickerSelection}
-                          data-tooltip={availableConditions.length === 0
-                            ? text(
-                                'FABRICATE.Admin.Manager.Environment.Tasks.AllConditionsAdded',
-                                'All conditions already added.'
-                              )
-                            : null}
-                          onclick={() => addGatheringEventConditionModifier(kind, pickerSelection)}
-                        >
-                          <i class="fas fa-plus" aria-hidden="true"></i>
-                        </button>
-                      </div>
-                      <div class="manager-condition-modifier-row-list">
-                        {#each attachedModifiers as modifier (modifier.id)}
-                          <article
-                            class={`manager-condition-modifier-row-reference ${gatheringModifierValueClass(modifier)}`}
-                            data-gathering-event-modifier-id={modifier.id}
-                          >
-                            <header class="manager-character-modifier-row-reference-header">
-                              <span class="manager-character-modifier-icon">
-                                <i
-                                  class={gatheringModifierKindIcon(kind, modifier.conditionId)}
-                                  aria-hidden="true"
-                                ></i>
-                              </span>
-                              <span class="manager-character-modifier-row-reference-label"
-                                >{gatheringConditionLabel(kind, modifier.conditionId) ||
-                                  modifier.conditionId}</span
-                              >
-                              <label class="manager-condition-modifier-value">
-                                <span class="visually-hidden"
-                                  >{text(
-                                    'FABRICATE.Admin.Manager.Environment.Tasks.ModifierValue',
-                                    'Modifier value'
-                                  )}</span
-                                >
-                                <input
-                                  type="text"
-                                  inputmode="numeric"
-                                  value={gatheringModifierDisplayValue(modifier)}
-                                  aria-label={text(
-                                    'FABRICATE.Admin.Manager.Environment.Tasks.ModifierValue',
-                                    'Modifier value'
-                                  )}
-                                  oninput={(event) =>
-                                    updateGatheringEventConditionModifier(
-                                      kind,
-                                      modifier.id,
-                                      signedToOperatorValue(event.currentTarget.value)
-                                    )}
-                                  onkeydown={(event) =>
-                                    onGatheringEventModifierKeydown(kind, modifier, event)}
-                                />
-                                <span aria-hidden="true">%</span>
-                              </label>
-                              <button
-                                type="button"
-                                class="fabricate-icon-button manager-icon-button is-danger manager-character-modifier-row-reference-delete"
-                                aria-label={text(
-                                  'FABRICATE.Admin.Manager.Environment.Tasks.DeleteModifier',
-                                  'Delete modifier'
-                                )}
-                                onclick={() =>
-                                  deleteGatheringEventConditionModifier(kind, modifier.id)}
-                              >
-                                <i class="fas fa-trash" aria-hidden="true"></i>
-                              </button>
-                            </header>
-                          </article>
-                        {/each}
-                      </div>
-                    </section>
-                  {/each}
-
-                  <section
-                    class="fabricate-card manager-inspector-card manager-character-modifier-row-card"
-                    data-gathering-event-character-modifiers
-                  >
-                    <header class="manager-character-modifier-row-card-header">
-                      <div class="manager-character-modifier-row-card-heading">
-                        <h3 class="manager-card-title">
-                          {text(
-                            'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.RowSectionTitle',
-                            'Character modifiers'
-                          )}
-                        </h3>
-                        <p class="manager-muted">
-                          {text(
-                            'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.RowSectionHint',
-                            'Modifiers adjust the final chance based on the attempting character.'
-                          )}
-                        </p>
-                      </div>
-                    </header>
-                    <div class="manager-character-modifier-add-search-row">
-                      <label
-                        bind:this={characterModifierSearchAnchor}
-                        class="fabricate-search manager-search is-compact manager-character-modifier-add-search"
-                        data-gathering-event-character-modifier-search
-                      >
-                        <i class="fas fa-search" aria-hidden="true"></i>
-                        <input
-                          type="search"
-                          value={characterModifierSearchTerm}
-                          oninput={(event) => {
-                            characterModifierSearchTerm = event.currentTarget.value;
-                          }}
-                          placeholder={text(
-                            'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.AddSearchPlaceholder',
-                            'Search character modifiers...'
-                          )}
-                          aria-label={text(
-                            'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.AddSearchLabel',
-                            'Search character modifiers to add'
-                          )}
-                          disabled={selectedSystemModifiers.length === 0}
-                          data-tooltip={selectedSystemModifiers.length === 0
-                            ? text(
-                                'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.LibraryEmptyHint',
-                                'Add a modifier to the system library first to reference it here.'
-                              )
-                            : null}
-                        />
-                        {#if eventCharacterModifierSearchSuggestions.length > 0}
-                          <div
-                            class="manager-tag-suggestions manager-character-modifier-add-suggestions"
-                            class:is-above={characterModifierSearchOpenUp}
-                            data-gathering-event-character-modifier-suggestions
-                          >
-                            {#each eventCharacterModifierSearchSuggestions as option (option.id)}
-                              <button
-                                type="button"
-                                class="manager-tag-suggestion manager-character-modifier-add-suggestion"
-                                data-gathering-event-character-modifier-suggestion={option.id}
-                                onclick={() => pickCharacterModifierForEvent(option.id)}
-                              >
-                                <i class={option.icon || 'fa-solid fa-user'} aria-hidden="true"></i>
-                                <span>{option.label || option.id}</span>
-                              </button>
-                            {/each}
-                          </div>
-                        {/if}
-                      </label>
-                    </div>
-                    <div class="manager-character-modifier-row-list">
-                      {#each rowCharacterModifiers(editingGatheringEvent) as ref (ref.id)}
-                        {@const libraryEntry = characterModifierLibraryEntry(ref.modifierId)}
-                        {@const hasOverride = characterModifierIsCustomized(ref)}
-                        {@const operatorClass = characterModifierOperatorClass(ref.operator)}
-                        <article
-                          class="manager-character-modifier-row-reference"
-                          data-gathering-event-character-modifier-ref={ref.id}
-                        >
-                          <header class="manager-character-modifier-row-reference-header">
-                            <span class="manager-character-modifier-icon"
-                              ><i class={characterModifierIconForRef(ref)} aria-hidden="true"
-                              ></i></span
-                            >
-                            <span class="manager-character-modifier-row-reference-label"
-                              >{characterModifierLabelForRef(ref)}</span
-                            >
-                            {#if !libraryEntry}
-                              <span
-                                class="manager-character-modifier-stale-warning"
-                                data-tooltip={text(
-                                  'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.UnknownModifier',
-                                  'Unknown modifier ({id})'
-                                ).replace('{id}', ref.modifierId)}
-                              >
-                                <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
-                              </span>
-                            {/if}
-                            <label
-                              class={`manager-character-modifier-operator-select ${operatorClass}`}
-                            >
-                              <span class="visually-hidden"
-                                >{text(
-                                  'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Operator',
-                                  'Operator'
-                                )}</span
-                              >
-                              <select
-                                value={ref.operator || '+'}
-                                onchange={(event) =>
-                                  onUpdateEventCharacterModifier(ref.id, {
-                                    operator: event.currentTarget.value,
-                                  })}
-                              >
-                                <option value="+"
-                                  >{text(
-                                    'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OperatorPositive',
-                                    'Positive'
-                                  )}</option
-                                >
-                                <option value="-"
-                                  >{text(
-                                    'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OperatorNegative',
-                                    'Negative'
-                                  )}</option
-                                >
-                              </select>
-                            </label>
-                            <button
-                              type="button"
-                              class="fabricate-icon-button manager-icon-button is-danger manager-character-modifier-row-reference-delete"
-                              aria-label={text(
-                                'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.DeleteRowReference',
-                                'Delete character modifier reference'
-                              )}
-                              onclick={() => onDeleteEventCharacterModifier(ref.id)}
-                            >
-                              <i class="fas fa-trash" aria-hidden="true"></i>
-                            </button>
-                          </header>
-                          <CharacterModifierBoundsRow
-                            min={ref.min}
-                            max={ref.max}
-                            onChange={(patch) => onUpdateEventCharacterModifier(ref.id, patch)}
-                          />
-                          <div class="manager-character-modifier-override-row">
-                            <button
-                              type="button"
-                              class={`fabricate-toggle manager-status-toggle ${hasOverride ? 'is-on' : 'is-off'}`}
-                              aria-pressed={hasOverride}
-                              aria-label={text(
-                                'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideToggle',
-                                'Override?'
-                              )}
-                              onclick={() =>
-                                setEventCharacterModifierOverrideEnabled(
-                                  ref,
-                                  !hasOverride,
-                                  libraryEntry
-                                )}
-                            >
-                              <span class="manager-status-toggle-track" aria-hidden="true">
-                                <span class="manager-status-toggle-knob"></span>
-                              </span>
-                              <span class="manager-status-toggle-label">
-                                {hasOverride
-                                  ? text(
-                                      'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideToggleOn',
-                                      'Overridden'
-                                    )
-                                  : text(
-                                      'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideToggle',
-                                      'Override?'
-                                    )}
-                              </span>
-                            </button>
-                          </div>
-                          {#if hasOverride}
-                            <p class="manager-muted manager-character-modifier-override-hint">
-                              {text(
-                                'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.OverrideHint',
-                                'Overrides the library expression for this row.'
-                              )}
-                            </p>
-                            <label
-                              class="fabricate-field manager-field"
-                              for={`event-${editingGatheringEvent.id}-character-modifier-${ref.id}-expression`}
-                            >
-                              <span
-                                >{text(
-                                  'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.Expression',
-                                  'Expression'
-                                )}</span
-                              >
-                              <input
-                                id={`event-${editingGatheringEvent.id}-character-modifier-${ref.id}-expression`}
-                                type="text"
-                                value={ref.expressionOverride || ''}
-                                oninput={(event) =>
-                                  onUpdateEventCharacterModifier(ref.id, {
-                                    expressionOverride: event.currentTarget.value,
-                                  })}
-                              />
-                            </label>
-                          {/if}
-                        </article>
-                      {:else}
-                        <EmptyState
-                          compact
-                          icon="fas fa-sliders"
-                          title={text(
-                            'FABRICATE.Admin.Manager.Gathering.CharacterModifiers.RowEmpty',
-                            'No character modifiers attached.'
-                          )}
-                        />
-                      {/each}
-                    </div>
-                  </section>
+                  <GatheringModifierEditor
+                    subject="event"
+                    row={editingGatheringEvent}
+                    idPrefix={`event-${editingGatheringEvent.id}`}
+                    suggestions={eventCharacterModifierSearchSuggestions}
+                    characterModifierLibrary={selectedSystemModifiers}
+                    {characterModifierSearchOpenUp}
+                    bind:characterModifierSearchAnchor
+                    bind:characterModifierSearchTerm
+                    {gatheringConditionAvailableOptions}
+                    {gatheringConditionLabel}
+                    {gatheringConditionModifierRows}
+                    {gatheringModifierCardHint}
+                    {gatheringModifierCardTitle}
+                    {gatheringModifierDisplayValue}
+                    {gatheringModifierKindIcon}
+                    {gatheringModifierValueClass}
+                    {signedToOperatorValue}
+                    {rowCharacterModifiers}
+                    {characterModifierIconForRef}
+                    {characterModifierIsCustomized}
+                    {characterModifierLabelForRef}
+                    {characterModifierLibraryEntry}
+                    {characterModifierOperatorClass}
+                    modifierPickerSelection={gatheringEventModifierPickerSelection}
+                    onSelectModifierPickerOption={setGatheringEventModifierPickerSelection}
+                    onAddConditionModifier={addGatheringEventConditionModifier}
+                    onUpdateConditionModifier={updateGatheringEventConditionModifier}
+                    onConditionModifierKeydown={onGatheringEventModifierKeydown}
+                    onDeleteConditionModifier={deleteGatheringEventConditionModifier}
+                    onPickCharacterModifier={pickCharacterModifierForEvent}
+                    onUpdateCharacterModifier={onUpdateEventCharacterModifier}
+                    onDeleteCharacterModifier={onDeleteEventCharacterModifier}
+                    onSetCharacterModifierOverride={setEventCharacterModifierOverrideEnabled}
+                  />
                 </div>
               </div>
             {:else if selectedGatheringEvent && currentView !== 'gathering-event-edit'}

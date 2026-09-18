@@ -27,14 +27,26 @@ const CLASS_EXCEPTIONS = Object.freeze([
   }),
   Object.freeze({
     file: 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
-    count: 32,
+    count: 28,
     why:
-      'deferred: root convergence pending. Thirty-two hand-rolled cards — the gathering task, ' +
-      'drop, event and travel inspectors, the drop and modifier editors, and the systems ' +
-      'feature panels — are held out of the sweep because the converging 12k-line root is the ' +
-      'wrong place to land its tail. They are 40% of the whole census, the highest ' +
-      'concentration in this programme. Pinned by count so a later root pass that converts ' +
-      'some of the 32 fails here instead of leaving a fraction of a deferral nobody is tracking.',
+      'deferred: root convergence pending. Twenty-eight hand-rolled cards — the gathering task, ' +
+      'drop, event and travel inspectors, the drop editor, and the systems feature panels — are ' +
+      'held out of the sweep because the converging 12k-line root is the wrong place to land its ' +
+      'tail. The count was 32 until issue 1707 wrote the twice-authored modifier panel once: FOUR ' +
+      'cards left this file and TWO landed in the row below, so the other two were DE-DUPLICATED ' +
+      'rather than converted and no sweep may count them as progress. Pinned by count so a later ' +
+      'root pass that converts some of the 28 fails here instead of leaving a fraction of a ' +
+      'deferral nobody is tracking.',
+  }),
+  Object.freeze({
+    file: 'src/ui/svelte/apps/manager/environment/GatheringModifierEditor.svelte',
+    count: 2,
+    why:
+      'deferred with a named reason: issue 1707 RELOCATED these two without converting either — ' +
+      'the condition-modifier card and the character-modifier card of the panel it wrote once — ' +
+      'so the deferral is unchanged in substance and the file is now small enough for a ' +
+      'conversion lane to take this screen on its own. Pinned by count so a later partial pass ' +
+      'fails here rather than silently reducing a deferral nobody is tracking.',
   }),
 ]);
 

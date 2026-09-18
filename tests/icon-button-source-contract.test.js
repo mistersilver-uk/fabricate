@@ -30,26 +30,26 @@ const CLASS_EXCEPTIONS = Object.freeze([
       'markup survives — so the count is now exactly the one place that writes it',
   }),
   Object.freeze({
-    file: 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
-    count: 6,
+    file: 'src/ui/svelte/apps/manager/environment/GatheringModifierEditor.svelte',
+    count: 3,
     why:
-      'deferred: root convergence pending. Six hand-rolled icon buttons — the gathering-drop ' +
-      'condition modifier adds and the four character-modifier reference deletes — are held ' +
-      'out of the sweep because the converging 12k-line root is the wrong place to land its ' +
-      'tail. Pinned by count so a later root pass that converts some of the six fails here ' +
-      'instead of leaving a fraction of a deferral nobody is tracking. Issue 1502 left the ' +
-      'deferral intact and gave each of the six the ROOT class as a literal token instead — ' +
-      'one token per site, no composition and no new props — because the sheet is now rooted ' +
-      'at it and a carrier without it would have lost its entire paint. That is why the count ' +
-      'is still 6: `fabricate-icon-button` does not contain `manager-icon-button`, so adding ' +
-      'it moves nothing here.',
+      'deferred with a named reason. The root\'s SIX became THREE: issue 1707 wrote the ' +
+      'twice-authored modifier panel once, so the drop and event copies of the condition-modifier ' +
+      'add and the two reference deletes collapsed into one of each. The other three were ' +
+      'DE-DUPLICATED, not converted, and no sweep may count them as progress. The three that ' +
+      'remain are this shared panel\'s own attach control and its two delete controls, so ' +
+      'converting them is one decision about one shared unit rather than the tail of an 82-site ' +
+      'sweep. Pinned BY COUNT so a later partial pass fails here instead of silently halving a ' +
+      'deferral. Each one still leads its `class` with the ROOT token (issue 1502), because the ' +
+      'sheet is rooted at it and a carrier without it would lose its entire paint.',
   }),
 ]);
 
 /**
  * `component/ComponentIdentityStrip.svelte` WAS the third exemption and is DELIBERATELY GONE,
  * written out rather than deleted so the resolution is legible. Issue 1477 removed the premise
- * rather than doing that work.
+ * rather than doing that work. `CraftingSystemManagerRoot.svelte` is gone the same way: it wrote
+ * the class 6x and now writes it 0x, because issue 1707 moved all six into the row above.
  */
 
 const contract = definePrimitiveSourceContract({
